@@ -12,7 +12,7 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 
 ## Features
 
-* Tiny ~1MB executable
+* Java archive plus bundled-runtime platform installers
 * Written entirely in Java with Java Swing
 * Sensible defaults out-of-the-box
 * First-class [Vim Bindings](./docs/KEYBINDS.md)
@@ -37,35 +37,31 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 ## Usage
 
 > [!IMPORTANT]
-> Please use [JDK 21](https://www.oracle.com/java/technologies/downloads/#java21) for either of these instructions.
+> Use Java 21 for the JAR or source build. The bundled-runtime platform installers do not require a separate JDK or JRE.
 
-Note you can either choose to run the precompiled [`Shed.jar`](build/Shed.jar) file or build Shed yourself. 
+Choose a published `shed-<version>.jar`, a bundled-runtime platform installer, or a local source build. See [install and troubleshooting](./docs/INSTALL.md) for supported targets and verification.
 
-### Running the precompiled [`Shed.jar`](build/Shed.jar) file
+### Running a published JAR file
 
-1. First install the [Java Runtime Environment (JRE)](https://www.oracle.com/java/technologies/downloads/) or [Java Development Kit (JDK)](https://www.oracle.com/java/technologies/downloads/) to enable running the `.jar` file. 
+1. Install a Java 21 runtime or JDK to run the `.jar` file.
 2. Then follow the relevant instructions for your respective operating system.
 
 #### Linux
 
-1. Download the Java Development Kit (JDK) 21 [Linux distribution](https://www.oracle.com/java/technologies/downloads/#java21).
-2. Assuming the JDK file has been downloaded to the *Downloads* directory, run the following commands in your terminal.
+1. Install a Java 21 runtime or JDK for Linux.
+2. From the directory containing the published JAR, run:
 
 ```console
-$ cd Downloads
-$ sudo apt install ./jdk-21_linux-x64_bin.deb # Debian/Ubuntu
-$ sudo dnf install ./jdk-21_linux-x64_bin.rpm # Fedora
+$ java -jar shed-<version>.jar [file]
 ```
 
-3. Download the [`Shed.jar`](build/Shed.jar) file.q
-4. Run `Shed.jar` as you would any other file on your machine, by *double-clicking* it. 
+3. See [install and troubleshooting](./docs/INSTALL.md) for the bundled-runtime DEB target.
 
 #### OSX
 
-1. Download the [macOS distribution of JDK 21](https://www.oracle.com/java/technologies/downloads/#java21).
-2. Follow the JDK installer to install JDK to your machine.
-3. Download the [`Shed.jar`](build/Shed.jar) file.
-4. Run `Shed.jar` as you would any other file on your machine, by *double-clicking* it.
+1. Install a Java 21 runtime or JDK for macOS.
+2. From the directory containing the published JAR, run `java -jar shed-<version>.jar [file]`.
+3. See [install and troubleshooting](./docs/INSTALL.md) for the bundled-runtime macOS arm64 target.
 
 <p align="center">
   <a href="https://docs.oracle.com/en/java/javase/21/install/installation-guide.pdf">JDK 21 installation guide</a>
@@ -73,10 +69,9 @@ $ sudo dnf install ./jdk-21_linux-x64_bin.rpm # Fedora
 
 #### Windows
 
-1. Download the JDK 21 [Windows distribution](https://www.oracle.com/java/technologies/downloads/#java21).
-2. Follow the set-up instructions to install JDK to your machine.
-3. Download the [`Shed.jar`](build/Shed.jar) file.
-4. Run `Shed.jar` as you would any other file on your machine, by *double-clicking* it.
+1. Install a Java 21 runtime or JDK for Windows.
+2. From PowerShell in the JAR directory, run `java -jar shed-<version>.jar [file]`.
+3. See [install and troubleshooting](./docs/INSTALL.md) for the bundled-runtime Windows x64 target.
 
 <p align="center">
   <img src="https://phoenixnap.com/kb/wp-content/uploads/2021/12/java-installation-wizard-complete.png" width="60%"/>

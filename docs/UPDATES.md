@@ -1,6 +1,6 @@
 # Update checks
 
-Shed starts with update checks disabled. `:update consent` is the only command that enables automatic checks; it displays the network and installer boundary before writing both consent settings. `:update disable` clears both settings and cancels the active check when one is tracked. `:update status` is local-only and reports consent, configuration presence, last trusted metadata, and the latest error or result.
+Shed starts with update checks disabled. `:update consent` is the interactive command that enables automatic checks; setting both global consent keys is also an explicit opt-in. `:update consent` displays the network and installer boundary before writing both settings. `:update disable` clears both settings and cancels the active check when one is tracked. `:update status` is local-only and reports consent, configuration presence, last trusted metadata, and the latest error or result.
 
 Automatic checks run once on launch only when both `updates.enabled` and `updates.consent.granted` are true. `:update check` uses the same gate. Before a request, Shed requires an HTTPS metadata URL, a Base64 Ed25519 SubjectPublicKeyInfo public key, a supported packaged platform, and an installed `major.minor.patch` version. Misconfiguration sends no request.
 

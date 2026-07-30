@@ -544,6 +544,7 @@ final class PaletteController {
         dialog.setLayout(new BorderLayout(6, 6));
         dialog.getContentPane().setBackground(editor.configManager.getCommandBarBackground());
         JTextField filterField = new JTextField();
+        AccessibilitySupport.describe(filterField, title + " filter", "Filter available " + title.toLowerCase(Locale.ROOT) + " entries.");
         filterField.setFont(editor.writingArea.getFont());
         filterField.setBackground(editor.configManager.getCommandBarBackground());
         filterField.setForeground(editor.configManager.getCommandBarForeground());
@@ -554,6 +555,7 @@ final class PaletteController {
         DefaultListModel<String> model = new DefaultListModel<>();
         for (String candidate : candidates) model.addElement(candidate);
         JList<String> list = new JList<>(model);
+        AccessibilitySupport.describe(list, title + " results", "Matching " + title.toLowerCase(Locale.ROOT) + " entries. Use Up and Down to select, Enter to open, or Escape to dismiss.");
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setFont(editor.writingArea.getFont());
         list.setBackground(editor.configManager.getCommandBarBackground());
@@ -566,6 +568,7 @@ final class PaletteController {
         titleLabel.setFont(editor.writingArea.getFont().deriveFont(java.awt.Font.BOLD));
         titleLabel.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 6, 2, 6));
         JTextArea previewArea = new JTextArea();
+        AccessibilitySupport.describe(previewArea, title + " preview", "Preview of the selected " + title.toLowerCase(Locale.ROOT) + " entry.");
         previewArea.setEditable(false);
         previewArea.setLineWrap(true);
         previewArea.setWrapStyleWord(true);

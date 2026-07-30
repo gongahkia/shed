@@ -63,6 +63,9 @@ final class GitHubPullRequestDialog extends JDialog {
         this.editor = editor;
         this.draftStore = draftStore;
         this.loader = loader;
+        AccessibilitySupport.describe(list, "GitHub pull requests", "Open pull requests available from the configured repository.");
+        AccessibilitySupport.describe(details, "Selected pull request details", "Read-only details and diff summary for the selected pull request.");
+        AccessibilitySupport.describe(draft, "Local review draft", "Editable local review draft; it is not submitted until Submit Review is chosen.");
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));

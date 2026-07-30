@@ -138,6 +138,7 @@ final class EditorUiController {
             }
         };
         textArea.addKeyListener(editor);
+        AccessibilitySupport.describe(textArea, "Editor", "Active source editor. Use keyboard navigation and configured keymap commands to edit the current buffer.");
         textArea.setFont(resolveEditorFont());
         textArea.setTabSize(editor.configManager.getTabSize());
         textArea.setCaret(new BlockCaret());

@@ -35,9 +35,13 @@ final class KeymapInspectorDialog extends JDialog {
         super(editor, "Keymap Inspector", false);
         this.editor = editor;
         this.searchField = new JTextField();
+        AccessibilitySupport.describe(searchField, "Keymap search", "Search effective keybindings by scope, key, mapping, source, or status.");
         this.scopeField = new JTextField("normal");
+        AccessibilitySupport.describe(scopeField, "Keybinding scope", "Vim keybinding scope: normal, insert, visual, visual_line, replace, command, search, or global.");
         this.lhsField = new JTextField();
+        AccessibilitySupport.describe(lhsField, "Keybinding key", "Key or supported key token to override.");
         this.rhsField = new JTextField();
+        AccessibilitySupport.describe(rhsField, "Keybinding mapping", "Replacement key sequence or nop.");
         this.tableModel = new DefaultTableModel(new Object[] {"Scope", "Key", "Mapping", "Source", "Status"}, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -45,6 +49,7 @@ final class KeymapInspectorDialog extends JDialog {
             }
         };
         this.table = new JTable(tableModel);
+        AccessibilitySupport.describe(table, "Effective keybindings", "Searchable active profile bindings and Vim overlays, including precedence status.");
         this.visibleBindings = List.of();
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);

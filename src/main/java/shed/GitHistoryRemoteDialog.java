@@ -50,6 +50,9 @@ final class GitHistoryRemoteDialog extends JDialog {
         super(editor, "Git History and Remote Operations", false);
         this.editor = editor;
         this.loader = loader;
+        AccessibilitySupport.describe(history, "Git history", "Local commits in the current repository.");
+        AccessibilitySupport.describe(commitDetails, "Selected commit details", "Read-only details for the selected commit.");
+        AccessibilitySupport.describe(operationOutput, "Git remote operation output", "Read-only output from fetch, pull, or push.");
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));

@@ -155,6 +155,8 @@ The changes document is effective only when `git.workbench.enabled`, `git.change
 
 ## GitHub Review Integration
 
+See [Network and telemetry boundary](NETWORK_PRIVACY.md) for the complete app-owned outbound-path audit, including explicit plugin updates, Git remotes, loopback debug adapters, browser delegation, and user-controlled child processes.
+
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
 | `github.review.enabled` | `false` | bool | Requests explicit GitHub review actions; effective only with granted consent |

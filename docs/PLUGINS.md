@@ -29,6 +29,8 @@ Place plugin files in `~/.shed/plugins/`. They are loaded automatically on start
 | `:plugin remove <name>` | Remove package + plugin file |
 | `:plugin pin/unpin <name>` | Toggle version pinning |
 
+Remote package sources are fetched only by an explicit `:plugin install` or `:plugin update` command; Shed has no scheduled plugin update or catalog refresh. A remote source requires `--checksum=<sha256>`, while package startup/reload reads only local metadata and plugin files. See the [network and telemetry boundary](NETWORK_PRIVACY.md) for the complete outbound-path audit.
+
 ## Declarative Plugins (`.shed`)
 
 A `.shed` file is a list of `# @` directives. Lines without this prefix are ignored.

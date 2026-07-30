@@ -29,12 +29,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 final class DebugAdapterTransport implements AutoCloseable {
     enum State { RUNNING, FAILED, CLOSED }
 
-    record Response(int seq, int requestSeq, String command, boolean success, Map<String, Object> body, String message) {
-        Response { body = immutableMap(body); command = command == null ? "" : command; message = message == null ? "" : message; }
+    record Response(int seq, int requestSeq, String command, boolean success, Object body, String message) {
+        Response { command = command == null ? "" : command; message = message == null ? "" : message; }
     }
 
-    record Event(int seq, String event, Map<String, Object> body) {
-        Event { body = immutableMap(body); event = event == null ? "" : event; }
+    record Event(int seq, String event, Object body) {
+        Event { event = event == null ? "" : event; }
     }
 
     record Diagnostic(String code, String message) {
@@ -62,6 +62,7 @@ final class DebugAdapterTransport implements AutoCloseable {
     private final Set<Integer> ignoredResponses;
     private final Object outputLock;
     private volatile State state;
+    private volatile boolean supportsCancelRequest;
 
     private DebugAdapterTransport(InputStream input, OutputStream output, Process process, Closeable endpoint, Listener listener,
         DiagnosticLog diagnosticLog, boolean terminateDebuggee) {
@@ -77,6 +78,7 @@ final class DebugAdapterTransport implements AutoCloseable {
         this.ignoredResponses = ConcurrentHashMap.newKeySet();
         this.outputLock = new Object();
         this.state = State.RUNNING;
+        this.supportsCancelRequest = false;
         startReader();
         startStderrDrain();
     }
@@ -225,7 +227,7 @@ final class DebugAdapterTransport implements AutoCloseable {
     }
 
     private void cancel(int requestSeq) {
-        if (state != State.RUNNING) return;
+        if (state != State.RUNNING || !supportsCancelRequest) return;
         int cancelSeq;
         try {
             cancelSeq = nextSequence();
@@ -311,17 +313,24 @@ final class DebugAdapterTransport implements AutoCloseable {
             Boolean success = message.get("success") instanceof Boolean value ? value : null;
             if (success == null) throw new IOException("DAP response success must be boolean");
             String command = MiniJson.asString(message.get("command"));
-            Map<String, Object> body = objectOrEmpty(message.get("body"), "response body");
+            if (command == null || command.isBlank()) throw new IOException("DAP response command is required");
+            Object body = message.get("body");
             String responseMessage = MiniJson.asString(message.get("message"));
             if (ignoredResponses.remove(requestSeq)) return;
             CompletableFuture<Response> response = pending.remove(requestSeq);
-            if (response != null) response.complete(new Response(seq, requestSeq, command, success, body, responseMessage));
+            if (response != null) {
+                if (success && "initialize".equals(command)) {
+                    Map<String, Object> capabilities = MiniJson.asObject(body);
+                    supportsCancelRequest = Boolean.TRUE.equals(capabilities == null ? null : capabilities.get("supportsCancelRequest"));
+                }
+                response.complete(new Response(seq, requestSeq, command, success, body, responseMessage));
+            }
             return;
         }
         if ("event".equals(type)) {
             String event = MiniJson.asString(message.get("event"));
             if (event == null || event.isBlank()) throw new IOException("DAP event name is required");
-            Event incoming = new Event(seq, event, objectOrEmpty(message.get("body"), "event body"));
+            Event incoming = new Event(seq, event, message.get("body"));
             try { listener.onEvent(incoming); }
             catch (RuntimeException error) { report("event-listener-failed", "A debug event listener failed", error); }
             return;
@@ -431,13 +440,6 @@ final class DebugAdapterTransport implements AutoCloseable {
             throw new IOException("DAP " + field + " must be a positive 32-bit integer");
         }
         return (int) integer;
-    }
-
-    private static Map<String, Object> objectOrEmpty(Object value, String field) throws IOException {
-        if (value == null) return Map.of();
-        Map<String, Object> object = MiniJson.asObject(value);
-        if (object == null) throw new IOException("DAP " + field + " must be an object");
-        return object;
     }
 
     private static Map<String, Object> immutableMap(Map<String, Object> values) {

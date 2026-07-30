@@ -726,7 +726,7 @@ final class SessionConfigController {
         payload.put("buffers", serializedBuffers);
         payload.put("panes", serializeSessionPanes(bufferIds));
         if (editor.configManager.getTerminalSessionRestoreEnabled()) {
-            payload.put("terminals", editor.terminalController.serializeSessionMetadata());
+            payload.put("terminals", editor.serializeTerminalSessionMetadata());
         }
         payload.put("layout", serializeWindowLayout(editor.windowLayoutRoot));
         payload.put("activePaneIndex", editor.activePaneIndex);
@@ -799,7 +799,7 @@ final class SessionConfigController {
             return false;
         }
 
-        editor.terminalController.closeAllTerminalSessions();
+        editor.closeAllTerminalSessions();
         editor.specialBufferReturns.clear();
         editor.treeLineTargets.clear();
         editor.treeBuffer = null;
@@ -850,8 +850,7 @@ final class SessionConfigController {
             editor.writingArea.setCaretPosition(Math.min(Math.max(0, activeCaret), editor.writingArea.getText().length()));
         }
 
-        TerminalController.TerminalRestoreResult terminalRestore = editor.terminalController.restoreSessionMetadata(payload.get("terminals"));
-        terminalRestoreSummary = terminalRestore.summary();
+        terminalRestoreSummary = editor.restoreTerminalSessionMetadata(payload.get("terminals"));
         FileBuffer terminalFallback = fallback;
         if (terminalFallback != null && editor.editorPanes.stream().noneMatch(pane -> pane.getBuffer() == terminalFallback)) {
             editor.buffers.remove(terminalFallback);

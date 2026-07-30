@@ -1367,6 +1367,18 @@ public class Texteditor extends JFrame implements KeyListener {
         terminalController.closeTerminalSession(buffer);
     }
 
+    void closeAllTerminalSessions() {
+        terminalController.closeAllTerminalSessions();
+    }
+
+    List<Map<String, Object>> serializeTerminalSessionMetadata() {
+        return terminalController.serializeSessionMetadata();
+    }
+
+    String restoreTerminalSessionMetadata(Object value) {
+        return terminalController.restoreSessionMetadata(value).summary();
+    }
+
     void closeExitedTerminal(FileBuffer buffer) {
         terminalController.closeExitedTerminal(buffer);
     }

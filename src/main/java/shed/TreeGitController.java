@@ -3,7 +3,10 @@ package shed;
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -641,7 +644,23 @@ final class TreeGitController {
         if (!editor.configManager.getGitWorkbenchEnabled()) {
             return "Git workbench disabled by git.workbench.enabled=false";
         }
-        GitChangesWorkbenchDialog.showFor(editor, this::loadGitChangesWorkbench);
+        GitChangesWorkbenchDialog.showFor(editor, new GitChangesWorkbenchDialog.Loader() {
+            @Override
+            public GitChangesWorkbenchModel.Snapshot status() {
+                return loadGitChangesWorkbench();
+            }
+
+            @Override
+            public GitChangesWorkbenchModel.Diff diff(GitChangesWorkbenchModel.Snapshot snapshot, GitChangesWorkbenchModel.Change change) {
+                return loadGitChangesWorkbenchDiff(snapshot, change);
+            }
+
+            @Override
+            public String open(GitChangesWorkbenchModel.Snapshot snapshot, GitChangesWorkbenchModel.Change change,
+                GitChangesWorkbenchModel.Diff diff, GitHunkNavigation.Hunk hunk) {
+                return openGitChangesWorkbenchTarget(snapshot, change, diff, hunk);
+            }
+        });
         return "Git workbench opened";
     }
 
@@ -650,6 +669,116 @@ final class TreeGitController {
         if (root == null) return GitChangesWorkbenchModel.unavailable("Not inside a Git repository.");
         CommandResult result = runCommand(root, List.of("git", "status", "--porcelain=v1", "-z", "--branch"));
         return GitChangesWorkbenchModel.fromStatus(root, result);
+    }
+
+    private GitChangesWorkbenchModel.Diff loadGitChangesWorkbenchDiff(GitChangesWorkbenchModel.Snapshot snapshot,
+        GitChangesWorkbenchModel.Change change) {
+        if (snapshot == null || !snapshot.available() || change == null) {
+            return workbenchDiffFailure("Git status is unavailable; refresh the workbench.");
+        }
+        Path target = workbenchPath(snapshot, change);
+        if (target == null) return workbenchDiffFailure("Changed path escapes the current repository.");
+        File root = new File(snapshot.root());
+        if (gitHeadExists(root)) {
+            CommandResult result = runCommand(root, List.of("git", "diff", "HEAD", "--no-ext-diff", "--unified=3", "--", change.path()));
+            if (result.exitCode != 0) return workbenchDiffFailure(gitError(result));
+            if (result.stdout.isBlank()) {
+                return new GitChangesWorkbenchModel.Diff(GitChangesWorkbenchModel.State.UNAVAILABLE, "", List.of(),
+                    "No textual Git diff is available for this file; untracked files can be opened directly.", workbenchDigest(target));
+            }
+            String content = "# Current changes from HEAD\n\n" + result.stdout.strip() + "\n";
+            List<GitHunkNavigation.Hunk> hunks = GitHunkNavigation.parse(content);
+            String detail = hunks.isEmpty() ? "Diff loaded; no navigable text hunks." : hunks.size() + " hunk" + (hunks.size() == 1 ? "" : "s") + " loaded.";
+            return new GitChangesWorkbenchModel.Diff(GitChangesWorkbenchModel.State.READY, content, hunks, detail, workbenchDigest(target));
+        }
+        StringBuilder content = new StringBuilder();
+        String failure = appendGitDiff(content, root, change.path(), change.indexStatus(), true);
+        if (failure != null) return workbenchDiffFailure(failure);
+        failure = appendGitDiff(content, root, change.path(), change.worktreeStatus(), false);
+        if (failure != null) return workbenchDiffFailure(failure);
+        if (content.isEmpty()) {
+            return new GitChangesWorkbenchModel.Diff(GitChangesWorkbenchModel.State.UNAVAILABLE, "", List.of(),
+                "No textual Git diff is available for this file; untracked files can be opened directly.", workbenchDigest(target));
+        }
+        List<GitHunkNavigation.Hunk> hunks = GitHunkNavigation.parse(content.toString());
+        String detail = hunks.isEmpty() ? "Diff loaded; no navigable text hunks." : hunks.size() + " hunk" + (hunks.size() == 1 ? "" : "s") + " loaded.";
+        boolean precise = change.indexStatus().isBlank() || change.worktreeStatus().isBlank();
+        String digest = precise ? workbenchDigest(target) : null;
+        if (!precise) detail += " Save/commit the initial repository state before hunk navigation.";
+        return new GitChangesWorkbenchModel.Diff(GitChangesWorkbenchModel.State.READY, content.toString(), hunks, detail, digest);
+    }
+
+    private String appendGitDiff(StringBuilder content, File root, String path, String status, boolean cached) {
+        if (status == null || status.isBlank() || "Untracked".equals(status)) return null;
+        List<String> command = cached
+            ? List.of("git", "diff", "--cached", "--no-ext-diff", "--unified=3", "--", path)
+            : List.of("git", "diff", "--no-ext-diff", "--unified=3", "--", path);
+        CommandResult result = runCommand(root, command);
+        if (result.exitCode != 0) return gitError(result);
+        if (!result.stdout.isBlank()) {
+            if (!content.isEmpty()) content.append("\n\n");
+            content.append(cached ? "# Staged changes\n\n" : "# Working tree changes\n\n");
+            content.append(result.stdout.strip()).append("\n");
+        }
+        return null;
+    }
+
+    private String openGitChangesWorkbenchTarget(GitChangesWorkbenchModel.Snapshot snapshot, GitChangesWorkbenchModel.Change change,
+        GitChangesWorkbenchModel.Diff diff, GitHunkNavigation.Hunk hunk) {
+        if (snapshot == null || change == null) return "Select a changed file first.";
+        Path target = workbenchPath(snapshot, change);
+        if (target == null) return "Changed path escapes the current repository.";
+        if (!Files.isRegularFile(target)) return "Diff navigation unavailable: file is missing or no longer regular; refresh Git status.";
+        try {
+            Path root = Path.of(snapshot.root()).toRealPath();
+            if (!target.toRealPath().startsWith(root)) return "Diff navigation unavailable: file resolves outside the repository.";
+        } catch (IOException e) {
+            return "Diff navigation unavailable: " + e.getMessage();
+        }
+        if (hunk != null) {
+            if (diff == null || !diff.available() || diff.sourceDigest() == null) {
+                return "Diff navigation unavailable: load a current text diff first.";
+            }
+            FileBuffer buffer = editor.findBufferByPath(target.toFile());
+            if (buffer != null && buffer.isModified()) return "Diff navigation unavailable: file has unsaved edits; save and refresh the diff.";
+            String currentDigest = workbenchDigest(target);
+            if (!Objects.equals(diff.sourceDigest(), currentDigest)) return "Diff navigation stale: file changed; refresh the diff.";
+        }
+        try {
+            editor.openFile(target.toFile());
+            return hunk == null ? "Opened " + target : editor.gotoLine(hunk.targetLine());
+        } catch (IOException e) {
+            return "Diff navigation unavailable: " + e.getMessage();
+        }
+    }
+
+    private Path workbenchPath(GitChangesWorkbenchModel.Snapshot snapshot, GitChangesWorkbenchModel.Change change) {
+        try {
+            Path root = Path.of(snapshot.root()).toAbsolutePath().normalize();
+            Path target = root.resolve(change.path()).normalize();
+            return target.startsWith(root) ? target : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private GitChangesWorkbenchModel.Diff workbenchDiffFailure(String detail) {
+        return new GitChangesWorkbenchModel.Diff(GitChangesWorkbenchModel.State.ERROR, "", List.of(), detail, null);
+    }
+
+    private String workbenchDigest(Path target) {
+        if (target == null || !Files.isRegularFile(target)) return null;
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream input = Files.newInputStream(target)) {
+                byte[] bytes = new byte[8192];
+                int read;
+                while ((read = input.read(bytes)) >= 0) digest.update(bytes, 0, read);
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (IOException | NoSuchAlgorithmException e) {
+            return null;
+        }
     }
 
 
@@ -1113,7 +1242,7 @@ final class TreeGitController {
             "Git commands\n\n"
                 + ":git                  Show status\n"
                 + ":git status|st        Show status\n"
-                + ":git workbench        Open graphical read-only changes workbench\n"
+                + ":git workbench        Open graphical read-only changes/diff/hunk workbench\n"
                 + ":git diff [args]      Show diff\n"
                 + ":git log [count]      Show compact history\n"
                 + ":git branch           Show branch list\n"

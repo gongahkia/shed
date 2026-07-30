@@ -54,4 +54,12 @@ public class GitChangesWorkbenchModelTest {
         assertEquals(GitChangesWorkbenchModel.State.ERROR, error.state());
         assertTrue(error.detail().contains("truncated"));
     }
+
+    @Test
+    void retainsRawPathsForGitCommandsWhileRenderingControlCharactersSafely() {
+        GitChangesWorkbenchModel.Snapshot snapshot = GitChangesWorkbenchModel.parse("/repo", "## main\0 M notes\nnext.txt\0");
+
+        assertEquals("notes\nnext.txt", snapshot.changes().getFirst().path());
+        assertEquals("notes⏎next.txt", snapshot.changes().getFirst().displayPath());
+    }
 }

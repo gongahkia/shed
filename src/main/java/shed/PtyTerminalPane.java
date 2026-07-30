@@ -62,6 +62,10 @@ final class PtyTerminalPane implements AutoCloseable {
         return widget.getComponent();
     }
 
+    JComponent getInputComponent() {
+        return widget.getTerminalPanel();
+    }
+
     void requestFocusInWindow() {
         widget.requestFocusInWindow();
     }
@@ -97,7 +101,7 @@ final class PtyTerminalPane implements AutoCloseable {
         }
     }
 
-    private static final class ShedTerminalSettingsProvider extends DefaultSettingsProvider {
+    static final class ShedTerminalSettingsProvider extends DefaultSettingsProvider {
         private final Font font;
         private final float fontSize;
         private final TerminalColor foreground;
@@ -106,7 +110,7 @@ final class PtyTerminalPane implements AutoCloseable {
         private final TextStyle selectionColor;
         private final ColorPalette colorPalette;
 
-        private ShedTerminalSettingsProvider(ConfigManager configManager, Font editorFont) {
+        ShedTerminalSettingsProvider(ConfigManager configManager, Font editorFont) {
             int size = configManager == null ? 14 : configManager.getFontSize();
             String family = configManager == null ? "Monospaced" : configManager.getFontFamily();
             Font resolvedFont = editorFont == null ? null : editorFont.deriveFont(Font.PLAIN, (float) size);

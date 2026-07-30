@@ -10,6 +10,7 @@ import java.util.List;
 final class PtyTerminalConnector extends ProcessTtyConnector {
     private final PtyProcess process;
     private final String name;
+    private TermSize lastSize;
 
     PtyTerminalConnector(PtyProcess process, List<String> commandLine, Charset charset) {
         super(process, charset, commandLine);
@@ -23,9 +24,14 @@ final class PtyTerminalConnector extends ProcessTtyConnector {
     }
 
     @Override
-    public void resize(TermSize termSize) {
-        if (termSize != null && process.isRunning()) {
+    public synchronized void resize(TermSize termSize) {
+        if (termSize == null || termSize.getColumns() <= 0 || termSize.getRows() <= 0 || termSize.equals(lastSize) || !process.isRunning()) {
+            return;
+        }
+        try {
             process.setWinSize(new WinSize(termSize.getColumns(), termSize.getRows()));
+            lastSize = termSize;
+        } catch (IllegalStateException ignored) {
         }
     }
 

@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.awt.GraphicsEnvironment;
+import java.awt.event.FocusEvent;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -124,6 +125,42 @@ public class TexteditorSwingIntegrationTest {
             assertTrue(onEdt(() -> editor.ptyTerminalPanes.isEmpty()));
             assertEquals(1, onEdt(() -> editor.editorPanes.size()));
             assertFalse(onEdt(() -> editor.buffers.contains(terminalBuffer)));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void terminalInputSurfaceTransfersFocusWithoutDuplicatingOwnership() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-terminal-focus");
+        Path file = tempDir.resolve("terminal-focus.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "term\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            EditorPane editorPane = onEdt(editor::getActivePane);
+            assertEquals("Terminal opened", onEdt(() -> editor.commandHandler.execute("term")));
+            EditorPane terminalEditorPane = onEdt(editor::getActivePane);
+            PtyTerminalPane terminalPane = onEdt(terminalEditorPane::getTerminalPane);
+            FileBuffer terminalBuffer = onEdt(editor::getCurrentBuffer);
+
+            onEdt(() -> {
+                editor.activateEditorPane(editorPane);
+                terminalPane.getInputComponent().dispatchEvent(new FocusEvent(terminalPane.getInputComponent(), FocusEvent.FOCUS_GAINED));
+                return null;
+            });
+            assertSame(terminalEditorPane, onEdt(editor::getActivePane));
+            assertSame(terminalBuffer, onEdt(editor::getCurrentBuffer));
+
+            onEdt(() -> {
+                terminalPane.getInputComponent().dispatchEvent(new FocusEvent(terminalPane.getInputComponent(), FocusEvent.FOCUS_GAINED));
+                editorPane.getTextArea().dispatchEvent(new FocusEvent(editorPane.getTextArea(), FocusEvent.FOCUS_GAINED));
+                return null;
+            });
+            assertSame(editorPane, onEdt(editor::getActivePane));
+            assertFalse(onEdt(() -> editor.getCurrentBuffer() == terminalBuffer));
         } finally {
             disposeEditor(editor);
         }

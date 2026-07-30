@@ -1383,10 +1383,6 @@ public class Texteditor extends JFrame implements KeyListener {
         terminalController.closeExitedTerminal(buffer);
     }
 
-    void installTerminalActivationListeners(EditorPane pane, Component component) {
-        terminalController.installTerminalActivationListeners(pane, component);
-    }
-
     // ========== End of Markdown / Orgmode features ==========
 
     public String deleteLineRange(int startLine, int endLine) {

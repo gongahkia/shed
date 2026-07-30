@@ -78,6 +78,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `session.restore.on.start` | `false` | bool | Restore session/workspace on launch |
 | `session.autoload` | `default` | string | Session name used when autoloading |
 | `session.dir` | `~/.shed/sessions` | path | Session storage directory |
+| `terminal.session.restore` | `false` | bool | Persist terminal pane cwd and restore a fresh interactive shell; never stores or replays commands, scrollback, shell arguments, or process state |
 | `workspace.index.enabled` | `false` | bool | Enable persisted Git-ignore-aware workspace indexing |
 | `large.file.threshold.mb` | `100` | int | Selects large-file mode above this MiB value; effective minimum `1` |
 | `large.file.line.threshold` | `50000` | int | Selects large-file mode above this logical-line count; effective minimum `1000` |

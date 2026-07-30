@@ -25,12 +25,14 @@ final class PtyTerminalPane implements AutoCloseable {
     private final JediTermWidget widget;
     private final PtyTerminalConnector connector;
     private final PtyProcess process;
+    private final File workingDirectory;
     private boolean closed;
 
-    private PtyTerminalPane(JediTermWidget widget, PtyTerminalConnector connector, PtyProcess process) {
+    private PtyTerminalPane(JediTermWidget widget, PtyTerminalConnector connector, PtyProcess process, File workingDirectory) {
         this.widget = widget;
         this.connector = connector;
         this.process = process;
+        this.workingDirectory = workingDirectory;
     }
 
     static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font editorFont) throws IOException {
@@ -53,7 +55,7 @@ final class PtyTerminalPane implements AutoCloseable {
         JediTermWidget widget = new JediTermWidget(INITIAL_COLUMNS, INITIAL_ROWS, new ShedTerminalSettingsProvider(configManager, editorFont));
         widget.setTtyConnector(connector);
         widget.start();
-        return new PtyTerminalPane(widget, connector, process);
+        return new PtyTerminalPane(widget, connector, process, cwd);
     }
 
     JComponent getComponent() {
@@ -62,6 +64,10 @@ final class PtyTerminalPane implements AutoCloseable {
 
     void requestFocusInWindow() {
         widget.requestFocusInWindow();
+    }
+
+    File getWorkingDirectory() {
+        return workingDirectory;
     }
 
     void onExit(Runnable callback) {

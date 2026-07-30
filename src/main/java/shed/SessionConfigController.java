@@ -16,10 +16,12 @@ import java.util.regex.Matcher;
 final class SessionConfigController {
     private final Texteditor editor;
     private final ConfigLiveReloadService configLiveReloadService;
+    private String terminalRestoreSummary;
 
     SessionConfigController(Texteditor editor) {
         this.editor = editor;
         this.configLiveReloadService = new ConfigLiveReloadService(editor.configManager);
+        this.terminalRestoreSummary = "";
     }
 
     public void toggleLineNumbers(boolean enabled) {
@@ -723,6 +725,9 @@ final class SessionConfigController {
         List<Map<String, Object>> serializedBuffers = serializeSessionBuffers(bufferIds);
         payload.put("buffers", serializedBuffers);
         payload.put("panes", serializeSessionPanes(bufferIds));
+        if (editor.configManager.getTerminalSessionRestoreEnabled()) {
+            payload.put("terminals", editor.terminalController.serializeSessionMetadata());
+        }
         payload.put("layout", serializeWindowLayout(editor.windowLayoutRoot));
         payload.put("activePaneIndex", editor.activePaneIndex);
         FileBuffer current = editor.getCurrentBuffer();
@@ -767,7 +772,7 @@ final class SessionConfigController {
                 return "Session file is invalid";
             }
             if (restoreSessionV2(payload)) {
-                return "Restored session: " + sessionFile.getAbsolutePath();
+                return "Restored session: " + sessionFile.getAbsolutePath() + terminalRestoreSummary;
             }
             if (restoreLegacySession(payload)) {
                 return "Restored legacy session: " + sessionFile.getAbsolutePath();
@@ -781,12 +786,20 @@ final class SessionConfigController {
 
 
     boolean restoreSessionV2(Map<String, Object> payload) {
+        terminalRestoreSummary = "";
         Map<String, FileBuffer> idToBuffer = new HashMap<>();
         List<FileBuffer> restoredBuffers = deserializeSessionBuffers(payload.get("buffers"), idToBuffer);
+        TerminalSessionState.ParseResult terminalStates = TerminalSessionState.parseAll(payload.get("terminals"));
+        FileBuffer fallback = null;
+        if (restoredBuffers.isEmpty() && !terminalStates.states().isEmpty()) {
+            fallback = FileBuffer.createScratch("[terminal session]", "Terminal session restore in progress.");
+            restoredBuffers.add(fallback);
+        }
         if (restoredBuffers.isEmpty()) {
             return false;
         }
 
+        editor.terminalController.closeAllTerminalSessions();
         editor.specialBufferReturns.clear();
         editor.treeLineTargets.clear();
         editor.treeBuffer = null;
@@ -837,6 +850,19 @@ final class SessionConfigController {
             editor.writingArea.setCaretPosition(Math.min(Math.max(0, activeCaret), editor.writingArea.getText().length()));
         }
 
+        TerminalController.TerminalRestoreResult terminalRestore = editor.terminalController.restoreSessionMetadata(payload.get("terminals"));
+        terminalRestoreSummary = terminalRestore.summary();
+        FileBuffer terminalFallback = fallback;
+        if (terminalFallback != null && editor.editorPanes.stream().noneMatch(pane -> pane.getBuffer() == terminalFallback)) {
+            editor.buffers.remove(terminalFallback);
+        }
+        editor.currentBufferIndex = editor.buffers.indexOf(editor.getActivePane().getBuffer());
+        if (editor.getActivePane().getTerminalPane() != null) {
+            editor.setMode(EditorMode.INSERT);
+        }
+        editor.updateStatusBar();
+        editor.requestActivePaneFocus();
+
         String savedTreeRoot = MiniJson.asString(payload.get("treeRoot"));
         if (savedTreeRoot != null && !savedTreeRoot.isBlank()) {
             File root = new File(savedTreeRoot);
@@ -850,6 +876,7 @@ final class SessionConfigController {
 
 
     boolean restoreLegacySession(Map<String, Object> payload) {
+        terminalRestoreSummary = "";
         List<String> filePaths = extractSessionFilePaths(payload.get("files"));
         if (filePaths.isEmpty()) {
             return false;
@@ -954,7 +981,7 @@ final class SessionConfigController {
         List<Map<String, Object>> entries = new ArrayList<>();
         int scratchIndex = 1;
         for (FileBuffer buffer : editor.buffers) {
-            if (buffer == null) {
+            if (buffer == null || editor.ptyTerminalPanes.containsKey(buffer)) {
                 continue;
             }
             String id;
@@ -993,7 +1020,7 @@ final class SessionConfigController {
                 continue;
             }
             Map<String, Object> state = new LinkedHashMap<>();
-            String bufferId = bufferIds.get(pane.getBuffer());
+            String bufferId = pane.getTerminalPane() == null ? bufferIds.get(pane.getBuffer()) : null;
             if (bufferId != null) {
                 state.put("bufferId", bufferId);
             }

@@ -68,6 +68,10 @@ public final class BuildInfo {
         return details.toString();
     }
 
+    String version() {
+        return version;
+    }
+
     private static Attributes manifestAttributes() {
         try {
             CodeSource source = BuildInfo.class.getProtectionDomain().getCodeSource();

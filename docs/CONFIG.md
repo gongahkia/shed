@@ -172,6 +172,18 @@ The **Local Unsent Draft** tab creates and edits a local review-comment draft bo
 
 GitHub review failures are classified as authentication, rate limit, permission, network, CLI-version, malformed-output, or unknown. Each result states whether a retry is safe, the remediation, and a non-GitHub fallback: local inspection with `:git workbench`, `:git diff`, or `:git log`. Uncertain network/write outcomes require server-state verification before any manual retry.
 
+## Update Checks
+
+Update checks require a global consent receipt, HTTPS metadata endpoint, and Base64 Ed25519 public key. Project-local config cannot override any `updates.*` setting. A check validates a signed, bounded metadata response and only opens a verified installer URL in the system browser when explicitly requested; Shed never downloads, installs, or replaces itself. See [Update Checks](UPDATES.md) for the exact metadata format, error handling, rollback boundary, and unsigned-development limitation.
+
+| Key | Default | Type | Notes |
+| :--- | :--- | :--- | :--- |
+| `updates.enabled` | `false` | bool | Requests automatic checks; ineffective without consent |
+| `updates.consent.granted` | `false` | bool | Consent receipt; clearing it revokes future checks |
+| `updates.metadata.url` | empty | string | HTTPS signed-metadata endpoint; empty blocks requests |
+| `updates.metadata.public.key` | empty | string | Base64 Ed25519 SubjectPublicKeyInfo verification key |
+| `updates.check.timeout.ms` | `5000` | int | Request timeout; `1000..30000` |
+
 ## Debug Adapter Protocol
 
 | Key | Default | Type | Notes |

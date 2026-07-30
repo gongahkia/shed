@@ -45,10 +45,25 @@ public class NetworkConsentAuditTest {
     }
 
     @Test
+    void updateRequestsRemainDisabledUntilEnabledAndConsented() throws IOException {
+        System.setProperty("user.home", tempDir.resolve("home-updates").toString());
+        ConfigManager config = new ConfigManager();
+
+        assertFalse(config.getUpdatesEnabled());
+        assertFalse(config.getUpdateConsentGranted());
+        config.set("updates.enabled", "true");
+        assertFalse(config.getUpdatesEnabled());
+        config.set("updates.consent.granted", "true");
+        assertTrue(config.getUpdatesEnabled());
+        assertFalse(config.isProjectConfigKeyAllowed("updates.metadata.url"));
+    }
+
+    @Test
     void appOwnedOutboundPrimitivesRemainDocumented() throws IOException {
         assertEquals(Set.of("PluginManager.java"), sourcesContaining("openConnection("));
+        assertEquals(Set.of("UpdateMetadataTransport.java"), sourcesContaining("HttpClient.newBuilder("));
         assertEquals(Set.of("DebugAdapterTransport.java"), sourcesContaining("new Socket("));
-        assertEquals(Set.of("EditActionController.java", "MarkdownController.java"), sourcesContaining(".browse("));
+        assertEquals(Set.of("EditActionController.java", "MarkdownController.java", "UpdateController.java"), sourcesContaining(".browse("));
         assertEquals(Set.of(
             "DebugAdapterTransport.java", "JobQuickfixController.java", "LanguageServerDetector.java", "LspClient.java",
             "LuaEngine.java", "PaletteController.java", "SyntaxUiController.java", "WorkspaceIndexService.java"
@@ -56,7 +71,7 @@ public class NetworkConsentAuditTest {
         assertEquals(Set.of("PtyTerminalPane.java"), sourcesContaining("PtyProcessBuilder"));
 
         String audit = Files.readString(Path.of("docs/NETWORK_PRIVACY.md"));
-        for (String source : Set.of("PluginManager", "DebugAdapterTransport", "GitHub", "ManagedLanguageCatalog", "browser", "child processes")) {
+        for (String source : Set.of("PluginManager", "DebugAdapterTransport", "GitHub", "UpdateMetadataTransport", "ManagedLanguageCatalog", "browser", "child processes")) {
             assertTrue(audit.contains(source), "audit missing " + source);
         }
     }

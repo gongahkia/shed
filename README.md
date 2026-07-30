@@ -20,6 +20,7 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 * Rich [Command](./docs/COMMANDS.md) Palette
 * Extensible [Plugin](./docs/PLUGINS.md) System
 * No telemetry; app-owned network paths require explicit action or consent ([boundary audit](./docs/NETWORK_PRIVACY.md))
+* Signed update metadata checks only after explicit consent; no in-app install ([policy](./docs/UPDATES.md))
 
 ## Video of `Shed` editing its own source code
 

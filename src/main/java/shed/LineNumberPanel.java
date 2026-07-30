@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.IntConsumer;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
 import javax.swing.text.BadLocationException;
@@ -28,6 +29,8 @@ class LineNumberPanel extends JPanel {
     private Set<Integer> gitAddedLines = new HashSet<>();
     private Set<Integer> gitModifiedLines = new HashSet<>();
     private Set<Integer> gitDeletedAfterLines = new HashSet<>();
+    private Map<Integer, BreakpointStore.State> breakpointStateByLine = new HashMap<>();
+    private IntConsumer breakpointToggleListener = ignored -> { };
 
     public LineNumberPanel(JTextArea textArea) {
         this.textArea = textArea;
@@ -37,6 +40,16 @@ class LineNumberPanel extends JPanel {
         this.currentLineNumberColor = Color.decode("#FAF9F6");
         this.mode = LineNumberMode.ABSOLUTE;
         this.highlightCurrentLine = true;
+        addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mousePressed(java.awt.event.MouseEvent event) {
+                if (event.getX() > 12) return;
+                try {
+                    int offset = textArea.viewToModel2D(new Point(0, event.getY()));
+                    breakpointToggleListener.accept(textArea.getLineOfOffset(offset));
+                } catch (BadLocationException ignored) {
+                }
+            }
+        });
     }
     public void updatePreferredWidth() {
         FontMetrics fm = getFontMetrics(getFont() != null ? getFont() : textArea.getFont());
@@ -129,6 +142,19 @@ class LineNumberPanel extends JPanel {
                     g.setColor(new Color(0xF85149));
                     g.fillRect(gitX, p.y + lineH - 2, 4, 2);
                 }
+                BreakpointStore.State breakpointState = breakpointStateByLine.get(i);
+                if (breakpointState != null) {
+                    int dotSize = Math.max(7, lineH / 2);
+                    int dotY = p.y + (lineH - dotSize) / 2;
+                    Color breakpointColor = switch (breakpointState) {
+                        case REJECTED -> new Color(0xF8, 0x51, 0x49);
+                        case CHANGED -> new Color(0xFF, 0xCC, 0x00);
+                        default -> new Color(0xFF, 0x55, 0x55);
+                    };
+                    g.setColor(breakpointColor);
+                    if (breakpointState == BreakpointStore.State.REJECTED) g.drawOval(8, dotY, dotSize - 1, dotSize - 1);
+                    else g.fillOval(8, dotY, dotSize, dotSize);
+                }
                 // diagnostic severity icon
                 Integer severity = diagnosticSeverityByLine.get(i);
                 if (severity != null) {
@@ -186,6 +212,16 @@ class LineNumberPanel extends JPanel {
         if (modified != null) gitModifiedLines.addAll(modified);
         if (deletedAfter != null) gitDeletedAfterLines.addAll(deletedAfter);
         repaint();
+    }
+
+    public void updateBreakpointMarkers(Map<Integer, BreakpointStore.State> states) {
+        breakpointStateByLine.clear();
+        if (states != null) breakpointStateByLine.putAll(states);
+        repaint();
+    }
+
+    public void setBreakpointToggleListener(IntConsumer listener) {
+        breakpointToggleListener = listener == null ? ignored -> { } : listener;
     }
 
     private String formatLineNumber(int line, int currentLine) {

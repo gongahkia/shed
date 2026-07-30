@@ -10,16 +10,22 @@ import java.util.Map;
 final class DebugSessionController {
     private final Texteditor editor;
     private final DebugSessionService sessions;
+    private final BreakpointStore breakpoints;
     private Path lastWorkspace;
     private Path lastActiveFile;
 
     DebugSessionController(Texteditor editor) {
-        this(editor, new DebugSessionService());
+        this(editor, new DebugSessionService(), new BreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
     }
 
     DebugSessionController(Texteditor editor, DebugSessionService sessions) {
+        this(editor, sessions, new BreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
+    }
+
+    DebugSessionController(Texteditor editor, DebugSessionService sessions, BreakpointStore breakpoints) {
         this.editor = editor;
         this.sessions = sessions == null ? new DebugSessionService() : sessions;
+        this.breakpoints = breakpoints == null ? new BreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")) : breakpoints;
     }
 
     String handle(String argument) {
@@ -94,7 +100,7 @@ final class DebugSessionController {
         String name = requested == null ? "" : requested.trim();
         int jobId = editor.asyncJobService.submit("debug " + (restart ? "restart" : "start"), token -> sessions.start(workspace, activeFile,
             editor.configManager.getDebugConfiguration(), editor.configManager.getDebugFeatureSettings(), name,
-            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs())), this::startTransport), (job, result, error) -> {
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs())), this::startTransport, breakpoints), (job, result, error) -> {
                 if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
                     editor.showMessage("Debug " + (restart ? "restart" : "start") + " cancelled.");
                     return;
@@ -103,6 +109,7 @@ final class DebugSessionController {
                     editor.showMessage("Debug start failed: " + (error == null ? job.getErrorMessage() : error.getMessage()));
                     return;
                 }
+                refreshBreakpointMarkers();
                 showStatus(workspace);
                 editor.showMessage(result.succeeded() ? result.snapshot().detail() : result.snapshot().detail() + diagnosticSuffix(result.snapshot()));
             });
@@ -124,6 +131,55 @@ final class DebugSessionController {
         DebugSessionService.Result result = sessions.stop(workspace());
         showStatus(workspace());
         return result.snapshot().detail();
+    }
+
+    void toggleBreakpoint(FileBuffer buffer, int zeroBasedLine) {
+        if (buffer == null || !buffer.hasFilePath() || zeroBasedLine < 0) {
+            editor.showMessage("Source breakpoints require a file-backed editor buffer.");
+            return;
+        }
+        try {
+            Path source = buffer.getFile().toPath().toAbsolutePath().normalize();
+            Path workspace = editor.lspController.resolveWorkspaceRoot(source.getParent());
+            lastWorkspace = workspace;
+            lastActiveFile = source;
+            BreakpointStore.Toggle result = breakpoints.toggle(workspace, source, zeroBasedLine + 1);
+            refreshBreakpointMarkers();
+            editor.showMessage(result.added() ? "Breakpoint added at " + source + ":" + (zeroBasedLine + 1) + "."
+                : "Breakpoint removed from " + source + ":" + (zeroBasedLine + 1) + ".");
+            if (sessions.snapshot(workspace).lifecycle() == DebugSessionService.Lifecycle.RUNNING) synchronizeBreakpoints(workspace);
+        } catch (IOException | IllegalArgumentException error) {
+            editor.showMessage("Unable to update source breakpoint: " + error.getMessage());
+        }
+    }
+
+    void refreshBreakpointMarkers() {
+        for (EditorPane pane : editor.editorPanes) {
+            FileBuffer buffer = pane.getBuffer();
+            if (buffer == null || !buffer.hasFilePath()) {
+                pane.getLineNumberPanel().updateBreakpointMarkers(Map.of());
+                continue;
+            }
+            try {
+                Path source = buffer.getFile().toPath().toAbsolutePath().normalize();
+                Path workspace = editor.lspController.resolveWorkspaceRoot(source.getParent());
+                pane.getLineNumberPanel().updateBreakpointMarkers(breakpoints.markers(workspace, source));
+            } catch (IOException | IllegalArgumentException error) {
+                pane.getLineNumberPanel().updateBreakpointMarkers(Map.of());
+            }
+        }
+    }
+
+    private void synchronizeBreakpoints(Path workspace) {
+        editor.asyncJobService.submit("debug breakpoints", token -> sessions.synchronizeBreakpoints(workspace, breakpoints,
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                refreshBreakpointMarkers();
+                if (error != null || result == null || !result.succeeded()) {
+                    editor.showMessage("Source breakpoint synchronization failed.");
+                } else if (!result.snapshot().diagnostics().isEmpty()) {
+                    editor.showMessage("Source breakpoint synchronization completed; inspect :debug status for diagnostics.");
+                }
+            });
     }
 
     private String status() {

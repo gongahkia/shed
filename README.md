@@ -105,3 +105,7 @@ On macOS arm64 with JDK 21, run `bash scripts/package-macos.sh` to create a DMG 
 ### Windows x64 installer
 
 On Windows x64 with JDK 21 and WiX available to `jpackage`, run `./scripts/package-windows.ps1` to create an MSI with a bundled runtime. See [Windows packaging](./docs/WINDOWS_PACKAGING.md) for verification and signing boundaries.
+
+### Linux x64 installer
+
+On Debian-family Linux x64 with JDK 21, `dpkg-deb`, and `fakeroot`, run `bash scripts/package-linux.sh` to create a DEB with a bundled runtime. See [Linux packaging](./docs/LINUX_PACKAGING.md) for installation, verification, and signing boundaries.

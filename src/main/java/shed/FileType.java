@@ -73,6 +73,7 @@ public enum FileType {
                     case "css":
                         return CSS;
                     case "json":
+                    case "jsonc":
                         return JSON;
                     case "md":
                     case "markdown":

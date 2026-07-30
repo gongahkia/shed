@@ -20,7 +20,8 @@ public class ManagedLanguageCatalogTest {
         assertEquals(entry, ManagedLanguageCatalog.forExtension(".JAVA"));
         assertEquals(ManagedLanguageCatalog.python(), ManagedLanguageCatalog.forExtension("py"));
         assertEquals(ManagedLanguageCatalog.rust(), ManagedLanguageCatalog.forExtension("rs"));
-        assertNull(ManagedLanguageCatalog.forExtension("md"));
+        assertEquals(ManagedLanguageCatalog.markdown(), ManagedLanguageCatalog.forExtension("md"));
+        assertNull(ManagedLanguageCatalog.forExtension("lua"));
         assertEquals("jdtls", entry.commandFor(ManagedLanguageSupportTrust.Platform.MACOS));
         assertEquals("jdtls", entry.commandFor(ManagedLanguageSupportTrust.Platform.LINUX));
         assertEquals("jdtls.bat", entry.commandFor(ManagedLanguageSupportTrust.Platform.WINDOWS));
@@ -275,6 +276,29 @@ public class ManagedLanguageCatalogTest {
         assertFalse(consent.permitsManagedInstall());
         assertEquals(ManagedLanguageCatalog.Availability.MANAGED_INSTALL_READY, ready.availability());
         assertTrue(ready.permitsManagedInstall());
+    }
+
+    @Test
+    void jsonAndMarkdownEntriesExposeRuntimeAndConsentStates() {
+        ManagedLanguageCatalog.Entry json = ManagedLanguageCatalog.json();
+        ManagedLanguageCatalog.Entry markdown = ManagedLanguageCatalog.markdown();
+        ManagedLanguageCatalog.Status jsonReady = json.assessUserManaged(ManagedLanguageSupportTrust.Platform.LINUX,
+            new ManagedLanguageCatalog.ToolDetection("vscode-json-languageserver", null));
+        ManagedLanguageCatalog.Status markdownOld = markdown.assessUserManaged(ManagedLanguageSupportTrust.Platform.LINUX,
+            new ManagedLanguageCatalog.ToolDetection("remark-language-server", "v14.21.3"));
+        ManagedLanguageCatalog.Status markdownReady = markdown.assessUserManaged(ManagedLanguageSupportTrust.Platform.LINUX,
+            new ManagedLanguageCatalog.ToolDetection("remark-language-server", "v16.0.0"));
+        ManagedLanguageCatalog.Status consent = markdown.assessManagedInstall(trustWith(markdown.installMetadata().coordinate()),
+            ManagedLanguageSupportTrust.Platform.LINUX, false);
+
+        assertEquals("json.vscode-json-languageserver@1.3.4", json.installMetadata().coordinate().displayName());
+        assertEquals(ManagedLanguageCatalog.RuntimeRequirementKind.NONE, json.installMetadata().runtimeRequirementKind());
+        assertEquals(ManagedLanguageCatalog.Availability.AVAILABLE, jsonReady.availability());
+        assertEquals("markdown.remark-language-server@3.0.0", markdown.installMetadata().coordinate().displayName());
+        assertEquals(ManagedLanguageCatalog.Availability.RUNTIME_VERSION_UNSUPPORTED, markdownOld.availability());
+        assertEquals(ManagedLanguageCatalog.Availability.AVAILABLE, markdownReady.availability());
+        assertEquals(ManagedLanguageCatalog.Availability.MANAGED_CONSENT_REQUIRED, consent.availability());
+        assertFalse(consent.permitsManagedInstall());
     }
 
     private ManagedLanguageSupportTrust trustWith(ManagedLanguageSupportTrust.ArtifactCoordinate coordinate) {

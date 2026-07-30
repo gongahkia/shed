@@ -26,6 +26,7 @@ final class ManagedLanguageCatalog {
     }
 
     enum RuntimeRequirementKind {
+        NONE,
         MINIMUM_VERSION,
         LATEST_STABLE
     }
@@ -142,6 +143,10 @@ final class ManagedLanguageCatalog {
                 return status(Availability.EXECUTABLE_MISSING, displayName + " executable was not found",
                     "Install " + displayName + " and set lsp." + defaultExtension() + ".command, or review the managed install option.");
             }
+            if (installMetadata.runtimeRequirementKind() == RuntimeRequirementKind.NONE) {
+                return status(Availability.AVAILABLE, displayName + " executable is available",
+                    "Use :lsp restart " + defaultExtension() + " after changing its command.");
+            }
             if (installMetadata.runtimeRequirementKind() == RuntimeRequirementKind.LATEST_STABLE) {
                 return assessLatestStableRuntime(detection);
             }
@@ -193,6 +198,7 @@ final class ManagedLanguageCatalog {
         }
 
         private String runtimeRequirement() {
+            if (installMetadata.runtimeRequirementKind() == RuntimeRequirementKind.NONE) return "no versioned runtime";
             return installMetadata.runtimeRequirementKind() == RuntimeRequirementKind.LATEST_STABLE
                 ? installMetadata.runtimeName() + " latest stable" : installMetadata.runtimeName() + " " + installMetadata.minimumRuntimeVersion() + "+";
         }
@@ -338,7 +344,23 @@ final class ManagedLanguageCatalog {
             DESKTOP_PLATFORMS
         )
     );
-    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT, GO, RUST, C_CPP);
+    private static final Entry JSON = new Entry(
+        "json", Set.of("json", "jsonc"), "VS Code JSON Language Server",
+        "vscode-json-languageserver", "vscode-json-languageserver.cmd",
+        new InstallMetadata(new ManagedLanguageSupportTrust.ArtifactCoordinate("json.vscode-json-languageserver", "1.3.4"),
+            URI.create("https://github.com/microsoft/vscode/tree/main/extensions/json-language-features/server"),
+            URI.create("https://github.com/microsoft/vscode/blob/main/LICENSE.txt"), "MIT License", "Node.js", "none",
+            RuntimeRequirementKind.NONE, RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
+    );
+    private static final Entry MARKDOWN = new Entry(
+        "markdown", Set.of("md", "markdown"), "remark-language-server",
+        "remark-language-server", "remark-language-server.cmd",
+        new InstallMetadata(new ManagedLanguageSupportTrust.ArtifactCoordinate("markdown.remark-language-server", "3.0.0"),
+            URI.create("https://github.com/remarkjs/remark-language-server"),
+            URI.create("https://github.com/remarkjs/remark-language-server/blob/main/license"), "MIT License", "Node.js", "16",
+            RuntimeRequirementKind.MINIMUM_VERSION, RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
+    );
+    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT, GO, RUST, C_CPP, JSON, MARKDOWN);
 
     private ManagedLanguageCatalog() {
     }
@@ -370,6 +392,10 @@ final class ManagedLanguageCatalog {
     static Entry cCpp() {
         return C_CPP;
     }
+
+    static Entry json() { return JSON; }
+
+    static Entry markdown() { return MARKDOWN; }
 
     static Entry forExtension(String extension) {
         if (extension == null || extension.isBlank()) {

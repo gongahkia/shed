@@ -124,7 +124,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleSessionCommand(args), "session", "sessions");
         registerCommand((args, range, force) -> editor.handleWorkspaceProfileCommand(args), "workspace", "ws");
         registerCommand((args, range, force) -> editor.showJobs(), "jobs");
-        registerCommand((args, range, force) -> editor.showPerfReport(), "perf");
+        registerCommand((args, range, force) -> editor.showPerfReport(args), "perf");
         registerCommand((args, range, force) -> editor.showLargeFileStatus(), "largefile", "lf");
         registerCommand((args, range, force) -> editor.showBuildInfo(), "version", "about", "buildinfo");
         registerCommand((args, range, force) -> editor.cancelJob(args), "jobcancel", "jobkill");

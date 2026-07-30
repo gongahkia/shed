@@ -19,7 +19,7 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 * Highly customisable via [`~/.shed/config.toml`](./docs/CONFIG.md)
 * Rich [Command](./docs/COMMANDS.md) Palette
 * Extensible [Plugin](./docs/PLUGINS.md) System
-* No telemetry whatsoever
+* No telemetry; app-owned network paths require explicit action or consent ([boundary audit](./docs/NETWORK_PRIVACY.md))
 
 ## Video of `Shed` editing its own source code
 

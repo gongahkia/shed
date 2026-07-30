@@ -40,7 +40,7 @@ public class LspService {
             case "java":
                 return new String[] {ManagedLanguageCatalog.java().command()};
             case "rs":
-                return new String[] {"rust-analyzer"};
+                return new String[] {ManagedLanguageCatalog.rust().command()};
             case "py":
                 return new String[] {ManagedLanguageCatalog.python().command(), "--stdio"};
             case "js":

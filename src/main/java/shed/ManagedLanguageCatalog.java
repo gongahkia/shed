@@ -25,7 +25,16 @@ final class ManagedLanguageCatalog {
         JAVA_LEGACY
     }
 
-    record ToolDetection(String executable, String runtimeVersion) {
+    enum RuntimeRequirementKind {
+        MINIMUM_VERSION,
+        LATEST_STABLE
+    }
+
+    record ToolDetection(String executable, String runtimeVersion, Boolean runtimeSupported) {
+        ToolDetection(String executable, String runtimeVersion) {
+            this(executable, runtimeVersion, null);
+        }
+
         boolean executableFound() {
             return executable != null && !executable.isBlank();
         }
@@ -61,6 +70,7 @@ final class ManagedLanguageCatalog {
         String licenseName,
         String runtimeName,
         String minimumRuntimeVersion,
+        RuntimeRequirementKind runtimeRequirementKind,
         RuntimeVersionScheme runtimeVersionScheme,
         Set<ManagedLanguageSupportTrust.Platform> supportedPlatforms
     ) {
@@ -71,15 +81,18 @@ final class ManagedLanguageCatalog {
             licenseName = Objects.requireNonNull(licenseName, "license name");
             runtimeName = requireText(runtimeName, "runtime name");
             minimumRuntimeVersion = requireText(minimumRuntimeVersion, "minimum runtime version");
+            runtimeRequirementKind = Objects.requireNonNull(runtimeRequirementKind, "runtime requirement kind");
             runtimeVersionScheme = Objects.requireNonNull(runtimeVersionScheme, "runtime version scheme");
-            if (parseRuntimeVersion(minimumRuntimeVersion, runtimeVersionScheme) == null) {
+            if (runtimeRequirementKind == RuntimeRequirementKind.MINIMUM_VERSION
+                && parseRuntimeVersion(minimumRuntimeVersion, runtimeVersionScheme) == null) {
                 throw new IllegalArgumentException("minimum runtime version is invalid");
             }
             supportedPlatforms = supportedPlatforms == null ? Set.of() : Set.copyOf(supportedPlatforms);
         }
 
         RuntimeVersion minimumRuntime() {
-            return parseRuntimeVersion(minimumRuntimeVersion, runtimeVersionScheme);
+            return runtimeRequirementKind == RuntimeRequirementKind.MINIMUM_VERSION
+                ? parseRuntimeVersion(minimumRuntimeVersion, runtimeVersionScheme) : null;
         }
     }
 
@@ -129,6 +142,9 @@ final class ManagedLanguageCatalog {
                 return status(Availability.EXECUTABLE_MISSING, displayName + " executable was not found",
                     "Install " + displayName + " and set lsp." + defaultExtension() + ".command, or review the managed install option.");
             }
+            if (installMetadata.runtimeRequirementKind() == RuntimeRequirementKind.LATEST_STABLE) {
+                return assessLatestStableRuntime(detection);
+            }
             RuntimeVersion version = parseRuntimeVersion(detection.runtimeVersion(), installMetadata.runtimeVersionScheme());
             if (version == null) {
                 return status(Availability.RUNTIME_VERSION_UNKNOWN, installMetadata.runtimeName() + " runtime version could not be validated",
@@ -177,7 +193,25 @@ final class ManagedLanguageCatalog {
         }
 
         private String runtimeRequirement() {
-            return installMetadata.runtimeName() + " " + installMetadata.minimumRuntimeVersion() + "+";
+            return installMetadata.runtimeRequirementKind() == RuntimeRequirementKind.LATEST_STABLE
+                ? installMetadata.runtimeName() + " latest stable" : installMetadata.runtimeName() + " " + installMetadata.minimumRuntimeVersion() + "+";
+        }
+
+        private Status assessLatestStableRuntime(ToolDetection detection) {
+            if (detection.runtimeSupported() == null) {
+                return status(Availability.RUNTIME_VERSION_UNKNOWN,
+                    installMetadata.runtimeName() + " stable-toolchain compatibility could not be validated",
+                    "Use the latest stable " + installMetadata.runtimeName() + " toolchain with required components, then restart the LSP client.");
+            }
+            if (!detection.runtimeSupported()) {
+                return status(Availability.RUNTIME_VERSION_UNSUPPORTED,
+                    displayName + " requires the " + runtimeRequirement(),
+                    "Update to the latest stable " + installMetadata.runtimeName() + " toolchain and install required components, then restart the LSP client.");
+            }
+            String version = detection.runtimeVersion() == null || detection.runtimeVersion().isBlank()
+                ? installMetadata.runtimeName() + " stable" : detection.runtimeVersion().trim();
+            return status(Availability.AVAILABLE, displayName + " is available with " + version,
+                "Use :lsp restart " + defaultExtension() + " after changing its command or runtime.");
         }
 
         private Status status(Availability availability, String detail, String remediation) {
@@ -209,6 +243,7 @@ final class ManagedLanguageCatalog {
             "Eclipse Public License 2.0",
             "Java",
             "21",
+            RuntimeRequirementKind.MINIMUM_VERSION,
             RuntimeVersionScheme.JAVA_LEGACY,
             DESKTOP_PLATFORMS
         )
@@ -226,6 +261,7 @@ final class ManagedLanguageCatalog {
             "MIT License",
             "Node.js",
             "14",
+            RuntimeRequirementKind.MINIMUM_VERSION,
             RuntimeVersionScheme.STANDARD,
             DESKTOP_PLATFORMS
         )
@@ -243,6 +279,7 @@ final class ManagedLanguageCatalog {
             "Apache License 2.0",
             "Node.js",
             "22.22.2",
+            RuntimeRequirementKind.MINIMUM_VERSION,
             RuntimeVersionScheme.STANDARD,
             DESKTOP_PLATFORMS
         )
@@ -260,11 +297,30 @@ final class ManagedLanguageCatalog {
             "BSD 3-Clause License",
             "Go",
             "1.21",
+            RuntimeRequirementKind.MINIMUM_VERSION,
             RuntimeVersionScheme.STANDARD,
             DESKTOP_PLATFORMS
         )
     );
-    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT, GO);
+    private static final Entry RUST = new Entry(
+        "rust",
+        Set.of("rs"),
+        "rust-analyzer",
+        "rust-analyzer",
+        "rust-analyzer.exe",
+        new InstallMetadata(
+            new ManagedLanguageSupportTrust.ArtifactCoordinate("rust.rust-analyzer", "2026-07-27"),
+            URI.create("https://rust-analyzer.github.io/book/installation.html"),
+            URI.create("https://github.com/rust-lang/rust-analyzer/blob/master/LICENSE-MIT"),
+            "MIT OR Apache-2.0",
+            "Rust",
+            "stable",
+            RuntimeRequirementKind.LATEST_STABLE,
+            RuntimeVersionScheme.STANDARD,
+            DESKTOP_PLATFORMS
+        )
+    );
+    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT, GO, RUST);
 
     private ManagedLanguageCatalog() {
     }
@@ -287,6 +343,10 @@ final class ManagedLanguageCatalog {
 
     static Entry go() {
         return GO;
+    }
+
+    static Entry rust() {
+        return RUST;
     }
 
     static Entry forExtension(String extension) {

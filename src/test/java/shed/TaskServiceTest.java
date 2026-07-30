@@ -67,7 +67,9 @@ public class TaskServiceTest {
         service.saveTasks(project.toFile(), tasks);
 
         String text = Files.readString(project.resolve(".shedtasks"));
-        assertTrue(text.startsWith("# Shed workspace tasks\nschema_version = 1\n"));
+        List<String> lines = Files.readAllLines(project.resolve(".shedtasks"));
+        assertEquals("# Shed workspace tasks", lines.get(0));
+        assertEquals("schema_version = 1", lines.get(1));
         assertTrue(text.indexOf("[task.alpha]") < text.indexOf("[task.beta]"));
         assertTrue(text.indexOf("[task.beta]") < text.indexOf("[task.zeta]"));
         assertTrue(text.contains("command = \"echo a\""));
@@ -135,7 +137,7 @@ public class TaskServiceTest {
         assertEquals(TaskService.ProblemMatcher.NONE, task.problemMatcher());
         assertEquals(TaskService.Presentation.ALWAYS, task.presentation());
         TaskService.TaskExecutionPlan plan = service.buildExecutionPlan(task, project.toFile(), source.toFile());
-        assertEquals(List.of("echo", "src/Main.java"), plan.processCommand());
+        assertEquals(List.of("echo", project.relativize(source).toString()), plan.processCommand());
         assertEquals(scripts.toFile().getCanonicalFile(), plan.workingDirectory());
         assertEquals("check", plan.environment().get("MODE"));
     }

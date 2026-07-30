@@ -218,6 +218,9 @@ final class TypedSettings {
         if (key.startsWith("lsp.")) {
             return "Language Server";
         }
+        if (key.startsWith("debug.")) {
+            return "Debug";
+        }
         if (key.startsWith("github.")) {
             return "GitHub";
         }
@@ -298,6 +301,9 @@ final class TypedSettings {
         }
         if (key.startsWith("lsp.")) {
             return "Restart: takes effect when an LSP server is started or restarted";
+        }
+        if (key.startsWith("debug.")) {
+            return "Live: checked when explicit debug-session planning begins";
         }
         if (key.startsWith("large.")) {
             return "Live: used when opening files";

@@ -169,6 +169,21 @@ The **Local Unsent Draft** tab creates and edits a local review-comment draft bo
 
 GitHub review failures are classified as authentication, rate limit, permission, network, CLI-version, malformed-output, or unknown. Each result states whether a retry is safe, the remediation, and a non-GitHub fallback: local inspection with `:git workbench`, `:git diff`, or `:git log`. Uncertain network/write outcomes require server-state verification before any manual retry.
 
+## Debug Adapter Protocol
+
+| Key | Default | Type | Notes |
+| :--- | :--- | :--- | :--- |
+| `debug.enabled` | `false` | bool | Enables explicit debug-session planning; M0 has no launch surface |
+| `debug.breakpoints.enabled` | `true` | bool | Enables breakpoint configuration when a session exists |
+| `debug.threads.enabled` | `true` | bool | Enables thread presentation when adapter-supported |
+| `debug.stacktrace.enabled` | `true` | bool | Enables stack-trace presentation when adapter-supported |
+| `debug.scopes.enabled` | `true` | bool | Enables scope presentation when adapter-supported |
+| `debug.variables.enabled` | `true` | bool | Enables variable presentation when adapter-supported |
+| `debug.evaluate.enabled` | `true` | bool | Enables expression evaluation when adapter-supported |
+| `debug.attach.enabled` | `true` | bool | Enables attach planning when adapter-supported |
+
+See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/attach schema, capability declarations, and M0 no-launch boundary.
+
 ## Undo History Policy
 
 | Key | Default | Type | Notes |
@@ -236,6 +251,8 @@ When `project.config.allow.unsafe=false`, project-local config only applies:
 | `keybind.<mode>.<lhs>` | Key remap by mode | `"keybind.normal.H" = "^"` |
 | `lsp.<ext>.command` | LSP server command for extension | `"lsp.py.command" = "pyright-langserver"` |
 | `lsp.<ext>.args` | LSP server args | `"lsp.py.args" = "--stdio"` |
+| `debug.adapter.<id>.<field>` | User-managed DAP adapter (`command`, `args`, `transport`, `capabilities`) | `"debug.adapter.java.command" = "java-debug-adapter"` |
+| `debug.configuration.<name>.<field>` | DAP launch/attach configuration | `"debug.configuration.main.request" = "launch"` |
 
 Supported keybind modes: `normal`, `insert`, `visual`, `visual_line`, `replace`, `command`, `search`, `global`.
 

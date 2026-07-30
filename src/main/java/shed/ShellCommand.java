@@ -46,7 +46,12 @@ final class ShellCommand {
                 continue;
             }
             if (character == '\\') {
-                escaped = true;
+                char next = index + 1 < command.length() ? command.charAt(index + 1) : '\0';
+                if (Character.isWhitespace(next) || next == '\\' || next == '\'' || next == '\"') {
+                    escaped = true;
+                } else {
+                    current.append(character);
+                }
                 tokenStarted = true;
                 continue;
             }

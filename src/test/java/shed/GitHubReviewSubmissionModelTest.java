@@ -36,8 +36,10 @@ public class GitHubReviewSubmissionModelTest {
         assertFalse(failed.acknowledged());
         assertEquals(GitHubReviewSubmissionModel.State.FAILED, failed.state());
         assertEquals("validation failed", failed.serverResult());
+        assertTrue(failed.detail().contains("Retry safe:"));
+        assertTrue(failed.detail().contains("Non-GitHub fallback"));
         assertEquals(GitHubReviewSubmissionModel.State.UNKNOWN, unknown.state());
-        assertTrue(unknown.detail().contains("no automatic retry"));
+        assertTrue(unknown.detail().contains("do not retry automatically"));
         assertEquals("Process timed out", unknown.serverResult());
     }
 }

@@ -167,6 +167,8 @@ Selecting **View Details and Diff** in that workspace explicitly runs read-only 
 
 The **Local Unsent Draft** tab creates and edits a local review-comment draft bound to the displayed `OWNER/REPO` and pull-request number. **Save Local Draft** persists it in `~/.shed/github-review-drafts-v1.json`; **Discard Local Draft** removes only that target's local draft. Neither action invokes `gh`, creates server-side state, or submits a review. **Submit Review…** requires a final confirmation, then explicitly runs one `gh pr review` command using the selected Comment, Approve, or Request changes action. Its result tab preserves the exact captured `gh` output; an acknowledged review removes its draft and records a local fingerprint to block duplicate resubmission. Failed or unacknowledged attempts retain the draft and never retry automatically.
 
+GitHub review failures are classified as authentication, rate limit, permission, network, CLI-version, malformed-output, or unknown. Each result states whether a retry is safe, the remediation, and a non-GitHub fallback: local inspection with `:git workbench`, `:git diff`, or `:git log`. Uncertain network/write outcomes require server-state verification before any manual retry.
+
 ## Undo History Policy
 
 | Key | Default | Type | Notes |

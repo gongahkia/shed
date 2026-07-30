@@ -36,18 +36,22 @@ final class GitHubCapabilityModel {
 
     static Report inspect(boolean enabled, CommandResult version, CommandResult auth, CommandResult remote, CommandResult... commands) {
         if (version == null || version.exitCode != 0) {
-            return new Report(enabled, false, false, false, "", List.of("gh CLI"), "Install GitHub CLI and ensure `gh` is on PATH.");
+            return new Report(enabled, false, false, false, "", List.of("gh CLI"),
+                GitHubReviewFailureModel.cliVersion("Install GitHub CLI and ensure `gh` is on PATH, then run :github status.").format());
         }
         if (!supportedVersion(version.stdout)) {
-            return new Report(enabled, true, false, false, "", List.of("supported gh version"), "Install GitHub CLI 2.0.0 or newer.");
+            return new Report(enabled, true, false, false, "", List.of("supported gh version"),
+                GitHubReviewFailureModel.cliVersion("Install GitHub CLI 2.0.0 or newer, then run :github status.").format());
         }
         if (auth == null || auth.exitCode != 0) {
-            return new Report(enabled, true, true, false, "", List.of("GitHub authentication"), "Run `gh auth login`, then run :github status again.");
+            CommandResult authentication = auth == null ? new CommandResult(4, "", "") : new CommandResult(4, auth.stdout, auth.stderr);
+            return new Report(enabled, true, true, false, "", List.of("GitHub authentication"),
+                GitHubReviewFailureModel.fromResult("gh auth status", authentication, false).format());
         }
         String repository = repository(remote == null ? "" : remote.stdout);
         if (repository.isBlank()) {
-            return new Report(enabled, true, true, true, "", List.of("GitHub repository context"),
-                "Set origin to a GitHub remote, for example `git remote add origin https://github.com/OWNER/REPO.git`.");
+            return new Report(enabled, true, true, true, "", List.of("GitHub repository context"), GitHubReviewFailureModel.unavailable(
+                "Set origin to a GitHub remote, for example `git remote add origin https://github.com/OWNER/REPO.git`.").format());
         }
         List<String> missing = new ArrayList<>();
         String[] names = { "gh pr list", "gh pr view", "gh api" };
@@ -55,7 +59,8 @@ final class GitHubCapabilityModel {
             if (commands == null || index >= commands.length || commands[index] == null || commands[index].exitCode != 0) missing.add(names[index]);
         }
         if (!missing.isEmpty()) {
-            return new Report(enabled, true, true, true, repository, missing, "Upgrade or reinstall GitHub CLI with pull-request and API commands.");
+            return new Report(enabled, true, true, true, repository, missing, GitHubReviewFailureModel.cliVersion(
+                "Upgrade or reinstall GitHub CLI with pull-request and API commands.").format());
         }
         String remediation = enabled ? "GitHub review actions remain explicit; no background network work is enabled."
             : "Set `github.review.enabled=true` in the settings GUI or TOML before later review actions are enabled.";

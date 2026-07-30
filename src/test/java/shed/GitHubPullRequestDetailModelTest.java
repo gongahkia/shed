@@ -30,7 +30,9 @@ public class GitHubPullRequestDetailModelTest {
 
         assertFalse(malformed.available());
         assertTrue(malformed.error().contains("malformed"));
+        assertTrue(malformed.error().contains("Non-GitHub fallback"));
         assertFalse(truncated.available());
         assertTrue(truncated.error().contains("truncated"));
+        assertTrue(truncated.error().contains("Retry safe: yes"));
     }
 }

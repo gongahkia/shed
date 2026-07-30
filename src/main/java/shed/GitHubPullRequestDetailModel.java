@@ -32,15 +32,16 @@ final class GitHubPullRequestDetailModel {
         failure = failure(patch, "gh pr diff");
         if (failure != null) return new Detail("", "", "", "", "", "", "", List.of(), "", failure);
         List<String> fields = nulSeparated(metadata.stdout);
-        if (fields.size() != 7) return new Detail("", "", "", "", "", "", "", List.of(), "", "Pull-request metadata was malformed.");
+        if (fields.size() != 7) return new Detail("", "", "", "", "", "", "", List.of(), "",
+            GitHubReviewFailureModel.malformed("gh pr view metadata").format());
         return new Detail(fields.get(0), fields.get(1), fields.get(2), fields.get(3), fields.get(4), fields.get(5), fields.get(6),
             lines(files.stdout), patch.stdout, "");
     }
 
     private static String failure(CommandResult result, String command) {
-        if (result == null) return command + " returned no result.";
-        if (result.exitCode != 0) return result.stderr.isBlank() ? (result.stdout.isBlank() ? command + " failed." : result.stdout.strip()) : result.stderr.strip();
-        return result.stdout.endsWith("\n[shed: output truncated]") ? command + " output was truncated; increase process.output.max.bytes." : null;
+        if (result == null) return GitHubReviewFailureModel.unavailable(command + " returned no result.").format();
+        if (result.exitCode != 0) return GitHubReviewFailureModel.fromResult(command, result, false).format();
+        return result.stdout.endsWith("\n[shed: output truncated]") ? GitHubReviewFailureModel.malformed(command + " output was truncated").format() : null;
     }
 
     private static List<String> nulSeparated(String value) {

@@ -54,7 +54,7 @@ final class GitHubReviewSubmissionModel {
     }
 
     static Result fromResult(CommandResult result) {
-        if (result == null) return new Result(State.UNKNOWN, "gh pr review returned no result; no automatic retry will run.", "");
+        if (result == null) return new Result(State.UNKNOWN, GitHubReviewFailureModel.unavailable("gh pr review returned no result.").format(), "");
         String output = output(result);
         if (result.exitCode == 0) {
             String detail = output.endsWith("\n[shed: output truncated]")
@@ -62,13 +62,12 @@ final class GitHubReviewSubmissionModel {
                 : "gh acknowledged the review.";
             return new Result(State.ACKNOWLEDGED, detail, output);
         }
-        if (result.exitCode < 0) return new Result(State.UNKNOWN,
-            "gh pr review has no acknowledgement; no automatic retry will run (" + fallback(output, "process failure") + ").", output);
-        return new Result(State.FAILED, "gh pr review failed with exit " + result.exitCode + "; the local draft is retained.", output);
+        GitHubReviewFailureModel.Remediation remediation = GitHubReviewFailureModel.fromResult("gh pr review", result, true);
+        return new Result(result.exitCode < 0 ? State.UNKNOWN : State.FAILED, remediation.format(), output);
     }
 
     static Result unavailable(String detail) {
-        return new Result(State.UNKNOWN, detail, "");
+        return new Result(State.UNKNOWN, GitHubReviewFailureModel.unavailable(detail).format(), "");
     }
 
     static Result alreadyAcknowledged() {
@@ -81,8 +80,4 @@ final class GitHubReviewSubmissionModel {
         return "stdout:\n" + result.stdout + "\nstderr:\n" + result.stderr;
     }
 
-    private static String fallback(String output, String fallback) {
-        String value = output == null ? "" : output.strip();
-        return value.isEmpty() ? fallback : value;
-    }
 }

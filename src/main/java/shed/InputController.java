@@ -62,6 +62,12 @@ final class InputController {
             editor.updateStatusBar();
             return;
         }
+        if (isCommandPaletteShortcut(e)) {
+            e.consume();
+            editor.showMessage(editor.showCommandPalette());
+            editor.updateStatusBar();
+            return;
+        }
         editor.modeEngine.dispatch(editor, editor.editorState, e);
         if (previousMode != EditorMode.INSERT && editor.editorState.mode == EditorMode.INSERT && editor.isPrintableKey(e)) {
             editor.suppressNextTypedChar = true;
@@ -72,6 +78,11 @@ final class InputController {
             editor.setMode(EditorMode.INSERT);
         }
         editor.updateStatusBar();
+    }
+
+    static boolean isCommandPaletteShortcut(KeyEvent event) {
+        return event != null && event.getKeyCode() == KeyEvent.VK_P && event.isShiftDown()
+            && (event.isControlDown() || event.isMetaDown()) && !event.isAltDown();
     }
 
     private void handlePlainKeymap(KeyEvent event) {

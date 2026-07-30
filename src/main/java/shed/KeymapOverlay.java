@@ -151,7 +151,10 @@ final class KeymapOverlay {
                 fixed("C-x b/k/C-c", "Buffers, kill buffer, quit"), fixed("M-x", "Command palette"), fixed("C-g", "Cancel prefix"), fixed("C-h/F1", "Emacs keymap help")
             );
         }
-        return List.of(new Binding(null, "vim", "built-in", "Vim mode dispatcher", "Profile", "Active; see :help and docs/KEYBINDS.md"));
+        return List.of(
+            fixed("Ctrl/Cmd-Shift-P", "Command palette"),
+            new Binding(null, "vim", "built-in", "Vim mode dispatcher", "Profile", "Active; see :help and docs/KEYBINDS.md")
+        );
     }
 
     private static Binding fixed(String lhs, String mapping) {

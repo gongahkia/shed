@@ -24,7 +24,19 @@ class PlainKeymapTest {
         assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_ESCAPE, InputEvent.CTRL_DOWN_MASK));
     }
 
+    @Test
+    void recognizesVimCommandPaletteShortcut() {
+        assertEquals(true, InputController.isCommandPaletteShortcut(keyEvent(KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)));
+        assertEquals(true, InputController.isCommandPaletteShortcut(keyEvent(KeyEvent.VK_P, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)));
+        assertEquals(false, InputController.isCommandPaletteShortcut(keyEvent(KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK)));
+        assertEquals(false, InputController.isCommandPaletteShortcut(keyEvent(KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)));
+    }
+
     private PlainKeymap.Action action(int keyCode, int modifiers) {
-        return PlainKeymap.actionFor(new KeyEvent(new Canvas(), KeyEvent.KEY_PRESSED, 0L, modifiers, keyCode, KeyEvent.CHAR_UNDEFINED));
+        return PlainKeymap.actionFor(keyEvent(keyCode, modifiers));
+    }
+
+    private KeyEvent keyEvent(int keyCode, int modifiers) {
+        return new KeyEvent(new Canvas(), KeyEvent.KEY_PRESSED, 0L, modifiers, keyCode, KeyEvent.CHAR_UNDEFINED);
     }
 }

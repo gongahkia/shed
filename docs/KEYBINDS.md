@@ -1,5 +1,18 @@
 # `Shed` Keybinds
 
+### Plain profile
+
+Set `keymap.profile = "plain"` for non-modal editing. Plain bypasses Vim mode handling and `keybind.<mode>.*` remaps; standard Swing text, selection, clipboard, undo, and redo bindings remain active.
+
+| Key-binds | Function |
+| :---: | :---: |
+| `Ctrl`/`Cmd` + `S` | Save current file |
+| `Ctrl`/`Cmd` + `O` or `P` | Find file |
+| `Ctrl`/`Cmd` + `Shift` + `P` | Command palette |
+| `Ctrl`/`Cmd` + `B` | Buffer picker |
+| `Ctrl`/`Cmd` + `W` | Close active split |
+| `F1` | Plain-keymap help |
+
 ### Mode Switching
 
 | Key-binds | Function |

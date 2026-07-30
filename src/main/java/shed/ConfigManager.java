@@ -51,6 +51,7 @@ public class ConfigManager {
     private static final String DEFAULT_FONT_FAMILY = "Hack";
     private static final int DEFAULT_FONT_SIZE = 16;
     private static final int DEFAULT_TAB_SIZE = 4;
+    private static final KeymapProfile DEFAULT_KEYMAP_PROFILE = KeymapProfile.VIM;
     private static final LineNumberMode DEFAULT_LINE_NUMBER_MODE = LineNumberMode.ABSOLUTE;
     private static final boolean DEFAULT_SHOW_CURRENT_LINE = true;
     private static final boolean DEFAULT_EXPAND_TAB = true;
@@ -224,6 +225,7 @@ public class ConfigManager {
         defineDefault("font.family", DEFAULT_FONT_FAMILY);
         defineDefault("font.size", DEFAULT_FONT_SIZE);
         defineDefault("tab.size", DEFAULT_TAB_SIZE);
+        defineDefault(KeymapProfile.CONFIG_KEY, DEFAULT_KEYMAP_PROFILE.configValue());
         defineDefault("line.numbers", DEFAULT_LINE_NUMBER_MODE.toConfigValue());
         defineDefault("show.current.line", DEFAULT_SHOW_CURRENT_LINE);
         defineDefault("expand.tab", DEFAULT_EXPAND_TAB);
@@ -337,6 +339,7 @@ public class ConfigManager {
             case "font.family" -> "Editor font family";
             case "font.size" -> "Editor font size";
             case "tab.size" -> "Tab width in spaces";
+            case "keymap.profile" -> "Input keymap profile";
             case "line.numbers" -> "Line number display mode";
             case "show.current.line" -> "Highlight the active line";
             case "expand.tab" -> "Insert spaces for tab input";
@@ -905,6 +908,10 @@ public class ConfigManager {
             getBoolean("multi.selection.enabled", DEFAULT_MULTI_SELECTION_ENABLED),
             getInt("multi.selection.max.cursors", MultiSelectionPolicy.DEFAULT_MAX_CURSORS)
         );
+    }
+
+    public KeymapProfile getKeymapProfile() {
+        return KeymapProfile.fromConfig(getString(KeymapProfile.CONFIG_KEY, DEFAULT_KEYMAP_PROFILE.configValue()));
     }
 
     public LspFeatureSettings getLspFeatureSettings() {

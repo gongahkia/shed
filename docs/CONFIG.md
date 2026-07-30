@@ -192,6 +192,12 @@ See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/a
 | `undo.history.max.entries` | `500` | int | Retained undo/redo edits per buffer; `1..100000` |
 | `undo.history.max.bytes` | `8388608` | int | Estimated retained UTF-16 edit payload bytes per buffer; `1..1073741824` |
 
+## Keymap
+
+| Key | Default | Type | Notes |
+| :--- | :--- | :--- | :--- |
+| `keymap.profile` | `vim` | string | `vim` or non-modal `plain`; Plain bypasses `keybind.<mode>.*` |
+
 ## Dramatic UI / Theater Keys
 
 | Key | Default | Type | Notes |
@@ -343,6 +349,9 @@ schema_version = 1
 "command.alias.ww" = "w"
 "keybind.normal.H" = "^"
 "keybind.insert.<c-s>" = "<esc>:w<enter>"
+
+# Non-modal profile
+"keymap.profile" = "plain"
 
 # Palette override
 "ui.caret" = "#7AA2F7"

@@ -1,8 +1,6 @@
 package shed;
 
 import javax.swing.SwingUtilities;
-import java.awt.Component;
-import java.awt.Container;
 import java.awt.Dimension;
 import java.io.File;
 import java.io.IOException;
@@ -39,7 +37,7 @@ final class TerminalController {
         EditorPane terminalEditorPane = editor.createEditorPane(size);
         terminalEditorPane.setBuffer(termBuffer);
         terminalEditorPane.setTerminalPane(terminalPane);
-        installTerminalActivationListeners(terminalEditorPane, terminalPane.getComponent());
+        installTerminalActivationListeners(terminalEditorPane, terminalPane);
         editor.editorPanes.add(terminalEditorPane);
         if (editor.windowLayoutRoot == null) {
             editor.windowLayoutRoot = WindowLayoutNode.leaf(activePane);
@@ -147,7 +145,7 @@ final class TerminalController {
         pane.setBuffer(terminalBuffer);
         pane.setLargeFileProjection(null);
         pane.setTerminalPane(terminalPane);
-        installTerminalActivationListeners(pane, terminalPane.getComponent());
+        installTerminalActivationListeners(pane, terminalPane);
         editor.ptyTerminalPanes.put(terminalBuffer, terminalPane);
         terminalPane.onExit(() -> SwingUtilities.invokeLater(() -> closeExitedTerminal(terminalBuffer)));
     }
@@ -212,27 +210,22 @@ final class TerminalController {
     }
 
 
-    void installTerminalActivationListeners(EditorPane pane, Component component) {
-        if (pane == null || component == null) {
+    void installTerminalActivationListeners(EditorPane pane, PtyTerminalPane terminalPane) {
+        if (pane == null || terminalPane == null) {
             return;
         }
-        component.addFocusListener(new java.awt.event.FocusAdapter() {
+        terminalPane.getInputComponent().addFocusListener(new java.awt.event.FocusAdapter() {
             @Override
             public void focusGained(java.awt.event.FocusEvent e) {
                 editor.activateEditorPane(pane);
             }
         });
-        component.addMouseListener(new java.awt.event.MouseAdapter() {
+        terminalPane.getInputComponent().addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mousePressed(java.awt.event.MouseEvent e) {
-                editor.activateEditorPane(pane);
+                terminalPane.requestFocusInWindow();
             }
         });
-        if (component instanceof Container) {
-            for (Component child : ((Container) component).getComponents()) {
-                installTerminalActivationListeners(pane, child);
-            }
-        }
     }
 
 

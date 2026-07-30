@@ -151,7 +151,7 @@ Notes:
 | `:theater off|subtle|full` | Apply dramatic UI preset |
 | `:zen` | Toggle zen mode |
 | `:minimap` | Toggle minimap panel |
-| `:term`, `:terminal` | Open integrated terminal split |
+| `:term`, `:terminal` | Open integrated terminal split; terminal input owns focus, uses the system clipboard (`Cmd-C`/`Cmd-V` on macOS, `Ctrl-Shift-C`/`Ctrl-Shift-V` elsewhere), and ignores zero-size resize events |
 
 ## Workspace Index Commands
 

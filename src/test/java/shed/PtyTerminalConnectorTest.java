@@ -32,6 +32,9 @@ public class PtyTerminalConnectorTest {
         try {
             Future<String> output = reader.submit(() -> readUntilExit(connector));
             connector.resize(new TermSize(100, 40));
+            connector.resize(new TermSize(100, 40));
+            connector.resize(new TermSize(0, 0));
+            connector.resize(new TermSize(-1, 20));
             connector.write("stty size; printf shed-pty-ok; exit\n");
             String text = output.get(8, TimeUnit.SECONDS);
             assertTrue(text.contains("shed-pty-ok"), text);

@@ -56,9 +56,24 @@ jobs:
             Pop-Location
           }
 
+      - name: Build macOS installer
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        env:
+          SHED_BUILD_COMMIT: ${{ github.sha }}
+        run: bash scripts/package-macos.sh
+
       - name: Upload jar artifact
         uses: actions/upload-artifact@v4
         with:
           name: shed-jar-${{ matrix.os }}
           path: target/shed-2.0.0.jar
+          if-no-files-found: error
+
+      - name: Upload macOS installer artifact
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: shed-macos-arm64-installer
+          path: target/macos-package/dist/*
           if-no-files-found: error

@@ -13,7 +13,19 @@ final class GitChangesWorkbenchModel {
 
     record Change(String indexStatus, String worktreeStatus, String path, String originalPath) {
         String displayPath() {
-            return originalPath == null || originalPath.isBlank() ? path : originalPath + " → " + path;
+            return originalPath == null || originalPath.isBlank() ? safePath(path) : safePath(originalPath) + " → " + safePath(path);
+        }
+    }
+
+    record Diff(State state, String content, List<GitHunkNavigation.Hunk> hunks, String detail, String sourceDigest) {
+        Diff {
+            content = content == null ? "" : content;
+            hunks = hunks == null ? List.of() : List.copyOf(hunks);
+            detail = detail == null ? "" : detail;
+        }
+
+        boolean available() {
+            return state == State.READY;
         }
     }
 
@@ -64,10 +76,10 @@ final class GitChangesWorkbenchModel {
             if (entry.length() < 4 || entry.charAt(2) != ' ') continue;
             String indexStatus = status(entry.charAt(0));
             String worktreeStatus = status(entry.charAt(1));
-            String path = safePath(entry.substring(3));
+            String path = entry.substring(3);
             String originalPath = null;
             if ((entry.charAt(0) == 'R' || entry.charAt(0) == 'C') && index + 1 < entries.size()) {
-                originalPath = safePath(entries.get(++index));
+                originalPath = entries.get(++index);
             }
             changes.add(new Change(indexStatus, worktreeStatus, path, originalPath));
         }

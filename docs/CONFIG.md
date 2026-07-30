@@ -165,6 +165,8 @@ The changes document is effective only when `git.workbench.enabled`, `git.change
 
 Selecting **View Details and Diff** in that workspace explicitly runs read-only `gh pr view` and `gh pr diff` for the selected pull request. Metadata, changed-file names, and patch output are rejected if malformed or truncated; review actions remain unavailable.
 
+The **Local Unsent Draft** tab creates and edits a local review-comment draft bound to the displayed `OWNER/REPO` and pull-request number. **Save Local Draft** persists it in `~/.shed/github-review-drafts-v1.json`; **Discard Local Draft** removes only that target's local draft. Neither action invokes `gh`, creates server-side state, or submits a review.
+
 ## Undo History Policy
 
 | Key | Default | Type | Notes |

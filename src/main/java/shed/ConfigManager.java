@@ -108,6 +108,7 @@ public class ConfigManager {
     private static final boolean DEFAULT_PROJECT_REPLACE_BACKUP_ENABLED = true;
     private static final String DEFAULT_PROJECT_REPLACE_SCOPE = "workspace";
     private static final boolean DEFAULT_TREE_DELETE_PROTECT_CRITICAL = true;
+    private static final boolean DEFAULT_GIT_WORKBENCH_ENABLED = true;
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "config.toml";
     private static final String PROJECT_CONFIG_NAME = ".shed.toml";
@@ -288,6 +289,7 @@ public class ConfigManager {
         defineDefault("project.replace.backup.directory", Path.of(shedDirectoryPath).resolve("project-replace-backups").toString());
         defineDefault("project.replace.scope", DEFAULT_PROJECT_REPLACE_SCOPE);
         defineDefault("tree.delete.protect.critical", DEFAULT_TREE_DELETE_PROTECT_CRITICAL);
+        defineDefault("git.workbench.enabled", DEFAULT_GIT_WORKBENCH_ENABLED);
         settings.reset();
         defaultConfig.clear();
         defaultConfig.putAll(config);
@@ -380,6 +382,7 @@ public class ConfigManager {
             case "project.replace.backup.directory" -> "Directory for project replacement backups";
             case "project.replace.scope" -> "Project replacement scope";
             case "tree.delete.protect.critical" -> "Protect critical paths from tree deletion";
+            case "git.workbench.enabled" -> "Enable the graphical read-only Git changes workbench";
             default -> key;
         };
     }
@@ -961,6 +964,10 @@ public class ConfigManager {
 
     public boolean getTreeDeleteProtectCritical() {
         return getBoolean("tree.delete.protect.critical", DEFAULT_TREE_DELETE_PROTECT_CRITICAL);
+    }
+
+    public boolean getGitWorkbenchEnabled() {
+        return getBoolean("git.workbench.enabled", DEFAULT_GIT_WORKBENCH_ENABLED);
     }
 
     public boolean isProjectConfigKeyAllowed(String key) {

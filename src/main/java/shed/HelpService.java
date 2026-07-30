@@ -80,7 +80,7 @@ public class HelpService {
                    "  :diagnostics   Push diagnostics into quickfix\n" +
                    "  :dnext/:dprev  Jump next/prev diagnostic\n" +
                    "  :symbols [q]   Symbol picker (class/function/heading)\n" +
-                   "  :git ...       Git status/diff/log/add/commit\n" +
+                   "  :git ...       Git status/diff/log/add/commit; :git workbench shows changes\n" +
                    "  :split/:vsplit Split the active window\n" +
                    "  Ctrl-w s/v/c   Split/vertical-split/close window\n" +
                    "  Ctrl-w h/j/k/l Move window focus\n" +

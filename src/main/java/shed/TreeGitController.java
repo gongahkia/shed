@@ -560,8 +560,11 @@ final class TreeGitController {
 
 
     public String handleGitCommand(String argument) {
-        File gitRoot = resolveGitRoot();
         String trimmed = argument == null ? "" : argument.trim();
+        if ("workbench".equalsIgnoreCase(trimmed) || "changes".equalsIgnoreCase(trimmed)) {
+            return showGitChangesWorkbench();
+        }
+        File gitRoot = resolveGitRoot();
         if (gitRoot != null && trimmed.toLowerCase(Locale.ROOT).startsWith("hunk")) {
             String rest = trimmed.length() <= 4 ? "" : trimmed.substring(4).trim();
             return runGitHunkCommand(gitRoot, rest);
@@ -632,6 +635,21 @@ final class TreeGitController {
                 return showGitHelp();
             }
         });
+    }
+
+    String showGitChangesWorkbench() {
+        if (!editor.configManager.getGitWorkbenchEnabled()) {
+            return "Git workbench disabled by git.workbench.enabled=false";
+        }
+        GitChangesWorkbenchDialog.showFor(editor, this::loadGitChangesWorkbench);
+        return "Git workbench opened";
+    }
+
+    private GitChangesWorkbenchModel.Snapshot loadGitChangesWorkbench() {
+        File root = resolveGitRoot();
+        if (root == null) return GitChangesWorkbenchModel.unavailable("Not inside a Git repository.");
+        CommandResult result = runCommand(root, List.of("git", "status", "--porcelain=v1", "-z", "--branch"));
+        return GitChangesWorkbenchModel.fromStatus(root, result);
     }
 
 
@@ -1095,6 +1113,7 @@ final class TreeGitController {
             "Git commands\n\n"
                 + ":git                  Show status\n"
                 + ":git status|st        Show status\n"
+                + ":git workbench        Open graphical read-only changes workbench\n"
                 + ":git diff [args]      Show diff\n"
                 + ":git log [count]      Show compact history\n"
                 + ":git branch           Show branch list\n"

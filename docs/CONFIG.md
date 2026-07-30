@@ -135,6 +135,12 @@ Managed language support has no configuration key or network path yet. Its plann
 | `project.replace.backup.directory` | `~/.shed/project-replace-backups` | path | Directory for retained replacement backups |
 | `project.replace.scope` | `workspace` | enum | `workspace` or `current-file` |
 
+## Git Workbench
+
+| Key | Default | Type | Notes |
+| :--- | :--- | :--- | :--- |
+| `git.workbench.enabled` | `true` | bool | Enables `:git workbench`, a read-only asynchronous repository-status view |
+
 ## Undo History Policy
 
 | Key | Default | Type | Notes |

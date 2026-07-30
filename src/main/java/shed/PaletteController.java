@@ -380,6 +380,9 @@ final class PaletteController {
                 return "Jump to selected quickfix entry.";
             case "lsp":
                 return "Run LSP actions and server management.";
+            case "debug":
+            case "dap":
+                return "Select and control explicit Debug Adapter Protocol sessions.";
             case "definition":
                 return "Jump to symbol definition.";
             case "hover":

@@ -81,6 +81,7 @@ public class Texteditor extends JFrame implements KeyListener {
     TreeGitController treeGitController;
     GitHubCapabilityController gitHubCapabilityController;
     LspController lspController;
+    DebugSessionController debugSessionController;
     JobQuickfixController jobQuickfixController;
     TerminalController terminalController;
     MarkdownController markdownController;
@@ -251,6 +252,7 @@ public class Texteditor extends JFrame implements KeyListener {
         treeGitController = new TreeGitController(this);
         lspService = new LspService();
         lspController = new LspController(this);
+        debugSessionController = new DebugSessionController(this);
         syntaxHighlightService = new SyntaxHighlightService();
         asyncJobService = new AsyncJobService(200, this.errorReporter);
         gitHubCapabilityController = new GitHubCapabilityController(this);
@@ -1336,7 +1338,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("d"); commands.add("delete"); commands.add("files"); commands.add("folder"); commands.add("projectreplace");
         commands.add("tree"); commands.add("git"); commands.add("grep"); commands.add("copen");
         commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
-        commands.add("lsp"); commands.add("definition"); commands.add("hover"); commands.add("references");
+        commands.add("lsp"); commands.add("debug"); commands.add("dap"); commands.add("definition"); commands.add("hover"); commands.add("references");
         commands.add("diagnostics"); commands.add("diag"); commands.add("dnext"); commands.add("dprev"); commands.add("symbols"); commands.add("sym");
         commands.add("registers"); commands.add("yankring"); commands.add("marks"); commands.add("zen"); commands.add("theater"); commands.add("normal");
         commands.add("reload"); commands.add("source"); commands.add("clean"); commands.add("shedclean");
@@ -1947,6 +1949,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String handleLspCommand(String argument) {
         return lspController.handleLspCommand(argument);
+    }
+
+    public String handleDebugCommand(String argument) {
+        return debugSessionController.handle(argument);
     }
 
     public String lspStatus() {
@@ -2993,6 +2999,9 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         if (asyncJobService != null) {
             asyncJobService.shutdownNow();
+        }
+        if (debugSessionController != null) {
+            debugSessionController.shutdown();
         }
         dispose();
         System.exit(0);

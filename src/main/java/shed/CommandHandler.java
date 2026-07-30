@@ -155,6 +155,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.quickfixLast(), "clast");
         registerCommand((args, range, force) -> editor.quickfixCurrent(args), "cc");
         registerCommand((args, range, force) -> editor.handleLspCommand(args), "lsp");
+        registerCommand((args, range, force) -> editor.handleDebugCommand(args), "debug", "dap");
         registerCommand((args, range, force) -> editor.lspGoToDefinition(), "definition");
         registerCommand((args, range, force) -> editor.lspHover(), "hover");
         registerCommand((args, range, force) -> editor.lspReferences(), "references");

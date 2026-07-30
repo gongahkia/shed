@@ -207,6 +207,24 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void debugStatusCommandShowsVisibleLifecycleWithoutStartingAnAdapter() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-debug-status");
+        Path file = tempDir.resolve("debug-status.java");
+        Files.createDirectories(home);
+        Files.writeString(file, "class DebugStatus {}\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertEquals("Showing debug status", onEdt(() -> editor.commandHandler.execute("debug status")));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("Debug Lifecycle"));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("State: IDLE"));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void managedLspCommandsExposeInertStatusAndManualRemediation() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-managed-lsp");

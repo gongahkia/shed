@@ -79,6 +79,7 @@ public class Texteditor extends JFrame implements KeyListener {
     QuickfixService quickfixService;
     PluginManager pluginManager;
     TreeGitController treeGitController;
+    GitHubCapabilityController gitHubCapabilityController;
     LspController lspController;
     JobQuickfixController jobQuickfixController;
     TerminalController terminalController;
@@ -252,6 +253,7 @@ public class Texteditor extends JFrame implements KeyListener {
         lspController = new LspController(this);
         syntaxHighlightService = new SyntaxHighlightService();
         asyncJobService = new AsyncJobService(200, this.errorReporter);
+        gitHubCapabilityController = new GitHubCapabilityController(this);
         quickfixService = new QuickfixService();
         jobQuickfixController = new JobQuickfixController(this);
         editorState = new EditorState();
@@ -1639,6 +1641,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String handleGitCommand(String argument) {
         return treeGitController.handleGitCommand(argument);
+    }
+
+    public String handleGitHubCommand(String argument) {
+        return gitHubCapabilityController.handle(argument);
     }
 
     File resolveGitRoot() {

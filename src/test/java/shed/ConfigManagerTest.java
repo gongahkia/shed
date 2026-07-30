@@ -192,6 +192,20 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void keepsGitHubReviewDisabledUntilExplicitlyEnabled() throws IOException {
+        Path home = tempDir.resolve("home-github-review");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        assertFalse(config.getGitHubReviewEnabled());
+        config.setAndPersist("github.review.enabled", "true");
+        assertTrue(config.getGitHubReviewEnabled());
+        TypedSettings.Descriptor descriptor = config.typedSettingDescriptors().stream()
+            .filter(setting -> setting.key().equals("github.review.enabled")).findFirst().orElseThrow();
+        assertEquals("GitHub", descriptor.category());
+    }
+
+    @Test
     void materializesStableDefaultTemplateOnlyWhenConfirmed() throws IOException {
         Path home = tempDir.resolve("home-materialize");
         System.setProperty("user.home", home.toString());

@@ -81,6 +81,7 @@ public class HelpService {
                    "  :dnext/:dprev  Jump next/prev diagnostic\n" +
                    "  :symbols [q]   Symbol picker (class/function/heading)\n" +
                    "  :git ...       Git status/diff/log/add/commit; workbench, conflicts, and history UI\n" +
+                   "  :github status Explicit local-only gh CLI capability report\n" +
                    "  :split/:vsplit Split the active window\n" +
                    "  Ctrl-w s/v/c   Split/vertical-split/close window\n" +
                    "  Ctrl-w h/j/k/l Move window focus\n" +

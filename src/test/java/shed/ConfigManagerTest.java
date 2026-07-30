@@ -53,6 +53,11 @@ public class ConfigManagerTest {
         assertEquals(LineNumberMode.ABSOLUTE, config.getLineNumberMode());
         assertTrue(config.getHighlightSearch());
         assertFalse(config.getSessionRestoreOnStart());
+        assertFalse(config.getTerminalSessionRestoreEnabled());
+        TypedSettings.Descriptor terminalRestore = config.typedSettingDescriptors().stream()
+            .filter(setting -> setting.key().equals("terminal.session.restore")).findFirst().orElseThrow();
+        assertEquals("Terminal", terminalRestore.category());
+        assertEquals("Live: checked when saving or loading a session", terminalRestore.applyBehavior());
         assertFalse(config.getWorkspaceIndexEnabled());
         assertEquals("default", config.getSessionAutoloadName());
         assertEquals(15000, config.getProcessTimeoutMs());

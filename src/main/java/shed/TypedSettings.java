@@ -212,6 +212,9 @@ final class TypedSettings {
         if (key.startsWith("session.")) {
             return "Session";
         }
+        if (key.startsWith("terminal.")) {
+            return "Terminal";
+        }
         if (key.startsWith("workspace.")) {
             return "Workspace";
         }
@@ -292,6 +295,9 @@ final class TypedSettings {
         }
         if (key.equals("session.dir")) {
             return "Live: used by future session operations";
+        }
+        if (key.equals("terminal.session.restore")) {
+            return "Live: checked when saving or loading a session";
         }
         if (key.startsWith("workspace.index.")) {
             return "Live: used by subsequent workspace index operations";

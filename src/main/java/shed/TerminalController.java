@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 final class TerminalController {
     private final Texteditor editor;
@@ -18,7 +19,7 @@ final class TerminalController {
 
     public String openTerminal() {
         File startDirectory = resolveTerminalStartDirectory();
-        String title = "[Terminal " + (editor.terminalBufferCounter++) + "]";
+        String title = nextTerminalTitle();
         PtyTerminalPane terminalPane;
         try {
             terminalPane = PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveEditorFont());
@@ -73,6 +74,103 @@ final class TerminalController {
         if (terminalPane != null) {
             terminalPane.close();
         }
+    }
+
+
+    void closeAllTerminalSessions() {
+        for (PtyTerminalPane terminalPane : new ArrayList<>(editor.ptyTerminalPanes.values())) {
+            terminalPane.close();
+        }
+        editor.ptyTerminalPanes.clear();
+        for (EditorPane pane : editor.editorPanes) {
+            pane.closeTerminalPane();
+        }
+    }
+
+
+    List<Map<String, Object>> serializeSessionMetadata() {
+        List<Map<String, Object>> states = new ArrayList<>();
+        for (int index = 0; index < editor.editorPanes.size(); index++) {
+            EditorPane pane = editor.editorPanes.get(index);
+            PtyTerminalPane terminalPane = pane == null ? null : pane.getTerminalPane();
+            if (terminalPane == null) {
+                continue;
+            }
+            TerminalSessionState state = new TerminalSessionState(index, terminalPane.getWorkingDirectory().getAbsolutePath());
+            states.add(state.toMap());
+        }
+        return states;
+    }
+
+
+    TerminalRestoreResult restoreSessionMetadata(Object value) {
+        TerminalSessionState.ParseResult parsed = TerminalSessionState.parseAll(value);
+        int restored = 0;
+        int unavailable = 0;
+        int ignored = parsed.ignored();
+        for (TerminalSessionState state : parsed.states()) {
+            if (state.paneIndex() >= editor.editorPanes.size()) {
+                ignored++;
+                continue;
+            }
+            EditorPane pane = editor.editorPanes.get(state.paneIndex());
+            if (!editor.configManager.getTerminalSessionRestoreEnabled()) {
+                installUnavailableTerminal(pane, state, "terminal.session.restore is disabled");
+                unavailable++;
+                continue;
+            }
+            File workingDirectory = new File(state.workingDirectory());
+            if (!workingDirectory.isDirectory()) {
+                installUnavailableTerminal(pane, state, "saved working directory is unavailable");
+                unavailable++;
+                continue;
+            }
+            try {
+                installRestoredTerminal(pane, workingDirectory);
+                restored++;
+            } catch (IOException | SecurityException error) {
+                installUnavailableTerminal(pane, state, "fresh shell could not start: " + safeMessage(error));
+                unavailable++;
+            }
+        }
+        if (restored > 0) {
+            editor.renderWindowLayout();
+        }
+        return new TerminalRestoreResult(restored, unavailable, ignored);
+    }
+
+
+    private void installRestoredTerminal(EditorPane pane, File workingDirectory) throws IOException {
+        PtyTerminalPane terminalPane = PtyTerminalPane.open(workingDirectory, editor.configManager, editor.resolveEditorFont());
+        FileBuffer terminalBuffer = FileBuffer.createScratch(nextTerminalTitle(), "");
+        editor.buffers.add(terminalBuffer);
+        pane.setBuffer(terminalBuffer);
+        pane.setLargeFileProjection(null);
+        pane.setTerminalPane(terminalPane);
+        installTerminalActivationListeners(pane, terminalPane.getComponent());
+        editor.ptyTerminalPanes.put(terminalBuffer, terminalPane);
+        terminalPane.onExit(() -> SwingUtilities.invokeLater(() -> closeExitedTerminal(terminalBuffer)));
+    }
+
+
+    private void installUnavailableTerminal(EditorPane pane, TerminalSessionState state, String reason) {
+        String content = "Terminal session not restored\n\nWorking directory: " + state.workingDirectory()
+            + "\nReason: " + reason
+            + "\n\nOnly the terminal pane working directory is session metadata. Commands, shell arguments, scrollback, and process state are never saved or replayed.";
+        FileBuffer notice = FileBuffer.createScratch("[terminal not restored]", content);
+        editor.buffers.add(notice);
+        editor.loadBufferIntoPane(pane, notice, 0);
+    }
+
+
+    private String nextTerminalTitle() {
+        return "[Terminal " + (editor.terminalBufferCounter++) + "]";
+    }
+
+
+    private String safeMessage(Exception error) {
+        String message = error.getMessage();
+        return message == null || message.isBlank() ? error.getClass().getSimpleName() : message;
     }
 
 
@@ -134,6 +232,32 @@ final class TerminalController {
             for (Component child : ((Container) component).getComponents()) {
                 installTerminalActivationListeners(pane, child);
             }
+        }
+    }
+
+
+    record TerminalRestoreResult(int restored, int unavailable, int ignored) {
+        TerminalRestoreResult {
+            if (restored < 0 || unavailable < 0 || ignored < 0) {
+                throw new IllegalArgumentException("terminal restore counts must be non-negative");
+            }
+        }
+
+        String summary() {
+            if (restored == 0 && unavailable == 0 && ignored == 0) {
+                return "";
+            }
+            List<String> parts = new ArrayList<>();
+            if (restored > 0) {
+                parts.add(restored + " fresh terminal " + (restored == 1 ? "shell" : "shells"));
+            }
+            if (unavailable > 0) {
+                parts.add(unavailable + " terminal " + (unavailable == 1 ? "pane was" : "panes were") + " not restored");
+            }
+            if (ignored > 0) {
+                parts.add(ignored + " invalid terminal " + (ignored == 1 ? "entry" : "entries") + " ignored");
+            }
+            return " (" + String.join("; ", parts) + ")";
         }
     }
 

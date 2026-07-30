@@ -141,6 +141,10 @@ Managed language support has no configuration key or network path yet. Its plann
 | :--- | :--- | :--- | :--- |
 | `git.workbench.enabled` | `true` | bool | Enables `:git workbench`, a read-only asynchronous repository-status, diff, and hunk-navigation view |
 | `git.conflict.resolution.enabled` | `true` | bool | Enables `:git conflict`, an explicit conflict-resolution document with preserved Git sides |
+| `git.history.enabled` | `true` | bool | Enables `:git history`, an asynchronous local-history document |
+| `git.remote.actions.enabled` | `true` | bool | Enables explicit Fetch, Pull (fast-forward only), and Push controls in `:git history` |
+
+`:git history` never starts network activity when opened or refreshed. Fetch requires its button click; Pull uses `git pull --ff-only` and Push each require a second confirmation. Each remote operation runs in a cancellable background job, exposes captured output or failure in the document, and can be disabled independently with `git.remote.actions.enabled`.
 
 ## Undo History Policy
 

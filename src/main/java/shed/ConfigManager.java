@@ -110,6 +110,8 @@ public class ConfigManager {
     private static final boolean DEFAULT_TREE_DELETE_PROTECT_CRITICAL = true;
     private static final boolean DEFAULT_GIT_WORKBENCH_ENABLED = true;
     private static final boolean DEFAULT_GIT_CONFLICT_RESOLUTION_ENABLED = true;
+    private static final boolean DEFAULT_GIT_HISTORY_ENABLED = true;
+    private static final boolean DEFAULT_GIT_REMOTE_ACTIONS_ENABLED = true;
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "config.toml";
     private static final String PROJECT_CONFIG_NAME = ".shed.toml";
@@ -292,6 +294,8 @@ public class ConfigManager {
         defineDefault("tree.delete.protect.critical", DEFAULT_TREE_DELETE_PROTECT_CRITICAL);
         defineDefault("git.workbench.enabled", DEFAULT_GIT_WORKBENCH_ENABLED);
         defineDefault("git.conflict.resolution.enabled", DEFAULT_GIT_CONFLICT_RESOLUTION_ENABLED);
+        defineDefault("git.history.enabled", DEFAULT_GIT_HISTORY_ENABLED);
+        defineDefault("git.remote.actions.enabled", DEFAULT_GIT_REMOTE_ACTIONS_ENABLED);
         settings.reset();
         defaultConfig.clear();
         defaultConfig.putAll(config);
@@ -386,6 +390,8 @@ public class ConfigManager {
             case "tree.delete.protect.critical" -> "Protect critical paths from tree deletion";
             case "git.workbench.enabled" -> "Enable the graphical read-only Git changes workbench";
             case "git.conflict.resolution.enabled" -> "Enable the graphical Git conflict-resolution document";
+            case "git.history.enabled" -> "Enable the graphical Git history document";
+            case "git.remote.actions.enabled" -> "Enable explicit Fetch, Pull, and Push controls in Git history";
             default -> key;
         };
     }
@@ -975,6 +981,14 @@ public class ConfigManager {
 
     public boolean getGitConflictResolutionEnabled() {
         return getBoolean("git.conflict.resolution.enabled", DEFAULT_GIT_CONFLICT_RESOLUTION_ENABLED);
+    }
+
+    public boolean getGitHistoryEnabled() {
+        return getBoolean("git.history.enabled", DEFAULT_GIT_HISTORY_ENABLED);
+    }
+
+    public boolean getGitRemoteActionsEnabled() {
+        return getBoolean("git.remote.actions.enabled", DEFAULT_GIT_REMOTE_ACTIONS_ENABLED);
     }
 
     public boolean isProjectConfigKeyAllowed(String key) {

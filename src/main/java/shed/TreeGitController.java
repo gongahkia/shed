@@ -3,9 +3,9 @@ package shed;
 import javax.swing.*;
 import java.awt.*;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
@@ -568,6 +568,9 @@ final class TreeGitController {
         if ("conflict".equalsIgnoreCase(trimmed) || "conflicts".equalsIgnoreCase(trimmed)) {
             return showGitConflictResolutionDocument();
         }
+        if ("history".equalsIgnoreCase(trimmed) || "remote".equalsIgnoreCase(trimmed)) {
+            return showGitHistoryRemoteDocument();
+        }
         if ("workbench".equalsIgnoreCase(trimmed) || "changes".equalsIgnoreCase(trimmed)) {
             return showGitChangesWorkbench();
         }
@@ -684,6 +687,45 @@ final class TreeGitController {
             }
         });
         return "Git conflict resolution opened";
+    }
+
+    String showGitHistoryRemoteDocument() {
+        if (!editor.configManager.getGitHistoryEnabled()) {
+            return "Git history disabled by git.history.enabled=false";
+        }
+        GitHistoryRemoteDialog.showFor(editor, new GitHistoryRemoteDialog.Loader() {
+            @Override
+            public GitHistoryModel.Snapshot load(AsyncJobService.JobToken token) {
+                return loadGitHistory(token);
+            }
+
+            @Override
+            public GitHistoryModel.RemoteResult run(GitHistoryModel.RemoteAction action, AsyncJobService.JobToken token) {
+                return runGitRemoteOperation(action, token);
+            }
+        }, editor.configManager.getGitRemoteActionsEnabled());
+        return "Git history opened";
+    }
+
+    private GitHistoryModel.Snapshot loadGitHistory(AsyncJobService.JobToken token) {
+        File root = resolveGitRoot();
+        if (root == null) return GitHistoryModel.unavailable("Not inside a Git repository.");
+        CommandResult history = runCommand(root,
+            List.of("git", "log", "-z", "--format=%H%x00%D%x00%s%x00%an%x00%aI", "-n", "100"), token);
+        if (token.isCancelled()) return GitHistoryModel.unavailable("Git history refresh cancelled.");
+        CommandResult remotes = runCommand(root, List.of("git", "remote"), token);
+        return GitHistoryModel.fromCommands(root, history, remotes);
+    }
+
+    private GitHistoryModel.RemoteResult runGitRemoteOperation(GitHistoryModel.RemoteAction action, AsyncJobService.JobToken token) {
+        if (action == null) return new GitHistoryModel.RemoteResult(null, false, "No Git remote action was selected.");
+        File root = resolveGitRoot();
+        if (root == null) return new GitHistoryModel.RemoteResult(action, false, "Not inside a Git repository.");
+        CommandResult result = runCommand(root, action.command(), token);
+        if (token.isCancelled()) return new GitHistoryModel.RemoteResult(action, false, action.label() + " cancelled.");
+        if (result.exitCode != 0) return new GitHistoryModel.RemoteResult(action, false, gitError(result));
+        String output = result.stdout.strip();
+        return new GitHistoryModel.RemoteResult(action, true, output.isEmpty() ? action.label() + " completed." : output);
     }
 
     private GitConflictResolutionDialog.Load loadGitConflicts() {
@@ -1355,6 +1397,7 @@ final class TreeGitController {
                 + ":git status|st        Show status\n"
                 + ":git workbench        Open graphical read-only changes/diff/hunk workbench\n"
                 + ":git conflict         Open graphical conflict-resolution document\n"
+                + ":git history          Open graphical local history and explicit remote controls\n"
                 + ":git diff [args]      Show diff\n"
                 + ":git log [count]      Show compact history\n"
                 + ":git branch           Show branch list\n"
@@ -1425,11 +1468,15 @@ final class TreeGitController {
 
 
     CommandResult runCommand(File workingDirectory, List<String> command) {
+        return runCommand(workingDirectory, command, null);
+    }
+
+    CommandResult runCommand(File workingDirectory, List<String> command, AsyncJobService.JobToken token) {
         return editor.runExternalCommand(
             command,
             workingDirectory,
             null,
-            null,
+            token,
             editor.configManager.getProcessTimeoutMs(),
             editor.configManager.getProcessOutputMaxBytes(),
             true

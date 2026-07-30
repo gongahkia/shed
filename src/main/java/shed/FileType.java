@@ -45,8 +45,14 @@ public enum FileType {
                     case "py":
                         return PYTHON;
                     case "js":
+                    case "jsx":
+                    case "mjs":
+                    case "cjs":
                         return JAVASCRIPT;
                     case "ts":
+                    case "tsx":
+                    case "mts":
+                    case "cts":
                         return TYPESCRIPT;
                     case "go":
                         return GO;

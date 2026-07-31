@@ -164,6 +164,12 @@ Enable ``multi.selection.enabled`` first. ``Ctrl+Shift+D`` adds the next matchin
 
 ### `Command` mode
 
+| Key-binds | Function |
+| :---: | :---: |
+| `Cmd`/`Ctrl` + `V` | Paste into the `:` prompt |
+| `←` / `→` | Move the command-prompt block cursor |
+| `Tab` | Insert the selected local path suggestion, when shown |
+
 #### File Operations
 
 | Key-binds | Function |

@@ -249,7 +249,7 @@ Notes:
 | :--- | :--- |
 | `:git status`, `:git st` | Status (`--short --branch`) |
 | `:git diff [args]` | Diff |
-| `:git log [count]` | Compact ASCII graph log (default 20); click a commit or press Enter to open its details |
+| `:git log [count]` | Colored topology graph (default 20); click a commit for its details. Falls back to the ASCII log when graphical Git history is disabled. |
 | `:git branch`, `:git branches` | List branches; press Enter on a local branch to switch to it |
 | `:git add <paths...>`, `:git stage <paths...>` | Stage paths |
 | `:git restore <paths...>`, `:git unstage <paths...>` | Unstage paths |

@@ -846,14 +846,14 @@ final class TreeGitController {
         return paths;
     }
 
-    private GitChangesWorkbenchModel.Snapshot loadGitChangesWorkbench() {
+    GitChangesWorkbenchModel.Snapshot loadGitChangesWorkbench() {
         File root = resolveGitRoot();
         if (root == null) return GitChangesWorkbenchModel.unavailable("Not inside a Git repository.");
         CommandResult result = runCommand(root, List.of("git", "status", "--porcelain=v1", "-z", "--branch"));
         return GitChangesWorkbenchModel.fromStatus(root, result);
     }
 
-    private GitChangesWorkbenchModel.Diff loadGitChangesWorkbenchDiff(GitChangesWorkbenchModel.Snapshot snapshot,
+    GitChangesWorkbenchModel.Diff loadGitChangesWorkbenchDiff(GitChangesWorkbenchModel.Snapshot snapshot,
         GitChangesWorkbenchModel.Change change) {
         if (!editor.configManager.getGitDiffsEnabled()) {
             return workbenchDiffFailure("Git diff navigation disabled by git.diffs.enabled=false");
@@ -1311,6 +1311,28 @@ final class TreeGitController {
             return gitError(result);
         }
         return "git restore --staged complete";
+    }
+
+    String runGitRestoreWorktree(File gitRoot, String args) {
+        List<String> pathSpecs = splitWhitespaceArgs(args);
+        if (pathSpecs.isEmpty()) return "Usage: Git restore requires a path";
+        List<String> command = new ArrayList<>();
+        command.add("git");
+        command.add("restore");
+        command.add("--worktree");
+        command.add("--");
+        command.addAll(pathSpecs);
+        CommandResult result = runCommand(gitRoot, command);
+        if (result.exitCode != 0) return gitError(result);
+        editor.refreshGitGutter();
+        return "git restore complete";
+    }
+
+    List<String> localBranchesForPanel(File gitRoot) {
+        if (gitRoot == null) return List.of();
+        CommandResult result = runCommand(gitRoot, List.of("git", "for-each-ref", "--format=%(refname:short)", "refs/heads"));
+        if (result.exitCode != 0) return List.of();
+        return result.stdout.lines().map(String::strip).filter(value -> !value.isEmpty()).sorted().toList();
     }
 
 

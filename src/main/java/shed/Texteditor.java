@@ -63,6 +63,8 @@ public class Texteditor extends JFrame implements KeyListener {
     LineNumberPanel lineNumberPanel;
     JScrollPane editorScrollPane;
     JPanel editorHostPanel;
+    JSplitPane editorToolSplit;
+    ToolWindowHost toolWindowHost;
 
     // Managers
     ClipboardManager clipboardManager;
@@ -475,6 +477,18 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void renderWindowLayout() {
         editorUiController.renderWindowLayout();
+    }
+
+    void showToolWindow() {
+        editorUiController.showToolWindow();
+    }
+
+    void hideToolWindow() {
+        editorUiController.hideToolWindow();
+    }
+
+    void showToolWindow(ToolWindowHost.Tab tab) {
+        if (toolWindowHost != null) toolWindowHost.showTab(tab);
     }
 
     Font resolveEditorFont() {

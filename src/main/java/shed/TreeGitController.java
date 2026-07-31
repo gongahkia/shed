@@ -324,6 +324,11 @@ final class TreeGitController {
             return "Path not found: " + root.getPath();
         }
         editor.treeRoot = root.getAbsoluteFile();
+        cachedGitRoot = null;
+        cachedGitRootResolved = false;
+        File treeGitRoot = resolveGitRoot();
+        editor.gitBranch = treeGitRoot == null ? "" : resolveBranchName(treeGitRoot);
+        editor.updateStatusBar();
 
         StringBuilder builder = new StringBuilder();
         List<String> lineTargets = new ArrayList<>();
@@ -964,7 +969,7 @@ final class TreeGitController {
 
 
     File resolveGitRoot() {
-        CommandResult result = runCommand(new File("."), List.of("git", "rev-parse", "--show-toplevel"));
+        CommandResult result = runCommand(gitWorkingDirectory(), List.of("git", "rev-parse", "--show-toplevel"));
         if (result.exitCode != 0) {
             return null;
         }
@@ -974,6 +979,20 @@ final class TreeGitController {
         }
         File root = new File(path);
         return root.exists() ? root : null;
+    }
+
+    private File gitWorkingDirectory() {
+        if (editor.treeRoot != null) {
+            if (editor.treeRoot.isDirectory()) return editor.treeRoot;
+            File parent = editor.treeRoot.getParentFile();
+            if (parent != null) return parent;
+        }
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer != null && buffer.hasFilePath()) {
+            File parent = new File(buffer.getFilePath()).getParentFile();
+            if (parent != null) return parent;
+        }
+        return new File(".");
     }
 
 
@@ -1349,6 +1368,8 @@ final class TreeGitController {
         if (!output.isEmpty()) {
             editor.showScratchBuffer("[git checkout]", output + "\n");
         }
+        editor.gitBranch = resolveBranchName(gitRoot);
+        editor.updateStatusBar();
         return "Checkout complete";
     }
 
@@ -1369,6 +1390,8 @@ final class TreeGitController {
         if (!output.isEmpty()) {
             editor.showScratchBuffer("[git switch]", output + "\n");
         }
+        editor.gitBranch = resolveBranchName(gitRoot);
+        editor.updateStatusBar();
         return "Switch complete";
     }
 

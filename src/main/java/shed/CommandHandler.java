@@ -402,7 +402,7 @@ public class CommandHandler {
             return editor.showSettingsInspector();
         }
         String trimmed = args.trim().toLowerCase(Locale.ROOT);
-        if ("file".equals(trimmed) || "toml".equals(trimmed)) {
+        if ("file".equals(trimmed) || "toml".equals(trimmed) || "text".equals(trimmed)) {
             return editor.openSettingsBuffer();
         }
         if ("save".equals(trimmed) || "write".equals(trimmed)) {

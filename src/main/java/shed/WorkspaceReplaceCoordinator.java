@@ -7,6 +7,7 @@ import java.nio.file.Path;
 final class WorkspaceReplaceCoordinator {
     private final Texteditor editor;
     private WorkspaceReplaceService.Plan plan;
+    private WorkspaceReplaceService.ApplyResult lastApplyResult;
     private long activeRequest;
 
     WorkspaceReplaceCoordinator(Texteditor editor) {
@@ -39,6 +40,42 @@ final class WorkspaceReplaceCoordinator {
             default -> usage();
         };
     }
+
+    WorkspaceReplaceService.Plan planForPanel() { return plan == null ? null : plan.snapshot(); }
+
+    WorkspaceReplaceService.ApplyResult lastApplyResultForPanel() { return lastApplyResult; }
+
+    ProjectReplacePolicy policyForPanel() { return policy(); }
+
+    String previewForPanel(String find, String replacement) {
+        if (find == null || find.isEmpty() || find.indexOf('\n') >= 0 || find.indexOf('\r') >= 0
+            || replacement == null || replacement.indexOf('\n') >= 0 || replacement.indexOf('\r') >= 0) {
+            return "Find must be non-empty and both values must be single-line.";
+        }
+        String escapedFind = find.replace("\\", "\\\\").replace("/", "\\/");
+        String escapedReplacement = replacement.replace("\\", "\\\\").replace("/", "\\/");
+        return preview("/" + escapedFind + "/" + escapedReplacement + "/");
+    }
+
+    String selectFileForPanel(int id, boolean selected) {
+        if (plan == null || !plan.selectFile(id, selected ? WorkspaceReplaceService.Selection.ON : WorkspaceReplaceService.Selection.OFF)) {
+            return "No project replace preview or file selection.";
+        }
+        return "File selection updated";
+    }
+
+    String selectMatchForPanel(int id, boolean selected) {
+        if (plan == null || !plan.selectMatch(id, selected ? WorkspaceReplaceService.Selection.ON : WorkspaceReplaceService.Selection.OFF)) {
+            return "No project replace preview or match selection.";
+        }
+        return "Match selection updated";
+    }
+
+    String applyForPanel() { return apply(policy().confirmRequired() ? "confirm" : ""); }
+
+    String cancelForPanel() { return cancel(); }
+
+    String setForPanel(String key, String value) { return setSetting(key, value); }
 
     private String preview(String argument) {
         ProjectReplacePolicy policy = policy();
@@ -161,7 +198,11 @@ final class WorkspaceReplaceCoordinator {
             return;
         }
         plan = preview.plan();
-        showPlan();
+        if (editor.toolWindowHost != null && editor.toolWindowHost.isSelected(ToolWindowHost.Tab.REPLACE)) {
+            editor.toolWindowHost.refresh(ToolWindowHost.Tab.REPLACE);
+        } else {
+            showPlan();
+        }
         editor.showMessage("Project replace preview ready");
     }
 
@@ -227,7 +268,12 @@ final class WorkspaceReplaceCoordinator {
             editor.showMessage("Project replace apply job " + jobId + " failed: " + (message == null ? "" : message));
             return;
         }
-        editor.showScratchBuffer("[project replace result]", formatResult(result));
+        lastApplyResult = result;
+        if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.REPLACE)) {
+            editor.showScratchBuffer("[project replace result]", formatResult(result));
+        } else {
+            editor.toolWindowHost.refresh(ToolWindowHost.Tab.REPLACE);
+        }
         editor.showMessage("Project replace apply complete");
     }
 

@@ -63,8 +63,17 @@ final class PaletteController {
 
 
     String handleProjectReplace(String argument) {
+        String trimmed = argument == null ? "" : argument.trim();
+        if (trimmed.isEmpty() || "ui".equalsIgnoreCase(trimmed)) {
+            editor.showToolWindow(ToolWindowHost.Tab.REPLACE);
+            return "Project Replace panel opened";
+        }
+        if (trimmed.equalsIgnoreCase("text")) return workspaceReplaceCoordinator.handle("settings");
+        if (trimmed.regionMatches(true, 0, "text ", 0, 5)) return workspaceReplaceCoordinator.handle(trimmed.substring(5).trim());
         return workspaceReplaceCoordinator.handle(argument);
     }
+
+    WorkspaceReplaceCoordinator workspaceReplaceCoordinator() { return workspaceReplaceCoordinator; }
 
 
     public String showSymbols(String argument) {

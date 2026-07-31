@@ -2076,7 +2076,8 @@ final class InputController {
         knownCommands.add("pastepicker");
         knownCommands.add("yr");
         knownCommands.add("zen");
-        knownCommands.add("theater");
+        knownCommands.add("goyo");
+        knownCommands.add("limelight");
         knownCommands.add("normal");
         knownCommands.add("reload");
         knownCommands.add("source");

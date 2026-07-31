@@ -488,7 +488,7 @@ public class ConfigManagerTest {
         Path configPath = home.resolve(".shed/config.toml");
         String source = "schema_version = 1\n"
             + "\"tab.size\" = \"8\"\n"
-            + "\"ui.dramatic.sound.volume\" = 101\n"
+            + "\"minimap.width\" = 20\n"
             + "\"line.numbers\" = \"diagonal\"\n";
         Files.createDirectories(configPath.getParent());
         Files.writeString(configPath, source);
@@ -498,14 +498,14 @@ public class ConfigManagerTest {
 
         assertTrue(config.hasConfigLoadFailure());
         assertEquals(4, config.getTabSize());
-        assertEquals(75, config.getDramaticSoundVolume());
+        assertEquals(84, config.getMinimapWidth());
         assertEquals(LineNumberMode.ABSOLUTE, config.getLineNumberMode());
         assertEquals(source, Files.readString(configPath));
         assertTrue(config.getConfigLoadReport().contains("line 2, column"));
         assertTrue(config.getConfigLoadReport().contains("tab.size must be TOML integer"));
         assertTrue(config.getConfigLoadReport().contains("tab.size must be TOML integer (active fallback: 4)"));
-        assertTrue(config.getConfigLoadReport().contains("ui.dramatic.sound.volume must be between 0 and 100"));
-        assertTrue(config.getConfigLoadReport().contains("ui.dramatic.sound.volume must be between 0 and 100 (active fallback: 75)"));
+        assertTrue(config.getConfigLoadReport().contains("minimap.width must be at least 40"));
+        assertTrue(config.getConfigLoadReport().contains("minimap.width must be at least 40 (active fallback: 84)"));
         assertTrue(config.getConfigLoadReport().contains("line.numbers must be none, absolute, relative, relativeabsolute, or hybrid"));
     }
 
@@ -713,55 +713,19 @@ public class ConfigManagerTest {
     }
 
     @Test
-    void dramaticDefaultsAndRuntimeTogglePathsWork() {
-        Path home = tempDir.resolve("home-dramatic-defaults");
+    void limelightSettingsAreValidatedAndApplied() {
+        Path home = tempDir.resolve("home-limelight-settings");
         System.setProperty("user.home", home.toString());
-        System.clearProperty("prefers.reduced.motion");
         ConfigManager config = new ConfigManager();
 
-        assertFalse(config.getDramaticUiEnabled());
-        assertEquals("default", config.getDramaticSoundPack());
-        assertEquals(75, config.getDramaticSoundVolume());
-        assertTrue(config.getDramaticPerformanceGuardrailsEnabled());
+        assertEquals(0.5, config.getLimelightCoefficient(), 0.0001);
+        assertEquals(0, config.getLimelightParagraphSpan());
 
-        config.set("ui.dramatic", "true");
-        config.set("ui.dramatic.sound", "true");
-        config.set("ui.dramatic.sound.pack", "cinema");
-        config.set("ui.dramatic.sound.volume", "90");
-        config.set("ui.dramatic.performance.cpu.threshold", "0.65");
+        config.set("limelight.coefficient", "0.65");
+        config.set("limelight.paragraph.span", "2");
 
-        assertTrue(config.getDramaticUiEnabled());
-        assertTrue(config.getDramaticSoundEnabled());
-        assertEquals("cinema", config.getDramaticSoundPack());
-        assertEquals(90, config.getDramaticSoundVolume());
-        assertEquals(0.65, config.getDramaticPerformanceCpuThreshold(), 0.0001);
-    }
-
-    @Test
-    void dramaticOverridesAndReducedMotionSyncAreParsed() throws IOException {
-        Path home = tempDir.resolve("home-dramatic-override");
-        Path shedDir = home.resolve(".shed");
-        Files.createDirectories(shedDir);
-        Files.writeString(shedDir.resolve("config.toml"),
-            "schema_version = 1\n"
-            + "\"ui.dramatic\" = true\n"
-            + "\"ui.dramatic.sound\" = true\n"
-            + "\"ui.dramatic.sound.pack\" = \"soft\"\n"
-            + "\"ui.dramatic.sound.volume\" = 40\n"
-            + "\"ui.dramatic.reduced.motion\" = false\n"
-            + "\"ui.dramatic.reduced.motion.sync\" = true\n"
-            + "\"ui.dramatic.performance.guardrails\" = true\n"
-            + "\"ui.dramatic.performance.line.threshold\" = 30000\n");
-        System.setProperty("user.home", home.toString());
-        System.setProperty("prefers.reduced.motion", "true");
-
-        ConfigManager config = new ConfigManager();
-        assertTrue(config.getDramaticUiEnabled());
-        assertTrue(config.getDramaticSoundEnabled());
-        assertEquals("soft", config.getDramaticSoundPack());
-        assertEquals(40, config.getDramaticSoundVolume());
-        assertTrue(config.getDramaticReducedMotionEnabled());
-        assertEquals(30000, config.getDramaticPerformanceLineThreshold());
+        assertEquals(0.65, config.getLimelightCoefficient(), 0.0001);
+        assertEquals(2, config.getLimelightParagraphSpan());
     }
 
     @Test
@@ -770,16 +734,16 @@ public class ConfigManagerTest {
         System.setProperty("user.home", home.toString());
         ConfigManager config = new ConfigManager();
 
-        config.setAndPersist("ui.dramatic", "true");
-        config.setAndPersist("ui.dramatic.sound.pack", "cinema");
+        config.setAndPersist("limelight.coefficient", "0.65");
+        config.setAndPersist("limelight.paragraph.span", "2");
 
         String file = Files.readString(Path.of(config.getConfigPath()));
         assertTrue(file.contains("schema_version = 1"));
-        assertTrue(file.contains("\"ui.dramatic\" = true"));
-        assertTrue(file.contains("\"ui.dramatic.sound.pack\" = \"cinema\""));
+        assertTrue(file.contains("\"limelight.coefficient\" = 0.65"));
+        assertTrue(file.contains("\"limelight.paragraph.span\" = 2"));
         ConfigManager reloaded = new ConfigManager();
-        assertTrue(reloaded.getDramaticUiEnabled());
-        assertEquals("cinema", reloaded.getDramaticSoundPack());
+        assertEquals(0.65, reloaded.getLimelightCoefficient(), 0.0001);
+        assertEquals(2, reloaded.getLimelightParagraphSpan());
     }
 
     @Test
@@ -878,7 +842,7 @@ public class ConfigManagerTest {
         Path projectB = tempDir.resolve("project-b");
         Files.createDirectories(projectA.resolve("src"));
         Files.createDirectories(projectB.resolve("src"));
-        Files.writeString(projectA.resolve(".shed.toml"), "schema_version = 1\n\"ui.dramatic\" = true\n\"ui.dramatic.sound.pack\" = \"cinema\"\n");
+        Files.writeString(projectA.resolve(".shed.toml"), "schema_version = 1\n\"theme\" = \"dracula\"\n");
 
         File fileA = projectA.resolve("src/App.java").toFile();
         Files.writeString(fileA.toPath(), "class App {}\n");
@@ -887,12 +851,12 @@ public class ConfigManagerTest {
 
         String loaded = config.applyProjectConfigForFile(fileA);
         assertTrue(loaded.contains("Project config loaded"));
-        assertEquals("cinema", config.getDramaticSoundPack());
+        assertEquals("dracula", config.getThemeId());
         assertNotNull(config.getActiveProjectConfigPath());
 
         String cleared = config.applyProjectConfigForFile(fileB);
         assertTrue(cleared.contains("Project config cleared"));
-        assertEquals("default", config.getDramaticSoundPack());
+        assertEquals("one-dark-pro", config.getThemeId());
         assertNull(config.getActiveProjectConfigPath());
     }
 
@@ -906,7 +870,6 @@ public class ConfigManagerTest {
         Files.createDirectories(project.resolve("src"));
         Files.writeString(project.resolve(".shed.toml"),
             "schema_version = 1\n"
-                + "ui.dramatic = true\n"
                 + "command.user.pwn = \"echo hacked\"\n"
                 + "keybind.normal.q = \":q!\"\n");
         File file = project.resolve("src/Main.java").toFile();
@@ -914,7 +877,6 @@ public class ConfigManagerTest {
 
         String loaded = config.applyProjectConfigForFile(file);
         assertTrue(loaded.contains("blocked"));
-        assertTrue(config.getDramaticUiEnabled());
         assertTrue(config.getUserCommands().isEmpty());
         assertNull(config.getKeybinding("normal", "q"));
     }
@@ -949,15 +911,15 @@ public class ConfigManagerTest {
 
         Path project = tempDir.resolve("project-disabled");
         Files.createDirectories(project.resolve("src"));
-        Files.writeString(project.resolve(".shed.toml"), "schema_version = 1\nui.dramatic = true\n");
+        Files.writeString(project.resolve(".shed.toml"), "schema_version = 1\ntheme = \"dracula\"\n");
         File file = project.resolve("src/Main.java").toFile();
         Files.writeString(file.toPath(), "class Main {}\n");
 
         assertTrue(config.applyProjectConfigForFile(file).contains("Project config loaded"));
-        assertTrue(config.getDramaticUiEnabled());
+        assertEquals("dracula", config.getThemeId());
 
         config.set("project.config.enabled", "false");
         assertTrue(config.applyProjectConfigForFile(file).contains("Project config disabled"));
-        assertFalse(config.getDramaticUiEnabled());
+        assertEquals("one-dark-pro", config.getThemeId());
     }
 }

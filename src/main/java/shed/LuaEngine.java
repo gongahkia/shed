@@ -156,7 +156,6 @@ public class LuaEngine {
         shed.set("theme_set", permissions != null && permissions.contains("config.write") ? new ThemeSet() : new DeniedVarArg("config.write permission required"));
         shed.set("palette_get", new PaletteGet());
         shed.set("palette_set", permissions != null && permissions.contains("config.write") ? new PaletteSet() : new DeniedVarArg("config.write permission required"));
-        shed.set("theater", permissions != null && permissions.contains("config.write") ? new Theater() : new DeniedOneArg("config.write permission required"));
         shed.set("mode", new Mode());
         shed.set("on", permissions != null && permissions.contains("event") ? new On() : new DeniedTwoArg("event permission required"));
         return shed;
@@ -462,14 +461,6 @@ public class LuaEngine {
                 overrides.put(key.tojstring(), val.tojstring());
             }
             String result = onEdt(() -> editor.applyPaletteOverridesFromPlugin(overrides, persist), "");
-            return LuaValue.valueOf(result == null ? "" : result);
-        }
-    }
-
-    private class Theater extends OneArgFunction {
-        public LuaValue call(LuaValue arg) {
-            String preset = arg.optjstring("");
-            String result = onEdt(() -> editor.applyTheaterPreset(preset), "");
             return LuaValue.valueOf(result == null ? "" : result);
         }
     }

@@ -170,7 +170,8 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.showMarks(), "marks");
         registerCommand((args, range, force) -> editor.showThemes(), "themes");
         registerCommand((args, range, force) -> editor.toggleZenMode(), "zen");
-        registerCommand((args, range, force) -> editor.applyTheaterPreset(args), "theater");
+        registerCommand((args, range, force) -> editor.toggleGoyoMode(), "goyo");
+        registerCommand((args, range, force) -> editor.toggleLimelight(), "limelight");
         registerCommand((args, range, force) -> editor.toggleMinimap(), "minimap");
         registerCommand((args, range, force) -> handleNormal(args, range), "normal", "norm");
         registerCommand((args, range, force) -> editor.reloadConfigFromDisk(), "reload", "source");
@@ -271,7 +272,7 @@ public class CommandHandler {
         if (persist) {
             int separator = option.indexOf('=');
             if (separator <= 0) {
-                return "Persistent set requires key=value (example: :set! ui.dramatic=true)";
+                return "Persistent set requires key=value (example: :set! limelight.coefficient=0.5)";
             }
             String key = option.substring(0, separator).trim();
             String value = option.substring(separator + 1).trim();

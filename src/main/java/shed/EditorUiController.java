@@ -311,6 +311,7 @@ final class EditorUiController {
         }
         SearchManager paneSearchManager = new SearchManager(textArea);
         final EditorPane[] paneRef = new EditorPane[1];
+        final int[] previousCaretLine = {-1};
         textArea.addCaretListener(e -> {
             if (paneRef[0] != null && paneRef[0] != getActivePane()) {
                 activateEditorPane(paneRef[0]);
@@ -321,8 +322,13 @@ final class EditorUiController {
             }
             editor.updateCurrentLineHighlight();
             editor.updateMatchingBracketHighlight();
-            if (editor.lineNumberPanel != null) {
-                editor.lineNumberPanel.repaint();
+            if (paneRef[0] != null) {
+                try {
+                    int currentCaretLine = textArea.getLineOfOffset(textArea.getCaretPosition());
+                    paneRef[0].getLineNumberPanel().repaintLines(previousCaretLine[0], currentCaretLine);
+                    previousCaretLine[0] = currentCaretLine;
+                } catch (BadLocationException ignored) {
+                }
             }
             editor.dismissCompletionPopup();
             requestStatusBarRefresh();

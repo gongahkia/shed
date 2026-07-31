@@ -224,6 +224,23 @@ class LineNumberPanel extends JPanel {
         breakpointToggleListener = listener == null ? ignored -> { } : listener;
     }
 
+    public void repaintLines(int... lines) {
+        if (lines == null || lines.length == 0) {
+            return;
+        }
+        int lineHeight = Math.max(1, getFontMetrics(textArea.getFont()).getHeight());
+        for (int line : lines) {
+            if (line < 0 || line >= textArea.getLineCount()) {
+                continue;
+            }
+            try {
+                int y = textArea.modelToView2D(textArea.getLineStartOffset(line)).getBounds().y;
+                repaint(0, y, getWidth(), lineHeight);
+            } catch (BadLocationException ignored) {
+            }
+        }
+    }
+
     private String formatLineNumber(int line, int currentLine) {
         switch (mode) {
             case NONE:

@@ -808,6 +808,10 @@ public class Texteditor extends JFrame implements KeyListener {
         syntaxUiController.updateCurrentLineHighlight();
     }
 
+    void invalidateCurrentLineHighlight() {
+        syntaxUiController.invalidateCurrentLineHighlight();
+    }
+
     String getGitBlameForCurrentLine(FileBuffer buffer) {
         return syntaxUiController.getGitBlameForCurrentLine(buffer);
     }
@@ -842,6 +846,14 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void applySyntaxHighlighting() {
         syntaxUiController.applySyntaxHighlighting();
+    }
+
+    void scheduleSyntaxHighlighting() {
+        syntaxUiController.scheduleSyntaxHighlighting();
+    }
+
+    void scheduleSymbolRefresh() {
+        syntaxUiController.scheduleSymbolRefresh();
     }
 
     void clearSyntaxHighlighting() {
@@ -1137,6 +1149,14 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void persistRecoverySnapshotsSafely() {
         recoveryController.persistRecoverySnapshotsSafely();
+    }
+
+    void scheduleRecoverySnapshotCapture() {
+        recoveryController.scheduleRecoverySnapshotCapture();
+    }
+
+    void flushScheduledRecoverySnapshotCapture() {
+        recoveryController.flushScheduledRecoverySnapshotCapture();
     }
 
     void persistRecoverySnapshots() throws IOException {
@@ -2160,6 +2180,10 @@ public class Texteditor extends JFrame implements KeyListener {
         lspController.syncLspChange(buffer);
     }
 
+    void flushLspChange(FileBuffer buffer) {
+        lspController.flushPendingLspChange(buffer);
+    }
+
     void scheduleDiagnosticRefresh() {
         lspController.scheduleDiagnosticRefresh();
     }
@@ -2476,6 +2500,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void updateDiffGutter(FileBuffer buffer) {
         paneBufferController.updateDiffGutter(buffer);
+    }
+
+    void scheduleDiffGutter(FileBuffer buffer) {
+        paneBufferController.scheduleDiffGutter(buffer);
     }
 
     // Show message in status bar
@@ -3075,6 +3103,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (recoverySnapshotTimer != null) {
             recoverySnapshotTimer.stop();
         }
+        flushScheduledRecoverySnapshotCapture();
         shutdownRecoveryJournalScheduling();
         flushPendingBackups();
         if (backupScheduler != null) {

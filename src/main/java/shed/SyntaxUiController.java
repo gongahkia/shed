@@ -14,7 +14,13 @@ import java.util.regex.Pattern;
 final class SyntaxUiController {
     static final int MAX_FULL_SYNTAX_CHARS = 750_000;
     static final int MAX_FULL_SYNTAX_LINES = 20_000;
+    private static final int EDIT_IDLE_DEBOUNCE_MS = 120;
     private final Texteditor editor;
+    private int highlightedLine = -1;
+    private Timer syntaxHighlightTimer;
+    private Timer symbolRefreshTimer;
+    private FileBuffer cachedSymbolBuffer;
+    private List<SymbolService.Symbol> cachedSymbols = List.of();
 
     SyntaxUiController(Texteditor editor) {
         this.editor = editor;
@@ -22,23 +28,33 @@ final class SyntaxUiController {
 
     void updateCurrentLineHighlight() {
         Highlighter highlighter = editor.writingArea.getHighlighter();
-        if (editor.currentLineHighlightTag != null) {
-            highlighter.removeHighlight(editor.currentLineHighlightTag);
-            editor.currentLineHighlightTag = null;
-        }
-
         if (!editor.configManager.getShowCurrentLine() || editor.editorState.mode == EditorMode.VISUAL || editor.editorState.mode == EditorMode.VISUAL_LINE) {
+            invalidateCurrentLineHighlight();
             return;
         }
 
         try {
             int caret = editor.writingArea.getCaretPosition();
             int line = editor.writingArea.getLineOfOffset(caret);
+            if (editor.currentLineHighlightTag != null && highlightedLine == line) {
+                return;
+            }
+            invalidateCurrentLineHighlight();
             int start = editor.writingArea.getLineStartOffset(line);
             int end = editor.writingArea.getLineEndOffset(line);
             editor.currentLineHighlightTag = highlighter.addHighlight(start, end, editor.currentLinePainter);
+            highlightedLine = line;
         } catch (BadLocationException ignored) {
         }
+    }
+
+    void invalidateCurrentLineHighlight() {
+        Highlighter highlighter = editor.writingArea.getHighlighter();
+        if (editor.currentLineHighlightTag != null) {
+            highlighter.removeHighlight(editor.currentLineHighlightTag);
+            editor.currentLineHighlightTag = null;
+        }
+        highlightedLine = -1;
     }
 
 
@@ -74,14 +90,14 @@ final class SyntaxUiController {
     String findCurrentBreadcrumb() {
         try {
             FileBuffer buffer = editor.getCurrentBuffer();
-            if (buffer == null) {
+            if (buffer == null || cachedSymbolBuffer != buffer) {
+                scheduleSymbolRefresh();
                 return null;
             }
             int caret = editor.writingArea.getCaretPosition();
             int line = editor.writingArea.getLineOfOffset(caret) + 1;
-            List<SymbolService.Symbol> symbols = editor.symbolService.collectSymbols(editor.writingArea.getText(), buffer.getFileType());
-            if (!symbols.isEmpty()) {
-                List<SymbolService.Symbol> trail = editor.symbolService.breadcrumbTrail(symbols, line);
+            if (!cachedSymbols.isEmpty()) {
+                List<SymbolService.Symbol> trail = editor.symbolService.breadcrumbTrail(cachedSymbols, line);
                 if (!trail.isEmpty()) {
                     StringBuilder breadcrumb = new StringBuilder();
                     for (int i = 0; i < trail.size(); i++) {
@@ -99,7 +115,45 @@ final class SyntaxUiController {
             }
         } catch (BadLocationException ignored) {
         }
-        return findCurrentScopeHeuristic();
+        return null;
+    }
+
+    void scheduleSyntaxHighlighting() {
+        if (syntaxHighlightTimer == null) {
+            syntaxHighlightTimer = new Timer(EDIT_IDLE_DEBOUNCE_MS, event -> applySyntaxHighlighting());
+            syntaxHighlightTimer.setRepeats(false);
+        }
+        syntaxHighlightTimer.restart();
+        scheduleSymbolRefresh();
+    }
+
+    void scheduleSymbolRefresh() {
+        if (symbolRefreshTimer == null) {
+            symbolRefreshTimer = new Timer(EDIT_IDLE_DEBOUNCE_MS, event -> refreshSymbolCache());
+            symbolRefreshTimer.setRepeats(false);
+        }
+        symbolRefreshTimer.restart();
+    }
+
+    private void refreshSymbolCache() {
+        long started = System.nanoTime();
+        FileBuffer buffer = editor.getCurrentBuffer();
+        String detail = "no-buffer";
+        if (buffer == null) {
+            cachedSymbolBuffer = null;
+            cachedSymbols = List.of();
+        } else {
+            String text = editor.writingArea.getText();
+            int lines = editor.writingArea.getLineCount();
+            detail = "chars=" + text.length() + " lines=" + lines;
+            cachedSymbolBuffer = buffer;
+            cachedSymbols = shouldSkipSyntaxHighlighting(text.length(), lines, buffer.isLargeFile())
+                ? List.of() : List.copyOf(editor.symbolService.collectSymbols(text, buffer.getFileType()));
+        }
+        if (editor.perfService != null) {
+            editor.perfService.recordDuration("symbol.cache", started, detail);
+        }
+        editor.requestStatusBarRefresh();
     }
 
 
@@ -220,6 +274,7 @@ final class SyntaxUiController {
         Color selectionTextColor = editor.configManager.getSelectionTextColor();
 
         editor.currentLinePainter = new DefaultHighlighter.DefaultHighlightPainter(editor.configManager.getCurrentLineHighlightColor());
+        invalidateCurrentLineHighlight();
         editor.substitutePreviewPainter = new DefaultHighlighter.DefaultHighlightPainter(editor.configManager.getSubstitutePreviewColor());
         editor.syntaxKeywordColor = editor.configManager.getSyntaxKeywordColor();
         editor.syntaxStringColor = editor.configManager.getSyntaxStringColor();

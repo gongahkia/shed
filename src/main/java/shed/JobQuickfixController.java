@@ -591,7 +591,6 @@ final class JobQuickfixController {
             editor.quickfixBuffer.setContent(content, false);
             editor.loadBufferIntoEditor(editor.quickfixBuffer);
             editor.writingArea.setCaretPosition(Math.min(Math.max(0, editor.quickfixService.currentIndex()), Math.max(0, editor.writingArea.getDocument().getLength() - 1)));
-            editor.animateEditorHostTint(editor.configManager.getCommandColor());
             return "Quickfix updated";
         }
 
@@ -604,7 +603,6 @@ final class JobQuickfixController {
             editor.specialBufferReturns.push(new SpecialBufferReturnState(editor.quickfixBuffer, returnBuffer, returnCaretPosition));
         }
         editor.loadBufferIntoEditor(editor.quickfixBuffer);
-        editor.animateEditorHostTint(editor.configManager.getCommandColor());
         return "Quickfix opened";
     }
 
@@ -672,7 +670,6 @@ final class JobQuickfixController {
         pruneSpecialBufferReturns(editor.quickfixBuffer);
         editor.buffers.remove(editor.quickfixBuffer);
         editor.quickfixBuffer = null;
-        editor.animateEditorHostTint(editor.configManager.getCommandColor());
         return "Quickfix closed";
     }
 
@@ -734,8 +731,6 @@ final class JobQuickfixController {
             editor.writingArea.setCaretPosition(target);
         } catch (BadLocationException ignored) {
         }
-        editor.pulseCaretLine(editor.blendColor(editor.configManager.getCommandColor(), editor.configManager.getCaretColor(), 0.35));
-        editor.playCue(CueType.NAVIGATE);
         return "Quickfix " + (editor.quickfixService.currentIndex() + 1) + "/" + editor.quickfixService.size();
     }
 

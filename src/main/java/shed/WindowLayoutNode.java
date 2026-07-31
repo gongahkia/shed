@@ -74,7 +74,7 @@ public class WindowLayoutNode {
 
     Component render(EditorPane activePane, int availableWidth, int availableHeight) {
         if (isLeaf()) {
-            return pane.getComponent();
+            return pane.isHiddenByFocusMode() ? null : pane.getComponent();
         }
 
         int safeWidth = Math.max(0, availableWidth);
@@ -90,8 +90,11 @@ public class WindowLayoutNode {
         int secondWidth = orientation == Orientation.HORIZONTAL ? Math.max(0, safeWidth - firstWidth - DIVIDER_SIZE) : safeWidth;
         int firstHeight = orientation == Orientation.VERTICAL ? (int) Math.round(safeHeight * ratio) : safeHeight;
         int secondHeight = orientation == Orientation.VERTICAL ? Math.max(0, safeHeight - firstHeight - DIVIDER_SIZE) : safeHeight;
-        JSplitPane splitPane = new JSplitPane(splitOrientation,
-            first.render(activePane, firstWidth, firstHeight), second.render(activePane, secondWidth, secondHeight));
+        Component firstComponent = first == null ? null : first.render(activePane, firstWidth, firstHeight);
+        Component secondComponent = second == null ? null : second.render(activePane, secondWidth, secondHeight);
+        if (firstComponent == null) return secondComponent;
+        if (secondComponent == null) return firstComponent;
+        JSplitPane splitPane = new JSplitPane(splitOrientation, firstComponent, secondComponent);
         splitPane.setResizeWeight(ratio);
         splitPane.setContinuousLayout(true);
         splitPane.setDividerSize(DIVIDER_SIZE);
@@ -107,13 +110,13 @@ public class WindowLayoutNode {
     }
 
     private int minimumWidth() {
-        if (isLeaf()) return MINIMUM_LEAF_WIDTH;
+        if (isLeaf()) return pane.isHiddenByFocusMode() ? 0 : MINIMUM_LEAF_WIDTH;
         if (orientation == Orientation.HORIZONTAL) return childMinimumWidth(first) + childMinimumWidth(second) + DIVIDER_SIZE;
         return Math.max(childMinimumWidth(first), childMinimumWidth(second));
     }
 
     private int minimumHeight() {
-        if (isLeaf()) return MINIMUM_LEAF_HEIGHT;
+        if (isLeaf()) return pane.isHiddenByFocusMode() ? 0 : MINIMUM_LEAF_HEIGHT;
         if (orientation == Orientation.VERTICAL) return childMinimumHeight(first) + childMinimumHeight(second) + DIVIDER_SIZE;
         return Math.max(childMinimumHeight(first), childMinimumHeight(second));
     }

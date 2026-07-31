@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Window;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Map;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -20,6 +21,7 @@ final class ToolWindowHost extends JPanel {
     private final JTabbedPane tabs = new JTabbedPane();
     private final Map<Tab, ToolSurface> surfaces = new EnumMap<>(Tab.class);
     private final Map<Tab, JDialog> detached = new EnumMap<>(Tab.class);
+    private final EnumSet<Tab> hiddenDetachedForFocusMode = EnumSet.noneOf(Tab.class);
 
     ToolWindowHost(Texteditor editor) {
         super(new BorderLayout());
@@ -89,6 +91,33 @@ final class ToolWindowHost extends JPanel {
                 return;
             }
         }
+    }
+
+    boolean hideForFocusMode() {
+        boolean dockedVisible = isVisible();
+        hiddenDetachedForFocusMode.clear();
+        for (Map.Entry<Tab, JDialog> entry : detached.entrySet()) {
+            JDialog dialog = entry.getValue();
+            if (dialog != null && dialog.isDisplayable() && dialog.isVisible()) {
+                hiddenDetachedForFocusMode.add(entry.getKey());
+                dialog.setVisible(false);
+            }
+        }
+        editor.hideToolWindow();
+        return dockedVisible;
+    }
+
+    void restoreAfterFocusMode(boolean restoreDocked) {
+        if (restoreDocked) {
+            editor.showToolWindow();
+        }
+        for (Tab tab : EnumSet.copyOf(hiddenDetachedForFocusMode)) {
+            JDialog dialog = detached.get(tab);
+            if (dialog != null && dialog.isDisplayable()) {
+                dialog.setVisible(true);
+            }
+        }
+        hiddenDetachedForFocusMode.clear();
     }
 
     private void detachSelected() {

@@ -507,14 +507,10 @@ final class PaneBufferController {
         if (editor.windowLayoutRoot == null) {
             editor.windowLayoutRoot = WindowLayoutNode.leaf(activePane);
         }
-        double startRatio = editor.dramaticPanelAnimationsEnabled && editor.dramaticMotionAllowed() ? 0.12 : 0.5;
-        editor.windowLayoutRoot.splitLeaf(activePane, newPane, orientation, false, startRatio);
+        editor.windowLayoutRoot.splitLeaf(activePane, newPane, orientation, false, 0.5);
         loadBufferIntoPane(newPane, currentBuffer, editor.writingArea.getCaretPosition());
         editor.renderWindowLayout();
-        editor.animateSplitForPane(newPane, startRatio, 0.5);
         editor.activateEditorPane(newPane);
-        editor.flashPaneJump(newPane);
-        editor.animateEditorHostTint(editor.configManager.getCommandColor());
         newPane.getTextArea().requestFocusInWindow();
         return vertical ? "Vertical split created" : "Horizontal split created";
     }
@@ -580,12 +576,14 @@ final class PaneBufferController {
 
 
     public String cycleWindowFocus() {
-        if (editor.editorPanes.size() <= 1) {
+        if (visiblePaneCount() <= 1) {
             return "Only one window";
         }
-        int nextIndex = (editor.activePaneIndex + 1) % editor.editorPanes.size();
+        int nextIndex = editor.activePaneIndex;
+        do {
+            nextIndex = (nextIndex + 1) % editor.editorPanes.size();
+        } while (editor.editorPanes.get(nextIndex).isHiddenByFocusMode());
         editor.activateEditorPane(editor.editorPanes.get(nextIndex));
-        editor.flashPaneJump(editor.getActivePane());
         editor.requestActivePaneFocus();
         return "Window focus changed";
     }
@@ -614,7 +612,7 @@ final class PaneBufferController {
 
 
     public String focusWindowDirection(int dx, int dy) {
-        if (editor.editorPanes.size() <= 1) {
+        if (visiblePaneCount() <= 1) {
             return "Only one window";
         }
         EditorPane activePane = editor.getActivePane();
@@ -633,6 +631,7 @@ final class PaneBufferController {
         double bestScore = Double.MAX_VALUE;
 
         for (EditorPane pane : candidates) {
+            if (pane.isHiddenByFocusMode()) continue;
             Rectangle candidateBounds = paneBounds(pane);
             double score = directionalAlignmentScore(activeBounds, candidateBounds, direction);
             if (score < bestScore) {
@@ -646,7 +645,6 @@ final class PaneBufferController {
         }
 
         editor.activateEditorPane(bestPane);
-        editor.flashPaneJump(bestPane);
         editor.requestActivePaneFocus();
         return "Window focus changed";
     }
@@ -663,6 +661,14 @@ final class PaneBufferController {
             return WindowLayoutNode.Direction.UP;
         }
         return WindowLayoutNode.Direction.DOWN;
+    }
+
+    private int visiblePaneCount() {
+        int count = 0;
+        for (EditorPane pane : editor.editorPanes) {
+            if (!pane.isHiddenByFocusMode()) count++;
+        }
+        return count;
     }
 
 

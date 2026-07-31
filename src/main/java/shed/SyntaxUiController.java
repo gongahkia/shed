@@ -362,7 +362,7 @@ final class SyntaxUiController {
                 editor.configManager.getLineNumberForeground(),
                 editor.configManager.getLineNumberActiveForeground()
             );
-            if (editor.lineNumberMode == LineNumberMode.NONE) {
+            if (editor.goyoModeEnabled || editor.lineNumberMode == LineNumberMode.NONE) {
                 pane.getScrollPane().setRowHeaderView(null);
             } else {
                 pane.getScrollPane().setRowHeaderView(pane.getLineNumberPanel());
@@ -393,7 +393,6 @@ final class SyntaxUiController {
         editor.statusBar.setForeground(editor.configManager.getStatusBarForeground());
         editor.commandBar.setBackground(editor.configManager.getCommandBarBackground());
         editor.commandBar.setForeground(editor.configManager.getCommandBarForeground());
-        editor.applyDramaticFooterStyling();
 
         for (EditorPane pane : editor.editorPanes) {
             JTextArea area = pane.getTextArea();
@@ -407,6 +406,7 @@ final class SyntaxUiController {
             editor.writingArea.setBackground(editor.getModeBackground(editor.editorState.mode));
         }
         editor.updateZenModeLayout();
+        editor.refreshLimelight();
 
         refreshLineNumberPanel();
         updateCurrentLineHighlight();

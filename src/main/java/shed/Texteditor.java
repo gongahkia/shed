@@ -1455,6 +1455,17 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String handleTaskCommand(String argument) {
+        String trimmed = argument == null ? "" : argument.trim();
+        if (trimmed.isEmpty() || "ui".equalsIgnoreCase(trimmed)) {
+            showToolWindow(ToolWindowHost.Tab.TASKS);
+            return "Tasks panel opened";
+        }
+        if (trimmed.equalsIgnoreCase("text")) {
+            return jobQuickfixController.handleTaskCommand("list");
+        }
+        if (trimmed.regionMatches(true, 0, "text ", 0, 5)) {
+            return jobQuickfixController.handleTaskCommand(trimmed.substring(5).trim());
+        }
         return jobQuickfixController.handleTaskCommand(argument);
     }
 
@@ -1852,6 +1863,8 @@ public class Texteditor extends JFrame implements KeyListener {
         return paletteController.handleProjectReplace(argument);
     }
 
+    WorkspaceReplaceCoordinator workspaceReplaceCoordinator() { return paletteController.workspaceReplaceCoordinator(); }
+
     public String showSymbols(String argument) {
         return paletteController.showSymbols(argument);
     }
@@ -2047,6 +2060,17 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String handleDebugCommand(String argument) {
+        String trimmed = argument == null ? "" : argument.trim();
+        if (trimmed.isEmpty() || "ui".equalsIgnoreCase(trimmed)) {
+            showToolWindow(ToolWindowHost.Tab.DEBUG);
+            return "Debug panel opened";
+        }
+        if (trimmed.equalsIgnoreCase("text")) {
+            return debugSessionController.handle("status");
+        }
+        if (trimmed.regionMatches(true, 0, "text ", 0, 5)) {
+            return debugSessionController.handle(trimmed.substring(5).trim());
+        }
         return debugSessionController.handle(argument);
     }
 

@@ -586,8 +586,16 @@ final class TreeGitController {
         if ("history".equalsIgnoreCase(trimmed) || "remote".equalsIgnoreCase(trimmed)) {
             return showGitHistoryRemoteDocument();
         }
-        if ("workbench".equalsIgnoreCase(trimmed) || "changes".equalsIgnoreCase(trimmed)) {
-            return showGitChangesWorkbench();
+        if ("workbench".equalsIgnoreCase(trimmed) || "changes".equalsIgnoreCase(trimmed) || "ui".equalsIgnoreCase(trimmed)) {
+            editor.showToolWindow(ToolWindowHost.Tab.GIT);
+            return "Git Changes panel opened";
+        }
+        if (trimmed.equalsIgnoreCase("text")) {
+            return showGitStatus(resolveGitRoot());
+        }
+        if (trimmed.regionMatches(true, 0, "text ", 0, 5)) {
+            argument = trimmed.substring(5).trim();
+            trimmed = argument;
         }
         File gitRoot = resolveGitRoot();
         if (gitRoot != null && trimmed.toLowerCase(Locale.ROOT).startsWith("hunk")) {

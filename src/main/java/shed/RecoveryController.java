@@ -8,10 +8,12 @@ import java.util.*;
 import java.util.List;
 
 final class RecoveryController {
+    private static final int SNAPSHOT_CAPTURE_DEBOUNCE_MS = 750;
     private final Texteditor editor;
     private final RecoveryJournalScheduler recoveryJournalScheduler;
     private boolean recoveryJournalDeferred;
     private boolean recoveryJournalDiscardConfirmed;
+    private Timer snapshotCaptureTimer;
 
     RecoveryController(Texteditor editor) {
         this.editor = editor;
@@ -296,6 +298,21 @@ final class RecoveryController {
         } catch (Exception error) {
             editor.errorReporter.report(error, "recovery-journal", "capturing recovery journal input",
                 "docs/RECOVERY_JOURNAL.md#read-and-write-semantics");
+        }
+    }
+
+    void scheduleRecoverySnapshotCapture() {
+        if (snapshotCaptureTimer == null) {
+            snapshotCaptureTimer = new Timer(SNAPSHOT_CAPTURE_DEBOUNCE_MS, event -> persistRecoverySnapshotsSafely());
+            snapshotCaptureTimer.setRepeats(false);
+        }
+        snapshotCaptureTimer.restart();
+    }
+
+    void flushScheduledRecoverySnapshotCapture() {
+        if (snapshotCaptureTimer != null && snapshotCaptureTimer.isRunning()) {
+            snapshotCaptureTimer.stop();
+            persistRecoverySnapshotsSafely();
         }
     }
 

@@ -784,14 +784,17 @@ final class EditActionController {
             Rectangle2D bounds = area.modelToView2D(area.getCaretPosition());
             if (bounds == null) return;
             int scrolloff = editor.configManager.getScrolloff();
+            Rectangle target = bounds.getBounds();
             if (scrolloff > 0) {
                 int lineHeight = area.getFontMetrics(area.getFont()).getHeight();
-                Rectangle expanded = bounds.getBounds();
+                Rectangle expanded = target;
                 expanded.y -= scrolloff * lineHeight;
                 expanded.height += 2 * scrolloff * lineHeight;
-                area.scrollRectToVisible(expanded);
-            } else {
-                area.scrollRectToVisible(bounds.getBounds());
+                target = expanded;
+            }
+            Rectangle visible = area.getVisibleRect();
+            if (!visible.contains(target)) {
+                area.scrollRectToVisible(target);
             }
         } catch (BadLocationException ignored) {
         }

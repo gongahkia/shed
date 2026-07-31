@@ -10,8 +10,11 @@ import java.util.List;
 
 final class PaneBufferController {
     private static final int BACKUP_IDLE_DEBOUNCE_MS = 750;
+    private static final int DIFF_GUTTER_DEBOUNCE_MS = 120;
     private final Texteditor editor;
     private final Map<FileBuffer, Timer> backupTimers = new IdentityHashMap<>();
+    private Timer diffGutterTimer;
+    private FileBuffer pendingDiffGutterBuffer;
 
     PaneBufferController(Texteditor editor) {
         this.editor = editor;
@@ -245,6 +248,21 @@ final class PaneBufferController {
         if (editor.lineNumberPanel != null && buffer != null) {
             editor.lineNumberPanel.updateDiffMarkers(buffer.getSavedContent(), editor.writingArea.getText());
         }
+    }
+
+    void scheduleDiffGutter(FileBuffer buffer) {
+        pendingDiffGutterBuffer = buffer;
+        if (diffGutterTimer == null) {
+            diffGutterTimer = new Timer(DIFF_GUTTER_DEBOUNCE_MS, event -> {
+                FileBuffer pending = pendingDiffGutterBuffer;
+                pendingDiffGutterBuffer = null;
+                if (pending != null && pending == editor.getCurrentBuffer()) {
+                    updateDiffGutter(pending);
+                }
+            });
+            diffGutterTimer.setRepeats(false);
+        }
+        diffGutterTimer.restart();
     }
 
 

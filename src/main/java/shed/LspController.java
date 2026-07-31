@@ -15,8 +15,11 @@ import java.util.*;
 import java.util.List;
 
 final class LspController {
+    private static final int CHANGE_DEBOUNCE_MS = 120;
     private final Texteditor editor;
     private final ManagedLanguageSupportService managedLanguageSupport;
+    private Timer lspChangeTimer;
+    private FileBuffer pendingLspChange;
 
     LspController(Texteditor editor) {
         this.editor = editor;
@@ -83,6 +86,7 @@ final class LspController {
 
 
     public String handleLspCommand(String argument) {
+        flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
             return "Usage: :lsp completion|definition|hover|semantic|inlay|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
@@ -1691,6 +1695,29 @@ final class LspController {
         if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
             return;
         }
+        pendingLspChange = buffer;
+        if (lspChangeTimer == null) {
+            lspChangeTimer = new Timer(CHANGE_DEBOUNCE_MS, event -> flushPendingLspChange(pendingLspChange));
+            lspChangeTimer.setRepeats(false);
+        }
+        lspChangeTimer.restart();
+    }
+
+    void flushPendingLspChange(FileBuffer buffer) {
+        if (buffer == null || pendingLspChange != buffer) {
+            return;
+        }
+        if (lspChangeTimer != null) {
+            lspChangeTimer.stop();
+        }
+        pendingLspChange = null;
+        sendLspChange(buffer);
+    }
+
+    private void sendLspChange(FileBuffer buffer) {
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
+            return;
+        }
         LspClient client = resolveLspClient(buffer);
         if (client == null) {
             return;
@@ -1718,6 +1745,7 @@ final class LspController {
         if (buffer == null || !buffer.hasFilePath()) {
             return;
         }
+        flushPendingLspChange(buffer);
         syncLspOpen(buffer);
         LspClient client = resolveLspClient(buffer);
         if (client != null) {

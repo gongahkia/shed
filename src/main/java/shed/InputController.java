@@ -2161,6 +2161,7 @@ final class InputController {
             return;
         }
         FileBuffer buffer = editor.getCurrentBuffer();
+        editor.flushLspChange(buffer);
         LspClient client = editor.existingLspClient(buffer);
         if (buffer == null || client == null || !buffer.hasFilePath() || !client.supports(LspCapability.COMPLETION)) {
             showCompletionPopup(localCompletionItems(prefix), prefix);
@@ -2387,6 +2388,7 @@ final class InputController {
     private void showSignatureHelp() {
         dismissSignatureHelp();
         FileBuffer buffer = editor.getCurrentBuffer();
+        editor.flushLspChange(buffer);
         LspClient client = editor.existingLspClient(buffer);
         if (buffer == null || client == null || !buffer.hasFilePath() || !client.supports(LspCapability.SIGNATURE_HELP)) return;
         try {

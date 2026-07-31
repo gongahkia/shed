@@ -533,6 +533,7 @@ final class EditorUiController {
 
 
     void updateStatusBar() {
+        long started = System.nanoTime();
         FileBuffer buffer = editor.getCurrentBuffer();
         StringBuilder status = new StringBuilder();
 
@@ -598,6 +599,9 @@ final class EditorUiController {
             setCommandBarDisplay(blame != null ? blame : "");
         }
         editor.applyDramaticFooterStyling();
+        if (editor.perfService != null) {
+            editor.perfService.recordDuration("status.render", started, "lines=" + editor.writingArea.getLineCount());
+        }
     }
 
     void requestStatusBarRefresh() {

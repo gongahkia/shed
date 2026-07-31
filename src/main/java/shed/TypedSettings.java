@@ -282,6 +282,7 @@ final class TypedSettings {
             case "recovery.retention.max.entries" -> "integer 1.." + RecoveryJournal.MAX_ENTRIES;
             case "recovery.retention.max.content.bytes" -> "integer 1.." + RecoveryJournal.MAX_CONTENT_BYTES;
             case "backup.directory" -> "string path";
+            case "backup.mode" -> "idle | save-only";
             case "project.replace.backup.directory" -> "string path";
             case "project.replace.scope" -> "workspace | current-file";
             case "backup.retention.count" -> "integer 1.." + BackupPolicy.MAX_RETENTION_COUNT;
@@ -374,6 +375,13 @@ final class TypedSettings {
     }
 
     private String valueError(String key, Object value) {
+        if ("backup.mode".equals(key)) {
+            try {
+                BackupPolicy.BackupMode.parse(value instanceof String ? (String) value : null);
+            } catch (IllegalArgumentException error) {
+                return error.getMessage();
+            }
+        }
         if (value instanceof Long) {
             long number = (Long) value;
             if (number < 0) {

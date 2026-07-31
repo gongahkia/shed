@@ -206,6 +206,7 @@ public class FileBufferTest {
         System.setProperty("user.home", home.toString());
         try {
             ConfigManager config = new ConfigManager();
+            config.set("backup.enabled", "true");
             config.set("backup.directory", directory.toString());
             config.set("backup.retention.count", "2");
             Path source = tempDir.resolve("backup.txt");

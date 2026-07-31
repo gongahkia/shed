@@ -52,6 +52,36 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void vimLineMotionRetainsCaretAndCurrentLineHighlightAcrossLargeBuffer() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-motion");
+        Path file = tempDir.resolve("motion.txt");
+        Files.createDirectories(home);
+        StringBuilder content = new StringBuilder();
+        for (int line = 0; line < 300; line++) content.append("line ").append(line).append('\n');
+        Files.writeString(file, content, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                for (int index = 0; index < 220; index++) editor.moveDown();
+                return null;
+            });
+            assertEquals(221, onEdt(() -> editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition()) + 1));
+            assertNotNull(onEdt(() -> editor.currentLineHighlightTag));
+
+            onEdt(() -> {
+                for (int index = 0; index < 220; index++) editor.moveUp();
+                return null;
+            });
+            assertEquals(1, onEdt(() -> editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition()) + 1));
+            assertNotNull(onEdt(() -> editor.currentLineHighlightTag));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void splitCloseFocusPreservesActiveBuffer() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-split");
@@ -408,7 +438,12 @@ public class TexteditorSwingIntegrationTest {
                 editor.lspClients.clear();
             }
             if (editor.asyncJobService != null) {
+                editor.shutdownSyntaxUi();
+                editor.shutdownLspScheduling();
                 editor.asyncJobService.shutdownNow();
+            }
+            if (editor.backupScheduler != null) {
+                editor.backupScheduler.close();
             }
             editor.dispose();
             return null;

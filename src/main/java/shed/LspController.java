@@ -1715,7 +1715,15 @@ final class LspController {
         sendLspChange(buffer);
     }
 
+    void shutdown() {
+        if (lspChangeTimer != null) {
+            lspChangeTimer.stop();
+        }
+        pendingLspChange = null;
+    }
+
     private void sendLspChange(FileBuffer buffer) {
+        long started = System.nanoTime();
         if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
             return;
         }
@@ -1727,8 +1735,12 @@ final class LspController {
         String uri = bufferUri(buffer);
         int version = editor.lspDocumentVersions.getOrDefault(uri, 1) + 1;
         editor.lspDocumentVersions.put(uri, version);
-        client.didChange(uri, version, buffer.getFullContent());
+        String content = buffer.getFullContent();
+        client.didChange(uri, version, content);
         scheduleDiagnosticRefresh();
+        if (editor.perfService != null) {
+            editor.perfService.recordDuration("lsp.change", started, "chars=" + content.length());
+        }
     }
 
 

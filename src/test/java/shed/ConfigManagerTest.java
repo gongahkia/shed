@@ -60,6 +60,8 @@ public class ConfigManagerTest {
         assertEquals("Terminal", terminalRestore.category());
         assertEquals("Live: checked when saving or loading a session", terminalRestore.applyBehavior());
         assertFalse(config.getWorkspaceIndexEnabled());
+        assertFalse(config.getBackupPolicy().enabled());
+        assertEquals(BackupPolicy.BackupMode.IDLE, config.getBackupPolicy().mode());
         assertEquals("default", config.getSessionAutoloadName());
         assertEquals(15000, config.getProcessTimeoutMs());
         assertEquals(UndoHistoryPolicy.defaults(), config.getUndoHistoryPolicy());
@@ -98,6 +100,20 @@ public class ConfigManagerTest {
             config.validateSettingValue("undo.history.max.entries", "0"));
         assertEquals("undo.history.max.bytes must be between 1 and " + UndoHistoryPolicy.MAX_BYTES,
             config.validateSettingValue("undo.history.max.bytes", "0"));
+    }
+
+    @Test
+    void configuresOptionalBackupModes() {
+        Path home = tempDir.resolve("home-backup-policy");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.set("backup.enabled", "true");
+        config.set("backup.mode", "save-only");
+
+        assertTrue(config.getBackupPolicy().enabled());
+        assertEquals(BackupPolicy.BackupMode.SAVE_ONLY, config.getBackupPolicy().mode());
+        assertEquals("backup.mode must be idle or save-only", config.validateSettingValue("backup.mode", "always"));
     }
 
     @Test

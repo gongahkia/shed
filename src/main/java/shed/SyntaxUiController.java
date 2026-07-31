@@ -103,6 +103,13 @@ final class SyntaxUiController {
         }
     }
 
+    void shutdown() {
+        if (syntaxHighlightTimer != null) syntaxHighlightTimer.stop();
+        if (symbolRefreshTimer != null) symbolRefreshTimer.stop();
+        if (gitBlameTimer != null) gitBlameTimer.stop();
+        clearGitBlameCache();
+    }
+
     private GitBlameKey gitBlameKey(FileBuffer buffer) {
         if (buffer == null || buffer.getFile() == null || buffer.isModified()) {
             return null;
@@ -127,6 +134,9 @@ final class SyntaxUiController {
     }
 
     private void startPendingGitBlame() {
+        if (editor.closingDown) {
+            return;
+        }
         GitBlameKey key = pendingGitBlame;
         pendingGitBlame = null;
         if (key == null || gitBlameCache.containsKey(key)) {
@@ -289,19 +299,20 @@ final class SyntaxUiController {
         editor.matchBracketTags.clear();
 
         try {
-            String text = editor.writingArea.getText();
             int caret = editor.writingArea.getCaretPosition();
-            if (text.isEmpty()) return;
+            int length = editor.writingArea.getDocument().getLength();
+            if (length == 0) return;
 
             // Check char at caret and before caret
             int bracketPos = -1;
-            if (caret < text.length() && isBracketChar(text.charAt(caret))) {
+            if (caret < length && isBracketChar(editor.writingArea.getDocument().getText(caret, 1).charAt(0))) {
                 bracketPos = caret;
-            } else if (caret > 0 && isBracketChar(text.charAt(caret - 1))) {
+            } else if (caret > 0 && isBracketChar(editor.writingArea.getDocument().getText(caret - 1, 1).charAt(0))) {
                 bracketPos = caret - 1;
             }
             if (bracketPos < 0) return;
 
+            String text = editor.writingArea.getDocument().getText(0, length);
             char bracket = text.charAt(bracketPos);
             int matchPos = findMatchingBracketPos(text, bracketPos, bracket);
             if (matchPos < 0) return;

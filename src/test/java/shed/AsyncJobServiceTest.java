@@ -26,6 +26,12 @@ public class AsyncJobServiceTest {
     Path tempDir;
 
     @Test
+    void defaultWorkerCountIsBounded() {
+        assertTrue(AsyncJobService.workerCount() >= 2);
+        assertTrue(AsyncJobService.workerCount() <= 4);
+    }
+
+    @Test
     void runsJobAndMarksSucceeded() throws Exception {
         AsyncJobService service = new AsyncJobService(20);
         CountDownLatch latch = new CountDownLatch(1);
@@ -105,6 +111,23 @@ public class AsyncJobServiceTest {
         AsyncJobService service = new AsyncJobService(20);
         assertThrows(IllegalArgumentException.class, () -> service.submit("bad", null, null));
         service.shutdownNow();
+    }
+
+    @Test
+    void reportsCancelledCompletionWhenSubmittedAfterShutdown() throws Exception {
+        AsyncJobService service = new AsyncJobService(20);
+        service.shutdownNow();
+        CountDownLatch completion = new CountDownLatch(1);
+        AtomicReference<AsyncJobService.JobSnapshot> snapshotRef = new AtomicReference<>();
+
+        int id = service.submit("late", token -> "never", (snapshot, result, error) -> {
+            snapshotRef.set(snapshot);
+            completion.countDown();
+        });
+
+        assertTrue(completion.await(2, TimeUnit.SECONDS));
+        assertEquals(id, snapshotRef.get().getId());
+        assertEquals(AsyncJobService.Status.CANCELLED, snapshotRef.get().getStatus());
     }
 
     @Test

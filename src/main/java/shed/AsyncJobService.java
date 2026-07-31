@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 
@@ -196,7 +197,9 @@ public class AsyncJobService {
             }
         };
 
-        Future<?> future = executor.submit(() -> {
+        Future<?> future;
+        try {
+            future = executor.submit(() -> {
             record.started = true;
             T result = null;
             Exception error = null;
@@ -237,7 +240,19 @@ public class AsyncJobService {
                     ));
                 }
             }
-        });
+            });
+        } catch (RejectedExecutionException error) {
+            record.status = Status.CANCELLED;
+            record.errorMessage = "executor is shut down";
+            record.finishedAtMillis = System.currentTimeMillis();
+            trimHistoryIfNeeded();
+            if (completion != null && completionDelivered.compareAndSet(false, true)) {
+                JobSnapshot snapshot = record.snapshot();
+                SwingUtilities.invokeLater(() -> completeOnEventDispatchThread(completion, snapshot, null,
+                    new CancellationException("executor is shut down"), record.description));
+            }
+            return id;
+        }
 
         record.future = future;
         return id;

@@ -53,6 +53,47 @@ final class DebugSessionController {
 
     void shutdown() { sessions.stop(workspace()); }
 
+    List<String> configurationNamesForPanel() {
+        DebugAdapterRegistry.Validation validation = editor.configManager.getDebugConfiguration();
+        return validation == null || !validation.valid() ? List.of() : validation.configurations().keySet().stream().sorted().toList();
+    }
+
+    DebugSessionService.Snapshot snapshotForPanel() { return sessions.snapshot(workspace()); }
+
+    DebugInspection.Snapshot inspectionForPanel() { return sessions.inspection(workspace()); }
+
+    DebugConsole.Snapshot consoleForPanel() { return sessions.console(workspace()); }
+
+    String selectForPanel(String name) { return select(name); }
+
+    String startForPanel() { return start(""); }
+
+    String stopForPanel() { return stop(); }
+
+    String restartForPanel() { return restart(""); }
+
+    String refreshInspectionForPanel() {
+        Path workspace = workspace();
+        int jobId = editor.asyncJobService.submit("debug inspect", token -> sessions.refreshInspection(workspace,
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                if (editor.toolWindowHost != null) editor.toolWindowHost.refresh(ToolWindowHost.Tab.DEBUG);
+            });
+        return "Debug inspection requested (job " + jobId + ").";
+    }
+
+    String addWatchForPanel(String expression) {
+        DebugSessionService.InspectionResult result = sessions.addWatch(workspace(), expression);
+        return result.succeeded() ? "Watch added" : "Watch expression is empty, invalid, too long, or already exists.";
+    }
+
+    String removeWatchForPanel(String expression) {
+        return sessions.removeWatch(workspace(), expression).succeeded() ? "Watch removed" : "Watch was not found.";
+    }
+
+    String selectFrameForPanel(int id) {
+        return sessions.selectFrame(workspace(), id).succeeded() ? refreshInspectionForPanel() : "Debug frame is unavailable.";
+    }
+
     private String configurations() {
         Path workspace = workspace();
         DebugAdapterDetector.WorkspaceReport report = new DebugAdapterDetector(null).detect(workspace, editor.configManager.getDebugConfiguration(),
@@ -116,7 +157,11 @@ final class DebugSessionController {
                     return;
                 }
                 refreshBreakpointMarkers();
-                showStatus(workspace);
+                if (editor.toolWindowHost != null && editor.toolWindowHost.isSelected(ToolWindowHost.Tab.DEBUG)) {
+                    editor.toolWindowHost.refresh(ToolWindowHost.Tab.DEBUG);
+                } else {
+                    showStatus(workspace);
+                }
                 editor.showMessage(result.succeeded() ? result.snapshot().detail() : result.snapshot().detail() + diagnosticSuffix(result.snapshot()));
             });
         return "Explicit debug " + (restart ? "restart" : "start") + " requested (job " + jobId + ").";
@@ -135,7 +180,11 @@ final class DebugSessionController {
 
     private String stop() {
         DebugSessionService.Result result = sessions.stop(workspace());
-        showStatus(workspace());
+        if (editor.toolWindowHost != null && editor.toolWindowHost.isSelected(ToolWindowHost.Tab.DEBUG)) {
+            editor.toolWindowHost.refresh(ToolWindowHost.Tab.DEBUG);
+        } else {
+            showStatus(workspace());
+        }
         return result.snapshot().detail();
     }
 

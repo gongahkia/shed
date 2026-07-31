@@ -1,0 +1,139 @@
+package shed;
+
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.GridLayout;
+import java.util.List;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.DefaultListModel;
+
+final class DebugToolPanel implements ToolWindowHost.ToolSurface {
+    private final Texteditor editor;
+    private final JPanel panel = new JPanel(new BorderLayout(6, 6));
+    private final JComboBox<String> configurations = new JComboBox<>();
+    private final JLabel state = new JLabel("No debug session selected.");
+    private final DefaultListModel<DebugInspection.Frame> frames = new DefaultListModel<>();
+    private final JList<DebugInspection.Frame> frameList = new JList<>(frames);
+    private final DefaultListModel<DebugInspection.Watch> watches = new DefaultListModel<>();
+    private final JList<DebugInspection.Watch> watchList = new JList<>(watches);
+    private final JTextArea inspector = textArea();
+    private final JTextArea console = textArea();
+    private final JTextField watchInput = new JTextField();
+    private boolean refreshing;
+
+    DebugToolPanel(Texteditor editor, ToolWindowHost host) {
+        this.editor = editor;
+        panel.setBorder(BorderFactory.createEmptyBorder(5, 7, 7, 7));
+        panel.add(toolbar(), BorderLayout.NORTH);
+        panel.add(content(), BorderLayout.CENTER);
+        AccessibilitySupport.describe(frameList, "Debug call stack", "Select a paused stack frame to inspect variables.");
+        AccessibilitySupport.describe(watchList, "Debug watches", "Session-local watch expressions.");
+    }
+
+    @Override public JPanel component() { return panel; }
+
+    private JPanel toolbar() {
+        JPanel panel = new JPanel(new BorderLayout(6, 0));
+        JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        controls.add(new JLabel("Configuration"));
+        configurations.addActionListener(event -> {
+            if (!refreshing && configurations.getSelectedItem() != null) message(editor.debugSessionController.selectForPanel(String.valueOf(configurations.getSelectedItem())));
+        });
+        controls.add(configurations);
+        JButton start = button("Start", () -> message(editor.debugSessionController.startForPanel()));
+        JButton stop = button("Stop", () -> message(editor.debugSessionController.stopForPanel()));
+        JButton restart = button("Restart", () -> message(editor.debugSessionController.restartForPanel()));
+        JButton inspect = button("Refresh", () -> message(editor.debugSessionController.refreshInspectionForPanel()));
+        controls.add(start); controls.add(stop); controls.add(restart); controls.add(inspect);
+        panel.add(controls, BorderLayout.WEST);
+        panel.add(state, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private java.awt.Component content() {
+        JPanel framesPanel = new JPanel(new BorderLayout(3, 3));
+        framesPanel.setBorder(BorderFactory.createTitledBorder("Call Stack"));
+        framesPanel.add(new JScrollPane(frameList), BorderLayout.CENTER);
+        JButton selectFrame = button("Inspect Frame", this::selectFrame);
+        framesPanel.add(selectFrame, BorderLayout.SOUTH);
+
+        JPanel watchPanel = new JPanel(new BorderLayout(3, 3));
+        watchPanel.setBorder(BorderFactory.createTitledBorder("Watches"));
+        watchPanel.add(new JScrollPane(watchList), BorderLayout.CENTER);
+        JPanel watchActions = new JPanel(new BorderLayout(3, 0));
+        watchActions.add(watchInput, BorderLayout.CENTER);
+        JPanel buttons = new JPanel(new GridLayout(1, 2, 3, 0));
+        buttons.add(button("Add", this::addWatch));
+        buttons.add(button("Remove", this::removeWatch));
+        watchActions.add(buttons, BorderLayout.EAST);
+        watchPanel.add(watchActions, BorderLayout.SOUTH);
+
+        JPanel left = new JPanel(new GridLayout(2, 1, 4, 4));
+        left.add(framesPanel); left.add(watchPanel);
+        inspector.setBorder(BorderFactory.createTitledBorder("Variables and Scopes"));
+        console.setBorder(BorderFactory.createTitledBorder("Debug Console"));
+        JSplitPane right = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(inspector), new JScrollPane(console));
+        right.setResizeWeight(0.56);
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
+        split.setResizeWeight(0.28);
+        return split;
+    }
+
+    @Override public void refresh() {
+        if (refreshing) return;
+        refreshing = true;
+        try {
+            List<String> available = editor.debugSessionController.configurationNamesForPanel();
+            String selected = configurations.getSelectedItem() == null ? "" : String.valueOf(configurations.getSelectedItem());
+            configurations.removeAllItems();
+            for (String value : available) configurations.addItem(value);
+            DebugSessionService.Snapshot session = editor.debugSessionController.snapshotForPanel();
+            if (!session.configuration().isBlank()) configurations.setSelectedItem(session.configuration());
+            else configurations.setSelectedItem(selected);
+            state.setText(session.lifecycle().name().toLowerCase() + " — " + session.detail());
+            DebugInspection.Snapshot snapshot = editor.debugSessionController.inspectionForPanel();
+            frames.clear();
+            for (DebugInspection.Frame frame : snapshot.frames()) frames.addElement(frame);
+            watches.clear();
+            for (DebugInspection.Watch watch : snapshot.watches()) watches.addElement(watch);
+            inspector.setText(renderInspection(snapshot));
+            DebugConsole.Snapshot output = editor.debugSessionController.consoleForPanel();
+            console.setText(output.output());
+            console.setCaretPosition(0);
+        } finally { refreshing = false; }
+    }
+
+    private void selectFrame() {
+        DebugInspection.Frame frame = frameList.getSelectedValue();
+        if (frame == null) { message("Select a stack frame."); return; }
+        message(editor.debugSessionController.selectFrameForPanel(frame.id()));
+    }
+
+    private void addWatch() { message(editor.debugSessionController.addWatchForPanel(watchInput.getText())); watchInput.setText(""); }
+    private void removeWatch() {
+        DebugInspection.Watch watch = watchList.getSelectedValue();
+        message(watch == null ? "Select a watch." : editor.debugSessionController.removeWatchForPanel(watch.expression()));
+    }
+
+    private void message(String text) { editor.showMessage(text); refresh(); }
+    private static JButton button(String text, Runnable action) { JButton button = new JButton(text); button.addActionListener(event -> action.run()); return button; }
+    private static JTextArea textArea() { JTextArea area = new JTextArea(); area.setEditable(false); area.setLineWrap(false); return area; }
+    private static String renderInspection(DebugInspection.Snapshot snapshot) {
+        StringBuilder text = new StringBuilder(snapshot.state().name()).append(" — ").append(snapshot.detail()).append('\n');
+        for (DebugInspection.Scope scope : snapshot.scopes()) {
+            text.append('\n').append(scope.name()).append('\n');
+            for (DebugInspection.Variable variable : scope.variables()) text.append("  ").append(variable.name()).append(" = ").append(variable.value())
+                .append(variable.type().isBlank() ? "" : " : " + variable.type()).append('\n');
+        }
+        return text.toString();
+    }
+}

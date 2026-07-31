@@ -10,9 +10,14 @@ import java.util.regex.Matcher;
 
 final class JobQuickfixController {
     private final Texteditor editor;
+    private final Map<Integer, String> taskOutputs = new LinkedHashMap<>();
 
     JobQuickfixController(Texteditor editor) {
         this.editor = editor;
+    }
+
+    String taskOutputForPanel(int jobId) {
+        return taskOutputs.getOrDefault(jobId, "");
     }
 
     public String deleteLineRange(int startLine, int endLine) {
@@ -437,6 +442,10 @@ final class JobQuickfixController {
             return;
         }
         String output = taskOutput(result);
+        if (jobId >= 0) {
+            taskOutputs.put(jobId, output);
+            while (taskOutputs.size() > 100) taskOutputs.remove(taskOutputs.keySet().iterator().next());
+        }
         List<QuickfixService.Entry> parsedEntries = plan.task().problemMatcher() == TaskService.ProblemMatcher.NONE
             ? List.of()
             : parseTaskQuickfixEntries(output, "task:" + taskName, plan.workingDirectory());
@@ -446,7 +455,9 @@ final class JobQuickfixController {
 
         if (result.exitCode != 0) {
             if (shouldPresentTaskOutput(plan.task().presentation(), false) && !output.isEmpty()) {
-                editor.showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
+                if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.TASKS)) {
+                    editor.showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
+                }
             }
             String failure = result.stderr == null || result.stderr.isBlank() ? "exit " + result.exitCode : result.stderr.strip();
             editor.showMessage(parsedEntries.isEmpty()
@@ -456,11 +467,14 @@ final class JobQuickfixController {
         }
 
         if (shouldPresentTaskOutput(plan.task().presentation(), true) && !output.isEmpty()) {
-            editor.showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
+            if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.TASKS)) {
+                editor.showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
+            }
         }
         editor.showMessage(parsedEntries.isEmpty()
             ? "Task '" + taskName + "' complete"
             : "Task '" + taskName + "' complete (quickfix updated)");
+        if (editor.toolWindowHost != null) editor.toolWindowHost.refresh(ToolWindowHost.Tab.TASKS);
     }
 
 

@@ -399,9 +399,12 @@ public class CommandHandler {
 
     private String handleConfig(String args, boolean force) {
         if (args == null || args.isBlank()) {
-            return editor.openSettingsBuffer();
+            return editor.showSettingsInspector();
         }
         String trimmed = args.trim().toLowerCase(Locale.ROOT);
+        if ("file".equals(trimmed) || "toml".equals(trimmed)) {
+            return editor.openSettingsBuffer();
+        }
         if ("save".equals(trimmed) || "write".equals(trimmed)) {
             return editor.saveConfigToDisk();
         }
@@ -411,7 +414,7 @@ public class CommandHandler {
         if ("defaults".equals(trimmed)) {
             return editor.materializeDefaultConfig(force);
         }
-        if ("inspector".equals(trimmed)) {
+        if ("inspector".equals(trimmed) || "ui".equals(trimmed)) {
             return editor.showSettingsInspector();
         }
         if ("reference".equals(trimmed)) {
@@ -420,7 +423,7 @@ public class CommandHandler {
         if (trimmed.startsWith("reset ")) {
             return editor.resetConfigOptionPersistent(args.substring("reset".length()).trim());
         }
-        return "Usage: :config[!] [save|status|defaults|inspector|reference|reset <key>]";
+        return "Usage: :config[!] [file|save|status|defaults|inspector|reference|reset <key>]";
     }
 
     private String handleKeymap(String args) {

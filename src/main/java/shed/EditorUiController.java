@@ -81,8 +81,14 @@ final class EditorUiController {
         footerPanel.add(editor.statusBar);
         footerPanel.add(editor.commandBar);
 
+        editor.toolWindowHost = new ToolWindowHost(editor);
+        editor.toolWindowHost.setVisible(false);
+        editor.editorToolSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, editor.editorHostPanel, editor.toolWindowHost);
+        editor.editorToolSplit.setResizeWeight(1.0);
+        editor.editorToolSplit.setDividerSize(0);
+        editor.editorToolSplit.setBorder(BorderFactory.createEmptyBorder());
         // Add components
-        editor.add(editor.editorHostPanel, BorderLayout.CENTER);
+        editor.add(editor.editorToolSplit, BorderLayout.CENTER);
         editor.add(footerPanel, BorderLayout.SOUTH);
 
         // Window close handler
@@ -440,6 +446,24 @@ final class EditorUiController {
         editor.updateZenModeLayout();
         editor.editorHostPanel.revalidate();
         editor.editorHostPanel.repaint();
+    }
+
+    void showToolWindow() {
+        if (editor.toolWindowHost == null || editor.editorToolSplit == null) return;
+        editor.toolWindowHost.setVisible(true);
+        editor.editorToolSplit.setDividerSize(6);
+        int height = Math.max(editor.getHeight(), editor.editorToolSplit.getHeight());
+        editor.editorToolSplit.setDividerLocation(Math.max(180, (int) (height * 0.62)));
+        editor.toolWindowHost.refreshActive();
+        editor.editorToolSplit.revalidate();
+    }
+
+    void hideToolWindow() {
+        if (editor.toolWindowHost == null || editor.editorToolSplit == null) return;
+        editor.toolWindowHost.setVisible(false);
+        editor.editorToolSplit.setDividerSize(0);
+        editor.editorToolSplit.setDividerLocation(1.0);
+        editor.requestActivePaneFocus();
     }
 
 

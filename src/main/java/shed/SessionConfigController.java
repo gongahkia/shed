@@ -359,8 +359,8 @@ final class SessionConfigController {
     }
 
     public String showSettingsInspector() {
-        SettingsInspectorDialog.showFor(editor);
-        return "Settings inspector opened";
+        SettingsEditorDialog.showFor(editor);
+        return "Settings editor opened";
     }
 
     public String showTypedSettingsReference() {

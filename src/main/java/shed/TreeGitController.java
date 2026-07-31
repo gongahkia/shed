@@ -1084,6 +1084,23 @@ final class TreeGitController {
                 return "Usage: :git log [count]";
             }
         }
+        if (editor.configManager.getGitHistoryEnabled() && editor.configManager.getGitPanelPresentationEnabled()) {
+            int historyCount = count;
+            GitGraphDialog.showFor(editor, token -> loadGitGraph(gitRoot, historyCount, token));
+            return "Git graph opened";
+        }
+        return showAsciiGitLog(gitRoot, count);
+    }
+
+    private GitGraphModel.Snapshot loadGitGraph(File root, int count, AsyncJobService.JobToken token) {
+        if (root == null) return GitGraphModel.unavailable("Not inside a Git repository.");
+        CommandResult result = runCommand(root, List.of("git", "log", "--topo-order", "--date=relative", "-z",
+            "--format=%H%x00%P%x00%D%x00%s%x00%an%x00%ad", "-n", String.valueOf(count)), token);
+        if (token.isCancelled()) return GitGraphModel.unavailable("Git graph refresh cancelled.");
+        return GitGraphModel.fromCommand(root, result);
+    }
+
+    private String showAsciiGitLog(File gitRoot, int count) {
         List<String> command = new ArrayList<>();
         command.add("git");
         command.add("log");

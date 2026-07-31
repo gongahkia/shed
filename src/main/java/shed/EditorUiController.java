@@ -77,9 +77,9 @@ final class EditorUiController {
         editor.commandBar.setFocusable(false);
         initializeCommandPrompt();
 
-        JPanel footerPanel = new JPanel(new GridLayout(2, 1));
-        footerPanel.add(editor.statusBar);
-        footerPanel.add(editor.commandBar);
+        editor.footerPanel = new JPanel(new BorderLayout());
+        editor.footerPanel.add(editor.statusBar, BorderLayout.NORTH);
+        editor.footerPanel.add(editor.commandBar, BorderLayout.SOUTH);
 
         editor.toolWindowHost = new ToolWindowHost(editor);
         editor.toolWindowHost.setVisible(false);
@@ -89,7 +89,7 @@ final class EditorUiController {
         editor.editorToolSplit.setBorder(BorderFactory.createEmptyBorder());
         // Add components
         editor.add(editor.editorToolSplit, BorderLayout.CENTER);
-        editor.add(footerPanel, BorderLayout.SOUTH);
+        editor.add(editor.footerPanel, BorderLayout.SOUTH);
 
         // Window close handler
         editor.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -288,6 +288,7 @@ final class EditorUiController {
                     } catch (Exception ignored) {}
                 }
                 paintSyntaxForegroundOverlay(g, this);
+                editor.paintLimelightOverlay(g, this);
                 paintDiagnosticOverlay(g, this);
                 paintVisualBlockOverlay(g, this);
                 if (getLineWrap()) paintWrapIndicators(g, this);
@@ -338,6 +339,7 @@ final class EditorUiController {
                 }
             }
             editor.dismissCompletionPopup();
+            editor.refreshLimelight();
             requestStatusBarRefresh();
         });
         textArea.addFocusListener(new java.awt.event.FocusAdapter() {
@@ -408,7 +410,7 @@ final class EditorUiController {
 
     void activateEditorPane(EditorPane pane) {
         int index = editor.editorPanes.indexOf(pane);
-        if (index < 0 || index == editor.activePaneIndex) {
+        if (index < 0 || pane.isHiddenByFocusMode() || index == editor.activePaneIndex) {
             return;
         }
         editor.detachActiveDocumentListener();
@@ -419,6 +421,7 @@ final class EditorUiController {
         editor.updateCurrentLineHighlight();
         editor.refreshLineNumberPanel();
         updateStatusBar();
+        editor.refreshLimelight();
     }
 
 
@@ -442,6 +445,9 @@ final class EditorUiController {
         int height = Math.max(editor.editorHostPanel.getHeight(), editor.getHeight());
         editor.renderedLayoutComponent = editor.windowLayoutRoot == null ? new JPanel()
             : editor.windowLayoutRoot.render(getActivePane(), width, height);
+        if (editor.renderedLayoutComponent == null) {
+            editor.renderedLayoutComponent = new JPanel();
+        }
         editor.editorHostPanel.add(editor.renderedLayoutComponent, BorderLayout.CENTER);
         editor.updateZenModeLayout();
         editor.editorHostPanel.revalidate();
@@ -531,7 +537,6 @@ final class EditorUiController {
         }
         updateStatusBar();
         if (oldMode != mode) {
-            editor.animateModeTransition(oldMode, mode);
             editor.firePluginEvent("ModeChange");
         }
     }
@@ -586,10 +591,6 @@ final class EditorUiController {
 
         EditorMode modeForStatus = editor.editorState.mode == null ? EditorMode.NORMAL : editor.editorState.mode;
         status.append(modeForStatus.getDisplayName()).append("  ");
-        if (editor.dramaticUiEnabled && editor.isDramaticPerformanceThrottled()) {
-            status.append("dramatic:throttled").append("  ");
-        }
-
         if (buffer != null) {
             status.append(buffer.getFileType().getDisplayName()).append("  ");
             status.append(buffer.getEncoding()).append("/").append(buffer.getLineEndingLabel()).append("  ");
@@ -622,7 +623,6 @@ final class EditorUiController {
             String blame = editor.getGitBlameForCurrentLine(buffer);
             setCommandBarDisplay(blame != null ? blame : "");
         }
-        editor.applyDramaticFooterStyling();
         if (editor.perfService != null) {
             editor.perfService.recordDuration("status.render", started, "lines=" + editor.writingArea.getLineCount());
         }
@@ -777,14 +777,6 @@ final class EditorUiController {
 
     public void showMessage(String message) {
         editor.lastMessage = message == null ? "" : message;
-        if (!editor.lastMessage.isEmpty()) {
-            String normalized = editor.lastMessage.toLowerCase();
-            if (normalized.startsWith("error") || normalized.startsWith("invalid") || normalized.contains(" failed")) {
-                editor.playCue(CueType.ERROR);
-            } else if (normalized.contains("opened") || normalized.contains("saved") || normalized.contains("loaded")) {
-                editor.playCue(CueType.SUCCESS);
-            }
-        }
         if (editor.messageResetTimer != null) {
             editor.messageResetTimer.stop();
         }

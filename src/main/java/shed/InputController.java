@@ -789,30 +789,18 @@ final class InputController {
             editor.editorState.pendingCount = "";
             String result = editor.searchManager.nextMatch();
             editor.showMessage(result);
-            if (result.startsWith("Match")) {
-                editor.pulseCaretLine(editor.blendColor(editor.configManager.getSelectionColor(), editor.configManager.getCaretColor(), 0.35));
-            }
         } else if (c == 'N') {
             editor.editorState.pendingCount = "";
             String result = editor.searchManager.prevMatch();
             editor.showMessage(result);
-            if (result.startsWith("Match")) {
-                editor.pulseCaretLine(editor.blendColor(editor.configManager.getSelectionColor(), editor.configManager.getCaretColor(), 0.35));
-            }
         } else if (c == '*') {
             editor.editorState.pendingCount = "";
             String result = editor.searchWordUnderCursor(true);
             editor.showMessage(result);
-            if (result.startsWith("Match")) {
-                editor.pulseCaretLine(editor.blendColor(editor.configManager.getSelectionColor(), editor.configManager.getCaretColor(), 0.35));
-            }
         } else if (c == '#') {
             editor.editorState.pendingCount = "";
             String result = editor.searchWordUnderCursor(false);
             editor.showMessage(result);
-            if (result.startsWith("Match")) {
-                editor.pulseCaretLine(editor.blendColor(editor.configManager.getSelectionColor(), editor.configManager.getCaretColor(), 0.35));
-            }
         } else if (c == ';') {
             editor.editorState.pendingCount = "";
             editor.showMessage(editor.repeatFind(false));
@@ -1909,9 +1897,6 @@ final class InputController {
             String result = editor.editorState.searchForward ? editor.searchManager.searchForward(pattern) : editor.searchManager.searchBackward(pattern);
             if (!result.isEmpty()) {
                 editor.showMessage(result);
-                if (result.startsWith("Match")) {
-                    editor.pulseCaretLine(editor.blendColor(editor.configManager.getSelectionColor(), editor.configManager.getCaretColor(), 0.35));
-                }
             }
             if (!pattern.isEmpty()) {
                 addCommandHistory(editor.editorState.commandBuffer);

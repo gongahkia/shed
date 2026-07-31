@@ -91,7 +91,7 @@ public class Texteditor extends JFrame implements KeyListener {
     MarkdownController markdownController;
     PaneBufferController paneBufferController;
     SessionConfigController sessionConfigController;
-    DramaticUiController dramaticUiController;
+    FocusModeController focusModeController;
     SyntaxUiController syntaxUiController;
     EditActionController editActionController;
     InputController inputController;
@@ -137,7 +137,9 @@ public class Texteditor extends JFrame implements KeyListener {
     List<Object> substitutePreviewTags;
     Highlighter.HighlightPainter currentLinePainter;
     Highlighter.HighlightPainter substitutePreviewPainter;
-    boolean zenModeEnabled;
+    boolean goyoModeEnabled;
+    boolean limelightEnabled;
+    JPanel footerPanel;
     String lastInsertedText;
     Timer externalChangeTimer;
     Timer recoverySnapshotTimer;
@@ -203,38 +205,7 @@ public class Texteditor extends JFrame implements KeyListener {
     final List<Object> matchBracketTags = new ArrayList<>();
     List<Object> markdownHighlightTags;
     boolean bracketColorEnabled;
-    // Dramatic UI runtime settings
-    boolean dramaticUiEnabled;
-    boolean dramaticIdentityEnabled;
-    boolean dramaticModeTransitionsEnabled;
-    boolean dramaticCommandPaletteEnabled;
-    boolean dramaticEditingFeedbackEnabled;
-    boolean dramaticPanelAnimationsEnabled;
-    boolean dramaticSoundEnabled;
-    String dramaticSoundPack;
-    int dramaticSoundVolume;
-    boolean dramaticSoundModeCueEnabled;
-    boolean dramaticSoundNavigateCueEnabled;
-    boolean dramaticSoundSuccessCueEnabled;
-    boolean dramaticSoundErrorCueEnabled;
-    boolean dramaticReducedMotionEnabled;
-    boolean dramaticPerformanceGuardrailsEnabled;
-    double dramaticPerformanceCpuThreshold;
-    int dramaticPerformanceLineThreshold;
     boolean whichKeyHintsEnabled;
-    double cachedProcessCpuLoad;
-    long cachedProcessCpuLoadAtMillis;
-    int dramaticAnimationMs;
-    int dramaticMinimapWidth;
-    Timer modeTransitionTimer;
-    Timer feedbackPulseTimer;
-    Object feedbackPulseTag;
-    Timer hostTintTimer;
-    Timer splitAnimationTimer;
-    Timer minimapWidthTimer;
-    Timer paneJumpFlashTimer;
-    EditorPane paneJumpFlashTarget;
-    Border paneJumpFlashOriginalBorder;
 
     // Constants
     static final String VERSION = "2.0";
@@ -295,7 +266,8 @@ public class Texteditor extends JFrame implements KeyListener {
         substitutePreviewTags = new ArrayList<>();
         currentLinePainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getCurrentLineHighlightColor());
         substitutePreviewPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSubstitutePreviewColor());
-        zenModeEnabled = false;
+        goyoModeEnabled = false;
+        limelightEnabled = false;
         lastInsertedText = "";
         reloadPromptActive = false;
         recoverySnapshotTimer = null;
@@ -356,39 +328,8 @@ public class Texteditor extends JFrame implements KeyListener {
         bracketHighlightTags = new ArrayList<>();
         markdownHighlightTags = new ArrayList<>();
         bracketColorEnabled = false;
-        dramaticUiEnabled = false;
-        dramaticIdentityEnabled = false;
-        dramaticModeTransitionsEnabled = false;
-        dramaticCommandPaletteEnabled = false;
-        dramaticEditingFeedbackEnabled = false;
-        dramaticPanelAnimationsEnabled = false;
-        dramaticSoundEnabled = false;
-        dramaticSoundPack = "default";
-        dramaticSoundVolume = 75;
-        dramaticSoundModeCueEnabled = true;
-        dramaticSoundNavigateCueEnabled = true;
-        dramaticSoundSuccessCueEnabled = true;
-        dramaticSoundErrorCueEnabled = true;
-        dramaticReducedMotionEnabled = false;
-        dramaticPerformanceGuardrailsEnabled = true;
-        dramaticPerformanceCpuThreshold = 0.80;
-        dramaticPerformanceLineThreshold = 20000;
         whichKeyHintsEnabled = true;
-        cachedProcessCpuLoad = -1.0;
-        cachedProcessCpuLoadAtMillis = 0L;
-        dramaticAnimationMs = 220;
-        dramaticMinimapWidth = 84;
-        modeTransitionTimer = null;
-        feedbackPulseTimer = null;
-        feedbackPulseTag = null;
-        hostTintTimer = null;
-        splitAnimationTimer = null;
-        minimapWidthTimer = null;
-        paneJumpFlashTimer = null;
-        paneJumpFlashTarget = null;
-        paneJumpFlashOriginalBorder = null;
-        dramaticUiController = new DramaticUiController(this);
-        refreshDramaticSettings();
+        focusModeController = new FocusModeController(this);
         loadRecentFiles();
         loadTrustedProjectRoots();
         lastMessage = "";
@@ -1901,10 +1842,6 @@ public class Texteditor extends JFrame implements KeyListener {
         return paletteController.showPaletteDialog(title, candidates);
     }
 
-    void animatePaletteDialogOpen(JDialog dialog, Dimension targetSize) {
-        paletteController.animatePaletteDialogOpen(dialog, targetSize);
-    }
-
     String showPaletteDialog(String title, List<String> candidates, PalettePreviewProvider previewProvider) {
         return paletteController.showPaletteDialog(title, candidates, previewProvider);
     }
@@ -1931,95 +1868,31 @@ public class Texteditor extends JFrame implements KeyListener {
 
     MinimapPanel activeMinimapPanel;
     public String toggleMinimap() {
-        return dramaticUiController.toggleMinimap();
+        return focusModeController.toggleMinimap();
     }
 
     public String toggleZenMode() {
-        return dramaticUiController.toggleZenMode();
+        return focusModeController.toggleZenMode();
+    }
+
+    public String toggleGoyoMode() {
+        return focusModeController.toggleGoyoMode();
+    }
+
+    public String toggleLimelight() {
+        return focusModeController.toggleLimelight();
     }
 
     void updateZenModeLayout() {
-        dramaticUiController.updateZenModeLayout();
+        focusModeController.updateZenModeLayout();
     }
 
-    Color fadedMarginColor(Color base) {
-        return dramaticUiController.fadedMarginColor(base);
+    void refreshLimelight() {
+        focusModeController.refreshLimelight();
     }
 
-    Color blendColor(Color base, Color overlay, double ratio) {
-        return dramaticUiController.blendColor(base, overlay, ratio);
-    }
-
-    void refreshDramaticSettings() {
-        dramaticUiController.refreshDramaticSettings();
-    }
-
-    boolean dramaticMotionAllowed() {
-        return dramaticUiController.dramaticMotionAllowed();
-    }
-
-    boolean isDramaticPerformanceThrottled() {
-        return dramaticUiController.isDramaticPerformanceThrottled();
-    }
-
-    double cachedProcessCpuLoad() {
-        return dramaticUiController.cachedProcessCpuLoad();
-    }
-
-    double readProcessCpuLoad() {
-        return dramaticUiController.readProcessCpuLoad();
-    }
-
-    int animationDelayForSteps(int steps) {
-        return dramaticUiController.animationDelayForSteps(steps);
-    }
-
-    double easeOut(double t) {
-        return dramaticUiController.easeOut(t);
-    }
-
-    void applyDramaticFooterStyling() {
-        dramaticUiController.applyDramaticFooterStyling();
-    }
-
-    void animateModeTransition(EditorMode fromMode, EditorMode toMode) {
-        dramaticUiController.animateModeTransition(fromMode, toMode);
-    }
-
-    void clearFeedbackPulse() {
-        dramaticUiController.clearFeedbackPulse();
-    }
-
-    void pulseCaretLine(Color color) {
-        dramaticUiController.pulseCaretLine(color);
-    }
-
-    void animateEditorHostTint(Color tint) {
-        dramaticUiController.animateEditorHostTint(tint);
-    }
-
-    void animateSplitForPane(EditorPane pane, double startRatio, double targetRatio) {
-        dramaticUiController.animateSplitForPane(pane, startRatio, targetRatio);
-    }
-
-    void animateMinimapWidth(MinimapPanel panel, int fromWidth, int toWidth, Runnable onFinish) {
-        dramaticUiController.animateMinimapWidth(panel, fromWidth, toWidth, onFinish);
-    }
-
-    void clearPaneJumpFlash() {
-        dramaticUiController.clearPaneJumpFlash();
-    }
-
-    void flashPaneJump(EditorPane pane) {
-        dramaticUiController.flashPaneJump(pane);
-    }
-
-    void playCue(CueType cueType) {
-        dramaticUiController.playCue(cueType);
-    }
-
-    int[] cuePattern(CueType cueType) {
-        return dramaticUiController.cuePattern(cueType);
+    void paintLimelightOverlay(Graphics graphics, JTextArea area) {
+        focusModeController.paintLimelightOverlay(graphics, area);
     }
 
     public String executeNormalKeys(String keys, int startLine, int endLine) {
@@ -2795,10 +2668,6 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String showTypedSettingsReference() {
         return sessionConfigController.showTypedSettingsReference();
-    }
-
-    public String applyTheaterPreset(String presetArgument) {
-        return sessionConfigController.applyTheaterPreset(presetArgument);
     }
 
     public String reloadConfigFromDisk() {

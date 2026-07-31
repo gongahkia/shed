@@ -776,8 +776,6 @@ final class LspController {
             int start = editor.writingArea.getLineStartOffset(line);
             int target = Math.min(start + Math.max(0, selected.getCharacter()), editor.writingArea.getText().length());
             editor.writingArea.setCaretPosition(target);
-            editor.pulseCaretLine(editor.blendColor(editor.configManager.getVisualColor(), editor.configManager.getCaretColor(), 0.35));
-            editor.playCue(CueType.NAVIGATE);
             return diagnosticSeverityLabel(selected.getSeverity()) + ": " + selected.getMessage();
         } catch (BadLocationException e) {
             return "Diagnostic jump failed: " + e.getMessage();

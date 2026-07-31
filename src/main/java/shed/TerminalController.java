@@ -42,12 +42,10 @@ final class TerminalController {
         if (editor.windowLayoutRoot == null) {
             editor.windowLayoutRoot = WindowLayoutNode.leaf(activePane);
         }
-        double startRatio = editor.dramaticPanelAnimationsEnabled && editor.dramaticMotionAllowed() ? 0.12 : 0.5;
-        editor.windowLayoutRoot.splitLeaf(activePane, terminalEditorPane, WindowLayoutNode.Orientation.VERTICAL, false, startRatio);
+        editor.windowLayoutRoot.splitLeaf(activePane, terminalEditorPane, WindowLayoutNode.Orientation.VERTICAL, false, 0.5);
         editor.ptyTerminalPanes.put(termBuffer, terminalPane);
         terminalPane.onExit(() -> SwingUtilities.invokeLater(() -> closeExitedTerminal(termBuffer)));
         editor.renderWindowLayout();
-        editor.animateSplitForPane(terminalEditorPane, startRatio, 0.5);
         editor.activateEditorPane(terminalEditorPane);
         editor.setMode(EditorMode.INSERT);
         terminalPane.requestFocusInWindow();

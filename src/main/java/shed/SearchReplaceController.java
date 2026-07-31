@@ -15,9 +15,6 @@ final class SearchReplaceController {
         if (!editor.configManager.getHighlightSearch()) {
             editor.searchManager.clearHighlights();
         }
-        if (result.startsWith("Match")) {
-            editor.pulseCaretLine(editor.blendColor(editor.configManager.getSelectionColor(), editor.configManager.getCaretColor(), 0.35));
-        }
         return result;
     }
 
@@ -27,9 +24,6 @@ final class SearchReplaceController {
         String result = editor.searchManager.searchBackward(pattern);
         if (!editor.configManager.getHighlightSearch()) {
             editor.searchManager.clearHighlights();
-        }
-        if (result.startsWith("Match")) {
-            editor.pulseCaretLine(editor.blendColor(editor.configManager.getSelectionColor(), editor.configManager.getCaretColor(), 0.35));
         }
         return result;
     }
@@ -45,7 +39,6 @@ final class SearchReplaceController {
             editor.writingArea.setCaretPosition(Math.min(Math.max(0, result.firstMatchOffset), editor.writingArea.getText().length()));
             editor.markModified();
             editor.searchManager.clearHighlights();
-            editor.pulseCaretLine(editor.configManager.getSubstitutePreviewColor());
             return "Replaced " + result.matchCount + " occurrence" + (result.matchCount == 1 ? "" : "s");
         } else {
             return substituteCurrentLine(pattern, replacement, replaceAll);
@@ -69,8 +62,6 @@ final class SearchReplaceController {
             editor.writingArea.replaceRange(result.updatedText, lineStart, lineEnd);
             editor.writingArea.setCaretPosition(Math.min(lineStart + result.firstMatchOffset, editor.writingArea.getText().length()));
             editor.searchManager.clearHighlights();
-            editor.pulseCaretLine(editor.configManager.getSubstitutePreviewColor());
-
             return "Replaced " + result.matchCount + " occurrence" + (result.matchCount == 1 ? "" : "s");
         } catch (BadLocationException e) {
             return "Error: " + e.getMessage();

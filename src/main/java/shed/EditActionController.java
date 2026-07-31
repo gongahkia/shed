@@ -74,9 +74,6 @@ final class EditActionController {
             editor.showMessage("Selection " + (operator == '>' ? "indented" : operator == '<' ? "dedented" : "auto-indented"));
         } catch (BadLocationException ignored) {
         }
-        if (!editor.substitutePreviewTags.isEmpty()) {
-            editor.pulseCaretLine(editor.configManager.getSubstitutePreviewColor());
-        }
     }
 
 

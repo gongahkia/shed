@@ -378,10 +378,7 @@ final class TreeGitController {
             return "Tree pane already closed";
         }
         String result = editor.closePane(editor.treePane);
-        if ("Window closed".equals(result)) {
-            editor.animateEditorHostTint(editor.configManager.getCommandColor());
-            return "Tree pane closed";
-        }
+        if ("Window closed".equals(result)) return "Tree pane closed";
         return result;
     }
 
@@ -490,14 +487,11 @@ final class TreeGitController {
             editor.windowLayoutRoot = WindowLayoutNode.leaf(contentPane);
         }
         double treeTargetRatio = 0.24;
-        double treeStartRatio = editor.dramaticPanelAnimationsEnabled && editor.dramaticMotionAllowed() ? 0.08 : treeTargetRatio;
-        boolean split = editor.windowLayoutRoot.splitLeaf(contentPane, newPane, WindowLayoutNode.Orientation.HORIZONTAL, true, treeStartRatio);
+        boolean split = editor.windowLayoutRoot.splitLeaf(contentPane, newPane, WindowLayoutNode.Orientation.HORIZONTAL, true, treeTargetRatio);
         if (!split) {
             editor.windowLayoutRoot.splitLeaf(contentPane, newPane, WindowLayoutNode.Orientation.HORIZONTAL);
         }
         editor.renderWindowLayout();
-        editor.animateSplitForPane(newPane, treeStartRatio, treeTargetRatio);
-        editor.animateEditorHostTint(editor.configManager.getVisualColor());
         editor.treePane = newPane;
         return newPane;
     }

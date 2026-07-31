@@ -12,6 +12,7 @@ public class EditorPane {
     private FileBuffer buffer;
     private LargeFileProjection largeFileProjection;
     private PtyTerminalPane terminalPane;
+    private boolean hiddenByFocusMode;
 
     public EditorPane(JTextArea textArea, LineNumberPanel lineNumberPanel, JScrollPane scrollPane, SearchManager searchManager) {
         this.textArea = textArea;
@@ -70,5 +71,13 @@ public class EditorPane {
             terminalPane.close();
             terminalPane = null;
         }
+    }
+
+    boolean isHiddenByFocusMode() {
+        return hiddenByFocusMode;
+    }
+
+    void setHiddenByFocusMode(boolean hidden) {
+        hiddenByFocusMode = hidden;
     }
 }

@@ -72,7 +72,8 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:drop <cmd>` | Run async command against current file path (`%` expands to quoted file path) |
 | `:jobs` | Show async jobs buffer |
 | `:jobcancel <id>`, `:jobkill <id>` | Cancel running async job |
-| `:task`, `:task list` | Show validated workspace tasks (`.shedtasks`) |
+| `:task`, `:task ui` | Open graphical Tasks/Jobs panel |
+| `:task text`, `:task text list` | Show legacy task scratch buffer |
 | `:task add <name> <command>` | Save task |
 | `:task remove <name>`, `:task rm <name>`, `:task delete <name>` | Remove task |
 | `:task dry-run <name>` | Resolve and show task execution plan without starting it |
@@ -122,7 +123,9 @@ Notes:
 
 | Command | Action |
 | :--- | :--- |
-| `:settings`, `:config` | Open user config file |
+| `:settings`, `:config` | Open graphical Settings Editor |
+| `:config file`, `:config toml`, `:config text` | Open user config file |
+| `:config inspector`, `:config ui` | Open graphical Settings Editor |
 | `:config save`, `:config write` | Persist current runtime config to disk |
 | `:config status` | Show the current config load or recovery report |
 | `:reload`, `:source` | Reload config from disk |
@@ -247,6 +250,8 @@ Notes:
 
 | Command | Action |
 | :--- | :--- |
+| `:git workbench`, `:git changes`, `:git ui` | Open docked Git Changes panel |
+| `:git text [subcommand]` | Run Git command with legacy text presentation |
 | `:git status`, `:git st` | Status (`--short --branch`) |
 | `:git diff [args]` | Diff |
 | `:git log [count]` | Colored topology graph (default 20); click a commit for its details. Falls back to the ASCII log when graphical Git history is disabled. |

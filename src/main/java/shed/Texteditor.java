@@ -864,6 +864,10 @@ public class Texteditor extends JFrame implements KeyListener {
         syntaxUiController.scheduleSymbolRefresh();
     }
 
+    void shutdownSyntaxUi() {
+        syntaxUiController.shutdown();
+    }
+
     void clearSyntaxHighlighting() {
         syntaxUiController.clearSyntaxHighlighting();
     }
@@ -2192,6 +2196,10 @@ public class Texteditor extends JFrame implements KeyListener {
         lspController.flushPendingLspChange(buffer);
     }
 
+    void shutdownLspScheduling() {
+        lspController.shutdown();
+    }
+
     void scheduleDiagnosticRefresh() {
         lspController.scheduleDiagnosticRefresh();
     }
@@ -3113,6 +3121,8 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         flushScheduledRecoverySnapshotCapture();
         shutdownRecoveryJournalScheduling();
+        shutdownSyntaxUi();
+        shutdownLspScheduling();
         flushPendingBackups();
         if (backupScheduler != null) {
             backupScheduler.close();

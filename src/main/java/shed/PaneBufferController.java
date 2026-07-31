@@ -26,7 +26,11 @@ final class PaneBufferController {
             markModified();
             editor.updateCurrentLineHighlight();
             editor.scheduleSyntaxHighlighting();
-            editor.lineNumberPanel.repaint();
+            try {
+                int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
+                editor.lineNumberPanel.repaintLines(line);
+            } catch (BadLocationException ignored) {
+            }
         }
     }
 
@@ -247,8 +251,12 @@ final class PaneBufferController {
 
 
     void updateDiffGutter(FileBuffer buffer) {
+        long started = System.nanoTime();
         if (editor.lineNumberPanel != null && buffer != null) {
             editor.lineNumberPanel.updateDiffMarkers(buffer.getSavedContent(), editor.writingArea.getText());
+        }
+        if (editor.perfService != null) {
+            editor.perfService.recordDuration("diff.gutter", started, buffer == null ? "no-buffer" : buffer.getDisplayName());
         }
     }
 

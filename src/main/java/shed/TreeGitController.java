@@ -1046,12 +1046,16 @@ final class TreeGitController {
         }
         long generation = ++gitGutterGeneration;
         gitGutterJobId = editor.asyncJobService.submit("Git gutter", token -> {
+            long started = System.nanoTime();
             CommandResult result = runCommand(gitRoot, List.of("git", "diff", "HEAD", "--unified=0", "--", filePath));
             Set<Integer> added = new HashSet<>();
             Set<Integer> modified = new HashSet<>();
             Set<Integer> deletedAfter = new HashSet<>();
             if (result.exitCode == 0 && result.stdout != null) {
                 parseUnifiedDiffForGutter(result.stdout, added, modified, deletedAfter);
+            }
+            if (editor.perfService != null) {
+                editor.perfService.recordDuration("git.gutter", started, filePath);
             }
             return new GitGutterUpdate(filePath, added, modified, deletedAfter);
         }, (snapshot, update, error) -> {

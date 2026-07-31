@@ -31,6 +31,21 @@ public class WindowLayoutNodeResponsiveTest {
         assertTrue(root.getSecond().isLeaf());
     }
 
+    @Test
+    void hidesFocusModeLeafWithoutChangingTheSavedSplit() {
+        EditorPane first = pane();
+        EditorPane second = pane();
+        WindowLayoutNode root = WindowLayoutNode.split(WindowLayoutNode.Orientation.HORIZONTAL, 0.25,
+            WindowLayoutNode.leaf(first), WindowLayoutNode.leaf(second));
+
+        first.setHiddenByFocusMode(true);
+        assertSame(second.getComponent(), root.render(second, 900, 800));
+        first.setHiddenByFocusMode(false);
+        assertTrue(root.render(second, 900, 800) instanceof javax.swing.JSplitPane);
+        assertTrue(root.getFirst().isLeaf());
+        assertTrue(root.getSecond().isLeaf());
+    }
+
     private EditorPane pane() {
         JTextArea text = new JTextArea();
         return new EditorPane(text, new LineNumberPanel(text), new JScrollPane(text), new SearchManager(text));

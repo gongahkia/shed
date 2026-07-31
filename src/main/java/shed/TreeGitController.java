@@ -1362,7 +1362,9 @@ final class TreeGitController {
         if (body.isEmpty()) {
             body = "commit created";
         }
-        editor.showScratchBuffer("[git commit]", body + "\n");
+        if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.GIT)) {
+            editor.showScratchBuffer("[git commit]", body + "\n");
+        }
         return "Commit complete";
     }
 
@@ -1393,7 +1395,9 @@ final class TreeGitController {
         if (body.isEmpty()) {
             body = "commit amended";
         }
-        editor.showScratchBuffer("[git amend]", body + "\n");
+        if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.GIT)) {
+            editor.showScratchBuffer("[git amend]", body + "\n");
+        }
         return "Amend complete";
     }
 
@@ -1417,7 +1421,7 @@ final class TreeGitController {
             return gitError(result);
         }
         String output = result.stdout.strip();
-        if (!output.isEmpty()) {
+        if (!output.isEmpty() && (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.GIT))) {
             editor.showScratchBuffer("[git checkout]", output + "\n");
         }
         editor.gitBranch = resolveBranchName(gitRoot);
@@ -1440,7 +1444,7 @@ final class TreeGitController {
             return gitError(result);
         }
         String output = result.stdout.strip();
-        if (!output.isEmpty()) {
+        if (!output.isEmpty() && (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.GIT))) {
             editor.showScratchBuffer("[git switch]", output + "\n");
         }
         editor.gitBranch = resolveBranchName(gitRoot);

@@ -81,27 +81,10 @@ public class ConfigManager {
     private static final boolean DEFAULT_AUTO_PAIRS = true;
     private static final int DEFAULT_TEXTWIDTH = 0;
     private static final boolean DEFAULT_MINIMAP = false;
+    private static final int DEFAULT_MINIMAP_WIDTH = 84;
+    private static final double DEFAULT_LIMELIGHT_COEFFICIENT = 0.5;
+    private static final int DEFAULT_LIMELIGHT_PARAGRAPH_SPAN = 0;
     private static final boolean DEFAULT_MULTI_SELECTION_ENABLED = false;
-    private static final boolean DEFAULT_DRAMATIC_UI = false;
-    private static final boolean DEFAULT_DRAMATIC_IDENTITY = true;
-    private static final boolean DEFAULT_DRAMATIC_MODE_TRANSITIONS = true;
-    private static final boolean DEFAULT_DRAMATIC_COMMAND_PALETTE = true;
-    private static final boolean DEFAULT_DRAMATIC_EDITING_FEEDBACK = true;
-    private static final boolean DEFAULT_DRAMATIC_PANEL_ANIMATIONS = true;
-    private static final boolean DEFAULT_DRAMATIC_SOUND = false;
-    private static final String DEFAULT_DRAMATIC_SOUND_PACK = "default";
-    private static final int DEFAULT_DRAMATIC_SOUND_VOLUME = 75;
-    private static final boolean DEFAULT_DRAMATIC_SOUND_CUE_MODE = true;
-    private static final boolean DEFAULT_DRAMATIC_SOUND_CUE_NAVIGATE = true;
-    private static final boolean DEFAULT_DRAMATIC_SOUND_CUE_SUCCESS = true;
-    private static final boolean DEFAULT_DRAMATIC_SOUND_CUE_ERROR = true;
-    private static final boolean DEFAULT_DRAMATIC_REDUCED_MOTION = false;
-    private static final boolean DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC = true;
-    private static final boolean DEFAULT_DRAMATIC_PERFORMANCE_GUARDRAILS = true;
-    private static final double DEFAULT_DRAMATIC_PERFORMANCE_CPU_THRESHOLD = 0.80;
-    private static final int DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD = 20000;
-    private static final int DEFAULT_DRAMATIC_ANIMATION_MS = 220;
-    private static final int DEFAULT_DRAMATIC_MINIMAP_WIDTH = 84;
     private static final boolean DEFAULT_UI_WHICHKEY_HINTS = true;
     private static final boolean DEFAULT_PROJECT_CONFIG_ENABLED = true;
     private static final boolean DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE = false;
@@ -265,6 +248,9 @@ public class ConfigManager {
         defineDefault("auto.pairs", DEFAULT_AUTO_PAIRS);
         defineDefault("textwidth", DEFAULT_TEXTWIDTH);
         defineDefault("minimap", DEFAULT_MINIMAP);
+        defineDefault("minimap.width", DEFAULT_MINIMAP_WIDTH);
+        defineDefault("limelight.coefficient", DEFAULT_LIMELIGHT_COEFFICIENT);
+        defineDefault("limelight.paragraph.span", DEFAULT_LIMELIGHT_PARAGRAPH_SPAN);
         defineDefault("multi.selection.enabled", DEFAULT_MULTI_SELECTION_ENABLED);
         defineDefault("multi.selection.max.cursors", MultiSelectionPolicy.DEFAULT_MAX_CURSORS);
         LspFeatureSettings lspFeatures = LspFeatureSettings.defaults();
@@ -280,26 +266,6 @@ public class ConfigManager {
         defineDefault("lsp.code.actions.enabled", lspFeatures.codeActions());
         defineDefault("lsp.command.execution.enabled", lspFeatures.commandExecution());
         defineDefault("lsp.formatting.enabled", lspFeatures.formatting());
-        defineDefault("ui.dramatic", DEFAULT_DRAMATIC_UI);
-        defineDefault("ui.dramatic.identity", DEFAULT_DRAMATIC_IDENTITY);
-        defineDefault("ui.dramatic.mode.transitions", DEFAULT_DRAMATIC_MODE_TRANSITIONS);
-        defineDefault("ui.dramatic.command.palette", DEFAULT_DRAMATIC_COMMAND_PALETTE);
-        defineDefault("ui.dramatic.editing.feedback", DEFAULT_DRAMATIC_EDITING_FEEDBACK);
-        defineDefault("ui.dramatic.panel.animations", DEFAULT_DRAMATIC_PANEL_ANIMATIONS);
-        defineDefault("ui.dramatic.sound", DEFAULT_DRAMATIC_SOUND);
-        defineDefault("ui.dramatic.sound.pack", DEFAULT_DRAMATIC_SOUND_PACK);
-        defineDefault("ui.dramatic.sound.volume", DEFAULT_DRAMATIC_SOUND_VOLUME);
-        defineDefault("ui.dramatic.sound.cue.mode", DEFAULT_DRAMATIC_SOUND_CUE_MODE);
-        defineDefault("ui.dramatic.sound.cue.navigate", DEFAULT_DRAMATIC_SOUND_CUE_NAVIGATE);
-        defineDefault("ui.dramatic.sound.cue.success", DEFAULT_DRAMATIC_SOUND_CUE_SUCCESS);
-        defineDefault("ui.dramatic.sound.cue.error", DEFAULT_DRAMATIC_SOUND_CUE_ERROR);
-        defineDefault("ui.dramatic.reduced.motion", DEFAULT_DRAMATIC_REDUCED_MOTION);
-        defineDefault("ui.dramatic.reduced.motion.sync", DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC);
-        defineDefault("ui.dramatic.performance.guardrails", DEFAULT_DRAMATIC_PERFORMANCE_GUARDRAILS);
-        defineDefault("ui.dramatic.performance.cpu.threshold", DEFAULT_DRAMATIC_PERFORMANCE_CPU_THRESHOLD);
-        defineDefault("ui.dramatic.performance.line.threshold", DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD);
-        defineDefault("ui.dramatic.animation.ms", DEFAULT_DRAMATIC_ANIMATION_MS);
-        defineDefault("ui.dramatic.minimap.width", DEFAULT_DRAMATIC_MINIMAP_WIDTH);
         defineDefault("ui.whichkey.hints", DEFAULT_UI_WHICHKEY_HINTS);
         defineDefault("project.config.enabled", DEFAULT_PROJECT_CONFIG_ENABLED);
         defineDefault("project.config.allow.unsafe", DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE);
@@ -385,6 +351,9 @@ public class ConfigManager {
             case "auto.pairs" -> "Insert matching brackets and quotes";
             case "textwidth" -> "Paragraph width, zero disables wrapping";
             case "minimap" -> "Persisted minimap visibility setting";
+            case "minimap.width" -> "Minimap width in pixels";
+            case "limelight.coefficient" -> "Background blend strength for unfocused paragraphs";
+            case "limelight.paragraph.span" -> "Adjacent paragraphs retained at full brightness";
             case "multi.selection.enabled" -> "Enable experimental multi-selection editing";
             case "multi.selection.max.cursors" -> "Maximum total cursors for experimental multi-selection";
             case "lsp.completion.enabled" -> "Enable LSP completion requests";
@@ -399,26 +368,6 @@ public class ConfigManager {
             case "lsp.code.actions.enabled" -> "Enable LSP code-action requests";
             case "lsp.command.execution.enabled" -> "Enable LSP execute-command requests";
             case "lsp.formatting.enabled" -> "Enable LSP document-formatting requests";
-            case "ui.dramatic" -> "Enable dramatic interface effects";
-            case "ui.dramatic.identity" -> "Show dramatic identity accents";
-            case "ui.dramatic.mode.transitions" -> "Animate editor mode transitions";
-            case "ui.dramatic.command.palette" -> "Animate the command palette";
-            case "ui.dramatic.editing.feedback" -> "Show editing feedback effects";
-            case "ui.dramatic.panel.animations" -> "Animate interface panels";
-            case "ui.dramatic.sound" -> "Enable dramatic sound cues";
-            case "ui.dramatic.sound.pack" -> "Active sound cue pack";
-            case "ui.dramatic.sound.volume" -> "Sound cue volume percentage";
-            case "ui.dramatic.sound.cue.mode" -> "Enable mode-change sound cues";
-            case "ui.dramatic.sound.cue.navigate" -> "Enable navigation sound cues";
-            case "ui.dramatic.sound.cue.success" -> "Enable success sound cues";
-            case "ui.dramatic.sound.cue.error" -> "Enable error sound cues";
-            case "ui.dramatic.reduced.motion" -> "Force reduced-motion effects";
-            case "ui.dramatic.reduced.motion.sync" -> "Use system reduced-motion preference";
-            case "ui.dramatic.performance.guardrails" -> "Enable dramatic UI performance guardrails";
-            case "ui.dramatic.performance.cpu.threshold" -> "CPU threshold for dramatic UI guardrails";
-            case "ui.dramatic.performance.line.threshold" -> "Line-count threshold for dramatic UI guardrails";
-            case "ui.dramatic.animation.ms" -> "Animation duration in milliseconds";
-            case "ui.dramatic.minimap.width" -> "Dramatic minimap width";
             case "ui.whichkey.hints" -> "Show prefix-key hint overlays";
             case "project.config.enabled" -> "Enable project-local configuration";
             case "project.config.allow.unsafe" -> "Allow unsafe project-local keys";
@@ -954,90 +903,16 @@ public class ConfigManager {
         );
     }
 
-    public boolean getDramaticUiEnabled() {
-        return getBoolean("ui.dramatic", DEFAULT_DRAMATIC_UI);
+    public int getMinimapWidth() {
+        return Math.max(40, getInt("minimap.width", DEFAULT_MINIMAP_WIDTH));
     }
 
-    public boolean getDramaticIdentityEnabled() {
-        return getBoolean("ui.dramatic.identity", DEFAULT_DRAMATIC_IDENTITY);
+    public double getLimelightCoefficient() {
+        return Math.max(0.0, Math.min(1.0, getDouble("limelight.coefficient", DEFAULT_LIMELIGHT_COEFFICIENT)));
     }
 
-    public boolean getDramaticModeTransitionsEnabled() {
-        return getBoolean("ui.dramatic.mode.transitions", DEFAULT_DRAMATIC_MODE_TRANSITIONS);
-    }
-
-    public boolean getDramaticCommandPaletteEnabled() {
-        return getBoolean("ui.dramatic.command.palette", DEFAULT_DRAMATIC_COMMAND_PALETTE);
-    }
-
-    public boolean getDramaticEditingFeedbackEnabled() {
-        return getBoolean("ui.dramatic.editing.feedback", DEFAULT_DRAMATIC_EDITING_FEEDBACK);
-    }
-
-    public boolean getDramaticPanelAnimationsEnabled() {
-        return getBoolean("ui.dramatic.panel.animations", DEFAULT_DRAMATIC_PANEL_ANIMATIONS);
-    }
-
-    public boolean getDramaticSoundEnabled() {
-        return getBoolean("ui.dramatic.sound", DEFAULT_DRAMATIC_SOUND);
-    }
-
-    public String getDramaticSoundPack() {
-        String pack = getString("ui.dramatic.sound.pack", DEFAULT_DRAMATIC_SOUND_PACK);
-        if (pack == null || pack.isBlank()) {
-            return DEFAULT_DRAMATIC_SOUND_PACK;
-        }
-        return pack.trim().toLowerCase(Locale.ROOT);
-    }
-
-    public int getDramaticSoundVolume() {
-        return Math.max(0, Math.min(100, getInt("ui.dramatic.sound.volume", DEFAULT_DRAMATIC_SOUND_VOLUME)));
-    }
-
-    public boolean getDramaticSoundModeCueEnabled() {
-        return getBoolean("ui.dramatic.sound.cue.mode", DEFAULT_DRAMATIC_SOUND_CUE_MODE);
-    }
-
-    public boolean getDramaticSoundNavigateCueEnabled() {
-        return getBoolean("ui.dramatic.sound.cue.navigate", DEFAULT_DRAMATIC_SOUND_CUE_NAVIGATE);
-    }
-
-    public boolean getDramaticSoundSuccessCueEnabled() {
-        return getBoolean("ui.dramatic.sound.cue.success", DEFAULT_DRAMATIC_SOUND_CUE_SUCCESS);
-    }
-
-    public boolean getDramaticSoundErrorCueEnabled() {
-        return getBoolean("ui.dramatic.sound.cue.error", DEFAULT_DRAMATIC_SOUND_CUE_ERROR);
-    }
-
-    public boolean getDramaticReducedMotionEnabled() {
-        if (getBoolean("ui.dramatic.reduced.motion", DEFAULT_DRAMATIC_REDUCED_MOTION)) {
-            return true;
-        }
-        if (getBoolean("ui.dramatic.reduced.motion.sync", DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC)) {
-            return detectSystemReducedMotionPreference();
-        }
-        return false;
-    }
-
-    public int getDramaticAnimationMs() {
-        return getInt("ui.dramatic.animation.ms", DEFAULT_DRAMATIC_ANIMATION_MS);
-    }
-
-    public int getDramaticMinimapWidth() {
-        return Math.max(40, getInt("ui.dramatic.minimap.width", DEFAULT_DRAMATIC_MINIMAP_WIDTH));
-    }
-
-    public boolean getDramaticPerformanceGuardrailsEnabled() {
-        return getBoolean("ui.dramatic.performance.guardrails", DEFAULT_DRAMATIC_PERFORMANCE_GUARDRAILS);
-    }
-
-    public double getDramaticPerformanceCpuThreshold() {
-        return getDouble("ui.dramatic.performance.cpu.threshold", DEFAULT_DRAMATIC_PERFORMANCE_CPU_THRESHOLD);
-    }
-
-    public int getDramaticPerformanceLineThreshold() {
-        return Math.max(1000, getInt("ui.dramatic.performance.line.threshold", DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD));
+    public int getLimelightParagraphSpan() {
+        return Math.max(0, getInt("limelight.paragraph.span", DEFAULT_LIMELIGHT_PARAGRAPH_SPAN));
     }
 
     public boolean getWhichKeyHintsEnabled() {

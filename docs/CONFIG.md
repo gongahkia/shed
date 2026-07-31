@@ -67,8 +67,11 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `scrolloff` | `0` | int | Keep cursor context while scrolling |
 | `textwidth` | `0` | int | Paragraph formatting width (`0` disables) |
 | `auto.pairs` | `true` | bool | Auto-pair brackets/quotes |
-| `zen.mode.width` | `80` | int | Preferred zen-mode content width |
+| `zen.mode.width` | `80` | int | Goyo content width in columns |
 | `minimap` | `false` | bool | Stored key; minimap visibility is currently controlled by `:minimap` |
+| `minimap.width` | `84` | int | Minimap width in pixels; minimum `40` |
+| `limelight.coefficient` | `0.5` | double | Dim strength for non-focused paragraphs; `0.0..1.0` |
+| `limelight.paragraph.span` | `0` | int | Adjacent paragraphs retained at full brightness |
 | `multi.selection.enabled` | `false` | bool | Enable experimental multi-selection editing |
 | `multi.selection.max.cursors` | `16` | int | Maximum total cursors when enabled; `2..256` |
 
@@ -214,30 +217,10 @@ See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/a
 | :--- | :--- | :--- | :--- |
 | `keymap.profile` | `vim` | string | `vim`, non-modal `plain`, or chorded `emacs`; non-Vim profiles bypass `keybind.<mode>.*` |
 
-## Dramatic UI / Theater Keys
+## Focus and Command UI Keys
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `ui.dramatic` | `false` | bool | Master dramatic UI toggle |
-| `ui.dramatic.identity` | `true` | bool | Brand/identity accents |
-| `ui.dramatic.mode.transitions` | `true` | bool | Mode transition effects |
-| `ui.dramatic.command.palette` | `true` | bool | Palette animation treatment |
-| `ui.dramatic.editing.feedback` | `true` | bool | Editing feedback effects |
-| `ui.dramatic.panel.animations` | `true` | bool | Panel animation toggle |
-| `ui.dramatic.sound` | `false` | bool | Sound cues master toggle |
-| `ui.dramatic.sound.pack` | `default` | string | Active sound pack |
-| `ui.dramatic.sound.volume` | `75` | int | Clamped to `0..100` |
-| `ui.dramatic.sound.cue.mode` | `true` | bool | Mode cue enable |
-| `ui.dramatic.sound.cue.navigate` | `true` | bool | Navigation cue enable |
-| `ui.dramatic.sound.cue.success` | `true` | bool | Success cue enable |
-| `ui.dramatic.sound.cue.error` | `true` | bool | Error cue enable |
-| `ui.dramatic.reduced.motion` | `false` | bool | Force reduced motion |
-| `ui.dramatic.reduced.motion.sync` | `true` | bool | Sync reduced motion with OS/env hints |
-| `ui.dramatic.performance.guardrails` | `true` | bool | Runtime performance safety checks |
-| `ui.dramatic.performance.cpu.threshold` | `0.80` | double | Runtime-clamped to `0.1..1.0` |
-| `ui.dramatic.performance.line.threshold` | `20000` | int | Runtime minimum `1000` |
-| `ui.dramatic.animation.ms` | `220` | int | Runtime minimum `80` |
-| `ui.dramatic.minimap.width` | `84` | int | Runtime minimum `40` |
 | `ui.whichkey.hints` | `true` | bool | Prefix-key hint display |
 
 ## Safety and Project-Local Keys

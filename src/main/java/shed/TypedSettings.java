@@ -274,11 +274,9 @@ final class TypedSettings {
             case "font.size" -> "integer >= 1";
             case "line.numbers" -> "none | absolute | relative | relativeabsolute | hybrid";
             case "multi.selection.max.cursors" -> "integer " + MultiSelectionPolicy.MIN_MAX_CURSORS + ".." + MultiSelectionPolicy.MAX_MAX_CURSORS;
-            case "ui.dramatic.sound.volume" -> "integer 0..100";
-            case "ui.dramatic.performance.cpu.threshold" -> "number 0.1..1.0";
-            case "ui.dramatic.performance.line.threshold" -> "integer >= 1000";
-            case "ui.dramatic.animation.ms" -> "integer >= 80";
-            case "ui.dramatic.minimap.width" -> "integer >= 40";
+            case "minimap.width" -> "integer >= 40";
+            case "limelight.coefficient" -> "number 0.0..1.0";
+            case "limelight.paragraph.span" -> "integer >= 0";
             case "recovery.retention.max.entries" -> "integer 1.." + RecoveryJournal.MAX_ENTRIES;
             case "recovery.retention.max.content.bytes" -> "integer 1.." + RecoveryJournal.MAX_CONTENT_BYTES;
             case "backup.directory" -> "string path";
@@ -403,17 +401,8 @@ final class TypedSettings {
                 && (number < MultiSelectionPolicy.MIN_MAX_CURSORS || number > MultiSelectionPolicy.MAX_MAX_CURSORS)) {
                 return key + " must be between " + MultiSelectionPolicy.MIN_MAX_CURSORS + " and " + MultiSelectionPolicy.MAX_MAX_CURSORS;
             }
-            if ("ui.dramatic.sound.volume".equals(key) && number > 100) {
-                return key + " must be between 0 and 100";
-            }
-            if ("ui.dramatic.animation.ms".equals(key) && number < 80) {
-                return key + " must be at least 80";
-            }
-            if ("ui.dramatic.minimap.width".equals(key) && number < 40) {
+            if ("minimap.width".equals(key) && number < 40) {
                 return key + " must be at least 40";
-            }
-            if ("ui.dramatic.performance.line.threshold".equals(key) && number < 1000) {
-                return key + " must be at least 1000";
             }
             if ("recovery.retention.max.entries".equals(key) && (number < 1 || number > RecoveryJournal.MAX_ENTRIES)) {
                 return key + " must be between 1 and " + RecoveryJournal.MAX_ENTRIES;
@@ -436,8 +425,8 @@ final class TypedSettings {
             if (!Double.isFinite(number)) {
                 return key + " must be finite";
             }
-            if ("ui.dramatic.performance.cpu.threshold".equals(key) && (number < 0.1 || number > 1.0)) {
-                return key + " must be between 0.1 and 1.0";
+            if ("limelight.coefficient".equals(key) && (number < 0.0 || number > 1.0)) {
+                return key + " must be between 0.0 and 1.0";
             }
         }
         if ("line.numbers".equals(key) && value instanceof String) {

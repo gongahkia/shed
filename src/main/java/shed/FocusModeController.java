@@ -137,8 +137,10 @@ final class FocusModeController {
             return;
         }
         Color background = editor.getModeBackground(editor.editorState.mode == null ? EditorMode.NORMAL : editor.editorState.mode);
+        editor.getContentPane().setBackground(background);
         editor.editorHostPanel.setBackground(background);
         editor.editorHostPanel.setOpaque(true);
+        if (editor.editorToolSplit != null) editor.editorToolSplit.setBackground(background);
         for (EditorPane pane : editor.editorPanes) {
             JScrollPane scrollPane = pane.getScrollPane();
             JTextArea area = pane.getTextArea();

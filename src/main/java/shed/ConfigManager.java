@@ -1685,51 +1685,6 @@ public class ConfigManager {
         return escaped.append('"').toString();
     }
 
-    private boolean detectSystemReducedMotionPreference() {
-        String envOverride = normalizedTruth(System.getenv("PREFER_REDUCED_MOTION"));
-        if (envOverride != null) {
-            return Boolean.parseBoolean(envOverride);
-        }
-        String propOverride = normalizedTruth(System.getProperty("prefers.reduced.motion"));
-        if (propOverride != null) {
-            return Boolean.parseBoolean(propOverride);
-        }
-        try {
-            Toolkit toolkit = Toolkit.getDefaultToolkit();
-            Object awtPreference = toolkit.getDesktopProperty("awt.prefersReducedMotion");
-            if (awtPreference instanceof Boolean) {
-                return (Boolean) awtPreference;
-            }
-            Object gnomeAnimations = toolkit.getDesktopProperty("gnome.Net/EnableAnimations");
-            if (gnomeAnimations instanceof Boolean) {
-                return !((Boolean) gnomeAnimations);
-            }
-            Object kdeAnimations = toolkit.getDesktopProperty("kde.kdecoration.animationEnabled");
-            if (kdeAnimations instanceof Boolean) {
-                return !((Boolean) kdeAnimations);
-            }
-        } catch (Throwable ignored) {
-        }
-        return false;
-    }
-
-    private String normalizedTruth(String raw) {
-        if (raw == null) {
-            return null;
-        }
-        String normalized = raw.trim().toLowerCase(Locale.ROOT);
-        if (normalized.isEmpty()) {
-            return null;
-        }
-        if ("1".equals(normalized) || "true".equals(normalized) || "yes".equals(normalized) || "on".equals(normalized)) {
-            return "true";
-        }
-        if ("0".equals(normalized) || "false".equals(normalized) || "no".equals(normalized) || "off".equals(normalized)) {
-            return "false";
-        }
-        return null;
-    }
-
     private Color getUiColor(String key, Color fallback) {
         String value = config.get(key);
         if (value == null || value.isBlank()) {

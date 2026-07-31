@@ -121,7 +121,8 @@ Managed language support has no configuration key or network path yet. Its plann
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `backup.enabled` | `true` | bool | Create local versioned backups while editing |
+| `backup.enabled` | `false` | bool | Opt in to local versioned backups |
+| `backup.mode` | `idle` | enum | `idle` writes after 750 ms inactivity and flushes on exit; `save-only` writes before explicit saves |
 | `backup.directory` | `~/.shed/backups` | path | Directory for versioned backups; created on first backup |
 | `backup.retention.count` | `10` | int | Retained backups per source file; `1..100` |
 

@@ -68,7 +68,8 @@ public class ConfigManager {
     private static final int DEFAULT_RECOVERY_RETENTION_MAX_ENTRIES = RecoveryJournal.MAX_ENTRIES;
     private static final int DEFAULT_RECOVERY_RETENTION_MAX_CONTENT_BYTES = RecoveryJournal.MAX_CONTENT_BYTES;
     private static final boolean DEFAULT_RECOVERY_CLEANUP_ON_CLEAN_EXIT = true;
-    private static final boolean DEFAULT_BACKUP_ENABLED = true;
+    private static final boolean DEFAULT_BACKUP_ENABLED = false;
+    private static final String DEFAULT_BACKUP_MODE = "idle";
     private static final int DEFAULT_BACKUP_RETENTION_COUNT = BackupPolicy.DEFAULT_RETENTION_COUNT;
     private static final int DEFAULT_UNDO_HISTORY_MAX_ENTRIES = UndoHistoryPolicy.DEFAULT_MAX_ENTRIES;
     private static final long DEFAULT_UNDO_HISTORY_MAX_BYTES = UndoHistoryPolicy.DEFAULT_MAX_BYTES;
@@ -251,6 +252,7 @@ public class ConfigManager {
         defineDefault("recovery.retention.max.content.bytes", DEFAULT_RECOVERY_RETENTION_MAX_CONTENT_BYTES);
         defineDefault("recovery.cleanup.on.clean.exit", DEFAULT_RECOVERY_CLEANUP_ON_CLEAN_EXIT);
         defineDefault("backup.enabled", DEFAULT_BACKUP_ENABLED);
+        defineDefault("backup.mode", DEFAULT_BACKUP_MODE);
         defineDefault("backup.directory", Path.of(shedDirectoryPath).resolve("backups").toString());
         defineDefault("backup.retention.count", DEFAULT_BACKUP_RETENTION_COUNT);
         defineDefault("undo.history.max.entries", DEFAULT_UNDO_HISTORY_MAX_ENTRIES);
@@ -370,6 +372,7 @@ public class ConfigManager {
             case "recovery.retention.max.content.bytes" -> "Maximum retained recovery journal UTF-8 bytes";
             case "recovery.cleanup.on.clean.exit" -> "Remove recovery data only after a clean exit";
             case "backup.enabled" -> "Create local versioned backups while editing";
+            case "backup.mode" -> "Backup timing: idle or save-only";
             case "backup.directory" -> "Directory for local versioned backups";
             case "backup.retention.count" -> "Maximum retained backups per source file";
             case "undo.history.max.entries" -> "Maximum retained undo and redo edits per buffer";
@@ -884,7 +887,8 @@ public class ConfigManager {
     public BackupPolicy getBackupPolicy() {
         String directory = getString("backup.directory", Path.of(shedDirectoryPath).resolve("backups").toString());
         return new BackupPolicy(getBoolean("backup.enabled", DEFAULT_BACKUP_ENABLED), directory,
-            getInt("backup.retention.count", DEFAULT_BACKUP_RETENTION_COUNT));
+            getInt("backup.retention.count", DEFAULT_BACKUP_RETENTION_COUNT),
+            BackupPolicy.BackupMode.parse(getString("backup.mode", DEFAULT_BACKUP_MODE)));
     }
 
     public UndoHistoryPolicy getUndoHistoryPolicy() {

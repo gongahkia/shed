@@ -222,6 +222,7 @@ public class CommandHandler {
             String previousContent = buffer.getContent();
             String updatedContent = editor.getTextArea().getText();
             buffer.setContent(updatedContent);
+            editor.backupBeforeSave(buffer);
             if (targetPath != null && !targetPath.isEmpty()) {
                 buffer.saveAs(new File(targetPath));
             } else {

@@ -37,7 +37,7 @@ final class InputController {
 
     public void keyPressed(KeyEvent e) {
         if (handlePaneShortcut(e)) {
-            editor.updateStatusBar();
+            editor.requestStatusBarRefresh();
             return;
         }
         KeymapProfile profile = editor.configManager.getKeymapProfile();
@@ -46,12 +46,12 @@ final class InputController {
         }
         if (profile == KeymapProfile.PLAIN) {
             handlePlainKeymap(e);
-            editor.updateStatusBar();
+            editor.requestStatusBarRefresh();
             return;
         }
         if (profile == KeymapProfile.EMACS) {
             handleEmacsKeymap(e);
-            editor.updateStatusBar();
+            editor.requestStatusBarRefresh();
             return;
         }
         // Ctrl+[ as Escape alternative
@@ -63,13 +63,13 @@ final class InputController {
             editor.macroBuffer.add(NormalizedKeyStroke.fromKeyEvent(e));
         }
         if (applyConfiguredKeybinding(e)) {
-            editor.updateStatusBar();
+            editor.requestStatusBarRefresh();
             return;
         }
         if (isCommandPaletteShortcut(e)) {
             e.consume();
             editor.showMessage(editor.showCommandPalette());
-            editor.updateStatusBar();
+            editor.requestStatusBarRefresh();
             return;
         }
         editor.modeEngine.dispatch(editor, editor.editorState, e);

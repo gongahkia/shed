@@ -56,7 +56,7 @@ public class FileBuffer {
     private String largeFileTail;
     private LargeFileStore largeFileStore;
     private String largeFileError;
-    private File backupFile;
+    private volatile File backupFile;
     private boolean showingPreviewOnly;
     private long fileSizeBytes;
     private ConfigManager configManager;
@@ -663,19 +663,34 @@ public class FileBuffer {
     }
 
     public void createBackup() throws IOException {
+        BackupSnapshot snapshot = captureBackupSnapshot();
+        if (snapshot != null) {
+            writeBackupSnapshot(snapshot);
+        }
+    }
+
+    BackupSnapshot captureBackupSnapshot() throws IOException {
         if (scratch || file == null || !modified || largeFile) {
-            return;
+            return null;
         }
         BackupPolicy policy = backupPolicy();
         if (!policy.enabled()) {
+            return null;
+        }
+        return new BackupSnapshot(file.toPath().toAbsolutePath().normalize(), policy, encode(applyLineEndings(getFullContent())));
+    }
+
+    void writeBackupSnapshot(BackupSnapshot snapshot) throws IOException {
+        if (snapshot == null) {
             return;
         }
+        BackupPolicy policy = snapshot.policy();
         Path directory = policy.directoryPath();
         Files.createDirectories(directory);
-        String key = backupKey(file.toPath());
+        String key = backupKey(snapshot.source());
         Path target = reserveBackupPath(directory, key);
         try {
-            AtomicFileWriter.write(target, encode(applyLineEndings(getFullContent())));
+            AtomicFileWriter.write(target, snapshot.content());
         } catch (IOException error) {
             try {
                 Files.deleteIfExists(target);
@@ -775,6 +790,21 @@ public class FileBuffer {
             this.maxSizeBytes = maxSizeBytes;
             this.maxLineCount = maxLineCount;
             this.previewLineCount = previewLineCount;
+        }
+    }
+
+    record BackupSnapshot(Path source, BackupPolicy policy, byte[] content) {
+        BackupSnapshot {
+            source = source == null ? null : source.toAbsolutePath().normalize();
+            if (source == null || policy == null || content == null) {
+                throw new IllegalArgumentException("backup snapshot is incomplete");
+            }
+            content = content.clone();
+        }
+
+        @Override
+        public byte[] content() {
+            return content.clone();
         }
     }
 

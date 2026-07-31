@@ -247,8 +247,8 @@ Notes:
 | :--- | :--- |
 | `:git status`, `:git st` | Status (`--short --branch`) |
 | `:git diff [args]` | Diff |
-| `:git log [count]` | Compact graph log (default 20) |
-| `:git branch`, `:git branches` | List branches |
+| `:git log [count]` | Compact ASCII graph log (default 20); click a commit or press Enter to open its details |
+| `:git branch`, `:git branches` | List branches; press Enter on a local branch to switch to it |
 | `:git add <paths...>`, `:git stage <paths...>` | Stage paths |
 | `:git restore <paths...>`, `:git unstage <paths...>` | Unstage paths |
 | `:git commit <message>` | Commit staged changes |

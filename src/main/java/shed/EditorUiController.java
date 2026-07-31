@@ -19,6 +19,10 @@ import java.util.regex.Pattern;
 
 final class EditorUiController {
     private final Texteditor editor;
+    private final DefaultListModel<String> commandPathModel = new DefaultListModel<>();
+    private JPopupMenu commandPathPopup;
+    private JList<String> commandPathList;
+    private boolean updatingCommandBar;
 
     EditorUiController(Texteditor editor) {
         this.editor = editor;
@@ -57,12 +61,18 @@ final class EditorUiController {
         editor.statusBar.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
         editor.statusBar.setForeground(editor.configManager.getStatusBarForeground());
 
-        editor.commandBar = new JLabel();
+        editor.commandBar = new JTextField();
         editor.commandBar.setBackground(editor.configManager.getCommandBarBackground());
         editor.commandBar.setOpaque(true);
         editor.commandBar.setPreferredSize(new Dimension(screenSize.width / 2, 28));
         editor.commandBar.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
         editor.commandBar.setForeground(editor.configManager.getCommandBarForeground());
+        editor.commandBar.setCaret(new BlockCaret());
+        editor.commandBar.getCaret().setBlinkRate(500);
+        editor.commandBar.setCaretColor(editor.configManager.getCaretColor());
+        editor.commandBar.setEditable(false);
+        editor.commandBar.setFocusable(false);
+        initializeCommandPrompt();
 
         JPanel footerPanel = new JPanel(new GridLayout(2, 1));
         footerPanel.add(editor.statusBar);
@@ -79,6 +89,143 @@ final class EditorUiController {
                 editor.handleQuit(false);
             }
         });
+    }
+
+    private void initializeCommandPrompt() {
+        commandPathList = new JList<>(commandPathModel);
+        commandPathList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        commandPathList.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent event) {
+                if (event.getClickCount() == 1) {
+                    acceptCommandPathSuggestion();
+                }
+            }
+        });
+        commandPathPopup = new JPopupMenu();
+        commandPathPopup.setBorder(BorderFactory.createLineBorder(editor.configManager.getSelectionColor()));
+        commandPathPopup.add(new JScrollPane(commandPathList));
+        editor.commandBar.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent event) { commandPromptChanged(); }
+            @Override public void removeUpdate(DocumentEvent event) { commandPromptChanged(); }
+            @Override public void changedUpdate(DocumentEvent event) { commandPromptChanged(); }
+        });
+        editor.commandBar.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override public void keyPressed(java.awt.event.KeyEvent event) {
+                if (editor.editorState.mode == EditorMode.COMMAND && editor.inputController.handleCommandPromptKeyPressed(event)) {
+                    event.consume();
+                }
+            }
+
+            @Override public void keyTyped(java.awt.event.KeyEvent event) {
+                if (editor.editorState.mode == EditorMode.COMMAND && (Character.isISOControl(event.getKeyChar())
+                    || event.isControlDown() || event.isMetaDown() || event.isAltDown())) {
+                    event.consume();
+                }
+            }
+        });
+    }
+
+    private void commandPromptChanged() {
+        if (updatingCommandBar || editor.editorState.mode != EditorMode.COMMAND) {
+            return;
+        }
+        editor.editorState.commandBuffer = editor.commandBar.getText();
+        editor.updateSubstitutePreview();
+        updateCommandPathSuggestions();
+    }
+
+    void setCommandPromptText(String text) {
+        if (editor.commandBar == null) {
+            return;
+        }
+        String value = text == null ? "" : text;
+        editor.editorState.commandBuffer = value;
+        updatingCommandBar = true;
+        try {
+            if (!value.equals(editor.commandBar.getText())) {
+                editor.commandBar.setText(value);
+            }
+            editor.commandBar.setCaretPosition(value.length());
+        } finally {
+            updatingCommandBar = false;
+        }
+        editor.updateSubstitutePreview();
+        updateCommandPathSuggestions();
+    }
+
+    void configureCommandPrompt(EditorMode mode) {
+        if (editor.commandBar == null) {
+            return;
+        }
+        boolean active = mode == EditorMode.COMMAND;
+        editor.commandBar.setEditable(active);
+        editor.commandBar.setFocusable(active);
+        if (!active) {
+            dismissCommandPathSuggestions();
+            if (editor.commandBar.isFocusOwner()) {
+                SwingUtilities.invokeLater(this::requestActivePaneFocus);
+            }
+            return;
+        }
+        SwingUtilities.invokeLater(() -> {
+            editor.commandBar.requestFocusInWindow();
+            editor.commandBar.setCaretPosition(editor.commandBar.getDocument().getLength());
+        });
+    }
+
+    boolean acceptCommandPathSuggestion() {
+        if (commandPathPopup == null || !commandPathPopup.isVisible()) {
+            return false;
+        }
+        String selection = commandPathList.getSelectedValue();
+        if (selection == null && !commandPathModel.isEmpty()) {
+            selection = commandPathModel.getElementAt(0);
+        }
+        if (selection == null) {
+            return false;
+        }
+        setCommandPromptText(selection);
+        dismissCommandPathSuggestions();
+        editor.commandBar.requestFocusInWindow();
+        return true;
+    }
+
+    private void updateCommandPathSuggestions() {
+        if (editor.commandBar == null || !editor.commandBar.isFocusOwner()) {
+            dismissCommandPathSuggestions();
+            return;
+        }
+        List<String> suggestions = CommandPathCompletion.suggestions(editor.editorState.commandBuffer, commandPathBaseDirectory());
+        if (suggestions.isEmpty()) {
+            dismissCommandPathSuggestions();
+            return;
+        }
+        commandPathModel.clear();
+        suggestions.forEach(commandPathModel::addElement);
+        commandPathList.setSelectedIndex(0);
+        int rows = Math.min(8, commandPathModel.size());
+        commandPathList.setVisibleRowCount(rows);
+        commandPathPopup.setPopupSize(Math.max(260, editor.commandBar.getWidth()), rows * editor.commandBar.getFontMetrics(editor.commandBar.getFont()).getHeight() + 8);
+        if (!commandPathPopup.isVisible()) {
+            commandPathPopup.show(editor.commandBar, 0, editor.commandBar.getHeight());
+        }
+    }
+
+    private File commandPathBaseDirectory() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer != null && buffer.hasFilePath()) {
+            File parent = new File(buffer.getFilePath()).getParentFile();
+            if (parent != null) {
+                return parent;
+            }
+        }
+        return editor.treeRoot != null ? editor.treeRoot : new File(".");
+    }
+
+    private void dismissCommandPathSuggestions() {
+        if (commandPathPopup != null) {
+            commandPathPopup.setVisible(false);
+        }
     }
 
 
@@ -190,6 +337,14 @@ final class EditorUiController {
             public void mousePressed(java.awt.event.MouseEvent e) {
                 if (paneRef[0] != null) {
                     activateEditorPane(paneRef[0]);
+                }
+            }
+
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent event) {
+                String result = editor.openGitLogSelectionAtCaret();
+                if (!result.isEmpty()) {
+                    editor.showMessage(result);
                 }
             }
         });
@@ -335,6 +490,7 @@ final class EditorUiController {
         FileBuffer buffer = editor.getCurrentBuffer();
         editor.writingArea.setEditable(mode.isEditable() && (buffer == null || !buffer.isLargeFile()));
         editor.writingArea.setBackground(getModeBackground(mode));
+        configureCommandPrompt(mode);
         editor.updateZenModeLayout();
         if (mode != EditorMode.COMMAND) {
             editor.clearSubstitutePreview();
@@ -419,16 +575,31 @@ final class EditorUiController {
 
         String inlinePeek = inlinePeekMessage(buffer);
         if ((editor.editorState.mode == EditorMode.COMMAND || editor.editorState.mode == EditorMode.SEARCH) && !editor.editorState.commandBuffer.isEmpty()) {
-            editor.commandBar.setText(editor.editorState.commandBuffer);
+            setCommandBarDisplay(editor.editorState.commandBuffer);
         } else if (editor.lastMessage != null && !editor.lastMessage.isEmpty()) {
-            editor.commandBar.setText(editor.lastMessage);
+            setCommandBarDisplay(editor.lastMessage);
         } else if (inlinePeek != null) {
-            editor.commandBar.setText(inlinePeek);
+            setCommandBarDisplay(inlinePeek);
         } else {
             String blame = editor.getGitBlameForCurrentLine(buffer);
-            editor.commandBar.setText(blame != null ? blame : "");
+            setCommandBarDisplay(blame != null ? blame : "");
         }
         editor.applyDramaticFooterStyling();
+    }
+
+    private void setCommandBarDisplay(String text) {
+        if (editor.commandBar == null) {
+            return;
+        }
+        String value = text == null ? "" : text;
+        if (!value.equals(editor.commandBar.getText())) {
+            updatingCommandBar = true;
+            try {
+                editor.commandBar.setText(value);
+            } finally {
+                updatingCommandBar = false;
+            }
+        }
     }
 
 

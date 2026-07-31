@@ -777,17 +777,15 @@ public class ConfigManagerTest {
         System.setProperty("user.home", home.toString());
         ConfigManager config = new ConfigManager();
 
-        config.set("ui.dramatic", "true");
-        config.set("ui.dramatic.sound", "true");
-        config.set("ui.dramatic.sound.volume", "88");
+        config.set("limelight.coefficient", "0.8");
+        config.set("limelight.paragraph.span", "1");
         int persisted = config.persistCurrentConfig();
 
-        assertTrue(persisted >= 3);
+        assertTrue(persisted >= 2);
         String file = Files.readString(Path.of(config.getConfigPath()));
         assertTrue(file.contains("schema_version = 1"));
-        assertTrue(file.contains("\"ui.dramatic\" = true"));
-        assertTrue(file.contains("\"ui.dramatic.sound\" = true"));
-        assertTrue(file.contains("\"ui.dramatic.sound.volume\" = 88"));
+        assertTrue(file.contains("\"limelight.coefficient\" = 0.8"));
+        assertTrue(file.contains("\"limelight.paragraph.span\" = 1"));
     }
 
     @Test
@@ -796,13 +794,13 @@ public class ConfigManagerTest {
         System.setProperty("user.home", home.toString());
         ConfigManager config = new ConfigManager();
 
-        config.set("ui.dramatic", "true");
+        config.set("limelight.coefficient", "0.8");
         config.set("bad\nkey", "boom");
         int persisted = config.persistCurrentConfig();
 
         assertTrue(persisted >= 1);
         String file = Files.readString(Path.of(config.getConfigPath()));
-        assertTrue(file.contains("\"ui.dramatic\" = true"));
+        assertTrue(file.contains("\"limelight.coefficient\" = 0.8"));
         assertFalse(file.contains("bad"));
     }
 

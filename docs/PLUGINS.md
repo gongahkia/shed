@@ -133,7 +133,6 @@ shed.themes()              -- array-style list of available theme ids
 shed.theme_set(name[,persist]) -- apply theme, optional persist
 shed.palette_get()         -- table of active palette keys -> hex colors
 shed.palette_set(tbl[,persist]) -- apply color/ui overrides from table
-shed.theater(preset)       -- apply dramatic preset: off/subtle/full
 ```
 
 #### Mode

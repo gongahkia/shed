@@ -45,7 +45,7 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `PaletteController` | file, buffer, symbol, and command palettes | `FuzzyMatchService`, `SymbolService` |
 | `SessionConfigController` | sessions, workspaces, config and help | `ConfigManager`, `HelpService` |
 | `RecoveryController` | file watching, recovery snapshots, conflicts | `FileWatcherService`, `FileBuffer` |
-| `DramaticUiController` | minimap, animations, UI feedback | `PerfService`, Swing UI state |
+| `FocusModeController` | Goyo layout, Limelight, minimap | Swing UI state |
 
 ## Dependency rules
 

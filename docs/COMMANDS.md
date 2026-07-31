@@ -157,8 +157,9 @@ Notes:
 | `:palette`, `:commands` | Command palette |
 | `:undolist`, `:undotree` | Show undo state summary |
 | `:themes` | Show built-in themes |
-| `:theater off|subtle|full` | Apply dramatic UI preset |
-| `:zen` | Toggle zen mode |
+| `:zen` | Toggle Goyo layout with Limelight |
+| `:goyo` | Toggle Goyo layout without changing Limelight |
+| `:limelight` | Toggle paragraph focus dimming |
 | `:minimap` | Toggle minimap panel |
 | `:term`, `:terminal` | Open integrated terminal split; terminal input owns focus, uses the system clipboard (`Cmd-C`/`Cmd-V` on macOS, `Ctrl-Shift-C`/`Ctrl-Shift-V` elsewhere), and ignores zero-size resize events |
 

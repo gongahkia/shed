@@ -36,6 +36,10 @@ final class InputController {
     }
 
     public void keyPressed(KeyEvent e) {
+        if (handlePaneShortcut(e)) {
+            editor.updateStatusBar();
+            return;
+        }
         KeymapProfile profile = editor.configManager.getKeymapProfile();
         if (profile != KeymapProfile.EMACS) {
             emacsPrefix = EmacsKeymap.Prefix.NONE;
@@ -83,6 +87,35 @@ final class InputController {
     static boolean isCommandPaletteShortcut(KeyEvent event) {
         return event != null && event.getKeyCode() == KeyEvent.VK_P && event.isShiftDown()
             && (event.isControlDown() || event.isMetaDown()) && !event.isAltDown();
+    }
+
+    enum PaneShortcut { NONE, HORIZONTAL_SPLIT, VERTICAL_SPLIT, CLOSE }
+
+    static PaneShortcut paneShortcut(KeyEvent event) {
+        if (event == null || !event.isMetaDown() || event.isControlDown() || event.isAltDown()) {
+            return PaneShortcut.NONE;
+        }
+        return switch (event.getKeyCode()) {
+            case KeyEvent.VK_D -> event.isShiftDown() ? PaneShortcut.VERTICAL_SPLIT : PaneShortcut.HORIZONTAL_SPLIT;
+            case KeyEvent.VK_W -> event.isShiftDown() ? PaneShortcut.NONE : PaneShortcut.CLOSE;
+            default -> PaneShortcut.NONE;
+        };
+    }
+
+    private boolean handlePaneShortcut(KeyEvent event) {
+        PaneShortcut shortcut = paneShortcut(event);
+        if (shortcut == PaneShortcut.NONE) {
+            return false;
+        }
+        event.consume();
+        String result = switch (shortcut) {
+            case HORIZONTAL_SPLIT -> editor.splitWindow(false);
+            case VERTICAL_SPLIT -> editor.splitWindow(true);
+            case CLOSE -> editor.closeActiveWindow();
+            case NONE -> "";
+        };
+        editor.showMessage(result);
+        return true;
     }
 
     private void handlePlainKeymap(KeyEvent event) {
@@ -1777,6 +1810,9 @@ final class InputController {
     }
 
     boolean handleCommandPromptKeyPressed(KeyEvent e) {
+        if (handlePaneShortcut(e)) {
+            return true;
+        }
         int code = e.getKeyCode();
         char c = e.getKeyChar();
         if (e.isControlDown() && (code == KeyEvent.VK_R || c == 'r')) {

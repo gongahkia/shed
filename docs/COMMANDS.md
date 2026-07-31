@@ -143,6 +143,8 @@ Notes:
 | `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search; opens quickfix on completion |
 | `:largefile`, `:lf` | Show active [large-file mode](LARGE_FILE_SUPPORT.md), limits, and remediation |
 | `:projectreplace settings` | Show persisted project-replace safety controls |
+| `:projectreplace`, `:projectreplace ui` | Open the docked Project Replace review panel |
+| `:projectreplace text <subcommand>` | Run the legacy text workflow |
 | `:projectreplace enable`, `:projectreplace disable` | Persist the project-replace opt-in gate |
 | `:projectreplace preview /find/replacement/` | Build an in-memory literal replacement preview; no file is written |
 | `:projectreplace replace /find/replacement/ [confirm]` | Run the non-preview path only when preview is deliberately disabled |
@@ -192,6 +194,14 @@ Notes:
 | `:diagnostics`, `:diag`, `:ldiag` | Push current-buffer LSP diagnostics into quickfix |
 | `:dnext`, `:dn` | Jump to next diagnostic |
 | `:dprev`, `:dp` | Jump to previous diagnostic |
+
+## Debug Commands
+
+| Command | Action |
+| :--- | :--- |
+| `:debug`, `:debug ui` | Open the docked Debug panel |
+| `:debug text [subcommand]` | Open legacy debug scratch output |
+| `:debug select <name>`, `:debug start [name]`, `:debug stop`, `:debug restart [name]` | Control an explicitly configured DAP session |
 
 ## LSP and Symbol Commands
 

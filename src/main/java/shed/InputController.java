@@ -472,6 +472,12 @@ final class InputController {
             editor.editorState.pendingCount = "";
         }
 
+        if (editor.isInteractiveGitBufferActive() && (code == KeyEvent.VK_ENTER || c == 'o')) {
+            editor.editorState.pendingCount = "";
+            editor.showMessage(editor.openInteractiveGitSelection());
+            return;
+        }
+
         if (editor.isQuickfixBufferActive() && (code == KeyEvent.VK_ENTER || c == 'o')) {
             editor.editorState.pendingCount = "";
             editor.showMessage(editor.openQuickfixSelection());
@@ -533,6 +539,7 @@ final class InputController {
             editor.editorState.commandBuffer = String.valueOf(c);
             editor.commandHistoryIndex = -1;
             editor.commandHistoryPrefix = editor.editorState.commandBuffer;
+            editor.editorUiController.setCommandPromptText(editor.editorState.commandBuffer);
             editor.updateSubstitutePreview();
             return;
         } else if (c == '/' || c == '?') {
@@ -1769,6 +1776,51 @@ final class InputController {
         }
     }
 
+    boolean handleCommandPromptKeyPressed(KeyEvent e) {
+        int code = e.getKeyCode();
+        char c = e.getKeyChar();
+        if (e.isControlDown() && (code == KeyEvent.VK_R || c == 'r')) {
+            openCommandHistorySearch();
+            editor.editorUiController.setCommandPromptText(editor.editorState.commandBuffer);
+            return true;
+        }
+        if (code == KeyEvent.VK_ESCAPE) {
+            editor.editorState.commandBuffer = "";
+            editor.clearSubstitutePreview();
+            editor.setMode(EditorMode.NORMAL);
+            return true;
+        }
+        if (code == KeyEvent.VK_ENTER) {
+            String command = editor.editorState.commandBuffer;
+            String result = editor.commandHandler.execute(command);
+            addCommandHistory(command);
+            if (!result.isEmpty()) {
+                editor.showMessage(result);
+            }
+            editor.editorState.commandBuffer = "";
+            editor.clearSubstitutePreview();
+            editor.setMode(EditorMode.NORMAL);
+            return true;
+        }
+        if (code == KeyEvent.VK_UP) {
+            browseCommandHistory(-1);
+            editor.editorUiController.setCommandPromptText(editor.editorState.commandBuffer);
+            return true;
+        }
+        if (code == KeyEvent.VK_DOWN) {
+            browseCommandHistory(1);
+            editor.editorUiController.setCommandPromptText(editor.editorState.commandBuffer);
+            return true;
+        }
+        if (code == KeyEvent.VK_TAB) {
+            if (!editor.editorUiController.acceptCommandPathSuggestion()) {
+                editor.editorUiController.setCommandPromptText(completeCommand(editor.editorState.commandBuffer));
+            }
+            return true;
+        }
+        return false;
+    }
+
 
     void openCommandHistorySearch() {
         if (editor.commandHistory.isEmpty()) {
@@ -1795,6 +1847,9 @@ final class InputController {
         editor.editorState.commandBuffer = selected;
         editor.commandHistoryIndex = -1;
         editor.commandHistoryPrefix = editor.editorState.commandBuffer;
+        if (editor.editorState.mode == EditorMode.COMMAND) {
+            editor.editorUiController.setCommandPromptText(editor.editorState.commandBuffer);
+        }
     }
 
 

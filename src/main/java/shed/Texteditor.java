@@ -59,7 +59,7 @@ public class Texteditor extends JFrame implements KeyListener {
     ModeEngine modeEngine;
     JTextArea writingArea;
     JLabel statusBar;
-    JLabel commandBar;
+    JTextField commandBar;
     LineNumberPanel lineNumberPanel;
     JScrollPane editorScrollPane;
     JPanel editorHostPanel;
@@ -1530,6 +1530,18 @@ public class Texteditor extends JFrame implements KeyListener {
 
     String openQuickfixSelection() {
         return jobQuickfixController.openQuickfixSelection();
+    }
+
+    boolean isInteractiveGitBufferActive() {
+        return treeGitController.isInteractiveGitBufferActive();
+    }
+
+    String openInteractiveGitSelection() {
+        return treeGitController.openInteractiveGitSelection();
+    }
+
+    String openGitLogSelectionAtCaret() {
+        return treeGitController.openGitLogSelectionAtCaret();
     }
 
     String jumpToQuickfixEntry(QuickfixService.Entry entry) {

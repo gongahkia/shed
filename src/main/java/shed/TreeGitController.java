@@ -14,14 +14,22 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class TreeGitController {
+    private enum InteractiveGitView { BRANCHES, LOG }
+
     private final Texteditor editor;
     private File cachedGitRoot;
     private boolean cachedGitRootResolved;
     private final ProjectFileScanner projectFileScanner;
+    private FileBuffer interactiveGitBuffer;
+    private File interactiveGitRoot;
+    private InteractiveGitView interactiveGitView;
 
     TreeGitController(Texteditor editor) {
         this.editor = editor;
         this.projectFileScanner = new ProjectFileScanner();
+        this.interactiveGitBuffer = null;
+        this.interactiveGitRoot = null;
+        this.interactiveGitView = null;
     }
 
     public String showFileFinder() {
@@ -1092,7 +1100,7 @@ final class TreeGitController {
         if (body.isEmpty()) {
             body = "(no commits)";
         }
-        editor.showScratchBuffer("[git log]", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n");
+        showInteractiveGitBuffer("[git log]", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n", gitRoot, InteractiveGitView.LOG);
         return "Showing git log";
     }
 
@@ -1106,8 +1114,103 @@ final class TreeGitController {
         if (body.isEmpty()) {
             body = "(no branches)";
         }
-        editor.showScratchBuffer("[git branch]", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n");
+        showInteractiveGitBuffer("[git branch]", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n", gitRoot, InteractiveGitView.BRANCHES);
         return "Showing git branches";
+    }
+
+    private void showInteractiveGitBuffer(String title, String content, File gitRoot, InteractiveGitView view) {
+        interactiveGitBuffer = null;
+        interactiveGitRoot = null;
+        interactiveGitView = null;
+        editor.showScratchBuffer(title, content);
+        interactiveGitBuffer = editor.getCurrentBuffer();
+        interactiveGitRoot = gitRoot;
+        interactiveGitView = view;
+    }
+
+    boolean isInteractiveGitBufferActive() {
+        return interactiveGitBuffer != null && interactiveGitBuffer == editor.getCurrentBuffer()
+            && interactiveGitRoot != null && interactiveGitView != null;
+    }
+
+    String openInteractiveGitSelection() {
+        if (!isInteractiveGitBufferActive()) {
+            return "No interactive Git selection";
+        }
+        String line = lineAtCaret();
+        if (interactiveGitView == InteractiveGitView.BRANCHES) {
+            String branch = localBranchName(line);
+            if (branch == null) {
+                return "Select a local branch";
+            }
+            String result = runGitSwitch(interactiveGitRoot, branch);
+            if (!"Switch complete".equals(result)) {
+                return result;
+            }
+            editor.gitBranch = resolveBranchName(interactiveGitRoot);
+            refreshGitGutter();
+            return showGitBranches(interactiveGitRoot);
+        }
+        String hash = commitHash(line);
+        if (hash == null) {
+            return "Select a commit";
+        }
+        return showGitCommitDetails(interactiveGitRoot, hash);
+    }
+
+    String openGitLogSelectionAtCaret() {
+        return isInteractiveGitBufferActive() && interactiveGitView == InteractiveGitView.LOG
+            ? openInteractiveGitSelection() : "";
+    }
+
+    private String lineAtCaret() {
+        try {
+            int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
+            int start = editor.writingArea.getLineStartOffset(line);
+            int end = editor.writingArea.getLineEndOffset(line);
+            return editor.writingArea.getText(start, end - start);
+        } catch (javax.swing.text.BadLocationException ignored) {
+            return "";
+        }
+    }
+
+    static String localBranchName(String line) {
+        String value = line == null ? "" : line.strip();
+        if (value.startsWith("* ")) {
+            value = value.substring(2).stripLeading();
+        }
+        if (value.isEmpty() || value.startsWith("remotes/")) {
+            return null;
+        }
+        int separator = value.indexOf(' ');
+        if (separator <= 0) {
+            return null;
+        }
+        String branch = value.substring(0, separator);
+        return branch.startsWith("(") ? null : branch;
+    }
+
+    static String commitHash(String line) {
+        Matcher matcher = Pattern.compile("\\b[0-9a-f]{7,64}\\b").matcher(line == null ? "" : line);
+        return matcher.find() ? matcher.group() : null;
+    }
+
+    private String showGitCommitDetails(File gitRoot, String hash) {
+        CommandResult result = runCommand(gitRoot, List.of("git", "show", "--decorate", "--format=fuller", "--stat", hash));
+        if (result.exitCode != 0) {
+            return gitError(result);
+        }
+        String body = result.stdout.strip();
+        editor.showScratchBuffer("[git commit " + hash + "]", body.isEmpty() ? "(no commit details)\n" : body + "\n");
+        interactiveGitBuffer = null;
+        interactiveGitRoot = null;
+        interactiveGitView = null;
+        return "Showing commit " + hash;
+    }
+
+    private String resolveBranchName(File gitRoot) {
+        CommandResult result = runCommand(gitRoot, List.of("git", "rev-parse", "--abbrev-ref", "HEAD"));
+        return result.exitCode == 0 ? result.stdout.strip() : "";
     }
 
 

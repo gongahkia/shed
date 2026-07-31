@@ -1,6 +1,7 @@
 package shed;
 
 import javax.swing.*;
+import javax.swing.Timer;
 import javax.swing.text.BadLocationException;
 import java.io.*;
 import java.net.URI;
@@ -1745,6 +1746,7 @@ final class LspController {
         if (buffer == null || !buffer.hasFilePath()) {
             return;
         }
+        editor.invalidateGitBlame(buffer);
         flushPendingLspChange(buffer);
         syncLspOpen(buffer);
         LspClient client = resolveLspClient(buffer);

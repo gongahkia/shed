@@ -81,7 +81,7 @@ final class InputController {
             editor.insertNormalOneShot = false;
             editor.setMode(EditorMode.INSERT);
         }
-        editor.updateStatusBar();
+        editor.requestStatusBarRefresh();
     }
 
     static boolean isCommandPaletteShortcut(KeyEvent event) {

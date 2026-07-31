@@ -23,6 +23,8 @@ final class TreeGitController {
     private FileBuffer interactiveGitBuffer;
     private File interactiveGitRoot;
     private InteractiveGitView interactiveGitView;
+    private int gitGutterJobId = -1;
+    private long gitGutterGeneration;
 
     TreeGitController(Texteditor editor) {
         this.editor = editor;
@@ -1031,12 +1033,19 @@ final class TreeGitController {
     void refreshGitGutter() {
         FileBuffer buffer = editor.getCurrentBuffer();
         if (buffer == null || !buffer.hasFilePath()) return;
+        editor.clearGitBlameCache();
         String filePath = buffer.getFilePath();
-        // run git diff on background thread to avoid blocking EDT
-        new Thread(() -> {
-            if (!cachedGitRootResolved) { cachedGitRoot = resolveGitRoot(); cachedGitRootResolved = true; }
-            File gitRoot = cachedGitRoot;
-            if (gitRoot == null) return;
+        if (!cachedGitRootResolved) {
+            cachedGitRoot = resolveGitRoot();
+            cachedGitRootResolved = true;
+        }
+        File gitRoot = cachedGitRoot;
+        if (gitRoot == null) return;
+        if (gitGutterJobId >= 0) {
+            editor.asyncJobService.cancel(gitGutterJobId);
+        }
+        long generation = ++gitGutterGeneration;
+        gitGutterJobId = editor.asyncJobService.submit("Git gutter", token -> {
             CommandResult result = runCommand(gitRoot, List.of("git", "diff", "HEAD", "--unified=0", "--", filePath));
             Set<Integer> added = new HashSet<>();
             Set<Integer> modified = new HashSet<>();
@@ -1044,13 +1053,21 @@ final class TreeGitController {
             if (result.exitCode == 0 && result.stdout != null) {
                 parseUnifiedDiffForGutter(result.stdout, added, modified, deletedAfter);
             }
-            SwingUtilities.invokeLater(() -> {
-                EditorPane pane = editor.getActivePane();
-                if (pane != null && pane.getLineNumberPanel() != null) {
-                    pane.getLineNumberPanel().updateGitDiffMarkers(added, modified, deletedAfter);
-                }
-            });
-        }, "shed-git-gutter").start();
+            return new GitGutterUpdate(filePath, added, modified, deletedAfter);
+        }, (snapshot, update, error) -> {
+            if (generation != gitGutterGeneration || error != null || update == null) {
+                return;
+            }
+            gitGutterJobId = -1;
+            FileBuffer current = editor.getCurrentBuffer();
+            EditorPane pane = editor.getActivePane();
+            if (current != null && update.filePath().equals(current.getFilePath()) && pane != null) {
+                pane.getLineNumberPanel().updateGitDiffMarkers(update.added(), update.modified(), update.deletedAfter());
+            }
+        });
+    }
+
+    private record GitGutterUpdate(String filePath, Set<Integer> added, Set<Integer> modified, Set<Integer> deletedAfter) {
     }
 
 
@@ -1369,6 +1386,7 @@ final class TreeGitController {
             editor.showScratchBuffer("[git checkout]", output + "\n");
         }
         editor.gitBranch = resolveBranchName(gitRoot);
+        editor.clearGitBlameCache();
         editor.updateStatusBar();
         return "Checkout complete";
     }
@@ -1391,6 +1409,7 @@ final class TreeGitController {
             editor.showScratchBuffer("[git switch]", output + "\n");
         }
         editor.gitBranch = resolveBranchName(gitRoot);
+        editor.clearGitBlameCache();
         editor.updateStatusBar();
         return "Switch complete";
     }

@@ -1,6 +1,7 @@
 package shed;
 
 import javax.swing.JTextArea;
+import javax.swing.Timer;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
@@ -15,12 +16,23 @@ final class SyntaxUiController {
     static final int MAX_FULL_SYNTAX_CHARS = 750_000;
     static final int MAX_FULL_SYNTAX_LINES = 20_000;
     private static final int EDIT_IDLE_DEBOUNCE_MS = 120;
+    private static final int GIT_BLAME_DEBOUNCE_MS = 90;
+    private static final int GIT_BLAME_CACHE_LIMIT = 256;
     private final Texteditor editor;
     private int highlightedLine = -1;
     private Timer syntaxHighlightTimer;
     private Timer symbolRefreshTimer;
+    private Timer gitBlameTimer;
     private FileBuffer cachedSymbolBuffer;
     private List<SymbolService.Symbol> cachedSymbols = List.of();
+    private final Map<GitBlameKey, String> gitBlameCache = new LinkedHashMap<>(GIT_BLAME_CACHE_LIMIT, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<GitBlameKey, String> eldest) {
+            return size() > GIT_BLAME_CACHE_LIMIT;
+        }
+    };
+    private GitBlameKey pendingGitBlame;
+    private int gitBlameJobId = -1;
 
     SyntaxUiController(Texteditor editor) {
         this.editor = editor;
@@ -59,31 +71,113 @@ final class SyntaxUiController {
 
 
     String getGitBlameForCurrentLine(FileBuffer buffer) {
-        if (buffer == null || buffer.getFile() == null || buffer.isModified()) return null;
+        GitBlameKey key = gitBlameKey(buffer);
+        if (key == null) {
+            return null;
+        }
+        String cached = gitBlameCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        requestGitBlame(key);
+        return null;
+    }
+
+    void invalidateGitBlame(FileBuffer buffer) {
+        if (buffer == null || buffer.getFile() == null) {
+            return;
+        }
+        String path = buffer.getFile().toPath().toAbsolutePath().normalize().toString();
+        gitBlameCache.keySet().removeIf(key -> key.path().equals(path));
+        if (pendingGitBlame != null && pendingGitBlame.path().equals(path)) {
+            pendingGitBlame = null;
+        }
+    }
+
+    void clearGitBlameCache() {
+        gitBlameCache.clear();
+        pendingGitBlame = null;
+        if (gitBlameJobId >= 0) {
+            editor.asyncJobService.cancel(gitBlameJobId);
+            gitBlameJobId = -1;
+        }
+    }
+
+    private GitBlameKey gitBlameKey(FileBuffer buffer) {
+        if (buffer == null || buffer.getFile() == null || buffer.isModified()) {
+            return null;
+        }
         try {
             int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition()) + 1;
             File file = buffer.getFile();
-            ProcessBuilder pb = new ProcessBuilder("git", "blame", "-L", line + "," + line, "--porcelain", file.getName());
-            pb.directory(file.getParentFile());
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            String output = new String(p.getInputStream().readAllBytes());
-            if (!p.waitFor(500, java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                p.destroyForcibly();
+            return new GitBlameKey(file.toPath().toAbsolutePath().normalize().toString(), line, file.lastModified(), file.length(),
+                editor.gitBranch == null ? "" : editor.gitBranch);
+        } catch (BadLocationException ignored) {
+        }
+        return null;
+    }
+
+    private void requestGitBlame(GitBlameKey key) {
+        pendingGitBlame = key;
+        if (gitBlameTimer == null) {
+            gitBlameTimer = new Timer(GIT_BLAME_DEBOUNCE_MS, event -> startPendingGitBlame());
+            gitBlameTimer.setRepeats(false);
+        }
+        gitBlameTimer.restart();
+    }
+
+    private void startPendingGitBlame() {
+        GitBlameKey key = pendingGitBlame;
+        pendingGitBlame = null;
+        if (key == null || gitBlameCache.containsKey(key)) {
+            return;
+        }
+        if (gitBlameJobId >= 0) {
+            editor.asyncJobService.cancel(gitBlameJobId);
+        }
+        gitBlameJobId = editor.asyncJobService.submit("Git blame", token -> loadGitBlame(key, token),
+            (snapshot, result, error) -> completeGitBlame(key, snapshot, result, error));
+    }
+
+    private String loadGitBlame(GitBlameKey key, AsyncJobService.JobToken token) throws Exception {
+        long started = System.nanoTime();
+        File source = new File(key.path());
+        Process process = new ProcessBuilder("git", "blame", "-L", key.line() + "," + key.line(), "--porcelain", source.getName())
+            .directory(source.getParentFile()).redirectErrorStream(true).start();
+        token.onCancel(process::destroyForcibly);
+        try {
+            if (!process.waitFor(500, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                process.destroyForcibly();
                 return null;
             }
-            if (p.exitValue() != 0) return null;
+            if (process.exitValue() != 0) {
+                return null;
+            }
             String author = null;
             String summary = null;
-            for (String l : output.split("\n")) {
-                if (l.startsWith("author ")) author = l.substring(7);
-                else if (l.startsWith("summary ")) summary = l.substring(8);
+            for (String line : new String(process.getInputStream().readAllBytes()).split("\n")) {
+                if (line.startsWith("author ")) author = line.substring(7);
+                else if (line.startsWith("summary ")) summary = line.substring(8);
             }
-            if (author != null && summary != null) {
-                return author + ": " + summary;
+            return author != null && summary != null ? author + ": " + summary : null;
+        } finally {
+            if (editor.perfService != null) {
+                editor.perfService.recordDuration("git.blame", started, "line=" + key.line());
             }
-        } catch (Exception ignored) {}
-        return null;
+        }
+    }
+
+    private void completeGitBlame(GitBlameKey key, AsyncJobService.JobSnapshot snapshot, String result, Exception error) {
+        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
+            return;
+        }
+        gitBlameJobId = -1;
+        if (error == null && result != null) {
+            gitBlameCache.put(key, result);
+        }
+        if (key.equals(gitBlameKey(editor.getCurrentBuffer()))) {
+            editor.requestStatusBarRefresh();
+        }
     }
 
 
@@ -154,6 +248,9 @@ final class SyntaxUiController {
             editor.perfService.recordDuration("symbol.cache", started, detail);
         }
         editor.requestStatusBarRefresh();
+    }
+
+    private record GitBlameKey(String path, int line, long modifiedAtMillis, long size, String branch) {
     }
 
 

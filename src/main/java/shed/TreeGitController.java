@@ -591,7 +591,8 @@ final class TreeGitController {
             return "Git Changes panel opened";
         }
         if (trimmed.equalsIgnoreCase("text")) {
-            return showGitStatus(resolveGitRoot());
+            File root = resolveGitRoot();
+            return root == null ? "Not inside a git repository" : showGitStatus(root);
         }
         if (trimmed.regionMatches(true, 0, "text ", 0, 5)) {
             argument = trimmed.substring(5).trim();

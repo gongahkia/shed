@@ -1,6 +1,7 @@
 package shed;
 
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
@@ -65,7 +66,7 @@ final class WorkspaceIndexService {
             progress.root = root;
             String activity = persist ? "indexing" : "scanning";
             publish(progress.status(State.BUILDING, activity), effectiveObserver);
-            List<Entry> entries = new ArrayList<>();
+            List<Entry> candidates = new ArrayList<>();
             Files.walkFileTree(root, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
@@ -95,15 +96,7 @@ final class WorkspaceIndexService {
                     } else {
                         progress.visited++;
                         Path relative = root.relativize(normalized);
-                        if (ignoreMatcher.isIgnored(root, relative)) {
-                            progress.ignored++;
-                        } else {
-                            if (effectiveCancellation.isCancelled()) {
-                                return FileVisitResult.TERMINATE;
-                            }
-                            entries.add(new Entry(relativePath(relative), attributes.size(), attributes.lastModifiedTime().toMillis()));
-                            progress.indexed++;
-                        }
+                        candidates.add(new Entry(relativePath(relative), attributes.size(), attributes.lastModifiedTime().toMillis()));
                     }
                     publish(progress.status(State.BUILDING, activity), effectiveObserver);
                     return FileVisitResult.CONTINUE;
@@ -120,6 +113,26 @@ final class WorkspaceIndexService {
                 Status cancelled = progress.status(State.CANCELLED, activity + " cancelled");
                 publish(cancelled, effectiveObserver);
                 return new BuildResult(null, cancelled, null);
+            }
+            Set<String> ignored = ignoredPaths(root, candidates, effectiveCancellation);
+            if (effectiveCancellation.isCancelled()) {
+                Status cancelled = progress.status(State.CANCELLED, activity + " cancelled");
+                publish(cancelled, effectiveObserver);
+                return new BuildResult(null, cancelled, null);
+            }
+            List<Entry> entries = new ArrayList<>();
+            for (Entry candidate : candidates) {
+                if (effectiveCancellation.isCancelled()) {
+                    Status cancelled = progress.status(State.CANCELLED, activity + " cancelled");
+                    publish(cancelled, effectiveObserver);
+                    return new BuildResult(null, cancelled, null);
+                }
+                if (ignored.contains(candidate.relativePath())) {
+                    progress.ignored++;
+                } else {
+                    entries.add(candidate);
+                    progress.indexed++;
+                }
             }
             WorkspaceIndex index = new WorkspaceIndex(root.toString(), entries);
             Path target = null;
@@ -191,6 +204,26 @@ final class WorkspaceIndexService {
     private void publish(Status next, Observer observer) {
         status = next;
         observer.onStatus(next);
+    }
+
+    private Set<String> ignoredPaths(Path root, List<Entry> candidates, Cancellation cancellation) throws IOException {
+        if (candidates.isEmpty()) {
+            return Set.of();
+        }
+        if (ignoreMatcher instanceof GitIgnoreMatcher matcher) {
+            return matcher.ignoredPaths(root, candidates, cancellation);
+        }
+        Set<String> ignored = new LinkedHashSet<>();
+        for (Entry candidate : candidates) {
+            if (cancellation.isCancelled()) {
+                return ignored;
+            }
+            Path relative = Path.of(candidate.relativePath());
+            if (ignoreMatcher.isIgnored(root, relative)) {
+                ignored.add(candidate.relativePath());
+            }
+        }
+        return ignored;
     }
 
     private static Path normalizedDirectory(Path root) throws IOException {
@@ -407,6 +440,49 @@ final class WorkspaceIndexService {
                 }
                 throw new IOException("git check-ignore failed: " + new String(output, StandardCharsets.UTF_8).trim());
             } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                throw new IOException("git check-ignore interrupted", error);
+            }
+        }
+
+        Set<String> ignoredPaths(Path workspaceRoot, List<Entry> candidates, Cancellation cancellation) throws IOException {
+            Process process = new ProcessBuilder("git", "-C", workspaceRoot.toString(), "check-ignore", "--no-index", "-z", "--stdin")
+                .redirectErrorStream(true).start();
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            Thread reader = Thread.startVirtualThread(() -> {
+                try (java.io.InputStream input = process.getInputStream()) {
+                    input.transferTo(output);
+                } catch (IOException ignored) {
+                }
+            });
+            try (OutputStream input = process.getOutputStream()) {
+                for (Entry candidate : candidates) {
+                    if (cancellation.isCancelled()) {
+                        process.destroyForcibly();
+                        return Set.of();
+                    }
+                    input.write(candidate.relativePath().getBytes(StandardCharsets.UTF_8));
+                    input.write(0);
+                }
+            }
+            try {
+                int exitCode = process.waitFor();
+                reader.join();
+                if (exitCode == 1) {
+                    return Set.of();
+                }
+                if (exitCode != 0) {
+                    throw new IOException("git check-ignore failed: " + output.toString(StandardCharsets.UTF_8).trim());
+                }
+                Set<String> ignored = new LinkedHashSet<>();
+                for (String value : output.toString(StandardCharsets.UTF_8).split("\\u0000")) {
+                    if (!value.isBlank()) {
+                        ignored.add(value);
+                    }
+                }
+                return ignored;
+            } catch (InterruptedException error) {
+                process.destroyForcibly();
                 Thread.currentThread().interrupt();
                 throw new IOException("git check-ignore interrupted", error);
             }

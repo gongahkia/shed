@@ -1,6 +1,7 @@
 package shed;
 
 import javax.swing.*;
+import javax.swing.Timer;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
 import java.awt.*;
@@ -129,6 +130,7 @@ final class PaneBufferController {
         }
         if (buffer != null) {
             buffer.setModified(true);
+            editor.invalidateGitBlame(buffer);
             scheduleIdleBackup(buffer);
             editor.recordChangePosition();
             editor.syncLspChange(buffer);

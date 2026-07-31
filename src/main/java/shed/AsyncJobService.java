@@ -160,15 +160,23 @@ public class AsyncJobService {
     }
 
     public AsyncJobService(int maxHistoryEntries, ApplicationErrorReporter errorReporter) {
-        this(Executors.newCachedThreadPool(), maxHistoryEntries, errorReporter);
+        this(Executors.newFixedThreadPool(workerCount(), task -> {
+            Thread thread = new Thread(task, "shed-worker");
+            thread.setDaemon(true);
+            return thread;
+        }), maxHistoryEntries, errorReporter);
     }
 
     AsyncJobService(ExecutorService executor, int maxHistoryEntries, ApplicationErrorReporter errorReporter) {
-        this.executor = executor == null ? Executors.newCachedThreadPool() : executor;
+        this.executor = executor == null ? Executors.newFixedThreadPool(workerCount()) : executor;
         this.nextId = new AtomicInteger(1);
         this.jobs = new ConcurrentHashMap<>();
         this.maxHistoryEntries = Math.max(10, maxHistoryEntries);
         this.errorReporter = errorReporter;
+    }
+
+    static int workerCount() {
+        return Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors()));
     }
 
     public <T> int submit(String description, JobTask<T> task, JobCompletion<T> completion) {

@@ -816,6 +816,14 @@ public class Texteditor extends JFrame implements KeyListener {
         return syntaxUiController.getGitBlameForCurrentLine(buffer);
     }
 
+    void invalidateGitBlame(FileBuffer buffer) {
+        syntaxUiController.invalidateGitBlame(buffer);
+    }
+
+    void clearGitBlameCache() {
+        syntaxUiController.clearGitBlameCache();
+    }
+
     String findCurrentBreadcrumb() {
         return syntaxUiController.findCurrentBreadcrumb();
     }

@@ -1,6 +1,7 @@
 package shed;
 
 import javax.swing.*;
+import javax.swing.Timer;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

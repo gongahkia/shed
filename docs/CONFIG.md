@@ -34,13 +34,14 @@ Every global `config.toml` and project `.shed.toml` starts with the unquoted roo
 
 | Command | Behavior |
 | :--- | :--- |
-| `:settings`, `:config` | Open `~/.shed/config.toml` |
+| `:settings`, `:config` | Open the graphical Settings Editor; changes write immediately to `~/.shed/config.toml` |
+| `:config file`, `:config toml`, `:config text` | Open `~/.shed/config.toml` directly |
 | `:set key=value` | Set runtime value only |
 | `:set! key=value` | Set and persist one key to disk |
 | `:config save` / `:config write` | Persist current runtime config |
 | `:config defaults` | Create a complete commented default config only when no config exists |
 | `:config! defaults` | Confirm replacement with a complete commented default config |
-| `:config inspector` | Open the typed settings inspector; search by key or description, select a category, edit a value, or reset the selected setting to its default |
+| `:config inspector`, `:config ui` | Open the Settings Editor; search by key or description, select a category, edit typed controls, or open raw TOML |
 | `:config reset <key>` | Reset one typed setting to its canonical default and remove its global TOML override |
 | `:config reference`, `:help settings` | Open generated typed-setting help with its description, allowed values, default, and live/restart behaviour |
 | `:config status` | Show current config load/recovery details |

@@ -32,7 +32,8 @@ Supported variables in `command`, `cwd`, and environment values are `${workspace
 
 | Command | Action |
 | :--- | :--- |
-| `:task`, `:task list` | Show validated tasks and settings |
+| `:task`, `:task ui` | Open the docked Tasks/Jobs panel |
+| `:task text`, `:task text list` | Show validated tasks in the legacy scratch buffer |
 | `:task add <name> <command>` | Add a default login-shell task and write canonical TOML |
 | `:task remove <name>` | Remove a task while preserving other task settings |
 | `:task dry-run <name>` | Resolve variables and show the command, policy, cwd, and environment keys without starting a process |

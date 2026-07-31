@@ -67,7 +67,7 @@ Adapter versions are `NOT_PROBED`: the published DAP schema has no adapter-disco
 
 ## Explicit Session Lifecycle
 
-Use `:debug configurations` to inspect configured adapters without starting one, `:debug select <name>` to choose a configuration, and `:debug start [name]` to explicitly begin a session. The editor starts the validated adapter, sends DAP `initialize`, then sends the configured `launch` or `attach` request. When the adapter emits `initialized`, Shed sends configuration requests before `configurationDone` only when both the declared adapter capability and the DAP initialize response support it. `:debug stop`, `:debug restart [name]`, and `:debug status` provide visible lifecycle state and retained diagnostics.
+Use `:debug` to open the docked Debug panel, or `:debug configurations` to inspect configured adapters without starting one. The panel and `:debug select <name>` choose a configuration, while `:debug start [name]` explicitly begins a session. The editor starts the validated adapter, sends DAP `initialize`, then sends the configured `launch` or `attach` request. When the adapter emits `initialized`, Shed sends configuration requests before `configurationDone` only when both the declared adapter capability and the DAP initialize response support it. `:debug stop`, `:debug restart [name]`, and `:debug status` provide visible lifecycle state and retained diagnostics; prefix a command with `:debug text` for legacy scratch output.
 
 Shed never starts a debug adapter while inspecting configurations or selecting one. A rejected configuration, adapter start error, timeout, or failed DAP response leaves the session `FAILED` with diagnostics visible in `[debug status]`; normal editing remains available. The generic launch arguments are only `program`, `cwd`, and `args`; attach arguments are only `host`, `port`, `cwd`, and `args`, so adapters that require additional adapter-specific settings fail visibly rather than receiving inferred values.
 
@@ -79,7 +79,7 @@ Shed sends one DAP `setBreakpoints` request per source only when `debug.breakpoi
 
 ## Paused-frame Inspection
 
-On a DAP `stopped` event, use `:debug stack` or `:debug variables` to load `[debug inspector]`; loading, unavailable capability, and error states remain visible there. `:debug frame <id>` selects a returned frame before reloading its scopes and variables. `:debug watch add <expression>`, `:debug watch remove <expression>`, `:debug watch list`, and `:debug watch clear` manage session-local watches; evaluation uses DAP `evaluate` with `context: watch` for the selected paused frame.
+On a DAP `stopped` event, use the Debug panel or `:debug stack` / `:debug variables` to inspect state; loading, unavailable capability, and error states remain visible. `:debug frame <id>` selects a returned frame before reloading its scopes and variables. `:debug watch add <expression>`, `:debug watch remove <expression>`, `:debug watch list`, and `:debug watch clear` manage session-local watches; evaluation uses DAP `evaluate` with `context: watch` for the selected paused frame.
 
 Shed sends `threads`, `stackTrace`, `scopes`, `variables`, and `evaluate` only when their corresponding configured adapter capabilities and feature settings are enabled. A later `continued`, `terminated`, or `exited` event invalidates paused-frame references and leaves watches pending until the next stop; stale responses from a prior suspended state are discarded.
 

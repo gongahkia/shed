@@ -131,7 +131,7 @@ final class EditorUiController {
         }
         editor.editorState.commandBuffer = editor.commandBar.getText();
         editor.updateSubstitutePreview();
-        updateCommandPathSuggestions();
+        dismissCommandPathSuggestions();
     }
 
     void setCommandPromptText(String text) {
@@ -150,7 +150,7 @@ final class EditorUiController {
             updatingCommandBar = false;
         }
         editor.updateSubstitutePreview();
-        updateCommandPathSuggestions();
+        dismissCommandPathSuggestions();
     }
 
     void configureCommandPrompt(EditorMode mode) {
@@ -190,15 +190,15 @@ final class EditorUiController {
         return true;
     }
 
-    private void updateCommandPathSuggestions() {
+    boolean showCommandPathSuggestions() {
         if (editor.commandBar == null || !editor.commandBar.isFocusOwner()) {
             dismissCommandPathSuggestions();
-            return;
+            return false;
         }
         List<String> suggestions = CommandPathCompletion.suggestions(editor.editorState.commandBuffer, commandPathBaseDirectory());
         if (suggestions.isEmpty()) {
             dismissCommandPathSuggestions();
-            return;
+            return false;
         }
         commandPathModel.clear();
         suggestions.forEach(commandPathModel::addElement);
@@ -209,6 +209,7 @@ final class EditorUiController {
         if (!commandPathPopup.isVisible()) {
             commandPathPopup.show(editor.commandBar, 0, editor.commandBar.getHeight());
         }
+        return true;
     }
 
     private File commandPathBaseDirectory() {

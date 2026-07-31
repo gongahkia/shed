@@ -1813,7 +1813,7 @@ final class InputController {
             return true;
         }
         if (code == KeyEvent.VK_TAB) {
-            if (!editor.editorUiController.acceptCommandPathSuggestion()) {
+            if (!editor.editorUiController.acceptCommandPathSuggestion() && !editor.editorUiController.showCommandPathSuggestions()) {
                 editor.editorUiController.setCommandPromptText(completeCommand(editor.editorState.commandBuffer));
             }
             return true;

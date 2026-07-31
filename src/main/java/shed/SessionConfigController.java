@@ -369,54 +369,6 @@ final class SessionConfigController {
     }
 
 
-    public String applyTheaterPreset(String presetArgument) {
-        String preset = presetArgument == null ? "" : presetArgument.trim().toLowerCase(Locale.ROOT);
-        if (preset.isEmpty()) {
-            return "Usage: :theater off|subtle|full";
-        }
-
-        if ("off".equals(preset)) {
-            editor.configManager.set("ui.dramatic", "false");
-            applyRuntimeConfigFromSettings();
-            return "Theater preset applied: off";
-        }
-
-        if ("subtle".equals(preset)) {
-            editor.configManager.set("ui.dramatic", "true");
-            editor.configManager.set("ui.dramatic.identity", "true");
-            editor.configManager.set("ui.dramatic.mode.transitions", "true");
-            editor.configManager.set("ui.dramatic.command.palette", "true");
-            editor.configManager.set("ui.dramatic.editing.feedback", "true");
-            editor.configManager.set("ui.dramatic.panel.animations", "false");
-            editor.configManager.set("ui.dramatic.sound", "false");
-            editor.configManager.set("ui.dramatic.sound.pack", "soft");
-            editor.configManager.set("ui.dramatic.sound.volume", "40");
-            editor.configManager.set("ui.dramatic.reduced.motion", "false");
-            editor.configManager.set("ui.dramatic.animation.ms", "140");
-            applyRuntimeConfigFromSettings();
-            return "Theater preset applied: subtle";
-        }
-
-        if ("full".equals(preset)) {
-            editor.configManager.set("ui.dramatic", "true");
-            editor.configManager.set("ui.dramatic.identity", "true");
-            editor.configManager.set("ui.dramatic.mode.transitions", "true");
-            editor.configManager.set("ui.dramatic.command.palette", "true");
-            editor.configManager.set("ui.dramatic.editing.feedback", "true");
-            editor.configManager.set("ui.dramatic.panel.animations", "true");
-            editor.configManager.set("ui.dramatic.sound", "true");
-            editor.configManager.set("ui.dramatic.sound.pack", "cinema");
-            editor.configManager.set("ui.dramatic.sound.volume", "85");
-            editor.configManager.set("ui.dramatic.reduced.motion", "false");
-            editor.configManager.set("ui.dramatic.animation.ms", "240");
-            applyRuntimeConfigFromSettings();
-            return "Theater preset applied: full";
-        }
-
-        return "Unknown theater preset: " + preset + " (expected off|subtle|full)";
-    }
-
-
     public String reloadConfigFromDisk() {
         editor.configManager.reload();
         applyRuntimeConfigFromSettings();
@@ -510,7 +462,6 @@ final class SessionConfigController {
 
 
     void applyRuntimeConfigFromSettings() {
-        editor.refreshDramaticSettings();
         MultiSelectionPolicy multiSelection = editor.configManager.getMultiSelectionPolicy();
         if (!multiSelection.enabled()) {
             editor.clearExtraCursors();
@@ -537,7 +488,7 @@ final class SessionConfigController {
         editor.refreshLineNumberPanel();
         editor.updateCurrentLineHighlight();
         if (editor.activeMinimapPanel != null) {
-            editor.activeMinimapPanel.setPixelWidth(editor.dramaticMinimapWidth);
+            editor.activeMinimapPanel.setPixelWidth(editor.configManager.getMinimapWidth());
         }
         editor.updateStatusBar();
     }
@@ -972,18 +923,10 @@ final class SessionConfigController {
         Map<String, Object> settings = new LinkedHashMap<>();
         String[] keys = {
             "theme",
-            "ui.dramatic",
-            "ui.dramatic.identity",
-            "ui.dramatic.mode.transitions",
-            "ui.dramatic.command.palette",
-            "ui.dramatic.editing.feedback",
-            "ui.dramatic.panel.animations",
-            "ui.dramatic.sound",
-            "ui.dramatic.sound.pack",
-            "ui.dramatic.sound.volume",
-            "ui.dramatic.reduced.motion",
-            "ui.dramatic.animation.ms",
             "minimap",
+            "minimap.width",
+            "limelight.coefficient",
+            "limelight.paragraph.span",
             "ui.whichkey.hints"
         };
         for (String key : keys) {

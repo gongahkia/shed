@@ -425,10 +425,12 @@ final class PaletteController {
                 return "Show mark list for active buffer.";
             case "themes":
                 return "Show and switch built-in themes.";
-            case "theater":
-                return "Apply dramatic UI preset: off/subtle/full.";
             case "zen":
-                return "Toggle centered zen layout.";
+                return "Toggle Goyo layout with Limelight.";
+            case "goyo":
+                return "Toggle centered Goyo layout.";
+            case "limelight":
+                return "Toggle paragraph focus dimming.";
             case "minimap":
                 return "Toggle minimap side panel.";
             case "normal":
@@ -512,39 +514,6 @@ final class PaletteController {
     }
 
 
-    void animatePaletteDialogOpen(JDialog dialog, Dimension targetSize) {
-        if (!editor.dramaticCommandPaletteEnabled || !editor.dramaticMotionAllowed()) {
-            return;
-        }
-        int steps = Math.max(5, Math.min(12, editor.dramaticAnimationMs / 20));
-        int startWidth = Math.max(420, (int) Math.round(targetSize.width * 0.88));
-        int startHeight = Math.max(260, (int) Math.round(targetSize.height * 0.88));
-        Point target = dialog.getLocation();
-        int dx = (targetSize.width - startWidth) / 2;
-        int dy = 18;
-        dialog.setSize(startWidth, startHeight);
-        dialog.setLocation(target.x + dx, target.y + dy);
-        javax.swing.Timer timer = new javax.swing.Timer(editor.animationDelayForSteps(steps), null);
-        final int[] tick = new int[] {0};
-        timer.addActionListener(ev -> {
-            double t = editor.easeOut((double) tick[0] / steps);
-            int width = (int) Math.round(startWidth + (targetSize.width - startWidth) * t);
-            int height = (int) Math.round(startHeight + (targetSize.height - startHeight) * t);
-            int x = target.x + (targetSize.width - width) / 2;
-            int y = target.y + (int) Math.round(dy * (1.0 - t));
-            dialog.setSize(width, height);
-            dialog.setLocation(x, y);
-            tick[0]++;
-            if (tick[0] > steps) {
-                timer.stop();
-                dialog.setSize(targetSize);
-                dialog.setLocation(target);
-            }
-        });
-        timer.start();
-    }
-
-
     String showPaletteDialog(String title, List<String> candidates, PalettePreviewProvider previewProvider) {
         // undecorated modal dialog styled as floating picker
         JDialog dialog = new JDialog(editor, title, true);
@@ -587,10 +556,10 @@ final class PaletteController {
         previewArea.setBackground(editor.configManager.getStatusBarBackground());
         previewArea.setForeground(editor.configManager.getStatusBarForeground());
         previewArea.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(1, 0, 0, 0, editor.blendColor(editor.configManager.getCaretColor(), editor.configManager.getCommandBarBackground(), 0.45)),
+            BorderFactory.createMatteBorder(1, 0, 0, 0, editor.configManager.getCaretColor()),
             BorderFactory.createEmptyBorder(6, 8, 6, 8)
         ));
-        previewArea.setVisible(previewProvider != null && editor.dramaticCommandPaletteEnabled);
+        previewArea.setVisible(previewProvider != null);
         final Runnable syncPreview = () -> {
             String value = list.getSelectedValue();
             if (previewProvider == null) {
@@ -639,11 +608,9 @@ final class PaletteController {
         dialog.add(sp, BorderLayout.SOUTH);
         dialog.add(previewArea, BorderLayout.EAST);
         syncPreview.run();
-        Dimension targetSize = editor.dramaticCommandPaletteEnabled ? new Dimension(720, 420) : new Dimension(620, 400);
+        Dimension targetSize = previewProvider == null ? new Dimension(620, 400) : new Dimension(720, 420);
         dialog.setSize(targetSize);
         dialog.setLocationRelativeTo(editor);
-        animatePaletteDialogOpen(dialog, targetSize);
-        editor.playCue(CueType.SUCCESS);
         dialog.setVisible(true);
         return selection[0];
     }

@@ -1334,7 +1334,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
         commands.add("lsp"); commands.add("debug"); commands.add("dap"); commands.add("definition"); commands.add("hover"); commands.add("references");
         commands.add("diagnostics"); commands.add("diag"); commands.add("dnext"); commands.add("dprev"); commands.add("symbols"); commands.add("sym");
-        commands.add("registers"); commands.add("yankring"); commands.add("marks"); commands.add("zen"); commands.add("theater"); commands.add("normal");
+        commands.add("registers"); commands.add("yankring"); commands.add("marks"); commands.add("zen"); commands.add("goyo"); commands.add("limelight"); commands.add("normal");
         commands.add("reload"); commands.add("source"); commands.add("clean"); commands.add("shedclean");
         commands.add("noh"); commands.add("split");
         commands.add("vsplit"); commands.add("close"); commands.add("themes");

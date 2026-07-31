@@ -94,8 +94,9 @@ public class HelpService {
                    "  :yankring      Pick from yank/delete history and paste\n" +
                    "  :marks         Show marks\n" +
                    "  :themes        Show built-in themes\n" +
-                   "  :theater X     Dramatic UI preset (off/subtle/full)\n" +
-                   "  :zen           Toggle zen mode\n" +
+                   "  :zen           Toggle Goyo layout with Limelight\n" +
+                   "  :goyo          Toggle Goyo layout\n" +
+                   "  :limelight     Toggle paragraph focus dimming\n" +
                    "  :reload        Reload ~/.shed/config.toml now\n" +
                    "  :config status Show config load/recovery details\n" +
                    "  :config reference Open generated typed settings reference\n" +
@@ -364,7 +365,6 @@ public class HelpService {
                     + "    shed.theme_set(name[,persist]) apply theme\n"
                     + "    shed.palette_get()      table of active palette colors\n"
                     + "    shed.palette_set(tbl[,persist]) apply palette overrides\n"
-                    + "    shed.theater(preset)    apply theater preset (off/subtle/full)\n\n"
                     + "  MODE / EVENTS\n"
                     + "    shed.mode()             current mode name\n"
                     + "    shed.on(event, fn)      register callback\n\n"

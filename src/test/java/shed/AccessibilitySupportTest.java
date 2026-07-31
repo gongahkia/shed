@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.Color;
+import javax.accessibility.AccessibleContext;
+import javax.swing.JComponent;
 import javax.swing.JTextArea;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +17,15 @@ class AccessibilitySupportTest {
 
         assertEquals("Editor", area.getAccessibleContext().getAccessibleName());
         assertEquals("Edit the active source buffer.", area.getAccessibleContext().getAccessibleDescription());
+    }
+
+    @Test
+    void allowsComponentsWithoutAnAccessibleContext() {
+        JComponent component = new JComponent() {
+            @Override public AccessibleContext getAccessibleContext() { return null; }
+        };
+
+        assertEquals(component, AccessibilitySupport.describe(component, "Graph", "Git graph."));
     }
 
     @Test

@@ -10,6 +10,9 @@ final class AccessibilitySupport {
 
     static <T extends JComponent> T describe(T component, String name, String description) {
         AccessibleContext context = component.getAccessibleContext();
+        if (context == null) {
+            return component;
+        }
         context.setAccessibleName(name);
         context.setAccessibleDescription(description);
         return component;

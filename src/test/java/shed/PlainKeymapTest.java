@@ -32,6 +32,15 @@ class PlainKeymapTest {
         assertEquals(false, InputController.isCommandPaletteShortcut(keyEvent(KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)));
     }
 
+    @Test
+    void recognizesMacPaneShortcuts() {
+        assertEquals(InputController.PaneShortcut.HORIZONTAL_SPLIT, InputController.paneShortcut(keyEvent(KeyEvent.VK_D, InputEvent.META_DOWN_MASK)));
+        assertEquals(InputController.PaneShortcut.VERTICAL_SPLIT,
+            InputController.paneShortcut(keyEvent(KeyEvent.VK_D, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)));
+        assertEquals(InputController.PaneShortcut.CLOSE, InputController.paneShortcut(keyEvent(KeyEvent.VK_W, InputEvent.META_DOWN_MASK)));
+        assertEquals(InputController.PaneShortcut.NONE, InputController.paneShortcut(keyEvent(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK)));
+    }
+
     private PlainKeymap.Action action(int keyCode, int modifiers) {
         return PlainKeymap.actionFor(keyEvent(keyCode, modifiers));
     }

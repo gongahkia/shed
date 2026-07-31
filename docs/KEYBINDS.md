@@ -14,6 +14,8 @@ Set `keymap.profile = "plain"` for non-modal editing. Plain bypasses Vim mode ha
 | `Ctrl`/`Cmd` + `O` or `P` | Find file |
 | `Ctrl`/`Cmd` + `Shift` + `P` | Command palette |
 | `Ctrl`/`Cmd` + `B` | Buffer picker |
+| `Cmd` + `D` | Horizontal split |
+| `Cmd` + `Shift` + `D` | Vertical split |
 | `Ctrl`/`Cmd` + `W` | Close active split |
 | `F1` | Plain-keymap help |
 
@@ -39,6 +41,9 @@ Set `keymap.profile = "emacs"` for fixed Emacs bindings. Emacs bypasses Vim mode
 | Key-binds | Function |
 | :---: | :---: |
 | `Ctrl`/`Cmd` + `Shift` + `P` | Command palette |
+| `Cmd` + `D` | Horizontal split |
+| `Cmd` + `Shift` + `D` | Vertical split |
+| `Cmd` + `W` | Close active split |
 | `i` | Enter `Insert` mode |
 | `v` | Enter `Visual` mode |
 | `R` | Enter `Replace` mode |

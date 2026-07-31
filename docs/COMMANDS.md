@@ -132,9 +132,9 @@ Notes:
 
 | Command | Action |
 | :--- | :--- |
-| `:split`, `:sp` | Horizontal split |
-| `:vsplit`, `:vsp` | Vertical split |
-| `:close`, `:clo` | Close active window |
+| `:split`, `:sp` | Horizontal split (`Cmd+D`) |
+| `:vsplit`, `:vsp` | Vertical split (`Cmd+Shift+D`) |
+| `:close`, `:clo` | Close active window (`Cmd+W`) |
 | `:files` | Project file finder |
 | `:folder`, `:folders` | Folder chooser + file picker |
 | `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search; opens quickfix on completion |

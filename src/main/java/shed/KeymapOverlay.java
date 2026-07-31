@@ -142,6 +142,7 @@ final class KeymapOverlay {
             return List.of(
                 fixed("Ctrl/Cmd-S", "Save current file"), fixed("Ctrl/Cmd-O/P", "Find file"),
                 fixed("Ctrl/Cmd-Shift-P", "Command palette"), fixed("Ctrl/Cmd-B", "Buffer picker"),
+                fixed("Cmd-D", "Horizontal split"), fixed("Cmd-Shift-D", "Vertical split"),
                 fixed("Ctrl/Cmd-W", "Close active split"), fixed("F1", "Plain keymap help")
             );
         }
@@ -152,7 +153,8 @@ final class KeymapOverlay {
             );
         }
         return List.of(
-            fixed("Ctrl/Cmd-Shift-P", "Command palette"),
+            fixed("Ctrl/Cmd-Shift-P", "Command palette"), fixed("Cmd-D", "Horizontal split"),
+            fixed("Cmd-Shift-D", "Vertical split"), fixed("Cmd-W", "Close active split"),
             new Binding(null, "vim", "built-in", "Vim mode dispatcher", "Profile", "Active; see :help and docs/KEYBINDS.md")
         );
     }

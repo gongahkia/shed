@@ -9,7 +9,9 @@ import java.util.*;
 import java.util.List;
 
 final class PaneBufferController {
+    private static final int BACKUP_IDLE_DEBOUNCE_MS = 750;
     private final Texteditor editor;
+    private final Map<FileBuffer, Timer> backupTimers = new IdentityHashMap<>();
 
     PaneBufferController(Texteditor editor) {
         this.editor = editor;
@@ -19,7 +21,7 @@ final class PaneBufferController {
         if (!editor.suppressDocumentEvents) {
             markModified();
             editor.updateCurrentLineHighlight();
-            editor.applySyntaxHighlighting();
+            editor.scheduleSyntaxHighlighting();
             editor.lineNumberPanel.repaint();
         }
     }
@@ -124,16 +126,61 @@ final class PaneBufferController {
         }
         if (buffer != null) {
             buffer.setModified(true);
-            try {
-                buffer.createBackup();
-            } catch (IOException error) {
-                editor.errorReporter.report(error, "backup", "creating a local backup", "docs/BACKUPS.md");
-            }
+            scheduleIdleBackup(buffer);
             editor.recordChangePosition();
             editor.syncLspChange(buffer);
-            updateDiffGutter(buffer);
-            editor.updateStatusBar();
-            editor.persistRecoverySnapshotsSafely();
+            editor.scheduleDiffGutter(buffer);
+            editor.requestStatusBarRefresh();
+            editor.scheduleRecoverySnapshotCapture();
+        }
+    }
+
+    void scheduleIdleBackup(FileBuffer buffer) {
+        BackupPolicy policy = editor.configManager.getBackupPolicy();
+        if (buffer == null || !policy.enabled() || policy.mode() != BackupPolicy.BackupMode.IDLE) {
+            return;
+        }
+        Timer timer = backupTimers.computeIfAbsent(buffer, ignored -> {
+            Timer created = new Timer(BACKUP_IDLE_DEBOUNCE_MS, event -> queueBackup(buffer));
+            created.setRepeats(false);
+            return created;
+        });
+        timer.restart();
+    }
+
+    void backupBeforeSave(FileBuffer buffer) {
+        BackupPolicy policy = editor.configManager.getBackupPolicy();
+        if (buffer == null || !policy.enabled() || policy.mode() != BackupPolicy.BackupMode.SAVE_ONLY) {
+            return;
+        }
+        try {
+            buffer.createBackup();
+        } catch (IOException error) {
+            editor.errorReporter.report(error, "backup", "creating a local save-only backup", "docs/BACKUPS.md");
+        }
+    }
+
+    void flushPendingBackups() {
+        for (Timer timer : backupTimers.values()) {
+            if (timer.isRunning()) {
+                timer.stop();
+            }
+        }
+        for (FileBuffer buffer : new ArrayList<>(backupTimers.keySet())) {
+            queueBackup(buffer);
+        }
+        backupTimers.clear();
+    }
+
+    private void queueBackup(FileBuffer buffer) {
+        try {
+            FileBuffer.BackupSnapshot snapshot = buffer == null ? null : buffer.captureBackupSnapshot();
+            if (snapshot != null) {
+                editor.backupScheduler.submit(buffer, snapshot, error -> editor.errorReporter.report(error, "backup",
+                    "writing an idle backup", "docs/BACKUPS.md"));
+            }
+        } catch (IOException error) {
+            editor.errorReporter.report(error, "backup", "capturing an idle backup", "docs/BACKUPS.md");
         }
     }
 

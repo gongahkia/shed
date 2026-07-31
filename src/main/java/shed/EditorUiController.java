@@ -18,11 +18,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class EditorUiController {
+    private static final int STATUS_REFRESH_DEBOUNCE_MS = 33;
     private final Texteditor editor;
     private final DefaultListModel<String> commandPathModel = new DefaultListModel<>();
     private JPopupMenu commandPathPopup;
     private JList<String> commandPathList;
     private boolean updatingCommandBar;
+    private Timer statusRefreshTimer;
 
     EditorUiController(Texteditor editor) {
         this.editor = editor;
@@ -323,7 +325,7 @@ final class EditorUiController {
                 editor.lineNumberPanel.repaint();
             }
             editor.dismissCompletionPopup();
-            updateStatusBar();
+            requestStatusBarRefresh();
         });
         textArea.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override
@@ -572,7 +574,10 @@ final class EditorUiController {
             status.append("  preview");
         }
 
-        editor.statusBar.setText(status.toString());
+        String statusText = status.toString();
+        if (!statusText.equals(editor.statusBar.getText())) {
+            editor.statusBar.setText(statusText);
+        }
 
         String inlinePeek = inlinePeekMessage(buffer);
         if ((editor.editorState.mode == EditorMode.COMMAND || editor.editorState.mode == EditorMode.SEARCH) && !editor.editorState.commandBuffer.isEmpty()) {
@@ -586,6 +591,17 @@ final class EditorUiController {
             setCommandBarDisplay(blame != null ? blame : "");
         }
         editor.applyDramaticFooterStyling();
+    }
+
+    void requestStatusBarRefresh() {
+        if (editor.statusBar == null) {
+            return;
+        }
+        if (statusRefreshTimer == null) {
+            statusRefreshTimer = new Timer(STATUS_REFRESH_DEBOUNCE_MS, event -> updateStatusBar());
+            statusRefreshTimer.setRepeats(false);
+        }
+        statusRefreshTimer.restart();
     }
 
     private void setCommandBarDisplay(String text) {

@@ -76,6 +76,7 @@ public class Texteditor extends JFrame implements KeyListener {
     LspService lspService;
     SyntaxHighlightService syntaxHighlightService;
     AsyncJobService asyncJobService;
+    BackupScheduler backupScheduler;
     UpdateController updateController;
     QuickfixService quickfixService;
     PluginManager pluginManager;
@@ -257,6 +258,7 @@ public class Texteditor extends JFrame implements KeyListener {
         debugSessionController = new DebugSessionController(this);
         syntaxHighlightService = new SyntaxHighlightService();
         asyncJobService = new AsyncJobService(200, this.errorReporter);
+        backupScheduler = new BackupScheduler();
         gitHubCapabilityController = new GitHubCapabilityController(this);
         updateController = new UpdateController(this);
         quickfixService = new QuickfixService();
@@ -2391,6 +2393,10 @@ public class Texteditor extends JFrame implements KeyListener {
         editorUiController.updateStatusBar();
     }
 
+    void requestStatusBarRefresh() {
+        editorUiController.requestStatusBarRefresh();
+    }
+
     String inlinePeekMessage(FileBuffer buffer) {
         return editorUiController.inlinePeekMessage(buffer);
     }
@@ -2413,6 +2419,18 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void handleDocumentChange() {
         paneBufferController.handleDocumentChange();
+    }
+
+    void scheduleIdleBackup(FileBuffer buffer) {
+        paneBufferController.scheduleIdleBackup(buffer);
+    }
+
+    void backupBeforeSave(FileBuffer buffer) {
+        paneBufferController.backupBeforeSave(buffer);
+    }
+
+    void flushPendingBackups() {
+        paneBufferController.flushPendingBackups();
     }
 
     void withSuppressedDocumentEvents(Runnable action) {
@@ -3058,6 +3076,10 @@ public class Texteditor extends JFrame implements KeyListener {
             recoverySnapshotTimer.stop();
         }
         shutdownRecoveryJournalScheduling();
+        flushPendingBackups();
+        if (backupScheduler != null) {
+            backupScheduler.close();
+        }
         if (ptyTerminalPanes != null) {
             for (PtyTerminalPane terminalPane : new ArrayList<>(ptyTerminalPanes.values())) {
                 terminalPane.close();

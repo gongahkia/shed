@@ -522,11 +522,11 @@ final class PaneBufferController {
 
 
     String closePane(EditorPane paneToClose) {
-        if (editor.editorPanes.size() <= 1) {
-            return "Cannot close the only window";
-        }
         if (paneToClose == null) {
             return "No active window";
+        }
+        if (!paneToClose.isHiddenByFocusMode() && visiblePaneCount() <= 1) {
+            return "Cannot close the only window";
         }
 
         EditorPane previouslyActive = editor.getActivePane();
@@ -558,8 +558,13 @@ final class PaneBufferController {
         EditorPane nextActive = null;
         if (previouslyActive != null && previouslyActive != paneToClose && editor.editorPanes.contains(previouslyActive)) {
             nextActive = previouslyActive;
-        } else if (!editor.editorPanes.isEmpty()) {
-            nextActive = editor.editorPanes.get(0);
+        } else {
+            for (EditorPane pane : editor.editorPanes) {
+                if (!pane.isHiddenByFocusMode()) {
+                    nextActive = pane;
+                    break;
+                }
+            }
         }
 
         if (nextActive != null) {

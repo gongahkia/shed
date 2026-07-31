@@ -241,6 +241,11 @@ final class FocusModeController {
                 return;
             }
             int line = area.getLineOfOffset(area.getCaretPosition());
+            if (isBlankLine(area, line)) {
+                focusStart = area.getLineStartOffset(line);
+                focusEnd = area.getLineEndOffset(line);
+                return;
+            }
             int first = line;
             int last = line;
             while (first > 0 && !isBlankLine(area, first - 1)) first--;

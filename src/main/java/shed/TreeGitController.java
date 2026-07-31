@@ -311,6 +311,9 @@ final class TreeGitController {
 
 
     public String showFileTree(String pathArgument) {
+        if (editor.goyoModeEnabled) {
+            return "Tree hidden in Goyo mode";
+        }
         String trimmed = pathArgument == null ? "" : pathArgument.trim();
         if (trimmed.isEmpty() && editor.treePane != null && editor.editorPanes.contains(editor.treePane)) {
             return closeTreePane();

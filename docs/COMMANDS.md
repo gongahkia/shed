@@ -157,9 +157,9 @@ Notes:
 | `:palette`, `:commands` | Command palette |
 | `:undolist`, `:undotree` | Show undo state summary |
 | `:themes` | Show built-in themes |
-| `:zen` | Toggle Goyo layout with Limelight |
-| `:goyo` | Toggle Goyo layout without changing Limelight |
-| `:limelight` | Toggle paragraph focus dimming |
+| `:zen` | Toggle Goyo layout with Limelight; restores Limelight's prior state when disabled |
+| `:goyo` | Toggle the distraction-free layout without changing Limelight; hides status/line numbers/minimap/tree/tool windows while retaining every pane and split |
+| `:limelight` | Toggle paragraph focus dimming; the current paragraph or selected text stays bright |
 | `:minimap` | Toggle minimap panel |
 | `:term`, `:terminal` | Open integrated terminal split; terminal input owns focus, uses the system clipboard (`Cmd-C`/`Cmd-V` on macOS, `Ctrl-Shift-C`/`Ctrl-Shift-V` elsewhere), and ignores zero-size resize events |
 

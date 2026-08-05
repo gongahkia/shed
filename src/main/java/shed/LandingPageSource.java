@@ -21,11 +21,15 @@ final class LandingPageSource {
     static Resolved resolve(ConfigManager config) throws IOException {
         String source = config.getLandingSource();
         if (startsWithIgnoreCase(source, "https://")) {
-            URI remote = URI.create(source);
-            if (remote.getHost() == null || remote.getHost().isBlank()) {
-                throw new IOException("landing HTTPS URL must include a host");
+            try {
+                URI remote = URI.create(source);
+                if (remote.getHost() == null || remote.getHost().isBlank()) {
+                    throw new IOException("landing HTTPS URL must include a host");
+                }
+                return new Resolved(resolveLocalPath(config.getLandingRemoteCachePath()).toFile(), remote);
+            } catch (IllegalArgumentException error) {
+                throw new IOException("invalid landing HTTPS URL", error);
             }
-            return new Resolved(resolveLocalPath(config.getLandingRemoteCachePath()).toFile(), remote);
         }
         if (startsWithIgnoreCase(source, "http://")) {
             throw new IOException("remote landing source must use HTTPS");

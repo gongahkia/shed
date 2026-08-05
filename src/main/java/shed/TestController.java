@@ -156,7 +156,7 @@ final class TestController {
         TestService.AdapterSpec spec = tests.resolvedSpec(state.root, raw);
         if (adapter == null || spec == null || spec.command().isEmpty()) return 0;
         try {
-            Path cache = tests.reportCache(state.root, spec.id());
+            Path cache = tests.reportCache(state.root, spec.id(), Path.of(editor.configManager.getShedDirectoryPath()));
             TestService.Command command = adapter.run(spec, selection == null ? List.of() : selection, cache);
             if (!command.executable()) return 0;
             return start(state, "run", spec, adapter, command);

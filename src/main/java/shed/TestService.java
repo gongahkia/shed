@@ -140,9 +140,10 @@ final class TestService {
         return discoverJavaTests(root, spec.id());
     }
 
-    Path reportCache(Path root, String adapterId) throws IOException {
+    Path reportCache(Path root, String adapterId, Path shedDirectory) throws IOException {
         String value = Integer.toUnsignedString(Objects.toString(root, "").hashCode(), 36);
-        Path cache = Path.of(System.getProperty("user.home", "."), ".shed", "test-reports", value, adapterId);
+        Path base = shedDirectory == null ? Path.of(System.getProperty("user.home", "."), ".shed") : shedDirectory;
+        Path cache = base.resolve("test-reports").resolve(value).resolve(adapterId);
         Files.createDirectories(cache);
         return cache;
     }

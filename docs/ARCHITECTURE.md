@@ -4,7 +4,7 @@ This is the dependency inventory for `src/main/java/shed` as of the Java 21 base
 
 ## Composition and seams
 
-`Texteditor` is the Swing application, composition root, and shared editor-state owner. It constructs the services, all 15 controllers, `CommandHandler`, and `AsyncJobService`.
+`Texteditor` is the Swing application, composition root, and shared editor-state owner. It constructs the services, feature controllers, `CommandHandler`, and `AsyncJobService`.
 
 ```
 Swing input and timers
@@ -39,6 +39,7 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `SearchReplaceController` | search and substitution UI effects | `SearchManager`, `SubstituteService` |
 | `JobQuickfixController` | tasks, shell jobs, quickfix navigation | `AsyncJobService`, `TaskService`, `QuickfixService` |
 | `ProblemsController` | live diagnostic and retained quickfix aggregation | `ProblemsService`, `LspClient`, tool-window host |
+| `TestController` | explicit test discovery/run session state and Problems projection | `TestService`, `TestAdapterRegistry`, `AsyncJobService` |
 | `TerminalController` | PTY terminal panes and lifecycle | `PtyTerminalPane`, pane/buffer state |
 | `TreeGitController` | file tree and Git actions | `TreeService`, `GitService` |
 | `LspController` | language-server requests, diagnostics, edits, symbols | `LspService`, `LspClient`, `QuickfixService` |

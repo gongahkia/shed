@@ -11,6 +11,7 @@
 | Git | Docked Changes panel | `BOTTOM` |
 | Debugger | Docked inspection panel | `BOTTOM` |
 | Tasks | Docked task/job panel | `BOTTOM` |
+| Tests | Docked test explorer | `BOTTOM` |
 | Replace | Docked project-replace review panel | `BOTTOM` |
 | Status | Footer labels | `FOOTER` |
 
@@ -20,7 +21,7 @@
 
 Session V2 stores `toolPlacements` as validated workspace-scoped entries. A docked entry has a host and non-detached region. A detached entry additionally has bounded window geometry and the logical owner-window id `primary`. Restoring a detached Git tool only uses an entry from the active workspace and owner; its rectangle is clamped to the available screen so an old monitor arrangement cannot place the window off-screen.
 
-Tree and terminal remain docked `WindowLayoutNode` leaves, whose split topology is already stored in `layout`. Git Changes, Debug, Tasks, and Replace share the bottom tab host. Conflicts and History remain detached modeless tools; their bounds are captured on move, resize, and close. Unsupported, malformed, cross-workspace, or out-of-range placement data is ignored.
+Tree and terminal remain docked `WindowLayoutNode` leaves, whose split topology is already stored in `layout`. Git Changes, Debug, Tasks, Tests, Problems, and Replace share the bottom tab host. Conflicts and History remain detached modeless tools; their bounds are captured on move, resize, and close. Unsupported, malformed, cross-workspace, or out-of-range placement data is ignored.
 
 ## Constrained Windows
 

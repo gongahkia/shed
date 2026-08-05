@@ -18,6 +18,7 @@ final class TreeGitController {
 
     private final Texteditor editor;
     private File cachedGitRoot;
+    private File cachedGitWorkingDirectory;
     private boolean cachedGitRootResolved;
     private final ProjectFileScanner projectFileScanner;
     private FileBuffer interactiveGitBuffer;
@@ -328,12 +329,7 @@ final class TreeGitController {
         if (!root.exists()) {
             return "Path not found: " + root.getPath();
         }
-        editor.treeRoot = root.getAbsoluteFile();
-        cachedGitRoot = null;
-        cachedGitRootResolved = false;
-        File treeGitRoot = resolveGitRoot();
-        editor.gitBranch = treeGitRoot == null ? "" : resolveBranchName(treeGitRoot);
-        editor.updateStatusBar();
+        setWorkspaceTreeRoot(root.getAbsoluteFile(), false);
 
         StringBuilder builder = new StringBuilder();
         List<String> lineTargets = new ArrayList<>();
@@ -373,6 +369,21 @@ final class TreeGitController {
         editor.activateEditorPane(pane);
         pane.getTextArea().requestFocusInWindow();
         return "Tree pane opened";
+    }
+
+    void setWorkspaceTreeRoot(File root, boolean showTree) {
+        editor.treeRoot = root == null ? null : root.getAbsoluteFile();
+        cachedGitRoot = null;
+        cachedGitWorkingDirectory = null;
+        cachedGitRootResolved = false;
+        if (editor.treeRoot != null) editor.workspaceController.observeTreeRoot(editor.treeRoot);
+        File treeGitRoot = resolveGitRoot();
+        editor.gitBranch = treeGitRoot == null ? "" : resolveBranchName(treeGitRoot);
+        editor.updateStatusBar();
+        editor.refreshGitGutter();
+        if (showTree && editor.treeRoot != null && editor.treePane != null && editor.editorPanes.contains(editor.treePane)) {
+            showFileTree(editor.treeRoot.getAbsolutePath());
+        }
     }
 
 
@@ -583,6 +594,10 @@ final class TreeGitController {
         if ("history".equalsIgnoreCase(trimmed) || "remote".equalsIgnoreCase(trimmed)) {
             return showGitHistoryRemoteDocument();
         }
+        if ("worktree".equalsIgnoreCase(trimmed) || "worktrees".equalsIgnoreCase(trimmed)
+            || "stash".equalsIgnoreCase(trimmed) || "stashes".equalsIgnoreCase(trimmed)) {
+            return showGitRepositoryToolsDocument();
+        }
         if ("workbench".equalsIgnoreCase(trimmed) || "changes".equalsIgnoreCase(trimmed) || "ui".equalsIgnoreCase(trimmed)) {
             editor.showToolWindow(ToolWindowHost.Tab.GIT);
             return "Git Changes panel opened";
@@ -738,6 +753,103 @@ final class TreeGitController {
             }
         });
         return "Git history opened";
+    }
+
+    String showGitRepositoryToolsDocument() {
+        GitRepositoryDialog.showFor(editor, new GitRepositoryDialog.Loader() {
+            @Override public GitRepositoryModel.Snapshot load(AsyncJobService.JobToken token) { return loadGitRepositoryTools(token); }
+            @Override public String createWorktree(String path, String branch, boolean createBranch, AsyncJobService.JobToken token) {
+                return createGitWorktree(path, branch, createBranch, token);
+            }
+            @Override public String removeWorktree(GitRepositoryModel.Worktree worktree, AsyncJobService.JobToken token) {
+                return removeGitWorktree(worktree, token);
+            }
+            @Override public String stashPush(String message, AsyncJobService.JobToken token) { return pushGitStash(message, token); }
+            @Override public String stashApply(GitRepositoryModel.Stash stash, boolean pop, AsyncJobService.JobToken token) {
+                return applyGitStash(stash, pop, token);
+            }
+            @Override public String stashDrop(GitRepositoryModel.Stash stash, AsyncJobService.JobToken token) { return dropGitStash(stash, token); }
+            @Override public String openWorktree(GitRepositoryModel.Worktree worktree) { return openGitWorktree(worktree); }
+        });
+        return "Git Worktrees and Stashes opened";
+    }
+
+    private GitRepositoryModel.Snapshot loadGitRepositoryTools(AsyncJobService.JobToken token) {
+        File root = resolveGitRoot();
+        if (root == null) return GitRepositoryModel.unavailable("Not inside a Git repository.");
+        CommandResult worktrees = runCommand(root, List.of("git", "worktree", "list", "--porcelain", "-z"), token);
+        if (token != null && token.isCancelled()) return GitRepositoryModel.unavailable("Git worktree refresh cancelled.");
+        CommandResult stashes = runCommand(root, List.of("git", "stash", "list", "-z", "--format=%gd%x1f%H%x1f%gs%x1f%ci"), token);
+        return GitRepositoryModel.fromCommands(root, worktrees, stashes);
+    }
+
+    private String createGitWorktree(String pathArgument, String branchArgument, boolean createBranch, AsyncJobService.JobToken token) {
+        File root = resolveGitRoot();
+        if (root == null) return "Not inside a Git repository";
+        if (pathArgument == null || pathArgument.isBlank() || branchArgument == null || branchArgument.isBlank()) {
+            return "Worktree path and branch are required";
+        }
+        Path target;
+        try {
+            target = Path.of(pathArgument).toAbsolutePath().normalize();
+        } catch (RuntimeException error) {
+            return "Invalid worktree path";
+        }
+        if (Files.exists(target)) return "Worktree destination already exists: " + target;
+        Path parent = target.getParent();
+        if (parent == null || !Files.isDirectory(parent)) return "Worktree destination parent does not exist: " + target;
+        List<String> command = new ArrayList<>(List.of("git", "worktree", "add"));
+        if (createBranch) command.addAll(List.of("-b", branchArgument.trim()));
+        command.add(target.toString());
+        if (!createBranch) command.add(branchArgument.trim());
+        CommandResult result = runCommand(root, command, token);
+        if (result.exitCode != 0) return gitError(result);
+        return "Created worktree: " + target;
+    }
+
+    private String removeGitWorktree(GitRepositoryModel.Worktree worktree, AsyncJobService.JobToken token) {
+        File root = resolveGitRoot();
+        if (root == null) return "Not inside a Git repository";
+        if (worktree == null || worktree.path().isBlank()) return "Select a worktree";
+        if (worktree.main()) return "The main worktree cannot be removed";
+        CommandResult result = runCommand(root, List.of("git", "worktree", "remove", worktree.path()), token);
+        return result.exitCode == 0 ? "Removed worktree: " + worktree.path() : gitError(result);
+    }
+
+    private String openGitWorktree(GitRepositoryModel.Worktree worktree) {
+        if (worktree == null || worktree.path().isBlank()) return "Select a worktree";
+        File root = new File(worktree.path());
+        return root.isDirectory() ? editor.workspaceController.addDirectory(root, true) : "Worktree directory is unavailable: " + worktree.path();
+    }
+
+    private String pushGitStash(String message, AsyncJobService.JobToken token) {
+        File root = resolveGitRoot();
+        if (root == null) return "Not inside a Git repository";
+        List<String> command = new ArrayList<>(List.of("git", "stash", "push", "--include-untracked"));
+        if (message != null && !message.isBlank()) command.addAll(List.of("--message", message.strip()));
+        CommandResult result = runCommand(root, command, token);
+        return result.exitCode == 0 ? outputOr(result, "Stash created") : gitError(result);
+    }
+
+    private String applyGitStash(GitRepositoryModel.Stash stash, boolean pop, AsyncJobService.JobToken token) {
+        File root = resolveGitRoot();
+        if (root == null) return "Not inside a Git repository";
+        if (stash == null || !stash.reference().matches("stash@\\{\\d+}")) return "Select a valid stash";
+        CommandResult result = runCommand(root, List.of("git", "stash", pop ? "pop" : "apply", "--index", stash.reference()), token);
+        return result.exitCode == 0 ? outputOr(result, pop ? "Stash applied and removed" : "Stash applied") : gitError(result);
+    }
+
+    private String dropGitStash(GitRepositoryModel.Stash stash, AsyncJobService.JobToken token) {
+        File root = resolveGitRoot();
+        if (root == null) return "Not inside a Git repository";
+        if (stash == null || !stash.reference().matches("stash@\\{\\d+}")) return "Select a valid stash";
+        CommandResult result = runCommand(root, List.of("git", "stash", "drop", stash.reference()), token);
+        return result.exitCode == 0 ? outputOr(result, "Stash dropped") : gitError(result);
+    }
+
+    private static String outputOr(CommandResult result, String fallback) {
+        String output = result.stdout.strip();
+        return output.isBlank() ? fallback : output;
     }
 
     private GitHistoryModel.Snapshot loadGitHistory(AsyncJobService.JobToken token) {
@@ -990,14 +1102,14 @@ final class TreeGitController {
     }
 
     private File gitWorkingDirectory() {
-        if (editor.treeRoot != null) {
-            if (editor.treeRoot.isDirectory()) return editor.treeRoot;
-            File parent = editor.treeRoot.getParentFile();
-            if (parent != null) return parent;
-        }
         FileBuffer buffer = editor.getCurrentBuffer();
         if (buffer != null && buffer.hasFilePath()) {
             File parent = new File(buffer.getFilePath()).getParentFile();
+            if (parent != null) return parent;
+        }
+        if (editor.treeRoot != null) {
+            if (editor.treeRoot.isDirectory()) return editor.treeRoot;
+            File parent = editor.treeRoot.getParentFile();
             if (parent != null) return parent;
         }
         return new File(".");
@@ -1041,6 +1153,12 @@ final class TreeGitController {
         if (buffer == null || !buffer.hasFilePath()) return;
         editor.clearGitBlameCache();
         String filePath = buffer.getFilePath();
+        File workingDirectory = gitWorkingDirectory().getAbsoluteFile();
+        if (!workingDirectory.equals(cachedGitWorkingDirectory)) {
+            cachedGitWorkingDirectory = workingDirectory;
+            cachedGitRoot = null;
+            cachedGitRootResolved = false;
+        }
         if (!cachedGitRootResolved) {
             cachedGitRoot = resolveGitRoot();
             cachedGitRootResolved = true;
@@ -1625,6 +1743,7 @@ final class TreeGitController {
                 + ":git workbench        Open graphical read-only changes/diff/hunk workbench\n"
                 + ":git conflict         Open graphical conflict-resolution document\n"
                 + ":git history          Open graphical local history and explicit remote controls\n"
+                + ":git worktrees|stash  Open graphical worktree and stash controls\n"
                 + ":git diff [args]      Show diff\n"
                 + ":git log [count]      Show compact history\n"
                 + ":git branch           Show branch list\n"

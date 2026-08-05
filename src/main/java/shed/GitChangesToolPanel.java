@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -22,6 +23,7 @@ import javax.swing.table.DefaultTableModel;
 
 final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     private final Texteditor editor;
+    private final ToolWindowHost host;
     private final JPanel panel = new JPanel(new BorderLayout(6, 6));
     private final JLabel repository = new JLabel("Repository: resolving…");
     private final JLabel state = new JLabel("Refresh to load changes.");
@@ -36,9 +38,12 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     private GitChangesWorkbenchModel.Diff selectedDiff;
     private long statusGeneration;
     private long diffGeneration;
+    private final javax.swing.Timer autoRefreshTimer;
+    private boolean statusLoading;
 
     GitChangesToolPanel(Texteditor editor, ToolWindowHost host) {
         this.editor = editor;
+        this.host = host;
         panel.setBorder(BorderFactory.createEmptyBorder(5, 7, 7, 7));
         panel.add(header(), BorderLayout.NORTH);
         panel.add(content(), BorderLayout.CENTER);
@@ -47,6 +52,8 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
         changeTable.getSelectionModel().addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) loadDiff(); });
         diff.setEditable(false);
         AccessibilitySupport.describe(changeTable, "Git changes", "Staged, unstaged, and untracked repository files.");
+        autoRefreshTimer = new javax.swing.Timer(editor.configManager.getGitAutoRefreshIntervalMs(), event -> refreshIfChanged());
+        autoRefreshTimer.start();
     }
 
     @Override public JPanel component() { return panel; }
@@ -78,6 +85,8 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
         fileActions.add(button("Unstage", this::unstage));
         fileActions.add(button("Revert", this::revert));
         fileActions.add(button("Branch…", this::switchBranch));
+        fileActions.add(button("Worktrees…", () -> editor.treeGitController.showGitRepositoryToolsDocument()));
+        fileActions.add(button("Stashes…", () -> editor.treeGitController.showGitRepositoryToolsDocument()));
         panel.add(fileActions, BorderLayout.WEST);
         JPanel commitActions = new JPanel(new BorderLayout(4, 0));
         commitActions.add(commit, BorderLayout.CENTER);
@@ -87,20 +96,40 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     @Override public void refresh() {
+        requestRefresh(false);
+    }
+
+    private void refreshIfChanged() {
+        int interval = editor.configManager.getGitAutoRefreshIntervalMs();
+        if (autoRefreshTimer.getDelay() != interval) {
+            autoRefreshTimer.setDelay(interval);
+            autoRefreshTimer.setInitialDelay(interval);
+        }
+        if (!editor.configManager.getGitAutoRefreshEnabled() || !panel.isShowing() || !host.isSelected(ToolWindowHost.Tab.GIT)) return;
+        requestRefresh(true);
+    }
+
+    private void requestRefresh(boolean automatic) {
+        if (statusLoading) return;
+        statusLoading = true;
         long request = ++statusGeneration;
-        state.setText("Refreshing Git status…");
+        if (!automatic) state.setText("Refreshing Git status…");
         editor.asyncJobService.submit("Git changes refresh", token -> editor.treeGitController.loadGitChangesWorkbench(), (job, result, error) -> {
             if (request != statusGeneration || !panel.isDisplayable()) return;
+            statusLoading = false;
             if (error != null || result == null) {
                 snapshot = null; visibleChanges.clear(); changes.setRowCount(0);
                 state.setText(error == null ? job.getErrorMessage() : error.getMessage());
                 return;
             }
-            render(result);
+            if (automatic && Objects.equals(snapshot, result)) return;
+            render(result, automatic);
         });
     }
 
-    private void render(GitChangesWorkbenchModel.Snapshot result) {
+    private void render(GitChangesWorkbenchModel.Snapshot result, boolean preserveSelection) {
+        GitChangesWorkbenchModel.Change previous = preserveSelection ? selected() : null;
+        String selectedPath = previous == null ? null : previous.path();
         snapshot = result; selectedDiff = null; visibleChanges.clear(); changes.setRowCount(0); diff.setText("");
         repository.setText(result.root().isBlank() ? "Repository: unavailable" : "Repository: " + result.root());
         state.setText(result.detail() + (result.branch().isBlank() ? "" : "  Branch: " + result.branch()));
@@ -108,6 +137,14 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
             if (!change.indexStatus().isBlank()) addChange("Staged", change.indexStatus(), change);
             if (!change.worktreeStatus().isBlank()) addChange("Changes", change.worktreeStatus(), change);
             if (change.indexStatus().isBlank() && change.worktreeStatus().isBlank()) addChange("Other", "", change);
+        }
+        if (selectedPath != null) {
+            for (int row = 0; row < visibleChanges.size(); row++) {
+                if (selectedPath.equals(visibleChanges.get(row).path())) {
+                    changeTable.setRowSelectionInterval(row, row);
+                    break;
+                }
+            }
         }
     }
 

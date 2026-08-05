@@ -205,10 +205,14 @@ This is lexical parsing, not a full compiler parser: custom grammar packs, macro
 | `git.history.enabled` | `true` | bool | Enables `:git history`, an asynchronous local-history document |
 | `git.remote.actions.enabled` | `true` | bool | Enables explicit Fetch, Pull (fast-forward only), and Push controls in `:git history` |
 | `git.panel.presentation.enabled` | `true` | bool | Enables all graphical Git documents while leaving command-mode Git commands available |
+| `git.auto.refresh.enabled` | `true` | bool | Refresh the visible Git Changes panel in the background when its status changes |
+| `git.auto.refresh.interval.ms` | `1500` | int | Visible-panel poll interval; `500`–`60000` ms |
 
 The changes document is effective only when `git.workbench.enabled`, `git.changes.enabled`, and `git.panel.presentation.enabled` are all `true`. Diff controls require `git.diffs.enabled`; direct `:git diff` remains available. Conflict and history documents each require their own key plus `git.panel.presentation.enabled`; direct `:git log` remains available. Remote controls further require `git.remote.actions.enabled` after the history document opens. `git.staging.enabled` blocks only index-mutating staging and unstaging commands, including hunk stage/unstage; commit, checkout, switch, and hunk revert retain their existing command-mode behaviour. `git.panel.presentation.enabled=false` blocks graphical documents only.
 
 `:git history` never starts network activity when opened or refreshed. Fetch requires its button click; Pull uses `git pull --ff-only` and Push each require a second confirmation. Each remote operation runs in a cancellable background job, exposes captured output or failure in the document, and can be disabled independently with `git.remote.actions.enabled`.
+
+`:git worktrees` and `:git stash` open the local repository tools. Creating/removing a linked worktree, creating a stash, applying/popping a stash, and dropping a stash each require explicit confirmation; no force-remove or force-drop path is exposed.
 
 ## GitHub Review Integration
 

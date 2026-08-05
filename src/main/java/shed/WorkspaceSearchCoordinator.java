@@ -19,11 +19,11 @@ final class WorkspaceSearchCoordinator {
         if (!validQuery(query)) {
             return "Usage: :grep <text>";
         }
-        Path root = workspaceRoot();
-        if (root == null) {
+        List<Path> roots = workspaceRoots();
+        if (roots.isEmpty()) {
             return "Workspace search requires a directory";
         }
-        String title = "grep " + query;
+        String title = "grep " + query + (roots.size() == 1 ? "" : " (" + roots.size() + " folders)");
         long request = ++activeRequest;
         boolean persistentIndexEnabled = editor.configManager.getWorkspaceIndexEnabled();
         List<QuickfixService.Entry> partialEntries = new ArrayList<>();
@@ -33,7 +33,7 @@ final class WorkspaceSearchCoordinator {
             token -> {
                 token.onCancel(cancellation::cancel);
                 WorkspaceIndexService index = new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
-                return new WorkspaceTextSearchService(index).search(persistentIndexEnabled, root, query, cancellation,
+                return new WorkspaceTextSearchService(index).search(persistentIndexEnabled, roots, query, cancellation,
                     matches -> SwingUtilities.invokeLater(() -> appendMatches(request, title, partialEntries, matches)));
             },
             (snapshot, result, error) -> complete(request, title, query, snapshot, result, error));
@@ -95,6 +95,13 @@ final class WorkspaceSearchCoordinator {
             }
         }
         return projectRoot.isDirectory() ? projectRoot.toPath() : null;
+    }
+
+    private List<Path> workspaceRoots() {
+        List<Path> roots = editor.workspaceController.roots();
+        if (!roots.isEmpty()) return roots;
+        Path root = workspaceRoot();
+        return root == null ? List.of() : List.of(root);
     }
 
     private static List<QuickfixService.Entry> entries(List<WorkspaceTextSearchService.Match> matches) {

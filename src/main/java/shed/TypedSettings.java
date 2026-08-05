@@ -442,6 +442,9 @@ final class TypedSettings {
             if ("minimap.width".equals(key) && number < 40) {
                 return key + " must be at least 40";
             }
+            if ("git.auto.refresh.interval.ms".equals(key) && (number < 500 || number > 60000)) {
+                return key + " must be between 500 and 60000";
+            }
             if ("recovery.retention.max.entries".equals(key) && (number < 1 || number > RecoveryJournal.MAX_ENTRIES)) {
                 return key + " must be between 1 and " + RecoveryJournal.MAX_ENTRIES;
             }

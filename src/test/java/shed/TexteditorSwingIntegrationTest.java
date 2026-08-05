@@ -144,6 +144,54 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void markdownPreviewTracksSourceScrollAndCaretUnlessDisabled() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-markdown-preview-scroll-sync");
+        Path file = tempDir.resolve("preview-scroll-sync.md");
+        Files.createDirectories(home);
+        StringBuilder markdown = new StringBuilder();
+        for (int index = 1; index <= 180; index++) {
+            markdown.append("## Section ").append(index).append("\n\nContent ").append(index).append("\n\n");
+        }
+        Files.writeString(file, markdown, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            EditorPane source = onEdt(editor::getActivePane);
+            assertEquals("Markdown preview opened", onEdt(() -> editor.commandHandler.execute("markdown preview")));
+            MarkdownPreviewPane preview = onEdt(() -> (MarkdownPreviewPane) editor.editorPanes.stream()
+                .filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow().getComponent());
+
+            onEdt(() -> {
+                javax.swing.JScrollBar sourceBar = source.getScrollPane().getVerticalScrollBar();
+                sourceBar.setValue(sourceBar.getMaximum() - sourceBar.getVisibleAmount());
+                return null;
+            });
+            flushEdt();
+            int sourceScrollPosition = onEdt(preview::getVerticalScrollPosition);
+            assertTrue(sourceScrollPosition > 0);
+
+            onEdt(() -> {
+                source.getTextArea().setCaretPosition(source.getTextArea().getDocument().getLength());
+                return null;
+            });
+            flushEdt();
+            assertTrue(onEdt(preview::getVerticalScrollPosition) >= sourceScrollPosition);
+            int caretScrollPosition = onEdt(preview::getVerticalScrollPosition);
+
+            onEdt(() -> {
+                editor.configManager.set("markdown.preview.scroll.sync", "false");
+                source.getScrollPane().getVerticalScrollBar().setValue(0);
+                return null;
+            });
+            flushEdt();
+            assertEquals(caretScrollPosition, onEdt(preview::getVerticalScrollPosition));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void quickfixJumpOpensTargetAndMovesCaret() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-quickfix");
@@ -515,6 +563,10 @@ public class TexteditorSwingIntegrationTest {
             throw new InvocationTargetException(result.error);
         }
         return result.value;
+    }
+
+    private static void flushEdt() throws Exception {
+        onEdt(() -> null);
     }
 
     private static final class EdtResult<T> {

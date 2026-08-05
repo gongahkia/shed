@@ -5,8 +5,14 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.junit.jupiter.api.io.TempDir;
 
 class SnippetServiceTest {
+
+    @TempDir
+    Path temporaryDirectory;
 
     private SnippetService service;
 
@@ -98,5 +104,22 @@ class SnippetServiceTest {
     void findExact_goSnippets() {
         assertNotNull(service.findExact(FileType.GO, "fn"));
         assertNotNull(service.findExact(FileType.GO, "ife"));
+    }
+
+    @Test
+    void loadsVsCodeCompatibleScopedAndGlobalSnippets() throws Exception {
+        Files.writeString(temporaryDirectory.resolve("java.json"), """
+            {"Log":{"prefix":["log","logger"],"body":["System.out.println(${1:value});","$0"],"description":"log"}}
+            """);
+        Files.writeString(temporaryDirectory.resolve("snippets.json"), """
+            {"Todo":{"prefix":"todo","body":"// TODO: ${1:detail}"}}
+            """);
+
+        SnippetService.LoadResult loaded = service.loadFromDirectory(temporaryDirectory);
+
+        assertEquals(3, loaded.loaded());
+        assertTrue(loaded.errors().isEmpty());
+        assertEquals("log", service.findExact(FileType.JAVA, "log").description);
+        assertNotNull(service.findExact(FileType.PYTHON, "todo"));
     }
 }

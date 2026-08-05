@@ -774,7 +774,10 @@ public class ConfigManager {
 
     public String getSnippetsDirectory() {
         String configured = getString("snippets.directory", defaultSnippetsDirectoryPath());
-        return configured == null || configured.isBlank() ? defaultSnippetsDirectoryPath() : configured.trim();
+        String value = configured == null || configured.isBlank() ? defaultSnippetsDirectoryPath() : configured.trim();
+        if (value.equals("~")) return System.getProperty("user.home");
+        if (value.startsWith("~/") || value.startsWith("~\\")) return Path.of(System.getProperty("user.home"), value.substring(2)).toString();
+        return value;
     }
 
     // Get tab size

@@ -7,6 +7,7 @@ This is the complete TOML configuration reference for `Shed`.
 | Path | Purpose |
 | :--- | :--- |
 | `~/.shed/config.toml` | Main user config file loaded at startup |
+| `~/.shed/snippets/` | User snippets in VS Code-shaped JSON files |
 | `~/.shed/plugins/` | User plugin directory (`.shed` + `.lua`) |
 | `~/.shed/sessions/` | Saved session/workspace data (default) |
 | `.shed.toml` | Optional per-project override file (nearest parent directory) |
@@ -62,6 +63,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `ui.font.size` | `0` | int | UI font size; `0` retains each system UI default size |
 | `terminal.font.family` | `Monospaced` | string | Terminal font family |
 | `terminal.font.size` | `14` | int | Terminal font size |
+| `snippets.directory` | `~/.shed/snippets` | path | User snippet directory; applies immediately |
 | `tab.size` | `4` | int | Tab width (`:set ts=` command clamps to `1..16`) |
 | `line.numbers` | `absolute` | enum | `none`, `absolute`, `relative`, `relativeabsolute` (`hybrid` alias supported) |
 | `show.current.line` | `true` | bool | Highlight active line |
@@ -132,6 +134,30 @@ Shed keeps an independent client for each `(extension, workspace root)` pair, so
 | `lsp.code.actions.enabled` | `true` | bool | Actions: code-action requests |
 | `lsp.command.execution.enabled` | `true` | bool | Actions: execute-command requests |
 | `lsp.formatting.enabled` | `true` | bool | Document-formatting requests |
+
+## Snippets
+
+Use **Open Snippets** in Settings or `:snippets open` to create and open `snippets.json`. Snippets reload when the completion menu, `Ctrl-j`, or `:snippets` next uses them; no restart is needed.
+
+`snippets.json` and `*.code-snippets` are global. A lowercase language file scopes snippets to that language (`java.json`, `python.json`, `typescript.json`, `markdown.json`); a snippet's optional comma-separated `scope` overrides that file scope. Shed accepts VS Code-shaped `prefix` (string or array), `body` (string or array), and `description` fields.
+
+```json
+{
+  "Print value": {
+    "prefix": "log",
+    "body": ["System.out.println(${1:value});", "$0"],
+    "description": "Print a value"
+  }
+}
+```
+
+Use `Ctrl-n` to select snippets alongside local and LSP completions, or type an exact trigger and press `Ctrl-j`. `$1` / `${1:default}` create ordered editable stops and `$0` is final; built-in variables include `TM_SELECTED_TEXT`, `TM_CURRENT_LINE`, `TM_CURRENT_WORD`, line-number, filename, path, directory, and workspace-name values. Choice syntax inserts its first value; transforms, shell interpolation, and linked mirrored placeholders are not supported.
+
+## Syntax Highlighting
+
+Shed uses cached, stateful lexical grammars for its built-in file types. It re-lexes from the changed line and reuses an unchanged suffix once lexical state stabilizes, so strings and block comments no longer leak keyword highlighting. HTML injects JavaScript in `<script>` and CSS in `<style>`; Markdown injects known fenced-code languages. LSP semantic tokens render on top when a server supports them.
+
+This is lexical parsing, not a full compiler parser: custom grammar packs, macro expansion, and template-expression parsing are out of scope. Highlighting remains disabled by the existing large-file guard above 750,000 characters, 20,000 lines, or large-file mode.
 
 ## Recovery Journal Policy
 
@@ -345,6 +371,7 @@ schema_version = 1
 "ui.font.size" = 0
 "terminal.font.family" = "Monospaced"
 "terminal.font.size" = 14
+"snippets.directory" = "~/.shed/snippets"
 "tab.size" = 4
 "line.numbers" = "relative"
 "show.current.line" = true

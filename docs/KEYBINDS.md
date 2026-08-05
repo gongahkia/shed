@@ -146,6 +146,9 @@ Enable ``multi.selection.enabled`` first. ``Ctrl+Shift+D`` adds the next matchin
 | Key-binds | Function |
 | :---: | :---: |
 | `ESC` | Exit to `Normal` mode |
+| `Ctrl-j` | Expand exact snippet trigger |
+| `Ctrl-n` | Open user/LSP/local completion |
+| `Tab` / `Shift-Tab` | Next / previous active snippet placeholder |
 | Any text | Insert text at cursor |
 
 ### `Visual` mode

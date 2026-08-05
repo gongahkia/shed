@@ -440,17 +440,11 @@ final class SyntaxUiController {
                 return;
             }
 
-            boolean[] masked = new boolean[text.length()];
             FileType fileType = buffer.getFileType();
-
-            highlightComments(text, fileType, masked);
-            highlightStrings(text, fileType, masked);
-            highlightNumbers(text, masked);
-            if (fileType == FileType.JAVA) {
-                highlightJavaAnnotations(text, masked);
+            for (GrammarHighlightService.Token token : editor.grammarHighlightService.highlight(buffer, text, fileType)) {
+                Color color = colorFor(token.scope());
+                if (color != null) editor.syntaxForegroundSpans.add(new SyntaxSpan(token.start(), token.end(), color));
             }
-            highlightScopeRules(text, fileType, masked);
-            highlightKeywords(text, syntaxKeywordsFor(fileType), masked);
             if (editor.configManager.getShowWhitespace()) {
                 Highlighter highlighter = editor.writingArea.getHighlighter();
                 highlightTrailingWhitespace(highlighter, text);
@@ -462,6 +456,19 @@ final class SyntaxUiController {
                 editor.perfService.recordDuration("syntax.highlight", started, detail);
             }
         }
+    }
+
+    private Color colorFor(GrammarHighlightService.Scope scope) {
+        return switch (scope) {
+            case KEYWORD -> editor.syntaxKeywordColor;
+            case STRING -> editor.syntaxStringColor;
+            case COMMENT -> editor.syntaxCommentColor;
+            case NUMBER -> editor.syntaxNumberColor;
+            case TYPE -> editor.configManager.getSyntaxTypeColor();
+            case FUNCTION -> editor.configManager.getSyntaxFunctionColor();
+            case CONSTANT -> editor.configManager.getSyntaxConstantColor();
+            case ANNOTATION -> editor.configManager.getSyntaxAnnotationColor();
+        };
     }
 
 

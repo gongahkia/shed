@@ -110,6 +110,7 @@ public class ConfigManager {
     private static final String DEFAULT_UPDATES_METADATA_URL = "";
     private static final String DEFAULT_UPDATES_METADATA_PUBLIC_KEY = "";
     private static final int DEFAULT_UPDATES_CHECK_TIMEOUT_MS = 5000;
+    private static final int DEFAULT_LANDING_REMOTE_TIMEOUT_MS = 5000;
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "config.toml";
     private static final String PROJECT_CONFIG_NAME = ".shed.toml";
@@ -227,6 +228,9 @@ public class ConfigManager {
         defineDefault("session.autoload", DEFAULT_SESSION_AUTOLOAD);
         defineDefault("session.dir", defaultSessionDirectoryPath());
         defineDefault("terminal.session.restore", DEFAULT_TERMINAL_SESSION_RESTORE);
+        defineDefault("landing.source", defaultLandingSourcePath());
+        defineDefault("landing.remote.cache.path", defaultLandingRemoteCachePath());
+        defineDefault("landing.remote.timeout.ms", DEFAULT_LANDING_REMOTE_TIMEOUT_MS);
         defineDefault("workspace.index.enabled", DEFAULT_WORKSPACE_INDEX_ENABLED);
         defineDefault("large.file.threshold.mb", DEFAULT_LARGE_FILE_THRESHOLD_MB);
         defineDefault("large.file.line.threshold", DEFAULT_LARGE_FILE_LINE_THRESHOLD);
@@ -330,6 +334,9 @@ public class ConfigManager {
             case "session.autoload" -> "Session name loaded at startup";
             case "session.dir" -> "Directory for saved sessions";
             case "terminal.session.restore" -> "Persist terminal panel working directories and restore fresh shells";
+            case "landing.source" -> "Local path, file URI, or explicitly configured HTTPS landing-page source";
+            case "landing.remote.cache.path" -> "Local file used to cache an HTTPS landing-page source";
+            case "landing.remote.timeout.ms" -> "HTTPS landing-page connection and request timeout";
             case "workspace.index.enabled" -> "Enable persisted Git-ignore-aware workspace indexing";
             case "large.file.threshold.mb" -> "Large-file size threshold in megabytes";
             case "large.file.line.threshold" -> "Large-file line-count threshold";
@@ -789,6 +796,20 @@ public class ConfigManager {
             return defaultSessionDirectoryPath();
         }
         return configured.trim();
+    }
+
+    public String getLandingSource() {
+        String configured = getString("landing.source", defaultLandingSourcePath());
+        return configured == null || configured.isBlank() ? defaultLandingSourcePath() : configured.trim();
+    }
+
+    public String getLandingRemoteCachePath() {
+        String configured = getString("landing.remote.cache.path", defaultLandingRemoteCachePath());
+        return configured == null || configured.isBlank() ? defaultLandingRemoteCachePath() : configured.trim();
+    }
+
+    public int getLandingRemoteTimeoutMs() {
+        return getInt("landing.remote.timeout.ms", DEFAULT_LANDING_REMOTE_TIMEOUT_MS);
     }
 
     public boolean getTerminalSessionRestoreEnabled() {
@@ -1482,6 +1503,14 @@ public class ConfigManager {
 
     private String defaultSessionDirectoryPath() {
         return Path.of(shedDirectoryPath).resolve(SHED_SESSIONS_NAME).toString();
+    }
+
+    private String defaultLandingSourcePath() {
+        return Path.of(shedDirectoryPath).resolve("landing.md").toString();
+    }
+
+    private String defaultLandingRemoteCachePath() {
+        return Path.of(shedDirectoryPath).resolve("landing.remote.md").toString();
     }
 
     private void restoreProjectOverrides() {

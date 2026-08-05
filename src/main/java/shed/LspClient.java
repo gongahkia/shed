@@ -1086,8 +1086,13 @@ public class LspClient {
 
         Map<String, Object> completionItem = new LinkedHashMap<>();
         completionItem.put("snippetSupport", featureSettings.snippets());
+        completionItem.put("commitCharacterSupport", Boolean.TRUE);
+        completionItem.put("preselectSupport", Boolean.TRUE);
+        completionItem.put("documentationFormat", List.of("plaintext"));
+        completionItem.put("resolveSupport", Map.of("properties", List.of("documentation", "detail", "additionalTextEdits")));
         Map<String, Object> completion = new LinkedHashMap<>();
         completion.put("completionItem", completionItem);
+        completion.put("contextSupport", Boolean.TRUE);
         Map<String, Object> hover = new LinkedHashMap<>();
         hover.put("contentFormat", List.of("plaintext"));
         Map<String, Object> semanticTokens = new LinkedHashMap<>();

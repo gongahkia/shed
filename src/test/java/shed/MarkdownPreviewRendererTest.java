@@ -66,7 +66,8 @@ public class MarkdownPreviewRendererTest {
 
             <ul><li>one</li><li>two</li></ul>
             <table><thead><tr><th>name</th></tr></thead><tbody><tr><td>value</td></tr></tbody></table>
-            <script>alert(1)</script><video src="movie.mp4"></video>
+            <a href="javascript:alert(1)">unsafe</a><img src="https://example.com/remote.png" alt="remote">
+            <script>alert(1)</script><style>body { color: red; }</style><video src="movie.mp4"></video>
             """;
 
         String html;
@@ -80,8 +81,11 @@ public class MarkdownPreviewRendererTest {
         assertTrue(html.contains("src=\"" + image.toUri().toASCIIString() + "\" alt=\"logo\" width=\"20%\""));
         assertTrue(html.contains("<ul><li>one</li><li>two</li></ul>"));
         assertTrue(html.contains("<table>"));
+        assertTrue(html.contains("[image unavailable: remote]"));
         assertFalse(html.contains("onclick="));
+        assertFalse(html.contains("href=\"javascript:"));
         assertFalse(html.contains("<script"));
+        assertFalse(html.contains("color: red;"));
         assertFalse(html.contains("<video"));
     }
 

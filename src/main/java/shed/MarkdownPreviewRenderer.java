@@ -44,10 +44,10 @@ final class MarkdownPreviewRenderer {
     private static final PolicyFactory RAW_HTML_POLICY = new HtmlPolicyBuilder()
         .allowElements("a", "b", "blockquote", "br", "code", "del", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6",
             "hr", "i", "img", "input", "li", "ol", "p", "pre", "s", "span", "strong", "sub", "sup", "table", "tbody", "td",
-            "th", "thead", "tr", "u", "ul")
+            "th", "thead", "tr", "u", "ul", "section")
         .allowWithoutAttributes("a", "b", "blockquote", "br", "code", "del", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6",
             "hr", "i", "img", "input", "li", "ol", "p", "pre", "s", "span", "strong", "sub", "sup", "table", "tbody", "td",
-            "th", "thead", "tr", "u", "ul")
+            "th", "thead", "tr", "u", "ul", "section")
         .allowAttributes("class", "id").globally()
         .allowAttributes("align").onElements("div", "p", "img", "table", "td", "th")
         .allowAttributes("colspan", "rowspan").onElements("td", "th")

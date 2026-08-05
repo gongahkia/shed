@@ -22,11 +22,14 @@ import org.commonmark.ext.task.list.items.TaskListItemsExtension;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
 import org.commonmark.renderer.html.UrlSanitizer;
+import org.owasp.html.HtmlPolicyBuilder;
+import org.owasp.html.PolicyFactory;
 
 final class MarkdownPreviewRenderer {
     private static final Pattern FENCE = Pattern.compile("^(\\s{0,3})(`{3,}|~{3,})\\s*([^\\s`]*)[^`]*$");
     private static final Pattern IMAGE_TAG = Pattern.compile("<img\\s+([^>]*?)/?>");
     private static final Pattern ATTRIBUTE = Pattern.compile("\\b([A-Za-z][A-Za-z0-9-]*)=\"([^\"]*)\"");
+    private static final Pattern IMAGE_DIMENSION = Pattern.compile("(?:[1-9][0-9]{0,3}%|[1-9][0-9]{0,3})");
     private static final List<Extension> EXTENSIONS = List.of(
         AutolinkExtension.create(), FootnotesExtension.create(), AlertsExtension.create(), StrikethroughExtension.create(),
         TablesExtension.create(), HeadingAnchorExtension.create(), TaskListItemsExtension.create()
@@ -36,8 +39,23 @@ final class MarkdownPreviewRenderer {
         @Override public String sanitizeImageUrl(String url) { return safeUrl(url); }
     };
     private static final Parser PARSER = Parser.builder().extensions(EXTENSIONS).build();
-    private static final HtmlRenderer HTML = HtmlRenderer.builder().extensions(EXTENSIONS).escapeHtml(true)
+    private static final HtmlRenderer HTML = HtmlRenderer.builder().extensions(EXTENSIONS).escapeHtml(false)
         .sanitizeUrls(true).urlSanitizer(PREVIEW_URL_SANITIZER).build();
+    private static final PolicyFactory RAW_HTML_POLICY = new HtmlPolicyBuilder()
+        .allowElements("a", "b", "blockquote", "br", "code", "del", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6",
+            "hr", "i", "img", "input", "li", "ol", "p", "pre", "s", "span", "strong", "sub", "sup", "table", "tbody", "td",
+            "th", "thead", "tr", "u", "ul")
+        .allowWithoutAttributes("a", "b", "blockquote", "br", "code", "del", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6",
+            "hr", "i", "img", "input", "li", "ol", "p", "pre", "s", "span", "strong", "sub", "sup", "table", "tbody", "td",
+            "th", "thead", "tr", "u", "ul")
+        .allowAttributes("class", "id").globally()
+        .allowAttributes("align").onElements("div", "p", "img", "table", "td", "th")
+        .allowAttributes("colspan", "rowspan").onElements("td", "th")
+        .allowAttributes("href", "rel", "title").onElements("a")
+        .allowAttributes("src", "alt", "width", "height", "title").onElements("img")
+        .allowAttributes("type", "checked", "disabled").onElements("input")
+        .allowUrlProtocols("http", "https", "mailto", "file")
+        .toFactory();
 
     private MarkdownPreviewRenderer() {}
 
@@ -48,7 +66,7 @@ final class MarkdownPreviewRenderer {
         Color safeBackground = background == null ? Color.WHITE : background;
         Color safeForeground = foreground == null ? Color.BLACK : foreground;
         String prepared = prepare(markdown == null ? "" : markdown, assets, safeForeground);
-        String body = restrictImageSources(HTML.render(PARSER.parse(prepared)), sourceFile);
+        String body = restrictImageSources(RAW_HTML_POLICY.sanitize(HTML.render(PARSER.parse(prepared))), sourceFile);
         return "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + escapeHtml(safeTitle) + "</title><style>"
             + "body{margin:0;padding:22px 26px;font-family:'" + escapeCss(safeFont.getFamily()) + "';font-size:"
             + Math.max(8, safeFont.getSize()) + "pt;line-height:1.5;background:" + colorHex(safeBackground) + ";color:"
@@ -226,10 +244,13 @@ final class MarkdownPreviewRenderer {
             String attributes = images.group(1);
             String source = attribute(attributes, "src");
             String alt = attribute(attributes, "alt");
+            String width = imageDimension(attribute(attributes, "width"));
+            String height = imageDimension(attribute(attributes, "height"));
             String local = resolveLocalImage(source, sourceFile);
             String replacement = local == null
                 ? "<span class=\"blocked-image\">[image unavailable: " + escapeHtml(alt == null ? "image" : alt) + "]</span>"
-                : "<img src=\"" + escapeAttribute(local) + "\" alt=\"" + escapeAttribute(alt == null ? "" : alt) + "\">";
+                : "<img src=\"" + escapeAttribute(local) + "\" alt=\"" + escapeAttribute(alt == null ? "" : alt) + "\""
+                    + (width == null ? "" : " width=\"" + width + "\"") + (height == null ? "" : " height=\"" + height + "\"") + ">";
             images.appendReplacement(output, Matcher.quoteReplacement(replacement));
         }
         images.appendTail(output);
@@ -262,6 +283,10 @@ final class MarkdownPreviewRenderer {
             if (key.equalsIgnoreCase(matcher.group(1))) return matcher.group(2);
         }
         return null;
+    }
+
+    private static String imageDimension(String value) {
+        return value != null && IMAGE_DIMENSION.matcher(value).matches() ? value : null;
     }
 
     private static String safeUrl(String value) {

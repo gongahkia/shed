@@ -50,6 +50,10 @@ public class ConfigManager {
     private static final String DEFAULT_COLOR_REPLACE = "#4B2F3A";
     private static final String DEFAULT_FONT_FAMILY = "Monospaced";
     private static final int DEFAULT_FONT_SIZE = 16;
+    private static final String DEFAULT_UI_FONT_FAMILY = "";
+    private static final int DEFAULT_UI_FONT_SIZE = 0;
+    private static final String DEFAULT_TERMINAL_FONT_FAMILY = "Monospaced";
+    private static final int DEFAULT_TERMINAL_FONT_SIZE = 14;
     private static final int DEFAULT_TAB_SIZE = 4;
     private static final KeymapProfile DEFAULT_KEYMAP_PROFILE = KeymapProfile.VIM;
     private static final LineNumberMode DEFAULT_LINE_NUMBER_MODE = LineNumberMode.ABSOLUTE;
@@ -214,6 +218,10 @@ public class ConfigManager {
         defineDefault("theme", DEFAULT_THEME);
         defineDefault("font.family", DEFAULT_FONT_FAMILY);
         defineDefault("font.size", DEFAULT_FONT_SIZE);
+        defineDefault("ui.font.family", DEFAULT_UI_FONT_FAMILY);
+        defineDefault("ui.font.size", DEFAULT_UI_FONT_SIZE);
+        defineDefault("terminal.font.family", DEFAULT_TERMINAL_FONT_FAMILY);
+        defineDefault("terminal.font.size", DEFAULT_TERMINAL_FONT_SIZE);
         defineDefault("tab.size", DEFAULT_TAB_SIZE);
         defineDefault(KeymapProfile.CONFIG_KEY, DEFAULT_KEYMAP_PROFILE.configValue());
         defineDefault("line.numbers", DEFAULT_LINE_NUMBER_MODE.toConfigValue());
@@ -320,6 +328,10 @@ public class ConfigManager {
             case "theme" -> "Built-in theme identifier";
             case "font.family" -> "Editor font family";
             case "font.size" -> "Editor font size";
+            case "ui.font.family" -> "Application UI font family; empty uses the system UI font";
+            case "ui.font.size" -> "Application UI font size; zero uses each system UI default size";
+            case "terminal.font.family" -> "Terminal font family";
+            case "terminal.font.size" -> "Terminal font size";
             case "tab.size" -> "Tab width in spaces";
             case "keymap.profile" -> "Input keymap profile";
             case "line.numbers" -> "Line number display mode";
@@ -731,6 +743,22 @@ public class ConfigManager {
     // Get font size
     public int getFontSize() {
         return getInt("font.size", DEFAULT_FONT_SIZE);
+    }
+
+    public String getUiFontFamily() {
+        return getString("ui.font.family", DEFAULT_UI_FONT_FAMILY);
+    }
+
+    public int getUiFontSize() {
+        return getInt("ui.font.size", DEFAULT_UI_FONT_SIZE);
+    }
+
+    public String getTerminalFontFamily() {
+        return getString("terminal.font.family", DEFAULT_TERMINAL_FONT_FAMILY);
+    }
+
+    public int getTerminalFontSize() {
+        return getInt("terminal.font.size", DEFAULT_TERMINAL_FONT_SIZE);
     }
 
     // Get tab size

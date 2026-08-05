@@ -20,7 +20,7 @@ final class TerminalController {
         String title = nextTerminalTitle();
         PtyTerminalPane terminalPane;
         try {
-            terminalPane = PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveEditorFont());
+            terminalPane = PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont());
         } catch (IOException e) {
             return "Terminal failed: " + e.getMessage();
         }
@@ -137,7 +137,7 @@ final class TerminalController {
 
 
     private void installRestoredTerminal(EditorPane pane, File workingDirectory) throws IOException {
-        PtyTerminalPane terminalPane = PtyTerminalPane.open(workingDirectory, editor.configManager, editor.resolveEditorFont());
+        PtyTerminalPane terminalPane = PtyTerminalPane.open(workingDirectory, editor.configManager, editor.resolveTerminalFont());
         FileBuffer terminalBuffer = FileBuffer.createScratch(nextTerminalTitle(), "");
         editor.buffers.add(terminalBuffer);
         pane.setBuffer(terminalBuffer);

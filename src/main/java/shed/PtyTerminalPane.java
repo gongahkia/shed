@@ -35,7 +35,7 @@ final class PtyTerminalPane implements AutoCloseable {
         this.workingDirectory = workingDirectory;
     }
 
-    static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font editorFont) throws IOException {
+    static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font terminalFont) throws IOException {
         List<String> command = ShellCommand.interactiveCommand();
         File cwd = normalizeDirectory(workingDirectory);
         Map<String, String> env = new HashMap<>(System.getenv());
@@ -52,7 +52,7 @@ final class PtyTerminalPane implements AutoCloseable {
             .start();
 
         PtyTerminalConnector connector = new PtyTerminalConnector(process, command, StandardCharsets.UTF_8);
-        JediTermWidget widget = new JediTermWidget(INITIAL_COLUMNS, INITIAL_ROWS, new ShedTerminalSettingsProvider(configManager, editorFont));
+        JediTermWidget widget = new JediTermWidget(INITIAL_COLUMNS, INITIAL_ROWS, new ShedTerminalSettingsProvider(configManager, terminalFont));
         widget.setTtyConnector(connector);
         widget.start();
         return new PtyTerminalPane(widget, connector, process, cwd);
@@ -110,10 +110,10 @@ final class PtyTerminalPane implements AutoCloseable {
         private final TextStyle selectionColor;
         private final ColorPalette colorPalette;
 
-        ShedTerminalSettingsProvider(ConfigManager configManager, Font editorFont) {
-            int size = configManager == null ? 14 : configManager.getFontSize();
-            String family = configManager == null ? "Monospaced" : configManager.getFontFamily();
-            Font resolvedFont = editorFont == null ? null : editorFont.deriveFont(Font.PLAIN, (float) size);
+        ShedTerminalSettingsProvider(ConfigManager configManager, Font terminalFont) {
+            int size = configManager == null ? 14 : configManager.getTerminalFontSize();
+            String family = configManager == null ? "Monospaced" : configManager.getTerminalFontFamily();
+            Font resolvedFont = terminalFont == null ? null : terminalFont.deriveFont(Font.PLAIN, (float) size);
             this.font = resolvedFont == null
                 ? new Font(family == null || family.isBlank() ? "Monospaced" : family, Font.PLAIN, size)
                 : resolvedFont;

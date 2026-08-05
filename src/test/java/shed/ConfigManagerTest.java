@@ -50,6 +50,12 @@ public class ConfigManagerTest {
         ConfigManager config = new ConfigManager();
 
         assertEquals(4, config.getTabSize());
+        assertEquals("Monospaced", config.getFontFamily());
+        assertEquals(16, config.getFontSize());
+        assertEquals("", config.getUiFontFamily());
+        assertEquals(0, config.getUiFontSize());
+        assertEquals("Monospaced", config.getTerminalFontFamily());
+        assertEquals(14, config.getTerminalFontSize());
         assertEquals(KeymapProfile.VIM, config.getKeymapProfile());
         assertEquals(LineNumberMode.ABSOLUTE, config.getLineNumberMode());
         assertTrue(config.getHighlightSearch());
@@ -135,6 +141,29 @@ public class ConfigManagerTest {
         assertEquals("landing.remote.timeout.ms must be between 1000 and 30000",
             config.validateSettingValue("landing.remote.timeout.ms", "999"));
         assertFalse(config.isProjectConfigKeyAllowed("landing.source"));
+    }
+
+    @Test
+    void configuresUiBufferAndTerminalFonts() {
+        Path home = tempDir.resolve("home-fonts");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.set("font.family", "Fira Code");
+        config.set("font.size", "15");
+        config.set("ui.font.family", "SF Pro Text");
+        config.set("ui.font.size", "13");
+        config.set("terminal.font.family", "JetBrains Mono");
+        config.set("terminal.font.size", "12");
+
+        assertEquals("Fira Code", config.getFontFamily());
+        assertEquals(15, config.getFontSize());
+        assertEquals("SF Pro Text", config.getUiFontFamily());
+        assertEquals(13, config.getUiFontSize());
+        assertEquals("JetBrains Mono", config.getTerminalFontFamily());
+        assertEquals(12, config.getTerminalFontSize());
+        assertEquals("ui.font.size must be non-negative", config.validateSettingValue("ui.font.size", "-1"));
+        assertEquals("terminal.font.size must be at least 1", config.validateSettingValue("terminal.font.size", "0"));
     }
 
     @Test

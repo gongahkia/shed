@@ -39,7 +39,8 @@ final class WorkspaceController {
             case "open" -> add(value, true);
             case "remove", "rm" -> remove(value);
             case "switch", "use" -> activate(value, true);
-            default -> "Usage: :workspace [list|ui|add <folder>|open <folder>|remove <folder|index>|switch <folder|index>|save|load|index]";
+            case "symbols", "sym" -> editor.showWorkspaceSymbols(value);
+            default -> "Usage: :workspace [list|ui|add <folder>|open <folder>|remove <folder|index>|switch <folder|index>|symbols <query>]";
         };
     }
 

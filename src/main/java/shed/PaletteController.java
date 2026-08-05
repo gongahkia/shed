@@ -76,7 +76,7 @@ final class PaletteController {
     WorkspaceReplaceCoordinator workspaceReplaceCoordinator() { return workspaceReplaceCoordinator; }
 
 
-    public String showSymbols(String argument) {
+    String showHeuristicSymbols(String argument) {
         FileBuffer buffer = editor.getCurrentBuffer();
         if (buffer == null) {
             return "No buffer";
@@ -121,6 +121,28 @@ final class PaletteController {
         return editor.gotoLine(selected.getLine());
     }
 
+    String showLspSymbols(List<LspClient.NavigationSymbol> symbols, String argument, boolean workspace) {
+        if (symbols == null || symbols.isEmpty()) return "No symbols found";
+        String query = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
+        Map<String, LspClient.NavigationSymbol> candidates = new LinkedHashMap<>();
+        for (LspClient.NavigationSymbol symbol : symbols) {
+            if (symbol == null || symbol.getName().isBlank()) continue;
+            String haystack = (symbol.getName() + " " + symbol.getDetail() + " " + symbolKind(symbol.getKind())).toLowerCase(Locale.ROOT);
+            if (!query.isEmpty() && !haystack.contains(query)) continue;
+            String candidate = formatLspSymbolCandidate(symbol, workspace);
+            int duplicate = 2;
+            String unique = candidate;
+            while (candidates.containsKey(unique)) unique = candidate + "  [#" + duplicate++ + "]";
+            candidates.put(unique, symbol);
+        }
+        if (candidates.isEmpty()) return "No symbols matched: " + query;
+        String selection = showPaletteDialog(workspace ? "Workspace Symbols" : "Symbols", new ArrayList<>(candidates.keySet()),
+            value -> describeLspSymbol(value, candidates));
+        if (selection == null || selection.isEmpty()) return "Symbols cancelled";
+        LspClient.NavigationSymbol selected = candidates.get(selection);
+        return selected == null ? "Invalid symbol selection" : editor.openLspSymbol(selected);
+    }
+
 
     String formatSymbolCandidate(SymbolService.Symbol symbol) {
         StringBuilder indent = new StringBuilder();
@@ -132,6 +154,48 @@ final class PaletteController {
             symbol.getKind(),
             indent,
             symbol.getName());
+    }
+
+    private String formatLspSymbolCandidate(LspClient.NavigationSymbol symbol, boolean workspace) {
+        StringBuilder indent = new StringBuilder();
+        for (int i = 1; i < symbol.getLevel(); i++) indent.append("  ");
+        String detail = symbol.getDetail().isBlank() ? "" : "  " + symbol.getDetail();
+        String path = workspace ? "  " + displayUriPath(symbol.getUri()) : "";
+        return String.format("%4d  %-10s  %s%s%s%s", symbol.getLine() + 1, symbolKind(symbol.getKind()), indent,
+            symbol.getName(), detail, path);
+    }
+
+    private String describeLspSymbol(String selection, Map<String, LspClient.NavigationSymbol> candidates) {
+        LspClient.NavigationSymbol symbol = candidates.get(selection);
+        if (symbol == null) return selection == null ? "Select a symbol to jump." : selection;
+        String detail = symbol.getDetail().isBlank() ? "" : "\n" + symbol.getDetail();
+        return "Line " + (symbol.getLine() + 1) + " [" + symbolKind(symbol.getKind()) + "]" + detail + "\n" + displayUriPath(symbol.getUri());
+    }
+
+    private static String symbolKind(int kind) {
+        return switch (kind) {
+            case 5 -> "class";
+            case 6 -> "method";
+            case 7 -> "property";
+            case 8 -> "field";
+            case 11 -> "interface";
+            case 12 -> "function";
+            case 13 -> "variable";
+            case 22 -> "enum";
+            case 23 -> "constructor";
+            case 24 -> "namespace";
+            default -> "symbol";
+        };
+    }
+
+    private static String displayUriPath(String uri) {
+        if (uri == null || uri.isBlank()) return "";
+        try {
+            java.net.URI parsed = java.net.URI.create(uri);
+            if ("file".equalsIgnoreCase(parsed.getScheme())) return new File(parsed).getPath();
+        } catch (Exception ignored) {
+        }
+        return uri;
     }
 
 
@@ -405,6 +469,9 @@ final class PaletteController {
             case "diag":
             case "ldiag":
                 return "Push diagnostics into quickfix.";
+            case "problems":
+            case "problem":
+                return "Open unified LSP and quickfix problems.";
             case "dnext":
             case "dn":
                 return "Jump to next diagnostic.";
@@ -413,7 +480,7 @@ final class PaletteController {
                 return "Jump to previous diagnostic.";
             case "symbols":
             case "sym":
-                return "Open symbol picker and jump by class/function/heading.";
+                return "Open LSP symbol picker, with local fallback.";
             case "registers":
             case "reg":
                 return "Show register contents.";

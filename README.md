@@ -17,7 +17,7 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 * Sensible defaults out-of-the-box
 * First-class [Vim Bindings](./docs/KEYBINDS.md)
 * Highly customisable via [`~/.shed/config.toml`](./docs/CONFIG.md)
-* VS Code-shaped snippets, interactive LSP completion, and incremental lexical highlighting
+* VS Code-shaped snippets, interactive LSP completion, on-demand LSP symbol navigation, and incremental lexical highlighting
 * Rich [Command](./docs/COMMANDS.md) Palette
 * Extensible [Plugin](./docs/PLUGINS.md) System
 * No telemetry; app-owned network paths require explicit action or consent ([boundary audit](./docs/NETWORK_PRIVACY.md))

@@ -193,6 +193,9 @@ Notes:
 | `:cc` | Jump to current quickfix entry |
 | `:cc <index>` | Jump to one-based quickfix entry index |
 | `:diagnostics`, `:diag`, `:ldiag` | Push current-buffer LSP diagnostics into quickfix |
+| `:problems`, `:problems ui` | Open the docked, detachable Problems view of live LSP diagnostics plus retained quickfix producers |
+| `:problems text` | Open the current aggregated Problems list as a scratch buffer |
+| `:problems all\|errors\|warnings\|info\|hints\|other` | Open Problems with a severity filter |
 | `:dnext`, `:dn` | Jump to next diagnostic |
 | `:dprev`, `:dp` | Jump to previous diagnostic |
 
@@ -246,7 +249,8 @@ Notes:
 
 | Command | Action |
 | :--- | :--- |
-| `:symbols [query]`, `:sym [query]` | Symbol picker for current buffer |
+| `:symbols [query]`, `:sym [query]` | Asynchronous LSP document-symbol picker for the current file; falls back to local heuristics when unavailable |
+| `:workspace symbols <query>`, `:workspace sym <query>` | Explicit asynchronous query across active LSP workspace servers; no background symbol index is built |
 | `:45` | Go to line 45 (any numeric command) |
 
 ## Git Commands

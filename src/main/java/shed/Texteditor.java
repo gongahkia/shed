@@ -82,12 +82,14 @@ public class Texteditor extends JFrame implements KeyListener {
     BackupScheduler backupScheduler;
     UpdateController updateController;
     QuickfixService quickfixService;
+    ProblemsService problemsService;
     PluginManager pluginManager;
     TreeGitController treeGitController;
     GitHubCapabilityController gitHubCapabilityController;
     LspController lspController;
     DebugSessionController debugSessionController;
     JobQuickfixController jobQuickfixController;
+    ProblemsController problemsController;
     TerminalController terminalController;
     MarkdownController markdownController;
     PaneBufferController paneBufferController;
@@ -239,7 +241,9 @@ public class Texteditor extends JFrame implements KeyListener {
         gitHubCapabilityController = new GitHubCapabilityController(this);
         updateController = new UpdateController(this);
         quickfixService = new QuickfixService();
+        problemsService = new ProblemsService();
         jobQuickfixController = new JobQuickfixController(this);
+        problemsController = new ProblemsController(this, problemsService);
         editorState = new EditorState();
         modeEngine = new ModeEngine();
         buffers = new ArrayList<>();
@@ -1365,7 +1369,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("tree"); commands.add("git"); commands.add("grep"); commands.add("copen");
         commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
         commands.add("lsp"); commands.add("debug"); commands.add("dap"); commands.add("definition"); commands.add("hover"); commands.add("references");
-        commands.add("diagnostics"); commands.add("diag"); commands.add("dnext"); commands.add("dprev"); commands.add("symbols"); commands.add("sym");
+        commands.add("diagnostics"); commands.add("diag"); commands.add("problems"); commands.add("dnext"); commands.add("dprev"); commands.add("symbols"); commands.add("sym");
         commands.add("registers"); commands.add("yankring"); commands.add("marks"); commands.add("zen"); commands.add("goyo"); commands.add("limelight"); commands.add("normal");
         commands.add("reload"); commands.add("source"); commands.add("clean"); commands.add("shedclean");
         commands.add("noh"); commands.add("split");
@@ -1840,7 +1844,27 @@ public class Texteditor extends JFrame implements KeyListener {
     WorkspaceReplaceCoordinator workspaceReplaceCoordinator() { return paletteController.workspaceReplaceCoordinator(); }
 
     public String showSymbols(String argument) {
-        return paletteController.showSymbols(argument);
+        return lspController.showSymbols(argument);
+    }
+
+    public String showWorkspaceSymbols(String argument) {
+        return lspController.showWorkspaceSymbols(argument);
+    }
+
+    String showHeuristicSymbols(String argument) {
+        return paletteController.showHeuristicSymbols(argument);
+    }
+
+    String showLspSymbols(List<LspClient.NavigationSymbol> symbols, String query, boolean workspace) {
+        return paletteController.showLspSymbols(symbols, query, workspace);
+    }
+
+    String openLspSymbol(LspClient.NavigationSymbol symbol) {
+        return lspController.openLspSymbol(symbol);
+    }
+
+    public String handleProblemsCommand(String argument) {
+        return problemsController.handleCommand(argument);
     }
 
     String formatSymbolCandidate(SymbolService.Symbol symbol) {

@@ -118,6 +118,12 @@ final class TestController {
         return "Selected test adapter is unavailable";
     }
 
+    private String runId(Path root, String id) {
+        if (id == null || id.isBlank()) return "Test id required";
+        for (TestService.TestCase test : state(root).tests) if (id.equals(test.id())) return runSelection(root, test);
+        return "Test not found: " + id;
+    }
+
     String rerunFailed(Path root) {
         State state = state(root);
         Map<String, List<TestService.TestCase>> failed = new LinkedHashMap<>();

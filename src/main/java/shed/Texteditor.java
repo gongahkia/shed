@@ -146,6 +146,8 @@ public class Texteditor extends JFrame implements KeyListener {
     boolean reloadPromptActive;
     List<Object> syntaxHighlightTags;
     List<SyntaxSpan> syntaxForegroundSpans;
+    List<SyntaxSpan> lspSemanticSpans;
+    List<LspInlayHintOverlay> lspInlayHintOverlays;
     Color syntaxKeywordColor;
     Color syntaxStringColor;
     Color syntaxCommentColor;
@@ -168,10 +170,9 @@ public class Texteditor extends JFrame implements KeyListener {
     boolean insertNormalOneShot;
     final List<MultiSelection> extraSelections = new ArrayList<>();
     final List<Object> extraSelectionHighlightTags = new ArrayList<>();
-    Map<String, LspClient> lspClients;
-    Map<String, Path> lspClientRoots;
+    Map<LspServerKey, LspClient> lspClients;
     Map<String, Integer> lspDocumentVersions;
-    Map<String, String> lspErrors;
+    Map<LspServerKey, String> lspErrors;
     List<LspClient.TextEdit> pendingLspRenameEdits;
     String pendingLspRenameTarget;
     LspClient.CodeAction pendingLspCodeAction;
@@ -272,6 +273,8 @@ public class Texteditor extends JFrame implements KeyListener {
         recoverySnapshotTimer = null;
         syntaxHighlightTags = new ArrayList<>();
         syntaxForegroundSpans = new ArrayList<>();
+        lspSemanticSpans = new ArrayList<>();
+        lspInlayHintOverlays = new ArrayList<>();
         syntaxKeywordColor = configManager.getSyntaxKeywordColor();
         syntaxStringColor = configManager.getSyntaxStringColor();
         syntaxCommentColor = configManager.getSyntaxCommentColor();
@@ -293,7 +296,6 @@ public class Texteditor extends JFrame implements KeyListener {
         pendingSurroundTarget = null;
         insertNormalOneShot = false;
         lspClients = new HashMap<>();
-        lspClientRoots = new HashMap<>();
         lspDocumentVersions = new HashMap<>();
         lspErrors = new HashMap<>();
         pendingLspRenameEdits = null;
@@ -2126,6 +2128,10 @@ public class Texteditor extends JFrame implements KeyListener {
         lspController.syncLspChange(buffer);
     }
 
+    void syncLspChange(FileBuffer buffer, int offset, int removedLength, String insertedText) {
+        lspController.syncLspChange(buffer, offset, removedLength, insertedText);
+    }
+
     void flushLspChange(FileBuffer buffer) {
         lspController.flushPendingLspChange(buffer);
     }
@@ -2136,6 +2142,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void scheduleDiagnosticRefresh() {
         lspController.scheduleDiagnosticRefresh();
+    }
+
+    void refreshLspDecorations() {
+        lspController.refreshLspDecorations();
     }
 
     public void notifyCurrentBufferSaved() {
@@ -2392,8 +2402,8 @@ public class Texteditor extends JFrame implements KeyListener {
         editorUiController.appendLspStatus(status, buffer);
     }
 
-    void handleDocumentChange() {
-        paneBufferController.handleDocumentChange();
+    void handleDocumentChange(DocumentEvent event) {
+        paneBufferController.handleDocumentChange(event);
     }
 
     void scheduleIdleBackup(FileBuffer buffer) {
@@ -3040,6 +3050,14 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void paintSyntaxForegroundOverlay(Graphics g, JTextArea area) {
         editorUiController.paintSyntaxForegroundOverlay(g, area);
+    }
+
+    void paintLspSemanticOverlay(Graphics g, JTextArea area) {
+        editorUiController.paintLspSemanticOverlay(g, area);
+    }
+
+    void paintLspInlayHintOverlay(Graphics g, JTextArea area) {
+        editorUiController.paintLspInlayHintOverlay(g, area);
     }
 
     public void closeEditor() {

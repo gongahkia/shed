@@ -3,6 +3,7 @@ package shed;
 import javax.swing.*;
 import javax.swing.Timer;
 import javax.swing.text.BadLocationException;
+import java.awt.Color;
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -17,10 +18,16 @@ import java.util.List;
 
 final class LspController {
     private static final int CHANGE_DEBOUNCE_MS = 120;
+    private static final int DECORATION_DEBOUNCE_MS = 350;
+    private static final int MAX_INLINE_INLAY_HINTS = 160;
     private final Texteditor editor;
     private final ManagedLanguageSupportService managedLanguageSupport;
+    private final Map<String, LspDocumentSyncState> documentSyncStates = new HashMap<>();
     private Timer lspChangeTimer;
     private FileBuffer pendingLspChange;
+    private Timer lspDecorationTimer;
+    private FileBuffer pendingLspDecoration;
+    private int lspDecorationJobId = -1;
 
     LspController(Texteditor editor) {
         this.editor = editor;
@@ -64,8 +71,7 @@ final class LspController {
                 }
             }
         } else if (buffer != null) {
-            String extension = bufferExtension(buffer);
-            fallbackReason = editor.lspErrors.get(extension);
+            fallbackReason = lspErrorFor(buffer);
         }
 
         if (completions.isEmpty()) {
@@ -160,12 +166,12 @@ final class LspController {
             sb.append("No LSP servers active.\n");
             sb.append("Open a file with a configured language to start a server.\n");
         }
-        for (Map.Entry<String, LspClient> entry : editor.lspClients.entrySet()) {
-            String ext = entry.getKey();
+        for (Map.Entry<LspServerKey, LspClient> entry : editor.lspClients.entrySet()) {
+            LspServerKey key = entry.getKey();
             LspClient client = entry.getValue();
-            sb.append("  .").append(ext).append("  ");
+            sb.append("  ").append(key.displayName()).append("  ");
             sb.append(client.isAlive() ? "running" : "stopped");
-            Path root = editor.lspClientRoots.get(ext);
+            Path root = key.workspaceRoot();
             if (root != null) {
                 sb.append("  ").append(root);
             }
@@ -178,9 +184,11 @@ final class LspController {
         }
         if (!editor.lspErrors.isEmpty()) {
             sb.append("\nErrors:\n");
-            for (Map.Entry<String, String> entry : editor.lspErrors.entrySet()) {
-                String ext = entry.getKey().isEmpty() ? "(no ext)" : "." + entry.getKey();
-                sb.append("  ").append(ext).append(": ").append(entry.getValue()).append("\n");
+            for (Map.Entry<LspServerKey, String> entry : editor.lspErrors.entrySet()) {
+                LspServerKey key = entry.getKey();
+                sb.append("  ").append(key.displayName());
+                if (key.workspaceRoot() != null) sb.append("  ").append(key.workspaceRoot());
+                sb.append(": ").append(entry.getValue()).append("\n");
             }
         }
         sb.append("\nManaged support: :lsp manage (detect/install/update/remove/retry/manual)\n");
@@ -192,35 +200,33 @@ final class LspController {
     public String lspRestart(String ext) {
         String extension = ext.isEmpty() ? currentBufferExtension() : ext.replace(".", "").toLowerCase();
         if (extension.isEmpty()) return "No extension specified and no file open";
-        LspClient existing = editor.lspClients.remove(extension);
-        editor.lspClientRoots.remove(extension);
-        if (existing != null) existing.stop();
-        editor.lspErrors.remove(extension);
+        int stopped = stopServersForExtension(extension);
+        removeErrorsForExtension(extension);
         // remove document versions for this extension so didOpen fires again
         editor.lspDocumentVersions.entrySet().removeIf(e -> {
             String uri = e.getKey();
             int dot = uri.lastIndexOf('.');
             return dot >= 0 && uri.substring(dot + 1).equalsIgnoreCase(extension);
         });
+        documentSyncStates.entrySet().removeIf(e -> hasExtension(e.getKey(), extension));
         FileBuffer buf = editor.getCurrentBuffer();
         if (buf != null && bufferExtension(buf).equals(extension)) {
             LspClient client = resolveLspClient(buf);
             if (client != null) return "Restarted LSP for ." + extension;
             return "Failed to restart LSP for ." + extension;
         }
-        return "Stopped LSP for ." + extension + " (will restart on next use)";
+        return stopped == 0 ? "No LSP server running for ." + extension + " (will start on next use)"
+            : "Stopped " + stopped + " LSP server" + (stopped == 1 ? "" : "s") + " for ." + extension + " (will restart on next use)";
     }
 
 
     public String lspStop(String ext) {
         String extension = ext.isEmpty() ? currentBufferExtension() : ext.replace(".", "").toLowerCase();
         if (extension.isEmpty()) return "No extension specified and no file open";
-        LspClient existing = editor.lspClients.remove(extension);
-        editor.lspClientRoots.remove(extension);
-        if (existing == null) return "No LSP server running for ." + extension;
-        existing.stop();
-        editor.lspErrors.remove(extension);
-        return "Stopped LSP for ." + extension;
+        int stopped = stopServersForExtension(extension);
+        if (stopped == 0) return "No LSP server running for ." + extension;
+        removeErrorsForExtension(extension);
+        return "Stopped " + stopped + " LSP server" + (stopped == 1 ? "" : "s") + " for ." + extension;
     }
 
 
@@ -296,9 +302,11 @@ final class LspController {
         StringBuilder sb = new StringBuilder();
         sb.append("LSP Error Log\n");
         sb.append("=".repeat(40)).append("\n\n");
-        for (Map.Entry<String, String> entry : editor.lspErrors.entrySet()) {
-            String ext = entry.getKey().isEmpty() ? "(no ext)" : "." + entry.getKey();
-            sb.append(ext).append(": ").append(entry.getValue()).append("\n");
+        for (Map.Entry<LspServerKey, String> entry : editor.lspErrors.entrySet()) {
+            LspServerKey key = entry.getKey();
+            sb.append(key.displayName());
+            if (key.workspaceRoot() != null) sb.append("  ").append(key.workspaceRoot());
+            sb.append(": ").append(entry.getValue()).append("\n");
         }
         editor.showScratchBuffer("[lsp log]", sb.toString());
         return "Showing LSP log";
@@ -1337,7 +1345,7 @@ final class LspController {
                 return candidate.toRealPath();
             }
         }
-        return new File(".").getCanonicalFile().toPath().toAbsolutePath().normalize();
+        return Files.exists(current) ? current.toRealPath() : current;
     }
 
 
@@ -1616,6 +1624,41 @@ final class LspController {
         editor.markModified();
     }
 
+    private String lspErrorFor(FileBuffer buffer) {
+        if (buffer == null) {
+            return null;
+        }
+        String extension = bufferExtension(buffer);
+        try {
+            return editor.lspErrors.get(new LspServerKey(extension, workspaceRootPath(buffer)));
+        } catch (IOException ignored) {
+            return editor.lspErrors.get(new LspServerKey(extension, null));
+        }
+    }
+
+    private int stopServersForExtension(String extension) {
+        List<LspServerKey> keys = new ArrayList<>();
+        for (LspServerKey key : editor.lspClients.keySet()) {
+            if (key.extension().equalsIgnoreCase(extension)) {
+                keys.add(key);
+            }
+        }
+        for (LspServerKey key : keys) {
+            LspClient client = editor.lspClients.remove(key);
+            if (client != null) client.stop();
+        }
+        return keys.size();
+    }
+
+    private void removeErrorsForExtension(String extension) {
+        editor.lspErrors.entrySet().removeIf(entry -> entry.getKey().extension().equalsIgnoreCase(extension));
+    }
+
+    private boolean hasExtension(String uri, String extension) {
+        int dot = uri == null ? -1 : uri.lastIndexOf('.');
+        return dot >= 0 && uri.substring(dot + 1).equalsIgnoreCase(extension);
+    }
+
 
     LspClient resolveLspClient(FileBuffer buffer) {
         if (buffer == null || !buffer.hasFilePath()) {
@@ -1623,7 +1666,7 @@ final class LspController {
         }
         String extension = bufferExtension(buffer);
         if (extension.isEmpty()) {
-            editor.lspErrors.put("", "file has no recognized extension");
+            editor.lspErrors.put(new LspServerKey("", null), "file has no recognized extension");
             return null;
         }
 
@@ -1631,20 +1674,19 @@ final class LspController {
         try {
             workspaceRoot = workspaceRootPath(buffer);
         } catch (IOException e) {
-            editor.lspErrors.put(extension, e.getMessage());
+            editor.lspErrors.put(new LspServerKey(extension, null), e.getMessage());
             return null;
         }
+        LspServerKey key = new LspServerKey(extension, workspaceRoot);
 
-        LspClient existing = editor.lspClients.get(extension);
+        LspClient existing = editor.lspClients.get(key);
         if (existing != null && existing.isAlive()) {
-            Path existingRoot = editor.lspClientRoots.get(extension);
-            if (workspaceRoot.equals(existingRoot)) {
-                editor.lspErrors.remove(extension);
-                return existing;
-            }
+            editor.lspErrors.remove(key);
+            return existing;
+        }
+        if (existing != null) {
             existing.stop();
-            editor.lspClients.remove(extension);
-            editor.lspClientRoots.remove(extension);
+            editor.lspClients.remove(key);
         }
 
         String command = editor.configManager.getLspCommand(extension);
@@ -1652,7 +1694,7 @@ final class LspController {
         if (command == null || command.isBlank()) {
             String[] builtin = builtinLspCommand(extension);
             if (builtin == null) {
-                editor.lspErrors.put(extension, "no server configured for ." + extension);
+                editor.lspErrors.put(key, "no server configured for ." + extension);
                 return null;
             }
             command = builtin[0];
@@ -1662,12 +1704,12 @@ final class LspController {
         try {
             LspClient client = new LspClient(command, args, workspaceRoot, editor.configManager.getLspFeatureSettings());
             client.setWorkspaceEditHandler(this::applyWorkspaceEditFromServer);
-            editor.lspClients.put(extension, client);
-            editor.lspClientRoots.put(extension, workspaceRoot);
-            editor.lspErrors.remove(extension);
+            client.setDiagnosticsChangedHandler(() -> SwingUtilities.invokeLater(this::scheduleDiagnosticRefresh));
+            editor.lspClients.put(key, client);
+            editor.lspErrors.remove(key);
             return client;
         } catch (IOException e) {
-            editor.lspErrors.put(extension, e.getMessage());
+            editor.lspErrors.put(key, e.getMessage());
             return null;
         }
     }
@@ -1685,15 +1727,36 @@ final class LspController {
         if (editor.lspDocumentVersions.containsKey(uri)) {
             return;
         }
-        client.didOpen(uri, languageId(buffer), buffer.getFullContent());
+        String content = buffer.getFullContent();
+        client.didOpen(uri, languageId(buffer), content);
         editor.lspDocumentVersions.put(uri, 1);
+        documentSyncStates.put(uri, new LspDocumentSyncState(content));
+        scheduleLspDecorations(buffer);
     }
 
 
     void syncLspChange(FileBuffer buffer) {
+        syncLspChange(buffer, -1, -1, null);
+    }
+
+    void syncLspChange(FileBuffer buffer, int offset, int removedLength, String insertedText) {
         if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
             return;
         }
+        String uri = bufferUri(buffer);
+        boolean wasOpen = editor.lspDocumentVersions.containsKey(uri);
+        syncLspOpen(buffer);
+        if (!wasOpen) {
+            return;
+        }
+        LspDocumentSyncState syncState = documentSyncStates.computeIfAbsent(uri, ignored -> new LspDocumentSyncState(buffer.getFullContent()));
+        String content = buffer.getFullContent();
+        if (offset >= 0 && removedLength >= 0) {
+            syncState.apply(offset, removedLength, insertedText, content);
+        } else {
+            syncState.reconcile(content);
+        }
+        clearLspDecorations();
         pendingLspChange = buffer;
         if (lspChangeTimer == null) {
             lspChangeTimer = new Timer(CHANGE_DEBOUNCE_MS, event -> flushPendingLspChange(pendingLspChange));
@@ -1717,7 +1780,15 @@ final class LspController {
         if (lspChangeTimer != null) {
             lspChangeTimer.stop();
         }
+        if (lspDecorationTimer != null) {
+            lspDecorationTimer.stop();
+        }
+        if (lspDecorationJobId >= 0) {
+            editor.asyncJobService.cancel(lspDecorationJobId);
+            lspDecorationJobId = -1;
+        }
         pendingLspChange = null;
+        pendingLspDecoration = null;
     }
 
     private void sendLspChange(FileBuffer buffer) {
@@ -1731,11 +1802,18 @@ final class LspController {
         }
         syncLspOpen(buffer);
         String uri = bufferUri(buffer);
+        LspDocumentSyncState syncState = documentSyncStates.computeIfAbsent(uri, ignored -> new LspDocumentSyncState(buffer.getFullContent()));
+        if (!syncState.hasPendingChanges()) {
+            scheduleLspDecorations(buffer);
+            return;
+        }
         int version = editor.lspDocumentVersions.getOrDefault(uri, 1) + 1;
         editor.lspDocumentVersions.put(uri, version);
-        String content = buffer.getFullContent();
-        client.didChange(uri, version, content);
+        List<LspDocumentChange> changes = syncState.drainChanges();
+        String content = syncState.text();
+        client.didChange(uri, version, changes, content);
         scheduleDiagnosticRefresh();
+        scheduleLspDecorations(buffer);
         if (editor.perfService != null) {
             editor.perfService.recordDuration("lsp.change", started, "chars=" + content.length());
         }
@@ -1749,6 +1827,159 @@ final class LspController {
         }
         editor.diagnosticRefreshTimer.restart();
     }
+
+    void refreshLspDecorations() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) {
+            clearLspDecorations();
+            return;
+        }
+        if (!editor.configManager.getLspSemanticTokensInline() && !editor.configManager.getLspInlayHintsInline()) {
+            clearLspDecorations();
+            return;
+        }
+        scheduleLspDecorations(buffer);
+    }
+
+    private void scheduleLspDecorations(FileBuffer buffer) {
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
+            return;
+        }
+        if (!editor.configManager.getLspSemanticTokensInline() && !editor.configManager.getLspInlayHintsInline()) {
+            if (buffer == editor.getCurrentBuffer()) clearLspDecorations();
+            return;
+        }
+        pendingLspDecoration = buffer;
+        if (lspDecorationTimer == null) {
+            lspDecorationTimer = new Timer(DECORATION_DEBOUNCE_MS, event -> requestLspDecorations(pendingLspDecoration));
+            lspDecorationTimer.setRepeats(false);
+        }
+        lspDecorationTimer.restart();
+    }
+
+    private void requestLspDecorations(FileBuffer buffer) {
+        pendingLspDecoration = null;
+        if (buffer == null || buffer != editor.getCurrentBuffer() || !buffer.hasFilePath() || buffer.isLargeFile()) {
+            return;
+        }
+        LspClient client = existingLspClient(buffer);
+        String uri = bufferUri(buffer);
+        Integer version = editor.lspDocumentVersions.get(uri);
+        if (client == null || version == null || !client.isAlive()) {
+            clearLspDecorations();
+            return;
+        }
+        boolean semanticEnabled = editor.configManager.getLspSemanticTokensInline() && client.supports(LspCapability.SEMANTIC_TOKENS);
+        boolean inlayEnabled = editor.configManager.getLspInlayHintsInline() && client.supports(LspCapability.INLAY_HINTS);
+        if (!semanticEnabled && !inlayEnabled) {
+            clearLspDecorations();
+            return;
+        }
+        String text = buffer.getFullContent();
+        LspPosition end = endPosition(text);
+        if (lspDecorationJobId >= 0) editor.asyncJobService.cancel(lspDecorationJobId);
+        LspDecorationRequest request = new LspDecorationRequest(buffer, client, uri, version, text, semanticEnabled, inlayEnabled, end);
+        lspDecorationJobId = editor.asyncJobService.submit("LSP decorations", token -> {
+            List<LspClient.SemanticToken> semanticTokens = request.semanticEnabled()
+                ? request.client().semanticTokens(request.uri()) : List.of();
+            if (token.isCancelled()) return null;
+            List<LspClient.InlayHint> inlayHints = request.inlayEnabled()
+                ? request.client().inlayHints(request.uri(), request.end().line(), request.end().character()) : List.of();
+            return new LspDecorationResult(request, semanticTokens, inlayHints);
+        }, (snapshot, result, error) -> applyLspDecorations(snapshot, result, error));
+    }
+
+    private void applyLspDecorations(AsyncJobService.JobSnapshot snapshot, LspDecorationResult result, Exception error) {
+        if (snapshot == null || snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED || result == null || error != null) {
+            return;
+        }
+        lspDecorationJobId = -1;
+        LspDecorationRequest request = result.request();
+        if (request.buffer() != editor.getCurrentBuffer() || !request.text().equals(request.buffer().getFullContent())
+            || !Objects.equals(request.version(), editor.lspDocumentVersions.get(request.uri())) || existingLspClient(request.buffer()) != request.client()) {
+            return;
+        }
+        editor.lspSemanticSpans.clear();
+        if (request.semanticEnabled()) {
+            for (LspClient.SemanticToken token : result.semanticTokens()) {
+                Color color = semanticTokenColor(request.client().semanticTokenTypeName(token.type()));
+                int start = offsetForPosition(request.text(), token.line(), token.character());
+                int end = Math.min(request.text().length(), start + Math.max(0, token.length()));
+                if (color != null && end > start) editor.lspSemanticSpans.add(new SyntaxSpan(start, end, color));
+            }
+        }
+        editor.lspInlayHintOverlays.clear();
+        if (request.inlayEnabled()) {
+            Map<Integer, StringBuilder> labelsByOffset = new TreeMap<>();
+            for (LspClient.InlayHint hint : result.inlayHints()) {
+                int offset = offsetForPosition(request.text(), hint.line(), hint.character());
+                if (offset > request.text().length()) continue;
+                String label = hint.label().replace('\n', ' ').replace('\r', ' ').strip();
+                if (label.isEmpty()) continue;
+                StringBuilder labels = labelsByOffset.computeIfAbsent(offset, ignored -> new StringBuilder());
+                if (!labels.isEmpty()) labels.append(' ');
+                labels.append(label);
+                if (labelsByOffset.size() >= MAX_INLINE_INLAY_HINTS) break;
+            }
+            for (Map.Entry<Integer, StringBuilder> entry : labelsByOffset.entrySet()) {
+                editor.lspInlayHintOverlays.add(new LspInlayHintOverlay(entry.getKey(), entry.getValue().toString()));
+            }
+        }
+        editor.writingArea.repaint();
+    }
+
+    private void clearLspDecorations() {
+        if (editor.lspSemanticSpans.isEmpty() && editor.lspInlayHintOverlays.isEmpty()) return;
+        editor.lspSemanticSpans.clear();
+        editor.lspInlayHintOverlays.clear();
+        if (editor.writingArea != null) editor.writingArea.repaint();
+    }
+
+    private Color semanticTokenColor(String type) {
+        return switch (type == null ? "" : type.toLowerCase(Locale.ROOT)) {
+            case "namespace", "type", "class", "enum", "interface", "struct", "typeparameter" -> editor.configManager.getSyntaxTypeColor();
+            case "function", "method" -> editor.configManager.getSyntaxFunctionColor();
+            case "macro", "keyword", "modifier" -> editor.configManager.getSyntaxKeywordColor();
+            case "comment" -> editor.configManager.getSyntaxCommentColor();
+            case "string", "regexp" -> editor.configManager.getSyntaxStringColor();
+            case "number" -> editor.configManager.getSyntaxNumberColor();
+            default -> null;
+        };
+    }
+
+    private static int offsetForPosition(String text, int line, int character) {
+        if (text == null || text.isEmpty() || line < 0 || character < 0) return 0;
+        int offset = 0;
+        for (int currentLine = 0; currentLine < line && offset < text.length(); currentLine++) {
+            int newline = text.indexOf('\n', offset);
+            if (newline < 0) return text.length();
+            offset = newline + 1;
+        }
+        int end = text.indexOf('\n', offset);
+        int lineEnd = end < 0 ? text.length() : end;
+        return Math.min(lineEnd, offset + character);
+    }
+
+    private static LspPosition endPosition(String text) {
+        String value = text == null ? "" : text;
+        int line = 0;
+        int lineStart = 0;
+        for (int index = 0; index < value.length(); index++) {
+            if (value.charAt(index) == '\n') {
+                line++;
+                lineStart = index + 1;
+            }
+        }
+        return new LspPosition(line, value.length() - lineStart);
+    }
+
+    private record LspPosition(int line, int character) { }
+
+    private record LspDecorationRequest(FileBuffer buffer, LspClient client, String uri, Integer version, String text,
+                                        boolean semanticEnabled, boolean inlayEnabled, LspPosition end) { }
+
+    private record LspDecorationResult(LspDecorationRequest request, List<LspClient.SemanticToken> semanticTokens,
+                                       List<LspClient.InlayHint> inlayHints) { }
 
 
     public void notifyCurrentBufferSaved() {
@@ -1780,7 +2011,11 @@ final class LspController {
         if (buffer == null || !buffer.hasFilePath()) {
             return null;
         }
-        return editor.lspClients.get(bufferExtension(buffer));
+        try {
+            return editor.lspClients.get(new LspServerKey(bufferExtension(buffer), workspaceRootPath(buffer)));
+        } catch (IOException ignored) {
+            return null;
+        }
     }
 
 

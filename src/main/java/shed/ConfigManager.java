@@ -90,6 +90,8 @@ public class ConfigManager {
     private static final int DEFAULT_LIMELIGHT_PARAGRAPH_SPAN = 0;
     private static final boolean DEFAULT_MULTI_SELECTION_ENABLED = false;
     private static final boolean DEFAULT_MARKDOWN_PREVIEW_SCROLL_SYNC = true;
+    private static final boolean DEFAULT_LSP_SEMANTIC_TOKENS_INLINE = true;
+    private static final boolean DEFAULT_LSP_INLAY_HINTS_INLINE = true;
     private static final boolean DEFAULT_UI_WHICHKEY_HINTS = true;
     private static final boolean DEFAULT_PROJECT_CONFIG_ENABLED = true;
     private static final boolean DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE = false;
@@ -274,6 +276,8 @@ public class ConfigManager {
         defineDefault("lsp.hover.enabled", lspFeatures.hover());
         defineDefault("lsp.semantic.tokens.enabled", lspFeatures.semanticTokens());
         defineDefault("lsp.inlay.hints.enabled", lspFeatures.inlayHints());
+        defineDefault("lsp.semantic.tokens.inline", DEFAULT_LSP_SEMANTIC_TOKENS_INLINE);
+        defineDefault("lsp.inlay.hints.inline", DEFAULT_LSP_INLAY_HINTS_INLINE);
         defineDefault("lsp.definition.enabled", lspFeatures.definition());
         defineDefault("lsp.references.enabled", lspFeatures.references());
         defineDefault("lsp.rename.enabled", lspFeatures.rename());
@@ -384,6 +388,8 @@ public class ConfigManager {
             case "lsp.hover.enabled" -> "Enable LSP hover requests";
             case "lsp.semantic.tokens.enabled" -> "Enable LSP semantic-token requests";
             case "lsp.inlay.hints.enabled" -> "Enable LSP inlay-hint requests";
+            case "lsp.semantic.tokens.inline" -> "Render available LSP semantic tokens in the editor";
+            case "lsp.inlay.hints.inline" -> "Render available LSP inlay hints in the editor";
             case "lsp.definition.enabled" -> "Enable LSP definition requests";
             case "lsp.references.enabled" -> "Enable LSP reference requests";
             case "lsp.rename.enabled" -> "Enable LSP rename requests";
@@ -957,6 +963,14 @@ public class ConfigManager {
             getBoolean("lsp.command.execution.enabled", defaults.commandExecution()),
             getBoolean("lsp.formatting.enabled", defaults.formatting())
         );
+    }
+
+    public boolean getLspSemanticTokensInline() {
+        return getBoolean("lsp.semantic.tokens.inline", DEFAULT_LSP_SEMANTIC_TOKENS_INLINE);
+    }
+
+    public boolean getLspInlayHintsInline() {
+        return getBoolean("lsp.inlay.hints.inline", DEFAULT_LSP_INLAY_HINTS_INLINE);
     }
 
     public int getMinimapWidth() {

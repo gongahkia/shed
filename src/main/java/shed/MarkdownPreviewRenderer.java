@@ -64,7 +64,7 @@ final class MarkdownPreviewRenderer {
                 if (index < lines.length) index++;
                 html.append("<pre><code");
                 if (!language.isEmpty()) html.append(" class=\"language-").append(language).append("\"");
-                html.append("> ").append(escapeHtml(code.toString())).append("</code></pre>");
+                html.append(">").append(escapeHtml(code.toString())).append("</code></pre>");
                 continue;
             }
             Matcher heading = HEADING.matcher(line);

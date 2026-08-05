@@ -340,6 +340,8 @@ See [Update Checks](UPDATES.md) for endpoint/key configuration and metadata vali
 | `:snippets`, `:snippet` | Show snippets for current file type |
 | `:bracketcolor`, `:bracketcolors` | Toggle bracket pair colorization |
 
+Markdown preview is native, live, and side-by-side; it safely renders headings, emphasis, code fences, blockquotes, lists/tasks, tables, and links, while escaping raw HTML and never fetching remote images/content.
+
 ## Registers, Marks, Help, and Misc
 
 | Command | Action |

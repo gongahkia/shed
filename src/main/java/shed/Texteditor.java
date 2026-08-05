@@ -2412,6 +2412,14 @@ public class Texteditor extends JFrame implements KeyListener {
         paneBufferController.handleDocumentChange(event);
     }
 
+    void scheduleCompletionAfterDocumentChange(DocumentEvent event) {
+        inputController.onDocumentChanged(event);
+    }
+
+    void scheduleOpenBufferCompletionIndex() {
+        inputController.scheduleOpenBufferWordIndex();
+    }
+
     void scheduleIdleBackup(FileBuffer buffer) {
         paneBufferController.scheduleIdleBackup(buffer);
     }

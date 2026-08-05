@@ -31,6 +31,7 @@ final class PaneBufferController {
             markModified(event);
             editor.updateCurrentLineHighlight();
             editor.scheduleSyntaxHighlighting();
+            editor.scheduleCompletionAfterDocumentChange(event);
             try {
                 int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
                 editor.lineNumberPanel.repaintLines(line);
@@ -123,6 +124,7 @@ final class PaneBufferController {
             editor.applySyntaxHighlighting();
             editor.refreshLineNumberPanel();
             editor.syncLspOpen(buffer);
+            editor.scheduleOpenBufferCompletionIndex();
             editor.updateStatusBar();
         } else {
             pane.getLineNumberPanel().repaint();

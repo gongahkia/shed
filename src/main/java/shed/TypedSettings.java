@@ -300,6 +300,7 @@ final class TypedSettings {
             case "landing.source" -> "local path, file URI, or HTTPS URL";
             case "landing.remote.cache.path" -> "string path";
             case "landing.remote.timeout.ms" -> "integer 1000..30000";
+            case "lsp.completion.delay.ms" -> "integer 0..1000";
             case "updates.metadata.url" -> "HTTPS URL or empty";
             case "updates.metadata.public.key" -> "base64 Ed25519 key or empty";
             case "updates.check.timeout.ms" -> "integer 1000..30000";
@@ -335,6 +336,11 @@ final class TypedSettings {
         }
         if (key.startsWith("multi.selection.")) {
             return "Live: disabled clears extra cursors; limit applies to new cursors";
+        }
+        if (key.startsWith("lsp.completion.auto.") || key.startsWith("lsp.completion.delay.")
+            || key.startsWith("lsp.completion.trigger.") || key.startsWith("lsp.completion.fuzzy.")
+            || key.startsWith("lsp.completion.local.") || key.startsWith("lsp.completion.commit.")) {
+            return "Live: used by the next completion request";
         }
         if (key.startsWith("lsp.")) {
             return "Restart: takes effect when an LSP server is started or restarted";
@@ -425,6 +431,9 @@ final class TypedSettings {
             if (("updates.check.timeout.ms".equals(key) || "landing.remote.timeout.ms".equals(key))
                 && (number < 1000 || number > 30000)) {
                 return key + " must be between 1000 and 30000";
+            }
+            if ("lsp.completion.delay.ms".equals(key) && number > 1000) {
+                return key + " must be between 0 and 1000";
             }
             if ("multi.selection.max.cursors".equals(key)
                 && (number < MultiSelectionPolicy.MIN_MAX_CURSORS || number > MultiSelectionPolicy.MAX_MAX_CURSORS)) {

@@ -90,6 +90,7 @@ public class Texteditor extends JFrame implements KeyListener {
     DebugSessionController debugSessionController;
     JobQuickfixController jobQuickfixController;
     ProblemsController problemsController;
+    TestController testController;
     TerminalController terminalController;
     MarkdownController markdownController;
     PaneBufferController paneBufferController;
@@ -244,6 +245,7 @@ public class Texteditor extends JFrame implements KeyListener {
         problemsService = new ProblemsService();
         jobQuickfixController = new JobQuickfixController(this);
         problemsController = new ProblemsController(this, problemsService);
+        testController = new TestController(this, new TestService());
         editorState = new EditorState();
         modeEngine = new ModeEngine();
         buffers = new ArrayList<>();
@@ -1364,7 +1366,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("bn"); commands.add("bp"); commands.add("ls"); commands.add("buffers");
         commands.add("bd"); commands.add("set"); commands.add("settings"); commands.add("config");
         commands.add("log"); commands.add("session"); commands.add("workspace"); commands.add("jobs"); commands.add("jobcancel");
-        commands.add("drop"); commands.add("task"); commands.add("help"); commands.add("wc"); commands.add("recent");
+        commands.add("drop"); commands.add("task"); commands.add("test"); commands.add("help"); commands.add("wc"); commands.add("recent");
         commands.add("d"); commands.add("delete"); commands.add("files"); commands.add("folder"); commands.add("projectreplace");
         commands.add("tree"); commands.add("git"); commands.add("grep"); commands.add("copen");
         commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
@@ -1445,6 +1447,10 @@ public class Texteditor extends JFrame implements KeyListener {
             return jobQuickfixController.handleTaskCommand(trimmed.substring(5).trim());
         }
         return jobQuickfixController.handleTaskCommand(argument);
+    }
+
+    public String handleTestCommand(String argument) {
+        return testController.handle(argument);
     }
 
     File resolveTaskProjectRoot() {

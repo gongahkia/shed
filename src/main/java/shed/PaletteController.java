@@ -403,6 +403,8 @@ final class PaletteController {
                 return "Run async command against current file path.";
             case "task":
                 return "Run project tasks (:task test/build) with quickfix integration.";
+            case "test":
+                return "Open or control the explicit-refresh Test Explorer.";
             case "help":
             case "h":
                 return "Open help text (topic optional).";

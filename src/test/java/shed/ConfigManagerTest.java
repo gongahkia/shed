@@ -61,6 +61,7 @@ public class ConfigManagerTest {
         assertTrue(config.getHighlightSearch());
         assertFalse(config.getSessionRestoreOnStart());
         assertFalse(config.getTerminalSessionRestoreEnabled());
+        assertTrue(config.getMarkdownPreviewScrollSync());
         assertEquals(home.resolve(".shed/landing.md").toString(), config.getLandingSource());
         assertEquals(home.resolve(".shed/landing.remote.md").toString(), config.getLandingRemoteCachePath());
         assertEquals(5000, config.getLandingRemoteTimeoutMs());
@@ -77,6 +78,22 @@ public class ConfigManagerTest {
         assertEquals(new MultiSelectionPolicy(false, MultiSelectionPolicy.DEFAULT_MAX_CURSORS), config.getMultiSelectionPolicy());
         assertFalse(config.hasConfigLoadFailure());
         assertTrue(config.getConfigLoadReport().startsWith("Configuration not found: "));
+    }
+
+    @Test
+    void persistsMarkdownPreviewScrollSyncPreference() throws IOException {
+        Path home = tempDir.resolve("home-markdown-preview-sync");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.setAndPersist("markdown.preview.scroll.sync", "false");
+
+        assertFalse(config.getMarkdownPreviewScrollSync());
+        TypedSettings.Descriptor descriptor = config.typedSettingDescriptors().stream()
+            .filter(setting -> setting.key().equals("markdown.preview.scroll.sync")).findFirst().orElseThrow();
+        assertEquals("Markdown Preview", descriptor.category());
+        assertEquals("Live: applies to open Markdown previews", descriptor.applyBehavior());
+        assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"markdown.preview.scroll.sync\" = false"));
     }
 
     @Test

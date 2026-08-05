@@ -4,6 +4,8 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.event.KeyListener;
+import java.awt.geom.Rectangle2D;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javax.swing.BorderFactory;
@@ -11,9 +13,11 @@ import javax.swing.JEditorPane;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JScrollBar;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
+import javax.swing.event.CaretListener;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.HyperlinkEvent;
@@ -26,18 +30,24 @@ final class MarkdownPreviewPane extends JPanel {
     private final Supplier<Color> foregroundSupplier;
     private final Consumer<String> linkHandler;
     private final Runnable focusHandler;
+    private final BooleanSupplier scrollSyncEnabled;
+    private final EditorPane sourcePane;
     private final JLabel title;
     private final JEditorPane preview;
     private final JScrollPane scrollPane;
     private final MarkdownPreviewAssets assets;
     private final Timer renderTimer;
     private final DocumentListener sourceListener;
+    private final CaretListener sourceCaretListener;
+    private final java.awt.event.AdjustmentListener sourceScrollListener;
     private String html = "";
     private boolean disposed;
+    private boolean syncQueued;
+    private boolean syncToCaret;
 
     MarkdownPreviewPane(FileBuffer source, Supplier<Font> fontSupplier, Supplier<Color> backgroundSupplier,
                         Supplier<Color> foregroundSupplier, Consumer<String> linkHandler, Runnable focusHandler,
-                        KeyListener editorKeyListener) {
+                        BooleanSupplier scrollSyncEnabled, EditorPane sourcePane, KeyListener editorKeyListener) {
         super(new BorderLayout());
         this.source = source;
         this.fontSupplier = fontSupplier;
@@ -45,6 +55,8 @@ final class MarkdownPreviewPane extends JPanel {
         this.foregroundSupplier = foregroundSupplier;
         this.linkHandler = linkHandler;
         this.focusHandler = focusHandler;
+        this.scrollSyncEnabled = scrollSyncEnabled;
+        this.sourcePane = sourcePane;
         assets = new MarkdownPreviewAssets();
         title = new JLabel("Markdown Preview — " + source.getDisplayName(), SwingConstants.LEADING);
         title.setBorder(BorderFactory.createEmptyBorder(7, 10, 7, 10));
@@ -80,6 +92,10 @@ final class MarkdownPreviewPane extends JPanel {
             @Override public void changedUpdate(DocumentEvent event) { scheduleRender(); }
         };
         source.getDocument().addDocumentListener(sourceListener);
+        sourceCaretListener = event -> queueSourceSync(true);
+        sourceScrollListener = event -> queueSourceSync(false);
+        sourcePane.getTextArea().addCaretListener(sourceCaretListener);
+        sourcePane.getScrollPane().getVerticalScrollBar().addAdjustmentListener(sourceScrollListener);
         refreshAppearance();
         renderNow();
     }
@@ -116,6 +132,8 @@ final class MarkdownPreviewPane extends JPanel {
         disposed = true;
         renderTimer.stop();
         source.getDocument().removeDocumentListener(sourceListener);
+        sourcePane.getTextArea().removeCaretListener(sourceCaretListener);
+        sourcePane.getScrollPane().getVerticalScrollBar().removeAdjustmentListener(sourceScrollListener);
         assets.close();
     }
 
@@ -132,6 +150,58 @@ final class MarkdownPreviewPane extends JPanel {
         title.setText("Markdown Preview — " + source.getDisplayName());
         html = MarkdownPreviewRenderer.render(source.getFullContent(), source.getDisplayName(), font, background, foreground, assets, source.getFile());
         preview.setText(html);
-        SwingUtilities.invokeLater(() -> scrollPane.getVerticalScrollBar().setValue(scrollPosition));
+        if (isScrollSyncEnabled()) {
+            queueSourceSync(false);
+        } else {
+            SwingUtilities.invokeLater(() -> scrollPane.getVerticalScrollBar().setValue(scrollPosition));
+        }
+    }
+
+    int getVerticalScrollPosition() {
+        return scrollPane.getVerticalScrollBar().getValue();
+    }
+
+    private boolean isScrollSyncEnabled() {
+        return scrollSyncEnabled != null && scrollSyncEnabled.getAsBoolean();
+    }
+
+    private void queueSourceSync(boolean caret) {
+        if (disposed || !isScrollSyncEnabled()) return;
+        if (!syncQueued) {
+            syncQueued = true;
+            syncToCaret = caret;
+            SwingUtilities.invokeLater(() -> {
+                syncQueued = false;
+                syncPreviewToSource(syncToCaret);
+            });
+        } else if (!caret) {
+            syncToCaret = false;
+        }
+    }
+
+    private void syncPreviewToSource(boolean caret) {
+        if (disposed || !isScrollSyncEnabled()) return;
+        JScrollBar sourceBar = sourcePane.getScrollPane().getVerticalScrollBar();
+        JScrollBar previewBar = scrollPane.getVerticalScrollBar();
+        int sourceMaximum = Math.max(0, sourceBar.getMaximum() - sourceBar.getVisibleAmount());
+        int previewMaximum = Math.max(0, previewBar.getMaximum() - previewBar.getVisibleAmount());
+        if (previewMaximum == 0) return;
+        int sourcePosition = caret ? caretVerticalPosition(sourceMaximum) : sourceBar.getValue();
+        double progress = sourceMaximum == 0 ? caretDocumentProgress() : (double) sourcePosition / sourceMaximum;
+        previewBar.setValue((int) Math.round(Math.max(0.0, Math.min(1.0, progress)) * previewMaximum));
+    }
+
+    private int caretVerticalPosition(int sourceMaximum) {
+        try {
+            Rectangle2D bounds = sourcePane.getTextArea().modelToView2D(sourcePane.getTextArea().getCaretPosition());
+            if (bounds != null) return Math.min(sourceMaximum, Math.max(0, (int) Math.round(bounds.getY())));
+        } catch (javax.swing.text.BadLocationException ignored) {
+        }
+        return (int) Math.round(caretDocumentProgress() * sourceMaximum);
+    }
+
+    private double caretDocumentProgress() {
+        int length = sourcePane.getTextArea().getDocument().getLength();
+        return length == 0 ? 0.0 : (double) sourcePane.getTextArea().getCaretPosition() / length;
     }
 }

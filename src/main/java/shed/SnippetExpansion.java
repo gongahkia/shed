@@ -71,7 +71,7 @@ final class SnippetExpansion {
             addPlaceholder(placeholders, identifier, defaultText, text);
             return true;
         }
-        if (!identifier.chars().allMatch(SnippetExpansion::isVariablePart)) return false;
+        if (!identifier.chars().allMatch(value -> isVariablePart((char) value))) return false;
         String fallback = colon >= 0 ? body.substring(colon + 1) : "";
         text.append(variables.getOrDefault(identifier, fallback));
         return true;

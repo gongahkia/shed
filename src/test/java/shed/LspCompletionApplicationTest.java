@@ -16,7 +16,7 @@ public class LspCompletionApplicationTest {
 
         assertEquals("fn name() {  }", result.text());
         assertEquals(3, result.placeholders().size());
-        assertEquals(new LspCompletionApplication.Placeholder(3, 7), result.placeholders().get(0));
+        assertEquals(new SnippetExpansion.Placeholder(1, 3, 7), result.placeholders().get(0));
         assertFalse(result.fallback());
     }
 

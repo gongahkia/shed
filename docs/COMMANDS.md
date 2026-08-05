@@ -220,8 +220,8 @@ Notes:
 | Command | Action |
 | :--- | :--- |
 | `:lsp completion`, `:lsp complete`, `:lsp comp` | Completion picker (LSP with local fallback) |
-| Insert-mode `Ctrl-n` | Asynchronous completion popup; Up/Down or Ctrl-p/Ctrl-n selects, Tab/Enter applies, Escape cancels; selected LSP item shows detail and documentation |
-| After an LSP snippet completion | Tab/Shift-Tab moves through unchanged placeholders; editing invalidates the placeholder session safely |
+| Insert-mode `Ctrl-n` | Asynchronous completion popup; user snippets, LSP, and buffer items are merged; Up/Down or Ctrl-p/Ctrl-n selects, Tab/Enter applies, Escape cancels |
+| After any snippet completion | Tab/Shift-Tab moves through ordered placeholders; positions survive ordinary edits |
 | Insert `(` or `,` | Shows capability-gated asynchronous signature help; the next edit or Escape cancels it |
 | `:lsp definition`, `:lsp def` | Go to definition |
 | `:lsp hover` | Show hover info |
@@ -338,6 +338,7 @@ See [Update Checks](UPDATES.md) for endpoint/key configuration and metadata vali
 | `:img`, `:image` | Insert markdown image template |
 | `:conceal 0|1|2`, `:conceallevel 0|1|2` | Set markdown conceal level |
 | `:snippets`, `:snippet` | Show snippets for current file type |
+| `:snippets open`, `:snippets edit` | Create if needed and open global user snippets |
 | `:bracketcolor`, `:bracketcolors` | Toggle bracket pair colorization |
 
 Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM, TeX math, local images, and Mermaid fences while escaping raw HTML and never fetching remote assets. See [Markdown Preview](MARKDOWN_PREVIEW.md).

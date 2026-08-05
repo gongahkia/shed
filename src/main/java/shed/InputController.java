@@ -2212,6 +2212,7 @@ final class InputController {
         editor.writingArea.setText(result.text());
         editor.suppressDocumentEvents = false;
         editor.markModified();
+        editor.scheduleSyntaxHighlighting();
         if (result.placeholders().isEmpty()) {
             editor.writingArea.setCaretPosition(Math.min(result.caret(), editor.writingArea.getDocument().getLength()));
         } else {
@@ -2223,7 +2224,7 @@ final class InputController {
 
     List<String> gatherCompletions(String prefix) {
         List<String> labels = new ArrayList<>();
-        for (LspClient.CompletionItem item : localCompletionItems(prefix)) {
+        for (LspClient.CompletionItem item : mergeCompletionItems(snippetCompletionItems(prefix), localCompletionItems(prefix))) {
             labels.add(item.getLabel());
         }
         return labels;
@@ -2380,7 +2381,8 @@ final class InputController {
             int start = editor.writingArea.getLineStartOffset(line);
             int end = editor.writingArea.getLineEndOffset(line);
             values.put("TM_CURRENT_LINE", editor.writingArea.getText(start, Math.max(0, end - start)).replaceAll("[\\r\\n]+$", ""));
-            values.put("TM_CURRENT_WORD", editor.currentCompletionPrefix());
+            String word = editor.currentCompletionPrefix();
+            values.put("TM_CURRENT_WORD", word == null ? "" : word);
             values.put("TM_LINE_INDEX", Integer.toString(line));
             values.put("TM_LINE_NUMBER", Integer.toString(line + 1));
         } catch (BadLocationException ignored) {

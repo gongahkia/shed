@@ -77,6 +77,7 @@ public class Texteditor extends JFrame implements KeyListener {
     TreeService treeService;
     LspService lspService;
     SyntaxHighlightService syntaxHighlightService;
+    GrammarHighlightService grammarHighlightService;
     AsyncJobService asyncJobService;
     BackupScheduler backupScheduler;
     UpdateController updateController;
@@ -230,6 +231,7 @@ public class Texteditor extends JFrame implements KeyListener {
         lspController = new LspController(this);
         debugSessionController = new DebugSessionController(this);
         syntaxHighlightService = new SyntaxHighlightService();
+        grammarHighlightService = new GrammarHighlightService();
         asyncJobService = new AsyncJobService(200, this.errorReporter);
         backupScheduler = new BackupScheduler();
         gitHubCapabilityController = new GitHubCapabilityController(this);

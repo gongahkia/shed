@@ -15,7 +15,7 @@ import javax.swing.JTabbedPane;
 
 /** Shared docked tool area; controllers remain the source of truth. */
 final class ToolWindowHost extends JPanel {
-    enum Tab { GIT, DEBUG, TASKS, PROBLEMS, REPLACE }
+    enum Tab { GIT, DEBUG, TASKS, TESTS, PROBLEMS, REPLACE }
 
     private final Texteditor editor;
     private final JTabbedPane tabs = new JTabbedPane();
@@ -33,6 +33,7 @@ final class ToolWindowHost extends JPanel {
         addSurface(Tab.GIT, "Git", new GitChangesToolPanel(editor, this));
         addSurface(Tab.DEBUG, "Debug", new DebugToolPanel(editor, this));
         addSurface(Tab.TASKS, "Tasks", new TasksToolPanel(editor, this));
+        addSurface(Tab.TESTS, "Tests", new TestsToolPanel(editor, this));
         addSurface(Tab.PROBLEMS, "Problems", new ProblemsToolPanel(editor, this));
         addSurface(Tab.REPLACE, "Replace", new ProjectReplaceToolPanel(editor, this));
         tabs.addChangeListener(event -> refreshActive());
@@ -162,7 +163,7 @@ final class ToolWindowHost extends JPanel {
     }
 
     private static String title(Tab tab) {
-        return switch (tab) { case GIT -> "Git"; case DEBUG -> "Debug"; case TASKS -> "Tasks"; case PROBLEMS -> "Problems"; case REPLACE -> "Replace"; };
+        return switch (tab) { case GIT -> "Git"; case DEBUG -> "Debug"; case TASKS -> "Tasks"; case TESTS -> "Tests"; case PROBLEMS -> "Problems"; case REPLACE -> "Replace"; };
     }
 
     private static WorkbenchLayout.SurfaceType surfaceType(Tab tab) {
@@ -170,6 +171,7 @@ final class ToolWindowHost extends JPanel {
             case GIT -> WorkbenchLayout.SurfaceType.GIT;
             case DEBUG -> WorkbenchLayout.SurfaceType.DEBUGGER;
             case TASKS -> WorkbenchLayout.SurfaceType.TASKS;
+            case TESTS -> WorkbenchLayout.SurfaceType.TESTS;
             case PROBLEMS -> WorkbenchLayout.SurfaceType.PROBLEMS;
             case REPLACE -> WorkbenchLayout.SurfaceType.REPLACE;
         };

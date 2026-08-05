@@ -15,6 +15,7 @@ final class WorkbenchLayout {
         GIT,
         DEBUGGER,
         TASKS,
+        TESTS,
         PROBLEMS,
         REPLACE,
         STATUS

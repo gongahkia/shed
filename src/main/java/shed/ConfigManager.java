@@ -89,6 +89,7 @@ public class ConfigManager {
     private static final double DEFAULT_LIMELIGHT_COEFFICIENT = 0.5;
     private static final int DEFAULT_LIMELIGHT_PARAGRAPH_SPAN = 0;
     private static final boolean DEFAULT_MULTI_SELECTION_ENABLED = false;
+    private static final boolean DEFAULT_MARKDOWN_PREVIEW_SCROLL_SYNC = true;
     private static final boolean DEFAULT_UI_WHICHKEY_HINTS = true;
     private static final boolean DEFAULT_PROJECT_CONFIG_ENABLED = true;
     private static final boolean DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE = false;
@@ -265,6 +266,7 @@ public class ConfigManager {
         defineDefault("limelight.paragraph.span", DEFAULT_LIMELIGHT_PARAGRAPH_SPAN);
         defineDefault("multi.selection.enabled", DEFAULT_MULTI_SELECTION_ENABLED);
         defineDefault("multi.selection.max.cursors", MultiSelectionPolicy.DEFAULT_MAX_CURSORS);
+        defineDefault("markdown.preview.scroll.sync", DEFAULT_MARKDOWN_PREVIEW_SCROLL_SYNC);
         LspFeatureSettings lspFeatures = LspFeatureSettings.defaults();
         defineDefault("lsp.completion.enabled", lspFeatures.completion());
         defineDefault("lsp.snippets.enabled", lspFeatures.snippets());
@@ -375,6 +377,7 @@ public class ConfigManager {
             case "limelight.paragraph.span" -> "Adjacent paragraphs retained at full brightness";
             case "multi.selection.enabled" -> "Enable experimental multi-selection editing";
             case "multi.selection.max.cursors" -> "Maximum total cursors for experimental multi-selection";
+            case "markdown.preview.scroll.sync" -> "Synchronize Markdown preview position with its source cursor and scroll position";
             case "lsp.completion.enabled" -> "Enable LSP completion requests";
             case "lsp.snippets.enabled" -> "Advertise LSP snippet-completion support";
             case "lsp.signature.help.enabled" -> "Enable LSP signature-help requests";
@@ -915,6 +918,10 @@ public class ConfigManager {
     }
     public boolean getAutoPairs() {
         return getBoolean("auto.pairs", DEFAULT_AUTO_PAIRS);
+    }
+
+    public boolean getMarkdownPreviewScrollSync() {
+        return getBoolean("markdown.preview.scroll.sync", DEFAULT_MARKDOWN_PREVIEW_SCROLL_SYNC);
     }
     public int getTextWidth() {
         return getInt("textwidth", DEFAULT_TEXTWIDTH);

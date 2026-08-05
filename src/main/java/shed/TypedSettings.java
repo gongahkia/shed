@@ -212,6 +212,9 @@ final class TypedSettings {
         if (key.startsWith("landing.")) {
             return "Interface";
         }
+        if (key.startsWith("markdown.preview.")) {
+            return "Markdown Preview";
+        }
         if (key.startsWith("session.")) {
             return "Session";
         }
@@ -320,6 +323,9 @@ final class TypedSettings {
         }
         if (key.startsWith("landing.")) {
             return "Live: used when the landing page next opens";
+        }
+        if (key.startsWith("markdown.preview.")) {
+            return "Live: applies to open Markdown previews";
         }
         if (key.startsWith("workspace.index.")) {
             return "Live: used by subsequent workspace index operations";

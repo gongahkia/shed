@@ -17,7 +17,7 @@ public class MarkdownPreviewRendererTest {
     Path tempDir;
 
     @Test
-    void rendersCommonMarkdownWithoutAllowingRawHtmlOrUnsafeLinks() {
+    void rendersCommonMarkdownAndSanitizesUnsafeHtmlOrLinks() {
         String markdown = """
             # Hello *Shed*
 
@@ -50,6 +50,39 @@ public class MarkdownPreviewRendererTest {
         assertTrue(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
         assertFalse(html.contains("href=\"javascript:"));
         assertFalse(html.contains("<script>alert(1)</script>"));
+    }
+
+    @Test
+    void rendersSupportedRawHtmlWithLocalImagesAndRemovesUnsafeMarkup() throws Exception {
+        Path image = tempDir.resolve("logo.png");
+        ImageIO.write(new BufferedImage(4, 4, BufferedImage.TYPE_INT_ARGB), "png", image.toFile());
+        Path markdown = tempDir.resolve("preview.md");
+        Files.writeString(markdown, "preview");
+        String source = """
+            <div align="center" onclick="alert(1)">
+              <h2>Logo</h2>
+              <a href="https://example.com"><img src="logo.png" alt="logo" width="20%"></a>
+            </div>
+
+            <ul><li>one</li><li>two</li></ul>
+            <table><thead><tr><th>name</th></tr></thead><tbody><tr><td>value</td></tr></tbody></table>
+            <script>alert(1)</script><video src="movie.mp4"></video>
+            """;
+
+        String html;
+        try (MarkdownPreviewAssets assets = new MarkdownPreviewAssets()) {
+            html = MarkdownPreviewRenderer.render(source, "Preview", new Font(Font.DIALOG, Font.PLAIN, 13), Color.WHITE, Color.BLACK, assets, markdown.toFile());
+        }
+
+        assertTrue(html.contains("<div align=\"center\">"));
+        assertTrue(html.contains("<h2>Logo</h2>"));
+        assertTrue(html.contains("href=\"https://example.com\""));
+        assertTrue(html.contains("src=\"" + image.toUri().toASCIIString() + "\" alt=\"logo\" width=\"20%\""));
+        assertTrue(html.contains("<ul><li>one</li><li>two</li></ul>"));
+        assertTrue(html.contains("<table>"));
+        assertFalse(html.contains("onclick="));
+        assertFalse(html.contains("<script"));
+        assertFalse(html.contains("<video"));
     }
 
     @Test

@@ -21,6 +21,6 @@ Diagrams are rasterized locally by the bundled JVM renderer; Node, a browser, a 
 
 ## Safety and limits
 
-Raw HTML remains escaped. Remote images are replaced with an unavailable-image label and are never fetched. Relative images resolve from the Markdown file's directory; local `file:` image URLs are allowed. External links still require an explicit click.
+Raw HTML supports a sanitized Swing-compatible subset: `div`, headings, paragraphs, links, local images, lists, tables, blockquotes, and text-formatting tags. `script`, `style`, event attributes, forms, embeds, media, SVG, and remote images are removed; relative images resolve from the Markdown file's directory, local `file:` image URLs are allowed, and external links still require an explicit click.
 
 Mermaid source is capped at 64 KiB per block and rendered images at 4096 px per side. Invalid TeX stays as source text; Mermaid failures show a preview error and preserve the original fence.

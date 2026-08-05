@@ -48,7 +48,7 @@ public class ConfigManager {
     private static final String DEFAULT_COLOR_COMMAND = "#3A3F4B";
     private static final String DEFAULT_COLOR_VISUAL = "#313A46";
     private static final String DEFAULT_COLOR_REPLACE = "#4B2F3A";
-    private static final String DEFAULT_FONT_FAMILY = "Hack";
+    private static final String DEFAULT_FONT_FAMILY = "Monospaced";
     private static final int DEFAULT_FONT_SIZE = 16;
     private static final int DEFAULT_TAB_SIZE = 4;
     private static final KeymapProfile DEFAULT_KEYMAP_PROFILE = KeymapProfile.VIM;

@@ -9,7 +9,9 @@ import javax.swing.text.Highlighter;
 import javax.swing.text.Segment;
 import javax.swing.text.TabExpander;
 import javax.swing.text.Utilities;
+import javax.imageio.ImageIO;
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
 import java.io.InputStream;
@@ -34,6 +36,7 @@ final class EditorUiController {
     void initializeUI() {
         editor.setTitle("Shed " + editor.VERSION);
         editor.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        setApplicationIcon();
 
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         editor.setSize(screenSize.width / 2, screenSize.height);
@@ -477,16 +480,7 @@ final class EditorUiController {
         int fontSize = editor.configManager.getFontSize();
         String configuredFamily = editor.configManager.getFontFamily();
         Font configuredFont = resolveInstalledFont(configuredFamily, fontSize);
-        if (configuredFont != null) {
-            return configuredFont;
-        }
-
-        Font bundledHackFont = loadBundledHackFont(fontSize);
-        if (bundledHackFont != null) {
-            return bundledHackFont;
-        }
-
-        return new Font("Monospaced", Font.PLAIN, fontSize);
+        return configuredFont != null ? configuredFont : new Font(Font.MONOSPACED, Font.PLAIN, fontSize);
     }
 
 
@@ -506,16 +500,15 @@ final class EditorUiController {
     }
 
 
-    Font loadBundledHackFont(int fontSize) {
-        try (InputStream resource = EditorUiController.class.getClassLoader().getResourceAsStream("assets/hackregfont.ttf")) {
-            Font hackFont = resource == null
-                ? Font.createFont(Font.TRUETYPE_FONT, new File("assets/hackregfont.ttf"))
-                : Font.createFont(Font.TRUETYPE_FONT, resource);
-            GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(hackFont);
-            return hackFont.deriveFont((float) fontSize);
-        } catch (Exception e) {
-            return null;
-        }
+    private void setApplicationIcon() {
+        try (InputStream resource = EditorUiController.class.getClassLoader().getResourceAsStream("assets/logo/shed.png")) {
+            BufferedImage icon = resource == null ? null : ImageIO.read(resource);
+            if (icon == null) return;
+            editor.setIconImages(List.of(icon));
+            if (GraphicsEnvironment.isHeadless() || !Taskbar.isTaskbarSupported()) return;
+            Taskbar taskbar = Taskbar.getTaskbar();
+            if (taskbar.isSupported(Taskbar.Feature.ICON_IMAGE)) taskbar.setIconImage(icon);
+        } catch (java.io.IOException | SecurityException | UnsupportedOperationException ignored) {}
     }
 
 

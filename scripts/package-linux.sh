@@ -58,7 +58,9 @@ PACKAGE_NAME="shed"
 ARCHITECTURE="linux-x64"
 JAR_NAME="shed-$VERSION.jar"
 JAR_PATH="$REPO_ROOT/target/$JAR_NAME"
+ICON_PATH="$REPO_ROOT/assets/logo/shed.png"
 [[ -f "$JAR_PATH" ]] || fail "missing packaged jar: $JAR_PATH"
+[[ -f "$ICON_PATH" ]] || fail "missing application icon: $ICON_PATH"
 
 PACKAGE_ROOT="$REPO_ROOT/target/linux-package"
 INPUT_DIR="$PACKAGE_ROOT/input"
@@ -75,7 +77,7 @@ printf '%s\n' "$MODULES" > "$PACKAGE_ROOT/runtime-modules.txt"
 
 "$JPACKAGE" --type app-image --dest "$APP_IMAGE_DIR" --input "$INPUT_DIR" --main-jar "$JAR_NAME" --main-class shed.Texteditor \
   --name "$APP_NAME" --app-version "$VERSION" --vendor Shed --description "Shed text editor" --copyright "Copyright Shed" \
-  --runtime-image "$RUNTIME_DIR"
+  --icon "$ICON_PATH" --runtime-image "$RUNTIME_DIR"
 
 APP_DIRECTORY="$APP_IMAGE_DIR/$APP_NAME"
 APP_EXECUTABLE="$APP_DIRECTORY/bin/$APP_NAME"
@@ -87,7 +89,7 @@ RUNTIME_JAVA="$APP_DIRECTORY/lib/runtime/bin/java"
 [[ -x "$RUNTIME_JAVA" ]] || fail "missing bundled Java runtime"
 RUNTIME_VERSION="$("$RUNTIME_JAVA" -version 2>&1 | awk -F'"' '/version/ {print $2; exit}')"
 [[ "${RUNTIME_VERSION%%.*}" == "21" ]] || fail "bundled runtime is not Java 21"
-jar tf "$APP_JAR" | grep -Fx 'assets/hackregfont.ttf' >/dev/null || fail "bundled font is missing"
+jar tf "$APP_JAR" | grep -Fx 'assets/logo/shed.png' >/dev/null || fail "bundled application logo is missing"
 
 "$JPACKAGE" --type deb --dest "$DIST_DIR" --name "$APP_NAME" --app-version "$VERSION" --app-image "$APP_DIRECTORY" \
   --linux-package-name "$PACKAGE_NAME" --linux-app-release 1

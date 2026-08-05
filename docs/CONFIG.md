@@ -54,7 +54,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
 | `theme` | `one-dark-pro` | string | Built-in theme id |
-| `font.family` | `Hack` | string | Falls back to bundled Hack, then `Monospaced` |
+| `font.family` | `Monospaced` | string | Java logical monospace font resolved by the local machine |
 | `font.size` | `16` | int | Editor font size |
 | `tab.size` | `4` | int | Tab width (`:set ts=` command clamps to `1..16`) |
 | `line.numbers` | `absolute` | enum | `none`, `absolute`, `relative`, `relativeabsolute` (`hybrid` alias supported) |
@@ -319,7 +319,7 @@ schema_version = 1
 
 # Editor
 "theme" = "nightfox"
-"font.family" = "Hack"
+"font.family" = "Monospaced"
 "font.size" = 16
 "tab.size" = 4
 "line.numbers" = "relative"

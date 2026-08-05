@@ -36,6 +36,6 @@ $ mvn -B clean package
 $ jar tf target/shed-2.0.0.jar
 ```
 
-The first two commands must report Java 21. The Maven command runs the test suite and creates `target/shed-2.0.0.jar`; the final command must list `META-INF/MANIFEST.MF` and `assets/hackregfont.ttf`.
+The first two commands must report Java 21. The Maven command runs the test suite and creates `target/shed-2.0.0.jar`; the final command must list `META-INF/MANIFEST.MF` and `assets/logo/shed.png`.
 
 To compare against the hosted verification, inspect the latest `Shed CI/CD on push` run in the repository Actions tab. It exposes one result each for Ubuntu, Windows, and macOS.

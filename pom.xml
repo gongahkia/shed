@@ -24,7 +24,7 @@
         <directory>assets</directory>
         <targetPath>assets</targetPath>
         <includes>
-          <include>hackregfont.ttf</include>
+          <include>logo/shed.png</include>
         </includes>
       </resource>
     </resources>

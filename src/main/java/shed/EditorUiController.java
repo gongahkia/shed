@@ -340,7 +340,7 @@ final class EditorUiController {
             if (paneRef[0] != null) {
                 try {
                     int currentCaretLine = textArea.getLineOfOffset(textArea.getCaretPosition());
-                    paneRef[0].getLineNumberPanel().repaintLines(previousCaretLine[0], currentCaretLine);
+                    paneRef[0].getLineNumberPanel().repaintForCaretChange(previousCaretLine[0], currentCaretLine);
                     previousCaretLine[0] = currentCaretLine;
                 } catch (BadLocationException ignored) {
                 }

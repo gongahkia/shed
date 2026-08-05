@@ -241,6 +241,14 @@ class LineNumberPanel extends JPanel {
         }
     }
 
+    public void repaintForCaretChange(int previousLine, int currentLine) {
+        if (mode == LineNumberMode.RELATIVE || mode == LineNumberMode.RELATIVE_ABSOLUTE) {
+            repaint();
+            return;
+        }
+        repaintLines(previousLine, currentLine);
+    }
+
     private String formatLineNumber(int line, int currentLine) {
         switch (mode) {
             case NONE:

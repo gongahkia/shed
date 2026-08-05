@@ -648,7 +648,7 @@ public class LspClient {
         boolean preselect = Boolean.TRUE.equals(itemObject.get("preselect"));
         return new CompletionItem(label, detail, kind, completionDocumentation(itemObject.get("documentation")),
             insertText == null ? label : insertText, Integer.valueOf(2).equals(insertTextFormat), completionTextEdits(itemObject),
-            filterText == null ? label : filterText, sortText == null ? label : sortText, preselect,
+            filterText == null ? label : filterText, sortText == null ? "" : sortText, preselect,
             completionStringList(itemObject.get("commitCharacters")), itemObject);
     }
 

@@ -29,6 +29,7 @@ final class MarkdownPreviewPane extends JPanel {
     private final JLabel title;
     private final JEditorPane preview;
     private final JScrollPane scrollPane;
+    private final MarkdownPreviewAssets assets;
     private final Timer renderTimer;
     private final DocumentListener sourceListener;
     private String html = "";
@@ -44,6 +45,7 @@ final class MarkdownPreviewPane extends JPanel {
         this.foregroundSupplier = foregroundSupplier;
         this.linkHandler = linkHandler;
         this.focusHandler = focusHandler;
+        assets = new MarkdownPreviewAssets();
         title = new JLabel("Markdown Preview — " + source.getDisplayName(), SwingConstants.LEADING);
         title.setBorder(BorderFactory.createEmptyBorder(7, 10, 7, 10));
         preview = new JEditorPane();
@@ -114,6 +116,7 @@ final class MarkdownPreviewPane extends JPanel {
         disposed = true;
         renderTimer.stop();
         source.getDocument().removeDocumentListener(sourceListener);
+        assets.close();
     }
 
     private void scheduleRender() {
@@ -127,7 +130,7 @@ final class MarkdownPreviewPane extends JPanel {
         Color background = backgroundSupplier.get();
         Color foreground = foregroundSupplier.get();
         title.setText("Markdown Preview — " + source.getDisplayName());
-        html = MarkdownPreviewRenderer.render(source.getFullContent(), source.getDisplayName(), font, background, foreground);
+        html = MarkdownPreviewRenderer.render(source.getFullContent(), source.getDisplayName(), font, background, foreground, assets, source.getFile());
         preview.setText(html);
         SwingUtilities.invokeLater(() -> scrollPane.getVerticalScrollBar().setValue(scrollPosition));
     }

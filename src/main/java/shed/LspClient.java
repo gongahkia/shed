@@ -231,6 +231,34 @@ public class LspClient {
         }
     }
 
+    public static class NavigationSymbol {
+        private final String name;
+        private final String detail;
+        private final int kind;
+        private final String uri;
+        private final int line;
+        private final int character;
+        private final int level;
+
+        public NavigationSymbol(String name, String detail, int kind, String uri, int line, int character, int level) {
+            this.name = name == null ? "" : name;
+            this.detail = detail == null ? "" : detail;
+            this.kind = kind;
+            this.uri = uri == null ? "" : uri;
+            this.line = Math.max(0, line);
+            this.character = Math.max(0, character);
+            this.level = Math.max(1, level);
+        }
+
+        public String getName() { return name; }
+        public String getDetail() { return detail; }
+        public int getKind() { return kind; }
+        public String getUri() { return uri; }
+        public int getLine() { return line; }
+        public int getCharacter() { return character; }
+        public int getLevel() { return level; }
+    }
+
     public static class TextEdit {
         private final String uri;
         private final int startLine;
@@ -1052,6 +1080,27 @@ public class LspClient {
         return entries == null ? List.of() : new ArrayList<>(entries);
     }
 
+    public Map<String, List<Diagnostic>> diagnosticsSnapshot() {
+        drainNotifications();
+        Map<String, List<Diagnostic>> snapshot = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Diagnostic>> entry : diagnostics.entrySet()) {
+            snapshot.put(entry.getKey(), List.copyOf(entry.getValue()));
+        }
+        return Map.copyOf(snapshot);
+    }
+
+    public List<NavigationSymbol> documentSymbols(String uri) {
+        if (!supports(LspCapability.DOCUMENT_SYMBOLS) || uri == null || uri.isBlank()) return List.of();
+        Map<String, Object> response = sendRequest("textDocument/documentSymbol", Map.of("textDocument", Map.of("uri", uri)), 2500L);
+        return parseNavigationSymbols(response == null ? null : response.get("result"), uri, true);
+    }
+
+    public List<NavigationSymbol> workspaceSymbols(String query) {
+        if (!supports(LspCapability.WORKSPACE_SYMBOLS) || query == null || query.isBlank()) return List.of();
+        Map<String, Object> response = sendRequest("workspace/symbol", Map.of("query", query), 2500L);
+        return parseNavigationSymbols(response == null ? null : response.get("result"), "", false);
+    }
+
     public void drainNotifications() {
         while (true) {
             Map<String, Object> message = messageQueue.poll();
@@ -1113,11 +1162,13 @@ public class LspClient {
         Map<String, Object> workspace = new LinkedHashMap<>();
         workspace.put("applyEdit", Boolean.TRUE);
         workspace.put("workspaceEdit", workspaceEdit);
+        workspace.put("symbol", Map.of("dynamicRegistration", Boolean.FALSE));
 
         Map<String, Object> textDocument = new LinkedHashMap<>();
         textDocument.put("completion", completion);
         textDocument.put("hover", hover);
         textDocument.put("definition", new LinkedHashMap<>());
+        textDocument.put("documentSymbol", Map.of("hierarchicalDocumentSymbolSupport", Boolean.TRUE));
         textDocument.put("publishDiagnostics", diagnosticsCapability);
         textDocument.put("semanticTokens", semanticTokens);
         textDocument.put("inlayHint", inlayHint);
@@ -1196,6 +1247,59 @@ public class LspClient {
         Map<String, Object> result = MiniJson.asObject(response == null ? null : response.get("result"));
         Map<String, Object> capabilities = MiniJson.asObject(result == null ? null : result.get("capabilities"));
         return MiniJson.asObject(capabilities == null ? null : capabilities.get("completionProvider"));
+    }
+
+    static List<NavigationSymbol> parseNavigationSymbols(Object result, String defaultUri, boolean hierarchical) {
+        List<Object> values = MiniJson.asArray(result);
+        if (values == null || values.isEmpty()) return List.of();
+        List<NavigationSymbol> symbols = new ArrayList<>();
+        for (Object value : values) {
+            Map<String, Object> symbol = MiniJson.asObject(value);
+            if (symbol == null) continue;
+            if (hierarchical && symbol.containsKey("selectionRange")) {
+                appendDocumentSymbol(symbols, symbol, defaultUri, 1);
+            } else {
+                NavigationSymbol parsed = parseFlatSymbol(symbol, defaultUri);
+                if (parsed != null) symbols.add(parsed);
+            }
+        }
+        return List.copyOf(symbols);
+    }
+
+    private static void appendDocumentSymbol(List<NavigationSymbol> symbols, Map<String, Object> symbol, String uri, int level) {
+        String name = MiniJson.asString(symbol.get("name"));
+        if (name == null || name.isBlank()) return;
+        Map<String, Object> selectionRange = MiniJson.asObject(symbol.get("selectionRange"));
+        Map<String, Object> start = MiniJson.asObject(selectionRange == null ? null : selectionRange.get("start"));
+        int line = intValue(start == null ? null : start.get("line"));
+        int character = intValue(start == null ? null : start.get("character"));
+        String detail = MiniJson.asString(symbol.get("detail"));
+        symbols.add(new NavigationSymbol(name, detail, intValue(symbol.get("kind")), uri, line, character, level));
+        List<Object> children = MiniJson.asArray(symbol.get("children"));
+        if (children == null) return;
+        for (Object child : children) {
+            Map<String, Object> childSymbol = MiniJson.asObject(child);
+            if (childSymbol != null) appendDocumentSymbol(symbols, childSymbol, uri, level + 1);
+        }
+    }
+
+    private static NavigationSymbol parseFlatSymbol(Map<String, Object> symbol, String defaultUri) {
+        String name = MiniJson.asString(symbol.get("name"));
+        if (name == null || name.isBlank()) return null;
+        String detail = MiniJson.asString(symbol.get("containerName"));
+        if (detail == null) detail = MiniJson.asString(symbol.get("detail"));
+        Map<String, Object> location = MiniJson.asObject(symbol.get("location"));
+        String uri = MiniJson.asString(location == null ? null : location.get("uri"));
+        if (uri == null || uri.isBlank()) uri = defaultUri;
+        Map<String, Object> range = MiniJson.asObject(location == null ? null : location.get("range"));
+        Map<String, Object> start = MiniJson.asObject(range == null ? null : range.get("start"));
+        return new NavigationSymbol(name, detail, intValue(symbol.get("kind")), uri,
+            intValue(start == null ? null : start.get("line")), intValue(start == null ? null : start.get("character")), 1);
+    }
+
+    private static int intValue(Object value) {
+        Integer parsed = MiniJson.asInt(value);
+        return parsed == null ? 0 : Math.max(0, parsed);
     }
 
     private Map<String, Object> sendTextDocumentPositionRequest(String method, String uri, int line, int character, long timeoutMs) {

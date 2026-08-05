@@ -27,6 +27,7 @@ final class WorkspaceSearchCoordinator {
         long request = ++activeRequest;
         boolean persistentIndexEnabled = editor.configManager.getWorkspaceIndexEnabled();
         List<QuickfixService.Entry> partialEntries = new ArrayList<>();
+        editor.problemsController.clearQuickfixSource("workspace-search");
         editor.updateQuickfixEntries(title, List.of());
         WorkspaceIndexService.CancellationSource cancellation = new WorkspaceIndexService.CancellationSource();
         int jobId = editor.asyncJobService.submit("workspace search: " + query,

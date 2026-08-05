@@ -28,6 +28,7 @@ final class LspController {
     private Timer lspDecorationTimer;
     private FileBuffer pendingLspDecoration;
     private int lspDecorationJobId = -1;
+    private int workspaceSymbolQueryGeneration;
 
     LspController(Texteditor editor) {
         this.editor = editor;
@@ -456,6 +457,7 @@ final class LspController {
             int column = editor.writingArea.getCaretPosition() - editor.writingArea.getLineStartOffset(line);
             List<LspClient.Location> locations = client.references(uri, line, column, true);
             if (locations.isEmpty()) {
+                editor.problemsController.clearQuickfixSource("lsp");
                 return "No references found";
             }
             List<QuickfixService.Entry> entries = new ArrayList<>();
@@ -467,6 +469,7 @@ final class LspController {
                 entries.add(new QuickfixService.Entry(path, location.getLine() + 1, location.getCharacter() + 1, "reference", "lsp"));
             }
             if (entries.isEmpty()) {
+                editor.problemsController.clearQuickfixSource("lsp");
                 return "No file references found";
             }
             editor.updateQuickfixEntries("lsp references", entries);
@@ -474,6 +477,72 @@ final class LspController {
         } catch (BadLocationException e) {
             return "LSP references failed: " + e.getMessage();
         }
+    }
+
+    String showSymbols(String argument) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
+            return editor.showHeuristicSymbols(argument);
+        }
+        LspClient client = resolveLspClient(buffer);
+        if (client == null || !client.supports(LspCapability.DOCUMENT_SYMBOLS)) {
+            return editor.showHeuristicSymbols(argument);
+        }
+        syncLspOpen(buffer);
+        String uri = bufferUri(buffer);
+        int jobId = editor.asyncJobService.submit("lsp document symbols", token -> {
+            if (token.isCancelled()) return List.<LspClient.NavigationSymbol>of();
+            return client.documentSymbols(uri);
+        }, (snapshot, symbols, error) -> {
+            if (snapshot.getStatus() == AsyncJobService.Status.CANCELLED) return;
+            if (error != null || symbols == null || symbols.isEmpty()) {
+                editor.showHeuristicSymbols(argument);
+                return;
+            }
+            editor.showLspSymbols(symbols, argument, false);
+        });
+        return "Loading document symbols (job " + jobId + ")";
+    }
+
+    String showWorkspaceSymbols(String argument) {
+        String query = argument == null ? "" : argument.trim();
+        if (query.isBlank()) return "Usage: :workspace symbols <query>";
+        FileBuffer active = editor.getCurrentBuffer();
+        if (active != null && active.hasFilePath() && !active.isLargeFile()) syncLspOpen(active);
+        List<LspClient> clients = new ArrayList<>(new LinkedHashSet<>(editor.lspClients.values()));
+        clients.removeIf(client -> client == null || !client.isAlive() || !client.supports(LspCapability.WORKSPACE_SYMBOLS));
+        if (clients.isEmpty()) return "No active LSP server supports workspace symbols";
+        int generation = ++workspaceSymbolQueryGeneration;
+        int jobId = editor.asyncJobService.submit("lsp workspace symbols", token -> collectWorkspaceSymbols(clients, query, token),
+            (snapshot, symbols, error) -> {
+                if (generation != workspaceSymbolQueryGeneration || snapshot.getStatus() == AsyncJobService.Status.CANCELLED) return;
+                if (error != null) { editor.showMessage("Workspace symbol search failed: " + error.getMessage()); return; }
+                if (symbols == null || symbols.isEmpty()) { editor.showMessage("No workspace symbols found: " + query); return; }
+                editor.showLspSymbols(symbols, query, true);
+            });
+        return "Loading workspace symbols (job " + jobId + ")";
+    }
+
+    private List<LspClient.NavigationSymbol> collectWorkspaceSymbols(List<LspClient> clients, String query, AsyncJobService.JobToken token) {
+        Map<String, LspClient.NavigationSymbol> unique = Collections.synchronizedMap(new LinkedHashMap<>());
+        clients.parallelStream().forEach(client -> {
+            if (token.isCancelled()) return;
+            for (LspClient.NavigationSymbol symbol : client.workspaceSymbols(query)) {
+                if (token.isCancelled()) return;
+                String key = symbol.getUri() + "\u0000" + symbol.getLine() + "\u0000" + symbol.getCharacter() + "\u0000" + symbol.getName();
+                unique.putIfAbsent(key, symbol);
+            }
+        });
+        List<LspClient.NavigationSymbol> result = new ArrayList<>(unique.values());
+        result.sort(Comparator.comparing(LspClient.NavigationSymbol::getName, String.CASE_INSENSITIVE_ORDER)
+            .thenComparing(LspClient.NavigationSymbol::getUri, String.CASE_INSENSITIVE_ORDER)
+            .thenComparingInt(LspClient.NavigationSymbol::getLine));
+        return result.size() <= 300 ? result : new ArrayList<>(result.subList(0, 300));
+    }
+
+    String openLspSymbol(LspClient.NavigationSymbol symbol) {
+        if (symbol == null) return "No symbol selected";
+        return openLspLocation(new LspClient.Location(symbol.getUri(), symbol.getLine(), symbol.getCharacter()), "symbol");
     }
 
 
@@ -1704,7 +1773,10 @@ final class LspController {
         try {
             LspClient client = new LspClient(command, args, workspaceRoot, editor.configManager.getLspFeatureSettings());
             client.setWorkspaceEditHandler(this::applyWorkspaceEditFromServer);
-            client.setDiagnosticsChangedHandler(() -> SwingUtilities.invokeLater(this::scheduleDiagnosticRefresh));
+            client.setDiagnosticsChangedHandler(() -> SwingUtilities.invokeLater(() -> {
+                scheduleDiagnosticRefresh();
+                editor.problemsController.diagnosticsChanged();
+            }));
             editor.lspClients.put(key, client);
             editor.lspErrors.remove(key);
             return client;

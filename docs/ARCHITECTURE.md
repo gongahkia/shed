@@ -38,9 +38,10 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `SyntaxUiController` | syntax and breadcrumb presentation | `SyntaxHighlightService`, `SymbolService`, `PerfService` |
 | `SearchReplaceController` | search and substitution UI effects | `SearchManager`, `SubstituteService` |
 | `JobQuickfixController` | tasks, shell jobs, quickfix navigation | `AsyncJobService`, `TaskService`, `QuickfixService` |
+| `ProblemsController` | live diagnostic and retained quickfix aggregation | `ProblemsService`, `LspClient`, tool-window host |
 | `TerminalController` | PTY terminal panes and lifecycle | `PtyTerminalPane`, pane/buffer state |
 | `TreeGitController` | file tree and Git actions | `TreeService`, `GitService` |
-| `LspController` | language-server requests, diagnostics, edits | `LspService`, `LspClient`, `QuickfixService` |
+| `LspController` | language-server requests, diagnostics, edits, symbols | `LspService`, `LspClient`, `QuickfixService` |
 | `MarkdownController` | Markdown tables, folds, snippets, brackets | `MarkdownService`, `SnippetService`, `BracketColorService` |
 | `PaletteController` | file, buffer, symbol, and command palettes | `FuzzyMatchService`, `SymbolService` |
 | `SessionConfigController` | sessions, workspaces, config and help | `ConfigManager`, `HelpService` |

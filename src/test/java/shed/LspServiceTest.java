@@ -48,6 +48,40 @@ public class LspServiceTest {
     }
 
     @Test
+    void parsesHierarchicalAndWorkspaceSymbols() {
+        List<LspClient.NavigationSymbol> document = LspClient.parseNavigationSymbols(MiniJson.parse("["
+            + "{\"name\":\"App\",\"kind\":5,\"selectionRange\":{\"start\":{\"line\":1,\"character\":6}},"
+            + "\"children\":[{\"name\":\"run\",\"detail\":\"void\",\"kind\":6,\"selectionRange\":{\"start\":{\"line\":4,\"character\":2}}}]}]"),
+            "file:///project/App.java", true);
+        List<LspClient.NavigationSymbol> workspace = LspClient.parseNavigationSymbols(MiniJson.parse("["
+            + "{\"name\":\"build\",\"kind\":12,\"containerName\":\"Tools\",\"location\":{\"uri\":\"file:///project/Tools.java\","
+            + "\"range\":{\"start\":{\"line\":9,\"character\":3}}}}]"), "", false);
+
+        assertEquals(2, document.size());
+        assertEquals("App", document.getFirst().getName());
+        assertEquals(1, document.getFirst().getLevel());
+        assertEquals("run", document.get(1).getName());
+        assertEquals(2, document.get(1).getLevel());
+        assertEquals(4, document.get(1).getLine());
+        assertEquals(1, workspace.size());
+        assertEquals("Tools", workspace.getFirst().getDetail());
+        assertEquals("file:///project/Tools.java", workspace.getFirst().getUri());
+        assertEquals(9, workspace.getFirst().getLine());
+    }
+
+    @Test
+    void recognizesServerAdvertisedSymbolCapabilities() {
+        Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
+            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{}}}}"
+        ));
+
+        LspCapabilityModel model = LspCapabilityModel.fromInitializeResult(response, LspFeatureSettings.defaults().capabilityEnablement());
+
+        assertTrue(model.allows(LspCapability.DOCUMENT_SYMBOLS));
+        assertTrue(model.allows(LspCapability.WORKSPACE_SYMBOLS));
+    }
+
+    @Test
     void parsesCompletionDetailsAndMarkdownDocumentation() {
         List<LspClient.CompletionItem> items = LspClient.parseCompletionItems(MiniJson.parse(
             "{\"items\":[{\"label\":\"render\",\"detail\":\"void render()\",\"kind\":3,\"documentation\":{\"kind\":\"markdown\",\"value\":\"Renders a frame.\"}}]}"

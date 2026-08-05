@@ -449,6 +449,7 @@ final class JobQuickfixController {
         List<QuickfixService.Entry> parsedEntries = plan.task().problemMatcher() == TaskService.ProblemMatcher.NONE
             ? List.of()
             : parseTaskQuickfixEntries(output, "task:" + taskName, plan.workingDirectory());
+        if (parsedEntries.isEmpty()) editor.problemsController.clearQuickfixSource("task:" + taskName);
         if (!parsedEntries.isEmpty()) {
             updateQuickfixEntries("task " + taskName + " #" + jobId, parsedEntries);
         }
@@ -740,6 +741,7 @@ final class JobQuickfixController {
             return;
         }
         editor.quickfixService.setEntries(title, entries);
+        editor.problemsController.recordQuickfixEntries(entries);
         if (editor.quickfixBuffer != null && editor.buffers.contains(editor.quickfixBuffer)) {
             editor.quickfixBuffer.setContent(editor.quickfixService.render(), false);
             if (editor.getCurrentBuffer() == editor.quickfixBuffer) {
@@ -948,6 +950,7 @@ final class JobQuickfixController {
 
         String output = result.stdout == null ? "" : result.stdout.stripTrailing();
         List<QuickfixService.Entry> parsedEntries = parseQuickfixEntries(output, "shell");
+        if (parsedEntries.isEmpty()) editor.problemsController.clearQuickfixSource("shell");
         if (!parsedEntries.isEmpty()) {
             updateQuickfixEntries("shell job " + jobId, parsedEntries);
         }

@@ -116,7 +116,7 @@ LSP feature keys appear in `:config inspector` under **Language Server**. Capabi
 
 Managed language support has no configuration key or network path yet. Its planned ownership, consent, catalog, integrity, cache, platform, and revocation policy is documented in [Managed Language Support Trust Model](MANAGED_LANGUAGE_SUPPORT.md); existing `lsp.<ext>.command` and `lsp.<ext>.args` remain user-managed local commands. Java resolves locally through `jdtls` by default and Python through `pyright-langserver --stdio`; set `lsp.java.command` or `lsp.py.command` when an executable or runtime differs.
 
-Shed keeps an independent client for each `(extension, workspace root)` pair, so files from separate projects do not replace each other's server. A server that advertises incremental document synchronization receives debounced range changes; others receive a full-document update for compatibility. Semantic tokens and inlay hints render automatically when supported, with inline rendering controlled separately below.
+Shed keeps an independent client for each `(extension, workspace root)` pair, so files from separate projects do not replace each other's server. A server that advertises incremental document synchronization receives debounced range changes; others receive a full-document update for compatibility. Semantic tokens and inlay hints render automatically when supported, with inline rendering controlled separately below. Document symbols use an on-demand LSP request with local fallback; workspace symbols run only after `:workspace symbols <query>`, so Shed does not build a background project index.
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |

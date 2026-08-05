@@ -79,15 +79,15 @@ final class WorkspaceTextSearchService {
                         if (matchOffset < 0) {
                             break;
                         }
+                        if (matches.size() >= maxResults) {
+                            truncated = true;
+                            break;
+                        }
                         Match match = new Match(file.toString(), lineNumber, matchOffset + 1, preview(line));
                         matches.add(match);
                         batch.add(match);
                         if (batch.size() >= batchSize) {
                             publish(batch, effectiveObserver);
-                        }
-                        if (matches.size() >= maxResults) {
-                            truncated = true;
-                            break;
                         }
                         offset = matchOffset + needle.length();
                     }

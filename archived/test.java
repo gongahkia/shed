@@ -88,14 +88,7 @@ public class test extends JFrame implements KeyListener { // taking JFrame as th
         // writingArea.setBounds(0,0,machinescreen.width/2, machinescreen.height - 130);
         writingArea.addKeyListener(this);
         
-        try {
-            Font hackNerdFont = Font.createFont(Font.TRUETYPE_FONT, new File("hackregfont.ttf")).deriveFont(16f);
-            GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-            ge.registerFont(hackNerdFont);
-            writingArea.setFont(hackNerdFont);
-        } catch (IOException | FontFormatException e) {
-            e.printStackTrace();
-        }
+        writingArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 16));
 
         // --- caret and editor customization
         writingArea.setTabSize(4); // preference to set tab size

@@ -440,10 +440,6 @@ public class Texteditor extends JFrame implements KeyListener {
         return editorUiController.resolveInstalledFont(family, fontSize);
     }
 
-    Font loadBundledHackFont(int fontSize) {
-        return editorUiController.loadBundledHackFont(fontSize);
-    }
-
     // Key event handling
     @Override
     public void keyPressed(KeyEvent e) {

@@ -56,7 +56,9 @@ APP_NAME="Shed"
 ARCHITECTURE="macos-arm64"
 JAR_NAME="shed-$VERSION.jar"
 JAR_PATH="$REPO_ROOT/target/$JAR_NAME"
+ICON_PATH="$REPO_ROOT/assets/logo/shed.icns"
 [[ -f "$JAR_PATH" ]] || fail "missing packaged jar: $JAR_PATH"
+[[ -f "$ICON_PATH" ]] || fail "missing application icon: $ICON_PATH"
 
 PACKAGE_ROOT="$REPO_ROOT/target/macos-package"
 INPUT_DIR="$PACKAGE_ROOT/input"
@@ -73,7 +75,7 @@ printf '%s\n' "$MODULES" > "$PACKAGE_ROOT/runtime-modules.txt"
 
 "$JPACKAGE" --type app-image --dest "$APP_IMAGE_DIR" --input "$INPUT_DIR" --main-jar "$JAR_NAME" --main-class shed.Texteditor \
   --name "$APP_NAME" --app-version "$VERSION" --vendor Shed --description "Shed text editor" --copyright "Copyright Shed" \
-  --mac-package-identifier dev.shed.app --mac-package-name Shed --runtime-image "$RUNTIME_DIR"
+  --mac-package-identifier dev.shed.app --mac-package-name Shed --icon "$ICON_PATH" --runtime-image "$RUNTIME_DIR"
 
 APP_BUNDLE="$APP_IMAGE_DIR/$APP_NAME.app"
 APP_JAR="$APP_BUNDLE/Contents/app/$JAR_NAME"
@@ -92,7 +94,7 @@ SIGNING="$(codesign -dvv "$APP_BUNDLE" 2>&1 | awk -F= '/^Signature=/ {print tolo
 "$RUNTIME_JAVA" -version >/dev/null 2>&1
 RUNTIME_VERSION="$("$RUNTIME_JAVA" -version 2>&1 | awk -F'"' '/version/ {print $2; exit}')"
 [[ "${RUNTIME_VERSION%%.*}" == "21" ]] || fail "bundled runtime is not Java 21"
-jar tf "$APP_JAR" | grep -Fx 'assets/hackregfont.ttf' >/dev/null || fail "bundled font is missing"
+jar tf "$APP_JAR" | grep -Fx 'assets/logo/shed.png' >/dev/null || fail "bundled application logo is missing"
 
 "$JPACKAGE" --type dmg --dest "$DIST_DIR" --name "$APP_NAME" --app-version "$VERSION" --app-image "$APP_BUNDLE"
 GENERATED_DMG="$(find "$DIST_DIR" -maxdepth 1 -type f -name '*.dmg' -print -quit)"

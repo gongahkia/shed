@@ -63,6 +63,8 @@ $architecture = 'windows-x64'
 $jarName = "shed-$version.jar"
 $jarPath = Join-Path $repoRoot "target/$jarName"
 if (-not (Test-Path -LiteralPath $jarPath -PathType Leaf)) { Fail "missing packaged jar: $jarPath" }
+$iconPath = Join-Path $repoRoot 'assets/logo/shed.ico'
+if (-not (Test-Path -LiteralPath $iconPath -PathType Leaf)) { Fail "missing application icon: $iconPath" }
 $packageRoot = Join-Path $repoRoot 'target/windows-package'
 $inputDir = Join-Path $packageRoot 'input'
 $runtimeDir = Join-Path $packageRoot 'runtime'
@@ -82,7 +84,7 @@ Invoke-Native $jlink @('--add-modules', $modules, '--output', $runtimeDir, '--st
 
 Invoke-Native $jpackage @('--type', 'app-image', '--dest', $appImageDir, '--input', $inputDir, '--main-jar', $jarName,
     '--main-class', 'shed.Texteditor', '--name', $appName, '--app-version', $version, '--vendor', 'Shed',
-    '--description', 'Shed text editor', '--copyright', 'Copyright Shed', '--runtime-image', $runtimeDir)
+    '--description', 'Shed text editor', '--copyright', 'Copyright Shed', '--icon', $iconPath, '--runtime-image', $runtimeDir)
 
 $appDirectory = Join-Path $appImageDir $appName
 $appExecutable = Join-Path $appDirectory "$appName.exe"
@@ -98,7 +100,7 @@ if (-not $runtimeVersionMatch.Success -or $runtimeVersionMatch.Groups[1].Value.S
 }
 $runtimeVersion = $runtimeVersionMatch.Groups[1].Value
 $jarEntries = Invoke-Native $jarTool @('tf', $appJar)
-if ($jarEntries -notcontains 'assets/hackregfont.ttf') { Fail 'bundled font is missing' }
+if ($jarEntries -notcontains 'assets/logo/shed.png') { Fail 'bundled application logo is missing' }
 
 Invoke-Native $jpackage @('--type', 'msi', '--dest', $distDir, '--name', $appName, '--app-version', $version, '--app-image', $appDirectory)
 $generatedMsi = Get-ChildItem -LiteralPath $distDir -Filter '*.msi' -File | Select-Object -First 1

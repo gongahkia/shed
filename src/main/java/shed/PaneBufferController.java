@@ -13,12 +13,16 @@ final class PaneBufferController {
     private static final int BACKUP_IDLE_DEBOUNCE_MS = 750;
     private static final int DIFF_GUTTER_DEBOUNCE_MS = 120;
     private final Texteditor editor;
+    private final LandingPageRemoteTransport landingPageRemoteTransport;
     private final Map<FileBuffer, Timer> backupTimers = new IdentityHashMap<>();
     private Timer diffGutterTimer;
     private FileBuffer pendingDiffGutterBuffer;
+    private File landingFile;
 
     PaneBufferController(Texteditor editor) {
         this.editor = editor;
+        this.landingPageRemoteTransport = new LandingPageRemoteTransport();
+        this.landingFile = null;
     }
 
     void handleDocumentChange() {
@@ -293,22 +297,78 @@ final class PaneBufferController {
 
 
     void openLandingPage() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("shed ").append(editor.VERSION).append("\n");
-        builder.append("swing modal editor\n\n");
-        builder.append(":help        view help\n");
-        builder.append(":e <file>    open a file\n");
-        builder.append(":recent      show recent files\n");
-        builder.append(":ls          list open buffers\n\n");
-        builder.append("note: this is a scratch buffer and can be edited.\n");
-
-        FileBuffer landing = FileBuffer.createScratch("[landing]", builder.toString());
-        if (editor.buffers.isEmpty()) {
-            editor.buffers.add(landing);
-        } else {
-            editor.buffers.set(0, landing);
+        try {
+            LandingPageSource.Resolved source = LandingPageSource.resolve(editor.configManager);
+            File file = LandingPageSource.ensureLocalFile(source, source.isRemote() ? remoteLandingPlaceholder(source) : defaultLandingContent());
+            landingFile = file.getAbsoluteFile();
+            FileBuffer landing = findBufferByPath(landingFile);
+            if (landing == null) {
+                landing = new FileBuffer(landingFile, editor.configManager);
+                if (editor.buffers.isEmpty()) {
+                    editor.buffers.add(landing);
+                } else {
+                    editor.buffers.set(0, landing);
+                }
+            }
+            loadBufferIntoEditor(landing);
+            editor.registerFileWatch(landing);
+            if (source.isRemote()) refreshRemoteLanding(source, landing);
+        } catch (IOException error) {
+            landingFile = null;
+            FileBuffer fallback = FileBuffer.createScratch("[landing unavailable]", "Landing page unavailable: " + error.getMessage() + "\n");
+            if (editor.buffers.isEmpty()) {
+                editor.buffers.add(fallback);
+            } else {
+                editor.buffers.set(0, fallback);
+            }
+            loadBufferIntoEditor(fallback);
+            editor.showMessage("Landing page unavailable: " + error.getMessage());
         }
-        loadBufferIntoEditor(landing);
+    }
+
+    private String defaultLandingContent() {
+        return "shed " + editor.VERSION + "\n"
+            + "swing modal editor\n\n"
+            + ":help        view help\n"
+            + ":e <file>    open a file\n"
+            + ":recent      show recent files\n"
+            + ":ls          list open buffers\n\n"
+            + "edit and save this local landing file to customize it.\n";
+    }
+
+    private String remoteLandingPlaceholder(LandingPageSource.Resolved source) {
+        return "Loading remote landing page from " + source.remoteUri() + "...\n";
+    }
+
+    private void refreshRemoteLanding(LandingPageSource.Resolved source, FileBuffer landing) {
+        editor.asyncJobService.submit("Refresh landing page", token -> landingPageRemoteTransport.fetch(
+            source.remoteUri(), editor.configManager.getLandingRemoteTimeoutMs(), token), (job, content, error) -> {
+            if (error != null || content == null) {
+                editor.showMessage("Remote landing refresh failed: " + (error == null ? job.getErrorMessage() : error.getMessage()));
+                return;
+            }
+            if (landing.isModified()) {
+                editor.showMessage("Remote landing refresh skipped: local edits are unsaved");
+                return;
+            }
+            try {
+                AtomicFileWriter.write(landing.getFile().toPath(), content);
+                editor.suppressDocumentEvents = true;
+                try {
+                    landing.load(editor.configManager);
+                } finally {
+                    editor.suppressDocumentEvents = false;
+                }
+                if (editor.getCurrentBuffer() == landing) {
+                    editor.applySyntaxHighlighting();
+                    editor.refreshLineNumberPanel();
+                    editor.updateStatusBar();
+                }
+                editor.showMessage("Remote landing refreshed: " + source.remoteUri());
+            } catch (IOException writeError) {
+                editor.showMessage("Remote landing cache update failed: " + writeError.getMessage());
+            }
+        });
     }
 
 
@@ -734,7 +794,8 @@ final class PaneBufferController {
             return false;
         }
         FileBuffer current = editor.buffers.get(0);
-        return current.isScratch() && "[landing]".equals(current.getDisplayName()) && !current.isModified();
+        if (current.isScratch()) return "[landing]".equals(current.getDisplayName()) && !current.isModified();
+        return landingFile != null && current.hasFilePath() && landingFile.equals(current.getFile().getAbsoluteFile()) && !current.isModified();
     }
 
 }

@@ -61,7 +61,7 @@ public class NetworkConsentAuditTest {
     @Test
     void appOwnedOutboundPrimitivesRemainDocumented() throws IOException {
         assertEquals(Set.of("PluginManager.java"), sourcesContaining("openConnection("));
-        assertEquals(Set.of("UpdateMetadataTransport.java"), sourcesContaining("HttpClient.newBuilder("));
+        assertEquals(Set.of("LandingPageRemoteTransport.java", "UpdateMetadataTransport.java"), sourcesContaining("HttpClient.newBuilder("));
         assertEquals(Set.of("DebugAdapterTransport.java"), sourcesContaining("new Socket("));
         assertEquals(Set.of("EditActionController.java", "MarkdownController.java", "UpdateController.java"), sourcesContaining(".browse("));
         assertEquals(Set.of(
@@ -71,7 +71,7 @@ public class NetworkConsentAuditTest {
         assertEquals(Set.of("PtyTerminalPane.java"), sourcesContaining("PtyProcessBuilder"));
 
         String audit = Files.readString(Path.of("docs/NETWORK_PRIVACY.md"));
-        for (String source : Set.of("PluginManager", "DebugAdapterTransport", "GitHub", "UpdateMetadataTransport", "ManagedLanguageCatalog", "browser", "child processes")) {
+        for (String source : Set.of("PluginManager", "DebugAdapterTransport", "GitHub", "UpdateMetadataTransport", "LandingPageRemoteTransport", "ManagedLanguageCatalog", "browser", "child processes")) {
             assertTrue(audit.contains(source), "audit missing " + source);
         }
     }

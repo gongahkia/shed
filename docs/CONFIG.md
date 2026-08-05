@@ -11,6 +11,8 @@ This is the complete TOML configuration reference for `Shed`.
 | `~/.shed/sessions/` | Saved session/workspace data (default) |
 | `.shed.toml` | Optional per-project override file (nearest parent directory) |
 
+The Settings Editor writes `~/.shed/config.toml`; `settings.toml` is not loaded.
+
 ## File Format
 
 | Rule | Details |
@@ -74,6 +76,15 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `limelight.paragraph.span` | `0` | int | Adjacent paragraphs retained at full brightness |
 | `multi.selection.enabled` | `false` | bool | Enable experimental multi-selection editing |
 | `multi.selection.max.cursors` | `16` | int | Maximum total cursors when enabled; `2..256` |
+| `landing.source` | `~/.shed/landing.md` | string | Local path, `file:` URI, or explicitly configured HTTPS URL |
+| `landing.remote.cache.path` | `~/.shed/landing.remote.md` | path | Local editable cache for an HTTPS source |
+| `landing.remote.timeout.ms` | `5000` | int | HTTPS source timeout; `1000..30000` |
+
+## Landing Page
+
+At startup without a file argument or restored session, Shed opens `landing.source` as a normal file buffer. The default `~/.shed/landing.md` is created with the startup text on its first use, then can be edited and saved like any other file. Relative paths resolve from the user home directory; `file:` URIs are local paths.
+
+An `https://` `landing.source` is an explicit global opt-in to fetch that URL when the landing page opens. Shed uses HTTPS only, never follows redirects, limits the response to 1 MiB, and caches it in `landing.remote.cache.path`; edits save to that local cache and are never uploaded. Project `.shed.toml` cannot override landing settings.
 
 ## Session, File, and Shell Limits
 
@@ -330,6 +341,11 @@ schema_version = 1
 "scrolloff" = 3
 "textwidth" = 88
 "ruler.column" = 88
+
+# Landing page
+"landing.source" = "~/.shed/landing.md"
+# "landing.source" = "https://example.com/start.md"
+# "landing.remote.cache.path" = "~/.shed/landing.remote.md"
 
 # Session + safety
 "session.restore.on.start" = true

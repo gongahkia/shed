@@ -55,6 +55,9 @@ public class ConfigManagerTest {
         assertTrue(config.getHighlightSearch());
         assertFalse(config.getSessionRestoreOnStart());
         assertFalse(config.getTerminalSessionRestoreEnabled());
+        assertEquals(home.resolve(".shed/landing.md").toString(), config.getLandingSource());
+        assertEquals(home.resolve(".shed/landing.remote.md").toString(), config.getLandingRemoteCachePath());
+        assertEquals(5000, config.getLandingRemoteTimeoutMs());
         TypedSettings.Descriptor terminalRestore = config.typedSettingDescriptors().stream()
             .filter(setting -> setting.key().equals("terminal.session.restore")).findFirst().orElseThrow();
         assertEquals("Terminal", terminalRestore.category());
@@ -114,6 +117,24 @@ public class ConfigManagerTest {
         assertTrue(config.getBackupPolicy().enabled());
         assertEquals(BackupPolicy.BackupMode.SAVE_ONLY, config.getBackupPolicy().mode());
         assertEquals("backup.mode must be idle or save-only", config.validateSettingValue("backup.mode", "always"));
+    }
+
+    @Test
+    void configuresLandingSource() {
+        Path home = tempDir.resolve("home-landing");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.set("landing.source", "notes/start.md");
+        config.set("landing.remote.cache.path", "cache/remote.md");
+        config.set("landing.remote.timeout.ms", "6000");
+
+        assertEquals("notes/start.md", config.getLandingSource());
+        assertEquals("cache/remote.md", config.getLandingRemoteCachePath());
+        assertEquals(6000, config.getLandingRemoteTimeoutMs());
+        assertEquals("landing.remote.timeout.ms must be between 1000 and 30000",
+            config.validateSettingValue("landing.remote.timeout.ms", "999"));
+        assertFalse(config.isProjectConfigKeyAllowed("landing.source"));
     }
 
     @Test

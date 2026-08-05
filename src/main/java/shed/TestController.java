@@ -32,6 +32,7 @@ final class TestController {
     }
 
     private record Execution(Path root, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command, CommandResult result) { }
+    private record StaticDiscovery(Path root, TestService.AdapterSpec spec, List<TestService.TestCase> tests) { }
 
     private final Texteditor editor;
     private final TestService tests;
@@ -81,6 +82,7 @@ final class TestController {
 
     Result refresh(Path root) {
         State state = state(root);
+        for (TestService.AdapterSpec spec : state.specs) editor.problemsController.clearQuickfixSource("test:" + spec.id());
         TestService.LoadResult loaded = tests.load(state.root);
         state.specs = loaded.specs();
         state.diagnostics = loaded.diagnostics();
@@ -93,13 +95,12 @@ final class TestController {
             TestAdapter adapter = tests.adapter(raw.id());
             TestService.AdapterSpec spec = tests.resolvedSpec(state.root, raw);
             if (adapter == null || spec == null) continue;
-            List<TestService.TestCase> staticTests = tests.staticDiscovery(state.root, spec);
-            if (!staticTests.isEmpty()) merge(state, staticTests);
+            if ("maven".equals(spec.id()) || "gradle".equals(spec.id())) started += startStaticDiscovery(state, spec);
             TestService.Command command = adapter.discovery(spec);
             if (!command.executable()) continue;
             started += start(state, "discover", spec, adapter, command);
         }
-        if (started == 0) { state.output = state.tests.isEmpty() ? "No runnable discovery command; Java tests listed from src/test/java." : "Discovery complete."; refreshPanel(); }
+        if (started == 0) { state.output = "No runnable discovery command."; refreshPanel(); }
         return new Result(started == 0 ? "Test discovery complete" : "Test discovery requested (" + started + " job" + (started == 1 ? "" : "s") + ")");
     }
 
@@ -177,6 +178,29 @@ final class TestController {
         state.output = operation + " " + spec.id() + " running (job " + jobId + ")";
         refreshPanel();
         return 1;
+    }
+
+    private int startStaticDiscovery(State state, TestService.AdapterSpec spec) {
+        int jobId = editor.asyncJobService.submit("test " + spec.id() + " discover", token ->
+            new StaticDiscovery(state.root, spec, token.isCancelled() ? List.of() : tests.staticDiscovery(state.root, spec)),
+            (job, discovery, error) -> completeStaticDiscovery(job, discovery, error));
+        state.jobs.put(jobId, spec.id());
+        state.output = "discover " + spec.id() + " running (job " + jobId + ")";
+        refreshPanel();
+        return 1;
+    }
+
+    private void completeStaticDiscovery(AsyncJobService.JobSnapshot job, StaticDiscovery discovery, Exception error) {
+        if (discovery == null) return;
+        State state = state(discovery.root());
+        state.jobs.remove(job.getId());
+        if (job.getStatus() == AsyncJobService.Status.CANCELLED) state.output = discovery.spec().id() + " discovery cancelled";
+        else if (error != null) state.output = discovery.spec().id() + " discovery failed: " + error.getMessage();
+        else {
+            merge(state, discovery.tests());
+            state.output = discovery.tests().isEmpty() ? "No Java tests found." : discovery.tests().size() + " Java tests discovered.";
+        }
+        refreshPanel();
     }
 
     private void complete(AsyncJobService.JobSnapshot job, Execution execution, Exception error) {

@@ -54,7 +54,7 @@ final class TestAdapterRegistry {
         @Override public TestService.Command discovery(TestService.AdapterSpec spec) { return new TestService.Command(List.of(), List.of()); }
         @Override public TestService.Command run(TestService.AdapterSpec spec, List<TestService.TestCase> selected, Path cache) {
             List<String> command = new ArrayList<>(base(spec));
-            if (!selected.isEmpty()) command.add("-Dtest=" + selected.getFirst().id());
+            if (!selected.isEmpty()) command.add("-Dtest=" + selected.stream().map(TestService.TestCase::id).collect(java.util.stream.Collectors.joining(",")));
             command.add("test");
             return command(command, Path.of("target", "surefire-reports"), Path.of("target", "failsafe-reports"));
         }
@@ -72,7 +72,7 @@ final class TestAdapterRegistry {
         @Override public TestService.Command run(TestService.AdapterSpec spec, List<TestService.TestCase> selected, Path cache) {
             List<String> command = new ArrayList<>(base(spec));
             command.add("test");
-            if (!selected.isEmpty()) { command.add("--tests"); command.add(selected.getFirst().id().replace('#', '.')); }
+            for (TestService.TestCase test : selected) { command.add("--tests"); command.add(test.id().replace('#', '.')); }
             return command(command, Path.of("build", "test-results", "test"));
         }
         @Override public List<TestService.TestCase> parseDiscovery(Path root, String output) { return noDiscovery(root, output); }
@@ -97,7 +97,7 @@ final class TestAdapterRegistry {
         @Override public TestService.Command run(TestService.AdapterSpec spec, List<TestService.TestCase> selected, Path cache) {
             Path report = cache.resolve("pytest.xml");
             List<String> command = new ArrayList<>(base(spec));
-            if (!selected.isEmpty()) command.add(selected.getFirst().id());
+            for (TestService.TestCase test : selected) command.add(test.id());
             command.add("--junit-xml=" + report);
             return command(command, report);
         }
@@ -145,7 +145,7 @@ final class TestAdapterRegistry {
         @Override public TestService.Command run(TestService.AdapterSpec spec, List<TestService.TestCase> selected, Path cache) {
             Path report = cache.resolve("jest.json");
             List<String> command = new ArrayList<>(base(spec));
-            if (!selected.isEmpty()) command.add(selected.getFirst().file() == null ? selected.getFirst().id() : selected.getFirst().file().toString());
+            for (TestService.TestCase test : selected) command.add(test.file() == null ? test.id() : test.file().toString());
             command.add("--json"); command.add("--outputFile=" + report);
             return command(command, report);
         }
@@ -158,7 +158,7 @@ final class TestAdapterRegistry {
             Path report = cache.resolve("vitest.json");
             List<String> command = new ArrayList<>(base(spec));
             command.add("run");
-            if (!selected.isEmpty()) command.add(selected.getFirst().file() == null ? selected.getFirst().id() : selected.getFirst().file().toString());
+            for (TestService.TestCase test : selected) command.add(test.file() == null ? test.id() : test.file().toString());
             command.add("--reporter=json"); command.add("--outputFile=" + report);
             return command(command, report);
         }
@@ -171,7 +171,10 @@ final class TestAdapterRegistry {
         @Override public TestService.Command discovery(TestService.AdapterSpec spec) { List<String> command = new ArrayList<>(base(spec)); command.addAll(List.of("test", "-list", ".", "./...")); return new TestService.Command(command, List.of()); }
         @Override public TestService.Command run(TestService.AdapterSpec spec, List<TestService.TestCase> selected, Path cache) {
             List<String> command = new ArrayList<>(base(spec)); command.addAll(List.of("test", "-json", "./..."));
-            if (!selected.isEmpty()) { command.add("-run"); command.add("^" + java.util.regex.Pattern.quote(selected.getFirst().name()) + "$"); }
+            if (!selected.isEmpty()) {
+                command.add("-run");
+                command.add("^(?:" + selected.stream().map(TestService.TestCase::name).map(java.util.regex.Pattern::quote).collect(java.util.stream.Collectors.joining("|")) + ")$");
+            }
             return new TestService.Command(command, List.of());
         }
         @Override public List<TestService.TestCase> parseDiscovery(Path root, String output) {

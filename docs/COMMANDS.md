@@ -84,6 +84,20 @@ Notes:
 - `:task run test` and `:task run build` have built-in fallbacks for Maven/npm/Make projects if not explicitly defined.
 - Task schema, variable, shell, quickfix, and presentation policy: [Workspace Tasks](TASKS.md).
 
+## Test Explorer
+
+| Command | Action |
+| :--- | :--- |
+| `:test`, `:test ui` | Open the docked Tests panel; this does not scan or start a process |
+| `:test refresh` | Explicitly detect configured/local runners and discover tests |
+| `:test run` | Run every detected/configured adapter in the selected workspace root |
+| `:test run <test-id>` | Run one discovered test by its exact id |
+| `:test failed`, `:test rerun-failed` | Run the failed tests retained for this session |
+| `:test cancel` | Cancel running test jobs for the selected root |
+| `:test text` | Open a text summary of the session-local test state |
+
+The Tests panel supports root selection, status/text filtering, Refresh, Run All, Run Selection, Rerun Failed, Cancel, output inspection, and source navigation. Tests are discovered only after an explicit refresh. Failure locations are also published to Problems under `test:<adapter>` without replacing quickfix entries. Adapter declarations, direct argv overrides, report-cache policy, and supported built-ins are in [Testing](TESTS.md).
+
 ## Settings and Configuration
 
 ### `:set` command

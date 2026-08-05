@@ -11,6 +11,7 @@ This is the complete TOML configuration reference for `Shed`.
 | `~/.shed/plugins/` | User plugin directory (`.shed` + `.lua`) |
 | `~/.shed/sessions/` | Saved session/workspace data (default) |
 | `.shed.toml` | Optional per-project override file (nearest parent directory) |
+| `.shedtests` | Optional workspace-local Test Explorer adapter declarations; not part of global settings |
 
 The Settings Editor writes `~/.shed/config.toml`; `settings.toml` is not loaded.
 

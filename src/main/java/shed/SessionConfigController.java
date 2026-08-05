@@ -473,6 +473,7 @@ final class SessionConfigController {
         for (FileBuffer buffer : editor.buffers) {
             buffer.applyUndoHistoryPolicy();
         }
+        editor.applyUiFont();
         Font editorFont = editor.resolveEditorFont();
         int tabSize = Math.max(1, editor.configManager.getTabSize());
         for (EditorPane pane : editor.editorPanes) {

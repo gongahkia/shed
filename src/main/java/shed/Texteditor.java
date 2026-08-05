@@ -436,6 +436,18 @@ public class Texteditor extends JFrame implements KeyListener {
         return editorUiController.resolveEditorFont();
     }
 
+    Font resolveUiFont() {
+        return editorUiController.resolveUiFont();
+    }
+
+    Font resolveTerminalFont() {
+        return editorUiController.resolveTerminalFont();
+    }
+
+    void applyUiFont() {
+        editorUiController.applyUiFont();
+    }
+
     Font resolveInstalledFont(String family, int fontSize) {
         return editorUiController.resolveInstalledFont(family, fontSize);
     }

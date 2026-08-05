@@ -4,6 +4,7 @@ import javax.swing.*;
 import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.plaf.FontUIResource;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Highlighter;
 import javax.swing.text.Segment;
@@ -23,6 +24,7 @@ import java.util.regex.Pattern;
 final class EditorUiController {
     private static final int STATUS_REFRESH_DEBOUNCE_MS = 33;
     private final Texteditor editor;
+    private final Map<Object, Font> systemUiFonts;
     private final DefaultListModel<String> commandPathModel = new DefaultListModel<>();
     private JPopupMenu commandPathPopup;
     private JList<String> commandPathList;
@@ -31,12 +33,14 @@ final class EditorUiController {
 
     EditorUiController(Texteditor editor) {
         this.editor = editor;
+        this.systemUiFonts = captureSystemUiFonts();
     }
 
     void initializeUI() {
         editor.setTitle("Shed " + editor.VERSION);
         editor.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setApplicationIcon();
+        applyUiFont();
 
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         editor.setSize(screenSize.width / 2, screenSize.height);
@@ -481,6 +485,42 @@ final class EditorUiController {
         String configuredFamily = editor.configManager.getFontFamily();
         Font configuredFont = resolveInstalledFont(configuredFamily, fontSize);
         return configuredFont != null ? configuredFont : new Font(Font.MONOSPACED, Font.PLAIN, fontSize);
+    }
+
+    Font resolveUiFont() {
+        Font systemFont = systemUiFonts.getOrDefault("Label.font", new Font(Font.DIALOG, Font.PLAIN, 13));
+        return configuredUiFont(systemFont);
+    }
+
+    Font resolveTerminalFont() {
+        int fontSize = editor.configManager.getTerminalFontSize();
+        Font configuredFont = resolveInstalledFont(editor.configManager.getTerminalFontFamily(), fontSize);
+        return configuredFont != null ? configuredFont : new Font(Font.MONOSPACED, Font.PLAIN, fontSize);
+    }
+
+    void applyUiFont() {
+        for (Map.Entry<Object, Font> entry : systemUiFonts.entrySet()) {
+            UIManager.put(entry.getKey(), new FontUIResource(configuredUiFont(entry.getValue())));
+        }
+        SwingUtilities.updateComponentTreeUI(editor);
+    }
+
+    private Map<Object, Font> captureSystemUiFonts() {
+        Map<Object, Font> fonts = new HashMap<>();
+        for (Map.Entry<Object, Object> entry : UIManager.getDefaults().entrySet()) {
+            if (entry.getKey() instanceof String key && key.endsWith(".font") && entry.getValue() instanceof Font font) {
+                fonts.put(entry.getKey(), font);
+            }
+        }
+        return fonts;
+    }
+
+    private Font configuredUiFont(Font systemFont) {
+        int requestedSize = editor.configManager.getUiFontSize();
+        Font configuredFamily = resolveInstalledFont(editor.configManager.getUiFontFamily(), Math.max(1, requestedSize));
+        String family = configuredFamily == null ? systemFont.getFamily() : configuredFamily.getFamily();
+        int size = requestedSize == 0 ? systemFont.getSize() : requestedSize;
+        return new Font(family, systemFont.getStyle(), size);
     }
 
 

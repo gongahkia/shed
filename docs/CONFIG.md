@@ -56,8 +56,12 @@ The inspector and generated reference derive each typed setting's identifier, de
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
 | `theme` | `one-dark-pro` | string | Built-in theme id |
-| `font.family` | `Monospaced` | string | Java logical monospace font resolved by the local machine |
-| `font.size` | `16` | int | Editor font size |
+| `font.family` | `Monospaced` | string | Buffer font family; Java logical monospace resolves locally |
+| `font.size` | `16` | int | Buffer font size |
+| `ui.font.family` | empty | string | UI font family; empty retains the system UI font |
+| `ui.font.size` | `0` | int | UI font size; `0` retains each system UI default size |
+| `terminal.font.family` | `Monospaced` | string | Terminal font family |
+| `terminal.font.size` | `14` | int | Terminal font size |
 | `tab.size` | `4` | int | Tab width (`:set ts=` command clamps to `1..16`) |
 | `line.numbers` | `absolute` | enum | `none`, `absolute`, `relative`, `relativeabsolute` (`hybrid` alias supported) |
 | `show.current.line` | `true` | bool | Highlight active line |
@@ -332,6 +336,10 @@ schema_version = 1
 "theme" = "nightfox"
 "font.family" = "Monospaced"
 "font.size" = 16
+"ui.font.family" = ""
+"ui.font.size" = 0
+"terminal.font.family" = "Monospaced"
+"terminal.font.size" = 14
 "tab.size" = 4
 "line.numbers" = "relative"
 "show.current.line" = true

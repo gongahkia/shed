@@ -274,7 +274,8 @@ final class TypedSettings {
         return switch (key) {
             case "tab.size" -> "integer 1..16";
             case "keymap.profile" -> "vim | plain | emacs";
-            case "font.size" -> "integer >= 1";
+            case "font.size", "terminal.font.size" -> "integer >= 1";
+            case "ui.font.size" -> "integer >= 0";
             case "line.numbers" -> "none | absolute | relative | relativeabsolute | hybrid";
             case "multi.selection.max.cursors" -> "integer " + MultiSelectionPolicy.MIN_MAX_CURSORS + ".." + MultiSelectionPolicy.MAX_MAX_CURSORS;
             case "minimap.width" -> "integer >= 40";
@@ -310,6 +311,12 @@ final class TypedSettings {
         }
         if (key.equals("terminal.session.restore")) {
             return "Live: checked when saving or loading a session";
+        }
+        if (key.startsWith("terminal.font.")) {
+            return "Live: used by newly opened terminals";
+        }
+        if (key.startsWith("ui.font.")) {
+            return "Live: applies to the application UI";
         }
         if (key.startsWith("landing.")) {
             return "Live: used when the landing page next opens";
@@ -400,8 +407,11 @@ final class TypedSettings {
             if ("tab.size".equals(key) && (number < 1 || number > 16)) {
                 return key + " must be between 1 and 16";
             }
-            if ("font.size".equals(key) && number < 1) {
+            if (("font.size".equals(key) || "terminal.font.size".equals(key)) && number < 1) {
                 return key + " must be at least 1";
+            }
+            if ("ui.font.size".equals(key) && number < 0) {
+                return key + " must be non-negative";
             }
             if (("updates.check.timeout.ms".equals(key) || "landing.remote.timeout.ms".equals(key))
                 && (number < 1000 || number > 30000)) {

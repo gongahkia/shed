@@ -91,4 +91,31 @@ public class MarkdownPreviewRendererTest {
         assertTrue(html.contains("footnotes"));
         assertTrue(html.contains("markdown-alert"));
     }
+
+    @Test
+    void rendersTexDelimitersAndLeavesCodeFencesUntouched() {
+        String markdown = """
+            ~~removed~~ and `$literal$`
+
+            \\(\\sqrt{2}\\)
+
+            \\[
+            a + b
+            \\]
+
+            ```text
+            $not math$
+            ```
+            """;
+
+        String html;
+        try (MarkdownPreviewAssets assets = new MarkdownPreviewAssets()) {
+            html = MarkdownPreviewRenderer.render(markdown, "Preview", new Font(Font.DIALOG, Font.PLAIN, 13), Color.WHITE, Color.BLACK, assets, null);
+        }
+
+        assertTrue(html.contains("<del>removed</del>"));
+        assertTrue(html.contains("<code>$literal$</code>"));
+        assertTrue(html.contains("<pre><code class=\"language-text\">$not math$"));
+        assertTrue(html.indexOf("alt=\"math\"") != html.lastIndexOf("alt=\"math\""));
+    }
 }

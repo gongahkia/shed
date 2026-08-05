@@ -462,6 +462,7 @@ final class SessionConfigController {
 
 
     void applyRuntimeConfigFromSettings() {
+        editor.snippetService.loadFromConfig(editor.configManager);
         MultiSelectionPolicy multiSelection = editor.configManager.getMultiSelectionPolicy();
         if (!multiSelection.enabled()) {
             editor.clearExtraCursors();
@@ -511,6 +512,25 @@ final class SessionConfigController {
             return "Opened settings: " + settingsFile.getAbsolutePath();
         } catch (IOException e) {
             return "Error opening settings: " + e.getMessage();
+        }
+    }
+
+    public String openSnippetsBuffer() {
+        Path directory = Path.of(editor.configManager.getSnippetsDirectory());
+        Path snippets = directory.resolve("snippets.json");
+        try {
+            Files.createDirectories(directory);
+            if (Files.notExists(snippets)) {
+                Files.writeString(snippets, "{\n  \"Log to console\": {\n    \"prefix\": \"log\",\n"
+                    + "    \"body\": [\"console.log(${1:value});\", \"$0\"],\n"
+                    + "    \"description\": \"Log a value\"\n  }\n}\n", StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+            }
+            editor.snippetService.loadFromConfig(editor.configManager);
+            editor.openFile(snippets.toFile());
+            return "Opened snippets: " + snippets;
+        } catch (IOException error) {
+            return "Error opening snippets: " + error.getMessage();
         }
     }
 

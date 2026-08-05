@@ -314,6 +314,7 @@ public class Texteditor extends JFrame implements KeyListener {
         markdownService = new MarkdownService();
         fuzzyMatchService = new FuzzyMatchService();
         snippetService = new SnippetService();
+        snippetService.loadFromConfig(configManager);
         bracketColorService = new BracketColorService();
         markdownController = new MarkdownController(this);
         paneBufferController = new PaneBufferController(this);
@@ -955,6 +956,9 @@ public class Texteditor extends JFrame implements KeyListener {
     void dismissCompletionPopup() {
         inputController.dismissCompletionPopup();
     }
+    void dismissCompletionPopupForCaretMove() {
+        inputController.dismissCompletionPopupForCaretMove();
+    }
     boolean isCompletionPopupVisible() {
         return inputController.isCompletionPopupVisible();
     }
@@ -1311,7 +1315,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     String expandSnippetAtCursor() {
-        return markdownController.expandSnippetAtCursor();
+        return inputController.expandNativeSnippetAtCursor();
     }
 
     public String listSnippets() {
@@ -2742,6 +2746,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String openSettingsBuffer() {
         return sessionConfigController.openSettingsBuffer();
+    }
+
+    public String openSnippetsBuffer() {
+        return sessionConfigController.openSnippetsBuffer();
     }
 
     public String openCommandLogBuffer() {

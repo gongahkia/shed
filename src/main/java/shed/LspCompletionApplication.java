@@ -2,13 +2,11 @@ package shed;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Map;
 import java.util.List;
 
 final class LspCompletionApplication {
-    record Placeholder(int start, int end) {
-    }
-
-    record Result(String text, int caret, List<Placeholder> placeholders, boolean fallback) {
+    record Result(String text, int caret, List<SnippetExpansion.Placeholder> placeholders, boolean fallback) {
     }
 
     static Result apply(String source, int caret, String prefix, LspClient.CompletionItem item) {
@@ -35,7 +33,7 @@ final class LspCompletionApplication {
         }
         ResolvedEdit primary = resolved.stream().filter(ResolvedEdit::primary).findFirst().orElse(null);
         if (primary == null) return new Result(replace(safeSource, fallbackStart, safeCaret, fallbackText), fallbackStart + fallbackText.length(), List.of(), true);
-        Expansion expansion = item.isSnippet() ? Expansion.parse(primary.text()) : Expansion.plain(primary.text());
+        SnippetExpansion.Result expansion = item.isSnippet() ? SnippetExpansion.parse(primary.text(), Map.of()) : plain(primary.text());
         if (expansion == null) return new Result(replace(safeSource, fallbackStart, safeCaret, fallbackText), fallbackStart + fallbackText.length(), List.of(), true);
         StringBuilder updated = new StringBuilder(safeSource);
         int primaryStart = primary.start();
@@ -49,17 +47,15 @@ final class LspCompletionApplication {
             String value = edit.primary() ? expansion.text() : edit.text();
             updated.replace(edit.start(), edit.end(), value);
         }
-        List<Placeholder> placeholders = new ArrayList<>();
-        for (IndexedPlaceholder placeholder : expansion.placeholders()) placeholders.add(new Placeholder(primaryStart + placeholder.start(), primaryStart + placeholder.end()));
+        List<SnippetExpansion.Placeholder> placeholders = offsetPlaceholders(primaryStart, expansion.placeholders());
         int finalCaret = placeholders.isEmpty() ? primaryStart + expansion.text().length() : placeholders.get(0).start();
         return new Result(updated.toString(), finalCaret, placeholders, false);
     }
 
     private static Result applyInsertion(String source, int start, int end, String text, boolean snippet, String fallbackText) {
-        Expansion expansion = snippet ? Expansion.parse(text) : Expansion.plain(text);
+        SnippetExpansion.Result expansion = snippet ? SnippetExpansion.parse(text, Map.of()) : plain(text);
         if (expansion == null) return new Result(replace(source, start, end, fallbackText), start + fallbackText.length(), List.of(), true);
-        List<Placeholder> placeholders = new ArrayList<>();
-        for (IndexedPlaceholder placeholder : expansion.placeholders()) placeholders.add(new Placeholder(start + placeholder.start(), start + placeholder.end()));
+        List<SnippetExpansion.Placeholder> placeholders = offsetPlaceholders(start, expansion.placeholders());
         int caret = placeholders.isEmpty() ? start + expansion.text().length() : placeholders.get(0).start();
         return new Result(replace(source, start, end, expansion.text()), caret, placeholders, false);
     }
@@ -84,45 +80,15 @@ final class LspCompletionApplication {
     private record ResolvedEdit(int start, int end, String text, boolean primary) {
     }
 
-    private record IndexedPlaceholder(int index, int start, int end) {
+    private static SnippetExpansion.Result plain(String text) {
+        return new SnippetExpansion.Result(text == null ? "" : text, List.of());
     }
 
-    private record Expansion(String text, List<IndexedPlaceholder> placeholders) {
-        static Expansion plain(String text) { return new Expansion(text == null ? "" : text, List.of()); }
-        static Expansion parse(String source) {
-            String input = source == null ? "" : source;
-            StringBuilder text = new StringBuilder();
-            List<IndexedPlaceholder> placeholders = new ArrayList<>();
-            for (int i = 0; i < input.length(); i++) {
-                char c = input.charAt(i);
-                if (c == '\\' && i + 1 < input.length()) { text.append(input.charAt(++i)); continue; }
-                if (c != '$') { text.append(c); continue; }
-                if (i + 1 >= input.length()) return null;
-                if (Character.isDigit(input.charAt(i + 1))) {
-                    int end = ++i;
-                    while (end + 1 < input.length() && Character.isDigit(input.charAt(end + 1))) end++;
-                    int index = Integer.parseInt(input.substring(i, end + 1));
-                    int start = text.length();
-                    placeholders.add(new IndexedPlaceholder(index, start, start));
-                    i = end;
-                    continue;
-                }
-                if (input.charAt(i + 1) != '{') return null;
-                int close = input.indexOf('}', i + 2);
-                if (close < 0) return null;
-                String body = input.substring(i + 2, close);
-                int colon = body.indexOf(':');
-                String indexText = colon < 0 ? body : body.substring(0, colon);
-                if (indexText.isEmpty() || !indexText.chars().allMatch(Character::isDigit)) return null;
-                int index = Integer.parseInt(indexText);
-                String defaultText = colon < 0 ? "" : body.substring(colon + 1);
-                int start = text.length();
-                text.append(defaultText);
-                placeholders.add(new IndexedPlaceholder(index, start, text.length()));
-                i = close;
-            }
-            placeholders.sort(Comparator.comparingInt(placeholder -> placeholder.index() == 0 ? Integer.MAX_VALUE : placeholder.index()));
-            return new Expansion(text.toString(), placeholders);
+    private static List<SnippetExpansion.Placeholder> offsetPlaceholders(int baseOffset, List<SnippetExpansion.Placeholder> source) {
+        List<SnippetExpansion.Placeholder> placeholders = new ArrayList<>();
+        for (SnippetExpansion.Placeholder placeholder : source) {
+            placeholders.add(new SnippetExpansion.Placeholder(placeholder.index(), baseOffset + placeholder.start(), baseOffset + placeholder.end()));
         }
+        return List.copyOf(placeholders);
     }
 }

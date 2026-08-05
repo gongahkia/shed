@@ -192,7 +192,10 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleTableCommand(args), "table");
         registerCommand((args, range, force) -> editor.insertLink(), "link");
         registerCommand((args, range, force) -> editor.insertImage(), "img", "image");
-        registerCommand((args, range, force) -> editor.listSnippets(), "snippets", "snippet");
+        registerCommand((args, range, force) -> {
+            String operation = args == null ? "" : args.trim().toLowerCase(Locale.ROOT);
+            return operation.equals("open") || operation.equals("edit") ? editor.openSnippetsBuffer() : editor.listSnippets();
+        }, "snippets", "snippet");
         registerCommand((args, range, force) -> editor.toggleBracketColors(), "bracketcolor", "bracketcolors");
         registerCommand((args, range, force) -> editor.openTerminal(), "term", "terminal");
         registerCommand((args, range, force) -> handleConceal(args), "conceal", "conceallevel");

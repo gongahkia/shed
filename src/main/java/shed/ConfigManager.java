@@ -92,6 +92,12 @@ public class ConfigManager {
     private static final boolean DEFAULT_MARKDOWN_PREVIEW_SCROLL_SYNC = true;
     private static final boolean DEFAULT_LSP_SEMANTIC_TOKENS_INLINE = true;
     private static final boolean DEFAULT_LSP_INLAY_HINTS_INLINE = true;
+    private static final boolean DEFAULT_LSP_COMPLETION_AUTO_SHOW = true;
+    private static final int DEFAULT_LSP_COMPLETION_DELAY_MS = 90;
+    private static final boolean DEFAULT_LSP_COMPLETION_TRIGGER_CHARACTERS = true;
+    private static final boolean DEFAULT_LSP_COMPLETION_FUZZY_MATCHING = true;
+    private static final boolean DEFAULT_LSP_COMPLETION_LOCAL_WORDS = true;
+    private static final boolean DEFAULT_LSP_COMPLETION_COMMIT_CHARACTERS = true;
     private static final boolean DEFAULT_UI_WHICHKEY_HINTS = true;
     private static final boolean DEFAULT_PROJECT_CONFIG_ENABLED = true;
     private static final boolean DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE = false;
@@ -273,6 +279,12 @@ public class ConfigManager {
         LspFeatureSettings lspFeatures = LspFeatureSettings.defaults();
         defineDefault("lsp.completion.enabled", lspFeatures.completion());
         defineDefault("lsp.snippets.enabled", lspFeatures.snippets());
+        defineDefault("lsp.completion.auto.show", DEFAULT_LSP_COMPLETION_AUTO_SHOW);
+        defineDefault("lsp.completion.delay.ms", DEFAULT_LSP_COMPLETION_DELAY_MS);
+        defineDefault("lsp.completion.trigger.characters", DEFAULT_LSP_COMPLETION_TRIGGER_CHARACTERS);
+        defineDefault("lsp.completion.fuzzy.matching", DEFAULT_LSP_COMPLETION_FUZZY_MATCHING);
+        defineDefault("lsp.completion.local.words", DEFAULT_LSP_COMPLETION_LOCAL_WORDS);
+        defineDefault("lsp.completion.commit.characters", DEFAULT_LSP_COMPLETION_COMMIT_CHARACTERS);
         defineDefault("lsp.signature.help.enabled", lspFeatures.signatureHelp());
         defineDefault("lsp.hover.enabled", lspFeatures.hover());
         defineDefault("lsp.semantic.tokens.enabled", lspFeatures.semanticTokens());
@@ -386,6 +398,12 @@ public class ConfigManager {
             case "markdown.preview.scroll.sync" -> "Synchronize Markdown preview position with its source cursor and scroll position";
             case "lsp.completion.enabled" -> "Enable LSP completion requests";
             case "lsp.snippets.enabled" -> "Advertise LSP snippet-completion support";
+            case "lsp.completion.auto.show" -> "Show completion suggestions while typing";
+            case "lsp.completion.delay.ms" -> "Idle delay before automatic completion requests";
+            case "lsp.completion.trigger.characters" -> "Request completion after server-advertised trigger characters";
+            case "lsp.completion.fuzzy.matching" -> "Fuzzy-filter and rank completion labels";
+            case "lsp.completion.local.words" -> "Include cached words from open buffers when LSP results are unavailable";
+            case "lsp.completion.commit.characters" -> "Accept a completion when its server-provided commit character is typed";
             case "lsp.signature.help.enabled" -> "Enable LSP signature-help requests";
             case "lsp.hover.enabled" -> "Enable LSP hover requests";
             case "lsp.semantic.tokens.enabled" -> "Enable LSP semantic-token requests";
@@ -977,6 +995,30 @@ public class ConfigManager {
 
     public boolean getLspSemanticTokensInline() {
         return getBoolean("lsp.semantic.tokens.inline", DEFAULT_LSP_SEMANTIC_TOKENS_INLINE);
+    }
+
+    public boolean getLspCompletionAutoShow() {
+        return getBoolean("lsp.completion.auto.show", DEFAULT_LSP_COMPLETION_AUTO_SHOW);
+    }
+
+    public int getLspCompletionDelayMs() {
+        return Math.max(0, Math.min(1000, getInt("lsp.completion.delay.ms", DEFAULT_LSP_COMPLETION_DELAY_MS)));
+    }
+
+    public boolean getLspCompletionTriggerCharacters() {
+        return getBoolean("lsp.completion.trigger.characters", DEFAULT_LSP_COMPLETION_TRIGGER_CHARACTERS);
+    }
+
+    public boolean getLspCompletionFuzzyMatching() {
+        return getBoolean("lsp.completion.fuzzy.matching", DEFAULT_LSP_COMPLETION_FUZZY_MATCHING);
+    }
+
+    public boolean getLspCompletionLocalWords() {
+        return getBoolean("lsp.completion.local.words", DEFAULT_LSP_COMPLETION_LOCAL_WORDS);
+    }
+
+    public boolean getLspCompletionCommitCharacters() {
+        return getBoolean("lsp.completion.commit.characters", DEFAULT_LSP_COMPLETION_COMMIT_CHARACTERS);
     }
 
     public boolean getLspInlayHintsInline() {

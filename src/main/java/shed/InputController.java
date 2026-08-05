@@ -1,6 +1,7 @@
 package shed;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
 import javax.swing.text.BadLocationException;
 import java.awt.*;
 import java.awt.event.InputEvent;
@@ -16,6 +17,18 @@ final class InputController {
     private int completionJobId;
     private CompletionRequestState.Snapshot activeCompletionRequest;
     private final SnippetSession snippetSession;
+    private final OpenBufferCompletionIndex openBufferCompletionIndex;
+    private final CompletionRanker completionRanker;
+    private javax.swing.Timer quickSuggestionTimer;
+    private LspClient.CompletionTriggerKind pendingQuickSuggestionKind;
+    private Character pendingQuickSuggestionCharacter;
+    private javax.swing.Timer wordIndexTimer;
+    private FileBuffer pendingWordIndexBuffer;
+    private int wordIndexGeneration;
+    private int wordIndexJobId;
+    private int completionResolveJobId;
+    private LspClient.CompletionItem resolvingCompletion;
+    private final Set<LspClient.CompletionItem> completionResolveAttempts;
     private final CompletionRequestState signatureHelpRequestState;
     private int signatureHelpJobId;
     private EmacsKeymap.Prefix emacsPrefix;
@@ -26,9 +39,105 @@ final class InputController {
         this.completionJobId = -1;
         this.activeCompletionRequest = null;
         this.snippetSession = new SnippetSession();
+        this.openBufferCompletionIndex = new OpenBufferCompletionIndex();
+        this.completionRanker = new CompletionRanker();
+        this.quickSuggestionTimer = null;
+        this.pendingQuickSuggestionKind = LspClient.CompletionTriggerKind.INVOKED;
+        this.pendingQuickSuggestionCharacter = null;
+        this.wordIndexTimer = null;
+        this.pendingWordIndexBuffer = null;
+        this.wordIndexGeneration = 0;
+        this.wordIndexJobId = -1;
+        this.completionResolveJobId = -1;
+        this.resolvingCompletion = null;
+        this.completionResolveAttempts = Collections.newSetFromMap(new IdentityHashMap<>());
         this.signatureHelpRequestState = new CompletionRequestState();
         this.signatureHelpJobId = -1;
         this.emacsPrefix = EmacsKeymap.Prefix.NONE;
+    }
+
+    void onDocumentChanged(DocumentEvent event) {
+        scheduleOpenBufferWordIndex();
+        if (!editor.configManager.getLspCompletionAutoShow() || editor.editorState.mode != EditorMode.INSERT) {
+            cancelQuickSuggestion();
+            return;
+        }
+        Character insertedCharacter = insertedCharacter(event);
+        FileBuffer buffer = editor.getCurrentBuffer();
+        LspClient client = editor.existingLspClient(buffer);
+        boolean triggerCharacter = insertedCharacter != null && editor.configManager.getLspCompletionTriggerCharacters()
+            && client != null && client.supports(LspCapability.COMPLETION) && client.isCompletionTriggerCharacter(insertedCharacter);
+        SwingUtilities.invokeLater(() -> {
+            if (editor.editorState.mode != EditorMode.INSERT) return;
+            String prefix = editor.currentCompletionPrefix();
+            if (!triggerCharacter && (prefix == null || prefix.length() < 2)) {
+                cancelQuickSuggestion();
+                return;
+            }
+            scheduleQuickSuggestion(triggerCharacter ? LspClient.CompletionTriggerKind.TRIGGER_CHARACTER
+                : LspClient.CompletionTriggerKind.INVOKED, triggerCharacter ? insertedCharacter : null);
+        });
+    }
+
+    void scheduleOpenBufferWordIndex() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || buffer.isLargeFile()) return;
+        pendingWordIndexBuffer = buffer;
+        if (wordIndexTimer == null) {
+            wordIndexTimer = new javax.swing.Timer(140, event -> rebuildOpenBufferWordIndex());
+            wordIndexTimer.setRepeats(false);
+        }
+        wordIndexTimer.restart();
+    }
+
+    void removeOpenBufferWordIndex(FileBuffer buffer) { openBufferCompletionIndex.remove(buffer); }
+
+    private void rebuildOpenBufferWordIndex() {
+        FileBuffer buffer = pendingWordIndexBuffer;
+        pendingWordIndexBuffer = null;
+        if (buffer == null || buffer != editor.getCurrentBuffer() || buffer.isLargeFile()) return;
+        String text = editor.writingArea.getText();
+        int generation = ++wordIndexGeneration;
+        if (wordIndexJobId >= 0) editor.asyncJobService.cancel(wordIndexJobId);
+        wordIndexJobId = editor.asyncJobService.submit("completion word index", token -> openBufferCompletionIndex.build(text),
+            (snapshot, words, error) -> {
+                if (snapshot == null || snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED || error != null
+                    || generation != wordIndexGeneration || words == null || buffer != editor.getCurrentBuffer()) return;
+                openBufferCompletionIndex.update(buffer, words);
+                wordIndexJobId = -1;
+            });
+    }
+
+    private void scheduleQuickSuggestion(LspClient.CompletionTriggerKind kind, Character character) {
+        pendingQuickSuggestionKind = kind == null ? LspClient.CompletionTriggerKind.INVOKED : kind;
+        pendingQuickSuggestionCharacter = character;
+        if (quickSuggestionTimer == null) {
+            quickSuggestionTimer = new javax.swing.Timer(editor.configManager.getLspCompletionDelayMs(), event -> {
+                LspClient.CompletionTriggerKind pendingKind = pendingQuickSuggestionKind;
+                Character pendingCharacter = pendingQuickSuggestionCharacter;
+                pendingQuickSuggestionCharacter = null;
+                if (editor.configManager.getLspCompletionAutoShow() && editor.editorState.mode == EditorMode.INSERT) {
+                    showInlineCompletion(pendingKind, pendingCharacter, false);
+                }
+            });
+            quickSuggestionTimer.setRepeats(false);
+        }
+        quickSuggestionTimer.setInitialDelay(editor.configManager.getLspCompletionDelayMs());
+        quickSuggestionTimer.restart();
+    }
+
+    private void cancelQuickSuggestion() {
+        if (quickSuggestionTimer != null) quickSuggestionTimer.stop();
+        pendingQuickSuggestionCharacter = null;
+    }
+
+    private static Character insertedCharacter(DocumentEvent event) {
+        if (event == null || event.getType() != DocumentEvent.EventType.INSERT || event.getLength() != 1) return null;
+        try {
+            return event.getDocument().getText(event.getOffset(), 1).charAt(0);
+        } catch (BadLocationException error) {
+            return null;
+        }
     }
 
     public void keyPressed(KeyEvent e) {
@@ -1398,6 +1507,9 @@ final class InputController {
                 completionPopupAccept(); e.consume(); return;
             } else if (code == KeyEvent.VK_ESCAPE) {
                 dismissCompletionPopup(); e.consume(); return;
+            } else if (!e.isControlDown() && !e.isAltDown() && !e.isMetaDown()
+                && editor.configManager.getLspCompletionCommitCharacters() && completionPopupCommits(e.getKeyChar())) {
+                completionPopupAccept();
             }
         }
         if (completionJobId >= 0 || isCompletionPopupVisible()) {
@@ -2134,11 +2246,16 @@ final class InputController {
 
 
     void showInlineCompletion() {
+        showInlineCompletion(LspClient.CompletionTriggerKind.INVOKED, null, true);
+    }
+
+    private void showInlineCompletion(LspClient.CompletionTriggerKind triggerKind, Character triggerCharacter, boolean explicit) {
         cancelCompletionJob();
         completionRequestState.invalidate();
         activeCompletionRequest = null;
         String prefix = editor.currentCompletionPrefix();
-        if (prefix == null || prefix.length() < 2) {
+        boolean serverTrigger = triggerKind == LspClient.CompletionTriggerKind.TRIGGER_CHARACTER && triggerCharacter != null;
+        if (!explicit && !serverTrigger && (prefix == null || prefix.length() < 2)) {
             dismissCompletionPopup();
             return;
         }
@@ -2158,7 +2275,7 @@ final class InputController {
             int documentVersion = editor.lspDocumentVersions.getOrDefault(uri, 0);
             CompletionRequestState.Snapshot request = completionRequestState.begin(uri, documentVersion, caretOffset, prefix);
             activeCompletionRequest = request;
-            completionJobId = editor.asyncJobService.submit("LSP completion", token -> client.completion(uri, line, column),
+            completionJobId = editor.asyncJobService.submit("LSP completion", token -> client.completion(uri, line, column, triggerKind, triggerCharacter),
                 (snapshot, items, error) -> completeInlineCompletion(request, snapshot, items, error));
         } catch (BadLocationException ignored) {
             dismissCompletionPopup();
@@ -2167,7 +2284,10 @@ final class InputController {
 
 
     void dismissCompletionPopup() {
+        cancelQuickSuggestion();
         cancelCompletionJob();
+        cancelCompletionResolve();
+        completionResolveAttempts.clear();
         completionRequestState.invalidate();
         activeCompletionRequest = null;
         snippetSession.clear();
@@ -2175,7 +2295,10 @@ final class InputController {
     }
 
     void dismissCompletionPopupForCaretMove() {
+        cancelQuickSuggestion();
         cancelCompletionJob();
+        cancelCompletionResolve();
+        completionResolveAttempts.clear();
         completionRequestState.invalidate();
         activeCompletionRequest = null;
         if (editor.completionPopup != null && editor.completionPopup.isVisible()) editor.completionPopup.setVisible(false);
@@ -2213,6 +2336,7 @@ final class InputController {
         editor.suppressDocumentEvents = false;
         editor.markModified();
         editor.scheduleSyntaxHighlighting();
+        scheduleOpenBufferWordIndex();
         if (result.placeholders().isEmpty()) {
             editor.writingArea.setCaretPosition(Math.min(result.caret(), editor.writingArea.getDocument().getLength()));
         } else {
@@ -2249,10 +2373,22 @@ final class InputController {
         try {
             editor.completionPrefix = prefix;
             ensureCompletionPopup();
+            completionResolveAttempts.clear();
             editor.completionModel.clear();
-            int max = Math.min(completions.size(), 12);
-            for (int i = 0; i < max; i++) editor.completionModel.addElement(completions.get(i));
-            editor.completionList.setSelectedIndex(0);
+            List<LspClient.CompletionItem> ranked = completionRanker.rank(prefix, completions,
+                editor.configManager.getLspCompletionFuzzyMatching(), 12);
+            int max = ranked.size();
+            if (max == 0) {
+                dismissCompletionPopup();
+                return;
+            }
+            int selectedIndex = 0;
+            for (int i = 0; i < max; i++) {
+                LspClient.CompletionItem item = ranked.get(i);
+                editor.completionModel.addElement(item);
+                if (item.isPreselect()) selectedIndex = i;
+            }
+            editor.completionList.setSelectedIndex(selectedIndex);
             updateCompletionDocumentation();
             Rectangle2D caretRect = editor.writingArea.modelToView2D(editor.writingArea.getCaretPosition());
             if (caretRect == null || !editor.writingArea.isShowing()) return;
@@ -2308,11 +2444,39 @@ final class InputController {
         String documentation = selected.getDocumentation();
         editor.completionDocumentation.setText(documentation.isBlank() ? selected.getDetail() : documentation);
         editor.completionDocumentation.setCaretPosition(0);
+        resolveCompletionDocumentation(selected);
+    }
+
+    private void resolveCompletionDocumentation(LspClient.CompletionItem item) {
+        if (item == null || !item.getDocumentation().isBlank() || item == resolvingCompletion || completionResolveAttempts.contains(item)) return;
+        FileBuffer buffer = editor.getCurrentBuffer();
+        LspClient client = editor.existingLspClient(buffer);
+        if (client == null || !client.supportsCompletionResolve()) return;
+        cancelCompletionResolve();
+        resolvingCompletion = item;
+        completionResolveAttempts.add(item);
+        completionResolveJobId = editor.asyncJobService.submit("LSP completion detail", token -> client.resolveCompletionItem(item),
+            (snapshot, resolved, error) -> {
+                completionResolveJobId = -1;
+                if (snapshot == null || snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED || error != null
+                    || resolved == null || resolved == item || !isCompletionPopupVisible() || editor.completionList == null
+                    || editor.completionList.getSelectedValue() != item) return;
+                int index = editor.completionList.getSelectedIndex();
+                if (index < 0) return;
+                editor.completionModel.set(index, resolved);
+                editor.completionList.setSelectedIndex(index);
+            });
     }
 
     private void cancelCompletionJob() {
         if (completionJobId >= 0) editor.asyncJobService.cancel(completionJobId);
         completionJobId = -1;
+    }
+
+    private void cancelCompletionResolve() {
+        if (completionResolveJobId >= 0) editor.asyncJobService.cancel(completionResolveJobId);
+        completionResolveJobId = -1;
+        resolvingCompletion = null;
     }
 
     private boolean isCurrentCompletion(CompletionRequestState.Snapshot request) {
@@ -2330,10 +2494,25 @@ final class InputController {
     }
 
     private List<LspClient.CompletionItem> localCompletionItems(String prefix) {
-        List<String> completions = editor.collectBufferCompletions(prefix);
+        if (!editor.configManager.getLspCompletionLocalWords() || prefix == null || prefix.isBlank()) return List.of();
         List<LspClient.CompletionItem> items = new ArrayList<>();
-        for (String completion : completions) items.add(new LspClient.CompletionItem(completion, "", null));
+        FileBuffer current = editor.getCurrentBuffer();
+        for (OpenBufferCompletionIndex.Candidate candidate : openBufferCompletionIndex.complete(editor.buffers, current, prefix,
+            editor.writingArea.getCaretPosition(), 12, editor.fuzzyMatchService)) {
+            items.add(new LspClient.CompletionItem(candidate.word(), "open buffer", 1));
+        }
+        if (current != null && !openBufferCompletionIndex.hasSnapshot(current)) {
+            for (String completion : editor.collectBufferCompletions(prefix)) {
+                items.add(new LspClient.CompletionItem(completion, "current buffer", 1));
+            }
+        }
         return items;
+    }
+
+    private boolean completionPopupCommits(char character) {
+        if (character == KeyEvent.CHAR_UNDEFINED || editor.completionList == null) return false;
+        LspClient.CompletionItem selected = editor.completionList.getSelectedValue();
+        return selected != null && selected.getCommitCharacters().contains(String.valueOf(character));
     }
 
     private boolean moveSnippetPlaceholder(int direction) {
@@ -2361,6 +2540,7 @@ final class InputController {
         }
         editor.markModified();
         editor.scheduleSyntaxHighlighting();
+        scheduleOpenBufferWordIndex();
         if (!snippetSession.begin(editor.writingArea, start, expansion.placeholders())) {
             editor.writingArea.setCaretPosition(Math.min(start + expansion.text().length(), editor.writingArea.getDocument().getLength()));
         }

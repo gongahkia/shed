@@ -6,8 +6,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,6 +35,15 @@ public class LspClient {
         INCREMENTAL
     }
 
+    enum CompletionTriggerKind {
+        INVOKED(1),
+        TRIGGER_CHARACTER(2);
+
+        private final int value;
+
+        CompletionTriggerKind(int value) { this.value = value; }
+    }
+
     public static class CompletionItem {
         private final String label;
         private final String detail;
@@ -41,6 +52,11 @@ public class LspClient {
         private final String insertText;
         private final boolean snippet;
         private final List<CompletionTextEdit> textEdits;
+        private final String filterText;
+        private final String sortText;
+        private final boolean preselect;
+        private final List<String> commitCharacters;
+        private final Map<String, Object> resolvePayload;
 
         public CompletionItem(String label, String detail, Integer kind) {
             this(label, detail, kind, "");
@@ -52,6 +68,12 @@ public class LspClient {
 
         public CompletionItem(String label, String detail, Integer kind, String documentation, String insertText,
                               boolean snippet, List<CompletionTextEdit> textEdits) {
+            this(label, detail, kind, documentation, insertText, snippet, textEdits, label, label, false, List.of(), Map.of());
+        }
+
+        private CompletionItem(String label, String detail, Integer kind, String documentation, String insertText,
+                               boolean snippet, List<CompletionTextEdit> textEdits, String filterText, String sortText,
+                               boolean preselect, List<String> commitCharacters, Map<String, Object> resolvePayload) {
             this.label = label;
             this.detail = detail == null ? "" : detail;
             this.kind = kind;
@@ -59,6 +81,12 @@ public class LspClient {
             this.insertText = insertText == null || insertText.isEmpty() ? label : insertText;
             this.snippet = snippet;
             this.textEdits = textEdits == null ? List.of() : List.copyOf(textEdits);
+            this.filterText = filterText == null ? "" : filterText;
+            this.sortText = sortText == null ? "" : sortText;
+            this.preselect = preselect;
+            this.commitCharacters = commitCharacters == null ? List.of() : List.copyOf(commitCharacters);
+            this.resolvePayload = resolvePayload == null || resolvePayload.isEmpty() ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(resolvePayload));
         }
 
         public String getLabel() {
@@ -88,6 +116,16 @@ public class LspClient {
         public List<CompletionTextEdit> getTextEdits() {
             return textEdits;
         }
+
+        public String getFilterText() { return filterText; }
+
+        public String getSortText() { return sortText; }
+
+        public boolean isPreselect() { return preselect; }
+
+        public List<String> getCommitCharacters() { return commitCharacters; }
+
+        Map<String, Object> getResolvePayload() { return resolvePayload; }
 
         @Override
         public String toString() {
@@ -416,6 +454,8 @@ public class LspClient {
     private LspCapabilityModel capabilityModel;
     private DocumentSyncKind documentSyncKind;
     private List<String> semanticTokenTypes;
+    private Set<String> completionTriggerCharacters;
+    private boolean completionResolveSupported;
 
     public LspClient(String command, String[] args, Path rootPath) throws IOException {
         this(command, args, rootPath, LspFeatureSettings.defaults());
@@ -446,6 +486,8 @@ public class LspClient {
         this.capabilityModel = LspCapabilityModel.uninitialized();
         this.documentSyncKind = DocumentSyncKind.FULL;
         this.semanticTokenTypes = List.of();
+        this.completionTriggerCharacters = Set.of();
+        this.completionResolveSupported = false;
         startReaderThread();
         initialize(rootPath);
     }
@@ -535,9 +577,25 @@ public class LspClient {
     }
 
     public List<CompletionItem> completion(String uri, int line, int character) {
+        return completion(uri, line, character, CompletionTriggerKind.INVOKED, null);
+    }
+
+    public List<CompletionItem> completion(String uri, int line, int character, CompletionTriggerKind triggerKind,
+                                           Character triggerCharacter) {
         if (!supports(LspCapability.COMPLETION)) {
             return List.of();
         }
+        Map<String, Object> params = completionParameters(uri, line, character, triggerKind, triggerCharacter);
+        Map<String, Object> response = sendRequest("textDocument/completion", params, 2000L);
+        if (response == null) {
+            return List.of();
+        }
+
+        return parseCompletionItems(response.get("result"));
+    }
+
+    static Map<String, Object> completionParameters(String uri, int line, int character, CompletionTriggerKind triggerKind,
+                                                      Character triggerCharacter) {
         Map<String, Object> textDocument = new LinkedHashMap<>();
         textDocument.put("uri", uri);
 
@@ -548,13 +606,14 @@ public class LspClient {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("textDocument", textDocument);
         params.put("position", position);
-
-        Map<String, Object> response = sendRequest("textDocument/completion", params, 2000L);
-        if (response == null) {
-            return List.of();
+        Map<String, Object> context = new LinkedHashMap<>();
+        CompletionTriggerKind resolvedKind = triggerKind == null ? CompletionTriggerKind.INVOKED : triggerKind;
+        context.put("triggerKind", resolvedKind.value);
+        if (resolvedKind == CompletionTriggerKind.TRIGGER_CHARACTER && triggerCharacter != null) {
+            context.put("triggerCharacter", String.valueOf(triggerCharacter));
         }
-
-        return parseCompletionItems(response.get("result"));
+        params.put("context", context);
+        return params;
     }
 
     static List<CompletionItem> parseCompletionItems(Object result) {
@@ -570,22 +629,52 @@ public class LspClient {
         List<CompletionItem> completions = new ArrayList<>();
         for (Object item : items) {
             Map<String, Object> itemObject = MiniJson.asObject(item);
-            if (itemObject == null) {
-                continue;
-            }
-            String label = MiniJson.asString(itemObject.get("label"));
-            if (label == null || label.isEmpty()) {
-                continue;
-            }
-            String detail = MiniJson.asString(itemObject.get("detail"));
-            Integer kind = MiniJson.asInt(itemObject.get("kind"));
-            String insertText = MiniJson.asString(itemObject.get("insertText"));
-            Integer insertTextFormat = MiniJson.asInt(itemObject.get("insertTextFormat"));
-            List<CompletionTextEdit> textEdits = completionTextEdits(itemObject);
-            completions.add(new CompletionItem(label, detail, kind, completionDocumentation(itemObject.get("documentation")),
-                insertText == null ? label : insertText, Integer.valueOf(2).equals(insertTextFormat), textEdits));
+            CompletionItem completion = parseCompletionItem(itemObject);
+            if (completion != null) completions.add(completion);
         }
         return completions;
+    }
+
+    private static CompletionItem parseCompletionItem(Map<String, Object> itemObject) {
+        if (itemObject == null) return null;
+        String label = MiniJson.asString(itemObject.get("label"));
+        if (label == null || label.isEmpty()) return null;
+        String detail = MiniJson.asString(itemObject.get("detail"));
+        Integer kind = MiniJson.asInt(itemObject.get("kind"));
+        String insertText = MiniJson.asString(itemObject.get("insertText"));
+        Integer insertTextFormat = MiniJson.asInt(itemObject.get("insertTextFormat"));
+        String filterText = MiniJson.asString(itemObject.get("filterText"));
+        String sortText = MiniJson.asString(itemObject.get("sortText"));
+        boolean preselect = Boolean.TRUE.equals(itemObject.get("preselect"));
+        return new CompletionItem(label, detail, kind, completionDocumentation(itemObject.get("documentation")),
+            insertText == null ? label : insertText, Integer.valueOf(2).equals(insertTextFormat), completionTextEdits(itemObject),
+            filterText == null ? label : filterText, sortText == null ? label : sortText, preselect,
+            completionStringList(itemObject.get("commitCharacters")), itemObject);
+    }
+
+    private static List<String> completionStringList(Object value) {
+        List<Object> values = MiniJson.asArray(value);
+        if (values == null || values.isEmpty()) return List.of();
+        List<String> parsed = new ArrayList<>();
+        for (Object candidate : values) {
+            String text = MiniJson.asString(candidate);
+            if (text != null && !text.isEmpty()) parsed.add(text);
+        }
+        return List.copyOf(parsed);
+    }
+
+    public boolean isCompletionTriggerCharacter(char character) {
+        return completionTriggerCharacters.contains(String.valueOf(character));
+    }
+
+    public boolean supportsCompletionResolve() { return completionResolveSupported; }
+
+    public CompletionItem resolveCompletionItem(CompletionItem item) {
+        if (item == null || !completionResolveSupported || item.getResolvePayload().isEmpty()) return item;
+        Map<String, Object> response = sendRequest("completionItem/resolve", item.getResolvePayload(), 2000L);
+        if (response == null) return item;
+        CompletionItem resolved = parseCompletionItem(MiniJson.asObject(response.get("result")));
+        return resolved == null ? item : resolved;
     }
 
     private static String completionDocumentation(Object documentation) {
@@ -1042,6 +1131,8 @@ public class LspClient {
         capabilityModel = LspCapabilityModel.fromInitializeResult(response, featureSettings.capabilityEnablement());
         documentSyncKind = parseDocumentSyncKind(response);
         semanticTokenTypes = parseSemanticTokenTypes(response);
+        completionTriggerCharacters = parseCompletionTriggerCharacters(response);
+        completionResolveSupported = parseCompletionResolveSupport(response);
         sendNotification("initialized", new LinkedHashMap<>());
         initialized = true;
     }
@@ -1077,6 +1168,29 @@ public class LspClient {
             parsed.add(value == null ? "" : value);
         }
         return List.copyOf(parsed);
+    }
+
+    static Set<String> parseCompletionTriggerCharacters(Map<String, Object> response) {
+        Map<String, Object> provider = completionProvider(response);
+        List<Object> values = MiniJson.asArray(provider == null ? null : provider.get("triggerCharacters"));
+        if (values == null || values.isEmpty()) return Set.of();
+        Set<String> characters = new LinkedHashSet<>();
+        for (Object value : values) {
+            String character = MiniJson.asString(value);
+            if (character != null && !character.isEmpty()) characters.add(character);
+        }
+        return Set.copyOf(characters);
+    }
+
+    static boolean parseCompletionResolveSupport(Map<String, Object> response) {
+        Map<String, Object> provider = completionProvider(response);
+        return Boolean.TRUE.equals(provider == null ? null : provider.get("resolveProvider"));
+    }
+
+    private static Map<String, Object> completionProvider(Map<String, Object> response) {
+        Map<String, Object> result = MiniJson.asObject(response == null ? null : response.get("result"));
+        Map<String, Object> capabilities = MiniJson.asObject(result == null ? null : result.get("capabilities"));
+        return MiniJson.asObject(capabilities == null ? null : capabilities.get("completionProvider"));
     }
 
     private Map<String, Object> sendTextDocumentPositionRequest(String method, String uri, int line, int character, long timeoutMs) {

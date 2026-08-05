@@ -210,7 +210,7 @@ final class TestService {
                 if (packageMatch.find()) packageName = packageMatch.group(1);
                 Matcher classMatch = classPattern.matcher(line);
                 if (classMatch.find()) className = classMatch.group(1);
-                if (line.matches(".*@(Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\\b.*")) { testAnnotation = true; continue; }
+                if (line.matches(".*@(Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\\b.*")) testAnnotation = true;
                 if (!testAnnotation) continue;
                 Matcher methodMatch = methodPattern.matcher(line);
                 if (!methodMatch.find()) continue;

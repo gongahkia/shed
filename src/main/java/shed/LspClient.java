@@ -17,6 +17,22 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class LspClient {
+    private static final List<String> STANDARD_SEMANTIC_TOKEN_TYPES = List.of(
+        "namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter", "variable",
+        "property", "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment",
+        "string", "number", "regexp", "operator", "decorator"
+    );
+    private static final List<String> STANDARD_SEMANTIC_TOKEN_MODIFIERS = List.of(
+        "declaration", "definition", "readonly", "static", "deprecated", "abstract", "async", "modification",
+        "documentation", "defaultLibrary"
+    );
+
+    enum DocumentSyncKind {
+        NONE,
+        FULL,
+        INCREMENTAL
+    }
+
     public static class CompletionItem {
         private final String label;
         private final String detail;
@@ -394,9 +410,12 @@ public class LspClient {
     private final Set<Integer> staleRequestIds;
     private final LspFeatureSettings featureSettings;
     private WorkspaceEditHandler workspaceEditHandler;
+    private Runnable diagnosticsChangedHandler;
     private int requestId;
     private boolean initialized;
     private LspCapabilityModel capabilityModel;
+    private DocumentSyncKind documentSyncKind;
+    private List<String> semanticTokenTypes;
 
     public LspClient(String command, String[] args, Path rootPath) throws IOException {
         this(command, args, rootPath, LspFeatureSettings.defaults());
@@ -419,18 +438,24 @@ public class LspClient {
         this.stdin = new BufferedOutputStream(process.getOutputStream());
         this.messageQueue = new LinkedBlockingQueue<>();
         this.deferredMessages = new ArrayList<>();
-        this.diagnostics = new HashMap<>();
+        this.diagnostics = new ConcurrentHashMap<>();
         this.staleRequestIds = ConcurrentHashMap.newKeySet();
         this.featureSettings = featureSettings == null ? LspFeatureSettings.defaults() : featureSettings;
         this.requestId = 0;
         this.initialized = false;
         this.capabilityModel = LspCapabilityModel.uninitialized();
+        this.documentSyncKind = DocumentSyncKind.FULL;
+        this.semanticTokenTypes = List.of();
         startReaderThread();
         initialize(rootPath);
     }
 
     public void setWorkspaceEditHandler(WorkspaceEditHandler workspaceEditHandler) {
         this.workspaceEditHandler = workspaceEditHandler;
+    }
+
+    public void setDiagnosticsChangedHandler(Runnable diagnosticsChangedHandler) {
+        this.diagnosticsChangedHandler = diagnosticsChangedHandler;
     }
 
     public boolean isAlive() {
@@ -462,17 +487,43 @@ public class LspClient {
     }
 
     public void didChange(String uri, int version, String text) {
+        didChange(uri, version, List.of(), text);
+    }
+
+    public void didChange(String uri, int version, List<LspDocumentChange> changes, String fullText) {
+        if (documentSyncKind == DocumentSyncKind.NONE) {
+            return;
+        }
         Map<String, Object> textDocument = new LinkedHashMap<>();
         textDocument.put("uri", uri);
         textDocument.put("version", version);
 
-        Map<String, Object> change = new LinkedHashMap<>();
-        change.put("text", text);
-
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("textDocument", textDocument);
-        params.put("contentChanges", List.of(change));
+        if (documentSyncKind == DocumentSyncKind.INCREMENTAL && changes != null && !changes.isEmpty()) {
+            List<Map<String, Object>> contentChanges = new ArrayList<>();
+            for (LspDocumentChange change : changes) {
+                Map<String, Object> range = new LinkedHashMap<>();
+                range.put("start", Map.of("line", change.startLine(), "character", change.startCharacter()));
+                range.put("end", Map.of("line", change.endLine(), "character", change.endCharacter()));
+                Map<String, Object> content = new LinkedHashMap<>();
+                content.put("range", range);
+                content.put("text", change.text());
+                contentChanges.add(content);
+            }
+            params.put("contentChanges", contentChanges);
+        } else {
+            params.put("contentChanges", List.of(Map.of("text", fullText == null ? "" : fullText)));
+        }
         sendNotification("textDocument/didChange", params);
+    }
+
+    DocumentSyncKind documentSyncKind() {
+        return documentSyncKind;
+    }
+
+    String semanticTokenTypeName(int type) {
+        return type >= 0 && type < semanticTokenTypes.size() ? semanticTokenTypes.get(type) : "";
     }
 
     public void didSave(String uri) {
@@ -950,6 +1001,13 @@ public class LspClient {
         completion.put("completionItem", completionItem);
         Map<String, Object> hover = new LinkedHashMap<>();
         hover.put("contentFormat", List.of("plaintext"));
+        Map<String, Object> semanticTokens = new LinkedHashMap<>();
+        semanticTokens.put("requests", Map.of("full", Boolean.TRUE));
+        semanticTokens.put("tokenTypes", STANDARD_SEMANTIC_TOKEN_TYPES);
+        semanticTokens.put("tokenModifiers", STANDARD_SEMANTIC_TOKEN_MODIFIERS);
+        semanticTokens.put("formats", List.of("relative"));
+        Map<String, Object> inlayHint = new LinkedHashMap<>();
+        inlayHint.put("dynamicRegistration", Boolean.FALSE);
         Map<String, Object> diagnosticsCapability = new LinkedHashMap<>();
         diagnosticsCapability.put("relatedInformation", Boolean.FALSE);
         Map<String, Object> changeAnnotationSupport = new LinkedHashMap<>();
@@ -967,6 +1025,8 @@ public class LspClient {
         textDocument.put("hover", hover);
         textDocument.put("definition", new LinkedHashMap<>());
         textDocument.put("publishDiagnostics", diagnosticsCapability);
+        textDocument.put("semanticTokens", semanticTokens);
+        textDocument.put("inlayHint", inlayHint);
         capabilities.put("textDocument", textDocument);
         capabilities.put("workspace", workspace);
 
@@ -980,8 +1040,43 @@ public class LspClient {
             throw new IOException("LSP initialize timed out");
         }
         capabilityModel = LspCapabilityModel.fromInitializeResult(response, featureSettings.capabilityEnablement());
+        documentSyncKind = parseDocumentSyncKind(response);
+        semanticTokenTypes = parseSemanticTokenTypes(response);
         sendNotification("initialized", new LinkedHashMap<>());
         initialized = true;
+    }
+
+    static DocumentSyncKind parseDocumentSyncKind(Map<String, Object> response) {
+        Map<String, Object> result = MiniJson.asObject(response == null ? null : response.get("result"));
+        Map<String, Object> capabilities = MiniJson.asObject(result == null ? null : result.get("capabilities"));
+        Object value = capabilities == null ? null : capabilities.get("textDocumentSync");
+        Integer kind = MiniJson.asInt(value);
+        if (kind == null) {
+            Map<String, Object> options = MiniJson.asObject(value);
+            kind = MiniJson.asInt(options == null ? null : options.get("change"));
+        }
+        return switch (kind == null ? 1 : kind) {
+            case 0 -> DocumentSyncKind.NONE;
+            case 2 -> DocumentSyncKind.INCREMENTAL;
+            default -> DocumentSyncKind.FULL;
+        };
+    }
+
+    static List<String> parseSemanticTokenTypes(Map<String, Object> response) {
+        Map<String, Object> result = MiniJson.asObject(response == null ? null : response.get("result"));
+        Map<String, Object> capabilities = MiniJson.asObject(result == null ? null : result.get("capabilities"));
+        Map<String, Object> provider = MiniJson.asObject(capabilities == null ? null : capabilities.get("semanticTokensProvider"));
+        Map<String, Object> legend = MiniJson.asObject(provider == null ? null : provider.get("legend"));
+        List<Object> tokenTypes = MiniJson.asArray(legend == null ? null : legend.get("tokenTypes"));
+        if (tokenTypes == null || tokenTypes.isEmpty()) {
+            return List.of();
+        }
+        List<String> parsed = new ArrayList<>();
+        for (Object tokenType : tokenTypes) {
+            String value = MiniJson.asString(tokenType);
+            parsed.add(value == null ? "" : value);
+        }
+        return List.copyOf(parsed);
     }
 
     private Map<String, Object> sendTextDocumentPositionRequest(String method, String uri, int line, int character, long timeoutMs) {
@@ -1030,7 +1125,7 @@ public class LspClient {
         staleRequestIds.add(id);
     }
 
-    private void writeMessage(Map<String, Object> body) {
+    private synchronized void writeMessage(Map<String, Object> body) {
         try {
             byte[] payload = MiniJson.stringify(body).getBytes(StandardCharsets.UTF_8);
             stdin.write(("Content-Length: " + payload.length + "\r\n\r\n").getBytes(StandardCharsets.UTF_8));
@@ -1124,6 +1219,8 @@ public class LspClient {
             parsed.add(new Diagnostic(line, character, severity, messageText == null ? "" : messageText));
         }
         diagnostics.put(uri, parsed);
+        Runnable handler = diagnosticsChangedHandler;
+        if (handler != null) handler.run();
     }
 
     private void handleIncomingMethod(Map<String, Object> message) {

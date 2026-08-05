@@ -2,6 +2,7 @@ package shed;
 
 import javax.swing.*;
 import javax.swing.Timer;
+import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
 import java.awt.*;
@@ -25,9 +26,9 @@ final class PaneBufferController {
         this.landingFile = null;
     }
 
-    void handleDocumentChange() {
+    void handleDocumentChange(DocumentEvent event) {
         if (!editor.suppressDocumentEvents) {
-            markModified();
+            markModified(event);
             editor.updateCurrentLineHighlight();
             editor.scheduleSyntaxHighlighting();
             try {
@@ -138,6 +139,10 @@ final class PaneBufferController {
 
 
     void markModified() {
+        markModified(null);
+    }
+
+    private void markModified(DocumentEvent event) {
         FileBuffer buffer = getCurrentBuffer();
         if (buffer != null && buffer.isLargeFile()) {
             return;
@@ -147,10 +152,25 @@ final class PaneBufferController {
             editor.invalidateGitBlame(buffer);
             scheduleIdleBackup(buffer);
             editor.recordChangePosition();
-            editor.syncLspChange(buffer);
+            syncLspChange(buffer, event);
             editor.scheduleDiffGutter(buffer);
             editor.requestStatusBarRefresh();
             editor.scheduleRecoverySnapshotCapture();
+        }
+    }
+
+    private void syncLspChange(FileBuffer buffer, DocumentEvent event) {
+        if (event == null || event.getType() == DocumentEvent.EventType.CHANGE) {
+            editor.syncLspChange(buffer);
+            return;
+        }
+        try {
+            String insertedText = event.getType() == DocumentEvent.EventType.INSERT
+                ? event.getDocument().getText(event.getOffset(), event.getLength()) : "";
+            int removedLength = event.getType() == DocumentEvent.EventType.REMOVE ? event.getLength() : 0;
+            editor.syncLspChange(buffer, event.getOffset(), removedLength, insertedText);
+        } catch (BadLocationException ignored) {
+            editor.syncLspChange(buffer);
         }
     }
 

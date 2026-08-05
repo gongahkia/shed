@@ -114,6 +114,8 @@ All LSP feature keys are typed booleans and appear in `:config inspector` under 
 
 Managed language support has no configuration key or network path yet. Its planned ownership, consent, catalog, integrity, cache, platform, and revocation policy is documented in [Managed Language Support Trust Model](MANAGED_LANGUAGE_SUPPORT.md); existing `lsp.<ext>.command` and `lsp.<ext>.args` remain user-managed local commands. Java resolves locally through `jdtls` by default and Python through `pyright-langserver --stdio`; set `lsp.java.command` or `lsp.py.command` when an executable or runtime differs.
 
+Shed keeps an independent client for each `(extension, workspace root)` pair, so files from separate projects do not replace each other's server. A server that advertises incremental document synchronization receives debounced range changes; others receive a full-document update for compatibility. Semantic tokens and inlay hints render automatically when supported, with inline rendering controlled separately below.
+
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
 | `lsp.completion.enabled` | `true` | bool | Completion requests |
@@ -122,6 +124,8 @@ Managed language support has no configuration key or network path yet. Its plann
 | `lsp.hover.enabled` | `true` | bool | Hover requests |
 | `lsp.semantic.tokens.enabled` | `true` | bool | Semantic-token requests |
 | `lsp.inlay.hints.enabled` | `true` | bool | Inlay-hint requests |
+| `lsp.semantic.tokens.inline` | `true` | bool | Render supported semantic-token colours inline; applies immediately |
+| `lsp.inlay.hints.inline` | `true` | bool | Render supported inlay hints inline; applies immediately |
 | `lsp.definition.enabled` | `true` | bool | Navigation: definition requests |
 | `lsp.references.enabled` | `true` | bool | Navigation: reference requests |
 | `lsp.rename.enabled` | `true` | bool | Rename requests |

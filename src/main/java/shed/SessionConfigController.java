@@ -489,6 +489,7 @@ final class SessionConfigController {
         editor.applyThemeColors();
         editor.refreshLineNumberPanel();
         editor.updateCurrentLineHighlight();
+        editor.refreshLspDecorations();
         if (editor.activeMinimapPanel != null) {
             editor.activeMinimapPanel.setPixelWidth(editor.configManager.getMinimapWidth());
         }

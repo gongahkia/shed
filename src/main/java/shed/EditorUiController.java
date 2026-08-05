@@ -51,9 +51,9 @@ final class EditorUiController {
         });
         editor.undoManager = new BoundedUndoManager(UndoHistoryPolicy.defaults());
         editor.bufferDocumentListener = new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { editor.handleDocumentChange(); }
-            public void removeUpdate(DocumentEvent e) { editor.handleDocumentChange(); }
-            public void changedUpdate(DocumentEvent e) { editor.handleDocumentChange(); }
+            public void insertUpdate(DocumentEvent e) { editor.handleDocumentChange(e); }
+            public void removeUpdate(DocumentEvent e) { editor.handleDocumentChange(e); }
+            public void changedUpdate(DocumentEvent e) { editor.handleDocumentChange(e); }
         };
 
         EditorPane initialPane = createEditorPane(screenSize);
@@ -295,9 +295,11 @@ final class EditorUiController {
                     } catch (Exception ignored) {}
                 }
                 paintSyntaxForegroundOverlay(g, this);
+                editor.paintLspSemanticOverlay(g, this);
                 editor.paintLimelightOverlay(g, this);
                 paintDiagnosticOverlay(g, this);
                 paintVisualBlockOverlay(g, this);
+                editor.paintLspInlayHintOverlay(g, this);
                 if (getLineWrap()) paintWrapIndicators(g, this);
                 paintColorPreviews(g, this);
             }
@@ -963,7 +965,7 @@ final class EditorUiController {
         if (diagPane != null && diagPane.getLineNumberPanel() != null) diagPane.getLineNumberPanel().updateDiagnosticMarkers(null);
         FileBuffer buffer = editor.getCurrentBuffer();
         if (buffer == null || !buffer.hasFilePath()) { editor.writingArea.repaint(); return; }
-        LspClient client = editor.lspClients.get(editor.bufferExtension(buffer));
+        LspClient client = editor.existingLspClient(buffer);
         if (client == null || !client.isAlive()) { editor.writingArea.repaint(); return; }
         String uri = editor.bufferUri(buffer);
         List<LspClient.Diagnostic> diags = client.getDiagnostics(uri);
@@ -1001,9 +1003,17 @@ final class EditorUiController {
 
 
     void paintSyntaxForegroundOverlay(Graphics g, JTextArea area) {
+        paintForegroundSpans(g, area, editor.syntaxForegroundSpans, "syntax.paint");
+    }
+
+    void paintLspSemanticOverlay(Graphics g, JTextArea area) {
+        paintForegroundSpans(g, area, editor.lspSemanticSpans, "lsp.semantic.paint");
+    }
+
+    private void paintForegroundSpans(Graphics g, JTextArea area, List<SyntaxSpan> spans, String metric) {
         long started = System.nanoTime();
         try {
-        if (area == null || area != editor.writingArea || editor.syntaxForegroundSpans.isEmpty()) {
+        if (area == null || area != editor.writingArea || spans.isEmpty()) {
             return;
         }
         int docLength = area.getDocument().getLength();
@@ -1033,7 +1043,7 @@ final class EditorUiController {
         int tabPixels = Math.max(1, area.getTabSize() * metrics.charWidth(' '));
         TabExpander tabExpander = (x, tabOffset) -> ((int) x / tabPixels + 1) * tabPixels;
 
-        for (SyntaxSpan span : editor.syntaxForegroundSpans) {
+        for (SyntaxSpan span : spans) {
             if (span.end <= visibleStart || span.start >= visibleEnd) {
                 continue;
             }
@@ -1078,9 +1088,41 @@ final class EditorUiController {
         g2.dispose();
         } finally {
             if (editor.perfService != null) {
-                editor.perfService.recordDuration("syntax.paint", started, "spans=" + editor.syntaxForegroundSpans.size());
+                editor.perfService.recordDuration(metric, started, "spans=" + spans.size());
             }
         }
+    }
+
+    void paintLspInlayHintOverlay(Graphics graphics, JTextArea area) {
+        if (area == null || area != editor.writingArea || editor.lspInlayHintOverlays.isEmpty()) return;
+        Graphics2D g2 = (Graphics2D) graphics.create();
+        Font hintFont = area.getFont().deriveFont(Math.max(10f, area.getFont().getSize2D() - 2f));
+        g2.setFont(hintFont);
+        FontMetrics metrics = g2.getFontMetrics(hintFont);
+        Color foreground = editor.configManager.getEditorForeground();
+        Color background = editor.configManager.getNormalColor();
+        Color text = new Color(foreground.getRed(), foreground.getGreen(), foreground.getBlue(), 150);
+        Color fill = new Color(background.getRed(), background.getGreen(), background.getBlue(), 205);
+        Rectangle clip = g2.getClipBounds();
+        int length = area.getDocument().getLength();
+        for (LspInlayHintOverlay hint : editor.lspInlayHintOverlays) {
+            if (hint.offset() > length || hint.label().isBlank()) continue;
+            try {
+                Rectangle2D position = area.modelToView2D(hint.offset());
+                if (position == null) continue;
+                int x = (int) Math.round(position.getX()) + 2;
+                int y = (int) Math.round(position.getY()) + metrics.getAscent();
+                int width = Math.min(280, metrics.stringWidth(hint.label()) + 6);
+                Rectangle bounds = new Rectangle(x, (int) Math.round(position.getY()), width, metrics.getHeight());
+                if (clip != null && !clip.intersects(bounds)) continue;
+                g2.setColor(fill);
+                g2.fillRoundRect(x, bounds.y, width, bounds.height, 4, 4);
+                g2.setColor(text);
+                g2.drawString(hint.label(), x + 3, y);
+            } catch (BadLocationException ignored) {
+            }
+        }
+        g2.dispose();
     }
 
 }

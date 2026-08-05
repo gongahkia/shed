@@ -96,6 +96,53 @@ public class LspServiceTest {
     }
 
     @Test
+    void tracksDebouncedIncrementalDocumentChangesAgainstEachIntermediateVersion() {
+        LspDocumentSyncState state = new LspDocumentSyncState("one\ntwo");
+
+        assertTrue(state.apply(0, 3, "ONE", "ONE\ntwo"));
+        assertTrue(state.apply(4, 0, "T", "ONE\nTtwo"));
+
+        assertEquals(List.of(
+            new LspDocumentChange(0, 0, 0, 3, "ONE"),
+            new LspDocumentChange(1, 0, 1, 0, "T")
+        ), state.drainChanges());
+        assertEquals("ONE\nTtwo", state.text());
+    }
+
+    @Test
+    void fallsBackToFullSynchronizationWhenAChangeCannotBeReconciled() {
+        LspDocumentSyncState state = new LspDocumentSyncState("before");
+
+        assertFalse(state.apply(1, 2, "x", "different"));
+        assertTrue(state.requiresFullSync());
+        assertTrue(state.drainChanges().isEmpty());
+        assertEquals("different", state.text());
+    }
+
+    @Test
+    void parsesServerDocumentSyncModeAndSemanticLegend() {
+        Map<String, Object> incremental = MiniJson.asObject(MiniJson.parse(
+            "{\"result\":{\"capabilities\":{\"textDocumentSync\":{\"change\":2},\"semanticTokensProvider\":{\"legend\":{\"tokenTypes\":[\"class\",\"function\"]}}}}}"
+        ));
+        Map<String, Object> none = MiniJson.asObject(MiniJson.parse(
+            "{\"result\":{\"capabilities\":{\"textDocumentSync\":0}}}"
+        ));
+
+        assertEquals(LspClient.DocumentSyncKind.INCREMENTAL, LspClient.parseDocumentSyncKind(incremental));
+        assertEquals(LspClient.DocumentSyncKind.NONE, LspClient.parseDocumentSyncKind(none));
+        assertEquals(List.of("class", "function"), LspClient.parseSemanticTokenTypes(incremental));
+    }
+
+    @Test
+    void keysLanguageServersByNormalizedExtensionAndWorkspaceRoot() {
+        LspServerKey first = new LspServerKey("py", Path.of("/tmp/shed-root/../shed-root"));
+        LspServerKey second = new LspServerKey("py", Path.of("/tmp/shed-root"));
+
+        assertEquals(first, second);
+        assertEquals(".py", first.displayName());
+    }
+
+    @Test
     void mapsFileTypesToLanguageIds() {
         LspService service = new LspService();
         assertEquals("java", service.languageId(FileType.JAVA));
@@ -239,5 +286,15 @@ public class LspServiceTest {
         LspController controller = new LspController(null);
 
         assertEquals(root.toRealPath(), controller.resolveWorkspaceRoot(nested));
+    }
+
+    @Test
+    void resolveWorkspaceRootKeepsStandaloneDirectoriesIndependent() throws Exception {
+        Path first = Files.createTempDirectory("shed-lsp-root-one");
+        Path second = Files.createTempDirectory("shed-lsp-root-two");
+        LspController controller = new LspController(null);
+
+        assertEquals(first.toRealPath(), controller.resolveWorkspaceRoot(first));
+        assertEquals(second.toRealPath(), controller.resolveWorkspaceRoot(second));
     }
 }

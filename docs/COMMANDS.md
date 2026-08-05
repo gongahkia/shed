@@ -263,6 +263,7 @@ Notes:
 | Command | Action |
 | :--- | :--- |
 | `:git workbench`, `:git changes`, `:git ui` | Open docked Git Changes panel |
+| `:git worktree`, `:git worktrees`, `:git stash`, `:git stashes` | Open graphical worktree and stash controls |
 | `:git text [subcommand]` | Run Git command with legacy text presentation |
 | `:git status`, `:git st` | Status (`--short --branch`) |
 | `:git diff [args]` | Diff |
@@ -317,6 +318,10 @@ See [Update Checks](UPDATES.md) for endpoint/key configuration and metadata vali
 | `:workspace load [name]`, `:ws load [name]` | Load workspace profile |
 | `:workspace load! [name]`, `:ws load! [name]` | Force load workspace profile |
 | `:workspace list`, `:ws list` | List workspace profiles |
+| `:workspace roots`, `:workspace ui` | Show/manage workspace folders |
+| `:workspace add <folder>` | Add a local folder without changing the active tree |
+| `:workspace open <folder>`, `:workspace switch <folder\|index>` | Make a workspace folder active and show its tree |
+| `:workspace remove <folder\|index>` | Remove a folder from the workspace; files are retained |
 
 ## Markdown and Writing Commands
 

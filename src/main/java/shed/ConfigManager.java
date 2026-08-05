@@ -116,6 +116,8 @@ public class ConfigManager {
     private static final boolean DEFAULT_GIT_HISTORY_ENABLED = true;
     private static final boolean DEFAULT_GIT_REMOTE_ACTIONS_ENABLED = true;
     private static final boolean DEFAULT_GIT_PANEL_PRESENTATION_ENABLED = true;
+    private static final boolean DEFAULT_GIT_AUTO_REFRESH_ENABLED = true;
+    private static final int DEFAULT_GIT_AUTO_REFRESH_INTERVAL_MS = 1500;
     private static final boolean DEFAULT_GITHUB_REVIEW_ENABLED = false;
     private static final boolean DEFAULT_GITHUB_REVIEW_CONSENT_GRANTED = false;
     private static final boolean DEFAULT_UPDATES_ENABLED = false;
@@ -316,6 +318,8 @@ public class ConfigManager {
         defineDefault("git.history.enabled", DEFAULT_GIT_HISTORY_ENABLED);
         defineDefault("git.remote.actions.enabled", DEFAULT_GIT_REMOTE_ACTIONS_ENABLED);
         defineDefault("git.panel.presentation.enabled", DEFAULT_GIT_PANEL_PRESENTATION_ENABLED);
+        defineDefault("git.auto.refresh.enabled", DEFAULT_GIT_AUTO_REFRESH_ENABLED);
+        defineDefault("git.auto.refresh.interval.ms", DEFAULT_GIT_AUTO_REFRESH_INTERVAL_MS);
         defineDefault("github.review.enabled", DEFAULT_GITHUB_REVIEW_ENABLED);
         defineDefault("github.review.consent.granted", DEFAULT_GITHUB_REVIEW_CONSENT_GRANTED);
         defineDefault("updates.enabled", DEFAULT_UPDATES_ENABLED);
@@ -435,6 +439,8 @@ public class ConfigManager {
             case "git.history.enabled" -> "Enable the graphical Git history document";
             case "git.remote.actions.enabled" -> "Enable explicit Fetch, Pull, and Push controls in Git history";
             case "git.panel.presentation.enabled" -> "Enable graphical Git workbench documents";
+            case "git.auto.refresh.enabled" -> "Refresh the visible Git Changes panel when the repository state changes";
+            case "git.auto.refresh.interval.ms" -> "Git Changes panel polling interval while visible";
             case "github.review.enabled" -> "Enable explicit GitHub review integration actions";
             case "github.review.consent.granted" -> "Record explicit GitHub review integration consent";
             case "updates.enabled" -> "Enable automatic signed update metadata checks only with consent";
@@ -1087,6 +1093,14 @@ public class ConfigManager {
 
     public boolean getGitPanelPresentationEnabled() {
         return getBoolean("git.panel.presentation.enabled", DEFAULT_GIT_PANEL_PRESENTATION_ENABLED);
+    }
+
+    public boolean getGitAutoRefreshEnabled() {
+        return getBoolean("git.auto.refresh.enabled", DEFAULT_GIT_AUTO_REFRESH_ENABLED);
+    }
+
+    public int getGitAutoRefreshIntervalMs() {
+        return Math.max(500, Math.min(60000, getInt("git.auto.refresh.interval.ms", DEFAULT_GIT_AUTO_REFRESH_INTERVAL_MS)));
     }
 
     public boolean getGitHubReviewEnabled() {

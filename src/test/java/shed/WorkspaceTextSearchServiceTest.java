@@ -70,4 +70,22 @@ public class WorkspaceTextSearchServiceTest {
         assertEquals(1, result.matches().size());
         assertFalse(Files.exists(tempDir.resolve("index-store")));
     }
+
+    @Test
+    void searchesMultipleWorkspaceFoldersWithinOneResultBudget() throws Exception {
+        Path first = Files.createDirectory(tempDir.resolve("first"));
+        Path second = Files.createDirectory(tempDir.resolve("second"));
+        Files.writeString(first.resolve("one.txt"), "needle\n", StandardCharsets.UTF_8);
+        Files.writeString(second.resolve("two.txt"), "needle\n", StandardCharsets.UTF_8);
+        WorkspaceIndexService index = new WorkspaceIndexService(tempDir.resolve("index-store"), (workspaceRoot, relativePath) -> false);
+
+        WorkspaceTextSearchService.SearchResult result = new WorkspaceTextSearchService(index, 2, 1)
+            .search(false, List.of(first, second), "needle", WorkspaceIndexService.Cancellation.NONE, WorkspaceTextSearchService.Observer.NO_OP);
+
+        assertEquals(WorkspaceTextSearchService.State.COMPLETE, result.state());
+        assertEquals(2, result.matches().size());
+        assertFalse(result.truncated());
+        assertTrue(result.matches().stream().anyMatch(match -> match.filePath().equals(first.resolve("one.txt").toString())));
+        assertTrue(result.matches().stream().anyMatch(match -> match.filePath().equals(second.resolve("two.txt").toString())));
+    }
 }

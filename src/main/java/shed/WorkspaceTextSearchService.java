@@ -107,6 +107,49 @@ final class WorkspaceTextSearchService {
         return new SearchResult(source, State.COMPLETE, matches, truncated, filesRead, unreadableFiles, indexed.index().entries().size(), message);
     }
 
+    SearchResult search(boolean persistentIndexEnabled, List<Path> workspaceRoots, String query, WorkspaceIndexService.Cancellation cancellation,
+                        Observer observer) {
+        String needle = requireQuery(query);
+        WorkspaceIndexService.Cancellation effectiveCancellation = cancellation == null ? WorkspaceIndexService.Cancellation.NONE : cancellation;
+        Observer effectiveObserver = observer == null ? Observer.NO_OP : observer;
+        List<Path> roots = workspaceRoots == null ? List.of() : workspaceRoots.stream().filter(Objects::nonNull).distinct().toList();
+        if (roots.isEmpty()) {
+            return new SearchResult(persistentIndexEnabled ? Source.PERSISTENT_INDEX : Source.AD_HOC, State.FAILED, List.of(), false, 0, 0, 0,
+                "no workspace folders");
+        }
+        List<Match> matches = new ArrayList<>();
+        int filesRead = 0;
+        int unreadableFiles = 0;
+        int indexedFiles = 0;
+        for (Path root : roots) {
+            if (effectiveCancellation.isCancelled()) {
+                return new SearchResult(persistentIndexEnabled ? Source.PERSISTENT_INDEX : Source.AD_HOC, State.CANCELLED, matches, false,
+                    filesRead, unreadableFiles, indexedFiles, "search cancelled");
+            }
+            int remaining = maxResults - matches.size();
+            if (remaining <= 0) {
+                return new SearchResult(persistentIndexEnabled ? Source.PERSISTENT_INDEX : Source.AD_HOC, State.COMPLETE, matches, true,
+                    filesRead, unreadableFiles, indexedFiles, "result limit reached");
+            }
+            SearchResult result = new WorkspaceTextSearchService(indexService, remaining, batchSize)
+                .search(persistentIndexEnabled, root, needle, effectiveCancellation, effectiveObserver);
+            matches.addAll(result.matches());
+            filesRead += result.filesRead();
+            unreadableFiles += result.unreadableFiles();
+            indexedFiles += result.indexedFiles();
+            if (result.state() != State.COMPLETE) {
+                return new SearchResult(result.source(), result.state(), matches, false, filesRead, unreadableFiles, indexedFiles,
+                    root + ": " + result.message());
+            }
+            if (result.truncated()) {
+                return new SearchResult(result.source(), State.COMPLETE, matches, true, filesRead, unreadableFiles, indexedFiles,
+                    "result limit reached");
+            }
+        }
+        return new SearchResult(persistentIndexEnabled ? Source.PERSISTENT_INDEX : Source.AD_HOC, State.COMPLETE, matches, false,
+            filesRead, unreadableFiles, indexedFiles, matches.isEmpty() ? "no matches" : "search complete");
+    }
+
     private static boolean readableRegularFile(Path file) {
         try {
             BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);

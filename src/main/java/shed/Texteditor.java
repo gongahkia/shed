@@ -98,6 +98,7 @@ public class Texteditor extends JFrame implements KeyListener {
     InputController inputController;
     PaletteController paletteController;
     EditorUiController editorUiController;
+    WorkspaceController workspaceController;
     RecoveryController recoveryController;
     SearchReplaceController searchReplaceController;
     PerfService perfService;
@@ -227,6 +228,7 @@ public class Texteditor extends JFrame implements KeyListener {
         gitService = new GitService();
         treeService = new TreeService();
         treeGitController = new TreeGitController(this);
+        workspaceController = new WorkspaceController(this);
         lspService = new LspService();
         lspController = new LspController(this);
         debugSessionController = new DebugSessionController(this);

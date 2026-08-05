@@ -70,6 +70,8 @@ public class ConfigManagerTest {
         assertEquals("Terminal", terminalRestore.category());
         assertEquals("Live: checked when saving or loading a session", terminalRestore.applyBehavior());
         assertFalse(config.getWorkspaceIndexEnabled());
+        assertTrue(config.getGitAutoRefreshEnabled());
+        assertEquals(1500, config.getGitAutoRefreshIntervalMs());
         assertFalse(config.getBackupPolicy().enabled());
         assertEquals(BackupPolicy.BackupMode.IDLE, config.getBackupPolicy().mode());
         assertEquals("default", config.getSessionAutoloadName());

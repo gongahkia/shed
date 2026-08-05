@@ -606,11 +606,15 @@ final class SessionConfigController {
     public String handleWorkspaceProfileCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty()) {
-            return "Usage: :workspace save [name] | load[!] [name] | list | index [status|enable|disable|benchmark]";
+            return editor.workspaceController.handle("");
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase(Locale.ROOT) : trimmed.substring(0, split).toLowerCase(Locale.ROOT);
         String args = split < 0 ? "" : trimmed.substring(split + 1).trim();
+        if (subcommand.equals("roots") || subcommand.equals("ui") || subcommand.equals("folders") || subcommand.equals("add")
+            || subcommand.equals("open") || subcommand.equals("remove") || subcommand.equals("rm") || subcommand.equals("switch") || subcommand.equals("use")) {
+            return editor.workspaceController.handle(trimmed);
+        }
         if ("index".equals(subcommand)) {
             return handleWorkspaceIndexCommand(args);
         }
@@ -626,7 +630,7 @@ final class SessionConfigController {
             case "list":
                 return listWorkspaceProfiles();
             default:
-                return "Usage: :workspace save [name] | load[!] [name] | list | index [status|enable|disable|benchmark]";
+                return "Usage: :workspace [list|ui|add <folder>|open <folder>|remove <folder|index>|switch <folder|index>|save|load|index]";
         }
     }
 
@@ -749,6 +753,9 @@ final class SessionConfigController {
         if (editor.treeRoot != null) {
             payload.put("treeRoot", editor.treeRoot.getAbsolutePath());
         }
+        payload.put("workspaceRoots", editor.workspaceController.serializeRoots());
+        Path activeWorkspaceRoot = editor.workspaceController.activeRoot();
+        if (activeWorkspaceRoot != null) payload.put("workspaceActiveRoot", activeWorkspaceRoot.toString());
         payload.put("uiSettings", captureSessionUiSettings());
         payload.put("savedAt", editor.commandLogTimeFormat.format(LocalDateTime.now()));
         try {
@@ -871,12 +878,8 @@ final class SessionConfigController {
         editor.requestActivePaneFocus();
 
         String savedTreeRoot = MiniJson.asString(payload.get("treeRoot"));
-        if (savedTreeRoot != null && !savedTreeRoot.isBlank()) {
-            File root = new File(savedTreeRoot);
-            editor.treeRoot = root.exists() ? root : null;
-        } else {
-            editor.treeRoot = null;
-        }
+        File legacyRoot = savedTreeRoot == null || savedTreeRoot.isBlank() ? null : new File(savedTreeRoot);
+        editor.workspaceController.restore(payload.get("workspaceRoots"), MiniJson.asString(payload.get("workspaceActiveRoot")), legacyRoot);
         editor.workbenchPlacementState = WorkbenchPlacementState.fromList(payload.get("toolPlacements"));
         applySessionUiSettings(MiniJson.asObject(payload.get("uiSettings")));
         return true;
@@ -932,12 +935,8 @@ final class SessionConfigController {
         if (activeCaret != null) {
             editor.writingArea.setCaretPosition(Math.min(Math.max(0, activeCaret), editor.writingArea.getText().length()));
         }
-        if (savedTreeRoot != null && !savedTreeRoot.isBlank()) {
-            File root = new File(savedTreeRoot);
-            editor.treeRoot = root.exists() ? root : null;
-        } else {
-            editor.treeRoot = null;
-        }
+        File legacyRoot = savedTreeRoot == null || savedTreeRoot.isBlank() ? null : new File(savedTreeRoot);
+        editor.workspaceController.restore(null, null, legacyRoot);
         return true;
     }
 

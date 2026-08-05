@@ -246,6 +246,15 @@ public class ConfigManagerTest {
         ConfigManager config = new ConfigManager();
 
         assertEquals(LspFeatureSettings.defaults(), config.getLspFeatureSettings());
+        assertTrue(config.getLspCompletionAutoShow());
+        assertEquals(90, config.getLspCompletionDelayMs());
+        assertTrue(config.getLspCompletionTriggerCharacters());
+        assertTrue(config.getLspCompletionFuzzyMatching());
+        assertTrue(config.getLspCompletionLocalWords());
+        assertTrue(config.getLspCompletionCommitCharacters());
+        config.setAndPersist("lsp.completion.delay.ms", "120");
+        assertEquals(120, config.getLspCompletionDelayMs());
+        assertEquals("lsp.completion.delay.ms must be between 0 and 1000", config.validateSettingValue("lsp.completion.delay.ms", "1001"));
         config.setAndPersist("lsp.completion.enabled", "false");
         config.setAndPersist("lsp.snippets.enabled", "true");
         config.setAndPersist("lsp.signature.help.enabled", "false");
@@ -278,6 +287,9 @@ public class ConfigManagerTest {
             .orElseThrow();
         assertEquals("Language Server", descriptor.category());
         assertEquals("Restart: takes effect when an LSP server is started or restarted", descriptor.applyBehavior());
+        TypedSettings.Descriptor autoShow = config.typedSettingDescriptors().stream()
+            .filter(setting -> setting.key().equals("lsp.completion.auto.show")).findFirst().orElseThrow();
+        assertEquals("Live: used by the next completion request", autoShow.applyBehavior());
         assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"lsp.formatting.enabled\" = false"));
     }
 

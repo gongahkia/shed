@@ -15,7 +15,7 @@ public class OpenBufferCompletionIndexTest {
         index.update(first, index.build("connection requestContext connection"));
         index.update(second, index.build("requestConfig requestContext"));
 
-        List<OpenBufferCompletionIndex.Candidate> matches = index.complete(List.of(first, second), second, "req", 13, 12,
+        List<OpenBufferCompletionIndex.Candidate> matches = index.complete(List.of(first, second), second, "req", 20, 12,
             new FuzzyMatchService());
 
         assertEquals("requestContext", matches.get(0).word());

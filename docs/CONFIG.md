@@ -112,7 +112,7 @@ An `https://` `landing.source` is an explicit global opt-in to fetch that URL wh
 
 ## LSP Feature Settings
 
-All LSP feature keys are typed booleans and appear in `:config inspector` under **Language Server**. Changing one writes/reloads immediately, but its effective capability state is negotiated when that language server starts; run `:lsp restart [ext]` for an existing server. `true` permits a server-advertised request and `false` prevents Shed from invoking it; the snippets key instead controls the client capability advertised at initialization. These toggles do not create network access, and diagnostics remain stored locally.
+LSP feature keys appear in `:config inspector` under **Language Server**. Capability and initialization settings require `:lsp restart [ext]` for an existing server; the completion interaction controls below apply to the next request. `true` permits a server-advertised request and `false` prevents Shed from invoking it; the snippets key instead controls the client capability advertised at initialization. These toggles do not create network access, and diagnostics remain stored locally.
 
 Managed language support has no configuration key or network path yet. Its planned ownership, consent, catalog, integrity, cache, platform, and revocation policy is documented in [Managed Language Support Trust Model](MANAGED_LANGUAGE_SUPPORT.md); existing `lsp.<ext>.command` and `lsp.<ext>.args` remain user-managed local commands. Java resolves locally through `jdtls` by default and Python through `pyright-langserver --stdio`; set `lsp.java.command` or `lsp.py.command` when an executable or runtime differs.
 
@@ -121,6 +121,12 @@ Shed keeps an independent client for each `(extension, workspace root)` pair, so
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
 | `lsp.completion.enabled` | `true` | bool | Completion requests |
+| `lsp.completion.auto.show` | `true` | bool | Show suggestions while typing; applies live |
+| `lsp.completion.delay.ms` | `90` | integer `0..1000` | Idle debounce before automatic suggestions; applies live |
+| `lsp.completion.trigger.characters` | `true` | bool | Request completion after a server-advertised trigger character; applies live |
+| `lsp.completion.fuzzy.matching` | `true` | bool | Fuzzy-filter and rank completion labels; applies live |
+| `lsp.completion.local.words` | `true` | bool | Include cached words from open buffers as a fallback; applies live |
+| `lsp.completion.commit.characters` | `true` | bool | Accept a server completion when its commit character is typed; applies live |
 | `lsp.snippets.enabled` | `false` | bool | Advertises snippet-completion support during initialization |
 | `lsp.signature.help.enabled` | `true` | bool | Signature-help requests |
 | `lsp.hover.enabled` | `true` | bool | Hover requests |
@@ -151,7 +157,7 @@ Use **Open Snippets** in Settings or `:snippets open` to create and open `snippe
 }
 ```
 
-Use `Ctrl-n` to select snippets alongside local and LSP completions, or type an exact trigger and press `Ctrl-j`. `$1` / `${1:default}` create ordered editable stops and `$0` is final; built-in variables include `TM_SELECTED_TEXT`, `TM_CURRENT_LINE`, `TM_CURRENT_WORD`, line-number, filename, path, directory, and workspace-name values. Choice syntax inserts its first value; transforms, shell interpolation, and linked mirrored placeholders are not supported.
+Suggestions appear after two word characters, after an LSP server's advertised trigger character, or when `Ctrl-n` is pressed manually. Shed uses server `filterText`, `sortText`, preselection, commit characters, and lazy completion-detail resolution where offered; open-buffer word snapshots are built off the UI thread. Use `Ctrl-n` to select snippets alongside local and LSP completions, or type an exact trigger and press `Ctrl-j`. `$1` / `${1:default}` create ordered editable stops and `$0` is final; built-in variables include `TM_SELECTED_TEXT`, `TM_CURRENT_LINE`, `TM_CURRENT_WORD`, line-number, filename, path, directory, and workspace-name values. Choice syntax inserts its first value; transforms, shell interpolation, and linked mirrored placeholders are not supported.
 
 ## Syntax Highlighting
 

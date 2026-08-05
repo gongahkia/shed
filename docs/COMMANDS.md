@@ -220,7 +220,8 @@ Notes:
 | Command | Action |
 | :--- | :--- |
 | `:lsp completion`, `:lsp complete`, `:lsp comp` | Completion picker (LSP with local fallback) |
-| Insert-mode `Ctrl-n` | Asynchronous completion popup; user snippets, LSP, and buffer items are merged; Up/Down or Ctrl-p/Ctrl-n selects, Tab/Enter applies, Escape cancels |
+| Insert-mode typing | Debounced suggestions after two word characters or a server-advertised trigger character; LSP details resolve only for the selected item |
+| Insert-mode `Ctrl-n` | Manually open the asynchronous completion popup, including at an empty prefix; user snippets, LSP, and cached open-buffer words are merged; Up/Down or Ctrl-p/Ctrl-n selects, Tab/Enter applies, Escape cancels |
 | After any snippet completion | Tab/Shift-Tab moves through ordered placeholders; positions survive ordinary edits |
 | Insert `(` or `,` | Shows capability-gated asynchronous signature help; the next edit or Escape cancels it |
 | `:lsp definition`, `:lsp def` | Go to definition |

@@ -26,6 +26,7 @@ final class InputController {
     private FileBuffer pendingWordIndexBuffer;
     private int wordIndexGeneration;
     private int wordIndexJobId;
+    private int wordIndexJobSerial;
     private int completionResolveJobId;
     private LspClient.CompletionItem resolvingCompletion;
     private final Set<LspClient.CompletionItem> completionResolveAttempts;
@@ -48,6 +49,7 @@ final class InputController {
         this.pendingWordIndexBuffer = null;
         this.wordIndexGeneration = 0;
         this.wordIndexJobId = -1;
+        this.wordIndexJobSerial = 0;
         this.completionResolveJobId = -1;
         this.resolvingCompletion = null;
         this.completionResolveAttempts = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -97,15 +99,33 @@ final class InputController {
         pendingWordIndexBuffer = null;
         if (buffer == null || buffer != editor.getCurrentBuffer() || buffer.isLargeFile()) return;
         String text = editor.writingArea.getText();
+        submitOpenBufferWordIndex(buffer, text);
+    }
+
+    private void submitOpenBufferWordIndex(FileBuffer buffer, String text) {
+        if (buffer == null || text == null || buffer.isLargeFile()) return;
         int generation = ++wordIndexGeneration;
+        int serial = ++wordIndexJobSerial;
         if (wordIndexJobId >= 0) editor.asyncJobService.cancel(wordIndexJobId);
         wordIndexJobId = editor.asyncJobService.submit("completion word index", token -> openBufferCompletionIndex.build(text),
             (snapshot, words, error) -> {
-                if (snapshot == null || snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED || error != null
-                    || generation != wordIndexGeneration || words == null || buffer != editor.getCurrentBuffer()) return;
-                openBufferCompletionIndex.update(buffer, words);
+                if (serial != wordIndexJobSerial) return;
                 wordIndexJobId = -1;
+                if (snapshot == null || snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED || error != null
+                    || generation != wordIndexGeneration || words == null || !editor.buffers.contains(buffer)) return;
+                openBufferCompletionIndex.update(buffer, words);
             });
+    }
+
+    private void scheduleMissingOpenBufferWordIndex() {
+        if (wordIndexJobId >= 0) return;
+        FileBuffer current = editor.getCurrentBuffer();
+        for (FileBuffer buffer : editor.buffers) {
+            if (buffer.isLargeFile() || openBufferCompletionIndex.hasSnapshot(buffer)) continue;
+            String text = buffer == current ? editor.writingArea.getText() : buffer.getFullContent();
+            submitOpenBufferWordIndex(buffer, text);
+            return;
+        }
     }
 
     private void scheduleQuickSuggestion(LspClient.CompletionTriggerKind kind, Character character) {
@@ -2495,6 +2515,7 @@ final class InputController {
 
     private List<LspClient.CompletionItem> localCompletionItems(String prefix) {
         if (!editor.configManager.getLspCompletionLocalWords() || prefix == null || prefix.isBlank()) return List.of();
+        scheduleMissingOpenBufferWordIndex();
         List<LspClient.CompletionItem> items = new ArrayList<>();
         FileBuffer current = editor.getCurrentBuffer();
         for (OpenBufferCompletionIndex.Candidate candidate : openBufferCompletionIndex.complete(editor.buffers, current, prefix,

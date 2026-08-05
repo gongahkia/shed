@@ -61,6 +61,28 @@ public class LspServiceTest {
     }
 
     @Test
+    void parsesCompletionInteractionMetadataAndBuildsTriggerContext() {
+        List<LspClient.CompletionItem> items = LspClient.parseCompletionItems(MiniJson.parse(
+            "[{\"label\":\"render\",\"filterText\":\"rnd\",\"sortText\":\"001\",\"preselect\":true,\"commitCharacters\":[\".\",\";\"]}]"
+        ));
+        Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
+            "{\"result\":{\"capabilities\":{\"completionProvider\":{\"triggerCharacters\":[\".\",\":\"],\"resolveProvider\":true}}}}"
+        ));
+        Map<String, Object> params = LspClient.completionParameters("file:///tmp/a.java", 3, 4,
+            LspClient.CompletionTriggerKind.TRIGGER_CHARACTER, '.');
+        Map<String, Object> context = MiniJson.asObject(params.get("context"));
+
+        assertEquals("rnd", items.get(0).getFilterText());
+        assertEquals("001", items.get(0).getSortText());
+        assertTrue(items.get(0).isPreselect());
+        assertEquals(List.of(".", ";"), items.get(0).getCommitCharacters());
+        assertEquals(java.util.Set.of(".", ":"), LspClient.parseCompletionTriggerCharacters(response));
+        assertTrue(LspClient.parseCompletionResolveSupport(response));
+        assertEquals(2, MiniJson.asInt(context.get("triggerKind")));
+        assertEquals(".", MiniJson.asString(context.get("triggerCharacter")));
+    }
+
+    @Test
     void parsesSnippetCompletionTextEdits() {
         List<LspClient.CompletionItem> items = LspClient.parseCompletionItems(MiniJson.parse(
             "[{\"label\":\"fn\",\"insertText\":\"fn ${1:name}\",\"insertTextFormat\":2,\"textEdit\":{\"range\":{\"start\":{\"line\":0,\"character\":0},\"end\":{\"line\":0,\"character\":2}},\"newText\":\"fn ${1:name}\"}}]"

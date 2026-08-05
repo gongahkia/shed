@@ -239,6 +239,7 @@ public class ConfigManager {
         defineDefault("session.autoload", DEFAULT_SESSION_AUTOLOAD);
         defineDefault("session.dir", defaultSessionDirectoryPath());
         defineDefault("terminal.session.restore", DEFAULT_TERMINAL_SESSION_RESTORE);
+        defineDefault("snippets.directory", defaultSnippetsDirectoryPath());
         defineDefault("landing.source", defaultLandingSourcePath());
         defineDefault("landing.remote.cache.path", defaultLandingRemoteCachePath());
         defineDefault("landing.remote.timeout.ms", DEFAULT_LANDING_REMOTE_TIMEOUT_MS);
@@ -352,6 +353,7 @@ public class ConfigManager {
             case "session.autoload" -> "Session name loaded at startup";
             case "session.dir" -> "Directory for saved sessions";
             case "terminal.session.restore" -> "Persist terminal panel working directories and restore fresh shells";
+            case "snippets.directory" -> "Directory containing VS Code-compatible JSON snippet files";
             case "landing.source" -> "Local path, file URI, or explicitly configured HTTPS landing-page source";
             case "landing.remote.cache.path" -> "Local file used to cache an HTTPS landing-page source";
             case "landing.remote.timeout.ms" -> "HTTPS landing-page connection and request timeout";
@@ -768,6 +770,11 @@ public class ConfigManager {
 
     public int getTerminalFontSize() {
         return getInt("terminal.font.size", DEFAULT_TERMINAL_FONT_SIZE);
+    }
+
+    public String getSnippetsDirectory() {
+        String configured = getString("snippets.directory", defaultSnippetsDirectoryPath());
+        return configured == null || configured.isBlank() ? defaultSnippetsDirectoryPath() : configured.trim();
     }
 
     // Get tab size
@@ -1507,6 +1514,10 @@ public class ConfigManager {
 
     public String getPluginsDirectoryPath() {
         return Path.of(shedDirectoryPath).resolve(SHED_PLUGINS_NAME).toString();
+    }
+
+    private String defaultSnippetsDirectoryPath() {
+        return Path.of(shedDirectoryPath, "snippets").toString();
     }
 
     // Check if config file exists

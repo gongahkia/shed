@@ -15,9 +15,7 @@ final class InputController {
     private final CompletionRequestState completionRequestState;
     private int completionJobId;
     private CompletionRequestState.Snapshot activeCompletionRequest;
-    private List<LspCompletionApplication.Placeholder> lspSnippetPlaceholders;
-    private int lspSnippetPlaceholderIndex;
-    private int lspSnippetDocumentVersion;
+    private final SnippetSession snippetSession;
     private final CompletionRequestState signatureHelpRequestState;
     private int signatureHelpJobId;
     private EmacsKeymap.Prefix emacsPrefix;
@@ -27,9 +25,7 @@ final class InputController {
         this.completionRequestState = new CompletionRequestState();
         this.completionJobId = -1;
         this.activeCompletionRequest = null;
-        this.lspSnippetPlaceholders = List.of();
-        this.lspSnippetPlaceholderIndex = -1;
-        this.lspSnippetDocumentVersion = -1;
+        this.snippetSession = new SnippetSession();
         this.signatureHelpRequestState = new CompletionRequestState();
         this.signatureHelpJobId = -1;
         this.emacsPrefix = EmacsKeymap.Prefix.NONE;
@@ -1389,7 +1385,7 @@ final class InputController {
 
     void handleInsertMode(KeyEvent e) {
         int code = e.getKeyCode();
-        if ((code == KeyEvent.VK_TAB || (e.isShiftDown() && code == KeyEvent.VK_TAB)) && moveLspSnippetPlaceholder(e.isShiftDown() ? -1 : 1)) {
+        if ((code == KeyEvent.VK_TAB || (e.isShiftDown() && code == KeyEvent.VK_TAB)) && moveSnippetPlaceholder(e.isShiftDown() ? -1 : 1)) {
             e.consume();
             return;
         }
@@ -2147,10 +2143,11 @@ final class InputController {
             return;
         }
         FileBuffer buffer = editor.getCurrentBuffer();
+        List<LspClient.CompletionItem> snippets = snippetCompletionItems(prefix);
         editor.flushLspChange(buffer);
         LspClient client = editor.existingLspClient(buffer);
         if (buffer == null || client == null || !buffer.hasFilePath() || !client.supports(LspCapability.COMPLETION)) {
-            showCompletionPopup(localCompletionItems(prefix), prefix);
+            showCompletionPopup(mergeCompletionItems(snippets, localCompletionItems(prefix)), prefix);
             return;
         }
         try {
@@ -2173,7 +2170,14 @@ final class InputController {
         cancelCompletionJob();
         completionRequestState.invalidate();
         activeCompletionRequest = null;
-        clearLspSnippetSession();
+        snippetSession.clear();
+        if (editor.completionPopup != null && editor.completionPopup.isVisible()) editor.completionPopup.setVisible(false);
+    }
+
+    void dismissCompletionPopupForCaretMove() {
+        cancelCompletionJob();
+        completionRequestState.invalidate();
+        activeCompletionRequest = null;
         if (editor.completionPopup != null && editor.completionPopup.isVisible()) editor.completionPopup.setVisible(false);
     }
 
@@ -2211,12 +2215,7 @@ final class InputController {
         if (result.placeholders().isEmpty()) {
             editor.writingArea.setCaretPosition(Math.min(result.caret(), editor.writingArea.getDocument().getLength()));
         } else {
-            FileBuffer buffer = editor.getCurrentBuffer();
-            String uri = buffer == null || !buffer.hasFilePath() ? null : editor.bufferUri(buffer);
-            lspSnippetPlaceholders = result.placeholders();
-            lspSnippetPlaceholderIndex = 0;
-            lspSnippetDocumentVersion = uri == null ? -1 : editor.lspDocumentVersions.getOrDefault(uri, -1);
-            selectLspSnippetPlaceholder();
+            snippetSession.begin(editor.writingArea, 0, result.placeholders());
         }
         if (result.fallback()) editor.showMessage("LSP completion edit was invalid; inserted label");
     }
@@ -2238,7 +2237,7 @@ final class InputController {
         }
         completionJobId = -1;
         List<LspClient.CompletionItem> resolved = items == null || items.isEmpty() ? localCompletionItems(request.prefix()) : items;
-        showCompletionPopup(resolved, request.prefix());
+        showCompletionPopup(mergeCompletionItems(snippetCompletionItems(request.prefix()), resolved), request.prefix());
     }
 
     private void showCompletionPopup(List<LspClient.CompletionItem> completions, String prefix) {
@@ -2336,39 +2335,84 @@ final class InputController {
         return items;
     }
 
-    private boolean moveLspSnippetPlaceholder(int direction) {
-        if (lspSnippetPlaceholders.isEmpty()) return false;
+    private boolean moveSnippetPlaceholder(int direction) {
+        return snippetSession.move(editor.writingArea, direction);
+    }
+
+    String expandNativeSnippetAtCursor() {
         FileBuffer buffer = editor.getCurrentBuffer();
-        String uri = buffer == null || !buffer.hasFilePath() ? null : editor.bufferUri(buffer);
-        if (uri == null || editor.lspDocumentVersions.getOrDefault(uri, -1) != lspSnippetDocumentVersion) {
-            clearLspSnippetSession();
-            return false;
+        if (buffer == null) return "No buffer";
+        int caret = editor.writingArea.getCaretPosition();
+        String text = editor.writingArea.getText();
+        int start = caret;
+        while (start > 0 && isSnippetTriggerCharacter(text.charAt(start - 1))) start--;
+        if (start == caret) return "No trigger word";
+        String trigger = text.substring(start, caret);
+        SnippetService.Snippet snippet = editor.snippetService.findExact(buffer.getFileType(), trigger);
+        if (snippet == null) return "No snippet: " + trigger;
+        SnippetExpansion.Result expansion = SnippetExpansion.parse(snippet.body, snippetVariables(buffer));
+        if (expansion == null) return "Invalid snippet: " + trigger;
+        editor.suppressDocumentEvents = true;
+        try {
+            editor.writingArea.replaceRange(expansion.text(), start, caret);
+        } finally {
+            editor.suppressDocumentEvents = false;
         }
-        int next = lspSnippetPlaceholderIndex + direction;
-        if (next < 0 || next >= lspSnippetPlaceholders.size()) {
-            clearLspSnippetSession();
-            return false;
+        editor.markModified();
+        editor.scheduleSyntaxHighlighting();
+        if (!snippetSession.begin(editor.writingArea, start, expansion.placeholders())) {
+            editor.writingArea.setCaretPosition(Math.min(start + expansion.text().length(), editor.writingArea.getDocument().getLength()));
         }
-        lspSnippetPlaceholderIndex = next;
-        selectLspSnippetPlaceholder();
-        return true;
+        return "Expanded: " + trigger;
     }
 
-    private void selectLspSnippetPlaceholder() {
-        LspCompletionApplication.Placeholder placeholder = lspSnippetPlaceholders.get(lspSnippetPlaceholderIndex);
-        int length = editor.writingArea.getDocument().getLength();
-        if (placeholder.start() < 0 || placeholder.end() < placeholder.start() || placeholder.end() > length) {
-            clearLspSnippetSession();
-            return;
-        }
-        editor.writingArea.setCaretPosition(placeholder.start());
-        editor.writingArea.moveCaretPosition(placeholder.end());
+    private boolean isSnippetTriggerCharacter(char character) {
+        return Character.isLetterOrDigit(character) || character == '_' || character == '-' || character == '.';
     }
 
-    private void clearLspSnippetSession() {
-        lspSnippetPlaceholders = List.of();
-        lspSnippetPlaceholderIndex = -1;
-        lspSnippetDocumentVersion = -1;
+    private Map<String, String> snippetVariables(FileBuffer buffer) {
+        Map<String, String> values = new HashMap<>();
+        String selected = editor.writingArea.getSelectedText();
+        values.put("TM_SELECTED_TEXT", selected == null ? "" : selected);
+        try {
+            int caret = editor.writingArea.getCaretPosition();
+            int line = editor.writingArea.getLineOfOffset(caret);
+            int start = editor.writingArea.getLineStartOffset(line);
+            int end = editor.writingArea.getLineEndOffset(line);
+            values.put("TM_CURRENT_LINE", editor.writingArea.getText(start, Math.max(0, end - start)).replaceAll("[\\r\\n]+$", ""));
+            values.put("TM_CURRENT_WORD", editor.currentCompletionPrefix());
+            values.put("TM_LINE_INDEX", Integer.toString(line));
+            values.put("TM_LINE_NUMBER", Integer.toString(line + 1));
+        } catch (BadLocationException ignored) {
+        }
+        File file = buffer.getFile();
+        if (file != null) {
+            String filename = file.getName();
+            int dot = filename.lastIndexOf('.');
+            values.put("TM_FILENAME", filename);
+            values.put("TM_FILENAME_BASE", dot > 0 ? filename.substring(0, dot) : filename);
+            values.put("TM_DIRECTORY", file.getParent() == null ? "" : file.getParent());
+            values.put("TM_FILEPATH", file.getAbsolutePath());
+        }
+        values.put("WORKSPACE_NAME", editor.treeRoot == null ? "" : editor.treeRoot.getName());
+        return values;
+    }
+
+    private List<LspClient.CompletionItem> snippetCompletionItems(String prefix) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null) return List.of();
+        List<LspClient.CompletionItem> items = new ArrayList<>();
+        for (SnippetService.Snippet snippet : editor.snippetService.getSnippetsFor(buffer.getFileType(), prefix)) {
+            items.add(new LspClient.CompletionItem(snippet.trigger, snippet.description, 15, snippet.description, snippet.body, true, List.of()));
+        }
+        return items;
+    }
+
+    private List<LspClient.CompletionItem> mergeCompletionItems(List<LspClient.CompletionItem> first, List<LspClient.CompletionItem> second) {
+        LinkedHashMap<String, LspClient.CompletionItem> merged = new LinkedHashMap<>();
+        for (LspClient.CompletionItem item : first) merged.put(item.getLabel() + '\u0000' + item.getInsertText(), item);
+        for (LspClient.CompletionItem item : second) merged.putIfAbsent(item.getLabel() + '\u0000' + item.getInsertText(), item);
+        return List.copyOf(merged.values());
     }
 
     private void showSignatureHelp() {

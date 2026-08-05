@@ -62,9 +62,14 @@ final class SettingsEditorDialog extends JDialog {
         panel.setBorder(BorderFactory.createEmptyBorder(8, 8, 0, 8));
         panel.add(new JLabel("Search settings"), BorderLayout.WEST);
         panel.add(search, BorderLayout.CENTER);
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
         JButton file = new JButton("Open TOML");
         file.addActionListener(event -> editor.openSettingsBuffer());
-        panel.add(file, BorderLayout.EAST);
+        actions.add(file);
+        JButton snippets = new JButton("Open Snippets");
+        snippets.addActionListener(event -> editor.openSnippetsBuffer());
+        actions.add(snippets);
+        panel.add(actions, BorderLayout.EAST);
         return panel;
     }
 

@@ -221,6 +221,9 @@ final class TypedSettings {
         if (key.startsWith("terminal.")) {
             return "Terminal";
         }
+        if (key.startsWith("snippets.")) {
+            return "Snippets";
+        }
         if (key.startsWith("workspace.")) {
             return "Workspace";
         }

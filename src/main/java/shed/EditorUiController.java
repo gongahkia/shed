@@ -347,7 +347,7 @@ final class EditorUiController {
                 } catch (BadLocationException ignored) {
                 }
             }
-            editor.dismissCompletionPopup();
+            editor.dismissCompletionPopupForCaretMove();
             editor.refreshLimelight();
             requestStatusBarRefresh();
         });

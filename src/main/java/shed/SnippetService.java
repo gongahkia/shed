@@ -1,11 +1,20 @@
 package shed;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public class SnippetService {
+
+    record LoadResult(int loaded, List<String> errors) {}
 
     public static class Snippet {
         public final String trigger;
@@ -23,10 +32,14 @@ public class SnippetService {
 
     private final List<Snippet> builtins;
     private final List<Snippet> userSnippets;
+    private Path loadedDirectory;
+    private String directoryFingerprint;
 
     public SnippetService() {
         builtins = new ArrayList<>();
         userSnippets = new ArrayList<>();
+        loadedDirectory = null;
+        directoryFingerprint = "";
         registerBuiltins();
     }
 
@@ -119,12 +132,166 @@ public class SnippetService {
     }
 
     public void loadFromConfig(ConfigManager config) {
+        if (config == null) return;
+        Path directory = Path.of(config.getSnippetsDirectory()).toAbsolutePath().normalize();
+        if (directory.equals(loadedDirectory)) reloadIfChanged();
+        else loadFromDirectory(directory);
+    }
+
+    public LoadResult loadFromDirectory(Path directory) {
         userSnippets.clear();
-        // Config format: snippet.<filetype>.<trigger>=<body>
-        // We parse through known config keys
+        loadedDirectory = directory == null ? null : directory.toAbsolutePath().normalize();
+        directoryFingerprint = fingerprint(loadedDirectory);
+        if (loadedDirectory == null || !Files.isDirectory(loadedDirectory)) return new LoadResult(0, List.of());
+        List<String> errors = new ArrayList<>();
+        int loaded = 0;
+        try (Stream<Path> entries = Files.list(loadedDirectory)) {
+            List<Path> files = entries.filter(Files::isRegularFile)
+                .filter(this::isSnippetFile).sorted(Comparator.comparing(path -> path.getFileName().toString())).toList();
+            for (Path file : files) loaded += loadFile(file, errors);
+        } catch (IOException error) {
+            errors.add("Cannot read " + loadedDirectory + ": " + error.getMessage());
+        }
+        return new LoadResult(loaded, List.copyOf(errors));
+    }
+
+    public boolean reloadIfChanged() {
+        String current = fingerprint(loadedDirectory);
+        if (current.equals(directoryFingerprint)) return false;
+        loadFromDirectory(loadedDirectory);
+        return true;
+    }
+
+    public Path getLoadedDirectory() {
+        return loadedDirectory;
+    }
+
+    private boolean isSnippetFile(Path file) {
+        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".json") || name.endsWith(".code-snippets");
+    }
+
+    private int loadFile(Path file, List<String> errors) {
+        try {
+            Map<String, Object> snippets = MiniJson.asObject(MiniJson.parse(Files.readString(file, StandardCharsets.UTF_8)));
+            if (snippets == null) {
+                errors.add("Expected object: " + file.getFileName());
+                return 0;
+            }
+            int loaded = 0;
+            FileType fileType = fileTypeForFilename(file);
+            for (Map.Entry<String, Object> entry : snippets.entrySet()) {
+                Map<String, Object> definition = MiniJson.asObject(entry.getValue());
+                if (definition == null) {
+                    errors.add("Invalid snippet " + entry.getKey() + " in " + file.getFileName());
+                    continue;
+                }
+                String body = body(definition.get("body"));
+                if (body == null) {
+                    errors.add("Missing body for " + entry.getKey() + " in " + file.getFileName());
+                    continue;
+                }
+                String description = MiniJson.asString(definition.get("description"));
+                List<String> prefixes = prefixes(definition.get("prefix"), entry.getKey());
+                List<FileType> scopes = scopes(definition.get("scope"), fileType);
+                for (String prefix : prefixes) {
+                    for (FileType scope : scopes) {
+                        if (prefix.isBlank()) continue;
+                        userSnippets.add(new Snippet(prefix, body, description == null ? entry.getKey() : description, scope));
+                        loaded++;
+                    }
+                }
+            }
+            return loaded;
+        } catch (RuntimeException | IOException error) {
+            errors.add("Cannot load " + file.getFileName() + ": " + error.getMessage());
+            return 0;
+        }
+    }
+
+    private String body(Object value) {
+        String direct = MiniJson.asString(value);
+        if (direct != null) return direct;
+        List<Object> lines = MiniJson.asArray(value);
+        if (lines == null) return null;
+        List<String> values = new ArrayList<>();
+        for (Object line : lines) {
+            String text = MiniJson.asString(line);
+            if (text == null) return null;
+            values.add(text);
+        }
+        return String.join("\n", values);
+    }
+
+    private List<String> prefixes(Object value, String fallback) {
+        String direct = MiniJson.asString(value);
+        if (direct != null) return List.of(direct);
+        List<Object> values = MiniJson.asArray(value);
+        if (values == null) return List.of(fallback);
+        List<String> prefixes = new ArrayList<>();
+        for (Object item : values) {
+            String prefix = MiniJson.asString(item);
+            if (prefix != null) prefixes.add(prefix);
+        }
+        return prefixes.isEmpty() ? List.of(fallback) : List.copyOf(prefixes);
+    }
+
+    private List<FileType> scopes(Object value, FileType fallback) {
+        String scope = MiniJson.asString(value);
+        if (scope == null || scope.isBlank()) return singletonScope(fallback);
+        List<FileType> types = new ArrayList<>();
+        for (String name : scope.split(",")) {
+            FileType type = fileTypeForName(name.trim());
+            if (type != null) types.add(type);
+        }
+        return types.isEmpty() ? singletonScope(fallback) : List.copyOf(types);
+    }
+
+    private List<FileType> singletonScope(FileType type) {
+        List<FileType> scopes = new ArrayList<>();
+        scopes.add(type);
+        return scopes;
+    }
+
+    private FileType fileTypeForFilename(Path file) {
+        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        if (name.equals("snippets.json") || name.endsWith(".code-snippets")) return null;
+        int dot = name.lastIndexOf('.');
+        return fileTypeForName(dot < 0 ? name : name.substring(0, dot));
+    }
+
+    private FileType fileTypeForName(String name) {
+        String normalized = name.toLowerCase(Locale.ROOT).replace('-', ' ').replace('_', ' ').trim();
+        for (FileType type : FileType.values()) {
+            if (type.getDisplayName().equals(normalized)) return type;
+        }
+        return switch (normalized) {
+            case "js", "jsx" -> FileType.JAVASCRIPT;
+            case "ts", "tsx" -> FileType.TYPESCRIPT;
+            case "c++", "cxx" -> FileType.CPP;
+            case "md" -> FileType.MARKDOWN;
+            case "plain text", "global" -> null;
+            default -> null;
+        };
+    }
+
+    private String fingerprint(Path directory) {
+        if (directory == null || !Files.isDirectory(directory)) return "";
+        try (Stream<Path> entries = Files.list(directory)) {
+            StringBuilder fingerprint = new StringBuilder();
+            for (Path file : entries.filter(Files::isRegularFile).filter(this::isSnippetFile)
+                .sorted(Comparator.comparing(path -> path.getFileName().toString())).toList()) {
+                FileTime modified = Files.getLastModifiedTime(file);
+                fingerprint.append(file.getFileName()).append(':').append(Files.size(file)).append(':').append(modified.toMillis()).append(';');
+            }
+            return fingerprint.toString();
+        } catch (IOException error) {
+            return "!" + error.getClass().getName() + ':' + error.getMessage();
+        }
     }
 
     public List<Snippet> getSnippetsFor(FileType fileType, String prefix) {
+        reloadIfChanged();
         List<Snippet> results = new ArrayList<>();
         for (Snippet s : userSnippets) {
             if ((s.fileType == fileType || s.fileType == null) && s.trigger.startsWith(prefix)) {
@@ -140,6 +307,7 @@ public class SnippetService {
     }
 
     public Snippet findExact(FileType fileType, String trigger) {
+        reloadIfChanged();
         for (Snippet s : userSnippets) {
             if ((s.fileType == fileType || s.fileType == null) && s.trigger.equals(trigger)) {
                 return s;
@@ -174,6 +342,7 @@ public class SnippetService {
     }
 
     public String listSnippets(FileType fileType) {
+        reloadIfChanged();
         StringBuilder sb = new StringBuilder();
         sb.append("Snippets");
         if (fileType != null && fileType != FileType.UNKNOWN) {
@@ -200,7 +369,7 @@ public class SnippetService {
                 sb.append("\n");
             }
         }
-        sb.append("\nType trigger text then Ctrl-j to expand.");
+        sb.append("\nType a trigger then Ctrl-j, or use Ctrl-n for completion.");
         return sb.toString();
     }
 }

@@ -72,6 +72,12 @@ final class PaneBufferController {
         if (pane == null || buffer == null) {
             return;
         }
+        if (pane.isMarkdownPreview()) {
+            editor.detachMarkdownPreview(pane);
+            pane.clearMarkdownPreviewComponent();
+        } else if (editor.hasMarkdownPreviewForSource(pane)) {
+            editor.closeMarkdownPreviewForSource(pane);
+        }
 
         boolean activePane = pane == editor.getActivePane();
         if (activePane) {
@@ -532,8 +538,9 @@ final class PaneBufferController {
             return "Buffer deleted";
         }
         FileBuffer replacement = editor.buffers.get(Math.min(editor.currentBufferIndex, editor.buffers.size() - 1));
-        for (EditorPane pane : editor.editorPanes) {
+        for (EditorPane pane : new ArrayList<>(editor.editorPanes)) {
             if (pane.getBuffer() == buffer) {
+                if (!editor.editorPanes.contains(pane)) continue;
                 loadBufferIntoPane(pane, replacement, 0);
             }
         }
@@ -585,7 +592,10 @@ final class PaneBufferController {
         if (paneToClose == null) {
             return "No active window";
         }
-        if (!paneToClose.isHiddenByFocusMode() && visiblePaneCount() <= 1) {
+        if (editor.hasMarkdownPreviewForSource(paneToClose)) {
+            return "Close Markdown preview first (:markdown close)";
+        }
+        if (!paneToClose.isMarkdownPreview() && !paneToClose.isHiddenByFocusMode() && visiblePaneCount() <= 1) {
             return "Cannot close the only window";
         }
 
@@ -599,6 +609,7 @@ final class PaneBufferController {
         }
         editor.closeTerminalSession(closingBuffer);
         paneToClose.closeTerminalPane();
+        editor.detachMarkdownPreview(paneToClose);
         if (editor.isTreeBuffer(closingBuffer)) {
             editor.treeLineTargets.remove(closingBuffer);
             editor.buffers.remove(closingBuffer);

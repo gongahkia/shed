@@ -150,7 +150,6 @@ public class Texteditor extends JFrame implements KeyListener {
     Color syntaxStringColor;
     Color syntaxCommentColor;
     Color syntaxNumberColor;
-    File lastPreviewedMarkdown;
     List<Integer> jumpList;
     int jumpIndex;
     List<Integer> changeList;
@@ -277,7 +276,6 @@ public class Texteditor extends JFrame implements KeyListener {
         syntaxStringColor = configManager.getSyntaxStringColor();
         syntaxCommentColor = configManager.getSyntaxCommentColor();
         syntaxNumberColor = configManager.getSyntaxNumberColor();
-        lastPreviewedMarkdown = null;
         jumpList = new ArrayList<>();
         jumpIndex = -1;
         changeList = new ArrayList<>();
@@ -1150,16 +1148,32 @@ public class Texteditor extends JFrame implements KeyListener {
         recoveryController.promptRecoveryRestoreIfAvailable();
     }
 
-    void maybePreviewMarkdown(FileBuffer buffer) {
-        markdownController.maybePreviewMarkdown(buffer);
+    String handleMarkdownPreview(String args) {
+        return markdownController.handlePreviewCommand(args);
     }
 
-    String renderMarkdownPreview(String markdown, String title) {
-        return markdownController.renderMarkdownPreview(markdown, title);
+    String openMarkdownPreview() {
+        return markdownController.openPreview();
     }
 
-    String escapeHtml(String value) {
-        return markdownController.escapeHtml(value);
+    void closeMarkdownPreviewForSource(EditorPane sourcePane) {
+        markdownController.closePreviewForSource(sourcePane);
+    }
+
+    boolean hasMarkdownPreviewForSource(EditorPane sourcePane) {
+        return markdownController.hasPreviewForSource(sourcePane);
+    }
+
+    void detachMarkdownPreview(EditorPane pane) {
+        markdownController.detachPreview(pane);
+    }
+
+    void disposeMarkdownPreviews() {
+        markdownController.disposePreviews();
+    }
+
+    void refreshMarkdownPreviews() {
+        markdownController.refreshPreviews();
     }
 
     // ========== Markdown / Orgmode features ==========
@@ -1348,6 +1362,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("vsplit"); commands.add("close"); commands.add("themes");
         // New markdown commands
         commands.add("toc"); commands.add("outline"); commands.add("toggle");
+        commands.add("markdown"); commands.add("md"); commands.add("markdownpreview"); commands.add("mdpreview");
         commands.add("table"); commands.add("link"); commands.add("img");
         commands.add("snippets"); commands.add("bracketcolor");
         commands.add("term"); commands.add("terminal");
@@ -2125,6 +2140,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public void notifyCurrentBufferSaved() {
         lspController.notifyCurrentBufferSaved();
+        markdownController.refreshPreviewForBuffer(getCurrentBuffer());
         persistRecoverySnapshotsSafely();
     }
 
@@ -3031,6 +3047,7 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
         closingDown = true;
+        disposeMarkdownPreviews();
         if (recoverySnapshotTimer != null) {
             recoverySnapshotTimer.stop();
         }

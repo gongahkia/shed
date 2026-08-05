@@ -186,6 +186,8 @@ public class CommandHandler {
         // Markdown / orgmode commands
         registerCommand((args, range, force) -> editor.showTableOfContents(), "toc");
         registerCommand((args, range, force) -> editor.showOutline(), "outline");
+        registerCommand((args, range, force) -> editor.handleMarkdownPreview(args), "markdown", "md");
+        registerCommand((args, range, force) -> editor.openMarkdownPreview(), "markdownpreview", "mdpreview");
         registerCommand((args, range, force) -> editor.toggleCheckbox(), "toggle", "checkbox");
         registerCommand((args, range, force) -> handleTableCommand(args), "table");
         registerCommand((args, range, force) -> editor.insertLink(), "link");

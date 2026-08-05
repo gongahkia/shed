@@ -107,6 +107,43 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void markdownPreviewUsesNativeSplitAndRefreshesFromSourceBuffer() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-markdown-preview");
+        Path file = tempDir.resolve("preview.md");
+        Files.createDirectories(home);
+        Files.writeString(file, "# Initial\n\n- [ ] Draft\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            EditorPane source = onEdt(editor::getActivePane);
+            FileBuffer buffer = onEdt(editor::getCurrentBuffer);
+            assertEquals("Markdown preview opened", onEdt(() -> editor.commandHandler.execute("markdown preview")));
+            assertEquals(2, onEdt(() -> editor.editorPanes.size()));
+            assertSame(source, onEdt(editor::getActivePane));
+
+            EditorPane preview = onEdt(() -> editor.editorPanes.stream().filter(EditorPane::isMarkdownPreview).findFirst().orElse(null));
+            assertNotNull(preview);
+            assertSame(buffer, onEdt(preview::getBuffer));
+            MarkdownPreviewPane previewComponent = onEdt(() -> (MarkdownPreviewPane) preview.getComponent());
+            assertTrue(onEdt(() -> previewComponent.getHtml().contains("Initial")));
+
+            onEdt(() -> {
+                editor.writingArea.append("\n## Updated\n");
+                return null;
+            });
+            assertEquals("Markdown preview refreshed", onEdt(() -> editor.commandHandler.execute("markdown refresh")));
+            assertTrue(onEdt(() -> previewComponent.getHtml().contains("id=\"updated\"")));
+            assertEquals("Markdown preview already open", onEdt(() -> editor.commandHandler.execute("mdpreview")));
+            assertEquals("Markdown preview closed", onEdt(() -> editor.commandHandler.execute("markdown close")));
+            assertEquals(1, onEdt(() -> editor.editorPanes.size()));
+            assertSame(source, onEdt(editor::getActivePane));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void quickfixJumpOpensTargetAndMovesCaret() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-quickfix");

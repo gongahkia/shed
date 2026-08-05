@@ -7,91 +7,158 @@ import javax.swing.text.Highlighter;
 import java.awt.*;
 import java.io.*;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
+import java.net.URISyntaxException;
 import java.util.*;
 import java.util.List;
 
 final class MarkdownController {
     private final Texteditor editor;
+    private final Map<FileBuffer, PreviewBinding> previews = new IdentityHashMap<>();
 
     MarkdownController(Texteditor editor) {
         this.editor = editor;
     }
 
-    void maybePreviewMarkdown(FileBuffer buffer) {
-        if (buffer == null || buffer.getFileType() != FileType.MARKDOWN || buffer.getFile() == null) {
-            return;
+    String handlePreviewCommand(String args) {
+        String operation = args == null ? "" : args.trim().toLowerCase(Locale.ROOT);
+        return switch (operation) {
+            case "preview", "open" -> openPreview();
+            case "close" -> closePreview();
+            case "refresh" -> refreshPreview();
+            default -> "Usage: :markdown preview|close|refresh";
+        };
+    }
+
+    String openPreview() {
+        EditorPane sourcePane = editor.getActivePane();
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (sourcePane == null || buffer == null || buffer.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
+        if (sourcePane.isMarkdownPreview()) return "Markdown preview is already open";
+        if (buffer.isLargeFile()) return "Markdown preview unavailable for a large file";
+        PreviewBinding existing = previews.get(buffer);
+        if (existing != null && editor.editorPanes.contains(existing.previewPane)) {
+            editor.activateEditorPane(existing.sourcePane);
+            editor.requestActivePaneFocus();
+            return "Markdown preview already open";
         }
-        if (buffer.isLargeFile()) {
-            editor.showMessage("Markdown preview unavailable for a large file");
-            return;
+        if (existing != null) releasePreview(existing);
+
+        EditorPane previewPane = editor.createEditorPane(editor.getSize());
+        editor.editorPanes.add(previewPane);
+        if (editor.windowLayoutRoot == null) editor.windowLayoutRoot = WindowLayoutNode.leaf(sourcePane);
+        if (!editor.windowLayoutRoot.splitLeaf(sourcePane, previewPane, WindowLayoutNode.Orientation.HORIZONTAL, false, 0.5)) {
+            editor.editorPanes.remove(previewPane);
+            return "Markdown preview could not create a split";
         }
-        if (buffer.getFile().equals(editor.lastPreviewedMarkdown)) {
-            return;
+        editor.loadBufferIntoPane(previewPane, buffer, 0);
+        MarkdownPreviewPane preview = new MarkdownPreviewPane(buffer, editor::resolveUiFont,
+            editor.configManager::getNormalColor, editor.configManager::getEditorForeground,
+            href -> editor.showMessage(openPreviewLink(buffer, href)),
+            () -> editor.activateEditorPane(previewPane), editor);
+        previewPane.setMarkdownPreviewComponent(preview);
+        previews.put(buffer, new PreviewBinding(sourcePane, previewPane, preview));
+        editor.renderWindowLayout();
+        sourcePane.getTextArea().requestFocusInWindow();
+        return "Markdown preview opened";
+    }
+
+    void closePreviewForSource(EditorPane sourcePane) {
+        PreviewBinding binding = previewForSource(sourcePane);
+        if (binding != null && editor.editorPanes.contains(binding.previewPane)) editor.closePane(binding.previewPane);
+    }
+
+    boolean hasPreviewForSource(EditorPane sourcePane) {
+        return previewForSource(sourcePane) != null;
+    }
+
+    void detachPreview(EditorPane pane) {
+        Iterator<Map.Entry<FileBuffer, PreviewBinding>> iterator = previews.entrySet().iterator();
+        while (iterator.hasNext()) {
+            PreviewBinding binding = iterator.next().getValue();
+            if (binding.previewPane == pane || binding.sourcePane == pane) {
+                binding.preview.disposePreview();
+                iterator.remove();
+            }
         }
-        editor.lastPreviewedMarkdown = buffer.getFile();
+    }
+
+    void disposePreviews() {
+        for (PreviewBinding binding : previews.values()) binding.preview.disposePreview();
+        previews.clear();
+    }
+
+    void refreshPreviews() {
+        for (PreviewBinding binding : previews.values()) binding.preview.refreshAppearance();
+    }
+
+    void refreshPreviewForBuffer(FileBuffer buffer) {
+        PreviewBinding binding = previews.get(buffer);
+        if (binding != null) binding.preview.refreshNow();
+    }
+
+    private String closePreview() {
+        PreviewBinding binding = previews.get(editor.getCurrentBuffer());
+        if (binding == null || !editor.editorPanes.contains(binding.previewPane)) return "No Markdown preview is open";
+        return editor.closePane(binding.previewPane).equals("Window closed") ? "Markdown preview closed" : "Markdown preview could not close";
+    }
+
+    private String refreshPreview() {
+        PreviewBinding binding = previews.get(editor.getCurrentBuffer());
+        if (binding == null || !editor.editorPanes.contains(binding.previewPane)) return "No Markdown preview is open";
+        binding.preview.refreshNow();
+        return "Markdown preview refreshed";
+    }
+
+    private PreviewBinding previewForSource(EditorPane sourcePane) {
+        for (PreviewBinding binding : previews.values()) {
+            if (binding.sourcePane == sourcePane) return binding;
+        }
+        return null;
+    }
+
+    private void releasePreview(PreviewBinding binding) {
+        binding.preview.disposePreview();
+        previews.values().removeIf(candidate -> candidate == binding);
+    }
+
+    private String openPreviewLink(FileBuffer source, String href) {
         try {
-            File previewFile = File.createTempFile("shed-markdown-", ".html");
-            previewFile.deleteOnExit();
-            String html = renderMarkdownPreview(buffer.getFullContent(), buffer.getDisplayName());
-            Files.writeString(previewFile.toPath(), html, StandardCharsets.UTF_8);
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().browse(previewFile.toURI());
+            URI uri = new URI(href);
+            String scheme = uri.getScheme();
+            if (scheme == null) {
+                String path = href.split("#", 2)[0];
+                if (path.isEmpty()) return "";
+                activatePreviewSource(source);
+                File parent = source.getFile() == null ? new File(".") : source.getFile().getParentFile();
+                File target = new File(parent == null ? new File(".") : parent, path);
+                if (!target.isFile()) return "Linked file not found: " + path;
+                editor.openFile(target);
+                return "Opened: " + target.getName();
             }
-        } catch (IOException ignored) {
+            if (scheme.equalsIgnoreCase("file")) {
+                activatePreviewSource(source);
+                File target = new File(uri);
+                if (!target.isFile()) return "Linked file not found: " + target.getPath();
+                editor.openFile(target);
+                return "Opened: " + target.getName();
+            }
+            if (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https") && !scheme.equalsIgnoreCase("mailto")) {
+                return "Unsupported Markdown link";
+            }
+            if (!Desktop.isDesktopSupported()) return "Desktop links are unavailable";
+            Desktop.getDesktop().browse(uri);
+            return "Opened: " + href;
+        } catch (IOException | URISyntaxException error) {
+            return "Markdown link failed: " + error.getMessage();
         }
     }
 
-
-    String renderMarkdownPreview(String markdown, String title) {
-        StringBuilder html = new StringBuilder();
-        html.append("<!doctype html><html><head><meta charset=\"utf-8\">");
-        html.append("<title>").append(title).append("</title>");
-        html.append("<style>body{font-family:Georgia,serif;max-width:880px;margin:40px auto;padding:0 24px;line-height:1.6;background:#faf7ef;color:#1f2933;}pre{background:#111827;color:#f9fafb;padding:16px;overflow:auto;}code{background:#e5e7eb;padding:2px 4px;}h1,h2,h3{line-height:1.2;}blockquote{border-left:4px solid #cbd5e1;padding-left:12px;color:#475569;}</style>");
-        html.append("</head><body>");
-        boolean inCode = false;
-        for (String line : markdown.split("\n", -1)) {
-            String escaped = escapeHtml(line);
-            if (line.startsWith("```")) {
-                html.append(inCode ? "</pre>" : "<pre>");
-                inCode = !inCode;
-                continue;
-            }
-            if (inCode) {
-                html.append(escaped).append("\n");
-                continue;
-            }
-            if (line.startsWith("### ")) {
-                html.append("<h3>").append(escapeHtml(line.substring(4))).append("</h3>");
-            } else if (line.startsWith("## ")) {
-                html.append("<h2>").append(escapeHtml(line.substring(3))).append("</h2>");
-            } else if (line.startsWith("# ")) {
-                html.append("<h1>").append(escapeHtml(line.substring(2))).append("</h1>");
-            } else if (line.startsWith("> ")) {
-                html.append("<blockquote>").append(escapeHtml(line.substring(2))).append("</blockquote>");
-            } else if (line.startsWith("- ") || line.startsWith("* ")) {
-                html.append("<p>&bull; ").append(escapeHtml(line.substring(2))).append("</p>");
-            } else if (line.isBlank()) {
-                html.append("<br/>");
-            } else {
-                html.append("<p>").append(escaped).append("</p>");
-            }
-        }
-        if (inCode) {
-            html.append("</pre>");
-        }
-        html.append("</body></html>");
-        return html.toString();
+    private void activatePreviewSource(FileBuffer source) {
+        PreviewBinding binding = previews.get(source);
+        if (binding != null && editor.editorPanes.contains(binding.sourcePane)) editor.activateEditorPane(binding.sourcePane);
     }
 
-
-    String escapeHtml(String value) {
-        return value
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;");
-    }
+    private record PreviewBinding(EditorPane sourcePane, EditorPane previewPane, MarkdownPreviewPane preview) {}
 
 
     String[] getCurrentLines() {

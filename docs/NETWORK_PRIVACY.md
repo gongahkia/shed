@@ -20,7 +20,7 @@ This is a source-level audit of Shed's app-owned outbound-capable paths. Shed ha
 | Managed plugin install/update | `PluginManager` runs `:plugin install` with an exact URL and `:plugin update` only as explicit commands. Remote sources require a SHA-256 checksum; package loading at startup reads only local package metadata and files. | A remote source may be fetched only by the explicit install/update command; no scheduled package update exists. |
 | Git fetch/pull/push | The Git history document performs remote work only from its Fetch, Pull, or Push controls; Pull and Push require confirmation. | Git owns the remote protocol; status/history refreshes use local repository data. |
 | Debug adapter TCP | `DebugAdapterTransport` starts only from an explicitly configured debug session; TCP targets are rejected unless loopback. | No remote adapter address is accepted. |
-| Browser links | Open-link and Markdown-preview actions explicitly delegate a URI to the platform browser. | The browser, not Shed, owns any resulting request. |
+| Browser links | Open-link actions and explicit clicks on Markdown-preview links delegate a URI to the platform browser. | The browser, not Shed, owns any resulting request. The native Markdown renderer does not load remote content. |
 | User-controlled child processes | Terminals, tasks, shell-enabled plugins, and configured language servers can launch user-selected programs. | Those programs can have their own network behavior; Shed does not inspect or authorize their traffic. |
 
 `gh`, Git, browsers, terminals, tasks, plugins, and language servers are external programs. Shed can constrain the arguments it gives them, but it cannot verify their implementation or network side effects.

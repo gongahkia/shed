@@ -323,6 +323,9 @@ See [Update Checks](UPDATES.md) for endpoint/key configuration and metadata vali
 | :--- | :--- |
 | `:toc` | Open markdown table-of-contents buffer |
 | `:outline` | Open markdown outline in split |
+| `:markdown preview`, `:mdpreview` | Open a live native Markdown preview beside the source buffer |
+| `:markdown refresh` | Re-render the open Markdown preview |
+| `:markdown close` | Close the open Markdown preview |
 | `:toggle`, `:checkbox` | Toggle markdown checkbox under cursor |
 | `:table` | Insert default `3x2` markdown table |
 | `:table NxM` | Insert `NxM` table |

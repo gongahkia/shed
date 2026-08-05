@@ -474,6 +474,7 @@ final class SessionConfigController {
             buffer.applyUndoHistoryPolicy();
         }
         editor.applyUiFont();
+        editor.refreshMarkdownPreviews();
         Font editorFont = editor.resolveEditorFont();
         int tabSize = Math.max(1, editor.configManager.getTabSize());
         for (EditorPane pane : editor.editorPanes) {
@@ -1124,6 +1125,7 @@ final class SessionConfigController {
 
     void resetEditorPanesForSession(int paneCount, Map<String, Object> layoutObject) {
         editor.detachActiveDocumentListener();
+        editor.disposeMarkdownPreviews();
         editor.editorPanes.clear();
         int totalPanes = Math.max(1, paneCount);
         Dimension size = editor.getSize();

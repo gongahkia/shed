@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -315,7 +314,6 @@ final class TestService {
         return List.copyOf(result);
     }
 
-    private static AdapterSpec ignored() { return null; }
     private static List<Path> expandReports(List<Path> reports, String suffix) {
         List<Path> result = new ArrayList<>();
         for (Path report : reports == null ? List.<Path>of() : reports) {

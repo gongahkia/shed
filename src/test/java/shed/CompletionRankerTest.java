@@ -13,7 +13,7 @@ public class CompletionRankerTest {
             + "{\"label\":\"create\",\"filterText\":\"create\",\"sortText\":\"a\"},"
             + "{\"label\":\"context\",\"filterText\":\"context\",\"sortText\":\"c\"}]"));
 
-        List<LspClient.CompletionItem> ranked = new CompletionRanker().rank("ct", items, true, 12);
+        List<LspClient.CompletionItem> ranked = new CompletionRanker().rank("xt", items, true, 12);
 
         assertEquals(List.of("context"), ranked.stream().map(LspClient.CompletionItem::getLabel).toList());
         assertEquals("create", new CompletionRanker().rank("c", items, true, 12).get(0).getLabel());

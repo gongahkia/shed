@@ -49,6 +49,7 @@ final class OpenBufferCompletionIndex {
     List<Candidate> complete(List<?> openBuffers, Object currentBuffer, String prefix, int caret, int maxResults,
                              FuzzyMatchService fuzzyMatchService) {
         if (prefix == null || prefix.isBlank() || openBuffers == null || fuzzyMatchService == null) return List.of();
+        snapshots.keySet().removeIf(buffer -> !openBuffers.contains(buffer));
         Map<String, Integer> scores = new HashMap<>();
         for (Object buffer : openBuffers) {
             Map<String, WordStats> words = snapshots.get(buffer);

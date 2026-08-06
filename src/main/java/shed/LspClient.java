@@ -710,7 +710,7 @@ public class LspClient {
         if (itemObject == null) return null;
         String label = MiniJson.asString(itemObject.get("label"));
         if (label == null || label.isEmpty()) return null;
-        String detail = MiniJson.asString(itemObject.get("detail"));
+        String detail = completionDetail(itemObject);
         Integer kind = MiniJson.asInt(itemObject.get("kind"));
         String insertText = MiniJson.asString(itemObject.get("insertText"));
         Integer insertTextFormat = MiniJson.asInt(itemObject.get("insertTextFormat"));
@@ -721,6 +721,17 @@ public class LspClient {
             insertText == null ? label : insertText, Integer.valueOf(2).equals(insertTextFormat), completionTextEdits(itemObject),
             filterText == null ? label : filterText, sortText == null ? "" : sortText, preselect,
             completionStringList(itemObject.get("commitCharacters")), itemObject);
+    }
+
+    private static String completionDetail(Map<String, Object> itemObject) {
+        String detail = MiniJson.asString(itemObject.get("detail"));
+        Map<String, Object> labelDetails = MiniJson.asObject(itemObject.get("labelDetails"));
+        String labelDetail = MiniJson.asString(labelDetails == null ? null : labelDetails.get("detail"));
+        String description = MiniJson.asString(labelDetails == null ? null : labelDetails.get("description"));
+        if (detail == null || detail.isBlank()) detail = labelDetail;
+        if (description == null || description.isBlank()) return detail;
+        if (detail == null || detail.isBlank()) return description;
+        return detail.contains(description) ? detail : detail + " — " + description;
     }
 
     private static List<String> completionStringList(Object value) {
@@ -1247,7 +1258,8 @@ public class LspClient {
         completionItem.put("snippetSupport", featureSettings.snippets());
         completionItem.put("commitCharacterSupport", Boolean.TRUE);
         completionItem.put("preselectSupport", Boolean.TRUE);
-        completionItem.put("documentationFormat", List.of("plaintext"));
+        completionItem.put("labelDetailsSupport", Boolean.TRUE);
+        completionItem.put("documentationFormat", List.of("markdown", "plaintext"));
         completionItem.put("resolveSupport", Map.of("properties", List.of("documentation", "detail", "additionalTextEdits")));
         Map<String, Object> completion = new LinkedHashMap<>();
         completion.put("completionItem", completionItem);

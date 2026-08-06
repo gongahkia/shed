@@ -124,6 +124,11 @@ final class PaneBufferController {
             editor.applySyntaxHighlighting();
             editor.refreshLineNumberPanel();
             editor.syncLspOpen(buffer);
+            SwingUtilities.invokeLater(() -> {
+                if (pane != editor.getActivePane() || pane.getBuffer() != buffer) return;
+                editor.applySyntaxHighlighting(); // repaint after the new document has entered the viewport
+                editor.refreshLspDecorations();
+            });
             editor.scheduleOpenBufferCompletionIndex();
             editor.updateStatusBar();
         } else {

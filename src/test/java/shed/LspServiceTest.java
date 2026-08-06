@@ -96,6 +96,15 @@ public class LspServiceTest {
     }
 
     @Test
+    void usesCompletionLabelDetailsWhenTheServerOmitsDetail() {
+        List<LspClient.CompletionItem> items = LspClient.parseCompletionItems(MiniJson.parse(
+            "[{\"label\":\"render\",\"labelDetails\":{\"detail\":\"(Frame frame)\",\"description\":\"Renderer\"}}]"
+        ));
+
+        assertEquals("(Frame frame) — Renderer", items.get(0).getDetail());
+    }
+
+    @Test
     void parsesCompletionInteractionMetadataAndBuildsTriggerContext() {
         List<LspClient.CompletionItem> items = LspClient.parseCompletionItems(MiniJson.parse(
             "[{\"label\":\"render\",\"filterText\":\"rnd\",\"sortText\":\"001\",\"preselect\":true,\"commitCharacters\":[\".\",\";\"]}]"

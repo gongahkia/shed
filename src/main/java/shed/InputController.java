@@ -2516,6 +2516,7 @@ final class InputController {
                 if (index < 0) return;
                 editor.completionModel.set(index, resolved);
                 editor.completionList.setSelectedIndex(index);
+                updateCompletionDocumentation();
             });
     }
 

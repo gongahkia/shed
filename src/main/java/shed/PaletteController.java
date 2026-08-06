@@ -13,6 +13,51 @@ import java.util.List;
 
 final class PaletteController {
     static final String LANGUAGE_SERVICES_ACTION = "Language Services";
+    private record PaletteAction(String label, String command, String description) { }
+
+    /*
+     * Keep surface actions separate from raw Ex commands. A top-level command such as
+     * :git is searchable, but it cannot communicate or invoke its graphical sub-surfaces.
+     */
+    private static final List<PaletteAction> SURFACE_ACTIONS = List.of(
+        action(LANGUAGE_SERVICES_ACTION, "lsp manage", "Open Language Services. Installing or updating always needs a separate GUI approval."),
+        action("Settings", "settings", "Open the Settings inspector, including font, landing-buffer, and Markdown-preview settings."),
+        action("Open Settings TOML", "settings file", "Open the persisted settings.toml buffer."),
+        action("Keymap Inspector", "keymap", "Inspect and edit validated keymap overlays."),
+        action("Edit Snippets", "snippets edit", "Open the user snippets buffer for editing."),
+        action("Markdown Preview", "markdownpreview", "Open the live native Markdown preview beside the source buffer."),
+        action("Formatter Policy", "formatter", "Configure the current language's formatter and format-on-save policy."),
+        action("Workspace Folders", "workspace ui", "Open the workspace-folder manager."),
+        action("Git Changes", "git workbench", "Open the docked Git Changes workbench."),
+        action("Git Conflict Resolution", "git conflict", "Open the graphical conflict-resolution view."),
+        action("Git History and Remotes", "git history", "Open graphical local history and explicit remote controls."),
+        action("Git Worktrees and Stashes", "git worktrees", "Open graphical worktree and stash controls."),
+        action("Git Graph", "git log", "Open graphical local Git history when enabled."),
+        action("GitHub Pull Requests", "github prs", "Open pull-request review after GitHub review consent has been granted."),
+        action("Tests", "test", "Open the Test Explorer."),
+        action("Import Coverage Report", "coverage ui", "Open Tests, then use Import Coverage to choose a local coverage report."),
+        action("Debug", "debug", "Open the Debug tool panel."),
+        action("Tasks", "task", "Open the workspace Tasks panel."),
+        action("Problems", "problems", "Open the unified diagnostics and quickfix Problems panel."),
+        action("Project Replace", "projectreplace", "Open the reviewed project-wide replacement panel."),
+        action("Show Completions", "lsp completion", "Request completion candidates at the caret."),
+        action("Code Actions", "lsp codeaction", "Show diagnostic-anchored code actions at the caret."),
+        action("Peek Definition", "peek definition", "Open a temporary read-only definition preview."),
+        action("Peek Type Definition", "peek type", "Open a temporary read-only type-definition preview."),
+        action("Incoming Call Hierarchy", "lsp calls incoming", "Open the incoming-call hierarchy for the symbol at the caret."),
+        action("Outgoing Call Hierarchy", "lsp calls outgoing", "Open the outgoing-call hierarchy for the symbol at the caret."),
+        action("Type Supertypes", "lsp typehierarchy supertypes", "Open the supertype hierarchy for the symbol at the caret."),
+        action("Type Subtypes", "lsp typehierarchy subtypes", "Open the subtype hierarchy for the symbol at the caret."),
+        action("Document Symbols", "symbols", "Open the document-symbol picker, with a local fallback."),
+        action("File Finder", "files", "Open the project file finder."),
+        action("Buffer Picker", "buffers", "Open the buffer picker."),
+        action("Integrated Terminal", "terminal", "Open the integrated terminal split.")
+    );
+
+    private static PaletteAction action(String label, String command, String description) {
+        return new PaletteAction(label, command, description);
+    }
+
     private final Texteditor editor;
     private final WorkspaceSearchCoordinator workspaceSearchCoordinator;
     private final WorkspaceReplaceCoordinator workspaceReplaceCoordinator;
@@ -26,15 +71,35 @@ final class PaletteController {
     public String showCommandPalette() {
         List<String> commands = editor.commandHandler.getCommandNames();
         List<String> candidates = new ArrayList<>();
+        for (PaletteAction action : SURFACE_ACTIONS) {
+            candidates.add(action.label());
+        }
         for (String cmd : commands) {
             candidates.add(":" + cmd);
         }
-        candidates.add(LANGUAGE_SERVICES_ACTION);
         String selected = showPaletteDialog("Command Palette", candidates, this::describeCommandPaletteCandidate);
         if (selected == null || selected.isEmpty()) return "Command palette cancelled";
-        if (LANGUAGE_SERVICES_ACTION.equals(selected)) return editor.handleLspCommand("manage");
+        PaletteAction action = surfaceAction(selected);
+        if (action != null) return editor.commandHandler.execute(action.command());
         String cmd = selected.startsWith(":") ? selected.substring(1) : selected;
         return editor.commandHandler.execute(cmd);
+    }
+
+    static List<String> surfaceActionNames() {
+        return SURFACE_ACTIONS.stream().map(PaletteAction::label).toList();
+    }
+
+    static String surfaceActionCommand(String label) {
+        PaletteAction action = surfaceAction(label);
+        return action == null ? null : action.command();
+    }
+
+    private static PaletteAction surfaceAction(String label) {
+        if (label == null) return null;
+        for (PaletteAction action : SURFACE_ACTIONS) {
+            if (action.label().equals(label)) return action;
+        }
+        return null;
     }
 
 
@@ -346,11 +411,10 @@ final class PaletteController {
 
     String describeCommandPaletteCandidate(String selection) {
         if (selection == null || selection.isBlank()) {
-            return "Type to fuzzy-filter commands, then press Enter.";
+            return "Type to fuzzy-filter actions and commands, then press Enter.";
         }
-        if (LANGUAGE_SERVICES_ACTION.equals(selection)) {
-            return "Open Language Services. Installing or updating always needs a separate GUI approval.";
-        }
+        PaletteAction action = surfaceAction(selection);
+        if (action != null) return action.description();
         String cmd = selection.startsWith(":") ? selection.substring(1) : selection;
         int split = cmd.indexOf(' ');
         String base = (split >= 0 ? cmd.substring(0, split) : cmd).toLowerCase(Locale.ROOT);

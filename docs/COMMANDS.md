@@ -172,7 +172,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:projectreplace cancel` | Discard the current replacement preview |
 | `:projectreplace preview-required on\|off`, `:projectreplace confirm on\|off`, `:projectreplace backup on\|off` | Persist preview, confirmation, or backup controls |
 | `:projectreplace scope workspace\|current-file` | Persist replacement preview scope |
-| `:palette`, `:commands` | Command palette |
+| `:palette`, `:commands` | Command palette. Alongside raw `:command` entries, it exposes direct named actions for graphical and contextual surfaces such as Settings, Workspace Folders, Git Changes, Tests, Debug, Language Services, coverage import, formatter policy, code actions, peek, hierarchies, Markdown Preview, and snippets. |
 | `:undolist`, `:undotree` | Show undo state summary |
 | `:themes` | Show built-in themes |
 | `:zen` | Toggle Goyo layout with Limelight; restores Limelight's prior state when disabled |

@@ -1871,6 +1871,21 @@ final class LspController {
         }
     }
 
+    String completionUnavailableReason(FileBuffer buffer) {
+        if (buffer == null || !buffer.hasFilePath()) {
+            return "buffer is not file-backed";
+        }
+        LspClient client = existingLspClient(buffer);
+        if (client != null && client.isAlive() && client.supports(LspCapability.COMPLETION)) {
+            return null;
+        }
+        String error = lspErrorFor(buffer);
+        if (error != null && !error.isBlank()) {
+            return error;
+        }
+        return client == null ? "language server is not configured" : client.capabilityUnavailableReason(LspCapability.COMPLETION);
+    }
+
     private int stopServersForExtension(String extension) {
         List<LspServerKey> keys = new ArrayList<>();
         for (LspServerKey key : editor.lspClients.keySet()) {

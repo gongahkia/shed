@@ -2289,7 +2289,7 @@ final class InputController {
         editor.flushLspChange(buffer);
         LspClient client = editor.existingLspClient(buffer);
         if (buffer == null || client == null || !buffer.hasFilePath() || !client.supports(LspCapability.COMPLETION)) {
-            showCompletionPopup(mergeCompletionItems(snippets, localCompletionItems(prefix)), prefix);
+            showCompletionPopup(mergeCompletionItems(snippets, localCompletionItems(prefix)), prefix, localCompletionSource(buffer, null));
             return;
         }
         try {
@@ -2381,16 +2381,29 @@ final class InputController {
 
     private void completeInlineCompletion(CompletionRequestState.Snapshot request, AsyncJobService.JobSnapshot snapshot,
                                           List<LspClient.CompletionItem> items, Exception error) {
-        if (snapshot == null || snapshot.getStatus() == AsyncJobService.Status.CANCELLED || error != null
-            || !isCurrentCompletion(request)) {
+        if (snapshot == null || snapshot.getStatus() == AsyncJobService.Status.CANCELLED || !isCurrentCompletion(request)) {
             return;
         }
         completionJobId = -1;
-        List<LspClient.CompletionItem> resolved = items == null || items.isEmpty() ? localCompletionItems(request.prefix()) : items;
-        showCompletionPopup(mergeCompletionItems(snippetCompletionItems(request.prefix()), resolved), request.prefix());
+        if (error != null || items == null || items.isEmpty()) {
+            String reason = error == null ? "language server returned no matches" : error.getMessage();
+            showCompletionPopup(mergeCompletionItems(snippetCompletionItems(request.prefix()), localCompletionItems(request.prefix())),
+                request.prefix(), localCompletionSource(editor.getCurrentBuffer(), reason));
+            return;
+        }
+        showCompletionPopup(mergeCompletionItems(items, snippetCompletionItems(request.prefix())), request.prefix(),
+            "Language server suggestions");
     }
 
-    private void showCompletionPopup(List<LspClient.CompletionItem> completions, String prefix) {
+    private String localCompletionSource(FileBuffer buffer, String requestReason) {
+        String reason = requestReason == null || requestReason.isBlank() ? editor.lspCompletionUnavailableReason(buffer) : requestReason;
+        if (reason == null || reason.isBlank()) return "Local words and snippets";
+        String compact = reason.replace('\n', ' ').replace('\r', ' ').strip();
+        if (compact.length() > 100) compact = compact.substring(0, 97) + "...";
+        return "Local fallback — LSP unavailable: " + compact;
+    }
+
+    private void showCompletionPopup(List<LspClient.CompletionItem> completions, String prefix, String source) {
         if (completions == null || completions.isEmpty()) {
             dismissCompletionPopup();
             return;
@@ -2400,6 +2413,8 @@ final class InputController {
             ensureCompletionPopup();
             completionResolveAttempts.clear();
             editor.completionModel.clear();
+            editor.completionSource.setText(source == null ? "" : source);
+            editor.completionSource.setToolTipText(source);
             List<LspClient.CompletionItem> ranked = completionRanker.rank(prefix, completions,
                 editor.configManager.getLspCompletionFuzzyMatching(), 12);
             int max = ranked.size();
@@ -2422,7 +2437,7 @@ final class InputController {
             int py = location.y + (int) (caretRect.getY() + caretRect.getHeight());
             int lineHeight = editor.writingArea.getFontMetrics(editor.writingArea.getFont()).getHeight();
             editor.completionPopup.setLocation(px, py);
-            editor.completionPopup.setSize(460, Math.min(max * lineHeight + 108, 340));
+            editor.completionPopup.setSize(760, Math.min(Math.max(max * lineHeight + 58, 150), 340));
             editor.completionPopup.setVisible(true);
         } catch (Exception ignored) {
             dismissCompletionPopup();
@@ -2449,10 +2464,19 @@ final class InputController {
         editor.completionDocumentation.setWrapStyleWord(true);
         editor.completionDocumentation.setBackground(editor.configManager.getCommandBarBackground());
         editor.completionDocumentation.setForeground(editor.configManager.getCommandBarForeground());
+        editor.completionSource = new JLabel();
+        editor.completionSource.setBorder(BorderFactory.createEmptyBorder(3, 5, 3, 5));
+        editor.completionSource.setFont(editor.writingArea.getFont().deriveFont(Math.max(10f, editor.writingArea.getFont().getSize2D() - 2f)));
+        editor.completionSource.setForeground(editor.configManager.getStatusBarForeground());
         JScrollPane listScroll = new JScrollPane(editor.completionList);
         JScrollPane documentationScroll = new JScrollPane(editor.completionDocumentation);
-        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, listScroll, documentationScroll);
-        split.setResizeWeight(0.7);
+        JPanel listPanel = new JPanel(new BorderLayout());
+        listPanel.setBackground(editor.configManager.getCommandBarBackground());
+        listPanel.add(editor.completionSource, BorderLayout.NORTH);
+        listPanel.add(listScroll, BorderLayout.CENTER);
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listPanel, documentationScroll);
+        split.setResizeWeight(0.48);
+        split.setDividerLocation(360);
         split.setBorder(BorderFactory.createLineBorder(editor.configManager.getCaretColor()));
         editor.completionPopup = new JWindow(editor);
         editor.completionPopup.add(split);
@@ -2467,7 +2491,9 @@ final class InputController {
             return;
         }
         String documentation = selected.getDocumentation();
-        editor.completionDocumentation.setText(documentation.isBlank() ? selected.getDetail() : documentation);
+        String detail = selected.getDetail();
+        editor.completionDocumentation.setText(documentation.isBlank() ? detail
+            : detail.isBlank() ? documentation : detail + "\n\n" + documentation);
         editor.completionDocumentation.setCaretPosition(0);
         resolveCompletionDocumentation(selected);
     }

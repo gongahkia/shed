@@ -962,6 +962,7 @@ public class Texteditor extends JFrame implements KeyListener {
     javax.swing.JWindow completionPopup;
     javax.swing.JList<LspClient.CompletionItem> completionList;
     javax.swing.DefaultListModel<LspClient.CompletionItem> completionModel;
+    javax.swing.JLabel completionSource;
     javax.swing.JTextArea completionDocumentation;
     String completionPrefix;
     javax.swing.JWindow signatureHelpPopup;
@@ -2194,6 +2195,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void flushLspChange(FileBuffer buffer) {
         lspController.flushPendingLspChange(buffer);
+    }
+
+    String lspCompletionUnavailableReason(FileBuffer buffer) {
+        return lspController.completionUnavailableReason(buffer);
     }
 
     void shutdownLspScheduling() {

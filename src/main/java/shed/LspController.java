@@ -40,7 +40,7 @@ final class LspController {
     LspController(Texteditor editor) {
         this.editor = editor;
         this.managedLanguageSupport = new ManagedLanguageSupportService(new LanguageServerDetector(null, null, null),
-            new ManagedLanguageSupportTrust(List.of(), Set.of()), Path.of(System.getProperty("user.home"), ".shed"),
+            ManagedLanguageDistributionCatalog.trust(), Path.of(editor.configManager.getShedDirectoryPath()),
             ManagedLanguageSupportService.platformFor(System.getProperty("os.name")));
     }
 
@@ -278,7 +278,11 @@ final class LspController {
 
     private String lspManage(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
-        if (trimmed.isEmpty() || "status".equalsIgnoreCase(trimmed) || "list".equalsIgnoreCase(trimmed)) {
+        if (trimmed.isEmpty() || "ui".equalsIgnoreCase(trimmed) || "gui".equalsIgnoreCase(trimmed)) {
+            ManagedLanguageServicesDialog.showFor(editor, managedLanguageSupport);
+            return "Opened language services";
+        }
+        if ("status".equalsIgnoreCase(trimmed) || "list".equalsIgnoreCase(trimmed)) {
             editor.showScratchBuffer("[lsp manage]", managedLanguageSupport.overview());
             return "Showing managed LSP support";
         }
@@ -291,8 +295,10 @@ final class LspController {
         if (entry == null) return "No managed LSP catalog entry for: " + target;
         return switch (action) {
             case "detect", "retry" -> startManagedLspDetection(entry);
-            case "install", "update" -> showManagedLspText("[lsp " + action + " " + target + "]",
-                managedLanguageSupport.managedAvailability(entry, action), "Showing managed LSP " + action + " guidance");
+            case "install", "update" -> {
+                ManagedLanguageServicesDialog.showFor(editor, managedLanguageSupport);
+                yield "Opened language services for " + action;
+            }
             case "remove", "uninstall" -> managedLanguageSupport.remove(entry).detail();
             case "manual", "configure", "config" -> showManagedLspText("[lsp manual " + target + "]",
                 managedLanguageSupport.manualInstructions(entry), "Showing manual LSP setup");

@@ -25,7 +25,7 @@ public class ManagedLanguageCatalogTest {
         assertEquals("jdtls", entry.commandFor(ManagedLanguageSupportTrust.Platform.MACOS));
         assertEquals("jdtls", entry.commandFor(ManagedLanguageSupportTrust.Platform.LINUX));
         assertEquals("jdtls.bat", entry.commandFor(ManagedLanguageSupportTrust.Platform.WINDOWS));
-        assertEquals("java.eclipse-jdtls@1.50.0", entry.installMetadata().coordinate().displayName());
+        assertEquals("java.eclipse-jdtls@1.60.0", entry.installMetadata().coordinate().displayName());
         assertEquals("Eclipse Public License 2.0", entry.installMetadata().licenseName());
         assertEquals("21", entry.installMetadata().minimumRuntimeVersion());
         assertEquals(3, entry.installMetadata().supportedPlatforms().size());

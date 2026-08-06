@@ -1,6 +1,11 @@
 package shed;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
+import java.net.HttpURLConnection;
+import java.net.URLConnection;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -12,15 +17,24 @@ final class ManagedLanguageSupportService {
     private final LanguageServerDetector detector;
     private final ManagedLanguageSupportTrust trust;
     private final ManagedLanguageArtifactStore artifactStore;
+    private final Path shedDirectory;
     private final ManagedLanguageSupportTrust.Platform platform;
+    private final ManagedLanguageInstaller.ArtifactFetcher artifactFetcher;
     private final Map<String, LanguageServerDetector.Result> detections = new ConcurrentHashMap<>();
 
     ManagedLanguageSupportService(LanguageServerDetector detector, ManagedLanguageSupportTrust trust, Path shedDirectory,
         ManagedLanguageSupportTrust.Platform platform) {
+        this(detector, trust, shedDirectory, platform, null);
+    }
+
+    ManagedLanguageSupportService(LanguageServerDetector detector, ManagedLanguageSupportTrust trust, Path shedDirectory,
+        ManagedLanguageSupportTrust.Platform platform, ManagedLanguageInstaller.ArtifactFetcher artifactFetcher) {
         this.detector = Objects.requireNonNull(detector, "detector");
         this.trust = Objects.requireNonNull(trust, "trust");
-        this.artifactStore = new ManagedLanguageArtifactStore(trust, Objects.requireNonNull(shedDirectory, "Shed directory"));
+        this.shedDirectory = Objects.requireNonNull(shedDirectory, "Shed directory");
+        this.artifactStore = new ManagedLanguageArtifactStore(trust, this.shedDirectory);
         this.platform = platform;
+        this.artifactFetcher = artifactFetcher;
     }
 
     ManagedLanguageCatalog.Entry entryFor(String extensionOrLanguage) {
@@ -43,6 +57,41 @@ final class ManagedLanguageSupportService {
             "language server is not in the catalog", null) : artifactStore.remove(entry.installMetadata().coordinate().toolId());
     }
 
+    ManagedLanguageDistributionCatalog.Distribution distributionFor(ManagedLanguageCatalog.Entry entry) {
+        ManagedLanguageDistributionCatalog.Distribution distribution = ManagedLanguageDistributionCatalog.forEntry(entry);
+        if (distribution == null || distribution.launchPath(platform) == null) return null;
+        return distribution.artifact().coordinate().equals(entry.installMetadata().coordinate()) ? distribution : null;
+    }
+
+    InstallResult install(ManagedLanguageCatalog.Entry entry, AsyncJobService.JobToken token) {
+        ManagedLanguageDistributionCatalog.Distribution distribution = distributionFor(entry);
+        if (distribution == null) return new InstallResult(false, "No verified managed download is available for "
+            + (entry == null ? "this language" : entry.displayName()), null);
+        ManagedLanguageInstaller installer = new ManagedLanguageInstaller(trust,
+            artifactFetcher == null ? artifact -> openOfficialArtifact(artifact, token) : artifactFetcher,
+            shedDirectory);
+        ManagedLanguageInstaller.Review review = new ManagedLanguageInstaller.Review(distribution.artifact(), entry.installMetadata(),
+            null, distribution.archiveFileName());
+        ManagedLanguageInstaller.Result downloaded = installer.install(review, platform, true, () -> token != null && token.isCancelled());
+        if (!downloaded.installed()) return new InstallResult(false, downloaded.detail(), null);
+        try {
+            Path runtime = downloaded.installedPath().getParent().resolve("runtime");
+            Path command = runtime.resolve(distribution.launchPath(platform)).normalize();
+            if (!command.startsWith(runtime)) return new InstallResult(false, "managed launch path escapes managed cache", null);
+            if (!Files.isRegularFile(command)) {
+                TarGzExtractor.extract(downloaded.installedPath(), runtime, () -> token != null && token.isCancelled());
+            }
+            if (!Files.isRegularFile(command)) return new InstallResult(false, "managed archive did not contain its language-server launcher", null);
+            command.toFile().setExecutable(true, true);
+            return new InstallResult(true, "Installed and verified " + entry.displayName(), command);
+        } catch (IOException error) {
+            return new InstallResult(false, error.getMessage() == null ? "managed archive extraction failed" : error.getMessage(), null);
+        }
+    }
+
+    record InstallResult(boolean installed, String detail, Path command) {
+    }
+
     String overview() {
         StringBuilder text = new StringBuilder("Managed LSP Support\n");
         text.append("=".repeat(40)).append("\n\n");
@@ -52,8 +101,9 @@ final class ManagedLanguageSupportService {
         text.append("Actions\n");
         text.append("  :lsp manage detect <ext>  explicit local probe; runs in a background job\n");
         text.append("  :lsp manage retry <ext>   repeat an explicit local probe\n");
-        text.append("  :lsp manage install <ext> review managed-install availability; no download without consent\n");
-        text.append("  :lsp manage update <ext>  review managed-update availability; no download without consent\n");
+        text.append("  :lsp manage              open the managed language-services panel\n");
+        text.append("  :lsp manage install <ext> open an explicit managed-install review\n");
+        text.append("  :lsp manage update <ext>  open an explicit managed-update review\n");
         text.append("  :lsp manage remove <ext>  remove only Shed-managed cache content\n");
         text.append("  :lsp manage manual <ext> show user-managed config.toml settings\n");
         return text.toString();
@@ -122,7 +172,25 @@ final class ManagedLanguageSupportService {
         }
         ManagedLanguageCatalog.Status managed = entry.assessManagedInstall(trust, platform, false);
         text.append("  Managed status: ").append(managed.availability()).append(" — ").append(managed.detail()).append("\n");
+        if (distributionFor(entry) == null) text.append("  Managed download: unavailable; use the manual setup\n");
+        else text.append("  Managed download: available after explicit review\n");
         text.append("  Manual: :lsp manage manual ").append(primaryExtension(entry)).append("\n\n");
+    }
+
+    private static InputStream openOfficialArtifact(ManagedLanguageSupportTrust.CatalogArtifact artifact,
+                                                     AsyncJobService.JobToken token) throws IOException {
+        URLConnection connection = artifact.source().toURL().openConnection();
+        if (!(connection instanceof HttpURLConnection http)) throw new IOException("managed download must use HTTPS");
+        http.setInstanceFollowRedirects(false);
+        http.setConnectTimeout(10_000);
+        http.setReadTimeout(30_000);
+        http.connect();
+        if (http.getResponseCode() != HttpURLConnection.HTTP_OK) {
+            http.disconnect();
+            throw new IOException("managed download failed with HTTP " + http.getResponseCode());
+        }
+        if (token != null) token.onCancel(http::disconnect);
+        return http.getInputStream();
     }
 
     private static List<String> extensions(ManagedLanguageCatalog.Entry entry) {

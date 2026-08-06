@@ -63,7 +63,7 @@ class NpmManagedLanguageInstallerTest {
     void catalogOffersOnlyReviewedNpmPlansAlongsidePinnedJdtls() {
         assertTrue(ManagedLanguageDistributionCatalog.forEntry(ManagedLanguageCatalog.java()).usesPinnedArchive());
         assertEquals(List.of("pyright@1.1.411"), ManagedLanguageDistributionCatalog.forEntry(ManagedLanguageCatalog.python()).npmPackages());
-        assertEquals(List.of("typescript-language-server@5.3.0", "typescript@7.0.2"),
+        assertEquals(List.of("typescript-language-server@5.3.0", "typescript@6.0.3"),
             ManagedLanguageDistributionCatalog.forEntry(ManagedLanguageCatalog.typescriptJavascript()).npmPackages());
         assertEquals(List.of("@zed-industries/vscode-langservers-extracted@4.10.8"),
             ManagedLanguageDistributionCatalog.forEntry(ManagedLanguageCatalog.json()).npmPackages());

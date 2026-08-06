@@ -284,7 +284,7 @@ final class ManagedLanguageCatalog {
             URI.create("https://github.com/typescript-language-server/typescript-language-server/blob/master/LICENSE"),
             "Apache License 2.0",
             "Node.js",
-            "22.22.2",
+            "20",
             RuntimeRequirementKind.MINIMUM_VERSION,
             RuntimeVersionScheme.STANDARD,
             DESKTOP_PLATFORMS

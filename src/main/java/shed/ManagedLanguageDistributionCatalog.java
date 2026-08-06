@@ -66,7 +66,7 @@ final class ManagedLanguageDistributionCatalog {
     private static final Distribution PYRIGHT = npm("pyright-langserver", List.of("pyright@1.1.411"), List.of("--stdio"),
         "npm resolves the exact requested Pyright version and records package-integrity values in its local lockfile. This is not an independently published archive checksum. npm lifecycle scripts, audit, funding, and update-notifier requests are disabled.");
     private static final Distribution TYPESCRIPT_JAVASCRIPT = npm("typescript-language-server",
-        List.of("typescript-language-server@5.3.0", "typescript@7.0.2"), List.of("--stdio"),
+        List.of("typescript-language-server@5.3.0", "typescript@6.0.3"), List.of("--stdio"),
         "npm resolves the exact requested TypeScript Language Server and TypeScript versions and records package-integrity values in its local lockfile. This is not an independently published archive checksum. npm lifecycle scripts, audit, funding, and update-notifier requests are disabled.");
     private static final Distribution JSON = npm("vscode-json-language-server",
         List.of("@zed-industries/vscode-langservers-extracted@4.10.8"), List.of("--stdio"),

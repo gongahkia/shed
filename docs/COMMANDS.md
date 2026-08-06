@@ -269,7 +269,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:lsp restart [ext]` | Restart LSP for extension (defaults to current buffer extension) |
 | `:lsp stop [ext]` | Stop LSP for extension |
 | `:lsp servers` | List configured + built-in server mappings |
-| `:lsp manage`, `:lsp manage ui` | Open the consent-gated Language Services panel |
+| `:lsp manage`, `:lsp manage ui` | Open the local Language Services panel; each install/update requires a fresh GUI confirmation |
 | `:lsp manage status` | Show managed-LSP status without probing or network access |
 | `:lsp log` | Show LSP error log |
 

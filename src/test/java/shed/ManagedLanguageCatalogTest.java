@@ -122,9 +122,9 @@ public class ManagedLanguageCatalogTest {
         ManagedLanguageCatalog.Entry entry = ManagedLanguageCatalog.typescriptJavascript();
 
         ManagedLanguageCatalog.Status tooOld = entry.assessUserManaged(ManagedLanguageSupportTrust.Platform.MACOS,
-            new ManagedLanguageCatalog.ToolDetection("typescript-language-server", "v22.22.1"));
+            new ManagedLanguageCatalog.ToolDetection("typescript-language-server", "v19.9.0"));
         ManagedLanguageCatalog.Status valid = entry.assessUserManaged(ManagedLanguageSupportTrust.Platform.MACOS,
-            new ManagedLanguageCatalog.ToolDetection("typescript-language-server", "v22.22.2"));
+            new ManagedLanguageCatalog.ToolDetection("typescript-language-server", "v20.0.0"));
 
         assertEquals(entry, ManagedLanguageCatalog.forExtension("js"));
         assertEquals(entry, ManagedLanguageCatalog.forExtension("jsx"));
@@ -133,13 +133,13 @@ public class ManagedLanguageCatalogTest {
         assertEquals("typescript-language-server", entry.commandFor(ManagedLanguageSupportTrust.Platform.LINUX));
         assertEquals("typescript-language-server.cmd", entry.commandFor(ManagedLanguageSupportTrust.Platform.WINDOWS));
         assertEquals("typescript.typescript-language-server@5.3.0", entry.installMetadata().coordinate().displayName());
-        assertEquals("22.22.2", entry.installMetadata().minimumRuntimeVersion());
+        assertEquals("20", entry.installMetadata().minimumRuntimeVersion());
         assertEquals(ManagedLanguageCatalog.Availability.RUNTIME_VERSION_UNSUPPORTED, tooOld.availability());
-        assertTrue(tooOld.detail().contains("Node.js 22.22.1"));
+        assertTrue(tooOld.detail().contains("Node.js 19.9.0"));
         assertEquals(ManagedLanguageCatalog.Availability.AVAILABLE, valid.availability());
         assertTrue(valid.usable());
-        assertEquals(new ManagedLanguageCatalog.RuntimeVersion(22, 22, 2),
-            ManagedLanguageCatalog.parseRuntimeVersion("v22.22.2"));
+        assertEquals(new ManagedLanguageCatalog.RuntimeVersion(20, 0, 0),
+            ManagedLanguageCatalog.parseRuntimeVersion("v20.0.0"));
     }
 
     @Test

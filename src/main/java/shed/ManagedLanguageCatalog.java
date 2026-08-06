@@ -346,9 +346,9 @@ final class ManagedLanguageCatalog {
     );
     private static final Entry JSON = new Entry(
         "json", Set.of("json", "jsonc"), "VS Code JSON Language Server",
-        "vscode-json-languageserver", "vscode-json-languageserver.cmd",
-        new InstallMetadata(new ManagedLanguageSupportTrust.ArtifactCoordinate("json.vscode-json-languageserver", "1.3.4"),
-            URI.create("https://github.com/microsoft/vscode/tree/main/extensions/json-language-features/server"),
+        "vscode-json-language-server", "vscode-json-language-server.cmd",
+        new InstallMetadata(new ManagedLanguageSupportTrust.ArtifactCoordinate("json.zed-vscode-langservers-extracted", "4.10.8"),
+            URI.create("https://www.npmjs.com/package/@zed-industries/vscode-langservers-extracted"),
             URI.create("https://github.com/microsoft/vscode/blob/main/LICENSE.txt"), "MIT License", "Node.js", "none",
             RuntimeRequirementKind.NONE, RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
     );

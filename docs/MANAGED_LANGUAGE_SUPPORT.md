@@ -1,6 +1,6 @@
 # Managed Language Support Trust Model
 
-This model governs future Shed-managed language runtimes and language servers. It does not alter existing `lsp.<ext>.command` or `lsp.<ext>.args` launches: those continue to execute a user-managed local command and Shed neither downloads, updates, caches, nor revokes that tool.
+This model governs Shed-managed language runtimes and language servers. Existing `lsp.<ext>.command` and `lsp.<ext>.args` launches remain user-managed; the Language Services panel changes only the extensions selected during an explicitly approved managed install.
 
 ## Ownership Boundary
 
@@ -9,7 +9,7 @@ This model governs future Shed-managed language runtimes and language servers. I
 | User-managed | User | Shed launches only the configured/local executable. It performs no managed download, update, cache write, integrity claim, or revocation action. |
 | Shed-managed | Shed | The exact cataloged artifact is eligible only after all policy checks below pass. |
 
-Shed-managed support is not automatic. Startup, file open, LSP detection, and background refresh must not issue a network request. A user must invoke an install or update action and explicitly approve that action; absence of approval produces `CONSENT_REQUIRED`, which permits neither a managed network request nor a cache write.
+Shed-managed support is not automatic. Startup, file open, LSP detection, and background refresh must not issue a network request. A user must invoke an install or update action and explicitly approve that action in the Language Services panel. The panel creates a one-use approval capability bound to the selected catalog entry; an install call without that fresh capability is rejected before it opens a connection, launches npm, or writes a cache file.
 
 ## Catalog Provenance and Artifact Identity
 
@@ -17,13 +17,13 @@ The managed catalog is bundled with a Shed release, reviewed with that release, 
 
 - HTTPS source URI;
 - SHA-256 of the downloaded bytes;
-- signing-key identifier and detached artifact signature;
+- verification provenance and, where published, signing metadata;
 - exact supported-platform set; and
 - the coordinate for revocation matching.
 
-An artifact not present at that exact coordinate is rejected. An entry with an HTTP/non-host source, malformed SHA-256, missing signing-key id, missing detached signature, or no supported platform is rejected before a download can start. The installer validates downloaded bytes against the catalog digest before activation and preserves the catalog signing identity in its receipt; cryptographic detached-signature verification remains required before a production managed artifact is admitted. Metadata is never trusted merely because a URL was supplied by a user or server.
+An artifact not present at that exact coordinate is rejected. An entry with an HTTP/non-host source, malformed SHA-256, missing verification provenance, or no supported platform is rejected before a download can start. The installer validates downloaded bytes against the catalog digest before activation and preserves the catalog verification identity in its receipt. Metadata is never trusted merely because a URL was supplied by a user or server.
 
-`ManagedLanguageSupportTrust` is the no-I/O policy gate. Its `Assessment.permitsManagedNetwork()` and `permitsManagedCacheWrite()` return true only for an approved, cataloged, signed, integrity-pinned, platform-supported, non-revoked Shed-managed artifact. The class intentionally contains no downloader, process launcher, or background work.
+`ManagedLanguageSupportTrust` is the no-I/O policy gate. Its `Assessment.permitsManagedNetwork()` and `permitsManagedCacheWrite()` return true only for an approved, cataloged, integrity-pinned, platform-supported, non-revoked Shed-managed artifact. The class intentionally contains no downloader, process launcher, or background work.
 
 ## Platform and Cache Ownership
 
@@ -39,9 +39,15 @@ Revocation data changes arrive only with an explicit Shed release/update flow. S
 
 ## Current Scope
 
-The catalog records Eclipse JDT LS (`java.eclipse-jdtls@1.50.0`, Java 21+, Eclipse Public License 2.0), Pyright (`python.pyright@1.1.411`, Node.js 14+, MIT License), TypeScript Language Server (`typescript.typescript-language-server@5.3.0`, Node.js 22.22.2+, Apache License 2.0), gopls (`go.gopls@0.23.0`, Go 1.21+, BSD 3-Clause License), rust-analyzer (`rust.rust-analyzer@2026-07-27`, latest stable Rust with `rust-src`, MIT OR Apache-2.0), and clangd (`c-cpp.clangd@22.1.8`, clangd 7+, Apache License 2.0 with LLVM Exceptions) for macOS, Windows, and Linux. The TypeScript entry serves `.js`, `.jsx`, `.ts`, and `.tsx`; clangd serves `.c`, `.cc`, `.cpp`, `.cxx`, `.h`, `.hpp`, and `.hxx`. It records platform-specific local command names and evaluates missing executable, unknown runtime, incompatible runtime, consent-required, and untrusted-artifact states with a manual configuration remediation. Runtime parsing preserves Go's `1.x` version scheme separately from legacy Java `1.x`; rust-analyzer instead requires a locally validated latest-stable toolchain and `rust-src`. It does not contain an approved binary source, checksum, or signature for a catalog entry, so a managed install remains unavailable until a later catalog revision supplies a signed, integrity-pinned artifact and the user approves the install. User-managed `jdtls`, `pyright-langserver`, `typescript-language-server`, `gopls`, `rust-analyzer`, and `clangd` commands can run locally after their runtimes are validated.
+The Language Services panel is available from Settings or `:lsp manage`. Every listed install/update is a separate GUI approval; selecting the panel, opening a file, or running `:lsp manage install <ext>` only opens the local panel and does not start an install.
 
-JSON adds `vscode-json-languageserver --stdio` for `.json` and `.jsonc`; upstream declares no Node.js version floor. Markdown adds `remark-language-server --stdio` for `.md` and `.markdown`, requiring Node.js 16+. These are user-managed commands until a signed, integrity-pinned managed artifact is added and approved.
+Eclipse JDT LS `java.eclipse-jdtls@1.60.0` is available for macOS, Windows, and Linux from a bundled, SHA-256-pinned Eclipse archive. Eclipse publishes that checksum but not a detached signature for this archive; the approval dialog states this before download. After approval Shed downloads without redirects, verifies the exact hash, and safely extracts only regular files/directories under `~/.shed/managed-languages/`.
+
+Pyright (`pyright@1.1.411`), TypeScript/JavaScript (`typescript-language-server@5.3.0` with `typescript@7.0.2`), JSON (`@zed-industries/vscode-langservers-extracted@4.10.8`), and Markdown (`remark-language-server@3.0.0`) are available through an explicitly approved npm action. Shed writes a minimal private `package.json` under its cache and runs `npm install` there only after approval. It requests the exact listed top-level package versions, keeps npm's generated package lockfile (which records registry-provided package-integrity values for the resolved dependency tree), and disables lifecycle scripts, audit, funding, and update notifications. This route does **not** claim an independently published SHA-256 for every npm dependency; that distinction is disclosed in the review dialog. It never installs globally or invokes Homebrew, pip, cargo, rustup, or Go tooling.
+
+On a successful managed install, Shed saves the exact cached launcher and LSP arguments for every extension that service covers, then restarts those clients. The installed server still runs as a user-controlled child process, and may have its own file or network behaviour.
+
+gopls, rust-analyzer, and clangd remain user-managed. Their supported upstream paths rely on the user's Go/Rust/LLVM toolchains or platform packages, which Shed will not modify from this panel. Configure them with `lsp.<ext>.command` and `lsp.<ext>.args` instead.
 
 `LanguageServerDetector` resolves a local executable and invokes only bounded `--version` probes. It does not alter the environment, install or update tools, create cache files, or make network requests. Its result preserves the executable, server version, runtime version, failure, availability state, and manual remediation.
 
@@ -49,6 +55,6 @@ JSON adds `vscode-json-languageserver --stdio` for `.json` and `.jsonc`; upstrea
 
 Each managed tool retains at most its active version and one prior verified version. Installing a user-approved update atomically selects it and keeps the previous verified version for explicit rollback; superseded managed-cache versions are pruned. Rollback re-verifies the retained prior artifact before selecting it and never fetches a replacement. This cache policy performs no startup, detection, or background network activity.
 
-`:lsp manage` is the visible managed-LSP status and remediation surface. Its status view performs no probe or network request. `:lsp manage detect <ext>` and `retry <ext>` start an explicit local-only, bounded version probe in a background job; `install`, `update`, `remove`, and `manual` expose their next steps. Until the bundled catalog supplies a verified managed artifact, install and update start no download and direct users to the shown user-managed `config.toml` alternative. Remove affects only the managed cache.
+`:lsp manage` opens the Language Services panel. `:lsp manage status` performs no probe or network request. `:lsp manage detect <ext>` and `retry <ext>` start an explicit local-only, bounded version probe in a background job; `install` and `update` open the explicit review panel, while `remove` affects only the managed cache. The panel permits cancellation during transfer and extraction; a failed or cancelled action does not configure a launcher.
 
 Subsequent catalog, installer, integrity, cache-policy, and UI work must call this gate before performing I/O. Eclipse JDT LS documents its Java 21 minimum runtime, platform-specific configuration directories, and Eclipse Public License 2.0 source at [its project repository](https://github.com/eclipse-jdtls/eclipse.jdt.ls). Pyright documents its npm distribution and Node.js dependency in [its installation guide](https://github.com/microsoft/pyright/blob/main/docs/installation.md); its package metadata declares Node.js 14+ and the `pyright-langserver` executable. TypeScript Language Server documents its combined JavaScript/TypeScript scope and required `--stdio` invocation in [its repository](https://github.com/typescript-language-server/typescript-language-server); its package metadata declares Node.js 22.22.2+. [The official gopls documentation](https://go.dev/gopls/) specifies the Go 1.21+ toolchain requirement and its installation command. [rust-analyzer's installation guide](https://rust-analyzer.github.io/book/installation.html) requires its binary, a latest-stable Rust toolchain, and `rust-src`. [clangd's installation guide](https://clangd.llvm.org/installation.html) documents desktop-platform support, `clangd` stdio launch, and the compile-command requirement for accurate analysis.

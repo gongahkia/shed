@@ -113,7 +113,7 @@ final class ManagedLanguageSupportTrust {
                 "explicit user consent is required before managed download or installation", artifact);
         }
         return new Assessment(ownership, Decision.ALLOWED,
-            "managed artifact is cataloged, signed, integrity-pinned, platform-supported, and user-approved", artifact);
+            "managed artifact is cataloged, integrity-pinned, platform-supported, and user-approved", artifact);
     }
 
     Path cacheRoot(Path shedDirectory) {

@@ -33,10 +33,14 @@ final class ManagedLanguageServicesDialog extends JDialog {
     private int activeJobId = -1;
 
     static void showFor(Texteditor editor, ManagedLanguageSupportService service) {
-        new ManagedLanguageServicesDialog(editor, service).setVisible(true);
+        showFor(editor, service, null);
     }
 
-    private ManagedLanguageServicesDialog(Texteditor editor, ManagedLanguageSupportService service) {
+    static void showFor(Texteditor editor, ManagedLanguageSupportService service, ManagedLanguageCatalog.Entry selected) {
+        new ManagedLanguageServicesDialog(editor, service, selected).setVisible(true);
+    }
+
+    private ManagedLanguageServicesDialog(Texteditor editor, ManagedLanguageSupportService service, ManagedLanguageCatalog.Entry selected) {
         super(editor, "Language Services", false);
         this.editor = editor;
         this.service = service;
@@ -68,7 +72,8 @@ final class ManagedLanguageServicesDialog extends JDialog {
         addWindowListener(new WindowAdapter() {
             @Override public void windowClosed(WindowEvent event) { cancel(); }
         });
-        if (!model.isEmpty()) services.setSelectedIndex(0);
+        if (selected != null) services.setSelectedValue(selected, true);
+        if (services.getSelectedIndex() < 0 && !model.isEmpty()) services.setSelectedIndex(0);
         refresh();
     }
 
@@ -112,7 +117,6 @@ final class ManagedLanguageServicesDialog extends JDialog {
             install.setEnabled(false);
             return;
         }
-        ManagedLanguageCatalog.Status managed = entry.assessManagedInstall(serviceTrust(), platform(), false);
         ManagedLanguageDistributionCatalog.Distribution distribution = service.distributionFor(entry);
         StringBuilder text = new StringBuilder(entry.displayName()).append("\n\n");
         text.append("Extensions: ").append(String.join(", ", entry.extensions())).append("\n");
@@ -122,9 +126,15 @@ final class ManagedLanguageServicesDialog extends JDialog {
         if (distribution == null) {
             text.append("Managed install: not available for this language yet.\n\n").append(service.manualInstructions(entry));
         } else {
-            text.append("Managed install: available only after you approve this exact download.\n");
-            text.append("Source: ").append(distribution.artifact().source()).append("\n");
-            text.append("SHA-256: ").append(distribution.artifact().sha256()).append("\n");
+            text.append("Managed install: available only after you approve this exact action.\n");
+            if (distribution.usesPinnedArchive()) {
+                text.append("Source: ").append(distribution.artifact().source()).append("\n");
+                text.append("SHA-256: ").append(distribution.artifact().sha256()).append("\n");
+            } else {
+                text.append("Installer: npm (local cache only; no global install)\n");
+                text.append("Packages: ").append(String.join(", ", distribution.npmPackages())).append("\n");
+                text.append("Source: https://registry.npmjs.org\n");
+            }
             text.append("License: ").append(entry.installMetadata().licenseName()).append("\n");
             text.append("Verification: ").append(distribution.verificationNotice()).append("\n");
         }
@@ -150,13 +160,12 @@ final class ManagedLanguageServicesDialog extends JDialog {
         ManagedLanguageCatalog.Entry entry = selected();
         ManagedLanguageDistributionCatalog.Distribution distribution = service.distributionFor(entry);
         if (entry == null || distribution == null || activeJobId >= 0) return;
-        String review = entry.displayName() + "\n\nSource:\n" + distribution.artifact().source() + "\n\nSHA-256:\n"
-            + distribution.artifact().sha256() + "\n\nLicense: " + entry.installMetadata().licenseName() + "\n\n"
-            + distribution.verificationNotice() + "\n\nDownload, verify, extract into ~/.shed/managed-languages, and configure this language server?";
+        String review = installReview(entry, distribution);
         if (JOptionPane.showConfirmDialog(this, review, "Approve language-service install", JOptionPane.YES_NO_OPTION,
             JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) return;
-        setBusy("Downloading and verifying " + entry.displayName() + "...");
-        activeJobId = editor.asyncJobService.submit("Install " + entry.displayName(), token -> service.install(entry, token),
+        ManagedLanguageInstallApproval approval = ManagedLanguageInstallApproval.approvedInLanguageServicesPanel(entry);
+        setBusy("Installing " + entry.displayName() + "...");
+        activeJobId = editor.asyncJobService.submit("Install " + entry.displayName(), token -> service.install(entry, approval, token),
             (snapshot, result, error) -> {
                 activeJobId = -1;
                 if (error != null || result == null || !result.installed()) {
@@ -165,10 +174,8 @@ final class ManagedLanguageServicesDialog extends JDialog {
                     return;
                 }
                 try {
-                    String extension = primaryExtension(entry);
-                    editor.configManager.setAndPersist("lsp." + extension + ".command", result.command().toString());
-                    editor.lspRestart(extension);
-                    status.setText(result.detail() + "; restarted ." + extension + " LSP");
+                    configureManagedLsp(entry, result);
+                    status.setText(result.detail() + "; configured and restarted " + extensionList(entry) + " LSP");
                 } catch (Exception configurationError) {
                     status.setText(result.detail() + "; set lsp command manually: " + configurationError.getMessage());
                 }
@@ -204,14 +211,39 @@ final class ManagedLanguageServicesDialog extends JDialog {
 
     private ManagedLanguageCatalog.Entry selected() { return services.getSelectedValue(); }
 
-    private ManagedLanguageSupportTrust serviceTrust() { return ManagedLanguageDistributionCatalog.trust(); }
-
-    private ManagedLanguageSupportTrust.Platform platform() {
-        return ManagedLanguageSupportService.platformFor(System.getProperty("os.name"));
-    }
-
     private static String primaryExtension(ManagedLanguageCatalog.Entry entry) {
         return entry.extensions().stream().sorted().findFirst().orElse(entry.languageId());
+    }
+
+    private String installReview(ManagedLanguageCatalog.Entry entry, ManagedLanguageDistributionCatalog.Distribution distribution) {
+        StringBuilder review = new StringBuilder(entry.displayName()).append("\n\n");
+        if (distribution.usesPinnedArchive()) {
+            review.append("Source:\n").append(distribution.artifact().source()).append("\n\nSHA-256:\n")
+                .append(distribution.artifact().sha256()).append("\n\n");
+        } else {
+            review.append("Installer: npm\nPackages:\n");
+            for (String npmPackage : distribution.npmPackages()) review.append("  ").append(npmPackage).append("\n");
+            review.append("\nSource: https://registry.npmjs.org\n")
+                .append("Install location: ~/.shed/managed-languages only (not global npm)\n")
+                .append("npm lifecycle scripts, audit, funding, and update notifications are disabled.\n\n");
+        }
+        return review.append("License: ").append(entry.installMetadata().licenseName()).append("\n\n")
+            .append(distribution.verificationNotice()).append("\n\n")
+            .append("Proceed with this one-time download, installation, and LSP configuration?\n")
+            .append("Nothing is installed or updated unless you choose Yes.").toString();
+    }
+
+    private void configureManagedLsp(ManagedLanguageCatalog.Entry entry, ManagedLanguageSupportService.InstallResult result) throws Exception {
+        String arguments = String.join(" ", result.arguments());
+        for (String extension : entry.extensions()) {
+            editor.configManager.setAndPersist("lsp." + extension + ".command", result.command().toString());
+            editor.configManager.setAndPersist("lsp." + extension + ".args", arguments);
+        }
+        for (String extension : entry.extensions()) editor.lspRestart(extension);
+    }
+
+    private static String extensionList(ManagedLanguageCatalog.Entry entry) {
+        return entry.extensions().stream().sorted().map(extension -> "." + extension).collect(java.util.stream.Collectors.joining(", "));
     }
 
     private static String failure(Exception error, AsyncJobService.JobSnapshot snapshot) {

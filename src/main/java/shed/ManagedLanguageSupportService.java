@@ -2,6 +2,10 @@ package shed;
 
 import java.nio.file.Path;
 import java.nio.file.Files;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.net.HttpURLConnection;
 import java.net.URLConnection;
 import java.io.IOException;
@@ -11,6 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 final class ManagedLanguageSupportService {
@@ -60,36 +65,48 @@ final class ManagedLanguageSupportService {
     ManagedLanguageDistributionCatalog.Distribution distributionFor(ManagedLanguageCatalog.Entry entry) {
         ManagedLanguageDistributionCatalog.Distribution distribution = ManagedLanguageDistributionCatalog.forEntry(entry);
         if (distribution == null || distribution.launchPath(platform) == null) return null;
-        return distribution.artifact().coordinate().equals(entry.installMetadata().coordinate()) ? distribution : null;
+        if (distribution.usesPinnedArchive()) {
+            return distribution.artifact().coordinate().equals(entry.installMetadata().coordinate()) ? distribution : null;
+        }
+        return distribution.usesNpm() ? distribution : null;
     }
 
-    InstallResult install(ManagedLanguageCatalog.Entry entry, AsyncJobService.JobToken token) {
+    InstallResult install(ManagedLanguageCatalog.Entry entry, ManagedLanguageInstallApproval approval, AsyncJobService.JobToken token) {
+        if (approval == null || !approval.consumeFor(entry)) {
+            return new InstallResult(false, "A fresh approval in the Language Services panel is required before installing.", null, List.of());
+        }
         ManagedLanguageDistributionCatalog.Distribution distribution = distributionFor(entry);
         if (distribution == null) return new InstallResult(false, "No verified managed download is available for "
-            + (entry == null ? "this language" : entry.displayName()), null);
+            + (entry == null ? "this language" : entry.displayName()), null, List.of());
+        if (distribution.usesNpm()) {
+            NpmManagedLanguageInstaller.Result installed = new NpmManagedLanguageInstaller(trust, shedDirectory).install(distribution, entry,
+                platform,
+                new NpmManagedLanguageInstaller.Cancellation() {
+                    @Override public boolean isCancelled() { return token != null && token.isCancelled(); }
+                    @Override public void onCancel(Runnable action) { if (token != null) token.onCancel(action); }
+                });
+            return new InstallResult(installed.installed(), installed.detail(), installed.command(), distribution.launchArguments());
+        }
         ManagedLanguageInstaller installer = new ManagedLanguageInstaller(trust,
             artifactFetcher == null ? artifact -> openOfficialArtifact(artifact, token) : artifactFetcher,
             shedDirectory);
         ManagedLanguageInstaller.Review review = new ManagedLanguageInstaller.Review(distribution.artifact(), entry.installMetadata(),
             null, distribution.archiveFileName());
         ManagedLanguageInstaller.Result downloaded = installer.install(review, platform, true, () -> token != null && token.isCancelled());
-        if (!downloaded.installed()) return new InstallResult(false, downloaded.detail(), null);
+        if (!downloaded.installed()) return new InstallResult(false, downloaded.detail(), null, List.of());
         try {
-            Path runtime = downloaded.installedPath().getParent().resolve("runtime");
-            Path command = runtime.resolve(distribution.launchPath(platform)).normalize();
-            if (!command.startsWith(runtime)) return new InstallResult(false, "managed launch path escapes managed cache", null);
-            if (!Files.isRegularFile(command)) {
-                TarGzExtractor.extract(downloaded.installedPath(), runtime, () -> token != null && token.isCancelled());
-            }
-            if (!Files.isRegularFile(command)) return new InstallResult(false, "managed archive did not contain its language-server launcher", null);
+            Path command = replaceRuntime(distribution, downloaded.installedPath(), platform, token);
             command.toFile().setExecutable(true, true);
-            return new InstallResult(true, "Installed and verified " + entry.displayName(), command);
+            return new InstallResult(true, "Installed and verified " + entry.displayName(), command, distribution.launchArguments());
         } catch (IOException error) {
-            return new InstallResult(false, error.getMessage() == null ? "managed archive extraction failed" : error.getMessage(), null);
+            return new InstallResult(false, error.getMessage() == null ? "managed archive extraction failed" : error.getMessage(), null, List.of());
         }
     }
 
-    record InstallResult(boolean installed, String detail, Path command) {
+    record InstallResult(boolean installed, String detail, Path command, List<String> arguments) {
+        InstallResult {
+            arguments = arguments == null ? List.of() : List.copyOf(arguments);
+        }
     }
 
     String overview() {
@@ -170,10 +187,19 @@ final class ManagedLanguageSupportService {
             text.append("  Local status: ").append(detection.status().availability()).append(" — ").append(detection.status().detail()).append("\n");
             text.append("  Next step: ").append(detection.status().remediation()).append("\n");
         }
-        ManagedLanguageCatalog.Status managed = entry.assessManagedInstall(trust, platform, false);
-        text.append("  Managed status: ").append(managed.availability()).append(" — ").append(managed.detail()).append("\n");
-        if (distributionFor(entry) == null) text.append("  Managed download: unavailable; use the manual setup\n");
-        else text.append("  Managed download: available after explicit review\n");
+        ManagedLanguageDistributionCatalog.Distribution distribution = distributionFor(entry);
+        if (distribution == null) {
+            ManagedLanguageCatalog.Status managed = entry.assessManagedInstall(trust, platform, false);
+            text.append("  Managed status: ").append(managed.availability()).append(" — ").append(managed.detail()).append("\n");
+            text.append("  Managed download: unavailable; use the manual setup\n");
+        } else if (distribution.usesPinnedArchive()) {
+            ManagedLanguageCatalog.Status managed = entry.assessManagedInstall(trust, platform, false);
+            text.append("  Managed status: ").append(managed.availability()).append(" — ").append(managed.detail()).append("\n");
+            text.append("  Managed download: available after explicit review\n");
+        } else {
+            text.append("  Managed status: GUI approval required — exact npm packages install only after review\n");
+            text.append("  Managed download: available after explicit review; npm scripts are disabled\n");
+        }
         text.append("  Manual: :lsp manage manual ").append(primaryExtension(entry)).append("\n\n");
     }
 
@@ -191,6 +217,62 @@ final class ManagedLanguageSupportService {
         }
         if (token != null) token.onCancel(http::disconnect);
         return http.getInputStream();
+    }
+
+    private static Path replaceRuntime(ManagedLanguageDistributionCatalog.Distribution distribution, Path archive,
+                                       ManagedLanguageSupportTrust.Platform platform, AsyncJobService.JobToken token) throws IOException {
+        Path versionDirectory = archive.getParent().toAbsolutePath().normalize();
+        Path runtime = versionDirectory.resolve("runtime").normalize();
+        if (!runtime.startsWith(versionDirectory)) throw new IOException("managed runtime escapes managed cache");
+        Path staged = Files.createTempDirectory(versionDirectory, ".shed-runtime-");
+        Path backup = null;
+        boolean replaced = false;
+        try {
+            TarGzExtractor.extract(archive, staged, () -> token != null && token.isCancelled());
+            String launchPath = distribution.launchPath(platform);
+            if (launchPath == null || launchPath.isBlank()) throw new IOException("managed distribution has no launcher for this platform");
+            Path stagedCommand = staged.resolve(launchPath).normalize();
+            if (!stagedCommand.startsWith(staged) || !Files.isRegularFile(stagedCommand)) {
+                throw new IOException("managed archive did not contain its language-server launcher");
+            }
+            if (Files.exists(runtime)) {
+                backup = versionDirectory.resolve(".shed-runtime-backup-" + UUID.randomUUID()).normalize();
+                move(runtime, backup);
+            }
+            move(staged, runtime);
+            replaced = true;
+            return runtime.resolve(launchPath).normalize();
+        } catch (IOException error) {
+            if (backup != null && Files.exists(backup) && !Files.exists(runtime)) move(backup, runtime);
+            throw error;
+        } finally {
+            if (Files.exists(staged)) deleteManagedTree(staged);
+            if (replaced && backup != null && Files.exists(backup)) deleteManagedTree(backup);
+        }
+    }
+
+    private static void move(Path source, Path target) throws IOException {
+        if (source.equals(target)) return;
+        try {
+            Files.move(source, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException error) {
+            Files.move(source, target);
+        }
+    }
+
+    private static void deleteManagedTree(Path root) throws IOException {
+        Files.walkFileTree(root, new SimpleFileVisitor<>() {
+            @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                Files.delete(file);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override public FileVisitResult postVisitDirectory(Path directory, IOException error) throws IOException {
+                if (error != null) throw error;
+                Files.delete(directory);
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 
     private static List<String> extensions(ManagedLanguageCatalog.Entry entry) {

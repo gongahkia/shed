@@ -39,8 +39,10 @@ final class LspController {
 
     LspController(Texteditor editor) {
         this.editor = editor;
+        Path managedLanguageDirectory = editor != null && editor.configManager != null
+            ? Path.of(editor.configManager.getShedDirectoryPath()) : Path.of(System.getProperty("user.home"), ".shed");
         this.managedLanguageSupport = new ManagedLanguageSupportService(new LanguageServerDetector(null, null, null),
-            ManagedLanguageDistributionCatalog.trust(), Path.of(editor.configManager.getShedDirectoryPath()),
+            ManagedLanguageDistributionCatalog.trust(), managedLanguageDirectory,
             ManagedLanguageSupportService.platformFor(System.getProperty("os.name")));
     }
 
@@ -296,7 +298,7 @@ final class LspController {
         return switch (action) {
             case "detect", "retry" -> startManagedLspDetection(entry);
             case "install", "update" -> {
-                ManagedLanguageServicesDialog.showFor(editor, managedLanguageSupport);
+                ManagedLanguageServicesDialog.showFor(editor, managedLanguageSupport, entry);
                 yield "Opened language services for " + action;
             }
             case "remove", "uninstall" -> managedLanguageSupport.remove(entry).detail();

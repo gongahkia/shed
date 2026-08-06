@@ -283,7 +283,7 @@ public class ManagedLanguageCatalogTest {
         ManagedLanguageCatalog.Entry json = ManagedLanguageCatalog.json();
         ManagedLanguageCatalog.Entry markdown = ManagedLanguageCatalog.markdown();
         ManagedLanguageCatalog.Status jsonReady = json.assessUserManaged(ManagedLanguageSupportTrust.Platform.LINUX,
-            new ManagedLanguageCatalog.ToolDetection("vscode-json-languageserver", null));
+            new ManagedLanguageCatalog.ToolDetection("vscode-json-language-server", null));
         ManagedLanguageCatalog.Status markdownOld = markdown.assessUserManaged(ManagedLanguageSupportTrust.Platform.LINUX,
             new ManagedLanguageCatalog.ToolDetection("remark-language-server", "v14.21.3"));
         ManagedLanguageCatalog.Status markdownReady = markdown.assessUserManaged(ManagedLanguageSupportTrust.Platform.LINUX,
@@ -291,7 +291,7 @@ public class ManagedLanguageCatalogTest {
         ManagedLanguageCatalog.Status consent = markdown.assessManagedInstall(trustWith(markdown.installMetadata().coordinate()),
             ManagedLanguageSupportTrust.Platform.LINUX, false);
 
-        assertEquals("json.vscode-json-languageserver@1.3.4", json.installMetadata().coordinate().displayName());
+        assertEquals("json.zed-vscode-langservers-extracted@4.10.8", json.installMetadata().coordinate().displayName());
         assertEquals(ManagedLanguageCatalog.RuntimeRequirementKind.NONE, json.installMetadata().runtimeRequirementKind());
         assertEquals(ManagedLanguageCatalog.Availability.AVAILABLE, jsonReady.availability());
         assertEquals("markdown.remark-language-server@3.0.0", markdown.installMetadata().coordinate().displayName());

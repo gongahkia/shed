@@ -230,7 +230,7 @@ public class LspServiceTest {
         assertArrayEquals(new String[] {"typescript-language-server", "--stdio"}, service.builtinCommand("tsx"));
         assertArrayEquals(new String[] {"gopls"}, service.builtinCommand("go"));
         assertArrayEquals(new String[] {"clangd"}, service.builtinCommand("cxx"));
-        assertArrayEquals(new String[] {"vscode-json-languageserver", "--stdio"}, service.builtinCommand("jsonc"));
+        assertArrayEquals(new String[] {"vscode-json-language-server", "--stdio"}, service.builtinCommand("jsonc"));
         assertArrayEquals(new String[] {"remark-language-server", "--stdio"}, service.builtinCommand("md"));
         assertArrayEquals(new String[] {"clangd"}, service.builtinCommand("cpp"));
         assertNull(service.builtinCommand("lua"));

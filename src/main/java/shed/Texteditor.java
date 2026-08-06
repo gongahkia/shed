@@ -2197,6 +2197,10 @@ public class Texteditor extends JFrame implements KeyListener {
         lspController.syncLspChange(buffer, offset, removedLength, insertedText);
     }
 
+    void syncLspChange(FileBuffer buffer, FileBuffer.DocumentTextChange textChange) {
+        lspController.syncLspChange(buffer, textChange);
+    }
+
     void flushLspChange(FileBuffer buffer) {
         lspController.flushPendingLspChange(buffer);
     }

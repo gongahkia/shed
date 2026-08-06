@@ -32,7 +32,7 @@ public class FileBufferTest {
         String original = builder.toString();
         Files.writeString(file, original, StandardCharsets.UTF_8);
 
-        FileBuffer buffer = new FileBuffer(file.toFile());
+        FileBuffer buffer = new FileBuffer(file.toFile(), boundedPreviewPolicy());
         assertTrue(buffer.isShowingPreviewOnly());
         assertTrue(buffer.getContent().contains("shed large-file preview"));
         assertTrue(buffer.getContent().length() <= LargeFileStore.MAX_PREVIEW_CHARS + 128);
@@ -54,7 +54,7 @@ public class FileBufferTest {
         }
         Files.write(file, content);
 
-        FileBuffer buffer = new FileBuffer(file.toFile());
+        FileBuffer buffer = new FileBuffer(file.toFile(), boundedPreviewPolicy());
 
         assertTrue(buffer.isLargeFile());
         assertTrue(buffer.isLargeFileUnavailable());
@@ -90,6 +90,13 @@ public class FileBufferTest {
         assertFalse(buffer.isModified());
         assertEquals("reloaded\n", buffer.getContent());
         assertEquals("reloaded\n", buffer.getSavedContent());
+    }
+
+    private static ConfigManager boundedPreviewPolicy() {
+        ConfigManager config = new ConfigManager();
+        config.set("large.file.threshold.mb", "1");
+        config.set("large.file.line.threshold", "1000");
+        return config;
     }
 
     @Test

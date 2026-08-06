@@ -66,8 +66,8 @@ public class ConfigManager {
     private static final String DEFAULT_SESSION_AUTOLOAD = "default";
     private static final boolean DEFAULT_TERMINAL_SESSION_RESTORE = false;
     private static final boolean DEFAULT_WORKSPACE_INDEX_ENABLED = false;
-    private static final long DEFAULT_LARGE_FILE_THRESHOLD_MB = 100L;
-    private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 50000;
+    private static final long DEFAULT_LARGE_FILE_THRESHOLD_MB = 25L;
+    private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 500000;
     private static final int DEFAULT_LARGE_FILE_PREVIEW_LINES = 1000;
     private static final int DEFAULT_RECOVERY_RETENTION_MAX_ENTRIES = RecoveryJournal.MAX_ENTRIES;
     private static final int DEFAULT_RECOVERY_RETENTION_MAX_CONTENT_BYTES = RecoveryJournal.MAX_CONTENT_BYTES;

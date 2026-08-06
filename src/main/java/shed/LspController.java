@@ -1988,8 +1988,8 @@ final class LspController {
         if (editor.lspDocumentVersions.containsKey(uri)) {
             return;
         }
-        String content = buffer.getFullContent();
-        client.didOpen(uri, languageId(buffer), content);
+        VersionedTextSnapshot content = buffer.textSnapshot();
+        client.didOpen(uri, languageId(buffer), content.text());
         editor.lspDocumentVersions.put(uri, 1);
         documentSyncStates.put(uri, new LspDocumentSyncState(content));
         scheduleLspDecorations(buffer);
@@ -1997,10 +1997,15 @@ final class LspController {
 
 
     void syncLspChange(FileBuffer buffer) {
-        syncLspChange(buffer, -1, -1, null);
+        syncLspChange(buffer, (FileBuffer.DocumentTextChange) null);
     }
 
     void syncLspChange(FileBuffer buffer, int offset, int removedLength, String insertedText) {
+        syncLspChange(buffer, new FileBuffer.DocumentTextChange(buffer == null ? null : buffer.textSnapshot(),
+            buffer == null ? null : buffer.textSnapshot(), offset, removedLength, insertedText == null ? "" : insertedText, false));
+    }
+
+    void syncLspChange(FileBuffer buffer, FileBuffer.DocumentTextChange textChange) {
         if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
             return;
         }
@@ -2010,12 +2015,11 @@ final class LspController {
         if (!wasOpen) {
             return;
         }
-        LspDocumentSyncState syncState = documentSyncStates.computeIfAbsent(uri, ignored -> new LspDocumentSyncState(buffer.getFullContent()));
-        String content = buffer.getFullContent();
-        if (offset >= 0 && removedLength >= 0) {
-            syncState.apply(offset, removedLength, insertedText, content);
+        LspDocumentSyncState syncState = documentSyncStates.computeIfAbsent(uri, ignored -> new LspDocumentSyncState(buffer.textSnapshot()));
+        if (textChange != null) {
+            syncState.apply(textChange);
         } else {
-            syncState.reconcile(content);
+            syncState.reconcile(buffer.textSnapshot());
         }
         clearLspDecorations();
         pendingLspChange = buffer;
@@ -2063,7 +2067,7 @@ final class LspController {
         }
         syncLspOpen(buffer);
         String uri = bufferUri(buffer);
-        LspDocumentSyncState syncState = documentSyncStates.computeIfAbsent(uri, ignored -> new LspDocumentSyncState(buffer.getFullContent()));
+        LspDocumentSyncState syncState = documentSyncStates.computeIfAbsent(uri, ignored -> new LspDocumentSyncState(buffer.textSnapshot()));
         if (!syncState.hasPendingChanges()) {
             scheduleLspDecorations(buffer);
             return;
@@ -2071,12 +2075,13 @@ final class LspController {
         int version = editor.lspDocumentVersions.getOrDefault(uri, 1) + 1;
         editor.lspDocumentVersions.put(uri, version);
         List<LspDocumentChange> changes = syncState.drainChanges();
-        String content = syncState.text();
+        String content = client.documentSyncKind() == LspClient.DocumentSyncKind.INCREMENTAL && !changes.isEmpty()
+            ? null : syncState.text();
         client.didChange(uri, version, changes, content);
         scheduleDiagnosticRefresh();
         scheduleLspDecorations(buffer);
         if (editor.perfService != null) {
-            editor.perfService.recordDuration("lsp.change", started, "chars=" + content.length());
+            editor.perfService.recordDuration("lsp.change", started, "chars=" + syncState.length());
         }
     }
 

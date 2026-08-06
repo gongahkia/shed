@@ -28,7 +28,10 @@ final class PaneBufferController {
 
     void handleDocumentChange(DocumentEvent event) {
         if (!editor.suppressDocumentEvents) {
-            markModified(event);
+            FileBuffer buffer = getCurrentBuffer();
+            FileBuffer.DocumentTextChange textChange = buffer != null && event != null && event.getDocument() == buffer.getDocument()
+                ? buffer.applyDocumentChange(event) : null;
+            markModified(event, textChange);
             editor.updateCurrentLineHighlight();
             editor.scheduleSyntaxHighlighting();
             editor.scheduleCompletionAfterDocumentChange(event);
@@ -146,10 +149,14 @@ final class PaneBufferController {
 
 
     void markModified() {
-        markModified(null);
+        markModified(null, null);
     }
 
     private void markModified(DocumentEvent event) {
+        markModified(event, null);
+    }
+
+    private void markModified(DocumentEvent event, FileBuffer.DocumentTextChange textChange) {
         FileBuffer buffer = getCurrentBuffer();
         if (buffer != null && buffer.isLargeFile()) {
             return;
@@ -159,14 +166,18 @@ final class PaneBufferController {
             editor.invalidateGitBlame(buffer);
             scheduleIdleBackup(buffer);
             editor.recordChangePosition();
-            syncLspChange(buffer, event);
+            syncLspChange(buffer, event, textChange);
             editor.scheduleDiffGutter(buffer);
             editor.requestStatusBarRefresh();
             editor.scheduleRecoverySnapshotCapture();
         }
     }
 
-    private void syncLspChange(FileBuffer buffer, DocumentEvent event) {
+    private void syncLspChange(FileBuffer buffer, DocumentEvent event, FileBuffer.DocumentTextChange textChange) {
+        if (textChange != null) {
+            editor.syncLspChange(buffer, textChange);
+            return;
+        }
         if (event == null || event.getType() == DocumentEvent.EventType.CHANGE) {
             editor.syncLspChange(buffer);
             return;

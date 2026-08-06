@@ -28,13 +28,14 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
+import javax.swing.event.DocumentEvent;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.PlainDocument;
 import javax.swing.undo.UndoManager;
 
 public class FileBuffer {
-    private static final long DEFAULT_LARGE_FILE_THRESHOLD_MB = 100L;
-    private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 50000;
+    private static final long DEFAULT_LARGE_FILE_THRESHOLD_MB = 25L;
+    private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 500000;
     private static final int DEFAULT_LARGE_FILE_PREVIEW_LINES = 1000;
     private static final String LARGE_FILE_PREVIEW_MARKER = "[shed large-file preview: remaining content is not loaded]";
     private static final AtomicLong BACKUP_STAMP = new AtomicLong();
@@ -46,6 +47,7 @@ public class FileBuffer {
     private int lineCount;
     private final BoundedUndoManager undoManager;
     private final PlainDocument document;
+    private VersionedTextSnapshot textSnapshot;
     private String lineEnding;
     private FileType fileType;
     private final Map<Character, Integer> marks;
@@ -72,6 +74,7 @@ public class FileBuffer {
             ? UndoHistoryPolicy.defaults() : configManager.getUndoHistoryPolicy());
         this.document = new PlainDocument();
         this.document.addUndoableEditListener(undoManager);
+        this.textSnapshot = VersionedTextSnapshot.empty();
         this.marks = new LinkedHashMap<>();
         this.configManager = configManager;
         this.file = file;
@@ -98,6 +101,7 @@ public class FileBuffer {
             ? UndoHistoryPolicy.defaults() : configManager.getUndoHistoryPolicy());
         this.document = new PlainDocument();
         this.document.addUndoableEditListener(undoManager);
+        this.textSnapshot = VersionedTextSnapshot.empty();
         this.marks = new LinkedHashMap<>();
         this.configManager = configManager;
         this.file = filename == null ? null : new File(filename);
@@ -408,7 +412,7 @@ public class FileBuffer {
         if (largeFile) {
             throw new IllegalStateException("Large-file content is not materialized");
         }
-        String content = getContent();
+        String content = textSnapshot.text();
         if (largeFile && largeFileTail != null) {
             String visibleContent = removeLargeFilePreviewMarker(content);
             return visibleContent + (visibleContent.isEmpty() || visibleContent.endsWith("\n") || largeFileTail.startsWith("\n") ? "" : "\n") + largeFileTail;
@@ -437,6 +441,36 @@ public class FileBuffer {
 
     public PlainDocument getDocument() {
         return document;
+    }
+
+    VersionedTextSnapshot textSnapshot() {
+        return textSnapshot;
+    }
+
+    DocumentTextChange applyDocumentChange(DocumentEvent event) {
+        VersionedTextSnapshot before = textSnapshot;
+        if (event == null || event.getType() == DocumentEvent.EventType.CHANGE) {
+            VersionedTextSnapshot current = VersionedTextSnapshot.of(getContent());
+            textSnapshot = current;
+            return new DocumentTextChange(before, current, 0, 0, "", false);
+        }
+        try {
+            int offset = event.getOffset();
+            int removedLength = event.getType() == DocumentEvent.EventType.REMOVE ? event.getLength() : 0;
+            String insertedText = event.getType() == DocumentEvent.EventType.INSERT
+                ? event.getDocument().getText(offset, event.getLength()) : "";
+            VersionedTextSnapshot after = before.replace(offset, removedLength, insertedText);
+            boolean incremental = after.length() == document.getLength();
+            if (!incremental) {
+                after = VersionedTextSnapshot.of(getContent());
+            }
+            textSnapshot = after;
+            return new DocumentTextChange(before, after, offset, removedLength, insertedText, incremental);
+        } catch (BadLocationException | RuntimeException error) {
+            VersionedTextSnapshot current = VersionedTextSnapshot.of(getContent());
+            textSnapshot = current;
+            return new DocumentTextChange(before, current, 0, 0, "", false);
+        }
     }
 
     public String getDisplayName() {
@@ -714,12 +748,14 @@ public class FileBuffer {
     }
 
     private void setDocumentText(String text, boolean modified) {
+        String value = text == null ? "" : text;
         try {
             document.remove(0, document.getLength());
-            document.insertString(0, text == null ? "" : text, null);
+            document.insertString(0, value, null);
         } catch (BadLocationException e) {
             throw new IllegalStateException("Unable to update buffer document", e);
         }
+        textSnapshot = VersionedTextSnapshot.of(value);
         undoManager.discardAllEdits();
         this.modified = modified;
         this.fileType = FileType.detect(file, largeFile ? getContent() : getFullContent());
@@ -792,6 +828,15 @@ public class FileBuffer {
             this.previewLineCount = previewLineCount;
         }
     }
+
+    record DocumentTextChange(
+        VersionedTextSnapshot before,
+        VersionedTextSnapshot after,
+        int offset,
+        int removedLength,
+        String insertedText,
+        boolean incremental
+    ) { }
 
     record BackupSnapshot(Path source, BackupPolicy policy, byte[] content) {
         BackupSnapshot {

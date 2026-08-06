@@ -37,6 +37,12 @@ final class GrammarHighlightService {
         return cache.update(text);
     }
 
+    /** Lexes an immutable background snapshot without sharing an editor cache across threads. */
+    List<Token> highlightSnapshot(String text, FileType fileType) {
+        if (text == null || text.isEmpty()) return List.of();
+        return new Cache(fileType == null ? FileType.TEXT : fileType).update(text);
+    }
+
     void invalidate(FileBuffer buffer) {
         if (buffer != null) caches.remove(buffer);
     }

@@ -25,6 +25,13 @@ final class SyntaxUiController {
     private Timer gitBlameTimer;
     private FileBuffer cachedSymbolBuffer;
     private List<SymbolService.Symbol> cachedSymbols = List.of();
+    private int syntaxJobId = -1;
+    private long syntaxGeneration;
+    private int symbolJobId = -1;
+    private long symbolGeneration;
+    private int bracketJobId = -1;
+    private long bracketGeneration;
+    private final Highlighter.HighlightPainter trailingWhitespacePainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x80FF4444, true));
     private final Map<GitBlameKey, String> gitBlameCache = new LinkedHashMap<>(GIT_BLAME_CACHE_LIMIT, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<GitBlameKey, String> eldest) {
@@ -108,6 +115,9 @@ final class SyntaxUiController {
         if (symbolRefreshTimer != null) symbolRefreshTimer.stop();
         if (gitBlameTimer != null) gitBlameTimer.stop();
         clearGitBlameCache();
+        if (syntaxJobId >= 0) editor.asyncJobService.cancel(syntaxJobId);
+        if (symbolJobId >= 0) editor.asyncJobService.cancel(symbolJobId);
+        if (bracketJobId >= 0) editor.asyncJobService.cancel(bracketJobId);
     }
 
     private GitBlameKey gitBlameKey(FileBuffer buffer) {
@@ -240,23 +250,41 @@ final class SyntaxUiController {
     }
 
     private void refreshSymbolCache() {
-        long started = System.nanoTime();
         FileBuffer buffer = editor.getCurrentBuffer();
-        String detail = "no-buffer";
         if (buffer == null) {
             cachedSymbolBuffer = null;
             cachedSymbols = List.of();
-        } else {
-            String text = editor.writingArea.getText();
-            int lines = editor.writingArea.getLineCount();
-            detail = "chars=" + text.length() + " lines=" + lines;
+            editor.requestStatusBarRefresh();
+            return;
+        }
+        if (buffer.isLargeFile()) {
             cachedSymbolBuffer = buffer;
-            cachedSymbols = shouldSkipSyntaxHighlighting(text.length(), lines, buffer.isLargeFile())
-                ? List.of() : List.copyOf(editor.symbolService.collectSymbols(text, buffer.getFileType()));
+            cachedSymbols = List.of();
+            editor.requestStatusBarRefresh();
+            return;
         }
-        if (editor.perfService != null) {
-            editor.perfService.recordDuration("symbol.cache", started, detail);
-        }
+        VersionedTextSnapshot text = buffer.textSnapshot();
+        SymbolRequest request = new SymbolRequest(buffer, text, buffer.getFileType(), ++symbolGeneration);
+        if (symbolJobId >= 0) editor.asyncJobService.cancel(symbolJobId);
+        symbolJobId = editor.asyncJobService.submit("Symbol cache", token -> {
+            long started = System.nanoTime();
+            List<SymbolService.Symbol> symbols = List.copyOf(editor.symbolService.collectSymbols(request.text().text(), request.fileType()));
+            if (editor.perfService != null) {
+                editor.perfService.recordDuration("symbol.cache", started,
+                    "chars=" + request.text().length() + " lines=" + request.text().lineCount());
+            }
+            return new SymbolResult(request, symbols);
+        }, (snapshot, result, error) -> applySymbolCache(snapshot, result, error));
+    }
+
+    private void applySymbolCache(AsyncJobService.JobSnapshot job, SymbolResult result, Exception error) {
+        if (job == null || job.getStatus() != AsyncJobService.Status.SUCCEEDED || result == null || error != null) return;
+        symbolJobId = -1;
+        SymbolRequest request = result.request();
+        if (request.generation() != symbolGeneration || request.buffer() != editor.getCurrentBuffer()
+            || request.buffer().textSnapshot() != request.text()) return;
+        cachedSymbolBuffer = request.buffer();
+        cachedSymbols = result.symbols();
         editor.requestStatusBarRefresh();
     }
 
@@ -298,28 +326,50 @@ final class SyntaxUiController {
         }
         editor.matchBracketTags.clear();
 
+        int caret = editor.writingArea.getCaretPosition();
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null) return;
+        VersionedTextSnapshot text = buffer.textSnapshot();
+        int length = text.length();
+        if (length == 0) return;
+
+        // Check char at caret and before caret
+        int bracketPos = -1;
+        if (caret < length && isBracketChar(text.charAt(caret))) {
+            bracketPos = caret;
+        } else if (caret > 0 && isBracketChar(text.charAt(caret - 1))) {
+            bracketPos = caret - 1;
+        }
+        if (bracketPos < 0) return;
+
+        char bracket = text.charAt(bracketPos);
+        if (length <= MAX_FULL_SYNTAX_CHARS) {
+            addMatchingBracketHighlights(highlighter, bracketPos, findMatchingBracketPos(text.text(), bracketPos, bracket));
+            return;
+        }
+        BracketRequest request = new BracketRequest(buffer, text, caret, bracketPos, bracket, ++bracketGeneration);
+        if (bracketJobId >= 0) editor.asyncJobService.cancel(bracketJobId);
+        bracketJobId = editor.asyncJobService.submit("Bracket match", token -> {
+            int match = findMatchingBracketPos(request.text().text(), request.bracketPosition(), request.bracket());
+            return new BracketResult(request, match);
+        }, (snapshot, result, error) -> applyBracketMatch(snapshot, result, error));
+    }
+
+    private void applyBracketMatch(AsyncJobService.JobSnapshot job, BracketResult result, Exception error) {
+        if (job == null || job.getStatus() != AsyncJobService.Status.SUCCEEDED || result == null || error != null) return;
+        bracketJobId = -1;
+        BracketRequest request = result.request();
+        if (request.generation() != bracketGeneration || request.buffer() != editor.getCurrentBuffer()
+            || request.buffer().textSnapshot() != request.text() || editor.writingArea.getCaretPosition() != request.caret()) return;
+        addMatchingBracketHighlights(editor.writingArea.getHighlighter(), request.bracketPosition(), result.matchPosition());
+    }
+
+    private void addMatchingBracketHighlights(Highlighter highlighter, int bracketPosition, int matchPosition) {
+        if (matchPosition < 0) return;
         try {
-            int caret = editor.writingArea.getCaretPosition();
-            int length = editor.writingArea.getDocument().getLength();
-            if (length == 0) return;
-
-            // Check char at caret and before caret
-            int bracketPos = -1;
-            if (caret < length && isBracketChar(editor.writingArea.getDocument().getText(caret, 1).charAt(0))) {
-                bracketPos = caret;
-            } else if (caret > 0 && isBracketChar(editor.writingArea.getDocument().getText(caret - 1, 1).charAt(0))) {
-                bracketPos = caret - 1;
-            }
-            if (bracketPos < 0) return;
-
-            String text = editor.writingArea.getDocument().getText(0, length);
-            char bracket = text.charAt(bracketPos);
-            int matchPos = findMatchingBracketPos(text, bracketPos, bracket);
-            if (matchPos < 0) return;
-
             Highlighter.HighlightPainter matchPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x44FFFFFF, true));
-            editor.matchBracketTags.add(highlighter.addHighlight(bracketPos, bracketPos + 1, matchPainter));
-            editor.matchBracketTags.add(highlighter.addHighlight(matchPos, matchPos + 1, matchPainter));
+            editor.matchBracketTags.add(highlighter.addHighlight(bracketPosition, bracketPosition + 1, matchPainter));
+            editor.matchBracketTags.add(highlighter.addHighlight(matchPosition, matchPosition + 1, matchPainter));
         } catch (BadLocationException ignored) {
         }
     }
@@ -417,45 +467,79 @@ final class SyntaxUiController {
 
 
     void applySyntaxHighlighting() {
-        long started = System.nanoTime();
-        String detail = "";
-        try {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || buffer.isLargeFile()) {
             clearSyntaxHighlighting();
-
-            FileBuffer buffer = editor.getCurrentBuffer();
-            if (buffer == null) {
-                detail = "no-buffer";
-                return;
-            }
-
-            String text = editor.writingArea.getText();
-            detail = "chars=" + text.length() + " lines=" + editor.writingArea.getLineCount();
-            if (text.isEmpty()) {
-                return;
-            }
-            if (shouldSkipSyntaxHighlighting(text.length(), editor.writingArea.getLineCount(), buffer.isLargeFile())) {
-                editor.applyBracketHighlighting();
-                editor.writingArea.repaint();
-                detail += " skipped";
-                return;
-            }
-
-            FileType fileType = buffer.getFileType();
-            for (GrammarHighlightService.Token token : editor.grammarHighlightService.highlight(buffer, text, fileType)) {
-                Color color = colorFor(token.scope());
-                if (color != null) editor.syntaxForegroundSpans.add(new SyntaxSpan(token.start(), token.end(), color));
-            }
-            if (editor.configManager.getShowWhitespace()) {
-                Highlighter highlighter = editor.writingArea.getHighlighter();
-                highlightTrailingWhitespace(highlighter, text);
-            }
-            editor.applyBracketHighlighting();
             editor.writingArea.repaint();
-        } finally {
-            if (editor.perfService != null) {
-                editor.perfService.recordDuration("syntax.highlight", started, detail);
+            return;
+        }
+        VersionedTextSnapshot text = buffer.textSnapshot();
+        if (text.length() == 0) {
+            clearSyntaxHighlighting();
+            editor.writingArea.repaint();
+            return;
+        }
+        SyntaxRequest request = new SyntaxRequest(buffer, text, buffer.getFileType(), syntaxColors(),
+            editor.configManager.getShowWhitespace(), ++syntaxGeneration);
+        if (syntaxJobId >= 0) editor.asyncJobService.cancel(syntaxJobId);
+        syntaxJobId = editor.asyncJobService.submit("Syntax highlighting", token -> highlightSnapshot(request, token),
+            (snapshot, result, error) -> applySyntaxSnapshot(snapshot, result, error));
+    }
+
+    private SyntaxResult highlightSnapshot(SyntaxRequest request, AsyncJobService.JobToken token) {
+        long started = System.nanoTime();
+        List<SyntaxSpan> spans = new ArrayList<>();
+        for (GrammarHighlightService.Token value : new GrammarHighlightService().highlightSnapshot(request.text().text(), request.fileType())) {
+            if (token.isCancelled()) return null;
+            Color color = request.colors().get(value.scope());
+            if (color != null) spans.add(new SyntaxSpan(value.start(), value.end(), color));
+        }
+        List<Range> trailingWhitespace = request.showWhitespace() ? trailingWhitespace(request.text()) : List.of();
+        if (editor.perfService != null) {
+            editor.perfService.recordDuration("syntax.highlight", started,
+                "chars=" + request.text().length() + " lines=" + request.text().lineCount());
+        }
+        return new SyntaxResult(request, List.copyOf(spans), trailingWhitespace);
+    }
+
+    private void applySyntaxSnapshot(AsyncJobService.JobSnapshot job, SyntaxResult result, Exception error) {
+        if (job == null || job.getStatus() != AsyncJobService.Status.SUCCEEDED || result == null || error != null) return;
+        syntaxJobId = -1;
+        SyntaxRequest request = result.request();
+        if (request.generation() != syntaxGeneration || request.buffer() != editor.getCurrentBuffer()
+            || request.buffer().textSnapshot() != request.text()) return;
+        clearSyntaxHighlighting();
+        editor.syntaxForegroundSpans.addAll(result.spans());
+        Highlighter highlighter = editor.writingArea.getHighlighter();
+        for (Range range : result.trailingWhitespace()) {
+            try {
+                editor.syntaxHighlightTags.add(highlighter.addHighlight(range.start(), range.end(), trailingWhitespacePainter));
+            } catch (BadLocationException ignored) {
             }
         }
+        editor.applyBracketHighlighting();
+        editor.writingArea.repaint();
+    }
+
+    private EnumMap<GrammarHighlightService.Scope, Color> syntaxColors() {
+        EnumMap<GrammarHighlightService.Scope, Color> colors = new EnumMap<>(GrammarHighlightService.Scope.class);
+        for (GrammarHighlightService.Scope scope : GrammarHighlightService.Scope.values()) {
+            Color color = colorFor(scope);
+            if (color != null) colors.put(scope, color);
+        }
+        return colors;
+    }
+
+    private List<Range> trailingWhitespace(VersionedTextSnapshot text) {
+        List<Range> ranges = new ArrayList<>();
+        for (int line = 0; line < text.lineCount(); line++) {
+            int start = text.lineStartOffset(line);
+            int end = text.lineEndOffset(line);
+            int trailing = end;
+            while (trailing > start && Character.isWhitespace(text.charAt(trailing - 1))) trailing--;
+            if (trailing < end) ranges.add(new Range(trailing, end));
+        }
+        return List.copyOf(ranges);
     }
 
     private Color colorFor(GrammarHighlightService.Scope scope) {
@@ -473,8 +557,17 @@ final class SyntaxUiController {
 
 
     static boolean shouldSkipSyntaxHighlighting(int charCount, int lineCount, boolean largeFile) {
-        return largeFile || charCount > MAX_FULL_SYNTAX_CHARS || lineCount > MAX_FULL_SYNTAX_LINES;
+        return largeFile;
     }
+
+    private record SyntaxRequest(FileBuffer buffer, VersionedTextSnapshot text, FileType fileType,
+                                 EnumMap<GrammarHighlightService.Scope, Color> colors, boolean showWhitespace, long generation) { }
+    private record SyntaxResult(SyntaxRequest request, List<SyntaxSpan> spans, List<Range> trailingWhitespace) { }
+    private record SymbolRequest(FileBuffer buffer, VersionedTextSnapshot text, FileType fileType, long generation) { }
+    private record SymbolResult(SymbolRequest request, List<SymbolService.Symbol> symbols) { }
+    private record BracketRequest(FileBuffer buffer, VersionedTextSnapshot text, int caret, int bracketPosition, char bracket, long generation) { }
+    private record BracketResult(BracketRequest request, int matchPosition) { }
+    private record Range(int start, int end) { }
 
 
     void clearSyntaxHighlighting() {

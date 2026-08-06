@@ -98,32 +98,30 @@ final class InputController {
         FileBuffer buffer = pendingWordIndexBuffer;
         pendingWordIndexBuffer = null;
         if (buffer == null || buffer != editor.getCurrentBuffer() || buffer.isLargeFile()) return;
-        String text = editor.writingArea.getText();
-        submitOpenBufferWordIndex(buffer, text);
+        submitOpenBufferWordIndex(buffer, buffer.textSnapshot());
     }
 
-    private void submitOpenBufferWordIndex(FileBuffer buffer, String text) {
+    private void submitOpenBufferWordIndex(FileBuffer buffer, VersionedTextSnapshot text) {
         if (buffer == null || text == null || buffer.isLargeFile()) return;
         int generation = ++wordIndexGeneration;
         int serial = ++wordIndexJobSerial;
         if (wordIndexJobId >= 0) editor.asyncJobService.cancel(wordIndexJobId);
-        wordIndexJobId = editor.asyncJobService.submit("completion word index", token -> openBufferCompletionIndex.build(text),
+        wordIndexJobId = editor.asyncJobService.submit("completion word index", token -> openBufferCompletionIndex.build(text.text()),
             (snapshot, words, error) -> {
                 if (serial != wordIndexJobSerial) return;
                 wordIndexJobId = -1;
                 if (snapshot == null || snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED || error != null
-                    || generation != wordIndexGeneration || words == null || !editor.buffers.contains(buffer)) return;
+                    || generation != wordIndexGeneration || words == null || !editor.buffers.contains(buffer)
+                    || buffer.textSnapshot() != text) return;
                 openBufferCompletionIndex.update(buffer, words);
             });
     }
 
     private void scheduleMissingOpenBufferWordIndex() {
         if (wordIndexJobId >= 0) return;
-        FileBuffer current = editor.getCurrentBuffer();
         for (FileBuffer buffer : editor.buffers) {
             if (buffer.isLargeFile() || openBufferCompletionIndex.hasSnapshot(buffer)) continue;
-            String text = buffer == current ? editor.writingArea.getText() : buffer.getFullContent();
-            submitOpenBufferWordIndex(buffer, text);
+            submitOpenBufferWordIndex(buffer, buffer.textSnapshot());
             return;
         }
     }

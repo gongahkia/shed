@@ -183,25 +183,47 @@ class LineNumberPanel extends JPanel {
     }
 
     public void updateDiffMarkers(String savedContent, String currentContent) {
-        addedLines.clear();
-        modifiedLines.clear();
-        deletedAfterLines.clear();
-        if (savedContent == null || currentContent == null) return;
-        String[] savedLines = savedContent.split("\n", -1);
-        String[] currentLines = currentContent.split("\n", -1);
+        updateDiffMarkers(diffMarkers(savedContent, currentContent));
+    }
+
+    static DiffMarkers diffMarkers(String savedContent, String currentContent) {
+        Set<Integer> added = new HashSet<>();
+        Set<Integer> modified = new HashSet<>();
+        Set<Integer> deletedAfter = new HashSet<>();
+        if (savedContent == null || currentContent == null) return new DiffMarkers(added, modified, deletedAfter);
+        String[] savedLines = savedContent.split("\\n", -1);
+        String[] currentLines = currentContent.split("\\n", -1);
         int maxLen = Math.max(savedLines.length, currentLines.length);
         for (int i = 0; i < maxLen; i++) {
             if (i >= savedLines.length) {
-                addedLines.add(i);
+                added.add(i);
             } else if (i >= currentLines.length) {
-                if (currentLines.length > 0) {
-                    deletedAfterLines.add(currentLines.length - 1);
-                }
+                if (currentLines.length > 0) deletedAfter.add(currentLines.length - 1);
             } else if (!savedLines[i].equals(currentLines[i])) {
-                modifiedLines.add(i);
+                modified.add(i);
             }
         }
+        return new DiffMarkers(added, modified, deletedAfter);
+    }
+
+    public void updateDiffMarkers(DiffMarkers markers) {
+        addedLines.clear();
+        modifiedLines.clear();
+        deletedAfterLines.clear();
+        if (markers != null) {
+            addedLines.addAll(markers.added());
+            modifiedLines.addAll(markers.modified());
+            deletedAfterLines.addAll(markers.deletedAfter());
+        }
         repaint();
+    }
+
+    record DiffMarkers(Set<Integer> added, Set<Integer> modified, Set<Integer> deletedAfter) {
+        DiffMarkers {
+            added = Set.copyOf(added == null ? Set.of() : added);
+            modified = Set.copyOf(modified == null ? Set.of() : modified);
+            deletedAfter = Set.copyOf(deletedAfter == null ? Set.of() : deletedAfter);
+        }
     }
 
     public void updateDiagnosticMarkers(Map<Integer, Integer> severityByLine) {

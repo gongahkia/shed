@@ -103,8 +103,8 @@ An `https://` `landing.source` is an explicit global opt-in to fetch that URL wh
 | `session.dir` | `~/.shed/sessions` | path | Session storage directory |
 | `terminal.session.restore` | `false` | bool | Persist terminal pane cwd and restore a fresh interactive shell; never stores or replays commands, scrollback, shell arguments, or process state |
 | `workspace.index.enabled` | `false` | bool | Enable persisted Git-ignore-aware workspace indexing |
-| `large.file.threshold.mb` | `100` | int | Selects large-file mode above this MiB value; effective minimum `1` |
-| `large.file.line.threshold` | `50000` | int | Selects large-file mode above this logical-line count; effective minimum `1000` |
+| `large.file.threshold.mb` | `25` | int | Selects read-only large-file mode above this MiB value; effective minimum `1` |
+| `large.file.line.threshold` | `500000` | int | Selects read-only large-file mode above this logical-line count; effective minimum `1000` |
 | `large.file.preview.lines` | `1000` | int | Initial large-file preview lines; effective minimum `50` |
 | `process.timeout.ms` | `15000` | int | Async shell/LSP helper timeout |
 | `process.output.max.bytes` | `1048576` | int | Max captured process output bytes |
@@ -172,7 +172,7 @@ Suggestions appear after two word characters, after an LSP server's advertised t
 
 Shed uses cached, stateful lexical grammars for its built-in file types. It highlights a buffer when it becomes active and refreshes once after its document enters the viewport; it then re-lexes from the changed line and reuses an unchanged suffix once lexical state stabilizes, so strings and block comments no longer leak keyword highlighting. HTML injects JavaScript in `<script>` and CSS in `<style>`; Markdown injects known fenced-code languages. LSP semantic tokens render on top when a server supports them.
 
-This is lexical parsing, not a full compiler parser: custom grammar packs, macro expansion, and template-expression parsing are out of scope. Highlighting remains disabled by the existing large-file guard above 750,000 characters, 20,000 lines, or large-file mode.
+This is lexical parsing, not a full compiler parser: custom grammar packs, macro expansion, and template-expression parsing are out of scope. Highlighting runs asynchronously for editable files and remains disabled only in read-only large-file mode.
 
 ## Recovery Journal Policy
 

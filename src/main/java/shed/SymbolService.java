@@ -59,7 +59,7 @@ public class SymbolService {
         if (fileType == FileType.MARKDOWN) {
             return collectMarkdownSymbols(lines);
         }
-        return collectCodeSymbols(lines);
+        return collectCodeSymbols(lines, fileType);
     }
 
     private List<Symbol> collectMarkdownSymbols(String[] lines) {
@@ -78,7 +78,7 @@ public class SymbolService {
         return symbols;
     }
 
-    private List<Symbol> collectCodeSymbols(String[] lines) {
+    private List<Symbol> collectCodeSymbols(String[] lines, FileType fileType) {
         List<Symbol> symbols = new ArrayList<>();
         int braceDepth = 0;
         for (int i = 0; i < lines.length; i++) {
@@ -89,7 +89,7 @@ public class SymbolService {
                 continue;
             }
 
-            if (tryAddSymbol(symbols, i + 1, line, braceDepth)) {
+            if (tryAddSymbol(symbols, i + 1, line, braceDepth, fileType)) {
                 braceDepth += netBraceDelta(trimmed);
                 continue;
             }
@@ -98,7 +98,55 @@ public class SymbolService {
         return symbols;
     }
 
-    private boolean tryAddSymbol(List<Symbol> symbols, int lineNumber, String line, int braceDepth) {
+    private boolean tryAddSymbol(List<Symbol> symbols, int lineNumber, String line, int braceDepth, FileType fileType) {
+        String value = line == null ? "" : line;
+        if (fileType == FileType.JAVA) {
+            Matcher classLike = CLASS_LIKE.matcher(value);
+            if (classLike.find()) {
+                symbols.add(new Symbol(classLike.group(2), "class", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            Matcher javaMethod = JAVA_METHOD.matcher(value);
+            if (javaMethod.find()) {
+                String method = javaMethod.group(1);
+                if (method != null && !method.isBlank() && !isControlKeyword(method)) {
+                    symbols.add(new Symbol(method, "method", lineNumber, Math.max(2, braceDepth + 1)));
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (fileType == FileType.PYTHON) {
+            Matcher pyClass = PY_CLASS.matcher(value);
+            if (pyClass.find()) {
+                symbols.add(new Symbol(pyClass.group(1), "class", lineNumber, Math.max(1, leadingSpaces(value) / 4 + 1)));
+                return true;
+            }
+            Matcher pyDef = PY_DEF.matcher(value);
+            if (pyDef.find()) {
+                symbols.add(new Symbol(pyDef.group(1), "function", lineNumber, Math.max(1, leadingSpaces(value) / 4 + 1)));
+                return true;
+            }
+            return false;
+        }
+        if (fileType == FileType.JAVASCRIPT || fileType == FileType.TYPESCRIPT) {
+            Matcher classLike = CLASS_LIKE.matcher(value);
+            if (classLike.find()) {
+                symbols.add(new Symbol(classLike.group(2), "class", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            Matcher jsFunction = JS_FUNCTION.matcher(value);
+            if (jsFunction.find()) {
+                symbols.add(new Symbol(jsFunction.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            Matcher jsArrow = JS_ARROW.matcher(value);
+            if (jsArrow.find()) {
+                symbols.add(new Symbol(jsArrow.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            return false;
+        }
         Matcher markdownHeading = MARKDOWN_HEADING.matcher(line == null ? "" : line);
         if (markdownHeading.matches()) {
             int headingLevel = markdownHeading.group(1).length();

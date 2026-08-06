@@ -1,6 +1,5 @@
 [![](https://img.shields.io/badge/shed_1.0-passing-dark_green)](https://github.com/gongahkia/shed/releases/tag/1.0)
 [![](https://img.shields.io/badge/shed_2.0-passing-green)](https://github.com/gongahkia/shed/releases/tag/2.0)
-![](https://github.com/gongahkia/shed/actions/workflows/ci.yml/badge.svg)
 
 # `Shed` - a SHit EDitor
 
@@ -36,7 +35,7 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 ## Usage
 
 > [!IMPORTANT]  
-> Use Java 21 for the JAR or source build. The bundled-runtime platform installers do not require a separate JDK or JRE.
+> Use Java 21 for the JAR or source build.
 
 Choose a published `shed-<version>.jar`, a bundled-runtime platform installer, or a local source build. See [install and troubleshooting](./docs/INSTALL.md) for supported targets and verification.
 
@@ -50,10 +49,7 @@ Choose a published `shed-<version>.jar`, a bundled-runtime platform installer, o
 1. Install a Java 21 runtime or JDK for macOS.
 2. From the directory containing the published JAR, run `java -jar shed-<version>.jar [file]`.
 3. See [install and troubleshooting](./docs/INSTALL.md) for the bundled-runtime macOS arm64 target.
-
-<p align="center">
-  <a href="https://docs.oracle.com/en/java/javase/21/install/installation-guide.pdf">JDK 21 installation guide</a>
-</p>
+4. For additional reference, see the [JDK 21 installation guide](https://docs.oracle.com/en/java/javase/21/install/installation-guide.pdf).
 
 #### Windows
 
@@ -93,7 +89,7 @@ $ java -jar target/shed-2.0.0.jar
 
 ### Native installation methods
 
-If you'd prefer, `Shed` also features native installers for the below major platforms.
+If you'd prefer, `Shed` also features native installers for the below major platforms. These do not require a separate JDK or JRE.
 
 #### OSX arm64 installer
 

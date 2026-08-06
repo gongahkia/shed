@@ -46,6 +46,10 @@ public final class EditorResponsivenessBenchmark {
         List<Long> editSamples = new ArrayList<>(arguments.samples());
         List<Long> caretSamples = new ArrayList<>(arguments.samples());
         List<Long> convergenceSamples = new ArrayList<>(arguments.samples());
+        List<Long> syntaxSamples = new ArrayList<>(arguments.samples());
+        List<Long> symbolSamples = new ArrayList<>(arguments.samples());
+        List<Long> completionSamples = new ArrayList<>(arguments.samples());
+        List<Long> diffSamples = new ArrayList<>(arguments.samples());
         for (int sample = 0; sample < arguments.samples(); sample++) {
             int offset = baseline.lineStartOffset((sample * 19_973) % TARGET_LINES);
             editSamples.add(measureNanos(() -> baseline.replace(offset, 0, "x")));
@@ -53,10 +57,16 @@ public final class EditorResponsivenessBenchmark {
                 VersionedTextSnapshot.Position position = baseline.positionAt(offset);
                 baseline.offsetAt(position.line(), position.character());
             }));
-            convergenceSamples.add(measureNanos(() -> converge(baseline)));
+            Convergence convergence = converge(baseline);
+            syntaxSamples.add(convergence.syntaxNanos());
+            symbolSamples.add(convergence.symbolNanos());
+            completionSamples.add(convergence.completionNanos());
+            diffSamples.add(convergence.diffNanos());
+            convergenceSamples.add(convergence.totalNanos());
         }
         return new Report(baseline.length(), baseline.lineCount(), percentile(editSamples), percentile(caretSamples),
-            percentile(convergenceSamples), arguments.samples());
+            percentile(convergenceSamples), percentile(syntaxSamples), percentile(symbolSamples), percentile(completionSamples),
+            percentile(diffSamples), arguments.samples());
     }
 
     private static void warm(VersionedTextSnapshot baseline) {
@@ -64,12 +74,13 @@ public final class EditorResponsivenessBenchmark {
         converge(baseline);
     }
 
-    private static void converge(VersionedTextSnapshot snapshot) {
+    private static Convergence converge(VersionedTextSnapshot snapshot) {
         String text = snapshot.text();
-        new GrammarHighlightService().highlightSnapshot(text, FileType.JAVA);
-        new SymbolService().collectSymbols(text, FileType.JAVA);
-        new OpenBufferCompletionIndex().build(text);
-        LineNumberPanel.diffMarkers(text, snapshot.replace(0, 0, "// ").text());
+        long syntax = measureNanos(() -> new GrammarHighlightService().highlightSnapshot(text, FileType.JAVA));
+        long symbols = measureNanos(() -> new SymbolService().collectSymbols(text, FileType.JAVA));
+        long completion = measureNanos(() -> new OpenBufferCompletionIndex().build(text));
+        long diff = measureNanos(() -> LineNumberPanel.diffMarkers(text, snapshot.replace(0, 0, "// ").text()));
+        return new Convergence(syntax, symbols, completion, diff);
     }
 
     private static long measureNanos(Runnable operation) {
@@ -100,7 +111,8 @@ public final class EditorResponsivenessBenchmark {
         return source.toString();
     }
 
-    record Report(int characters, int lines, long editP95Nanos, long caretP95Nanos, long convergenceP95Nanos, int samples) {
+    record Report(int characters, int lines, long editP95Nanos, long caretP95Nanos, long convergenceP95Nanos,
+                  long syntaxP95Nanos, long symbolP95Nanos, long completionP95Nanos, long diffP95Nanos, int samples) {
         boolean passes(Arguments arguments) {
             return editP95Nanos <= arguments.maxEditP95Ms() * 1_000_000L
                 && caretP95Nanos <= arguments.maxEditP95Ms() * 1_000_000L
@@ -113,7 +125,11 @@ public final class EditorResponsivenessBenchmark {
                 + "workload.samples=" + samples + '\n'
                 + "p95.edit.ms=" + millis(editP95Nanos) + '\n'
                 + "p95.caret.ms=" + millis(caretP95Nanos) + '\n'
-                + "p95.convergence.ms=" + millis(convergenceP95Nanos) + '\n';
+                + "p95.convergence.ms=" + millis(convergenceP95Nanos) + '\n'
+                + "p95.syntax.ms=" + millis(syntaxP95Nanos) + '\n'
+                + "p95.symbols.ms=" + millis(symbolP95Nanos) + '\n'
+                + "p95.completion-index.ms=" + millis(completionP95Nanos) + '\n'
+                + "p95.diff-gutter.ms=" + millis(diffP95Nanos) + '\n';
         }
 
         private static String millis(long nanos) {
@@ -150,6 +166,12 @@ public final class EditorResponsivenessBenchmark {
 
         static String usage() {
             return "Usage: shed.EditorResponsivenessBenchmark [--samples=1..25] [--max-edit-p95-ms=N] [--max-convergence-p95-ms=N]";
+        }
+    }
+
+    private record Convergence(long syntaxNanos, long symbolNanos, long completionNanos, long diffNanos) {
+        long totalNanos() {
+            return syntaxNanos + symbolNanos + completionNanos + diffNanos;
         }
     }
 }

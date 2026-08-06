@@ -830,14 +830,22 @@ final class EditorUiController {
 
 
     void paintColorPreviews(Graphics g, JTextArea area) {
-        String text = area.getText();
-        if (text.isEmpty()) return;
         FontMetrics fm = g.getFontMetrics(area.getFont());
         Rectangle clip = g.getClipBounds();
+        if (clip == null) return;
+        int visibleStart = Math.max(0, area.viewToModel2D(new Point(clip.x, clip.y)));
+        int visibleEnd = Math.min(area.getDocument().getLength(), area.viewToModel2D(new Point(clip.x + clip.width, clip.y + clip.height)) + 1);
+        if (visibleEnd <= visibleStart) return;
+        String text;
+        try {
+            text = area.getText(visibleStart, visibleEnd - visibleStart);
+        } catch (BadLocationException ignored) {
+            return;
+        }
         java.util.regex.Matcher m = editor.HEX_COLOR_PATTERN.matcher(text);
         while (m.find()) {
             try {
-                Rectangle2D r = area.modelToView2D(m.end());
+                Rectangle2D r = area.modelToView2D(visibleStart + m.end());
                 if (r == null) continue;
                 if (clip != null && ((int) r.getY() < clip.y - 20 || (int) r.getY() > clip.y + clip.height + 20)) continue;
                 String hex = m.group();
@@ -970,20 +978,17 @@ final class EditorUiController {
         String uri = editor.bufferUri(buffer);
         List<LspClient.Diagnostic> diags = client.getDiagnostics(uri);
         if (diags == null || diags.isEmpty()) { editor.writingArea.repaint(); return; }
-        try {
-            for (LspClient.Diagnostic d : diags) {
-                int line = d.getLine();
-                if (line >= editor.writingArea.getLineCount()) continue;
-                int lineStart = editor.writingArea.getLineStartOffset(line);
-                int lineEnd = editor.writingArea.getLineEndOffset(line);
-                int startOff = Math.min(lineStart + d.getCharacter(), lineEnd);
-                int endOff = Math.min(startOff + 1, lineEnd); // at least 1 char wide
-                // try to expand to end of token
-                String text = editor.writingArea.getText();
-                while (endOff < lineEnd && endOff < text.length() && !Character.isWhitespace(text.charAt(endOff))) endOff++;
-                editor.diagnosticRanges.add(new int[]{startOff, endOff, d.getSeverity()});
-            }
-        } catch (BadLocationException ignored) {}
+        VersionedTextSnapshot text = buffer.textSnapshot();
+        for (LspClient.Diagnostic d : diags) {
+            int line = d.getLine();
+            if (line < 0 || line >= text.lineCount()) continue;
+            int lineStart = text.lineStartOffset(line);
+            int lineEnd = text.lineEndOffset(line);
+            int startOff = Math.min(lineStart + Math.max(0, d.getCharacter()), lineEnd);
+            int endOff = Math.min(startOff + 1, lineEnd); // at least 1 char wide
+            while (endOff < lineEnd && !Character.isWhitespace(text.charAt(endOff))) endOff++;
+            editor.diagnosticRanges.add(new int[]{startOff, endOff, d.getSeverity()});
+        }
         // update gutter diagnostic markers
         java.util.HashMap<Integer, Integer> severityByLine = new java.util.HashMap<>();
         for (LspClient.Diagnostic d : diags) {
@@ -1043,7 +1048,10 @@ final class EditorUiController {
         int tabPixels = Math.max(1, area.getTabSize() * metrics.charWidth(' '));
         TabExpander tabExpander = (x, tabOffset) -> ((int) x / tabPixels + 1) * tabPixels;
 
-        for (SyntaxSpan span : spans) {
+        int first = firstVisibleSpan(spans, visibleStart);
+        for (int index = first; index < spans.size(); index++) {
+            SyntaxSpan span = spans.get(index);
+            if (span.start >= visibleEnd) break;
             if (span.end <= visibleStart || span.start >= visibleEnd) {
                 continue;
             }
@@ -1091,6 +1099,17 @@ final class EditorUiController {
                 editor.perfService.recordDuration(metric, started, "spans=" + spans.size());
             }
         }
+    }
+
+    private int firstVisibleSpan(List<SyntaxSpan> spans, int visibleStart) {
+        int low = 0;
+        int high = spans.size();
+        while (low < high) {
+            int middle = (low + high) >>> 1;
+            if (spans.get(middle).end <= visibleStart) low = middle + 1;
+            else high = middle;
+        }
+        return low;
     }
 
     void paintLspInlayHintOverlay(Graphics graphics, JTextArea area) {

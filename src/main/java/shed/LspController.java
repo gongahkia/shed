@@ -2141,8 +2141,9 @@ final class LspController {
             clearLspDecorations();
             return;
         }
-        String text = buffer.getFullContent();
-        LspPosition end = endPosition(text);
+        VersionedTextSnapshot text = buffer.textSnapshot();
+        VersionedTextSnapshot.Position textEnd = text.positionAt(text.length());
+        LspPosition end = new LspPosition(textEnd.line(), textEnd.character());
         if (lspDecorationJobId >= 0) editor.asyncJobService.cancel(lspDecorationJobId);
         LspDecorationRequest request = new LspDecorationRequest(buffer, client, uri, version, text, semanticEnabled, inlayEnabled, end);
         lspDecorationJobId = editor.asyncJobService.submit("LSP decorations", token -> {
@@ -2161,7 +2162,7 @@ final class LspController {
         }
         lspDecorationJobId = -1;
         LspDecorationRequest request = result.request();
-        if (request.buffer() != editor.getCurrentBuffer() || !request.text().equals(request.buffer().getFullContent())
+        if (request.buffer() != editor.getCurrentBuffer() || request.text() != request.buffer().textSnapshot()
             || !Objects.equals(request.version(), editor.lspDocumentVersions.get(request.uri())) || existingLspClient(request.buffer()) != request.client()) {
             return;
         }
@@ -2173,6 +2174,7 @@ final class LspController {
                 int end = Math.min(request.text().length(), start + Math.max(0, token.length()));
                 if (color != null && end > start) editor.lspSemanticSpans.add(new SyntaxSpan(start, end, color));
             }
+            editor.lspSemanticSpans.sort(Comparator.comparingInt(span -> span.start));
         }
         editor.lspInlayHintOverlays.clear();
         if (request.inlayEnabled()) {
@@ -2213,35 +2215,14 @@ final class LspController {
         };
     }
 
-    private static int offsetForPosition(String text, int line, int character) {
-        if (text == null || text.isEmpty() || line < 0 || character < 0) return 0;
-        int offset = 0;
-        for (int currentLine = 0; currentLine < line && offset < text.length(); currentLine++) {
-            int newline = text.indexOf('\n', offset);
-            if (newline < 0) return text.length();
-            offset = newline + 1;
-        }
-        int end = text.indexOf('\n', offset);
-        int lineEnd = end < 0 ? text.length() : end;
-        return Math.min(lineEnd, offset + character);
-    }
-
-    private static LspPosition endPosition(String text) {
-        String value = text == null ? "" : text;
-        int line = 0;
-        int lineStart = 0;
-        for (int index = 0; index < value.length(); index++) {
-            if (value.charAt(index) == '\n') {
-                line++;
-                lineStart = index + 1;
-            }
-        }
-        return new LspPosition(line, value.length() - lineStart);
+    private static int offsetForPosition(VersionedTextSnapshot text, int line, int character) {
+        if (text == null || line < 0 || character < 0) return 0;
+        return text.offsetAt(line, character);
     }
 
     private record LspPosition(int line, int character) { }
 
-    private record LspDecorationRequest(FileBuffer buffer, LspClient client, String uri, Integer version, String text,
+    private record LspDecorationRequest(FileBuffer buffer, LspClient client, String uri, Integer version, VersionedTextSnapshot text,
                                         boolean semanticEnabled, boolean inlayEnabled, LspPosition end) { }
 
     private record LspDecorationResult(LspDecorationRequest request, List<LspClient.SemanticToken> semanticTokens,

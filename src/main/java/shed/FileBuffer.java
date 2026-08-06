@@ -473,6 +473,17 @@ public class FileBuffer {
         }
     }
 
+    DocumentTextChange reconcileDocumentText() {
+        String current = getContent();
+        if (textSnapshot.length() == current.length() && textSnapshot.text().equals(current)) {
+            return null;
+        }
+        VersionedTextSnapshot before = textSnapshot;
+        VersionedTextSnapshot after = VersionedTextSnapshot.of(current);
+        textSnapshot = after;
+        return new DocumentTextChange(before, after, 0, 0, "", false);
+    }
+
     public String getDisplayName() {
         if (scratch) {
             return scratchName;

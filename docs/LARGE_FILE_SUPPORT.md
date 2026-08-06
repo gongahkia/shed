@@ -2,14 +2,14 @@
 
 ## Current status
 
-Large-file mode is a local, read-only UTF-8 viewport path. It avoids loading the complete source into the editor document, but it is not an editable large-file implementation and has no published performance service-level objective. Use `:largefile` or `:lf` to show the active buffer's state, limits, and remediation.
+Large-file mode is a local, read-only UTF-8 viewport path. Files at or below Shed's editable boundary use the versioned text model described in [editing performance](EDITING_PERFORMANCE.md). Use `:largefile` or `:lf` to show the active buffer's state, limits, and remediation.
 
 ## Activation
 
 Shed selects large-file mode when either condition is true:
 
-- The source is larger than `large.file.threshold.mb`. The default is 100 MiB (104,857,600 bytes); a file exactly that size does not select by size alone.
-- The source has more logical lines than `large.file.line.threshold`. The default is 50,000 lines.
+- The source is larger than `large.file.threshold.mb`. The default is 25 MiB (26,214,400 bytes); a file exactly that size does not select by size alone.
+- The source has more logical lines than `large.file.line.threshold`. The default is 500,000 lines.
 
 The effective minimums are 1 MiB, 1,000 lines, and 50 preview lines even if a lower configuration value is supplied. See [configuration](CONFIG.md) for the persisted keys.
 

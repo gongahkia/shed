@@ -123,6 +123,17 @@ public class CommandParsingTest {
         assertEquals(List.of("dir with spaces/file.txt", "plain path"), args);
     }
 
+    @Test
+    void exposesLanguageServicesAsACommandPaletteCandidate() {
+        CommandHandler handler = new CommandHandler(null);
+        FuzzyMatchService matcher = new FuzzyMatchService();
+
+        assertTrue(handler.getCommandNames().contains("languageservices"));
+        assertTrue(handler.getCommandNames().contains("language-services"));
+        assertTrue(matcher.matchStrings("Language Services", List.of(PaletteController.LANGUAGE_SERVICES_ACTION), 0)
+            .contains(PaletteController.LANGUAGE_SERVICES_ACTION));
+    }
+
     private static class RecordingHandler implements GitService.Handler {
         private String lastCall;
         private String lastArgs = "";

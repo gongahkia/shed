@@ -191,17 +191,32 @@ class LineNumberPanel extends JPanel {
         Set<Integer> modified = new HashSet<>();
         Set<Integer> deletedAfter = new HashSet<>();
         if (savedContent == null || currentContent == null) return new DiffMarkers(added, modified, deletedAfter);
-        String[] savedLines = savedContent.split("\\n", -1);
-        String[] currentLines = currentContent.split("\\n", -1);
-        int maxLen = Math.max(savedLines.length, currentLines.length);
-        for (int i = 0; i < maxLen; i++) {
-            if (i >= savedLines.length) {
-                added.add(i);
-            } else if (i >= currentLines.length) {
-                if (currentLines.length > 0) deletedAfter.add(currentLines.length - 1);
-            } else if (!savedLines[i].equals(currentLines[i])) {
-                modified.add(i);
+        int savedOffset = 0;
+        int currentOffset = 0;
+        int line = 0;
+        int lastCurrentLine = -1;
+        while (savedOffset <= savedContent.length() || currentOffset <= currentContent.length()) {
+            int savedEnd = savedContent.indexOf('\n', savedOffset);
+            int currentEnd = currentContent.indexOf('\n', currentOffset);
+            boolean hasSaved = savedOffset <= savedContent.length();
+            boolean hasCurrent = currentOffset <= currentContent.length();
+            if (!hasSaved && !hasCurrent) break;
+            int savedLineEnd = savedEnd < 0 ? savedContent.length() : savedEnd;
+            int currentLineEnd = currentEnd < 0 ? currentContent.length() : currentEnd;
+            if (!hasSaved) {
+                added.add(line);
+            } else if (!hasCurrent) {
+                if (lastCurrentLine >= 0) deletedAfter.add(lastCurrentLine);
+            } else if (!savedContent.regionMatches(savedOffset, currentContent, currentOffset, savedLineEnd - savedOffset)
+                || savedLineEnd - savedOffset != currentLineEnd - currentOffset) {
+                modified.add(line);
             }
+            if (hasCurrent) lastCurrentLine = line;
+            if (savedEnd < 0) savedOffset = savedContent.length() + 1;
+            else savedOffset = savedEnd + 1;
+            if (currentEnd < 0) currentOffset = currentContent.length() + 1;
+            else currentOffset = currentEnd + 1;
+            line++;
         }
         return new DiffMarkers(added, modified, deletedAfter);
     }

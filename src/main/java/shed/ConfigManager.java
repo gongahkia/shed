@@ -294,6 +294,7 @@ public class ConfigManager {
         defineDefault("lsp.semantic.tokens.inline", DEFAULT_LSP_SEMANTIC_TOKENS_INLINE);
         defineDefault("lsp.inlay.hints.inline", DEFAULT_LSP_INLAY_HINTS_INLINE);
         defineDefault("lsp.definition.enabled", lspFeatures.definition());
+        defineDefault("lsp.type.definition.enabled", lspFeatures.typeDefinition());
         defineDefault("lsp.references.enabled", lspFeatures.references());
         defineDefault("lsp.rename.enabled", lspFeatures.rename());
         defineDefault("lsp.code.actions.enabled", lspFeatures.codeActions());
@@ -415,6 +416,7 @@ public class ConfigManager {
             case "lsp.semantic.tokens.inline" -> "Render available LSP semantic tokens in the editor";
             case "lsp.inlay.hints.inline" -> "Render available LSP inlay hints in the editor";
             case "lsp.definition.enabled" -> "Enable LSP definition requests";
+            case "lsp.type.definition.enabled" -> "Enable LSP type-definition requests";
             case "lsp.references.enabled" -> "Enable LSP reference requests";
             case "lsp.rename.enabled" -> "Enable LSP rename requests";
             case "lsp.code.actions.enabled" -> "Enable LSP code-action requests";
@@ -991,6 +993,7 @@ public class ConfigManager {
             getBoolean("lsp.semantic.tokens.enabled", defaults.semanticTokens()),
             getBoolean("lsp.inlay.hints.enabled", defaults.inlayHints()),
             getBoolean("lsp.definition.enabled", defaults.definition()),
+            getBoolean("lsp.type.definition.enabled", defaults.typeDefinition()),
             getBoolean("lsp.references.enabled", defaults.references()),
             getBoolean("lsp.rename.enabled", defaults.rename()),
             getBoolean("lsp.code.actions.enabled", defaults.codeActions()),

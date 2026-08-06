@@ -97,7 +97,7 @@ final class LspController {
         flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|hover|semantic|inlay|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|typedefinition|hover|semantic|inlay|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -110,6 +110,11 @@ final class LspController {
             case "definition":
             case "def":
                 return lspGoToDefinition();
+            case "typedefinition":
+            case "type-definition":
+            case "type":
+            case "typedef":
+                return lspGoToTypeDefinition();
             case "hover":
                 return lspHover();
             case "semantic":
@@ -343,6 +348,26 @@ final class LspController {
             return openLspLocation(location, "definition");
         } catch (BadLocationException e) {
             return "LSP definition failed: " + e.getMessage();
+        }
+    }
+
+    public String lspGoToTypeDefinition() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP type definition requires a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        String unavailable = capabilityUnavailable(client, LspCapability.TYPE_DEFINITION);
+        if (unavailable != null) return unavailable;
+        syncLspOpen(buffer);
+        String uri = bufferUri(buffer);
+        try {
+            int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
+            int column = editor.writingArea.getCaretPosition() - editor.writingArea.getLineStartOffset(line);
+            LspClient.Location location = client.typeDefinition(uri, line, column);
+            if (location == null) return "No type definition found";
+            return openLspLocation(location, "type definition");
+        } catch (BadLocationException error) {
+            return "LSP type definition failed: " + error.getMessage();
         }
     }
 

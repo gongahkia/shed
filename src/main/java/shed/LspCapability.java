@@ -5,6 +5,7 @@ enum LspCapability {
     SIGNATURE_HELP("signature help", "signatureHelpProvider"),
     HOVER("hover", "hoverProvider"),
     DEFINITION("definition", "definitionProvider"),
+    TYPE_DEFINITION("type definition", "typeDefinitionProvider"),
     REFERENCES("references", "referencesProvider"),
     RENAME("rename", "renameProvider"),
     CODE_ACTION("code actions", "codeActionProvider"),

@@ -76,7 +76,7 @@ public class HelpService {
                    "  :copen         Open quickfix list\n" +
                    "  :cnext/:cprev  Next/previous quickfix entry\n" +
                    "  :cc [n]        Jump to quickfix entry\n" +
-                   "  :lsp ...       LSP commands (def/hover/refs/rename/actions)\n" +
+                   "  :lsp ...       LSP commands (def/type/hover/refs/rename/actions)\n" +
                    "  :lsp status    Show running LSP servers\n" +
                    "  :lsp servers   List all configured + builtin LSP servers\n" +
                    "  :lsp manage    Managed-LSP status and explicit actions\n" +
@@ -223,6 +223,7 @@ public class HelpService {
                     + "  Tab/Shift-Tab     move through unchanged LSP snippet placeholders\n"
                     + "  ( or , (insert)  async signature help; the next edit cancels it\n"
                     + "  :lsp definition  go to definition\n"
+                    + "  :lsp typedefinition  go to type definition\n"
                     + "  :lsp hover       show hover info\n"
                     + "  :lsp references  find references\n"
                     + "  :lsp rename X    preview rename edits for symbol -> X\n"

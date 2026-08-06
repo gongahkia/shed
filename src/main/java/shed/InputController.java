@@ -2189,6 +2189,8 @@ final class InputController {
         knownCommands.add("cc");
         knownCommands.add("lsp");
         knownCommands.add("definition");
+        knownCommands.add("typedefinition");
+        knownCommands.add("typedef");
         knownCommands.add("hover");
         knownCommands.add("references");
         knownCommands.add("diagnostics");

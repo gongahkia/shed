@@ -875,7 +875,16 @@ public class LspClient {
         if (!supports(LspCapability.DEFINITION)) {
             return null;
         }
-        Map<String, Object> response = sendTextDocumentPositionRequest("textDocument/definition", uri, line, character, 2000L);
+        return textDocumentLocation("textDocument/definition", uri, line, character);
+    }
+
+    public Location typeDefinition(String uri, int line, int character) {
+        if (!supports(LspCapability.TYPE_DEFINITION)) return null;
+        return textDocumentLocation("textDocument/typeDefinition", uri, line, character);
+    }
+
+    private Location textDocumentLocation(String method, String uri, int line, int character) {
+        Map<String, Object> response = sendTextDocumentPositionRequest(method, uri, line, character, 2000L);
         if (response == null) {
             return null;
         }
@@ -1168,6 +1177,7 @@ public class LspClient {
         textDocument.put("completion", completion);
         textDocument.put("hover", hover);
         textDocument.put("definition", new LinkedHashMap<>());
+        textDocument.put("typeDefinition", new LinkedHashMap<>());
         textDocument.put("documentSymbol", Map.of("hierarchicalDocumentSymbolSupport", Boolean.TRUE));
         textDocument.put("publishDiagnostics", diagnosticsCapability);
         textDocument.put("semanticTokens", semanticTokens);

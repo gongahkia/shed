@@ -46,6 +46,17 @@ class GrammarHighlightServiceTest {
         assertTrue(has(highlight("notes.md", markdown), markdown, "class", GrammarHighlightService.Scope.KEYWORD));
     }
 
+    @Test
+    void virtualizedCodeRangeRetainsMultilineCommentState() {
+        String text = "class Demo {\n/* open\nstill comment\n*/\nint value = 1;\n}";
+        int start = text.indexOf("still comment");
+        int end = start + "still comment".length();
+
+        List<GrammarHighlightService.Token> tokens = new GrammarHighlightService().highlightViewport(text, FileType.JAVA, start, end);
+
+        assertTrue(has(tokens, text, "still comment", GrammarHighlightService.Scope.COMMENT));
+    }
+
     private List<GrammarHighlightService.Token> highlight(String name, String text) throws Exception {
         FileBuffer buffer = buffer(name, text);
         return new GrammarHighlightService().highlight(buffer, text, buffer.getFileType());

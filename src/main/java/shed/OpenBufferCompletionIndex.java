@@ -28,9 +28,11 @@ final class OpenBufferCompletionIndex {
                 if (word.isEmpty()) offset = index;
                 word.append(character);
             } else if (!word.isEmpty()) {
-                String value = word.toString();
-                WordStats previous = words.get(value);
-                words.put(value, previous == null ? new WordStats(1, offset) : previous.next(offset));
+                if (isIdentifierStart(word.charAt(0))) {
+                    String value = word.toString();
+                    WordStats previous = words.get(value);
+                    words.put(value, previous == null ? new WordStats(1, offset) : previous.next(offset));
+                }
                 word.setLength(0);
             }
         }
@@ -74,5 +76,9 @@ final class OpenBufferCompletionIndex {
 
     private static boolean isWordCharacter(char character) {
         return Character.isLetterOrDigit(character) || character == '_';
+    }
+
+    private static boolean isIdentifierStart(char character) {
+        return Character.isLetter(character) || character == '_';
     }
 }

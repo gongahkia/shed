@@ -1,6 +1,7 @@
 package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import javax.swing.JTextArea;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,16 @@ public class LineNumberPanelTest {
 
         assertEquals(1, panel.fullRepaints);
         assertEquals(0, panel.regionRepaints);
+    }
+
+    @Test
+    void computesDiffMarkersWithoutSplittingWholeDocumentsIntoArrays() {
+        LineNumberPanel.DiffMarkers markers = LineNumberPanel.diffMarkers("one\ntwo\n", "one\nchanged\nthree\n");
+
+        assertTrue(markers.modified().contains(1));
+        assertTrue(markers.modified().contains(2));
+        assertTrue(markers.added().contains(3));
+        assertEquals(0, markers.deletedAfter().size());
     }
 
     private static final class RecordingLineNumberPanel extends LineNumberPanel {

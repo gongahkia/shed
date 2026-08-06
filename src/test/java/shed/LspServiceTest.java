@@ -176,6 +176,18 @@ public class LspServiceTest {
     }
 
     @Test
+    void usesSnapshotPositionsForDocumentEventChanges() {
+        VersionedTextSnapshot before = VersionedTextSnapshot.of("one\ntwo");
+        VersionedTextSnapshot after = before.replace(4, 0, "T");
+        LspDocumentSyncState state = new LspDocumentSyncState(before);
+
+        assertTrue(state.apply(new FileBuffer.DocumentTextChange(before, after, 4, 0, "T", true)));
+
+        assertEquals(List.of(new LspDocumentChange(1, 0, 1, 0, "T")), state.drainChanges());
+        assertEquals("one\nTtwo", state.text());
+    }
+
+    @Test
     void fallsBackToFullSynchronizationWhenAChangeCannotBeReconciled() {
         LspDocumentSyncState state = new LspDocumentSyncState("before");
 

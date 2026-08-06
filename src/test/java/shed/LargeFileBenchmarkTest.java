@@ -41,7 +41,7 @@ public class LargeFileBenchmarkTest {
     @Test
     void recordsLargeFileScrollAndStreamedSaveWithExplicitUnavailableEdit() throws Exception {
         Path input = tempDir.resolve("large.txt");
-        Files.writeString(input, "line\n".repeat(50_001), StandardCharsets.UTF_8);
+        Files.writeString(input, "line\n".repeat(500_001), StandardCharsets.UTF_8);
 
         LargeFileBenchmark.Report report = new LargeFileBenchmark(1).measure(input);
 

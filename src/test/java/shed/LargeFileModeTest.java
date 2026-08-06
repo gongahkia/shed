@@ -15,7 +15,7 @@ public class LargeFileModeTest {
     @Test
     void reportsActiveModeOperationsAndRemediation() throws Exception {
         Path file = tempDir.resolve("large.txt");
-        Files.writeString(file, "line\n".repeat(50_001), StandardCharsets.UTF_8);
+        Files.writeString(file, "line\n".repeat(500_001), StandardCharsets.UTF_8);
 
         String report = LargeFileMode.report(new FileBuffer(file.toFile()));
 

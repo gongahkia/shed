@@ -21,4 +21,15 @@ public class OpenBufferCompletionIndexTest {
         assertEquals("requestContext", matches.get(0).word());
         assertTrue(matches.stream().anyMatch(candidate -> candidate.word().equals("requestConfig")));
     }
+
+    @Test
+    void excludesNumericLiteralsFromIdentifierCompletionIndex() {
+        OpenBufferCompletionIndex index = new OpenBufferCompletionIndex();
+
+        var words = index.build("value 12345 _private");
+
+        assertTrue(words.containsKey("value"));
+        assertTrue(words.containsKey("_private"));
+        assertTrue(!words.containsKey("12345"));
+    }
 }

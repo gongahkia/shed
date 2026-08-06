@@ -11,6 +11,7 @@ import java.util.Map;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -63,8 +64,11 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
         controls.add(button("Refresh", () -> message(editor.testController.refresh(editor.testController.selectedRoot()).message())));
         controls.add(button("Run All", () -> message(editor.testController.runAll(editor.testController.selectedRoot()))));
         controls.add(button("Run Selection", () -> message(editor.testController.runSelection(editor.testController.selectedRoot(), selectedTest()))));
+        controls.add(button("Debug Selection", () -> message(editor.testController.debugSelection(editor.testController.selectedRoot(), selectedTest()))));
         controls.add(button("Rerun Failed", () -> message(editor.testController.rerunFailed(editor.testController.selectedRoot()))));
         controls.add(button("Cancel", () -> message(editor.testController.cancel(editor.testController.selectedRoot()))));
+        controls.add(button("Import Coverage…", this::importCoverage));
+        controls.add(button("Clear Coverage", () -> message(editor.testController.clearCoverage(editor.testController.selectedRoot()))));
         controls.add(new JLabel("Show")); controls.add(status); controls.add(filter);
         panel.add(controls, BorderLayout.WEST);
         panel.add(state, BorderLayout.CENTER);
@@ -129,10 +133,18 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     private void message(String value) { editor.showMessage(value); refresh(); }
+    private void importCoverage() {
+        JFileChooser chooser = new JFileChooser(editor.testController.selectedRoot().toFile());
+        chooser.setDialogTitle("Import coverage report");
+        if (chooser.showOpenDialog(panel) == JFileChooser.APPROVE_OPTION) {
+            message(editor.testController.importCoverage(editor.testController.selectedRoot(), chooser.getSelectedFile().toPath()));
+        }
+    }
     private static JButton button(String label, Runnable action) { JButton button = new JButton(label); button.addActionListener(event -> action.run()); return button; }
     private static String marker(TestService.Status value) { return switch (value) { case PASSED -> "✓"; case FAILED -> "✗"; case ERRORED -> "!"; case SKIPPED -> "–"; case UNKNOWN -> "·"; }; }
     private static String summary(TestController.Snapshot value) {
         long failed = value.tests().stream().filter(test -> test.status().failed()).count();
-        return value.tests().isEmpty() ? "Refresh to discover tests." : value.tests().size() + " tests" + (failed == 0 ? "" : ", " + failed + " failing");
+        String coverage = value.coverage().lines() == 0 ? "" : " — coverage " + value.coverage().display();
+        return (value.tests().isEmpty() ? "Refresh to discover tests." : value.tests().size() + " tests" + (failed == 0 ? "" : ", " + failed + " failing")) + coverage;
     }
 }

@@ -2168,6 +2168,9 @@ final class InputController {
         knownCommands.add("jobkill");
         knownCommands.add("drop");
         knownCommands.add("task");
+        knownCommands.add("test");
+        knownCommands.add("coverage");
+        knownCommands.add("cov");
         knownCommands.add("help");
         knownCommands.add("wc");
         knownCommands.add("recent");

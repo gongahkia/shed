@@ -26,6 +26,7 @@ class LineNumberPanel extends JPanel {
     private Set<Integer> modifiedLines = new HashSet<>();
     private Set<Integer> deletedAfterLines = new HashSet<>();
     private Map<Integer, Integer> diagnosticSeverityByLine = new HashMap<>(); // line -> min severity (1=error, 2=warn, 3=info, 4=hint)
+    private Map<Integer, Integer> coverageHitsByLine = new HashMap<>();
     private Set<Integer> gitAddedLines = new HashSet<>();
     private Set<Integer> gitModifiedLines = new HashSet<>();
     private Set<Integer> gitDeletedAfterLines = new HashSet<>();
@@ -142,6 +143,11 @@ class LineNumberPanel extends JPanel {
                     g.setColor(new Color(0xF85149));
                     g.fillRect(gitX, p.y + lineH - 2, 4, 2);
                 }
+                Integer coverageHits = coverageHitsByLine.get(i);
+                if (coverageHits != null) {
+                    g.setColor(coverageHits > 0 ? new Color(0x3F, 0xB9, 0x50) : new Color(0xF8, 0x51, 0x49));
+                    g.fillRect(markerX + markerW, p.y, 1, lineH);
+                }
                 BreakpointStore.State breakpointState = breakpointStateByLine.get(i);
                 if (breakpointState != null) {
                     int dotSize = Math.max(7, lineH / 2);
@@ -201,6 +207,12 @@ class LineNumberPanel extends JPanel {
     public void updateDiagnosticMarkers(Map<Integer, Integer> severityByLine) {
         diagnosticSeverityByLine.clear();
         if (severityByLine != null) diagnosticSeverityByLine.putAll(severityByLine);
+        repaint();
+    }
+
+    public void updateCoverageMarkers(Map<Integer, Integer> hitsByLine) {
+        coverageHitsByLine.clear();
+        if (hitsByLine != null) coverageHitsByLine.putAll(hitsByLine);
         repaint();
     }
 

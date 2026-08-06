@@ -342,6 +342,9 @@ final class TypedSettings {
             || key.startsWith("lsp.completion.local.") || key.startsWith("lsp.completion.commit.")) {
             return "Live: used by the next completion request";
         }
+        if (key.equals("lsp.format.on.save.enabled")) {
+            return "Live: used by the next save request";
+        }
         if (key.startsWith("lsp.")) {
             return "Restart: takes effect when an LSP server is started or restarted";
         }

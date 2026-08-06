@@ -68,6 +68,15 @@ final class DebugSessionController {
 
     String startForPanel() { return start(""); }
 
+    String startTest(Path root, TestService.TestCase test, String configuration) {
+        if (root == null || test == null || configuration == null || configuration.isBlank()) return "Test debug configuration is required";
+        if (test.file() == null) return "Test source location is unavailable";
+        Path workspace = root.toAbsolutePath().normalize();
+        Path file = test.file().toAbsolutePath().normalize();
+        if (!file.startsWith(workspace)) return "Test source escapes the selected workspace";
+        return submitStart(workspace, new DebugAdapterRegistry.LaunchContext(file, test.id(), file), configuration, false, "test debug");
+    }
+
     String stopForPanel() { return stop(); }
 
     String restartForPanel() { return restart(""); }
@@ -144,12 +153,16 @@ final class DebugSessionController {
     private String submitStart(String requested, boolean restart) {
         Path workspace = workspace();
         Path activeFile = activeFile();
+        return submitStart(workspace, new DebugAdapterRegistry.LaunchContext(activeFile, "", null), requested, restart, restart ? "restart" : "start");
+    }
+
+    private String submitStart(Path workspace, DebugAdapterRegistry.LaunchContext context, String requested, boolean restart, String operation) {
         String name = requested == null ? "" : requested.trim();
-        int jobId = editor.asyncJobService.submit("debug " + (restart ? "restart" : "start"), token -> sessions.start(workspace, activeFile,
+        int jobId = editor.asyncJobService.submit("debug " + operation, token -> sessions.start(workspace, context,
             editor.configManager.getDebugConfiguration(), editor.configManager.getDebugFeatureSettings(), name,
             Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs())), this::startTransport, breakpoints), (job, result, error) -> {
                 if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
-                    editor.showMessage("Debug " + (restart ? "restart" : "start") + " cancelled.");
+                    editor.showMessage("Debug " + operation + " cancelled.");
                     return;
                 }
                 if (error != null || result == null) {
@@ -164,7 +177,7 @@ final class DebugSessionController {
                 }
                 editor.showMessage(result.succeeded() ? result.snapshot().detail() : result.snapshot().detail() + diagnosticSuffix(result.snapshot()));
             });
-        return "Explicit debug " + (restart ? "restart" : "start") + " requested (job " + jobId + ").";
+        return "Explicit debug " + operation + " requested (job " + jobId + ").";
     }
 
     private DebugSessionService.Connection startTransport(DebugAdapterRegistry.Plan plan, DebugFeatureSettings features,

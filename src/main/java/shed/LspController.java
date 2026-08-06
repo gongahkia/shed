@@ -29,6 +29,13 @@ final class LspController {
     private FileBuffer pendingLspDecoration;
     private int lspDecorationJobId = -1;
     private int workspaceSymbolQueryGeneration;
+    private int codeActionJobId = -1;
+    private long codeActionGeneration;
+
+    private record CodeActionRequest(FileBuffer buffer, LspClient client, String uri, Integer version, int caretOffset,
+                                     int line, int column, List<LspClient.Diagnostic> diagnostics, int requestedIndex, long generation) { }
+    private record CodeActionResult(CodeActionRequest request, List<LspClient.CodeAction> actions) { }
+    private record PeekRequest(FileBuffer buffer, LspClient.Location location, String label, String uri, Integer version, int caret) { }
 
     LspController(Texteditor editor) {
         this.editor = editor;
@@ -97,7 +104,7 @@ final class LspController {
         flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|typedefinition|hover|semantic|inlay|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|typedefinition|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -125,6 +132,14 @@ final class LspController {
                 return lspInlayHints();
             case "format":
                 return lspFormat();
+            case "peek":
+                return lspPeek(args);
+            case "calls":
+            case "callhierarchy":
+                return lspCallHierarchy(args);
+            case "typehierarchy":
+            case "type-hierarchy":
+                return lspTypeHierarchy(args);
             case "references":
             case "refs":
                 return lspReferences();
@@ -368,6 +383,105 @@ final class LspController {
             return openLspLocation(location, "type definition");
         } catch (BadLocationException error) {
             return "LSP type definition failed: " + error.getMessage();
+        }
+    }
+
+    private String lspPeek(String argument) {
+        String target = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
+        if ("definition".equals(target) || "def".equals(target)) return requestPeek(false);
+        if ("type".equals(target) || "typedefinition".equals(target) || "type-definition".equals(target)) return requestPeek(true);
+        return "Usage: :lsp peek definition|type";
+    }
+
+    private String requestPeek(boolean typeDefinition) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP peek requires a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        LspCapability capability = typeDefinition ? LspCapability.TYPE_DEFINITION : LspCapability.DEFINITION;
+        String unavailable = capabilityUnavailable(client, capability);
+        if (unavailable != null) return unavailable;
+        try {
+            syncLspOpen(buffer);
+            String uri = bufferUri(buffer);
+            int caret = editor.writingArea.getCaretPosition();
+            int line = editor.writingArea.getLineOfOffset(caret);
+            int column = caret - editor.writingArea.getLineStartOffset(line);
+            Integer version = editor.lspDocumentVersions.get(uri);
+            String label = typeDefinition ? "type definition" : "definition";
+            editor.asyncJobService.submit("LSP peek " + label, token -> {
+                LspClient.Location location = typeDefinition ? client.typeDefinition(uri, line, column) : client.definition(uri, line, column);
+                return location == null ? null : new PeekRequest(buffer, location, label, uri, version, caret);
+            }, (job, request, error) -> completePeek(job, request, error));
+            return "LSP peek requested";
+        } catch (BadLocationException error) {
+            return "LSP peek failed: " + error.getMessage();
+        }
+    }
+
+    private void completePeek(AsyncJobService.JobSnapshot job, PeekRequest request, Exception error) {
+        if (job.getStatus() == AsyncJobService.Status.CANCELLED) { editor.showMessage("LSP peek cancelled"); return; }
+        if (error != null) { editor.showMessage("LSP peek failed: " + error.getMessage()); return; }
+        if (request == null) { editor.showMessage("No LSP target found"); return; }
+        if (editor.getCurrentBuffer() != request.buffer() || editor.writingArea.getCaretPosition() != request.caret()
+            || !Objects.equals(editor.lspDocumentVersions.get(request.uri()), request.version())) {
+            editor.showMessage("LSP peek became stale");
+            return;
+        }
+        editor.asyncJobService.submit("LSP peek file", token -> editor.peekView.load(request.location(), request.label()),
+            (loadJob, preview, loadError) -> {
+                if (loadJob.getStatus() == AsyncJobService.Status.CANCELLED) return;
+                if (loadError != null) editor.showMessage("LSP peek unavailable: " + loadError.getMessage());
+                else editor.peekView.show(preview);
+            });
+    }
+
+    private String lspCallHierarchy(String argument) {
+        String direction = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
+        if (!"incoming".equals(direction) && !"outgoing".equals(direction)) return "Usage: :lsp calls incoming|outgoing";
+        return requestHierarchy(true, direction);
+    }
+
+    private String lspTypeHierarchy(String argument) {
+        String direction = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
+        if (!"supertypes".equals(direction) && !"subtypes".equals(direction)) return "Usage: :lsp typehierarchy supertypes|subtypes";
+        return requestHierarchy(false, direction);
+    }
+
+    private String requestHierarchy(boolean callHierarchy, String direction) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP hierarchy requires a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        LspCapability capability = callHierarchy ? LspCapability.CALL_HIERARCHY : LspCapability.TYPE_HIERARCHY;
+        String unavailable = capabilityUnavailable(client, capability);
+        if (unavailable != null) return unavailable;
+        try {
+            syncLspOpen(buffer);
+            String uri = bufferUri(buffer);
+            int caret = editor.writingArea.getCaretPosition();
+            int line = editor.writingArea.getLineOfOffset(caret);
+            int column = caret - editor.writingArea.getLineStartOffset(line);
+            Integer version = editor.lspDocumentVersions.get(uri);
+            editor.asyncJobService.submit("LSP hierarchy prepare", token -> callHierarchy
+                ? client.prepareCallHierarchy(uri, line, column) : client.prepareTypeHierarchy(uri, line, column), (job, roots, error) -> {
+                    if (job.getStatus() == AsyncJobService.Status.CANCELLED) { editor.showMessage("LSP hierarchy cancelled"); return; }
+                    if (error != null) { editor.showMessage("LSP hierarchy failed: " + error.getMessage()); return; }
+                    if (editor.getCurrentBuffer() != buffer || editor.writingArea.getCaretPosition() != caret
+                        || !Objects.equals(editor.lspDocumentVersions.get(uri), version)) { editor.showMessage("LSP hierarchy became stale"); return; }
+                    if (roots == null || roots.isEmpty()) { editor.showMessage("No LSP hierarchy target found"); return; }
+                    String title = "LSP " + (callHierarchy ? "Call" : "Type") + " Hierarchy — " + direction;
+                    LspHierarchyDialog.show(editor, title, roots, item -> {
+                        if (callHierarchy) {
+                            List<LspClient.CallHierarchyCall> calls = "incoming".equals(direction) ? client.incomingCalls(item) : client.outgoingCalls(item);
+                            return calls.stream().map(LspClient.CallHierarchyCall::item).toList();
+                        }
+                        return "supertypes".equals(direction) ? client.typeSupertypes(item) : client.typeSubtypes(item);
+                    });
+                });
+            return "LSP hierarchy requested";
+        } catch (BadLocationException error) {
+            return "LSP hierarchy failed: " + error.getMessage();
         }
     }
 
@@ -698,59 +812,73 @@ final class LspController {
         }
         String unavailable = capabilityUnavailable(client, LspCapability.CODE_ACTION);
         if (unavailable != null) return unavailable;
+        int requestedIndex = parseOneBasedIndex(selectionArgument);
+        if (selectionArgument != null && !selectionArgument.isBlank() && requestedIndex < 1) return "Usage: :lsp codeaction [index]";
         syncLspOpen(buffer);
+        flushPendingLspChange(buffer);
         String uri = bufferUri(buffer);
         try {
-            int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
-            int column = editor.writingArea.getCaretPosition() - editor.writingArea.getLineStartOffset(line);
-            List<LspClient.CodeAction> actions = collectCursorCodeActions(client, uri, line, column);
-            if (actions.isEmpty()) {
-                return "No code actions";
-            }
-
-            int requestedIndex = parseOneBasedIndex(selectionArgument);
-            if (selectionArgument != null && !selectionArgument.isBlank() && requestedIndex < 1) {
-                return "Usage: :lsp codeaction [index]";
-            }
-            if (requestedIndex > 0) {
-                if (requestedIndex > actions.size()) {
-                    return "Code action index out of range: " + requestedIndex;
-                }
-                LspClient.CodeAction action = actions.get(requestedIndex - 1);
-                editor.pendingLspCodeAction = action;
-                editor.showScratchBuffer("[lsp code action preview]", buildWorkspaceEditPreview(action.getTitle(), action.getOperations(), new WorkspaceEditApplyResult())
-                    + "\nRun :lsp codeaction apply to confirm, or choose another action to replace this preview.\n");
-                return "Prepared code action preview. Run :lsp codeaction apply to confirm.";
-            }
-
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < actions.size(); i++) {
-                LspClient.CodeAction action = actions.get(i);
-                builder.append(i + 1).append(". ").append(action.getTitle());
-                if (!action.getKind().isBlank()) {
-                    builder.append(" (").append(action.getKind()).append(")");
-                }
-                if (action.isPreferred()) {
-                    builder.append(" [preferred]");
-                }
-                if (action.getCommandId() != null && !action.getCommandId().isBlank()) {
-                    builder.append(" [command]");
-                }
-                if (!action.getEdits().isEmpty()) {
-                    builder.append(" [edit]");
-                }
-                if (hasResourceOperation(action.getOperations())) {
-                    builder.append(" [resource]");
-                }
-                if (i < actions.size() - 1) {
-                    builder.append("\n");
-                }
-            }
-            editor.showScratchBuffer("[lsp code actions]", builder.toString() + "\n\nRun :lsp codeaction <index> to apply.");
-            return "Showing code actions (use :lsp codeaction <index>)";
+            int caret = editor.writingArea.getCaretPosition();
+            int line = editor.writingArea.getLineOfOffset(caret);
+            int column = caret - editor.writingArea.getLineStartOffset(line);
+            List<LspClient.Diagnostic> diagnostics = collectCursorDiagnostics(client, uri, line, column);
+            if (diagnostics.isEmpty()) return "No diagnostic at caret";
+            long generation = ++codeActionGeneration;
+            if (codeActionJobId >= 0) editor.asyncJobService.cancel(codeActionJobId);
+            CodeActionRequest request = new CodeActionRequest(buffer, client, uri, editor.lspDocumentVersions.get(uri), caret, line, column,
+                List.copyOf(diagnostics), requestedIndex, generation);
+            codeActionJobId = editor.asyncJobService.submit("LSP code actions", token -> new CodeActionResult(request,
+                client.codeActions(uri, line, column, request.diagnostics())), this::completeCodeActions);
+            return "Loading code actions…";
         } catch (BadLocationException e) {
             return "LSP code actions failed: " + e.getMessage();
         }
+    }
+
+    private void completeCodeActions(AsyncJobService.JobSnapshot job, CodeActionResult result, Exception error) {
+        if (result == null || result.request().generation() != codeActionGeneration) return;
+        codeActionJobId = -1;
+        if (job.getStatus() == AsyncJobService.Status.CANCELLED) return;
+        if (error != null) { editor.showMessage("Code actions failed: " + error.getMessage()); return; }
+        CodeActionRequest request = result.request();
+        if (editor.getCurrentBuffer() != request.buffer() || !Objects.equals(editor.lspDocumentVersions.get(request.uri()), request.version())
+            || editor.writingArea.getCaretPosition() != request.caretOffset()) {
+            editor.showMessage("Code actions became stale");
+            return;
+        }
+        List<LspClient.CodeAction> actions = result.actions() == null ? List.of() : result.actions();
+        if (actions.isEmpty()) { editor.showMessage("No code actions"); return; }
+        if (request.requestedIndex() > 0) {
+            if (request.requestedIndex() > actions.size()) { editor.showMessage("Code action index out of range: " + request.requestedIndex()); return; }
+            prepareCodeActionPreview(actions.get(request.requestedIndex() - 1));
+            return;
+        }
+        showCodeActionPicker(actions);
+    }
+
+    private void showCodeActionPicker(List<LspClient.CodeAction> actions) {
+        JPopupMenu popup = new JPopupMenu();
+        popup.setBorder(BorderFactory.createLineBorder(editor.configManager.getSelectionColor()));
+        for (LspClient.CodeAction action : actions) {
+            String label = action.getTitle() + (action.isPreferred() ? "  ★" : "");
+            JMenuItem item = new JMenuItem(label);
+            item.setFont(editor.resolveUiFont());
+            item.addActionListener(event -> prepareCodeActionPreview(action));
+            popup.add(item);
+        }
+        try {
+            java.awt.Rectangle bounds = editor.writingArea.modelToView2D(editor.writingArea.getCaretPosition()).getBounds();
+            popup.show(editor.writingArea, bounds.x, bounds.y + bounds.height);
+        } catch (BadLocationException error) {
+            editor.showMessage("Code action picker failed: " + error.getMessage());
+        }
+    }
+
+    private void prepareCodeActionPreview(LspClient.CodeAction action) {
+        editor.pendingLspCodeAction = action;
+        editor.showScratchBuffer("[lsp code action preview]", buildWorkspaceEditPreview(action.getTitle(), action.getOperations(), new WorkspaceEditApplyResult())
+            + "\nRun :lsp codeaction apply to confirm, or choose another action to replace this preview.\n");
+        editor.showMessage("Prepared code action preview. Run :lsp codeaction apply to confirm.");
     }
 
     public String lspCodeActionApply() {
@@ -766,14 +894,28 @@ final class LspController {
 
 
     List<LspClient.CodeAction> collectCursorCodeActions(LspClient client, String uri, int line, int column) {
-        List<LspClient.Diagnostic> diagnostics = client.getDiagnostics(uri);
+        return client.codeActions(uri, line, column, collectCursorDiagnostics(client, uri, line, column));
+    }
+
+    List<LspClient.Diagnostic> collectCursorDiagnostics(LspClient client, String uri, int line, int column) {
         List<LspClient.Diagnostic> scoped = new ArrayList<>();
-        for (LspClient.Diagnostic diagnostic : diagnostics) {
-            if (diagnostic.getLine() == line) {
-                scoped.add(diagnostic);
-            }
+        for (LspClient.Diagnostic diagnostic : client.getDiagnostics(uri)) {
+            if (contains(diagnostic, line, column)) scoped.add(diagnostic);
         }
-        return client.codeActions(uri, line, column, scoped);
+        return scoped;
+    }
+
+    private static boolean contains(LspClient.Diagnostic diagnostic, int line, int column) {
+        if (diagnostic == null) return false;
+        int startLine = diagnostic.getLine();
+        int startColumn = diagnostic.getCharacter();
+        int endLine = diagnostic.getEndLine();
+        int endColumn = diagnostic.getEndCharacter();
+        if (line < startLine || line > endLine) return false;
+        if (startLine == endLine) return line == startLine && column >= startColumn && column <= Math.max(startColumn, endColumn);
+        if (line == startLine) return column >= startColumn;
+        if (line == endLine) return column <= endColumn;
+        return true;
     }
 
     private String capabilityUnavailable(LspClient client, LspCapability capability) {
@@ -946,7 +1088,6 @@ final class LspController {
             return "LSP " + label + " open failed: " + e.getMessage();
         }
     }
-
 
     WorkspaceEditApplyResult applyWorkspaceTextEdits(List<LspClient.TextEdit> edits) {
         if (edits == null || edits.isEmpty()) {
@@ -2080,7 +2221,10 @@ final class LspController {
 
 
     public void notifyCurrentBufferSaved() {
-        FileBuffer buffer = editor.getCurrentBuffer();
+        notifyBufferSaved(editor.getCurrentBuffer());
+    }
+
+    public void notifyBufferSaved(FileBuffer buffer) {
         if (buffer == null || !buffer.hasFilePath()) {
             return;
         }

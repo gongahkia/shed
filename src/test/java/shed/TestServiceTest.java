@@ -31,7 +31,7 @@ class TestServiceTest {
     @Test
     void usesShedtestsInsteadOfAutoDetectionAndValidatesArgv() throws Exception {
         Files.writeString(root.resolve("pom.xml"), "<project/>");
-        Files.writeString(root.resolve(TestService.CONFIG_FILE), "schema_version = 1\n\n[[adapter]]\nid = \"pytest\"\ncommand = [\"python\", \"-m\", \"pytest\"]\n");
+        Files.writeString(root.resolve(TestService.CONFIG_FILE), "schema_version = 1\n\n[[adapter]]\nid = \"pytest\"\ncommand = [\"python\", \"-m\", \"pytest\"]\ndebug_configuration = \"pytest-test\"\n");
 
         TestService.LoadResult loaded = new TestService().load(root);
 
@@ -39,6 +39,7 @@ class TestServiceTest {
         assertTrue(loaded.valid());
         assertEquals(List.of("pytest"), loaded.specs().stream().map(TestService.AdapterSpec::id).toList());
         assertEquals(List.of("python", "-m", "pytest"), loaded.specs().getFirst().command());
+        assertEquals("pytest-test", loaded.specs().getFirst().debugConfiguration());
     }
 
     @Test

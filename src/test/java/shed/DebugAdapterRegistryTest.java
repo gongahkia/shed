@@ -41,6 +41,24 @@ public class DebugAdapterRegistryTest {
         assertTrue(plan.error().contains("no process"));
     }
 
+    @Test
+    void expandsOnlyKnownTestLaunchPlaceholdersInsideTheWorkspace() {
+        Map<String, Object> values = configuration("launch");
+        values.put("debug.configuration.main.args", "--test ${testId} ${testFile}");
+        DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.validate(values);
+        Path workspace = Path.of("build/debug-test-workspace").toAbsolutePath();
+        Path test = workspace.resolve("src/test/java/SampleTest.java");
+
+        DebugAdapterRegistry.PlanResult plan = DebugAdapterRegistry.plan(validation, "main", workspace,
+            new DebugAdapterRegistry.LaunchContext(test, "sample#works", test));
+
+        assertTrue(plan.launchable());
+        assertEquals(java.util.List.of("--test", "sample#works", test.toString()), plan.plan().args());
+        values.put("debug.configuration.main.args", "${unknown}");
+        assertFalse(DebugAdapterRegistry.plan(DebugAdapterRegistry.validate(values), "main", workspace,
+            new DebugAdapterRegistry.LaunchContext(test, "sample#works", test)).launchable());
+    }
+
     private static Map<String, Object> configuration(String request) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("debug.adapter.java.command", "java-debug-adapter");

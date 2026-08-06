@@ -295,11 +295,14 @@ public class ConfigManager {
         defineDefault("lsp.inlay.hints.inline", DEFAULT_LSP_INLAY_HINTS_INLINE);
         defineDefault("lsp.definition.enabled", lspFeatures.definition());
         defineDefault("lsp.type.definition.enabled", lspFeatures.typeDefinition());
+        defineDefault("lsp.call.hierarchy.enabled", lspFeatures.callHierarchy());
+        defineDefault("lsp.type.hierarchy.enabled", lspFeatures.typeHierarchy());
         defineDefault("lsp.references.enabled", lspFeatures.references());
         defineDefault("lsp.rename.enabled", lspFeatures.rename());
         defineDefault("lsp.code.actions.enabled", lspFeatures.codeActions());
         defineDefault("lsp.command.execution.enabled", lspFeatures.commandExecution());
         defineDefault("lsp.formatting.enabled", lspFeatures.formatting());
+        defineDefault("lsp.format.on.save.enabled", false);
         defineDefault("ui.whichkey.hints", DEFAULT_UI_WHICHKEY_HINTS);
         defineDefault("project.config.enabled", DEFAULT_PROJECT_CONFIG_ENABLED);
         defineDefault("project.config.allow.unsafe", DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE);
@@ -417,11 +420,14 @@ public class ConfigManager {
             case "lsp.inlay.hints.inline" -> "Render available LSP inlay hints in the editor";
             case "lsp.definition.enabled" -> "Enable LSP definition requests";
             case "lsp.type.definition.enabled" -> "Enable LSP type-definition requests";
+            case "lsp.call.hierarchy.enabled" -> "Enable LSP call-hierarchy requests";
+            case "lsp.type.hierarchy.enabled" -> "Enable LSP type-hierarchy requests";
             case "lsp.references.enabled" -> "Enable LSP reference requests";
             case "lsp.rename.enabled" -> "Enable LSP rename requests";
             case "lsp.code.actions.enabled" -> "Enable LSP code-action requests";
             case "lsp.command.execution.enabled" -> "Enable LSP execute-command requests";
             case "lsp.formatting.enabled" -> "Enable LSP document-formatting requests";
+            case "lsp.format.on.save.enabled" -> "Format with LSP before saving; failed formatting leaves the buffer unsaved";
             case "ui.whichkey.hints" -> "Show prefix-key hint overlays";
             case "project.config.enabled" -> "Enable project-local configuration";
             case "project.config.allow.unsafe" -> "Allow unsafe project-local keys";
@@ -521,6 +527,11 @@ public class ConfigManager {
                 continue;
             }
             String validationError = settings.validateToml(key, value);
+            if (key.startsWith("formatter.") && key.endsWith(".format.on.save")) {
+                validationError = value instanceof Boolean ? FormatterPolicy.validateConfig(key, Boolean.toString((Boolean) value)) : key + " must be a TOML boolean";
+            } else if (validationError == null && key.startsWith("formatter.")) {
+                validationError = value instanceof String ? FormatterPolicy.validateConfig(key, (String) value) : key + " must be a TOML string";
+            }
             if (validationError == null && KeymapOverlay.isKeybindKey(key)) {
                 validationError = value instanceof String ? KeymapOverlay.validate(key, (String) value) : key + " must be a TOML string";
             }
@@ -994,12 +1005,18 @@ public class ConfigManager {
             getBoolean("lsp.inlay.hints.enabled", defaults.inlayHints()),
             getBoolean("lsp.definition.enabled", defaults.definition()),
             getBoolean("lsp.type.definition.enabled", defaults.typeDefinition()),
+            getBoolean("lsp.call.hierarchy.enabled", defaults.callHierarchy()),
+            getBoolean("lsp.type.hierarchy.enabled", defaults.typeHierarchy()),
             getBoolean("lsp.references.enabled", defaults.references()),
             getBoolean("lsp.rename.enabled", defaults.rename()),
             getBoolean("lsp.code.actions.enabled", defaults.codeActions()),
             getBoolean("lsp.command.execution.enabled", defaults.commandExecution()),
             getBoolean("lsp.formatting.enabled", defaults.formatting())
         );
+    }
+
+    public boolean getLspFormatOnSaveEnabled() {
+        return getBoolean("lsp.format.on.save.enabled", false);
     }
 
     public boolean getLspSemanticTokensInline() {
@@ -1432,6 +1449,10 @@ public class ConfigManager {
         return raw.trim().split("\\s+");
     }
 
+    public FormatterPolicy getFormatterPolicy(String extension) {
+        return FormatterPolicy.resolve(this, extension);
+    }
+
     public String resolveCommandAlias(String command) {
         if (command == null || command.isBlank()) {
             return "";
@@ -1527,6 +1548,8 @@ public class ConfigManager {
         if (typedError != null) {
             return typedError;
         }
+        String formatterError = FormatterPolicy.validateConfig(normalizedKey, normalizedValue);
+        if (formatterError != null) return formatterError;
         return KeymapOverlay.isKeybindKey(normalizedKey) ? KeymapOverlay.validate(normalizedKey, normalizedValue) : null;
     }
 
@@ -1791,6 +1814,10 @@ public class ConfigManager {
 
     private String tomlValue(String key, String value) {
         String defaultValue = defaultConfig.get(key);
+        if (key != null && key.startsWith("formatter.") && key.endsWith(".format.on.save")
+            && ("true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value))) {
+            return value.toLowerCase(Locale.ROOT);
+        }
         if (defaultValue != null && ("true".equals(defaultValue) || "false".equals(defaultValue))
             && ("true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value))) {
             return value.toLowerCase(Locale.ROOT);

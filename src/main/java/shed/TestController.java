@@ -12,12 +12,14 @@ import java.util.Locale;
 import java.util.Map;
 
 final class TestController {
-    record Snapshot(Path root, List<TestService.AdapterSpec> adapters, List<TestService.TestCase> tests, List<String> diagnostics, String output, int runningJobs) {
+    record Snapshot(Path root, List<TestService.AdapterSpec> adapters, List<TestService.TestCase> tests, List<String> diagnostics, String output, int runningJobs,
+                    CoverageService.Summary coverage) {
         Snapshot {
             adapters = adapters == null ? List.of() : List.copyOf(adapters);
             tests = tests == null ? List.of() : List.copyOf(tests);
             diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
             output = output == null ? "" : output;
+            coverage = coverage == null ? CoverageService.Report.empty().summary() : coverage;
         }
     }
 
@@ -28,14 +30,17 @@ final class TestController {
         List<String> diagnostics = List.of();
         String output = "Refresh to discover tests.";
         final Map<Integer, String> jobs = new LinkedHashMap<>();
+        CoverageService.Report coverage = CoverageService.Report.empty();
         State(Path root) { this.root = root; }
     }
 
     private record Execution(Path root, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command, CommandResult result) { }
     private record StaticDiscovery(Path root, TestService.AdapterSpec spec, List<TestService.TestCase> tests) { }
+    private record CoverageImport(Path root, CoverageService.ImportResult imported) { }
 
     private final Texteditor editor;
     private final TestService tests;
+    private final CoverageService coverage = new CoverageService();
     private final Map<Path, State> states = new LinkedHashMap<>();
     private Path selectedRoot;
 
@@ -56,7 +61,25 @@ final class TestController {
         if ("cancel".equalsIgnoreCase(value)) return cancel(selectedRoot());
         if ("text".equalsIgnoreCase(value)) return showText(selectedRoot());
         if (value.regionMatches(true, 0, "run ", 0, 4)) return runId(selectedRoot(), value.substring(4).trim());
-        return "Usage: :test [ui|refresh|run [test-id]|failed|cancel|text]";
+        if (value.regionMatches(true, 0, "debug ", 0, 6)) return debugId(selectedRoot(), value.substring(6).trim());
+        return "Usage: :test [ui|refresh|run [test-id]|debug <test-id>|failed|cancel|text]";
+    }
+
+    String handleCoverage(String argument) {
+        String value = argument == null ? "" : argument.trim();
+        Path root = selectedRoot();
+        if (value.isEmpty() || "ui".equalsIgnoreCase(value)) {
+            editor.showToolWindow(ToolWindowHost.Tab.TESTS);
+            return "Tests panel opened";
+        }
+        if ("clear".equalsIgnoreCase(value)) return clearCoverage(root);
+        if ("text".equalsIgnoreCase(value)) {
+            editor.showScratchBuffer("[coverage]", coverageText(root));
+            return "Showing coverage";
+        }
+        if (value.regionMatches(true, 0, "import ", 0, 7)) value = value.substring(7).trim();
+        if (value.isBlank()) return "Usage: :coverage import <report>|clear|text";
+        return importCoverage(root, Path.of(value));
     }
 
     List<Path> rootsForPanel() {
@@ -77,7 +100,7 @@ final class TestController {
 
     Snapshot snapshot(Path root) {
         State state = state(root == null ? selectedRoot() : root);
-        return new Snapshot(state.root, state.specs, state.tests, state.diagnostics, state.output, state.jobs.size());
+        return new Snapshot(state.root, state.specs, state.tests, state.diagnostics, state.output, state.jobs.size(), state.coverage.summary());
     }
 
     Result refresh(Path root) {
@@ -125,6 +148,23 @@ final class TestController {
         return "Test not found: " + id;
     }
 
+    String debugSelection(Path root, TestService.TestCase test) {
+        if (test == null) return "Select a test";
+        State state = state(root);
+        for (TestService.AdapterSpec spec : state.specs) {
+            if (!spec.id().equals(test.adapterId())) continue;
+            if (spec.debugConfiguration().isBlank()) return "Adapter " + spec.id() + " has no debug_configuration in .shedtests";
+            return editor.debugSessionController.startTest(state.root, test, spec.debugConfiguration());
+        }
+        return "Selected test adapter is unavailable";
+    }
+
+    private String debugId(Path root, String id) {
+        if (id == null || id.isBlank()) return "Usage: :test debug <test-id>";
+        for (TestService.TestCase test : state(root).tests) if (id.equals(test.id())) return debugSelection(root, test);
+        return "Test not found: " + id;
+    }
+
     String rerunFailed(Path root) {
         State state = state(root);
         Map<String, List<TestService.TestCase>> failed = new LinkedHashMap<>();
@@ -150,6 +190,61 @@ final class TestController {
         if (test.file() == null || !Files.isRegularFile(test.file())) return "Test source location unavailable";
         try { editor.openFile(test.file().toFile()); return editor.gotoLine(test.line()); }
         catch (Exception error) { return "Test source open failed: " + error.getMessage(); }
+    }
+
+    String importCoverage(Path root, Path report) {
+        Path workspace = root == null ? selectedRoot() : root.toAbsolutePath().normalize();
+        if (report == null) return "Coverage report path required";
+        Path resolved = report.isAbsolute() ? report.normalize() : workspace.resolve(report).normalize();
+        State state = state(workspace);
+        int jobId = editor.asyncJobService.submit("coverage import: " + resolved.getFileName(), token ->
+            new CoverageImport(workspace, coverage.importReport(workspace, resolved)), (job, imported, error) -> completeCoverageImport(job, workspace, imported, error));
+        state.jobs.put(jobId, "coverage");
+        state.output = "coverage import running (job " + jobId + ")";
+        refreshPanel();
+        return "Coverage import requested";
+    }
+
+    String clearCoverage(Path root) {
+        State state = state(root);
+        state.coverage = CoverageService.Report.empty();
+        state.output = "Coverage cleared";
+        updateCoverageGutter(editor.getCurrentBuffer());
+        refreshPanel();
+        return "Coverage cleared";
+    }
+
+    void updateCoverageGutter(FileBuffer buffer) {
+        if (editor.lineNumberPanel == null) return;
+        if (buffer == null || !buffer.hasFilePath()) {
+            editor.lineNumberPanel.updateCoverageMarkers(Map.of());
+            return;
+        }
+        editor.lineNumberPanel.updateCoverageMarkers(state(selectedRoot()).coverage.hits(buffer.getFile().toPath()));
+    }
+
+    private void completeCoverageImport(AsyncJobService.JobSnapshot job, Path root, CoverageImport imported, Exception error) {
+        State state = state(root);
+        state.jobs.remove(job.getId());
+        if (job.getStatus() == AsyncJobService.Status.CANCELLED) state.output = "Coverage import cancelled";
+        else if (error != null) state.output = "Coverage import failed: " + error.getMessage();
+        else if (imported == null) state.output = "Coverage import failed";
+        else {
+            state.coverage = state.coverage.merge(imported.imported().report());
+            state.output = "Imported " + imported.imported().format().name().toLowerCase(Locale.ROOT) + " coverage: " + state.coverage.summary().display();
+            updateCoverageGutter(editor.getCurrentBuffer());
+        }
+        refreshPanel();
+    }
+
+    private String coverageText(Path root) {
+        State state = state(root);
+        StringBuilder text = new StringBuilder("Coverage\n\n").append(state.coverage.summary().display()).append("\n\n");
+        for (Map.Entry<Path, Map<Integer, CoverageService.Line>> entry : state.coverage.files().entrySet()) {
+            long covered = entry.getValue().values().stream().filter(CoverageService.Line::covered).count();
+            text.append(entry.getKey()).append(": ").append(covered).append('/').append(entry.getValue().size()).append(" lines\n");
+        }
+        return text.toString();
     }
 
     private int run(State state, TestService.AdapterSpec raw, List<TestService.TestCase> selection) {

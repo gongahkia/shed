@@ -254,6 +254,7 @@ public class ConfigManagerTest {
         assertTrue(config.getLspCompletionFuzzyMatching());
         assertTrue(config.getLspCompletionLocalWords());
         assertTrue(config.getLspCompletionCommitCharacters());
+        assertFalse(config.getLspFormatOnSaveEnabled());
         config.setAndPersist("lsp.completion.delay.ms", "120");
         assertEquals(120, config.getLspCompletionDelayMs());
         assertEquals("lsp.completion.delay.ms must be between 0 and 1000", config.validateSettingValue("lsp.completion.delay.ms", "1001"));
@@ -265,19 +266,25 @@ public class ConfigManagerTest {
         config.setAndPersist("lsp.inlay.hints.enabled", "false");
         config.setAndPersist("lsp.definition.enabled", "false");
         config.setAndPersist("lsp.type.definition.enabled", "false");
+        config.setAndPersist("lsp.call.hierarchy.enabled", "false");
+        config.setAndPersist("lsp.type.hierarchy.enabled", "false");
         config.setAndPersist("lsp.references.enabled", "false");
         config.setAndPersist("lsp.rename.enabled", "false");
         config.setAndPersist("lsp.code.actions.enabled", "false");
         config.setAndPersist("lsp.command.execution.enabled", "false");
         config.setAndPersist("lsp.formatting.enabled", "false");
+        config.setAndPersist("lsp.format.on.save.enabled", "true");
+        assertTrue(config.getLspFormatOnSaveEnabled());
 
         LspFeatureSettings features = config.getLspFeatureSettings();
-        assertEquals(new LspFeatureSettings(false, true, false, false, false, false, false, false, false, false, false, false, false), features);
+        assertEquals(new LspFeatureSettings(false, true, false, false, false, false, false, false, false, false, false, false, false, false, false), features);
         assertFalse(features.capabilityEnablement().get(LspCapability.COMPLETION));
         assertFalse(features.capabilityEnablement().get(LspCapability.SIGNATURE_HELP));
         assertFalse(features.capabilityEnablement().get(LspCapability.HOVER));
         assertFalse(features.capabilityEnablement().get(LspCapability.DEFINITION));
         assertFalse(features.capabilityEnablement().get(LspCapability.TYPE_DEFINITION));
+        assertFalse(features.capabilityEnablement().get(LspCapability.CALL_HIERARCHY));
+        assertFalse(features.capabilityEnablement().get(LspCapability.TYPE_HIERARCHY));
         assertFalse(features.capabilityEnablement().get(LspCapability.REFERENCES));
         assertFalse(features.capabilityEnablement().get(LspCapability.RENAME));
         assertFalse(features.capabilityEnablement().get(LspCapability.CODE_ACTION));
@@ -294,7 +301,31 @@ public class ConfigManagerTest {
         TypedSettings.Descriptor autoShow = config.typedSettingDescriptors().stream()
             .filter(setting -> setting.key().equals("lsp.completion.auto.show")).findFirst().orElseThrow();
         assertEquals("Live: used by the next completion request", autoShow.applyBehavior());
+        TypedSettings.Descriptor formatOnSave = config.typedSettingDescriptors().stream()
+            .filter(setting -> setting.key().equals("lsp.format.on.save.enabled")).findFirst().orElseThrow();
+        assertEquals("Live: used by the next save request", formatOnSave.applyBehavior());
         assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"lsp.formatting.enabled\" = false"));
+        assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"lsp.format.on.save.enabled\" = true"));
+    }
+
+    @Test
+    void persistsPerLanguageFormatterPolicies() throws IOException {
+        Path home = tempDir.resolve("home-formatter-policy");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.setAndPersist("formatter.py.mode", "external");
+        config.setAndPersist("formatter.py.command", "ruff");
+        config.setAndPersist("formatter.py.args", "format --stdin-filename '${file}'");
+        config.setAndPersist("formatter.py.format.on.save", "true");
+
+        FormatterPolicy policy = config.getFormatterPolicy(".py");
+        assertEquals(FormatterPolicy.Mode.EXTERNAL, policy.mode());
+        assertEquals("ruff", policy.command());
+        assertEquals(List.of("format", "--stdin-filename", "${file}"), policy.args());
+        assertTrue(policy.formatOnSave());
+        assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"formatter.py.format.on.save\" = true"));
+        assertEquals(FormatterPolicy.Mode.EXTERNAL, new ConfigManager().getFormatterPolicy("py").mode());
     }
 
     @Test

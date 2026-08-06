@@ -25,12 +25,17 @@ schema_version = 1
 [[adapter]]
 id = "pytest"
 command = ["python", "-m", "pytest"]
+debug_configuration = "pytest-test"
 
 [[adapter]]
 id = "vitest"
 command = ["./node_modules/.bin/vitest"]
 ```
 
-`schema_version` must be `1`. Each `[[adapter]]` requires one unique built-in id. `command` is optional; when supplied it is a non-empty direct argv array, never a shell string. Supported ids are `maven`, `gradle`, `pytest`, `jest`, `vitest`, and `go`. Invalid files block testing for that root and report exact diagnostics; Shed does not fall back to auto-detection.
+`schema_version` must be `1`. Each `[[adapter]]` requires one unique built-in id. `command` is optional; when supplied it is a non-empty direct argv array, never a shell string. `debug_configuration` is optional and names one global `debug.configuration.<name>` mapping. It enables only explicit **Debug Selection** and `:test debug <test-id>`; Shed does not infer or launch a test debugger. DAP launch args may use `${testId}` and `${testFile}` for that explicit mapping; unknown placeholders and files outside the selected workspace are rejected. Supported ids are `maven`, `gradle`, `pytest`, `jest`, `vitest`, and `go`. Invalid files block testing for that root and report exact diagnostics; Shed does not fall back to auto-detection.
 
 Results are session-only. Pytest/Jest/Vitest report files go under the configured Shed data directory's `test-reports/` cache (default `~/.shed/test-reports/`); source project files are not changed by Shed. Maven/Gradle use the XML reports their normal test tasks produce. Failed tests with a source location appear in Problems as `test:<adapter>`; no test failure replaces the quickfix list.
+
+## Coverage import
+
+Use **Import Coverage…** in Tests or `:coverage import <report>` to parse a local JaCoCo XML, Cobertura XML, LCOV, or Go `-coverprofile` report. Shed does not run, generate, upload, or watch coverage reports. Imported values are session-local, merge by workspace file/line, ignore paths outside the selected root, and show covered/uncovered active-file lines in the gutter. Use `:coverage clear` or **Clear Coverage** to remove them.

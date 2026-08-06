@@ -66,7 +66,7 @@ public class NetworkConsentAuditTest {
         assertEquals(Set.of("EditActionController.java", "MarkdownController.java", "UpdateController.java"), sourcesContaining(".browse("));
         assertEquals(Set.of(
             "DebugAdapterTransport.java", "JobQuickfixController.java", "LanguageServerDetector.java", "LspClient.java",
-            "LuaEngine.java", "PaletteController.java", "SyntaxUiController.java", "WorkspaceIndexService.java"
+            "ExternalFormatter.java", "LuaEngine.java", "PaletteController.java", "SyntaxUiController.java", "WorkspaceIndexService.java"
         ), sourcesContaining("new ProcessBuilder("));
         assertEquals(Set.of("PtyTerminalPane.java"), sourcesContaining("PtyProcessBuilder"));
 

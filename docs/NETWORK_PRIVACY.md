@@ -21,7 +21,7 @@ This is a source-level audit of Shed's app-owned outbound-capable paths. Shed ha
 | Git fetch/pull/push | The Git history document performs remote work only from its Fetch, Pull, or Push controls; Pull and Push require confirmation. | Git owns the remote protocol; status/history refreshes use local repository data. |
 | Debug adapter TCP | `DebugAdapterTransport` starts only from an explicitly configured debug session; TCP targets are rejected unless loopback. | No remote adapter address is accepted. |
 | Browser links | Open-link actions and explicit clicks on Markdown-preview links delegate a URI to the platform browser. | The browser, not Shed, owns any resulting request. Markdown, TeX, and Mermaid rendering run locally; remote images/content are never fetched. |
-| User-controlled child processes | Terminals, tasks, shell-enabled plugins, and configured language servers can launch user-selected programs. | Those programs can have their own network behavior; Shed does not inspect or authorize their traffic. |
+| User-controlled child processes | Terminals, tasks, shell-enabled plugins, configured language servers, and an opt-in external formatter can launch user-selected programs. | Those programs can have their own network behavior; Shed does not inspect or authorize their traffic. |
 
 `gh`, Git, browsers, terminals, tasks, plugins, and language servers are external programs. Shed can constrain the arguments it gives them, but it cannot verify their implementation or network side effects.
 

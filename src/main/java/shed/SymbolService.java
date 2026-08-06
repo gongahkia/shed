@@ -101,17 +101,22 @@ public class SymbolService {
     private boolean tryAddSymbol(List<Symbol> symbols, int lineNumber, String line, int braceDepth, FileType fileType) {
         String value = line == null ? "" : line;
         if (fileType == FileType.JAVA) {
-            Matcher classLike = CLASS_LIKE.matcher(value);
-            if (classLike.find()) {
-                symbols.add(new Symbol(classLike.group(2), "class", lineNumber, Math.max(1, braceDepth + 1)));
-                return true;
-            }
-            Matcher javaMethod = JAVA_METHOD.matcher(value);
-            if (javaMethod.find()) {
-                String method = javaMethod.group(1);
-                if (method != null && !method.isBlank() && !isControlKeyword(method)) {
-                    symbols.add(new Symbol(method, "method", lineNumber, Math.max(2, braceDepth + 1)));
+            if (value.indexOf("class") >= 0 || value.indexOf("interface") >= 0 || value.indexOf("enum") >= 0
+                || value.indexOf("record") >= 0) {
+                Matcher classLike = CLASS_LIKE.matcher(value);
+                if (classLike.find()) {
+                    symbols.add(new Symbol(classLike.group(2), "class", lineNumber, Math.max(1, braceDepth + 1)));
                     return true;
+                }
+            }
+            if (value.indexOf('(') >= 0 && value.indexOf(';') < 0) {
+                Matcher javaMethod = JAVA_METHOD.matcher(value);
+                if (javaMethod.find()) {
+                    String method = javaMethod.group(1);
+                    if (method != null && !method.isBlank() && !isControlKeyword(method)) {
+                        symbols.add(new Symbol(method, "method", lineNumber, Math.max(2, braceDepth + 1)));
+                        return true;
+                    }
                 }
             }
             return false;

@@ -3,7 +3,6 @@ package shed;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -40,7 +39,33 @@ final class GrammarHighlightService {
     /** Lexes an immutable background snapshot without sharing an editor cache across threads. */
     List<Token> highlightSnapshot(String text, FileType fileType) {
         if (text == null || text.isEmpty()) return List.of();
-        return new Cache(fileType == null ? FileType.TEXT : fileType).update(text);
+        FileType type = fileType == null ? FileType.TEXT : fileType;
+        List<Token> tokens = new ArrayList<>();
+        if (type != FileType.HTML && type != FileType.MARKDOWN) {
+            State state = State.normal();
+            int lineStart = 0;
+            while (lineStart <= text.length()) {
+                int lineEnd = text.indexOf('\n', lineStart);
+                if (lineEnd < 0) lineEnd = text.length();
+                state = code(text, lineStart, lineEnd, type, state.mode, tokens).withEmbedded(state.embedded, state.marker);
+                if (lineEnd == text.length()) break;
+                lineStart = lineEnd + 1;
+            }
+            return List.copyOf(tokens);
+        }
+        List<Token> lineTokens = new ArrayList<>(8);
+        State state = State.normal();
+        int lineStart = 0;
+        while (lineStart <= text.length()) {
+            int lineEnd = text.indexOf('\n', lineStart);
+            if (lineEnd < 0) lineEnd = text.length();
+            lineTokens.clear();
+            state = tokenizeLine(text.substring(lineStart, lineEnd), type, state, lineTokens);
+            for (Token token : lineTokens) tokens.add(new Token(lineStart + token.start(), lineStart + token.end(), token.scope()));
+            if (lineEnd == text.length()) break;
+            lineStart = lineEnd + 1;
+        }
+        return List.copyOf(tokens);
     }
 
     void invalidate(FileBuffer buffer) {
@@ -295,8 +320,7 @@ final class GrammarHighlightService {
             if (isIdentifierStart(current) || (isDollarLanguage(type) && current == '$')) {
                 int start = index++;
                 while (index < to && (isIdentifier(text.charAt(index)) || (isDollarLanguage(type) && text.charAt(index) == '$'))) index++;
-                String word = text.substring(start, index);
-                Scope scope = wordScope(word, text, index, type);
+                Scope scope = wordScope(text, start, index, to, type);
                 if (scope != null) add(tokens, start, index, scope);
                 continue;
             }
@@ -312,14 +336,30 @@ final class GrammarHighlightService {
         return State.normal();
     }
 
-    private Scope wordScope(String word, String text, int end, FileType type) {
-        if (keywords.getOrDefault(type, Set.of()).contains(word)) return Scope.KEYWORD;
-        if (word.length() > 1 && word.chars().allMatch(value -> Character.isUpperCase((char) value) || Character.isDigit((char) value) || value == '_')) return Scope.CONSTANT;
+    private Scope wordScope(String text, int start, int end, int limit, FileType type) {
+        if (isKeyword(text, start, end, type)) return Scope.KEYWORD;
+        if (end - start > 1 && isUpperConstant(text, start, end)) return Scope.CONSTANT;
         int next = end;
-        while (next < text.length() && Character.isWhitespace(text.charAt(next))) next++;
+        while (next < limit && Character.isWhitespace(text.charAt(next))) next++;
         if (next < text.length() && text.charAt(next) == '(') return Scope.FUNCTION;
-        if (Character.isUpperCase(word.charAt(0))) return Scope.TYPE;
+        if (Character.isUpperCase(text.charAt(start))) return Scope.TYPE;
         return null;
+    }
+
+    private boolean isKeyword(String text, int start, int end, FileType type) {
+        int length = end - start;
+        for (String keyword : keywords.getOrDefault(type, Set.of())) {
+            if (keyword.length() == length && text.regionMatches(start, keyword, 0, length)) return true;
+        }
+        return false;
+    }
+
+    private boolean isUpperConstant(String text, int start, int end) {
+        for (int index = start; index < end; index++) {
+            char value = text.charAt(index);
+            if (!(Character.isUpperCase(value) || Character.isDigit(value) || value == '_')) return false;
+        }
+        return true;
     }
 
     private Mode quoteMode(String text, int index, FileType type, int limit) {
@@ -406,11 +446,13 @@ final class GrammarHighlightService {
     }
 
     private boolean supportsLineComments(FileType type) {
-        return EnumSet.of(FileType.JAVA, FileType.JAVASCRIPT, FileType.TYPESCRIPT, FileType.RUST, FileType.GO, FileType.C, FileType.CPP).contains(type);
+        return type == FileType.JAVA || type == FileType.JAVASCRIPT || type == FileType.TYPESCRIPT || type == FileType.RUST
+            || type == FileType.GO || type == FileType.C || type == FileType.CPP;
     }
 
     private boolean supportsBlockComments(FileType type) {
-        return EnumSet.of(FileType.JAVA, FileType.JAVASCRIPT, FileType.TYPESCRIPT, FileType.RUST, FileType.GO, FileType.C, FileType.CPP, FileType.CSS).contains(type);
+        return type == FileType.JAVA || type == FileType.JAVASCRIPT || type == FileType.TYPESCRIPT || type == FileType.RUST
+            || type == FileType.GO || type == FileType.C || type == FileType.CPP || type == FileType.CSS;
     }
 
     private boolean isDollarLanguage(FileType type) {

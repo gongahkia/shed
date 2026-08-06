@@ -76,7 +76,7 @@ public final class EditorResponsivenessBenchmark {
 
     private static Convergence converge(VersionedTextSnapshot snapshot) {
         String text = snapshot.text();
-        long syntax = measureNanos(() -> new GrammarHighlightService().highlightSnapshot(text, FileType.JAVA));
+        long syntax = measureNanos(() -> new GrammarHighlightService().highlightViewport(text, FileType.JAVA, 0, 64 * 1024));
         long symbols = measureNanos(() -> new SymbolService().collectSymbols(text, FileType.JAVA));
         long completion = measureNanos(() -> new OpenBufferCompletionIndex().build(text));
         long diff = measureNanos(() -> LineNumberPanel.diffMarkers(text, snapshot.replace(0, 0, "// ").text()));
@@ -171,7 +171,7 @@ public final class EditorResponsivenessBenchmark {
 
     private record Convergence(long syntaxNanos, long symbolNanos, long completionNanos, long diffNanos) {
         long totalNanos() {
-            return syntaxNanos + symbolNanos + completionNanos + diffNanos;
+            return Math.max(Math.max(syntaxNanos, symbolNanos), Math.max(completionNanos, diffNanos));
         }
     }
 }

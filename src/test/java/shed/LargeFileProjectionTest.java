@@ -17,7 +17,7 @@ public class LargeFileProjectionTest {
     void movesBoundedWindowWithoutMaterializingAllLines() throws Exception {
         Path file = tempDir.resolve("large.txt");
         StringBuilder content = new StringBuilder();
-        for (int line = 1; line <= 50_001; line++) {
+        for (int line = 1; line <= 500_001; line++) {
             content.append("line-").append(line).append('\n');
         }
         Files.writeString(file, content, StandardCharsets.UTF_8);

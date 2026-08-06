@@ -412,7 +412,10 @@ public class FileBuffer {
         if (largeFile) {
             throw new IllegalStateException("Large-file content is not materialized");
         }
-        String content = textSnapshot.text();
+        String content = getContent();
+        if (textSnapshot.length() != content.length() || !textSnapshot.text().equals(content)) {
+            textSnapshot = VersionedTextSnapshot.of(content);
+        }
         if (largeFile && largeFileTail != null) {
             String visibleContent = removeLargeFilePreviewMarker(content);
             return visibleContent + (visibleContent.isEmpty() || visibleContent.endsWith("\n") || largeFileTail.startsWith("\n") ? "" : "\n") + largeFileTail;

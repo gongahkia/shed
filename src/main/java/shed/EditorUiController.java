@@ -386,6 +386,7 @@ final class EditorUiController {
         paneScrollPane.getVerticalScrollBar().addAdjustmentListener(event -> {
             if (!event.getValueIsAdjusting()) {
                 editor.handleLargeFileScroll(pane);
+                editor.scheduleSyntaxHighlighting();
             }
         });
         paneScrollPane.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {

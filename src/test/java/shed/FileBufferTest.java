@@ -11,7 +11,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -90,6 +93,25 @@ public class FileBufferTest {
         assertFalse(buffer.isModified());
         assertEquals("reloaded\n", buffer.getContent());
         assertEquals("reloaded\n", buffer.getSavedContent());
+    }
+
+    @Test
+    void documentEventsAdvanceTheVersionedSnapshotWithoutReadingTheFullBuffer() throws Exception {
+        FileBuffer buffer = new FileBuffer(tempDir.resolve("snapshot.txt").toString());
+        buffer.setContent("one\ntwo", false);
+        AtomicReference<FileBuffer.DocumentTextChange> change = new AtomicReference<>();
+        buffer.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent event) { change.set(buffer.applyDocumentChange(event)); }
+            @Override public void removeUpdate(DocumentEvent event) { change.set(buffer.applyDocumentChange(event)); }
+            @Override public void changedUpdate(DocumentEvent event) { change.set(buffer.applyDocumentChange(event)); }
+        });
+
+        buffer.getDocument().insertString(4, "T", null);
+
+        assertEquals("one\nTtwo", buffer.textSnapshot().text());
+        assertTrue(change.get().incremental());
+        assertEquals(new VersionedTextSnapshot.Position(1, 0), change.get().before().positionAt(change.get().offset()));
+        assertEquals(new VersionedTextSnapshot.Position(1, 1), change.get().after().positionAt(5));
     }
 
     private static ConfigManager boundedPreviewPolicy() {

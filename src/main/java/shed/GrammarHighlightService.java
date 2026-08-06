@@ -68,6 +68,39 @@ final class GrammarHighlightService {
         return List.copyOf(tokens);
     }
 
+    /**
+     * Lexes a visible code range after cheaply advancing lexical state through
+     * the preceding lines. This bounds token allocation for very large editable
+     * files while retaining correct multiline comment and string state.
+     */
+    List<Token> highlightViewport(String text, FileType fileType, int visibleStart, int visibleEnd) {
+        if (text == null || text.isEmpty()) return List.of();
+        FileType type = fileType == null ? FileType.TEXT : fileType;
+        if (type == FileType.HTML || type == FileType.MARKDOWN) return highlightSnapshot(text, type);
+        int start = Math.max(0, Math.min(visibleStart, text.length()));
+        int end = Math.max(start, Math.min(visibleEnd, text.length()));
+        int firstLine = text.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+        int lastLine = text.indexOf('\n', end);
+        if (lastLine < 0) lastLine = text.length();
+        State state = State.normal();
+        int lineStart = 0;
+        while (lineStart < firstLine) {
+            int lineEnd = text.indexOf('\n', lineStart);
+            if (lineEnd < 0) lineEnd = text.length();
+            state = code(text, lineStart, lineEnd, type, state.mode, null).withEmbedded(state.embedded, state.marker);
+            lineStart = lineEnd + 1;
+        }
+        List<Token> tokens = new ArrayList<>();
+        while (lineStart <= lastLine) {
+            int lineEnd = text.indexOf('\n', lineStart);
+            if (lineEnd < 0 || lineEnd > lastLine) lineEnd = lastLine;
+            state = code(text, lineStart, lineEnd, type, state.mode, tokens).withEmbedded(state.embedded, state.marker);
+            if (lineEnd == lastLine) break;
+            lineStart = lineEnd + 1;
+        }
+        return List.copyOf(tokens);
+    }
+
     void invalidate(FileBuffer buffer) {
         if (buffer != null) caches.remove(buffer);
     }
@@ -493,7 +526,7 @@ final class GrammarHighlightService {
     }
 
     private static void add(List<Token> tokens, int start, int end, Scope scope) {
-        if (start >= 0 && end > start) tokens.add(new Token(start, end, scope));
+        if (tokens != null && start >= 0 && end > start) tokens.add(new Token(start, end, scope));
     }
 
     private record Line(String text, State start, State end, List<Token> tokens) {}

@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
 final class SyntaxUiController {
     static final int MAX_FULL_SYNTAX_CHARS = 750_000;
     static final int MAX_FULL_SYNTAX_LINES = 20_000;
+    private static final int VIRTUAL_SYNTAX_CONTEXT_LINES = 120;
     private static final int EDIT_IDLE_DEBOUNCE_MS = 120;
     private static final int GIT_BLAME_DEBOUNCE_MS = 90;
     private static final int GIT_BLAME_CACHE_LIMIT = 256;
@@ -479,8 +480,10 @@ final class SyntaxUiController {
             editor.writingArea.repaint();
             return;
         }
+        Range visible = syntaxViewport(text);
+        boolean virtualized = text.length() > MAX_FULL_SYNTAX_CHARS || text.lineCount() > MAX_FULL_SYNTAX_LINES;
         SyntaxRequest request = new SyntaxRequest(buffer, text, buffer.getFileType(), syntaxColors(),
-            editor.configManager.getShowWhitespace(), ++syntaxGeneration);
+            editor.configManager.getShowWhitespace(), virtualized, visible.start(), visible.end(), ++syntaxGeneration);
         if (syntaxJobId >= 0) editor.asyncJobService.cancel(syntaxJobId);
         syntaxJobId = editor.asyncJobService.submit("Syntax highlighting", token -> highlightSnapshot(request, token),
             (snapshot, result, error) -> applySyntaxSnapshot(snapshot, result, error));
@@ -489,12 +492,18 @@ final class SyntaxUiController {
     private SyntaxResult highlightSnapshot(SyntaxRequest request, AsyncJobService.JobToken token) {
         long started = System.nanoTime();
         List<SyntaxSpan> spans = new ArrayList<>();
-        for (GrammarHighlightService.Token value : new GrammarHighlightService().highlightSnapshot(request.text().text(), request.fileType())) {
+        GrammarHighlightService grammar = new GrammarHighlightService();
+        List<GrammarHighlightService.Token> tokens = request.virtualized()
+            ? grammar.highlightViewport(request.text().text(), request.fileType(), request.visibleStart(), request.visibleEnd())
+            : grammar.highlightSnapshot(request.text().text(), request.fileType());
+        for (GrammarHighlightService.Token value : tokens) {
             if (token.isCancelled()) return null;
             Color color = request.colors().get(value.scope());
             if (color != null) spans.add(new SyntaxSpan(value.start(), value.end(), color));
         }
-        List<Range> trailingWhitespace = request.showWhitespace() ? trailingWhitespace(request.text()) : List.of();
+        List<Range> trailingWhitespace = request.showWhitespace()
+            ? trailingWhitespace(request.text(), request.virtualized() ? request.visibleStart() : 0,
+                request.virtualized() ? request.visibleEnd() : request.text().length()) : List.of();
         if (editor.perfService != null) {
             editor.perfService.recordDuration("syntax.highlight", started,
                 "chars=" + request.text().length() + " lines=" + request.text().lineCount());
@@ -530,9 +539,24 @@ final class SyntaxUiController {
         return colors;
     }
 
-    private List<Range> trailingWhitespace(VersionedTextSnapshot text) {
+    private Range syntaxViewport(VersionedTextSnapshot text) {
+        try {
+            Rectangle visible = editor.writingArea.getVisibleRect();
+            int start = editor.writingArea.viewToModel2D(new Point(visible.x, visible.y));
+            int end = editor.writingArea.viewToModel2D(new Point(visible.x + visible.width, visible.y + visible.height));
+            int startLine = Math.max(0, text.positionAt(Math.max(0, start)).line() - VIRTUAL_SYNTAX_CONTEXT_LINES);
+            int endLine = Math.min(text.lineCount() - 1, text.positionAt(Math.max(0, end)).line() + VIRTUAL_SYNTAX_CONTEXT_LINES);
+            return new Range(text.lineStartOffset(startLine), text.lineEndOffset(endLine));
+        } catch (RuntimeException ignored) {
+            return new Range(0, text.length());
+        }
+    }
+
+    private List<Range> trailingWhitespace(VersionedTextSnapshot text, int visibleStart, int visibleEnd) {
         List<Range> ranges = new ArrayList<>();
-        for (int line = 0; line < text.lineCount(); line++) {
+        int firstLine = text.positionAt(Math.max(0, visibleStart)).line();
+        int lastLine = text.positionAt(Math.max(0, visibleEnd)).line();
+        for (int line = firstLine; line <= lastLine; line++) {
             int start = text.lineStartOffset(line);
             int end = text.lineEndOffset(line);
             int trailing = end;
@@ -561,7 +585,8 @@ final class SyntaxUiController {
     }
 
     private record SyntaxRequest(FileBuffer buffer, VersionedTextSnapshot text, FileType fileType,
-                                 EnumMap<GrammarHighlightService.Scope, Color> colors, boolean showWhitespace, long generation) { }
+                                 EnumMap<GrammarHighlightService.Scope, Color> colors, boolean showWhitespace,
+                                 boolean virtualized, int visibleStart, int visibleEnd, long generation) { }
     private record SyntaxResult(SyntaxRequest request, List<SyntaxSpan> spans, List<Range> trailingWhitespace) { }
     private record SymbolRequest(FileBuffer buffer, VersionedTextSnapshot text, FileType fileType, long generation) { }
     private record SymbolResult(SymbolRequest request, List<SymbolService.Symbol> symbols) { }

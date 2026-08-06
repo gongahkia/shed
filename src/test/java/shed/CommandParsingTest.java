@@ -124,14 +124,27 @@ public class CommandParsingTest {
     }
 
     @Test
-    void exposesLanguageServicesAsACommandPaletteCandidate() {
+    void exposesSemanticSurfaceActionsInTheCommandPalette() {
         CommandHandler handler = new CommandHandler(null);
         FuzzyMatchService matcher = new FuzzyMatchService();
 
         assertTrue(handler.getCommandNames().contains("languageservices"));
         assertTrue(handler.getCommandNames().contains("language-services"));
-        assertTrue(matcher.matchStrings("Language Services", List.of(PaletteController.LANGUAGE_SERVICES_ACTION), 0)
+        List<String> actions = PaletteController.surfaceActionNames();
+        assertTrue(matcher.matchStrings("Language Services", actions, 0)
             .contains(PaletteController.LANGUAGE_SERVICES_ACTION));
+        assertTrue(matcher.matchStrings("Workspace Folders", actions, 0).contains("Workspace Folders"));
+        assertTrue(matcher.matchStrings("Code Actions", actions, 0).contains("Code Actions"));
+        assertTrue(matcher.matchStrings("Import Coverage Report", actions, 0).contains("Import Coverage Report"));
+        assertEquals("workspace ui", PaletteController.surfaceActionCommand("Workspace Folders"));
+        assertEquals("lsp codeaction", PaletteController.surfaceActionCommand("Code Actions"));
+        assertEquals("snippets edit", PaletteController.surfaceActionCommand("Edit Snippets"));
+        assertEquals(actions.size(), new java.util.HashSet<>(actions).size());
+        for (String action : actions) {
+            String command = PaletteController.surfaceActionCommand(action);
+            String topLevel = command.substring(0, command.indexOf(' ') < 0 ? command.length() : command.indexOf(' '));
+            assertTrue(handler.getCommandNames().contains(topLevel), action + " must route through a registered command");
+        }
     }
 
     private static class RecordingHandler implements GitService.Handler {

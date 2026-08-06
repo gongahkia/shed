@@ -264,6 +264,7 @@ public class ConfigManagerTest {
         config.setAndPersist("lsp.semantic.tokens.enabled", "false");
         config.setAndPersist("lsp.inlay.hints.enabled", "false");
         config.setAndPersist("lsp.definition.enabled", "false");
+        config.setAndPersist("lsp.type.definition.enabled", "false");
         config.setAndPersist("lsp.references.enabled", "false");
         config.setAndPersist("lsp.rename.enabled", "false");
         config.setAndPersist("lsp.code.actions.enabled", "false");
@@ -271,11 +272,12 @@ public class ConfigManagerTest {
         config.setAndPersist("lsp.formatting.enabled", "false");
 
         LspFeatureSettings features = config.getLspFeatureSettings();
-        assertEquals(new LspFeatureSettings(false, true, false, false, false, false, false, false, false, false, false, false), features);
+        assertEquals(new LspFeatureSettings(false, true, false, false, false, false, false, false, false, false, false, false, false), features);
         assertFalse(features.capabilityEnablement().get(LspCapability.COMPLETION));
         assertFalse(features.capabilityEnablement().get(LspCapability.SIGNATURE_HELP));
         assertFalse(features.capabilityEnablement().get(LspCapability.HOVER));
         assertFalse(features.capabilityEnablement().get(LspCapability.DEFINITION));
+        assertFalse(features.capabilityEnablement().get(LspCapability.TYPE_DEFINITION));
         assertFalse(features.capabilityEnablement().get(LspCapability.REFERENCES));
         assertFalse(features.capabilityEnablement().get(LspCapability.RENAME));
         assertFalse(features.capabilityEnablement().get(LspCapability.CODE_ACTION));

@@ -136,6 +136,7 @@ Shed keeps an independent client for each `(extension, workspace root)` pair, so
 | `lsp.semantic.tokens.inline` | `true` | bool | Render supported semantic-token colours inline; applies immediately |
 | `lsp.inlay.hints.inline` | `true` | bool | Render supported inlay hints inline; applies immediately |
 | `lsp.definition.enabled` | `true` | bool | Navigation: definition requests |
+| `lsp.type.definition.enabled` | `true` | bool | Navigation: type-definition requests |
 | `lsp.references.enabled` | `true` | bool | Navigation: reference requests |
 | `lsp.rename.enabled` | `true` | bool | Rename requests |
 | `lsp.code.actions.enabled` | `true` | bool | Actions: code-action requests |

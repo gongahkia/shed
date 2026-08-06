@@ -229,6 +229,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | :--- | :--- |
 | `:lsp <subcommand>` | Run explicit LSP subcommand |
 | `:definition` | LSP go-to-definition |
+| `:typedefinition`, `:typedef` | LSP go-to-type-definition |
 | `:hover` | LSP hover |
 | `:references` | LSP references to quickfix |
 
@@ -242,6 +243,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | After any snippet completion | Tab/Shift-Tab moves through ordered placeholders; positions survive ordinary edits |
 | Insert `(` or `,` | Shows capability-gated asynchronous signature help; the next edit or Escape cancels it |
 | `:lsp definition`, `:lsp def` | Go to definition |
+| `:lsp typedefinition`, `:lsp type`, `:lsp typedef` | Go to type definition |
 | `:lsp hover` | Show hover info |
 | `:lsp semantic`, `:lsp semantictokens` | Show current-document semantic tokens when supported; supported tokens also render inline by default |
 | `:lsp inlay`, `:lsp inlayhints` | Show current-document inlay hints when supported; supported hints also render inline by default |

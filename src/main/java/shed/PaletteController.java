@@ -463,6 +463,9 @@ final class PaletteController {
                 return "Select and control explicit Debug Adapter Protocol sessions.";
             case "definition":
                 return "Jump to symbol definition.";
+            case "typedefinition":
+            case "typedef":
+                return "Jump to the type definition behind the symbol.";
             case "hover":
                 return "Show hover docs in scratch buffer.";
             case "references":

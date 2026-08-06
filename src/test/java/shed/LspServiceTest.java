@@ -19,7 +19,7 @@ public class LspServiceTest {
     @Test
     void negotiatesAdvertisedDisabledAndUnsupportedCapabilities() {
         Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
-            "{\"result\":{\"capabilities\":{\"completionProvider\":{},\"hoverProvider\":true,\"renameProvider\":{\"prepareProvider\":true}},\"serverInfo\":{\"name\":\"testls\",\"version\":\"1.2\"}}}"
+            "{\"result\":{\"capabilities\":{\"completionProvider\":{},\"hoverProvider\":true,\"typeDefinitionProvider\":true,\"renameProvider\":{\"prepareProvider\":true}},\"serverInfo\":{\"name\":\"testls\",\"version\":\"1.2\"}}}"
         ));
         Map<LspCapability, Boolean> clientEnabled = new EnumMap<>(LspCapability.class);
         clientEnabled.put(LspCapability.HOVER, Boolean.FALSE);
@@ -28,6 +28,7 @@ public class LspServiceTest {
 
         assertTrue(model.allows(LspCapability.COMPLETION));
         assertTrue(model.allows(LspCapability.RENAME));
+        assertTrue(model.allows(LspCapability.TYPE_DEFINITION));
         assertFalse(model.allows(LspCapability.HOVER));
         assertEquals(LspCapabilityModel.Availability.DISABLED, model.availability(LspCapability.HOVER));
         assertEquals("LSP hover is disabled by client policy; enable it in LSP settings",

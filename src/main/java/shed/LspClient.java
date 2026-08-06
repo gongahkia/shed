@@ -201,15 +201,54 @@ public class LspClient {
         }
     }
 
+    public static class HierarchyItem {
+        private final String name;
+        private final String detail;
+        private final int kind;
+        private final String uri;
+        private final int line;
+        private final int character;
+        private final Map<String, Object> payload;
+
+        private HierarchyItem(String name, String detail, int kind, String uri, int line, int character, Map<String, Object> payload) {
+            this.name = name == null ? "" : name;
+            this.detail = detail == null ? "" : detail;
+            this.kind = Math.max(0, kind);
+            this.uri = uri == null ? "" : uri;
+            this.line = Math.max(0, line);
+            this.character = Math.max(0, character);
+            this.payload = payload == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(payload));
+        }
+
+        public String getName() { return name; }
+        public String getDetail() { return detail; }
+        public int getKind() { return kind; }
+        public String getUri() { return uri; }
+        public int getLine() { return line; }
+        public int getCharacter() { return character; }
+        Map<String, Object> requestPayload() { return payload; }
+        @Override public String toString() { return detail.isBlank() ? name : name + " — " + detail; }
+    }
+
+    public record CallHierarchyCall(HierarchyItem item) { }
+
     public static class Diagnostic {
         private final int line;
         private final int character;
+        private final int endLine;
+        private final int endCharacter;
         private final int severity;
         private final String message;
 
         public Diagnostic(int line, int character, int severity, String message) {
+            this(line, character, line, character + 1, severity, message);
+        }
+
+        public Diagnostic(int line, int character, int endLine, int endCharacter, int severity, String message) {
             this.line = line;
             this.character = character;
+            this.endLine = Math.max(line, endLine);
+            this.endCharacter = Math.max(0, endCharacter);
             this.severity = severity;
             this.message = message;
         }
@@ -221,6 +260,10 @@ public class LspClient {
         public int getCharacter() {
             return character;
         }
+
+        public int getEndLine() { return endLine; }
+
+        public int getEndCharacter() { return endCharacter; }
 
         public int getSeverity() {
             return severity;
@@ -883,6 +926,54 @@ public class LspClient {
         return textDocumentLocation("textDocument/typeDefinition", uri, line, character);
     }
 
+    public List<HierarchyItem> prepareCallHierarchy(String uri, int line, int character) {
+        if (!supports(LspCapability.CALL_HIERARCHY)) return List.of();
+        Map<String, Object> response = sendTextDocumentPositionRequest("textDocument/prepareCallHierarchy", uri, line, character, 2500L);
+        return parseHierarchyItems(response == null ? null : response.get("result"));
+    }
+
+    public List<CallHierarchyCall> incomingCalls(HierarchyItem item) {
+        return callHierarchyCalls("callHierarchy/incomingCalls", "from", item);
+    }
+
+    public List<CallHierarchyCall> outgoingCalls(HierarchyItem item) {
+        return callHierarchyCalls("callHierarchy/outgoingCalls", "to", item);
+    }
+
+    public List<HierarchyItem> prepareTypeHierarchy(String uri, int line, int character) {
+        if (!supports(LspCapability.TYPE_HIERARCHY)) return List.of();
+        Map<String, Object> response = sendTextDocumentPositionRequest("textDocument/prepareTypeHierarchy", uri, line, character, 2500L);
+        return parseHierarchyItems(response == null ? null : response.get("result"));
+    }
+
+    public List<HierarchyItem> typeSupertypes(HierarchyItem item) {
+        return typeHierarchyItems("typeHierarchy/supertypes", item);
+    }
+
+    public List<HierarchyItem> typeSubtypes(HierarchyItem item) {
+        return typeHierarchyItems("typeHierarchy/subtypes", item);
+    }
+
+    private List<CallHierarchyCall> callHierarchyCalls(String method, String field, HierarchyItem item) {
+        if (!supports(LspCapability.CALL_HIERARCHY) || item == null) return List.of();
+        Map<String, Object> response = sendRequest(method, Map.of("item", item.requestPayload()), 3000L);
+        List<Object> values = MiniJson.asArray(response == null ? null : response.get("result"));
+        if (values == null) return List.of();
+        List<CallHierarchyCall> calls = new ArrayList<>();
+        for (Object value : values) {
+            Map<String, Object> call = MiniJson.asObject(value);
+            HierarchyItem target = parseHierarchyItem(call == null ? null : MiniJson.asObject(call.get(field)));
+            if (target != null) calls.add(new CallHierarchyCall(target));
+        }
+        return calls;
+    }
+
+    private List<HierarchyItem> typeHierarchyItems(String method, HierarchyItem item) {
+        if (!supports(LspCapability.TYPE_HIERARCHY) || item == null) return List.of();
+        Map<String, Object> response = sendRequest(method, Map.of("item", item.requestPayload()), 3000L);
+        return parseHierarchyItems(response == null ? null : response.get("result"));
+    }
+
     private Location textDocumentLocation(String method, String uri, int line, int character) {
         Map<String, Object> response = sendTextDocumentPositionRequest(method, uri, line, character, 2000L);
         if (response == null) {
@@ -967,12 +1058,22 @@ public class LspClient {
     }
 
     public List<TextEdit> formatting(String uri, int tabSize, boolean insertSpaces) {
+        try {
+            return formattingChecked(uri, tabSize, insertSpaces);
+        } catch (IOException ignored) {
+            return List.of();
+        }
+    }
+
+    public List<TextEdit> formattingChecked(String uri, int tabSize, boolean insertSpaces) throws IOException {
         if (!supports(LspCapability.FORMATTING)) return List.of();
         Map<String, Object> options = new LinkedHashMap<>();
         options.put("tabSize", Math.max(1, tabSize));
         options.put("insertSpaces", insertSpaces);
         Map<String, Object> response = sendRequest("textDocument/formatting", Map.of("textDocument", Map.of("uri", uri), "options", options), 3000L);
-        return parseTextEdits(uri, MiniJson.asArray(response == null ? null : response.get("result")), null);
+        if (response == null) throw new IOException("LSP formatting request timed out");
+        if (response.get("error") != null) throw new IOException("LSP formatting request failed: " + response.get("error"));
+        return parseTextEdits(uri, MiniJson.asArray(response.get("result")), null);
     }
 
     public List<CodeAction> codeActions(String uri, int line, int character, List<Diagnostic> diagnosticsAtCursor) {
@@ -1001,8 +1102,8 @@ public class LspClient {
                 diagnosticRangeStart.put("line", diagnostic.getLine());
                 diagnosticRangeStart.put("character", diagnostic.getCharacter());
                 Map<String, Object> diagnosticRangeEnd = new LinkedHashMap<>();
-                diagnosticRangeEnd.put("line", diagnostic.getLine());
-                diagnosticRangeEnd.put("character", diagnostic.getCharacter() + 1);
+                diagnosticRangeEnd.put("line", diagnostic.getEndLine());
+                diagnosticRangeEnd.put("character", diagnostic.getEndCharacter());
                 Map<String, Object> diagnosticRange = new LinkedHashMap<>();
                 diagnosticRange.put("start", diagnosticRangeStart);
                 diagnosticRange.put("end", diagnosticRangeEnd);
@@ -1178,6 +1279,8 @@ public class LspClient {
         textDocument.put("hover", hover);
         textDocument.put("definition", new LinkedHashMap<>());
         textDocument.put("typeDefinition", new LinkedHashMap<>());
+        textDocument.put("callHierarchy", Map.of("dynamicRegistration", Boolean.FALSE));
+        textDocument.put("typeHierarchy", Map.of("dynamicRegistration", Boolean.FALSE));
         textDocument.put("documentSymbol", Map.of("hierarchicalDocumentSymbolSupport", Boolean.TRUE));
         textDocument.put("publishDiagnostics", diagnosticsCapability);
         textDocument.put("semanticTokens", semanticTokens);
@@ -1445,11 +1548,14 @@ public class LspClient {
             }
             Map<String, Object> range = MiniJson.asObject(entry.get("range"));
             Map<String, Object> start = range == null ? null : MiniJson.asObject(range.get("start"));
+            Map<String, Object> end = range == null ? null : MiniJson.asObject(range.get("end"));
             int line = start == null || MiniJson.asInt(start.get("line")) == null ? 0 : MiniJson.asInt(start.get("line"));
             int character = start == null || MiniJson.asInt(start.get("character")) == null ? 0 : MiniJson.asInt(start.get("character"));
+            int endLine = end == null || MiniJson.asInt(end.get("line")) == null ? line : MiniJson.asInt(end.get("line"));
+            int endCharacter = end == null || MiniJson.asInt(end.get("character")) == null ? character + 1 : MiniJson.asInt(end.get("character"));
             int severity = MiniJson.asInt(entry.get("severity")) == null ? 0 : MiniJson.asInt(entry.get("severity"));
             String messageText = MiniJson.asString(entry.get("message"));
-            parsed.add(new Diagnostic(line, character, severity, messageText == null ? "" : messageText));
+            parsed.add(new Diagnostic(line, character, endLine, endCharacter, severity, messageText == null ? "" : messageText));
         }
         diagnostics.put(uri, parsed);
         Runnable handler = diagnosticsChangedHandler;
@@ -1534,6 +1640,32 @@ public class LspClient {
             return null;
         }
         return new Location(uri, line, character);
+    }
+
+    static List<HierarchyItem> parseHierarchyItems(Object value) {
+        List<Object> values = MiniJson.asArray(value);
+        if (values == null) return List.of();
+        List<HierarchyItem> items = new ArrayList<>();
+        for (Object candidate : values) {
+            HierarchyItem item = parseHierarchyItem(MiniJson.asObject(candidate));
+            if (item != null) items.add(item);
+        }
+        return items;
+    }
+
+    private static HierarchyItem parseHierarchyItem(Map<String, Object> value) {
+        if (value == null) return null;
+        String name = MiniJson.asString(value.get("name"));
+        String uri = MiniJson.asString(value.get("uri"));
+        Map<String, Object> selection = MiniJson.asObject(value.get("selectionRange"));
+        if (selection == null) selection = MiniJson.asObject(value.get("range"));
+        Map<String, Object> start = selection == null ? null : MiniJson.asObject(selection.get("start"));
+        Integer line = start == null ? null : MiniJson.asInt(start.get("line"));
+        Integer character = start == null ? null : MiniJson.asInt(start.get("character"));
+        if (name == null || name.isBlank() || uri == null || line == null || character == null) return null;
+        String detail = MiniJson.asString(value.get("detail"));
+        Integer kind = MiniJson.asInt(value.get("kind"));
+        return new HierarchyItem(name, detail, kind == null ? 0 : kind, uri, line, character, value);
     }
 
     static List<TextEdit> parseTextEdits(String uri, List<Object> editObjects, Integer documentVersion) {

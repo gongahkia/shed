@@ -131,6 +131,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.runDropCommand(args), "drop");
         registerCommand((args, range, force) -> editor.handleTaskCommand(args), "task");
         registerCommand((args, range, force) -> editor.handleTestCommand(args), "test");
+        registerCommand((args, range, force) -> editor.handleCoverageCommand(args), "coverage", "cov");
         registerCommand((args, range, force) -> editor.handleTreeCommand(args), "tree");
         registerCommand((args, range, force) -> editor.handleGitCommand(args), "git");
         registerCommand((args, range, force) -> editor.handleGitHubCommand(args), "github", "gh");
@@ -158,6 +159,9 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.quickfixLast(), "clast");
         registerCommand((args, range, force) -> editor.quickfixCurrent(args), "cc");
         registerCommand((args, range, force) -> editor.handleLspCommand(args), "lsp");
+        registerCommand((args, range, force) -> editor.handleLspCommand("peek " + args), "peek");
+        registerCommand((args, range, force) -> editor.formatCurrentBuffer(), "format", "fmt");
+        registerCommand((args, range, force) -> editor.showFormatterPolicy(), "formatter", "formatpolicy");
         registerCommand((args, range, force) -> editor.handleDebugCommand(args), "debug", "dap");
         registerCommand((args, range, force) -> editor.lspGoToDefinition(), "definition");
         registerCommand((args, range, force) -> editor.lspGoToTypeDefinition(), "typedefinition", "typedef");
@@ -184,7 +188,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.showUndoHistory(), "undolist", "undotree");
         registerCommand((args, range, force) -> editor.writeAll(), "wa", "wall");
         registerCommand((args, range, force) -> editor.quitAll(force), "qa", "qall");
-        registerCommand((args, range, force) -> { String r = editor.writeAll(); if (r.startsWith("Error")) return r; return editor.quitAll(force); }, "wqa", "wqall", "xa", "xall");
+        registerCommand((args, range, force) -> editor.writeAllAndQuit(force), "wqa", "wqall", "xa", "xall");
 
         // Markdown / orgmode commands
         registerCommand((args, range, force) -> editor.showTableOfContents(), "toc");
@@ -222,42 +226,11 @@ public class CommandHandler {
     }
 
     private String handleWrite(String targetPath) {
-        try {
-            FileBuffer buffer = editor.getCurrentBuffer();
-            if (buffer == null) {
-                return "Error: No file open";
-            }
-
-            String previousContent = buffer.getContent();
-            String updatedContent = editor.getTextArea().getText();
-            buffer.setContent(updatedContent);
-            editor.backupBeforeSave(buffer);
-            if (targetPath != null && !targetPath.isEmpty()) {
-                buffer.saveAs(new File(targetPath));
-            } else {
-                buffer.save();
-            }
-            editor.notifyCurrentBufferSaved();
-            String reloadResult = editor.reloadConfigIfSettingsBuffer(buffer, previousContent, updatedContent);
-
-            String timestamp = timeFormat.format(LocalDateTime.now());
-            String base = "\"" + buffer.getDisplayName() + "\" " + buffer.getLineCount() + "L written " + timestamp;
-            if (reloadResult != null && !reloadResult.isEmpty()) {
-                return base + " (" + reloadResult + ")";
-            }
-            return base;
-        } catch (IOException e) {
-            return "Error saving file: " + e.getMessage();
-        }
+        return editor.formatOnSaveController.requestCurrent(targetPath, false);
     }
 
     private String handleWriteQuit(String targetPath) {
-        String writeResult = handleWrite(targetPath);
-        if (writeResult.startsWith("Error")) {
-            return writeResult;
-        }
-        editor.requestQuit(true);
-        return "Saved and quitting";
+        return editor.formatOnSaveController.requestCurrent(targetPath, true);
     }
 
     private String handleEdit(String filename) {

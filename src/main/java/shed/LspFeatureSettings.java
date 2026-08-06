@@ -12,6 +12,8 @@ record LspFeatureSettings(
     boolean inlayHints,
     boolean definition,
     boolean typeDefinition,
+    boolean callHierarchy,
+    boolean typeHierarchy,
     boolean references,
     boolean rename,
     boolean codeActions,
@@ -19,7 +21,7 @@ record LspFeatureSettings(
     boolean formatting
 ) {
     static LspFeatureSettings defaults() {
-        return new LspFeatureSettings(true, false, true, true, true, true, true, true, true, true, true, true, true);
+        return new LspFeatureSettings(true, false, true, true, true, true, true, true, true, true, true, true, true, true, true);
     }
 
     Map<LspCapability, Boolean> capabilityEnablement() {
@@ -29,6 +31,8 @@ record LspFeatureSettings(
         enabled.put(LspCapability.HOVER, hover);
         enabled.put(LspCapability.DEFINITION, definition);
         enabled.put(LspCapability.TYPE_DEFINITION, typeDefinition);
+        enabled.put(LspCapability.CALL_HIERARCHY, callHierarchy);
+        enabled.put(LspCapability.TYPE_HIERARCHY, typeHierarchy);
         enabled.put(LspCapability.REFERENCES, references);
         enabled.put(LspCapability.RENAME, rename);
         enabled.put(LspCapability.CODE_ACTION, codeActions);

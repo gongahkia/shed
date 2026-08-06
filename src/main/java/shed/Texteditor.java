@@ -91,6 +91,9 @@ public class Texteditor extends JFrame implements KeyListener {
     JobQuickfixController jobQuickfixController;
     ProblemsController problemsController;
     TestController testController;
+    FormatOnSaveController formatOnSaveController;
+    FormatterController formatterController;
+    PeekView peekView;
     TerminalController terminalController;
     MarkdownController markdownController;
     PaneBufferController paneBufferController;
@@ -246,6 +249,8 @@ public class Texteditor extends JFrame implements KeyListener {
         jobQuickfixController = new JobQuickfixController(this);
         problemsController = new ProblemsController(this, problemsService);
         testController = new TestController(this, new TestService());
+        formatOnSaveController = new FormatOnSaveController(this);
+        formatterController = new FormatterController(this);
         editorState = new EditorState();
         modeEngine = new ModeEngine();
         buffers = new ArrayList<>();
@@ -328,6 +333,7 @@ public class Texteditor extends JFrame implements KeyListener {
         bracketColorService = new BracketColorService();
         markdownController = new MarkdownController(this);
         paneBufferController = new PaneBufferController(this);
+        peekView = new PeekView(this);
         sessionConfigController = new SessionConfigController(this);
         symbolService = new SymbolService();
         taskService = new TaskService();
@@ -1366,11 +1372,11 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("bn"); commands.add("bp"); commands.add("ls"); commands.add("buffers");
         commands.add("bd"); commands.add("set"); commands.add("settings"); commands.add("config");
         commands.add("log"); commands.add("session"); commands.add("workspace"); commands.add("jobs"); commands.add("jobcancel");
-        commands.add("drop"); commands.add("task"); commands.add("test"); commands.add("help"); commands.add("wc"); commands.add("recent");
+        commands.add("drop"); commands.add("task"); commands.add("test"); commands.add("coverage"); commands.add("cov"); commands.add("help"); commands.add("wc"); commands.add("recent");
         commands.add("d"); commands.add("delete"); commands.add("files"); commands.add("folder"); commands.add("projectreplace");
         commands.add("tree"); commands.add("git"); commands.add("grep"); commands.add("copen");
         commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
-        commands.add("lsp"); commands.add("debug"); commands.add("dap"); commands.add("definition"); commands.add("typedefinition"); commands.add("hover"); commands.add("references");
+        commands.add("lsp"); commands.add("peek"); commands.add("format"); commands.add("formatter"); commands.add("debug"); commands.add("dap"); commands.add("definition"); commands.add("typedefinition"); commands.add("hover"); commands.add("references");
         commands.add("diagnostics"); commands.add("diag"); commands.add("problems"); commands.add("dnext"); commands.add("dprev"); commands.add("symbols"); commands.add("sym");
         commands.add("registers"); commands.add("yankring"); commands.add("marks"); commands.add("zen"); commands.add("goyo"); commands.add("limelight"); commands.add("normal");
         commands.add("reload"); commands.add("source"); commands.add("clean"); commands.add("shedclean");
@@ -1451,6 +1457,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String handleTestCommand(String argument) {
         return testController.handle(argument);
+    }
+
+    public String handleCoverageCommand(String argument) {
+        return testController.handleCoverage(argument);
     }
 
     File resolveTaskProjectRoot() {
@@ -1995,6 +2005,14 @@ public class Texteditor extends JFrame implements KeyListener {
         return lspController.handleLspCommand(argument);
     }
 
+    public String formatCurrentBuffer() {
+        return formatterController.formatCurrent();
+    }
+
+    public String showFormatterPolicy() {
+        return formatterController.showPolicyDialog();
+    }
+
     public String handleDebugCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "ui".equalsIgnoreCase(trimmed)) {
@@ -2191,8 +2209,12 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public void notifyCurrentBufferSaved() {
-        lspController.notifyCurrentBufferSaved();
-        markdownController.refreshPreviewForBuffer(getCurrentBuffer());
+        notifyBufferSaved(getCurrentBuffer());
+    }
+
+    public void notifyBufferSaved(FileBuffer buffer) {
+        lspController.notifyBufferSaved(buffer);
+        if (buffer == getCurrentBuffer()) markdownController.refreshPreviewForBuffer(buffer);
         persistRecoverySnapshotsSafely();
     }
 
@@ -2482,6 +2504,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void loadBufferIntoEditor(FileBuffer buffer) {
         paneBufferController.loadBufferIntoEditor(buffer);
+        testController.updateCoverageGutter(buffer);
     }
 
     void loadBufferIntoPane(EditorPane pane, FileBuffer buffer, int caretPosition) {
@@ -3027,7 +3050,11 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String writeAll() {
-        return sessionConfigController.writeAll();
+        return formatOnSaveController.requestAll(false, false);
+    }
+
+    public String writeAllAndQuit(boolean force) {
+        return formatOnSaveController.requestAll(true, force);
     }
 
     public String quitAll(boolean force) {

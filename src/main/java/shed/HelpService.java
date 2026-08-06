@@ -76,7 +76,9 @@ public class HelpService {
                    "  :copen         Open quickfix list\n" +
                    "  :cnext/:cprev  Next/previous quickfix entry\n" +
                    "  :cc [n]        Jump to quickfix entry\n" +
-                   "  :lsp ...       LSP commands (def/type/hover/refs/rename/actions)\n" +
+                   "  :lsp ...       LSP commands (def/type/peek/hierarchies/refs/rename/actions)\n" +
+                   "  :format        Format using current extension policy\n" +
+                   "  :formatter     Edit current extension formatter policy\n" +
                    "  :lsp status    Show running LSP servers\n" +
                    "  :lsp servers   List all configured + builtin LSP servers\n" +
                    "  :lsp manage    Managed-LSP status and explicit actions\n" +
@@ -224,14 +226,18 @@ public class HelpService {
                     + "  ( or , (insert)  async signature help; the next edit cancels it\n"
                     + "  :lsp definition  go to definition\n"
                     + "  :lsp typedefinition  go to type definition\n"
+                    + "  :lsp peek definition|type  temporary read-only peek; Enter opens, Escape closes\n"
+                    + "  :lsp calls incoming|outgoing  searchable lazy call hierarchy\n"
+                    + "  :lsp typehierarchy supertypes|subtypes  searchable lazy type hierarchy\n"
                     + "  :lsp hover       show hover info\n"
                     + "  :lsp references  find references\n"
                     + "  :lsp rename X    preview rename edits for symbol -> X\n"
                     + "  :lsp renameapply apply pending rename preview\n"
                     + "  :lsp renamecancel discard pending rename preview\n"
-                    + "  :lsp codeaction  list/apply code actions\n"
+                    + "  :lsp codeaction  show diagnostic-anchored code actions\n"
                     + "  :diagnostics     push diagnostics to quickfix\n"
-                    + "  :dnext/:dprev    jump through diagnostics\n\n"
+                    + "  :dnext/:dprev    jump through diagnostics\n"
+                    + "  :coverage import <report>  import local coverage\n\n"
                     + "MANAGEMENT\n"
                     + "  :lsp status      show running servers and errors\n"
                     + "  :lsp servers     list configured (config.toml) + builtin servers\n"
@@ -240,6 +246,8 @@ public class HelpService {
                     + "  :lsp restart [ext] restart server (default: current buffer ext)\n"
                     + "  :lsp stop [ext]  stop a server\n"
                     + "  :lsp log         show LSP error log\n\n"
+                    + "  :format          format using LSP or configured external formatter\n"
+                    + "  :formatter       edit current extension formatter policy\n\n"
                     + "CONFIGURATION\n"
                     + "  \"lsp.<ext>.command\" = \"<binary>\"   server command in ~/.shed/config.toml\n"
                     + "  \"lsp.<ext>.args\" = \"<flags>\"       server arguments\n"

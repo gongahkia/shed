@@ -405,6 +405,9 @@ final class PaletteController {
                 return "Run project tasks (:task test/build) with quickfix integration.";
             case "test":
                 return "Open or control the explicit-refresh Test Explorer.";
+            case "coverage":
+            case "cov":
+                return "Import, clear, or inspect session-local coverage in Tests.";
             case "help":
             case "h":
                 return "Open help text (topic optional).";

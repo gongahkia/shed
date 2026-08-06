@@ -137,11 +137,18 @@ Shed keeps an independent client for each `(extension, workspace root)` pair, so
 | `lsp.inlay.hints.inline` | `true` | bool | Render supported inlay hints inline; applies immediately |
 | `lsp.definition.enabled` | `true` | bool | Navigation: definition requests |
 | `lsp.type.definition.enabled` | `true` | bool | Navigation: type-definition requests |
+| `lsp.call.hierarchy.enabled` | `true` | bool | Navigation: call-hierarchy requests |
+| `lsp.type.hierarchy.enabled` | `true` | bool | Navigation: type-hierarchy requests |
 | `lsp.references.enabled` | `true` | bool | Navigation: reference requests |
 | `lsp.rename.enabled` | `true` | bool | Rename requests |
 | `lsp.code.actions.enabled` | `true` | bool | Actions: code-action requests |
 | `lsp.command.execution.enabled` | `true` | bool | Actions: execute-command requests |
 | `lsp.formatting.enabled` | `true` | bool | Document-formatting requests |
+| `lsp.format.on.save.enabled` | `false` | bool | Default format-on-save policy for extensions without an override; an unavailable, failed, or stale formatting request leaves the buffer unsaved |
+
+## Formatter policy
+
+Each extension defaults to `lsp`. Use `:formatter` for the active extension or set the dynamic keys below. `external` launches the configured command with direct argv only, sends the buffer on stdin, reads formatted stdout, uses the workspace as its working directory, and never invokes a shell. `${file}` is permitted as one complete argument. `disabled` skips formatting for that extension. `formatter.<ext>.format.on.save` overrides `lsp.format.on.save.enabled` for that extension; formatting runs asynchronously and an error or stale buffer leaves the file unwritten.
 
 ## Snippets
 
@@ -315,6 +322,10 @@ When `project.config.allow.unsafe=false`, project-local config only applies:
 | `keybind.<scope>.<lhs>` | Validated Vim keymap overlay | `"keybind.normal.H" = "^"` |
 | `lsp.<ext>.command` | LSP server command for extension | `"lsp.py.command" = "pyright-langserver"` |
 | `lsp.<ext>.args` | LSP server args | `"lsp.py.args" = "--stdio"` |
+| `formatter.<ext>.mode` | `lsp`, `external`, or `disabled` formatter selection | `"formatter.py.mode" = "external"` |
+| `formatter.<ext>.command` | Direct external formatter executable | `"formatter.py.command" = "ruff"` |
+| `formatter.<ext>.args` | Quoted direct argv text; `${file}` allowed | `"formatter.py.args" = "format -"` |
+| `formatter.<ext>.format.on.save` | Per-extension format-on-save override | `"formatter.py.format.on.save" = true` |
 | `debug.adapter.<id>.<field>` | User-managed DAP adapter (`command`, `args`, `transport`, `capabilities`) | `"debug.adapter.java.command" = "java-debug-adapter"` |
 | `debug.configuration.<name>.<field>` | DAP launch/attach configuration | `"debug.configuration.main.request" = "launch"` |
 

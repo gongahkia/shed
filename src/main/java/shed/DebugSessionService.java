@@ -76,10 +76,15 @@ final class DebugSessionService {
 
     Result start(Path workspace, Path activeFile, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
         String requestedConfiguration, Duration timeout, Starter starter) {
-        return start(workspace, activeFile, validation, features, requestedConfiguration, timeout, starter, null);
+        return start(workspace, new DebugAdapterRegistry.LaunchContext(activeFile, "", null), validation, features, requestedConfiguration, timeout, starter, null);
     }
 
     Result start(Path workspace, Path activeFile, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
+        String requestedConfiguration, Duration timeout, Starter starter, BreakpointStore breakpointStore) {
+        return start(workspace, new DebugAdapterRegistry.LaunchContext(activeFile, "", null), validation, features, requestedConfiguration, timeout, starter, breakpointStore);
+    }
+
+    Result start(Path workspace, DebugAdapterRegistry.LaunchContext context, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
         String requestedConfiguration, Duration timeout, Starter starter, BreakpointStore breakpointStore) {
         Path root = root(workspace);
         DebugFeatureSettings settings = features == null ? DebugFeatureSettings.defaults() : features;
@@ -93,7 +98,7 @@ final class DebugSessionService {
             if (!settings.enabled()) return fail(root, session, "Debugging is disabled by settings", List.of("Set debug.enabled=true before launch."));
             if (validation == null || !validation.valid()) return fail(root, session, "Debug configuration is invalid", validationErrors(validation));
             if (name.isBlank()) return fail(root, session, "Select a debug configuration before launch", List.of("Use :debug select <name>."));
-            DebugAdapterRegistry.PlanResult planned = DebugAdapterRegistry.plan(validation, name, root, activeFile);
+            DebugAdapterRegistry.PlanResult planned = DebugAdapterRegistry.plan(validation, name, root, context);
             if (!planned.launchable()) return fail(root, session, planned.error(), List.of(planned.error()));
             if (session.lifecycle == Lifecycle.RUNNING || session.lifecycle == Lifecycle.STARTING) {
                 return fail(root, session, "A debug session is already active; use :debug restart or :debug stop", List.of());
@@ -601,8 +606,8 @@ final class DebugSessionService {
     private static Map<String, Object> startArguments(DebugAdapterRegistry.Plan plan) {
         DebugAdapterRegistry.Configuration configuration = plan.configuration();
         if (configuration.request() == DebugAdapterRegistry.Request.ATTACH) {
-            return Map.of("host", configuration.host(), "port", configuration.port(), "cwd", plan.cwd().toString(), "args", configuration.args());
+            return Map.of("host", configuration.host(), "port", configuration.port(), "cwd", plan.cwd().toString(), "args", plan.args());
         }
-        return Map.of("program", plan.program().toString(), "cwd", plan.cwd().toString(), "args", configuration.args());
+        return Map.of("program", plan.program().toString(), "cwd", plan.cwd().toString(), "args", plan.args());
     }
 }

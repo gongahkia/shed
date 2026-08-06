@@ -59,7 +59,22 @@ final class DebugAdapterRegistry {
         boolean valid() { return errors.isEmpty(); }
     }
 
-    record Plan(Adapter adapter, Configuration configuration, Path workspace, Path cwd, Path program) { }
+    record LaunchContext(Path activeFile, String testId, Path testFile) {
+        LaunchContext {
+            activeFile = activeFile == null ? null : activeFile.toAbsolutePath().normalize();
+            testId = testId == null ? "" : testId;
+            testFile = testFile == null ? null : testFile.toAbsolutePath().normalize();
+        }
+    }
+
+    record Plan(Adapter adapter, Configuration configuration, Path workspace, Path cwd, Path program, List<String> args) {
+        Plan {
+            args = args == null ? List.of() : List.copyOf(args);
+        }
+        Plan(Adapter adapter, Configuration configuration, Path workspace, Path cwd, Path program) {
+            this(adapter, configuration, workspace, cwd, program, configuration == null ? List.of() : configuration.args());
+        }
+    }
 
     record PlanResult(Plan plan, String error) {
         PlanResult {
@@ -104,10 +119,14 @@ final class DebugAdapterRegistry {
     }
 
     static PlanResult plan(Validation validation, String configurationName, Path workspace) {
-        return plan(validation, configurationName, workspace, null);
+        return plan(validation, configurationName, workspace, new LaunchContext(null, "", null));
     }
 
     static PlanResult plan(Validation validation, String configurationName, Path workspace, Path activeFile) {
+        return plan(validation, configurationName, workspace, new LaunchContext(activeFile, "", null));
+    }
+
+    static PlanResult plan(Validation validation, String configurationName, Path workspace, LaunchContext context) {
         if (validation == null || !validation.valid()) return new PlanResult(null, "Debug configuration is invalid; no process will be launched.");
         Configuration configuration = validation.configurations().get(configurationName == null ? "" : configurationName);
         if (configuration == null) return new PlanResult(null, "Debug configuration is unavailable; no process will be launched.");
@@ -115,12 +134,15 @@ final class DebugAdapterRegistry {
         if (adapter == null) return new PlanResult(null, "Debug adapter is unavailable; no process will be launched.");
         if (workspace == null) return new PlanResult(null, "Workspace root is required; no process will be launched.");
         Path root = workspace.toAbsolutePath().normalize();
-        Path cwd = resolveWorkspacePath(root, configuration.cwd(), activeFile);
-        Path program = configuration.request() == Request.LAUNCH ? resolveWorkspacePath(root, configuration.program(), activeFile) : null;
+        LaunchContext launchContext = context == null ? new LaunchContext(null, "", null) : context;
+        Path cwd = resolveWorkspacePath(root, configuration.cwd(), launchContext.activeFile());
+        Path program = configuration.request() == Request.LAUNCH ? resolveWorkspacePath(root, configuration.program(), launchContext.activeFile()) : null;
         if (cwd == null || (configuration.request() == Request.LAUNCH && program == null)) {
             return new PlanResult(null, "Debug configuration escapes the workspace scope; no process will be launched.");
         }
-        return new PlanResult(new Plan(adapter, configuration, root, cwd, program), "");
+        List<String> args = resolveArguments(configuration.args(), root, launchContext);
+        if (args == null) return new PlanResult(null, "Debug configuration has invalid launch placeholders; no process will be launched.");
+        return new PlanResult(new Plan(adapter, configuration, root, cwd, program, args), "");
     }
 
     private static void collect(String key, String value, String prefix, Set<String> fields, Map<String, Map<String, String>> grouped, List<Error> errors) {
@@ -258,5 +280,44 @@ final class DebugAdapterRegistry {
         String suffix = configured.substring("${workspaceFolder}".length());
         Path resolved = suffix.isEmpty() ? workspace : workspace.resolve(suffix.substring(1).replace('\\', '/')).normalize();
         return resolved.startsWith(workspace) ? resolved : null;
+    }
+
+    private static List<String> resolveArguments(List<String> configured, Path workspace, LaunchContext context) {
+        List<String> resolved = new ArrayList<>();
+        for (String value : configured == null ? List.<String>of() : configured) {
+            String argument = value == null ? "" : value;
+            int index = 0;
+            StringBuilder output = new StringBuilder();
+            while (index < argument.length()) {
+                int start = argument.indexOf("${", index);
+                if (start < 0) { output.append(argument, index, argument.length()); break; }
+                output.append(argument, index, start);
+                int end = argument.indexOf('}', start + 2);
+                if (end < 0) return null;
+                String token = argument.substring(start, end + 1);
+                String replacement = switch (token) {
+                    case "${workspaceFolder}" -> workspace.toString();
+                    case "${file}" -> workspaceFile(workspace, context.activeFile());
+                    case "${testFile}" -> workspaceFile(workspace, context.testFile());
+                    case "${testId}" -> safeTestId(context.testId()) ? context.testId() : null;
+                    default -> null;
+                };
+                if (replacement == null) return null;
+                output.append(replacement);
+                index = end + 1;
+            }
+            resolved.add(output.toString());
+        }
+        return List.copyOf(resolved);
+    }
+
+    private static String workspaceFile(Path workspace, Path file) {
+        if (file == null) return null;
+        Path normalized = file.toAbsolutePath().normalize();
+        return normalized.startsWith(workspace) ? normalized.toString() : null;
+    }
+
+    private static boolean safeTestId(String value) {
+        return value != null && !value.isBlank() && value.length() <= 4096 && value.indexOf('\0') < 0 && value.indexOf('\n') < 0 && value.indexOf('\r') < 0;
     }
 }

@@ -54,11 +54,13 @@ final class TestService {
         String label() { return suite.isBlank() ? name : suite + " › " + name; }
     }
 
-    record AdapterSpec(String id, List<String> command) {
+    record AdapterSpec(String id, List<String> command, String debugConfiguration) {
         AdapterSpec {
             id = id == null ? "" : id.trim().toLowerCase(Locale.ROOT);
             command = command == null ? List.of() : List.copyOf(command);
+            debugConfiguration = debugConfiguration == null ? "" : debugConfiguration.trim();
         }
+        AdapterSpec(String id, List<String> command) { this(id, command, ""); }
     }
 
     record Command(List<String> argv, List<Path> reports) {
@@ -131,7 +133,7 @@ final class TestService {
     AdapterSpec resolvedSpec(Path root, AdapterSpec spec) {
         TestAdapter adapter = spec == null ? null : adapters.find(spec.id());
         if (adapter == null) return spec;
-        return spec.command().isEmpty() ? new AdapterSpec(spec.id(), adapter.defaultCommand(root)) : spec;
+        return spec.command().isEmpty() ? new AdapterSpec(spec.id(), adapter.defaultCommand(root), spec.debugConfiguration()) : spec;
     }
 
     List<TestCase> staticDiscovery(Path root, AdapterSpec spec) {
@@ -154,7 +156,7 @@ final class TestService {
     }
 
     private AdapterSpec parseSpec(TomlTable table, int index, List<String> diagnostics) {
-        for (String key : table.keySet()) if (!"id".equals(key) && !"command".equals(key)) diagnostics.add("adapter[" + index + "] unknown key: " + key);
+        for (String key : table.keySet()) if (!"id".equals(key) && !"command".equals(key) && !"debug_configuration".equals(key)) diagnostics.add("adapter[" + index + "] unknown key: " + key);
         Object idValue = table.get("id");
         if (!(idValue instanceof String rawId) || rawId.isBlank()) { diagnostics.add("adapter[" + index + "].id must be a non-empty string"); return null; }
         String id = rawId.trim().toLowerCase(Locale.ROOT);
@@ -173,7 +175,14 @@ final class TestService {
                 }
             }
         }
-        return new AdapterSpec(id, command);
+        Object debugValue = table.get("debug_configuration");
+        String debugConfiguration = "";
+        if (debugValue != null) {
+            if (!(debugValue instanceof String value) || !value.matches("[A-Za-z0-9_-]+")) {
+                diagnostics.add("adapter[" + index + "].debug_configuration must be a debug configuration name");
+            } else debugConfiguration = value;
+        }
+        return new AdapterSpec(id, command, debugConfiguration);
     }
 
     private static String location(TomlParseError error) {

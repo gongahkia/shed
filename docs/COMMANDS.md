@@ -92,11 +92,15 @@ Notes:
 | `:test refresh` | Explicitly detect configured/local runners and discover tests |
 | `:test run` | Run every detected/configured adapter in the selected workspace root |
 | `:test run <test-id>` | Run one discovered test by its exact id |
+| `:test debug <test-id>` | Start the adapter explicitly mapped by that test adapter's `.shedtests` `debug_configuration` |
 | `:test failed`, `:test rerun-failed` | Run the failed tests retained for this session |
 | `:test cancel` | Cancel running test jobs for the selected root |
 | `:test text` | Open a text summary of the session-local test state |
+| `:coverage import <report>` | Asynchronously import a local JaCoCo XML, Cobertura XML, LCOV, or Go `-coverprofile` report for the selected root |
+| `:coverage clear` | Clear imported session-local coverage for the selected root |
+| `:coverage text` | Open imported coverage totals and per-file line summaries |
 
-The Tests panel supports root selection, status/text filtering, Refresh, Run All, Run Selection, Rerun Failed, Cancel, output inspection, and source navigation. Tests are discovered only after an explicit refresh. Failure locations are also published to Problems under `test:<adapter>` without replacing quickfix entries. Adapter declarations, direct argv overrides, report-cache policy, and supported built-ins are in [Testing](TESTS.md).
+The Tests panel supports root selection, status/text filtering, Refresh, Run All, Run Selection, Debug Selection, Rerun Failed, Cancel, **Import Coverage**, **Clear Coverage**, output inspection, and source navigation. Imports are explicit and local; covered/uncovered lines render in the active editor gutter. Tests are discovered only after an explicit refresh. Failure locations are also published to Problems under `test:<adapter>` without replacing quickfix entries. Adapter declarations, direct argv overrides, debug mappings, report-cache policy, and supported built-ins are in [Testing](TESTS.md).
 
 ## Settings and Configuration
 
@@ -244,15 +248,21 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | Insert `(` or `,` | Shows capability-gated asynchronous signature help; the next edit or Escape cancels it |
 | `:lsp definition`, `:lsp def` | Go to definition |
 | `:lsp typedefinition`, `:lsp type`, `:lsp typedef` | Go to type definition |
+| `:lsp peek definition`, `:peek definition` | Asynchronously show a temporary read-only definition split; Enter opens and Escape restores the layout |
+| `:lsp peek type`, `:peek type` | Asynchronously show a temporary read-only type-definition split |
+| `:lsp calls incoming\|outgoing` | Open searchable lazy LSP call hierarchy |
+| `:lsp typehierarchy supertypes\|subtypes` | Open searchable lazy LSP type hierarchy |
 | `:lsp hover` | Show hover info |
 | `:lsp semantic`, `:lsp semantictokens` | Show current-document semantic tokens when supported; supported tokens also render inline by default |
 | `:lsp inlay`, `:lsp inlayhints` | Show current-document inlay hints when supported; supported hints also render inline by default |
 | `:lsp format` | Apply server formatting edits to the current document when supported |
+| `:format`, `:fmt` | Format with the current extension's selected formatter policy |
+| `:formatter`, `:formatpolicy` | Edit the current extension's formatter mode, direct command, args, and format-on-save policy |
 | `:lsp references`, `:lsp refs` | Find references and open quickfix |
 | `:lsp rename <newName>` | Prepare rename preview |
 | `:lsp renameapply`, `:lsp rename!` | Apply pending rename edits |
 | `:lsp renamecancel`, `:lsp renameclear` | Discard pending rename |
-| `:lsp codeaction [index]`, `:lsp codeactions [index]`, `:lsp actions [index]`, `:lsp ca [index]` | List/preview code actions |
+| `:lsp codeaction [index]`, `:lsp codeactions [index]`, `:lsp actions [index]`, `:lsp ca [index]` | Asynchronously show diagnostic-anchored actions at the caret; index prepares that action's preview |
 | `:lsp codeaction apply` | Apply the reviewed code-action preview |
 | `:lsp diagnostics`, `:lsp diag` | Same as `:diagnostics` |
 | `:lsp status` | Show running servers + errors |

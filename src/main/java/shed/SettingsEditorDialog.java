@@ -69,6 +69,9 @@ final class SettingsEditorDialog extends JDialog {
         JButton snippets = new JButton("Open Snippets");
         snippets.addActionListener(event -> editor.openSnippetsBuffer());
         actions.add(snippets);
+        JButton languageServices = new JButton("Language Services");
+        languageServices.addActionListener(event -> editor.showLanguageServices());
+        actions.add(languageServices);
         panel.add(actions, BorderLayout.EAST);
         return panel;
     }

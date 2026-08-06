@@ -243,7 +243,7 @@ final class ManagedLanguageCatalog {
         "jdtls",
         "jdtls.bat",
         new InstallMetadata(
-            new ManagedLanguageSupportTrust.ArtifactCoordinate("java.eclipse-jdtls", "1.50.0"),
+            new ManagedLanguageSupportTrust.ArtifactCoordinate("java.eclipse-jdtls", "1.60.0"),
             URI.create("https://github.com/eclipse-jdtls/eclipse.jdt.ls"),
             URI.create("https://www.eclipse.org/legal/epl-2.0/"),
             "Eclipse Public License 2.0",

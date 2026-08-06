@@ -2037,6 +2037,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return lspController.lspRestart(ext);
     }
 
+    void showLanguageServices() {
+        lspController.handleLspCommand("manage");
+    }
+
     public String lspStop(String ext) {
         return lspController.lspStop(ext);
     }

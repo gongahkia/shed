@@ -153,16 +153,15 @@ final class NpmManagedLanguageInstaller {
                     return new CommandResult(-1, output.toString(StandardCharsets.UTF_8), false);
                 }
                 while (stream.available() > 0) {
-                    int read = stream.read(buffer, 0, Math.min(buffer.length, MAX_OUTPUT_BYTES - output.size()));
+                    int read = stream.read(buffer);
                     if (read < 0) break;
-                    if (read > 0) output.write(buffer, 0, read);
-                    if (output.size() >= MAX_OUTPUT_BYTES) break;
+                    appendOutput(output, buffer, read);
                 }
                 if (process.waitFor(100, TimeUnit.MILLISECONDS)) {
-                    while (output.size() < MAX_OUTPUT_BYTES) {
-                        int read = stream.read(buffer, 0, Math.min(buffer.length, MAX_OUTPUT_BYTES - output.size()));
+                    while (true) {
+                        int read = stream.read(buffer);
                         if (read < 0) break;
-                        output.write(buffer, 0, read);
+                        appendOutput(output, buffer, read);
                     }
                     return new CommandResult(process.exitValue(), output.toString(StandardCharsets.UTF_8), false);
                 }
@@ -205,5 +204,10 @@ final class NpmManagedLanguageInstaller {
     private static String outputDetail(String output) {
         String text = output == null ? "" : output.trim();
         return text.isBlank() ? "" : ": " + text.substring(0, Math.min(500, text.length()));
+    }
+
+    private static void appendOutput(ByteArrayOutputStream output, byte[] buffer, int length) {
+        if (length <= 0 || output.size() >= MAX_OUTPUT_BYTES) return;
+        output.write(buffer, 0, Math.min(length, MAX_OUTPUT_BYTES - output.size()));
     }
 }

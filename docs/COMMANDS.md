@@ -270,6 +270,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:lsp stop [ext]` | Stop LSP for extension |
 | `:lsp servers` | List configured + built-in server mappings |
 | `:lsp manage`, `:lsp manage ui` | Open the local Language Services panel; each install/update requires a fresh GUI confirmation |
+| `:languageservices`, `:language-services`, `:lspmanage` | Command-Palette-friendly alias that opens Language Services |
 | `:lsp manage status` | Show managed-LSP status without probing or network access |
 | `:lsp log` | Show LSP error log |
 

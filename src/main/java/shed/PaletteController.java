@@ -12,6 +12,7 @@ import java.util.*;
 import java.util.List;
 
 final class PaletteController {
+    static final String LANGUAGE_SERVICES_ACTION = "Language Services";
     private final Texteditor editor;
     private final WorkspaceSearchCoordinator workspaceSearchCoordinator;
     private final WorkspaceReplaceCoordinator workspaceReplaceCoordinator;
@@ -28,8 +29,10 @@ final class PaletteController {
         for (String cmd : commands) {
             candidates.add(":" + cmd);
         }
+        candidates.add(LANGUAGE_SERVICES_ACTION);
         String selected = showPaletteDialog("Command Palette", candidates, this::describeCommandPaletteCandidate);
         if (selected == null || selected.isEmpty()) return "Command palette cancelled";
+        if (LANGUAGE_SERVICES_ACTION.equals(selected)) return editor.handleLspCommand("manage");
         String cmd = selected.startsWith(":") ? selected.substring(1) : selected;
         return editor.commandHandler.execute(cmd);
     }
@@ -345,6 +348,9 @@ final class PaletteController {
         if (selection == null || selection.isBlank()) {
             return "Type to fuzzy-filter commands, then press Enter.";
         }
+        if (LANGUAGE_SERVICES_ACTION.equals(selection)) {
+            return "Open Language Services. Installing or updating always needs a separate GUI approval.";
+        }
         String cmd = selection.startsWith(":") ? selection.substring(1) : selection;
         int split = cmd.indexOf(' ');
         String base = (split >= 0 ? cmd.substring(0, split) : cmd).toLowerCase(Locale.ROOT);
@@ -480,6 +486,10 @@ final class PaletteController {
             case "problems":
             case "problem":
                 return "Open unified LSP and quickfix problems.";
+            case "languageservices":
+            case "language-services":
+            case "lspmanage":
+                return "Open Language Services. Installing or updating always needs a separate GUI approval.";
             case "dnext":
             case "dn":
                 return "Jump to next diagnostic.";

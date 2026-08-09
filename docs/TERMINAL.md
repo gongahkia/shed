@@ -1,39 +1,86 @@
-# Terminal
+# M4 terminal host
 
-Shed opens an interactive shell in a PTY-backed bottom split. `:terminal split side` places a configured-default terminal beside the active pane, while `:terminal split bottom` makes the default placement explicit. `:terminal list` shows that default, detected standard shell profiles, and the resolved execution target for the current file; `:terminal profile <builtin:id>` opens one. After an explicit `:remote use <id>`, new ordinary terminals for files in that connected SSH/Docker/WSL workspace run through that provider; after an explicit `:container connect`, they run through `devcontainer exec`. A selected remote execution session takes precedence when both apply. Terminal session restoration, when enabled, records only a pane's host working directory and starts a fresh local shell. It never restores commands, arguments, scrollback, process state, remote/container connections, or credentials.
+`zenbu [--model vim|selection] [FILE]` is the interactive M4 executable.
+It loads an existing UTF-8 file, or creates an unnamed empty buffer when no
+file is supplied. File open and UTF-8 validation happen before terminal mode
+is entered; errors are reported on stderr. The deterministic
+`zenbu_headless` executable is retained for replay and scripted model tests.
 
-On a native Windows host, a local default terminal resolves to the system Windows PowerShell executable when available, then `ComSpec`/`cmd.exe`. Shell-backed local task and command execution use PowerShell's `-NoProfile -Command` or `cmd.exe /d /s /c` direct argument form. SSH, Docker, WSL, and Dev Container defaults remain selected by their remote provider rather than inheriting the host shell.
+Run an installed development switch with:
 
-## Shell profiles
-
-`terminal.default.profile` defaults to `system`, preserving the host's existing default-shell behavior. `:terminal list` detects locally executable standard profiles without launching them: Bash, Zsh, Fish, and PowerShell 7 on POSIX; PowerShell 7, Windows PowerShell, and Command Prompt on Windows. Select one for future ordinary terminals with a qualified profile id:
-
-```toml
-"terminal.default.profile" = "builtin:bash"
+```sh
+dune exec bin/zenbu.exe -- --model vim FILE
+dune exec bin/zenbu.exe -- --model selection FILE
 ```
 
-The setting does not accept arbitrary executable paths or arguments. If a selected built-in profile is unavailable, Shed opens the system shell and reports that fallback. Detection checks only the configured shell and executable paths; it does not start a shell, probe versions, or edit shell configuration.
+`Ctrl-S` saves an existing file. `Ctrl-Q` exits when clean; when dirty it shows
+a warning and requires a second `Ctrl-Q`. Unnamed save-as is intentionally not
+implemented. EOF with unsaved changes returns an error after terminal cleanup
+and does not write the file.
 
-## Shell integration
+## Backend and lifecycle
 
-For newly opened interactive Bash, Zsh, Fish, PowerShell, and PowerShell 7 terminals, `terminal.shell.integration` defaults to `true`. Shed creates startup files under `~/.shed/shell-integration/` for that terminal process only; it does not edit `.bashrc`, `.zshrc`, `config.fish`, a PowerShell profile, or another user dotfile. The generated hooks emit Jediterm's private custom-command OSC channel with command start, command completion status, and current-directory events. Fish gets an isolated `XDG_CONFIG_HOME`; its existing `config.fish`, when present, is sourced explicitly before Shed's hook. PowerShell starts with `-NoProfile`, explicitly sources its current-user profiles in their normal order, then loads Shed's hook. When the existing Enter binding is the stock PSReadLine `AcceptLine`, the hook emits a command event before submitting input; custom Enter bindings are retained and use a history-based post-execution command-event fallback instead.
+`terminal/Backend` uses `notty-community` only in its implementation. It
+requires stdin and stdout TTYs, enters raw non-canonical input plus an alternate
+screen, hides the physical cursor, maps terminal events to `Terminal.Event`,
+and restores input, cursor, and normal screen through `Fun.protect`. The
+backend's process-exit disposal fallback also covers initialization paths that
+cannot return a usable adapter. Mouse and bracketed paste are disabled.
 
-Use `:terminal commands` to inspect the retained event history and `:terminal cwd` to show the last reported directory. Turn the feature off with:
+The rest of the program sees no Notty values. `Input_decoder` maps printable
+UTF-8 keys, Escape, Enter, Backspace, Tab, Delete, arrows, Home/End, and
+reported modifiers into the public logical `Input_event` protocol. Resize stays
+a host event. For an unmodified printable key, the model's generic
+`Model_status.input_mode` decides between `Key_press` and `Text_input`; the
+adapter never branches on a model id, Vim mode, or selection-model state.
 
-```toml
-"terminal.shell.integration" = false
-```
+## Coordinates and rendering
 
-The integration is unavailable for noninteractive commands and unsupported shells. It is command metadata, not a shell security boundary: command text may contain secrets typed at a prompt, so event history remains in memory only for the terminal's lifetime and should be treated as sensitive.
+| layer | coordinate | purpose |
+| --- | --- | --- |
+| document/model | UTF-8 byte offset at a code-point boundary | anchors, selections, transactions |
+| view | source line plus display column | viewport and visible selection geometry |
+| frame | zero-based row and column | pure styled cells and logical cursor |
+| backend | terminal cursor position | physical presentation only |
 
-## Emulator boundary
+The view preserves document bytes. Uuseg finds extended grapheme clusters,
+Uucp supplies a terminal-width hint, tabs stop every four columns, and C0/DEL
+controls render as caret notation. A renderer indexes source line boundaries,
+then lays out only viewport lines. It separately styles primary selection,
+secondary selections, status/message cells, and leaves physical cursor control
+to the backend. The viewport adjusts vertically and horizontally so the primary
+selection head is visible. Tiny terminals render one clipped warning row.
 
-`TerminalConformanceFixtureTest` feeds deterministic characters into Jediterm's emulator without launching a shell. It covers plain output, ANSI SGR, newline output, Up-arrow and Enter input codes, and an unsupported private CSI sequence. The fixture requires surrounding output to remain intact and escape control bytes not to leak into terminal text.
+Terminal column width is inherently heuristic. Complex scripts and emoji can
+occupy a different width in a particular terminal than Uucp's estimate. M4
+does not support soft wrapping, proportional display, mouse selection, or
+pixel-perfect emoji alignment.
 
-Shed retains Jediterm/PTy4J behavior for terminal emulation. The fixture is a regression boundary, not a claim of complete xterm-sequence support.
+## Persistence
 
-## Output links
+The session retains its saved document version and source contents. A matching
+version is immediately clean; later versions compare their source contents, so
+selection-only history changes are not dirty and undoing to saved contents is
+clean. Saving writes and fsyncs an exclusive temporary file beside the target,
+preserves an existing target mode, then renames the temporary file over the
+target. This avoids in-place truncation, but M4 does not fsync the parent
+directory, detect external file changes, or implement save-as.
 
-Shed makes an existing local source location such as `src/Main.java:12:4` clickable, resolving a relative path against the terminal's latest shell-reported directory when available, otherwise its startup directory. Clicking opens that regular local file at the reported one-based line and column. An explicitly connected Dev Container maps only absolute paths beneath its verified mounted workspace to existing files beneath the matching host workspace. For a connected SSH/container/WSL workspace that declares a remote language-server root, an absolute terminal path under that remote root is also clickable only when the corresponding local-mirror file exists. An ordinary terminal opened through `:remote use` also resolves relative paths from its requested local-mirror subdirectory, and only accepts results that remain inside that mirror. It also makes `http://` and `https://` output clickable for an explicit system-browser handoff.
+## M4 integration pressure report
 
-It does not link a missing file, map a remote path outside the declared mirror root, infer a current remote directory after a user changes it in an SSH shell, parse every compiler's diagnostic format, or open arbitrary URI schemes. Link detection itself makes no network request; a browser handoff occurs only after the user clicks an HTTP(S) link.
+M4 exposed one addition to the public model protocol: `Model_status.input_mode`.
+Without it, a terminal host would have to inspect model-specific identifiers
+such as `insert` to distinguish a command key from committed text. The new
+two-case disposition is generic; Vim-style, selection-first, and the retained
+operator-first proof model declare `Text_entry` only while accepting committed
+text. No terminal state or terminal package type entered the kernel or model
+API.
+
+The existing immutable `Editor_context`, semantic effects, transactions,
+history, and selection offsets otherwise supported the host unchanged. The M4
+session owns dirty/save/quit and viewport concerns above models. Rendering
+projects the existing immutable context; it does not add display columns,
+terminal cells, or filenames to documents. M4 tests exercise terminal-event
+decoding, Unicode/tab display mapping, primary and secondary frame styling,
+viewport/tiny-terminal behavior, both model choices, safe file save, dirty
+state after undo, and quit policy.

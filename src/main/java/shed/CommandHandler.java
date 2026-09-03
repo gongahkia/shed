@@ -139,6 +139,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleCoverageCommand(args), "coverage", "cov");
         registerCommand((args, range, force) -> editor.handleTreeCommand(args), "tree");
         registerCommand((args, range, force) -> editor.handleGitCommand(args), "git");
+        registerCommand((args, range, force) -> editor.handleScmCommand(args), "scm");
         registerCommand((args, range, force) -> editor.handleGitHubCommand(args), "github", "gh");
         registerCommand((args, range, force) -> editor.handleUpdateCommand(args), "update", "updates");
         registerCommand((args, range, force) -> {
@@ -211,7 +212,7 @@ public class CommandHandler {
             return operation.equals("open") || operation.equals("edit") ? editor.openSnippetsBuffer() : editor.listSnippets();
         }, "snippets", "snippet");
         registerCommand((args, range, force) -> editor.toggleBracketColors(), "bracketcolor", "bracketcolors");
-        registerCommand((args, range, force) -> editor.openTerminal(), "term", "terminal");
+        registerCommand((args, range, force) -> editor.handleTerminalCommand(args), "term", "terminal");
         registerCommand((args, range, force) -> handleConceal(args), "conceal", "conceallevel");
 
         // Plugin commands

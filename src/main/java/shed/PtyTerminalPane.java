@@ -36,12 +36,18 @@ final class PtyTerminalPane implements AutoCloseable {
     }
 
     static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font terminalFont) throws IOException {
-        List<String> command = ShellCommand.interactiveCommand();
+        return open(workingDirectory, configManager, terminalFont, ShellCommand.interactiveCommand());
+    }
+
+    static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font terminalFont, List<String> requestedCommand) throws IOException {
+        List<String> command = validateCommand(requestedCommand);
         File cwd = normalizeDirectory(workingDirectory);
         Map<String, String> env = new HashMap<>(System.getenv());
         env.put("TERM", "xterm-256color");
         env.put("COLORTERM", "truecolor");
-        env.put("SHELL", command.get(0));
+        if (isShell(command.getFirst())) {
+            env.put("SHELL", command.getFirst());
+        }
 
         PtyProcess process = new PtyProcessBuilder(command.toArray(new String[0]))
             .setDirectory(cwd.getAbsolutePath())
@@ -99,6 +105,27 @@ final class PtyTerminalPane implements AutoCloseable {
         } catch (IOException ignored) {
             return candidate.getAbsoluteFile();
         }
+    }
+
+    private static List<String> validateCommand(List<String> command) throws IOException {
+        List<String> values = command == null ? List.of() : List.copyOf(command);
+        if (values.isEmpty()) throw new IOException("terminal command is required");
+        for (String value : values) {
+            if (value == null || value.isBlank() || value.indexOf('\0') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
+                throw new IOException("terminal command contains an invalid argument");
+            }
+        }
+        return values;
+    }
+
+    private static boolean isShell(String command) {
+        String normalized = command == null ? "" : command.replace('\\', '/');
+        int split = normalized.lastIndexOf('/');
+        String name = (split < 0 ? normalized : normalized.substring(split + 1)).toLowerCase(java.util.Locale.ROOT);
+        return switch (name) {
+            case "bash", "zsh", "sh", "dash", "ksh", "mksh", "fish", "pwsh", "powershell" -> true;
+            default -> false;
+        };
     }
 
     static final class ShedTerminalSettingsProvider extends DefaultSettingsProvider {

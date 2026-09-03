@@ -86,6 +86,7 @@ public class Texteditor extends JFrame implements KeyListener {
     PluginManager pluginManager;
     ExtensionRegistry extensionRegistry;
     ExtensionManager extensionManager;
+    ScmController scmController;
     TreeGitController treeGitController;
     GitHubCapabilityController gitHubCapabilityController;
     LspController lspController;
@@ -233,6 +234,7 @@ public class Texteditor extends JFrame implements KeyListener {
         // Initialize managers
         configManager = new ConfigManager();
         extensionRegistry = new ExtensionRegistry();
+        scmController = new ScmController(this, extensionRegistry);
         helpService = new HelpService();
         gitService = new GitService();
         treeService = new TreeService();
@@ -1424,6 +1426,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return terminalController.openTerminal();
     }
 
+    String handleTerminalCommand(String argument) {
+        return terminalController.handle(argument);
+    }
+
     File resolveTerminalStartDirectory() {
         return terminalController.resolveTerminalStartDirectory();
     }
@@ -1765,6 +1771,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String handleGitCommand(String argument) {
         return treeGitController.handleGitCommand(argument);
+    }
+
+    String handleScmCommand(String argument) {
+        return scmController.handle(argument);
     }
 
     public String handleGitHubCommand(String argument) {

@@ -24,6 +24,11 @@ final class WorkspaceController {
         return roots.active();
     }
 
+    /** Returns the folder that owns a resource, preferring the deepest matching multi-root folder. */
+    Path rootFor(Path resource) {
+        return WorkspaceRootResolver.configuredOrActive(resource, roots.all(), roots.active());
+    }
+
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "list".equalsIgnoreCase(trimmed) || "roots".equalsIgnoreCase(trimmed)) return showRoots();

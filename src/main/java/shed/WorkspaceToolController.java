@@ -102,9 +102,13 @@ final class WorkspaceToolController {
     }
 
     private Path workspace() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (editor.workspaceController != null && buffer != null && buffer.getFile() != null) {
+            Path root = editor.workspaceController.rootFor(buffer.getFile().toPath());
+            if (root != null) return root;
+        }
         Path active = editor.workspaceController == null ? null : editor.workspaceController.activeRoot();
         if (active != null) return active;
-        FileBuffer buffer = editor.getCurrentBuffer();
         return buffer == null || buffer.getFile() == null || buffer.getFile().getParentFile() == null ? null
             : buffer.getFile().getParentFile().toPath().toAbsolutePath().normalize();
     }

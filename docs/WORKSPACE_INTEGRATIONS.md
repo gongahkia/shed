@@ -17,6 +17,6 @@ It declares whether it supports the active workspace and supplies a fixed list o
 :integration example.database query "select 1"
 ```
 
-The controller does not background-scan workspaces, connect to a service, store credentials, or turn actions into shell commands. The extension receives the active workspace root and explicitly selected action/arguments; it owns its driver, authentication, network policy, cancellation, UI, and output format. A `ToolViewContribution` can add the matching docked Swing workbench view.
+The controller does not background-scan workspaces, connect to a service, store credentials, or turn actions into shell commands. The extension receives the current file's deepest configured workspace folder (or the selected folder for a scratch/outside file) and explicitly selected action/arguments; it owns its driver, authentication, network policy, cancellation, UI, and output format. A `ToolViewContribution` can add the matching docked Swing workbench view.
 
 There are no built-in database drivers, deployment vendors, live-share server, CRDT implementation, credential vault, or collaboration protocol. This is deliberately an extension boundary, not a claim of VS Code Marketplace parity.

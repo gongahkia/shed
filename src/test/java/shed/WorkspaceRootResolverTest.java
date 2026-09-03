@@ -21,4 +21,13 @@ class WorkspaceRootResolverTest {
     void ignoresRootsThatDoNotContainTheCandidate() {
         assertNull(WorkspaceRootResolver.configuredRoot(Path.of("/other/source.txt"), List.of(Path.of("/work/outer"))));
     }
+
+    @Test
+    void choosesTheResourceFolderBeforeTheExplorerSelection() {
+        Path client = Path.of("/work/client");
+        Path server = Path.of("/work/server");
+
+        assertEquals(client, WorkspaceRootResolver.configuredOrActive(Path.of("/work/client/src/App.java"), List.of(client, server), server));
+        assertEquals(server, WorkspaceRootResolver.configuredOrActive(Path.of("/unrelated/file.txt"), List.of(client, server), server));
+    }
 }

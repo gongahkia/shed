@@ -20,25 +20,36 @@ final class TerminalController {
         return openTerminal(null);
     }
 
+    String openDirect(String label, File workingDirectory, List<String> command) {
+        String normalizedLabel = label == null || label.isBlank() ? "Terminal" : label.trim();
+        return openTerminal(normalizedLabel, workingDirectory, command, "Terminal opened with " + normalizedLabel);
+    }
+
     String handle(String argument) {
         String value = argument == null ? "" : argument.trim();
         if (value.isEmpty()) return openTerminal();
         if ("list".equalsIgnoreCase(value) || "profiles".equalsIgnoreCase(value) || "status".equalsIgnoreCase(value)) return showProfiles();
+        if ("commands".equalsIgnoreCase(value) || "history".equalsIgnoreCase(value)) return showShellEvents();
+        if ("cwd".equalsIgnoreCase(value)) return showDetectedDirectory();
         String profile = value.regionMatches(true, 0, "profile ", 0, 8) ? value.substring(8).trim() : value;
-        if (profile.isBlank()) return "Usage: :terminal [list|profile <extension:id|id>]";
+        if (profile.isBlank()) return "Usage: :terminal [list|commands|cwd|profile <extension:id|id>]";
         ExtensionRegistry.Owned<TerminalProfile> selected = resolveProfile(profile);
         if (selected == null) return "Terminal profile not found: " + profile;
         return openTerminal(selected);
     }
 
     private String openTerminal(ExtensionRegistry.Owned<TerminalProfile> profile) {
-        File startDirectory = resolveTerminalStartDirectory();
-        String title = nextTerminalTitle(profile == null ? null : profile.value());
+        String label = profile == null ? "Terminal" : profile.value().displayName();
+        List<String> command = profile == null ? ShellCommand.interactiveCommand() : profile.value().command();
+        String message = profile == null ? "Terminal opened" : "Terminal opened with " + profile.extensionId() + ":" + profile.value().id();
+        return openTerminal(label, resolveTerminalStartDirectory(), command, message);
+    }
+
+    private String openTerminal(String label, File startDirectory, List<String> command, String successMessage) {
+        String title = nextTerminalTitle(label);
         PtyTerminalPane terminalPane;
         try {
-            terminalPane = profile == null
-                ? PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont())
-                : PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont(), profile.value().command());
+            terminalPane = PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont(), command);
         } catch (IOException e) {
             return "Terminal failed: " + e.getMessage();
         }
@@ -67,7 +78,7 @@ final class TerminalController {
         editor.activateEditorPane(terminalEditorPane);
         editor.setMode(EditorMode.INSERT);
         terminalPane.requestFocusInWindow();
-        return profile == null ? "Terminal opened" : "Terminal opened with " + profile.extensionId() + ":" + profile.value().id();
+        return successMessage;
     }
 
 
@@ -156,7 +167,7 @@ final class TerminalController {
 
     private void installRestoredTerminal(EditorPane pane, File workingDirectory) throws IOException {
         PtyTerminalPane terminalPane = PtyTerminalPane.open(workingDirectory, editor.configManager, editor.resolveTerminalFont());
-        FileBuffer terminalBuffer = FileBuffer.createScratch(nextTerminalTitle(null), "");
+        FileBuffer terminalBuffer = FileBuffer.createScratch(nextTerminalTitle("Terminal"), "");
         editor.buffers.add(terminalBuffer);
         pane.setBuffer(terminalBuffer);
         pane.setLargeFileProjection(null);
@@ -177,8 +188,7 @@ final class TerminalController {
     }
 
 
-    private String nextTerminalTitle(TerminalProfile profile) {
-        String label = profile == null ? "Terminal" : profile.displayName();
+    private String nextTerminalTitle(String label) {
         return "[" + label + " " + (editor.terminalBufferCounter++) + "]";
     }
 
@@ -195,7 +205,9 @@ final class TerminalController {
                     .append(profile.value().displayName()).append(" -> ").append(String.join(" ", profile.value().command())).append("\n");
             }
         }
-        output.append("\nUse :terminal profile <extension:id>.\n");
+        output.append("\nShell integration: ").append(editor.configManager.getTerminalShellIntegrationEnabled()
+            ? "enabled for newly opened Bash and Zsh terminals" : "disabled").append(".\n");
+        output.append("Use :terminal commands, :terminal cwd, or :terminal profile <extension:id>.\n");
         editor.showScratchBuffer("[terminal profiles]", output.toString());
         return "Showing terminal profiles";
     }
@@ -213,6 +225,31 @@ final class TerminalController {
             }
         }
         return candidate;
+    }
+
+    private String showShellEvents() {
+        PtyTerminalPane pane = currentTerminal();
+        if (pane == null) return "The active pane is not a terminal";
+        if (!pane.hasShellIntegration()) return "Shell integration is unavailable for this terminal";
+        StringBuilder output = new StringBuilder("Terminal Command Events\n\n");
+        for (TerminalShellIntegrationTracker.Event event : pane.shellIntegrationEvents()) {
+            output.append(event.at()).append("  ").append(event.type()).append("  ").append(event.value()).append("\n");
+        }
+        if (output.toString().endsWith("\n\n")) output.append("No shell events detected yet.\n");
+        editor.showScratchBuffer("[terminal commands]", output.toString());
+        return "Showing terminal command events";
+    }
+
+    private String showDetectedDirectory() {
+        PtyTerminalPane pane = currentTerminal();
+        if (pane == null) return "The active pane is not a terminal";
+        String directory = pane.detectedWorkingDirectory();
+        return directory == null ? "The terminal has not reported a working directory" : "Terminal working directory: " + directory;
+    }
+
+    private PtyTerminalPane currentTerminal() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        return buffer == null ? null : editor.ptyTerminalPanes.get(buffer);
     }
 
 

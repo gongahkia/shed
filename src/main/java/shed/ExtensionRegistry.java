@@ -9,6 +9,7 @@ import shed.api.ScmContribution;
 import shed.api.TerminalProfile;
 import shed.api.TestContribution;
 import shed.api.ToolViewContribution;
+import shed.api.WorkspaceToolContribution;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -32,6 +33,7 @@ final class ExtensionRegistry {
     private final Map<String, Owned<ToolViewContribution>> toolViews = new LinkedHashMap<>();
     private final Map<String, Owned<CustomEditorContribution>> customEditors = new LinkedHashMap<>();
     private final Map<String, Owned<RemoteWorkspaceProvider>> remoteWorkspaces = new LinkedHashMap<>();
+    private final Map<String, Owned<WorkspaceToolContribution>> workspaceTools = new LinkedHashMap<>();
 
     synchronized void registerCommand(String extensionId, String id, ExtensionCommand command) {
         commands.put(qualified(extensionId, id), new Owned<>(extensionId, require(command, "extension command")));
@@ -69,6 +71,10 @@ final class ExtensionRegistry {
         remoteWorkspaces.put(unique(extensionId, requiredId(contribution, "remote workspace provider")), new Owned<>(extensionId, contribution));
     }
 
+    synchronized void registerWorkspaceTool(String extensionId, WorkspaceToolContribution contribution) {
+        workspaceTools.put(unique(extensionId, requiredId(contribution, "workspace tool")), new Owned<>(extensionId, contribution));
+    }
+
     synchronized String executeCommand(String id, String arguments) throws Exception {
         Owned<ExtensionCommand> command = commands.get(normalize(id));
         return command == null ? null : command.value().execute(arguments == null ? "" : arguments);
@@ -95,6 +101,7 @@ final class ExtensionRegistry {
     synchronized List<Owned<ToolViewContribution>> toolViews() { return sortedValues(toolViews); }
     synchronized List<Owned<CustomEditorContribution>> customEditors() { return sortedValues(customEditors); }
     synchronized List<Owned<RemoteWorkspaceProvider>> remoteWorkspaceProviders() { return sortedValues(remoteWorkspaces); }
+    synchronized List<Owned<WorkspaceToolContribution>> workspaceTools() { return sortedValues(workspaceTools); }
 
     synchronized void removeExtension(String extensionId) {
         String normalized = normalizeExtensionId(extensionId);
@@ -107,6 +114,7 @@ final class ExtensionRegistry {
         toolViews.values().removeIf(value -> value.extensionId().equals(normalized));
         customEditors.values().removeIf(value -> value.extensionId().equals(normalized));
         remoteWorkspaces.values().removeIf(value -> value.extensionId().equals(normalized));
+        workspaceTools.values().removeIf(value -> value.extensionId().equals(normalized));
     }
 
     private static <T> List<Owned<T>> sortedValues(Map<String, Owned<T>> values) {
@@ -180,6 +188,11 @@ final class ExtensionRegistry {
     }
 
     private static String requiredId(RemoteWorkspaceProvider value, String label) {
+        require(value, label);
+        return value.id();
+    }
+
+    private static String requiredId(WorkspaceToolContribution value, String label) {
         require(value, label);
         return value.id();
     }

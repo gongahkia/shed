@@ -26,13 +26,16 @@ final class PtyTerminalPane implements AutoCloseable {
     private final PtyTerminalConnector connector;
     private final PtyProcess process;
     private final File workingDirectory;
+    private final TerminalShellIntegrationTracker shellIntegration;
     private boolean closed;
 
-    private PtyTerminalPane(JediTermWidget widget, PtyTerminalConnector connector, PtyProcess process, File workingDirectory) {
+    private PtyTerminalPane(JediTermWidget widget, PtyTerminalConnector connector, PtyProcess process, File workingDirectory,
+                            TerminalShellIntegrationTracker shellIntegration) {
         this.widget = widget;
         this.connector = connector;
         this.process = process;
         this.workingDirectory = workingDirectory;
+        this.shellIntegration = shellIntegration;
     }
 
     static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font terminalFont) throws IOException {
@@ -40,11 +43,14 @@ final class PtyTerminalPane implements AutoCloseable {
     }
 
     static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font terminalFont, List<String> requestedCommand) throws IOException {
-        List<String> command = validateCommand(requestedCommand);
+        List<String> requested = validateCommand(requestedCommand);
+        TerminalShellIntegration.Launch launch = TerminalShellIntegration.prepare(requested, configManager);
+        List<String> command = launch.command();
         File cwd = normalizeDirectory(workingDirectory);
         Map<String, String> env = new HashMap<>(System.getenv());
         env.put("TERM", "xterm-256color");
         env.put("COLORTERM", "truecolor");
+        env.putAll(launch.environment());
         if (isShell(command.getFirst())) {
             env.put("SHELL", command.getFirst());
         }
@@ -60,8 +66,10 @@ final class PtyTerminalPane implements AutoCloseable {
         PtyTerminalConnector connector = new PtyTerminalConnector(process, command, StandardCharsets.UTF_8);
         JediTermWidget widget = new JediTermWidget(INITIAL_COLUMNS, INITIAL_ROWS, new ShedTerminalSettingsProvider(configManager, terminalFont));
         widget.setTtyConnector(connector);
+        TerminalShellIntegrationTracker shellIntegration = launch.enabled() ? new TerminalShellIntegrationTracker() : null;
+        if (shellIntegration != null) widget.getTerminal().addCustomCommandListener(shellIntegration::accept);
         widget.start();
-        return new PtyTerminalPane(widget, connector, process, cwd);
+        return new PtyTerminalPane(widget, connector, process, cwd, shellIntegration);
     }
 
     JComponent getComponent() {
@@ -78,6 +86,18 @@ final class PtyTerminalPane implements AutoCloseable {
 
     File getWorkingDirectory() {
         return workingDirectory;
+    }
+
+    boolean hasShellIntegration() {
+        return shellIntegration != null;
+    }
+
+    List<TerminalShellIntegrationTracker.Event> shellIntegrationEvents() {
+        return shellIntegration == null ? List.of() : shellIntegration.events();
+    }
+
+    String detectedWorkingDirectory() {
+        return shellIntegration == null ? null : shellIntegration.currentDirectory();
     }
 
     void onExit(Runnable callback) {

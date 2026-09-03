@@ -41,6 +41,13 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `ProblemsController` | live diagnostic and retained quickfix aggregation | `ProblemsService`, `LspClient`, tool-window host |
 | `TestController` | explicit test discovery/run session state and Problems projection | `TestService`, `TestAdapterRegistry`, `AsyncJobService` |
 | `TerminalController` | PTY terminal panes and lifecycle | `PtyTerminalPane`, pane/buffer state |
+| `NotebookController` | local Jupyter notebook presentation/save/explicit execution | `NotebookDocument`, `NotebookPanel`, `AsyncJobService` |
+| `CustomEditorController` | extension text/binary custom-editor resource bridge | `CustomEditorDocument`, `AtomicFileWriter` |
+| `ScmController` | extension and built-in SCM command routing | `ScmContributionService` |
+| `RemoteWorkspaceController` | explicit local-mirror remote workspace lifecycle | `RemoteWorkspaceProvider`, `AsyncJobService`, workspace roots |
+| `DevContainerController` | explicit local Dev Container CLI bridge | `AsyncJobService`, `TerminalController`, remote workspace mirrors |
+| `WorkspaceToolController` | declared workspace integration actions | `WorkspaceToolContribution`, extension registry, workspace roots |
+| `ExtensionManager` / `ExtensionRegistry` | checksum-verified Java extension lifecycle and typed contributions | `shed.api`, isolated JAR class loaders, workbench controllers |
 | `TreeGitController` | file tree and Git actions | `TreeService`, `GitService` |
 | `LspController` | language-server requests, diagnostics, edits, symbols | `LspService`, `LspClient`, `QuickfixService` |
 | `MarkdownController` | Markdown tables, folds, snippets, brackets | `MarkdownService`, `SnippetService`, `BracketColorService` |

@@ -411,6 +411,36 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:plugin pin <name>` | Pin package version |
 | `:plugin unpin <name>` | Unpin package version |
 
+## Extensions, SCM, Remote Workspaces, and Notebooks
+
+| Command | Action |
+| :--- | :--- |
+| `:extension`, `:extension status` | Show installed Java extension receipts, errors, and contributions |
+| `:extension install <path-or-https> [--checksum=<sha256>]` | Explicitly install a Java extension JAR |
+| `:extension enable\|disable\|remove <id>`, `:extension reload` | Change local extension activation |
+| `:view`, `:view list` | List extension tool views |
+| `:view <extension:id>` | Open a contributed docked tool view |
+| `:customeditor`, `:customeditor list` | List contributed custom text/binary editors |
+| `:customeditor reopen` | Reopen the current file with its matching contributed editor |
+| `:scm`, `:scm list` | List SCM providers that support the active workspace |
+| `:scm status [provider]` | Show SCM status from one/all supported providers |
+| `:scm <provider> <declared-action> [args]` | Run an explicitly declared provider action |
+| `:remote providers` | List built-in and contributed remote workspace providers |
+| `:remote open <uri>` | Explicitly connect a remote workspace as a local working tree/mirror |
+| `:remote pull\|push\|close <id>` | Synchronize or disconnect a remote workspace |
+| `:container status` | Show the active workspace's `.devcontainer/devcontainer.json` when present |
+| `:container up` | Explicitly run the local `devcontainer up` workflow as a cancellable job |
+| `:container exec <command...>`, `:container terminal [command...]` | Explicitly run/open a direct-argv command through the local Dev Container CLI |
+| `:container open <container> <absolute-path>` | Open an explicit Docker container mirror |
+| `:integration`, `:integration list` | List supporting database, deployment, collaboration, and container extension integrations |
+| `:integration <extension:id> help` | Show provider-declared actions |
+| `:integration <extension:id> <action> [arguments]` | Run an explicitly declared workspace-integration action |
+| `:notebook open`, `:notebook run`, `:notebook raw` | Open, explicitly execute, or show raw JSON for the current `.ipynb` file |
+| `:terminal list`, `:terminal profile <id>` | Show/open terminal profiles |
+| `:terminal commands`, `:terminal cwd` | Show in-memory Bash/Zsh shell-integration events or latest reported cwd |
+
+See [Java Extensions](EXTENSIONS.md), [Workspace Integrations](WORKSPACE_INTEGRATIONS.md), [Remote Workspaces](REMOTE_WORKSPACES.md), [Jupyter Notebooks](NOTEBOOKS.md), and [Terminal](TERMINAL.md).
+
 ## Extended / User-Defined Commands
 
 | Mechanism | What it adds |

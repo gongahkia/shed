@@ -142,6 +142,8 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleScmCommand(args), "scm");
         registerCommand((args, range, force) -> editor.handleCustomEditorCommand(args), "customeditor", "custom-editor");
         registerCommand((args, range, force) -> editor.handleNotebookCommand(args), "notebook", "nb");
+        registerCommand((args, range, force) -> editor.handleContainerCommand(args), "container", "devcontainer", "dev-container");
+        registerCommand((args, range, force) -> editor.handleWorkspaceIntegrationCommand(args), "integration", "integrations");
         registerCommand((args, range, force) -> editor.handleRemoteWorkspaceCommand(args), "remote", "remotes");
         registerCommand((args, range, force) -> editor.handleGitHubCommand(args), "github", "gh");
         registerCommand((args, range, force) -> editor.handleUpdateCommand(args), "update", "updates");
@@ -234,7 +236,7 @@ public class CommandHandler {
 
     public List<String> getCommandNames() {
         List<String> names = new ArrayList<>(commandRegistry.keySet());
-        names.addAll(editor.extensionCommandIds());
+        if (editor != null) names.addAll(editor.extensionCommandIds());
         Collections.sort(names);
         return names;
     }

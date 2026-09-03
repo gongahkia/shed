@@ -11,6 +11,7 @@ import shed.api.ShedExtension;
 import shed.api.TerminalProfile;
 import shed.api.TestContribution;
 import shed.api.ToolViewContribution;
+import shed.api.WorkspaceToolContribution;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -125,6 +126,7 @@ final class ExtensionManager implements AutoCloseable {
     synchronized List<ExtensionRegistry.Owned<ToolViewContribution>> toolViews() { return registry.toolViews(); }
     synchronized List<ExtensionRegistry.Owned<CustomEditorContribution>> customEditors() { return registry.customEditors(); }
     synchronized List<ExtensionRegistry.Owned<RemoteWorkspaceProvider>> remoteWorkspaceProviders() { return registry.remoteWorkspaceProviders(); }
+    synchronized List<ExtensionRegistry.Owned<WorkspaceToolContribution>> workspaceTools() { return registry.workspaceTools(); }
 
     private String install(List<String> args) {
         if (args.isEmpty()) {
@@ -275,6 +277,7 @@ final class ExtensionManager implements AutoCloseable {
         appendContributions(text, "Tool views", registry.toolViews().stream().map(value -> value.extensionId() + ":" + value.value().id()).toList());
         appendContributions(text, "Custom editors", registry.customEditors().stream().map(value -> value.extensionId() + ":" + value.value().id()).toList());
         appendContributions(text, "Remote workspace providers", registry.remoteWorkspaceProviders().stream().map(value -> value.extensionId() + ":" + value.value().id()).toList());
+        appendContributions(text, "Workspace tools", registry.workspaceTools().stream().map(value -> value.extensionId() + ":" + value.value().id()).toList());
         return text.toString();
     }
 
@@ -481,6 +484,7 @@ final class ExtensionManager implements AutoCloseable {
         @Override public void registerToolView(ToolViewContribution contribution) { registry.registerToolView(extensionId, contribution); }
         @Override public void registerCustomEditor(CustomEditorContribution contribution) { registry.registerCustomEditor(extensionId, contribution); }
         @Override public void registerRemoteWorkspaceProvider(RemoteWorkspaceProvider contribution) { registry.registerRemoteWorkspace(extensionId, contribution); }
+        @Override public void registerWorkspaceTool(WorkspaceToolContribution contribution) { registry.registerWorkspaceTool(extensionId, contribution); }
     }
 
     private static final class ExtensionClassLoader extends java.net.URLClassLoader {

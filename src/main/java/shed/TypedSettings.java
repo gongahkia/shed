@@ -319,6 +319,9 @@ final class TypedSettings {
         if (key.equals("terminal.session.restore")) {
             return "Live: checked when saving or loading a session";
         }
+        if (key.equals("terminal.shell.integration")) {
+            return "Live: applies to newly opened Bash and Zsh terminals";
+        }
         if (key.startsWith("terminal.font.")) {
             return "Live: used by newly opened terminals";
         }

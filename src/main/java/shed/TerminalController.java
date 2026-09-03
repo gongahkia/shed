@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import shed.api.TerminalProfile;
 
 final class TerminalController {
     private final Texteditor editor;
@@ -16,11 +17,28 @@ final class TerminalController {
     }
 
     public String openTerminal() {
+        return openTerminal(null);
+    }
+
+    String handle(String argument) {
+        String value = argument == null ? "" : argument.trim();
+        if (value.isEmpty()) return openTerminal();
+        if ("list".equalsIgnoreCase(value) || "profiles".equalsIgnoreCase(value) || "status".equalsIgnoreCase(value)) return showProfiles();
+        String profile = value.regionMatches(true, 0, "profile ", 0, 8) ? value.substring(8).trim() : value;
+        if (profile.isBlank()) return "Usage: :terminal [list|profile <extension:id|id>]";
+        ExtensionRegistry.Owned<TerminalProfile> selected = resolveProfile(profile);
+        if (selected == null) return "Terminal profile not found: " + profile;
+        return openTerminal(selected);
+    }
+
+    private String openTerminal(ExtensionRegistry.Owned<TerminalProfile> profile) {
         File startDirectory = resolveTerminalStartDirectory();
-        String title = nextTerminalTitle();
+        String title = nextTerminalTitle(profile == null ? null : profile.value());
         PtyTerminalPane terminalPane;
         try {
-            terminalPane = PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont());
+            terminalPane = profile == null
+                ? PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont())
+                : PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont(), profile.value().command());
         } catch (IOException e) {
             return "Terminal failed: " + e.getMessage();
         }
@@ -49,7 +67,7 @@ final class TerminalController {
         editor.activateEditorPane(terminalEditorPane);
         editor.setMode(EditorMode.INSERT);
         terminalPane.requestFocusInWindow();
-        return "Terminal opened";
+        return profile == null ? "Terminal opened" : "Terminal opened with " + profile.extensionId() + ":" + profile.value().id();
     }
 
 
@@ -138,7 +156,7 @@ final class TerminalController {
 
     private void installRestoredTerminal(EditorPane pane, File workingDirectory) throws IOException {
         PtyTerminalPane terminalPane = PtyTerminalPane.open(workingDirectory, editor.configManager, editor.resolveTerminalFont());
-        FileBuffer terminalBuffer = FileBuffer.createScratch(nextTerminalTitle(), "");
+        FileBuffer terminalBuffer = FileBuffer.createScratch(nextTerminalTitle(null), "");
         editor.buffers.add(terminalBuffer);
         pane.setBuffer(terminalBuffer);
         pane.setLargeFileProjection(null);
@@ -159,8 +177,42 @@ final class TerminalController {
     }
 
 
-    private String nextTerminalTitle() {
-        return "[Terminal " + (editor.terminalBufferCounter++) + "]";
+    private String nextTerminalTitle(TerminalProfile profile) {
+        String label = profile == null ? "Terminal" : profile.displayName();
+        return "[" + label + " " + (editor.terminalBufferCounter++) + "]";
+    }
+
+    private String showProfiles() {
+        StringBuilder output = new StringBuilder("Terminal Profiles\n\nDefault: ")
+            .append(String.join(" ", ShellCommand.interactiveCommand())).append("\n");
+        List<ExtensionRegistry.Owned<TerminalProfile>> profiles = editor.extensionManager == null ? List.of() : editor.extensionManager.terminalProfiles();
+        if (profiles.isEmpty()) {
+            output.append("\nNo extension terminal profiles installed.\n");
+        } else {
+            output.append("\nExtensions:\n");
+            for (ExtensionRegistry.Owned<TerminalProfile> profile : profiles) {
+                output.append("  ").append(profile.extensionId()).append(":").append(profile.value().id()).append("  ")
+                    .append(profile.value().displayName()).append(" -> ").append(String.join(" ", profile.value().command())).append("\n");
+            }
+        }
+        output.append("\nUse :terminal profile <extension:id>.\n");
+        editor.showScratchBuffer("[terminal profiles]", output.toString());
+        return "Showing terminal profiles";
+    }
+
+    private ExtensionRegistry.Owned<TerminalProfile> resolveProfile(String requested) {
+        List<ExtensionRegistry.Owned<TerminalProfile>> profiles = editor.extensionManager == null ? List.of() : editor.extensionManager.terminalProfiles();
+        String normalized = requested.trim().toLowerCase(java.util.Locale.ROOT);
+        ExtensionRegistry.Owned<TerminalProfile> candidate = null;
+        for (ExtensionRegistry.Owned<TerminalProfile> profile : profiles) {
+            String qualified = profile.extensionId() + ":" + profile.value().id();
+            if (qualified.equalsIgnoreCase(normalized)) return profile;
+            if (profile.value().id().equalsIgnoreCase(normalized)) {
+                if (candidate != null) return null;
+                candidate = profile;
+            }
+        }
+        return candidate;
     }
 
 

@@ -119,7 +119,7 @@ final class TestController {
             TestService.AdapterSpec spec = tests.resolvedSpec(state.root, raw);
             if (adapter == null || spec == null) continue;
             if ("maven".equals(spec.id()) || "gradle".equals(spec.id())) started += startStaticDiscovery(state, spec);
-            TestService.Command command = adapter.discovery(spec);
+            TestService.Command command = adapter.discovery(state.root, spec);
             if (!command.executable()) continue;
             started += start(state, "discover", spec, adapter, command);
         }
@@ -253,7 +253,7 @@ final class TestController {
         if (adapter == null || spec == null || spec.command().isEmpty()) return 0;
         try {
             Path cache = tests.reportCache(state.root, spec.id(), Path.of(editor.configManager.getShedDirectoryPath()));
-            TestService.Command command = adapter.run(spec, selection == null ? List.of() : selection, cache);
+            TestService.Command command = adapter.run(state.root, spec, selection == null ? List.of() : selection, cache);
             if (!command.executable()) return 0;
             return start(state, "run", spec, adapter, command);
         } catch (IOException error) {

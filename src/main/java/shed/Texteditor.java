@@ -232,6 +232,7 @@ public class Texteditor extends JFrame implements KeyListener {
         this.errorReporter = errorReporter == null ? new ApplicationErrorReporter() : errorReporter;
         // Initialize managers
         configManager = new ConfigManager();
+        extensionRegistry = new ExtensionRegistry();
         helpService = new HelpService();
         gitService = new GitService();
         treeService = new TreeService();
@@ -250,7 +251,7 @@ public class Texteditor extends JFrame implements KeyListener {
         problemsService = new ProblemsService();
         jobQuickfixController = new JobQuickfixController(this);
         problemsController = new ProblemsController(this, problemsService);
-        testController = new TestController(this, new TestService());
+        testController = new TestController(this, new TestService(extensionRegistry));
         formatOnSaveController = new FormatOnSaveController(this);
         formatterController = new FormatterController(this);
         editorState = new EditorState();
@@ -373,7 +374,6 @@ public class Texteditor extends JFrame implements KeyListener {
         registerManager = new RegisterManager();
         commandHandler = new CommandHandler(this);
         pluginManager = new PluginManager(configManager, this);
-        extensionRegistry = new ExtensionRegistry();
         extensionManager = new ExtensionManager(configManager, extensionRegistry);
         extensionManager.loadInstalled();
 
@@ -3207,6 +3207,9 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         if (debugSessionController != null) {
             debugSessionController.shutdown();
+        }
+        if (extensionManager != null) {
+            extensionManager.close();
         }
         dispose();
         System.exit(0);

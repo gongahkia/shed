@@ -29,6 +29,7 @@ final class TestService {
     static final String CONFIG_FILE = ".shedtests";
     static final int CONFIG_SCHEMA_VERSION = 1;
     private final TestAdapterRegistry adapters;
+    private final ExtensionRegistry extensionRegistry;
 
     enum Status {
         UNKNOWN, PASSED, FAILED, SKIPPED, ERRORED;
@@ -79,8 +80,13 @@ final class TestService {
         boolean valid() { return diagnostics.isEmpty(); }
     }
 
-    TestService() { this(new TestAdapterRegistry()); }
-    TestService(TestAdapterRegistry adapters) { this.adapters = adapters == null ? new TestAdapterRegistry() : adapters; }
+    TestService() { this(new TestAdapterRegistry(), null); }
+    TestService(TestAdapterRegistry adapters) { this(adapters, null); }
+    TestService(ExtensionRegistry extensionRegistry) { this(new TestAdapterRegistry(), extensionRegistry); }
+    TestService(TestAdapterRegistry adapters, ExtensionRegistry extensionRegistry) {
+        this.adapters = adapters == null ? new TestAdapterRegistry() : adapters;
+        this.extensionRegistry = extensionRegistry;
+    }
 
     LoadResult load(Path root) {
         if (root == null) return new LoadResult(List.of(), List.of("workspace root unavailable"), false);
@@ -122,16 +128,25 @@ final class TestService {
         if (loaded == null || !loaded.valid()) return List.of();
         List<TestAdapter> result = new ArrayList<>();
         for (AdapterSpec spec : loaded.specs()) {
-            TestAdapter adapter = adapters.find(spec.id());
+            TestAdapter adapter = adapter(spec.id());
             if (adapter != null) result.add(adapter);
         }
         return List.copyOf(result);
     }
 
-    TestAdapter adapter(String id) { return adapters.find(id); }
+    TestAdapter adapter(String id) {
+        TestAdapter builtIn = adapters.find(id);
+        if (builtIn != null) return builtIn;
+        if (extensionRegistry == null || id == null) return null;
+        for (ExtensionRegistry.Owned<shed.api.TestContribution> contribution : extensionRegistry.tests()) {
+            ExtensionTestAdapter adapter = new ExtensionTestAdapter(contribution);
+            if (adapter.id().equalsIgnoreCase(id.trim())) return adapter;
+        }
+        return null;
+    }
 
     AdapterSpec resolvedSpec(Path root, AdapterSpec spec) {
-        TestAdapter adapter = spec == null ? null : adapters.find(spec.id());
+        TestAdapter adapter = spec == null ? null : adapter(spec.id());
         if (adapter == null) return spec;
         return spec.command().isEmpty() ? new AdapterSpec(spec.id(), adapter.defaultCommand(root), spec.debugConfiguration()) : spec;
     }
@@ -151,7 +166,17 @@ final class TestService {
 
     private List<AdapterSpec> autoDetect(Path root) {
         List<AdapterSpec> result = new ArrayList<>();
-        for (TestAdapter adapter : adapters.all()) if (adapter.supports(root)) result.add(new AdapterSpec(adapter.id(), adapter.defaultCommand(root)));
+        for (TestAdapter adapter : allAdapters()) if (adapter.supports(root)) result.add(new AdapterSpec(adapter.id(), adapter.defaultCommand(root)));
+        return List.copyOf(result);
+    }
+
+    private List<TestAdapter> allAdapters() {
+        List<TestAdapter> result = new ArrayList<>(adapters.all());
+        if (extensionRegistry != null) {
+            for (ExtensionRegistry.Owned<shed.api.TestContribution> contribution : extensionRegistry.tests()) {
+                result.add(new ExtensionTestAdapter(contribution));
+            }
+        }
         return List.copyOf(result);
     }
 
@@ -160,7 +185,7 @@ final class TestService {
         Object idValue = table.get("id");
         if (!(idValue instanceof String rawId) || rawId.isBlank()) { diagnostics.add("adapter[" + index + "].id must be a non-empty string"); return null; }
         String id = rawId.trim().toLowerCase(Locale.ROOT);
-        if (adapters.find(id) == null) { diagnostics.add("adapter[" + index + "].id unsupported: " + id); return null; }
+        if (adapter(id) == null) { diagnostics.add("adapter[" + index + "].id unsupported: " + id); return null; }
         List<String> command = new ArrayList<>();
         Object commandValue = table.get("command");
         if (commandValue != null) {

@@ -113,6 +113,10 @@ final class ExtensionManager implements AutoCloseable {
         return registry.commandIds();
     }
 
+    synchronized ExtensionRegistry.Owned<LanguageContribution> languageForExtension(String extension) {
+        return registry.languageForExtension(extension);
+    }
+
     synchronized List<ExtensionRegistry.Owned<LanguageContribution>> languages() { return registry.languages(); }
     synchronized List<ExtensionRegistry.Owned<DebugAdapterContribution>> debuggers() { return registry.debuggers(); }
     synchronized List<ExtensionRegistry.Owned<TestContribution>> tests() { return registry.tests(); }

@@ -118,6 +118,23 @@ final class DebugAdapterRegistry {
         return new Validation(new DebugAdapterRegistry(parsedAdapters), parsedConfigurations, errors);
     }
 
+    static Validation withContributedAdapters(Validation base, Map<String, Adapter> contributed) {
+        Validation source = base == null ? validate(Map.of()) : base;
+        if (!source.valid() || contributed == null || contributed.isEmpty()) return source;
+        Map<String, Adapter> adapters = new LinkedHashMap<>(source.registry().adapters());
+        Map<String, Configuration> configurations = new LinkedHashMap<>(source.configurations());
+        for (Map.Entry<String, Adapter> entry : contributed.entrySet()) {
+            String id = entry.getKey();
+            Adapter adapter = entry.getValue();
+            if (id == null || adapter == null || adapters.containsKey(id)) continue;
+            adapters.put(id, adapter);
+            if (adapter.supports(Request.LAUNCH) && !configurations.containsKey(id)) {
+                configurations.put(id, new Configuration(id, id, Request.LAUNCH, "workspace", "${file}", "${workspaceFolder}", List.of(), "127.0.0.1", 0));
+            }
+        }
+        return new Validation(new DebugAdapterRegistry(adapters), configurations, source.errors());
+    }
+
     static PlanResult plan(Validation validation, String configurationName, Path workspace) {
         return plan(validation, configurationName, workspace, new LaunchContext(null, "", null));
     }

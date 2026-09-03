@@ -54,7 +54,7 @@ final class DebugSessionController {
     void shutdown() { sessions.stop(workspace()); }
 
     List<String> configurationNamesForPanel() {
-        DebugAdapterRegistry.Validation validation = editor.configManager.getDebugConfiguration();
+        DebugAdapterRegistry.Validation validation = validation();
         return validation == null || !validation.valid() ? List.of() : validation.configurations().keySet().stream().sorted().toList();
     }
 
@@ -105,7 +105,7 @@ final class DebugSessionController {
 
     private String configurations() {
         Path workspace = workspace();
-        DebugAdapterDetector.WorkspaceReport report = new DebugAdapterDetector(null).detect(workspace, editor.configManager.getDebugConfiguration(),
+        DebugAdapterDetector.WorkspaceReport report = new DebugAdapterDetector(null).detect(workspace, validation(),
             editor.configManager.getDebugFeatureSettings());
         StringBuilder output = new StringBuilder("Debug Configurations\n\nWorkspace: ").append(workspace).append("\nEditing remains available: ")
             .append(report.normalEditingAvailable()).append("\n\nAdapters:\n");
@@ -127,7 +127,7 @@ final class DebugSessionController {
 
     private String select(String requested) {
         Path workspace = workspace();
-        DebugAdapterRegistry.Validation validation = editor.configManager.getDebugConfiguration();
+        DebugAdapterRegistry.Validation validation = validation();
         if (validation == null || !validation.valid()) return selectResult(sessions.select(workspace, validation, ""));
         String name = requested;
         if (name == null || name.isBlank()) {
@@ -159,7 +159,7 @@ final class DebugSessionController {
     private String submitStart(Path workspace, DebugAdapterRegistry.LaunchContext context, String requested, boolean restart, String operation) {
         String name = requested == null ? "" : requested.trim();
         int jobId = editor.asyncJobService.submit("debug " + operation, token -> sessions.start(workspace, context,
-            editor.configManager.getDebugConfiguration(), editor.configManager.getDebugFeatureSettings(), name,
+            validation(), editor.configManager.getDebugFeatureSettings(), name,
             Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs())), this::startTransport, breakpoints), (job, result, error) -> {
                 if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
                     editor.showMessage("Debug " + operation + " cancelled.");
@@ -189,6 +189,10 @@ final class DebugSessionController {
             @Override public DebugAdapterTransport.State state() { return transport.state(); }
             @Override public void close() { transport.close(); }
         };
+    }
+
+    private DebugAdapterRegistry.Validation validation() {
+        return ExtensionDebugAdapterSupport.effective(editor.configManager.getDebugConfiguration(), editor.extensionRegistry);
     }
 
     private String stop() {

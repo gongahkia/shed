@@ -79,6 +79,15 @@ final class ExtensionRegistry {
     }
 
     synchronized List<Owned<LanguageContribution>> languages() { return sortedValues(languages); }
+
+    synchronized Owned<LanguageContribution> languageForExtension(String extension) {
+        String normalized = extension == null ? "" : extension.trim().replaceFirst("^\\.", "").toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) return null;
+        for (Owned<LanguageContribution> candidate : sortedValues(languages)) {
+            if (candidate.value().fileExtensions().contains(normalized)) return candidate;
+        }
+        return null;
+    }
     synchronized List<Owned<DebugAdapterContribution>> debuggers() { return sortedValues(debuggers); }
     synchronized List<Owned<TestContribution>> tests() { return sortedValues(tests); }
     synchronized List<Owned<ScmContribution>> scmProviders() { return sortedValues(scm); }
@@ -117,7 +126,14 @@ final class ExtensionRegistry {
     private static String qualified(String extensionId, String commandId) {
         String normalized = normalizeContributionId(commandId);
         String owner = normalizeExtensionId(extensionId);
-        return normalize(normalized.contains(".") ? normalized : owner + "." + normalized);
+        if (normalized.contains(".")) {
+            String qualified = normalize(normalized);
+            if (!qualified.startsWith(owner + ".")) {
+                throw new IllegalArgumentException("extension commands must use their own id prefix");
+            }
+            return qualified;
+        }
+        return owner + "." + normalized;
     }
 
     private static String normalizeExtensionId(String value) {

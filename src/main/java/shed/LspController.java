@@ -269,9 +269,23 @@ final class LspController {
         sb.append("\nBuiltin:\n");
         for (String ext : editor.lspService.getBuiltinExtensions()) {
             if (configured.containsKey(ext)) continue;
+            ExtensionRegistry.Owned<shed.api.LanguageContribution> contribution = extensionLanguage(ext);
+            if (contribution != null) continue;
             String[] cmd = editor.lspService.builtinCommand(ext);
             if (cmd != null) {
                 sb.append("  .").append(ext).append(" -> ").append(String.join(" ", cmd)).append("\n");
+            }
+        }
+        List<ExtensionRegistry.Owned<shed.api.LanguageContribution>> contributed = editor.extensionManager == null ? List.of() : editor.extensionManager.languages();
+        if (!contributed.isEmpty()) {
+            sb.append("\nExtensions:\n");
+            for (ExtensionRegistry.Owned<shed.api.LanguageContribution> contribution : contributed) {
+                shed.api.LanguageContribution language = contribution.value();
+                sb.append("  ").append(contribution.extensionId()).append(":").append(language.id()).append("  .")
+                    .append(String.join(", .", language.fileExtensions()));
+                if (language.serverCommand().isEmpty()) sb.append("  (no LSP command)");
+                else sb.append(" -> ").append(String.join(" ", language.serverCommand())).append(language.serverArguments().isEmpty() ? "" : " " + String.join(" ", language.serverArguments()));
+                sb.append("\n");
             }
         }
         editor.showScratchBuffer("[lsp servers]", sb.toString());
@@ -1950,8 +1964,13 @@ final class LspController {
         String command = editor.configManager.getLspCommand(extension);
         String[] args = editor.configManager.getLspArgs(extension);
         if (command == null || command.isBlank()) {
-            String[] builtin = builtinLspCommand(extension);
-            if (builtin == null) {
+            String[] contributed = contributedLspCommand(extension);
+            if (contributed != null && contributed.length == 0) {
+                editor.lspErrors.put(key, "extension language for ." + extension + " does not provide an LSP command");
+                return null;
+            }
+            String[] builtin = contributed == null ? builtinLspCommand(extension) : contributed;
+            if (builtin == null || builtin.length == 0) {
                 editor.lspErrors.put(key, "no server configured for ." + extension);
                 return null;
             }
@@ -2275,6 +2294,8 @@ final class LspController {
 
 
     String languageId(FileBuffer buffer) {
+        ExtensionRegistry.Owned<shed.api.LanguageContribution> contribution = extensionLanguage(bufferExtension(buffer));
+        if (contribution != null) return contribution.value().id();
         return editor.lspService.languageId(buffer.getFileType());
     }
 
@@ -2294,6 +2315,20 @@ final class LspController {
 
     String[] builtinLspCommand(String extension) {
         return editor.lspService.builtinCommand(extension);
+    }
+
+    private String[] contributedLspCommand(String extension) {
+        ExtensionRegistry.Owned<shed.api.LanguageContribution> contribution = extensionLanguage(extension);
+        if (contribution == null) return null;
+        List<String> command = contribution.value().serverCommand();
+        if (command.isEmpty()) return new String[0];
+        List<String> parts = new ArrayList<>(command);
+        parts.addAll(contribution.value().serverArguments());
+        return parts.toArray(String[]::new);
+    }
+
+    private ExtensionRegistry.Owned<shed.api.LanguageContribution> extensionLanguage(String extension) {
+        return editor.extensionManager == null ? null : editor.extensionManager.languageForExtension(extension);
     }
 
 

@@ -43,7 +43,8 @@ public class TexteditorSwingIntegrationTest {
                 return editor.commandHandler.execute("w");
             });
 
-            assertTrue(result.contains("written"), result);
+            assertEquals("Saving…", result);
+            assertTrue(awaitBufferSaved(editor, file, "new\ncontent\n"));
             assertEquals("new\ncontent\n", Files.readString(file, StandardCharsets.UTF_8));
             assertFalse(onEdt(() -> editor.getCurrentBuffer().isModified()));
         } finally {
@@ -388,12 +389,11 @@ public class TexteditorSwingIntegrationTest {
 
         Texteditor editor = createEditor(home, file);
         try {
-            assertEquals("Showing managed LSP support", onEdt(() -> editor.handleLspCommand("manage")));
+            assertEquals("Showing managed LSP support", onEdt(() -> editor.handleLspCommand("manage status")));
             assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("Managed LSP Support"));
             assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains(":lsp manage detect <ext>"));
 
-            assertEquals("Showing managed LSP install guidance", onEdt(() -> editor.handleLspCommand("manage install py")));
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("No download or update was started."));
+            assertEquals("Opened language services for install", onEdt(() -> editor.handleLspCommand("manage install py")));
 
             assertEquals("Showing manual LSP setup", onEdt(() -> editor.handleLspCommand("manage manual py")));
             assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("\"lsp.py.command\""));
@@ -472,6 +472,16 @@ public class TexteditorSwingIntegrationTest {
                 && snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED) {
                 return false;
             }
+            Thread.sleep(20);
+        }
+        return false;
+    }
+
+    private static boolean awaitBufferSaved(Texteditor editor, Path file, String expected) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            if (Files.exists(file) && expected.equals(Files.readString(file, StandardCharsets.UTF_8))
+                && !onEdt(() -> editor.getCurrentBuffer().isModified())) return true;
             Thread.sleep(20);
         }
         return false;

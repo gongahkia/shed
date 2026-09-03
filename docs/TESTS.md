@@ -36,6 +36,10 @@ command = ["./node_modules/.bin/vitest"]
 
 Results are session-only. Pytest/Jest/Vitest report files go under the configured Shed data directory's `test-reports/` cache (default `~/.shed/test-reports/`); source project files are not changed by Shed. Maven/Gradle use the XML reports their normal test tasks produce. Failed tests with a source location appear in Problems as `test:<adapter>`; no test failure replaces the quickfix list.
 
+## Java extension providers
+
+An installed Java extension can register `TestContribution` through the versioned extension API. Shed asks a provider whether it supports the selected root, executes the provider's direct-argv discovery/run commands, and translates returned `ExtensionTestCase` values into the Tests view and Problems. Provider code owns its framework parser and report format. Discovery and execution remain explicit (`:test refresh` / `:test run`); registering a provider does not grant background scanning or automatic downloads.
+
 ## Coverage import
 
 Use **Import Coverage…** in Tests or `:coverage import <report>` to parse a local JaCoCo XML, Cobertura XML, LCOV, or Go `-coverprofile` report. Shed does not run, generate, upload, or watch coverage reports. Imported values are session-local, merge by workspace file/line, ignore paths outside the selected root, and show covered/uncovered active-file lines in the gutter. Use `:coverage clear` or **Clear Coverage** to remove them.

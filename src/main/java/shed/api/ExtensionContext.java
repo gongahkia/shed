@@ -25,4 +25,6 @@ public interface ExtensionContext {
     void registerCustomEditor(CustomEditorContribution contribution);
 
     void registerRemoteWorkspaceProvider(RemoteWorkspaceProvider contribution);
+
+    void registerWorkspaceTool(WorkspaceToolContribution contribution);
 }

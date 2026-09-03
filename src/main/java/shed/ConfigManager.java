@@ -65,6 +65,7 @@ public class ConfigManager {
     private static final boolean DEFAULT_SESSION_RESTORE_ON_START = false;
     private static final String DEFAULT_SESSION_AUTOLOAD = "default";
     private static final boolean DEFAULT_TERMINAL_SESSION_RESTORE = false;
+    private static final boolean DEFAULT_TERMINAL_SHELL_INTEGRATION = true;
     private static final boolean DEFAULT_WORKSPACE_INDEX_ENABLED = false;
     private static final long DEFAULT_LARGE_FILE_THRESHOLD_MB = 25L;
     private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 500000;
@@ -247,6 +248,7 @@ public class ConfigManager {
         defineDefault("session.autoload", DEFAULT_SESSION_AUTOLOAD);
         defineDefault("session.dir", defaultSessionDirectoryPath());
         defineDefault("terminal.session.restore", DEFAULT_TERMINAL_SESSION_RESTORE);
+        defineDefault("terminal.shell.integration", DEFAULT_TERMINAL_SHELL_INTEGRATION);
         defineDefault("snippets.directory", defaultSnippetsDirectoryPath());
         defineDefault("landing.source", defaultLandingSourcePath());
         defineDefault("landing.remote.cache.path", defaultLandingRemoteCachePath());
@@ -898,6 +900,10 @@ public class ConfigManager {
 
     public boolean getTerminalSessionRestoreEnabled() {
         return getBoolean("terminal.session.restore", DEFAULT_TERMINAL_SESSION_RESTORE);
+    }
+
+    public boolean getTerminalShellIntegrationEnabled() {
+        return getBoolean("terminal.shell.integration", DEFAULT_TERMINAL_SHELL_INTEGRATION);
     }
 
     public boolean getWorkspaceIndexEnabled() {

@@ -3244,11 +3244,11 @@ public class Texteditor extends JFrame implements KeyListener {
         if (debugSessionController != null) {
             debugSessionController.shutdown();
         }
-        if (extensionManager != null) {
-            extensionManager.close();
-        }
         if (remoteWorkspaceController != null) {
             remoteWorkspaceController.closeAll();
+        }
+        if (extensionManager != null) {
+            extensionManager.close();
         }
         dispose();
         System.exit(0);

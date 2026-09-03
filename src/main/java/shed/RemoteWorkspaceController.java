@@ -124,7 +124,7 @@ final class RemoteWorkspaceController {
     private String showProviders() {
         StringBuilder output = new StringBuilder("Remote Workspace Providers\n\n");
         for (RemoteWorkspaceProvider provider : providers()) output.append("  ").append(provider.id()).append("  ").append(provider.displayName()).append("\n");
-        output.append("\nBuilt in: git/Git-over-HTTPS-or-SSH, ssh mirror, and WSL on Windows. Extensions can register more URI schemes.\n");
+        output.append("\nBuilt in: git/Git-over-HTTPS-or-SSH, ssh mirror, Docker container mirror, and WSL on Windows. Extensions can register more URI schemes.\n");
         editor.showScratchBuffer("[remote providers]", output.toString());
         return "Showing remote workspace providers";
     }

@@ -33,7 +33,8 @@ public class LspService {
     }
 
     public java.util.List<String> getBuiltinExtensions() {
-        return java.util.List.of("java", "rs", "py", "js", "jsx", "ts", "tsx", "go", "c", "cc", "cpp", "cxx", "h", "hpp", "hxx", "json", "jsonc", "md", "markdown");
+        return java.util.List.of("java", "rs", "py", "js", "jsx", "ts", "tsx", "go", "c", "cc", "cpp", "cxx", "h", "hpp", "hxx",
+            "json", "jsonc", "html", "htm", "xhtml", "css", "scss", "less", "md", "markdown");
     }
 
     public String[] builtinCommand(String extension) {
@@ -62,6 +63,14 @@ public class LspService {
             case "json":
             case "jsonc":
                 return new String[] {ManagedLanguageCatalog.json().command(), "--stdio"};
+            case "html":
+            case "htm":
+            case "xhtml":
+                return new String[] {ManagedLanguageCatalog.html().command(), "--stdio"};
+            case "css":
+            case "scss":
+            case "less":
+                return new String[] {ManagedLanguageCatalog.css().command(), "--stdio"};
             case "md":
             case "markdown":
                 return new String[] {ManagedLanguageCatalog.markdown().command(), "--stdio"};

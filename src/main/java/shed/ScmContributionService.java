@@ -110,7 +110,9 @@ final class ScmContributionService {
 
     private List<ExtensionRegistry.Owned<ScmContribution>> supported(Path workspace) {
         List<ExtensionRegistry.Owned<ScmContribution>> result = new ArrayList<>();
-        for (ExtensionRegistry.Owned<ScmContribution> provider : registry == null ? List.<ExtensionRegistry.Owned<ScmContribution>>of() : registry.scmProviders()) {
+        List<ExtensionRegistry.Owned<ScmContribution>> candidates = new ArrayList<>(BuiltInScmContributions.all());
+        if (registry != null) candidates.addAll(registry.scmProviders());
+        for (ExtensionRegistry.Owned<ScmContribution> provider : candidates) {
             try {
                 if (provider.value().supports(workspace)) result.add(provider);
             } catch (Exception ignored) {

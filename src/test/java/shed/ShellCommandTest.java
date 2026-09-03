@@ -24,6 +24,18 @@ public class ShellCommandTest {
     }
 
     @Test
+    void usesFishWhenTheConfiguredShellIsExecutable() {
+        assertEquals(
+            java.util.List.of("/usr/bin/fish", "-c", "echo ok"),
+            ShellCommand.forCommand("echo ok", Map.of("SHELL", "/usr/bin/fish"), "/usr/bin/fish"::equals)
+        );
+        assertEquals(
+            java.util.List.of("/usr/bin/fish"),
+            ShellCommand.interactiveCommand(Map.of("SHELL", "/usr/bin/fish"), "/usr/bin/fish"::equals)
+        );
+    }
+
+    @Test
     void fallsBackToPosixShellWhenOnlyShExists() {
         assertEquals(
             java.util.List.of("/bin/sh", "-c", "echo ok"),

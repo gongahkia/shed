@@ -119,6 +119,7 @@ final class ShellCommand {
         String name = basename(shell).toLowerCase(Locale.ROOT);
         return "bash".equals(name)
             || "zsh".equals(name)
+            || "fish".equals(name)
             || "sh".equals(name)
             || "dash".equals(name)
             || "ksh".equals(name)

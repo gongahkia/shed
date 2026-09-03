@@ -1,6 +1,6 @@
 # Java Extensions
 
-Shed has two different local customization paths. Existing `.shed`/Lua plugins remain for small declarative and shell-backed behavior. Java extensions are the supported workbench-integration path: they can contribute commands, languages, debuggers, test providers, SCM providers, terminal profiles, tool views, custom editors, and remote-workspace providers.
+Shed has two different local customization paths. Existing `.shed`/Lua plugins remain for small declarative and shell-backed behavior. Java extensions are the supported workbench-integration path: they can contribute commands, languages, language profiles, debuggers, test providers, SCM providers, terminal profiles, tool views, custom editors, and remote-workspace providers.
 
 Java extensions are local JARs, not a Marketplace and not a sandbox. An activated extension executes with the same JVM user permissions as Shed. Install only code you trust.
 
@@ -42,6 +42,7 @@ main_class = "example.ProviderExtension"
 | --- | --- |
 | `ExtensionCommand` | Command palette and `:<extension-id>.<command>` dispatch |
 | `LanguageContribution` | File-extension routing and an optional direct-argv LSP launch |
+| `LanguageProfile` | File-name, extension, or first-line detection plus literal lexical metadata |
 | `DebugAdapterContribution` | DAP configuration validation and explicit debug launch |
 | `TestContribution` | Tests view discovery, run results, Problems locations, and debug configuration mapping |
 | `ScmContribution` | `:scm` provider status and declared actions |
@@ -52,6 +53,24 @@ main_class = "example.ProviderExtension"
 | `WorkspaceToolContribution` | Declared database, deployment, collaboration, or container actions through `:integration` |
 
 Command ids are namespaced to their extension id and cannot overwrite a built-in or another extension's command. SCM actions are allowlisted by the provider's declared action list; Shed does not turn them into shell strings.
+
+## Language profiles
+
+`LanguageContribution` selects an LSP language id and optional server command. `LanguageProfile` independently makes an extension language visible in the editor: it can match extensions, exact file names, or literal first-line prefixes, and supplies keywords, line/block comments, and string delimiters. The selected profile drives status-bar language naming, lexical highlighting, and comment/uncomment commands.
+
+Profiles intentionally use bounded literal tokens rather than arbitrary regular expressions. This keeps their typing-path cost predictable and avoids executing extension-supplied patterns in the editor. A profile may overlap a built-in file type; the extension profile then controls lexical display for its declared match, while the built-in type continues to supply any built-in editor behavior not represented by the profile.
+
+```java
+context.registerLanguageProfile(new LanguageProfile(
+    "example", "Example", Set.of("ex"), Set.of("Examplefile"),
+    Set.of("#!/usr/bin/env example"), List.of("//"),
+    List.of(new LanguageProfile.BlockComment("/*", "*/")),
+    List.of(new LanguageProfile.StringDelimiter("\"", false)),
+    Set.of("module", "let", "fn")
+));
+```
+
+This is lexical support only. It does not provide a TextMate grammar, injection grammar, folding query, parser, formatter, semantic tokens, symbols, or extension-defined snippets. Those capabilities remain separate implementation work; an LSP may supply semantic navigation and diagnostics when configured through `LanguageContribution`.
 
 `WorkspaceToolContribution` is the workspace-aware command boundary for database consoles, deployment workflows, collaboration clients, and container controls; `ToolViewContribution` adds their docked UI. Java extension code remains responsible for credentials, process/network policy, cancellation, and UI. Details: [Workspace Integrations](WORKSPACE_INTEGRATIONS.md).
 

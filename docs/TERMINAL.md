@@ -4,7 +4,7 @@ Shed opens an interactive shell in a PTY-backed split. `:terminal list` shows th
 
 ## Shell integration
 
-For newly opened interactive Bash and Zsh terminals, `terminal.shell.integration` defaults to `true`. Shed creates startup files under `~/.shed/shell-integration/` for that terminal process only; it does not edit `.bashrc`, `.zshrc`, or another user dotfile. The generated hooks emit Jediterm's private custom-command OSC channel with command start, command completion status, and current-directory events.
+For newly opened interactive Bash, Zsh, and Fish terminals, `terminal.shell.integration` defaults to `true`. Shed creates startup files under `~/.shed/shell-integration/` for that terminal process only; it does not edit `.bashrc`, `.zshrc`, `config.fish`, or another user dotfile. The generated hooks emit Jediterm's private custom-command OSC channel with command start, command completion status, and current-directory events. Fish gets an isolated `XDG_CONFIG_HOME`; its existing `config.fish`, when present, is sourced explicitly before Shed's hook.
 
 Use `:terminal commands` to inspect the retained event history and `:terminal cwd` to show the last reported directory. Turn the feature off with:
 

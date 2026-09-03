@@ -102,7 +102,7 @@ An `https://` `landing.source` is an explicit global opt-in to fetch that URL wh
 | `session.autoload` | `default` | string | Session name used when autoloading |
 | `session.dir` | `~/.shed/sessions` | path | Session storage directory |
 | `terminal.session.restore` | `false` | bool | Persist terminal pane cwd and restore a fresh interactive shell; never stores or replays commands, scrollback, shell arguments, or process state |
-| `terminal.shell.integration` | `true` | bool | Enable generated, per-terminal Bash/Zsh command and cwd hooks; affects newly opened terminals only |
+| `terminal.shell.integration` | `true` | bool | Enable generated, per-terminal Bash/Zsh/Fish command and cwd hooks; affects newly opened terminals only |
 | `workspace.index.enabled` | `false` | bool | Enable persisted Git-ignore-aware workspace indexing |
 | `large.file.threshold.mb` | `25` | int | Selects read-only large-file mode above this MiB value; effective minimum `1` |
 | `large.file.line.threshold` | `500000` | int | Selects read-only large-file mode above this logical-line count; effective minimum `1000` |

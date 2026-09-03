@@ -5,6 +5,7 @@ import shed.api.DebugAdapterContribution;
 import shed.api.ExtensionCommand;
 import shed.api.ExtensionContext;
 import shed.api.LanguageContribution;
+import shed.api.LanguageProfile;
 import shed.api.RemoteWorkspaceProvider;
 import shed.api.ScmContribution;
 import shed.api.ShedExtension;
@@ -119,6 +120,7 @@ final class ExtensionManager implements AutoCloseable {
     }
 
     synchronized List<ExtensionRegistry.Owned<LanguageContribution>> languages() { return registry.languages(); }
+    synchronized List<ExtensionRegistry.Owned<LanguageProfile>> languageProfiles() { return registry.languageProfiles(); }
     synchronized List<ExtensionRegistry.Owned<DebugAdapterContribution>> debuggers() { return registry.debuggers(); }
     synchronized List<ExtensionRegistry.Owned<TestContribution>> tests() { return registry.tests(); }
     synchronized List<ExtensionRegistry.Owned<ScmContribution>> scmProviders() { return registry.scmProviders(); }
@@ -477,6 +479,7 @@ final class ExtensionManager implements AutoCloseable {
         @Override public Path storageDirectory() { return storage; }
         @Override public void registerCommand(String id, ExtensionCommand command) { registry.registerCommand(extensionId, id, command); }
         @Override public void registerLanguage(LanguageContribution contribution) { registry.registerLanguage(extensionId, contribution); }
+        @Override public void registerLanguageProfile(LanguageProfile profile) { registry.registerLanguageProfile(extensionId, profile); }
         @Override public void registerDebugger(DebugAdapterContribution contribution) { registry.registerDebugger(extensionId, contribution); }
         @Override public void registerTestProvider(TestContribution contribution) { registry.registerTest(extensionId, contribution); }
         @Override public void registerScmProvider(ScmContribution contribution) { registry.registerScm(extensionId, contribution); }

@@ -4,6 +4,7 @@ import shed.api.CustomEditorContribution;
 import shed.api.DebugAdapterContribution;
 import shed.api.ExtensionCommand;
 import shed.api.LanguageContribution;
+import shed.api.LanguageProfile;
 import shed.api.RemoteWorkspaceProvider;
 import shed.api.ScmContribution;
 import shed.api.TerminalProfile;
@@ -26,6 +27,7 @@ final class ExtensionRegistry {
 
     private final Map<String, Owned<ExtensionCommand>> commands = new LinkedHashMap<>();
     private final Map<String, Owned<LanguageContribution>> languages = new LinkedHashMap<>();
+    private final Map<String, Owned<LanguageProfile>> languageProfiles = new LinkedHashMap<>();
     private final Map<String, Owned<DebugAdapterContribution>> debuggers = new LinkedHashMap<>();
     private final Map<String, Owned<TestContribution>> tests = new LinkedHashMap<>();
     private final Map<String, Owned<ScmContribution>> scm = new LinkedHashMap<>();
@@ -41,6 +43,10 @@ final class ExtensionRegistry {
 
     synchronized void registerLanguage(String extensionId, LanguageContribution contribution) {
         languages.put(unique(extensionId, require(contribution, "language contribution").id()), new Owned<>(extensionId, contribution));
+    }
+
+    synchronized void registerLanguageProfile(String extensionId, LanguageProfile profile) {
+        languageProfiles.put(unique(extensionId, require(profile, "language profile").languageId()), new Owned<>(extensionId, profile));
     }
 
     synchronized void registerDebugger(String extensionId, DebugAdapterContribution contribution) {
@@ -86,6 +92,25 @@ final class ExtensionRegistry {
 
     synchronized List<Owned<LanguageContribution>> languages() { return sortedValues(languages); }
 
+    synchronized List<Owned<LanguageProfile>> languageProfiles() { return sortedValues(languageProfiles); }
+
+    synchronized Owned<LanguageProfile> languageProfileFor(java.io.File file, String content) {
+        String name = file == null ? "" : file.getName().toLowerCase(Locale.ROOT);
+        String extension = "";
+        int dot = name.lastIndexOf('.');
+        if (dot >= 0 && dot < name.length() - 1) extension = name.substring(dot + 1);
+        String firstLine = content == null ? "" : content.lines().findFirst().orElse("");
+        for (Owned<LanguageProfile> candidate : sortedValues(languageProfiles)) {
+            LanguageProfile profile = candidate.value();
+            if (!name.isEmpty() && profile.fileNames().contains(name)) return candidate;
+            if (!extension.isEmpty() && profile.fileExtensions().contains(extension)) return candidate;
+            for (String prefix : profile.firstLinePrefixes()) {
+                if (firstLine.startsWith(prefix)) return candidate;
+            }
+        }
+        return null;
+    }
+
     synchronized Owned<LanguageContribution> languageForExtension(String extension) {
         String normalized = extension == null ? "" : extension.trim().replaceFirst("^\\.", "").toLowerCase(Locale.ROOT);
         if (normalized.isEmpty()) return null;
@@ -107,6 +132,7 @@ final class ExtensionRegistry {
         String normalized = normalizeExtensionId(extensionId);
         commands.values().removeIf(value -> value.extensionId().equals(normalized));
         languages.values().removeIf(value -> value.extensionId().equals(normalized));
+        languageProfiles.values().removeIf(value -> value.extensionId().equals(normalized));
         debuggers.values().removeIf(value -> value.extensionId().equals(normalized));
         tests.values().removeIf(value -> value.extensionId().equals(normalized));
         scm.values().removeIf(value -> value.extensionId().equals(normalized));

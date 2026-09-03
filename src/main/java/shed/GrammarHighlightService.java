@@ -1,5 +1,6 @@
 package shed;
 
+import shed.api.LanguageProfile;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -99,6 +100,167 @@ final class GrammarHighlightService {
             lineStart = lineEnd + 1;
         }
         return List.copyOf(tokens);
+    }
+
+    /**
+     * Lexes an extension-provided profile. Profiles use literal delimiters only,
+     * so extension metadata cannot inject regular-expression work into typing.
+     */
+    List<Token> highlightSnapshot(String text, LanguageProfile profile) {
+        if (text == null || text.isEmpty() || profile == null) return List.of();
+        return highlightProfileRange(text, profile, 0, text.length());
+    }
+
+    /** Lexes only a visible range after advancing profile state through prior lines. */
+    List<Token> highlightViewport(String text, LanguageProfile profile, int visibleStart, int visibleEnd) {
+        if (text == null || text.isEmpty() || profile == null) return List.of();
+        int start = Math.max(0, Math.min(visibleStart, text.length()));
+        int end = Math.max(start, Math.min(visibleEnd, text.length()));
+        int firstLine = text.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+        int lastLine = text.indexOf('\n', end);
+        return highlightProfileRange(text, profile, firstLine, lastLine < 0 ? text.length() : lastLine);
+    }
+
+    private List<Token> highlightProfileRange(String text, LanguageProfile profile, int firstLine, int lastLine) {
+        ProfileState state = ProfileState.normal();
+        int lineStart = 0;
+        while (lineStart < firstLine) {
+            int lineEnd = text.indexOf('\n', lineStart);
+            if (lineEnd < 0) lineEnd = text.length();
+            state = profileLine(text, lineStart, lineEnd, profile, state, null);
+            lineStart = lineEnd + 1;
+        }
+        List<Token> tokens = new ArrayList<>();
+        while (lineStart <= lastLine) {
+            int lineEnd = text.indexOf('\n', lineStart);
+            if (lineEnd < 0 || lineEnd > lastLine) lineEnd = lastLine;
+            state = profileLine(text, lineStart, lineEnd, profile, state, tokens);
+            if (lineEnd == lastLine) break;
+            lineStart = lineEnd + 1;
+        }
+        return List.copyOf(tokens);
+    }
+
+    private ProfileState profileLine(String text, int from, int to, LanguageProfile profile, ProfileState state, List<Token> tokens) {
+        int index = from;
+        if (!state.close().isEmpty()) {
+            int end = literalEnd(text, index, to, state.close());
+            add(tokens, index, end, state.scope());
+            if (end < to || endsWith(text, end, state.close())) {
+                index = end;
+                state = ProfileState.normal();
+            } else {
+                return state;
+            }
+        }
+        while (index < to) {
+            String lineComment = matching(text, index, to, profile.lineCommentPrefixes());
+            if (lineComment != null) {
+                add(tokens, index, to, Scope.COMMENT);
+                return ProfileState.normal();
+            }
+            LanguageProfile.BlockComment block = matchingBlockComment(text, index, to, profile.blockComments());
+            if (block != null) {
+                int end = literalEnd(text, index + block.start().length(), to, block.end());
+                add(tokens, index, end, Scope.COMMENT);
+                if (end >= to && !endsWith(text, end, block.end())) return new ProfileState(block.end(), Scope.COMMENT);
+                index = end;
+                continue;
+            }
+            LanguageProfile.StringDelimiter delimiter = matchingDelimiter(text, index, to, profile.stringDelimiters());
+            if (delimiter != null) {
+                int end = escapedLiteralEnd(text, index + delimiter.value().length(), to, delimiter.value());
+                add(tokens, index, end, Scope.STRING);
+                if (delimiter.multiline() && end >= to && !endsWith(text, end, delimiter.value())) {
+                    return new ProfileState(delimiter.value(), Scope.STRING);
+                }
+                index = end;
+                continue;
+            }
+            char current = text.charAt(index);
+            if (current == '@') {
+                int end = identifierEnd(text, index + 1, to);
+                add(tokens, index, end, Scope.ANNOTATION);
+                index = Math.max(index + 1, end);
+                continue;
+            }
+            if (Character.isDigit(current) && (index == from || !profileIdentifier(text.charAt(index - 1)))) {
+                int end = numberEnd(text, index, to);
+                add(tokens, index, end, Scope.NUMBER);
+                index = end;
+                continue;
+            }
+            if (profileIdentifierStart(current)) {
+                int start = index++;
+                while (index < to && profileIdentifier(text.charAt(index))) index++;
+                Scope scope = profileWordScope(text, start, index, to, profile);
+                if (scope != null) add(tokens, start, index, scope);
+                continue;
+            }
+            index++;
+        }
+        return ProfileState.normal();
+    }
+
+    private Scope profileWordScope(String text, int start, int end, int limit, LanguageProfile profile) {
+        if (profile.keywords().contains(text.substring(start, end))) return Scope.KEYWORD;
+        if (end - start > 1 && isUpperConstant(text, start, end)) return Scope.CONSTANT;
+        int next = end;
+        while (next < limit && Character.isWhitespace(text.charAt(next))) next++;
+        if (next < limit && text.charAt(next) == '(') return Scope.FUNCTION;
+        if (Character.isUpperCase(text.charAt(start))) return Scope.TYPE;
+        return null;
+    }
+
+    private static String matching(String text, int offset, int limit, List<String> candidates) {
+        for (String value : candidates) {
+            if (offset + value.length() <= limit && startsWith(text, offset, value)) return value;
+        }
+        return null;
+    }
+
+    private static LanguageProfile.BlockComment matchingBlockComment(String text, int offset, int limit,
+                                                                       List<LanguageProfile.BlockComment> candidates) {
+        for (LanguageProfile.BlockComment value : candidates) {
+            if (offset + value.start().length() <= limit && startsWith(text, offset, value.start())) return value;
+        }
+        return null;
+    }
+
+    private static LanguageProfile.StringDelimiter matchingDelimiter(String text, int offset, int limit,
+                                                                       List<LanguageProfile.StringDelimiter> candidates) {
+        for (LanguageProfile.StringDelimiter value : candidates) {
+            if (offset + value.value().length() <= limit && startsWith(text, offset, value.value())) return value;
+        }
+        return null;
+    }
+
+    private static int literalEnd(String text, int from, int limit, String delimiter) {
+        int close = text.indexOf(delimiter, from);
+        return close < 0 || close + delimiter.length() > limit ? limit : close + delimiter.length();
+    }
+
+    private static int escapedLiteralEnd(String text, int from, int limit, String delimiter) {
+        boolean escaped = false;
+        for (int index = from; index < limit; index++) {
+            if (!escaped && startsWith(text, index, delimiter)) return index + delimiter.length();
+            char current = text.charAt(index);
+            escaped = current == '\\' && !escaped;
+            if (current != '\\') escaped = false;
+        }
+        return limit;
+    }
+
+    private static boolean endsWith(String text, int end, String value) {
+        return end >= value.length() && text.regionMatches(end - value.length(), value, 0, value.length());
+    }
+
+    private static boolean profileIdentifierStart(char value) {
+        return Character.isLetter(value) || value == '_' || value == '$';
+    }
+
+    private static boolean profileIdentifier(char value) {
+        return Character.isLetterOrDigit(value) || value == '_' || value == '$';
     }
 
     void invalidate(FileBuffer buffer) {
@@ -531,6 +693,9 @@ final class GrammarHighlightService {
 
     private record Line(String text, State start, State end, List<Token> tokens) {}
     private record TagResult(int end, String name, boolean closing, FileType embedded) {}
+    private record ProfileState(String close, Scope scope) {
+        static ProfileState normal() { return new ProfileState("", Scope.STRING); }
+    }
     private record State(Mode mode, FileType embedded, Mode innerMode, String marker) {
         static State normal() { return new State(Mode.NORMAL, FileType.TEXT, Mode.NORMAL, ""); }
         State withEmbedded(FileType type, String marker) { return new State(mode, type, Mode.NORMAL, marker); }

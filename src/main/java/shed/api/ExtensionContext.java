@@ -12,6 +12,9 @@ public interface ExtensionContext {
 
     void registerLanguage(LanguageContribution contribution);
 
+    /** Registers file detection and safe lexical behavior for an extension language. */
+    void registerLanguageProfile(LanguageProfile profile);
+
     void registerDebugger(DebugAdapterContribution contribution);
 
     void registerTestProvider(TestContribution contribution);

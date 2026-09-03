@@ -1,5 +1,6 @@
 package shed;
 
+import shed.api.LanguageProfile;
 import javax.swing.JTextArea;
 import javax.swing.Timer;
 import javax.swing.text.BadLocationException;
@@ -482,7 +483,8 @@ final class SyntaxUiController {
         }
         Range visible = syntaxViewport(text);
         boolean virtualized = text.length() > MAX_FULL_SYNTAX_CHARS || text.lineCount() > MAX_FULL_SYNTAX_LINES;
-        SyntaxRequest request = new SyntaxRequest(buffer, text, buffer.getFileType(), syntaxColors(),
+        LanguageProfile profile = languageProfileFor(buffer, text.text());
+        SyntaxRequest request = new SyntaxRequest(buffer, text, buffer.getFileType(), profile, syntaxColors(),
             editor.configManager.getShowWhitespace(), virtualized, visible.start(), visible.end(), ++syntaxGeneration);
         if (syntaxJobId >= 0) editor.asyncJobService.cancel(syntaxJobId);
         syntaxJobId = editor.asyncJobService.submit("Syntax highlighting", token -> highlightSnapshot(request, token),
@@ -493,9 +495,16 @@ final class SyntaxUiController {
         long started = System.nanoTime();
         List<SyntaxSpan> spans = new ArrayList<>();
         GrammarHighlightService grammar = new GrammarHighlightService();
-        List<GrammarHighlightService.Token> tokens = request.virtualized()
-            ? grammar.highlightViewport(request.text().text(), request.fileType(), request.visibleStart(), request.visibleEnd())
-            : grammar.highlightSnapshot(request.text().text(), request.fileType());
+        List<GrammarHighlightService.Token> tokens;
+        if (request.profile() == null) {
+            tokens = request.virtualized()
+                ? grammar.highlightViewport(request.text().text(), request.fileType(), request.visibleStart(), request.visibleEnd())
+                : grammar.highlightSnapshot(request.text().text(), request.fileType());
+        } else {
+            tokens = request.virtualized()
+                ? grammar.highlightViewport(request.text().text(), request.profile(), request.visibleStart(), request.visibleEnd())
+                : grammar.highlightSnapshot(request.text().text(), request.profile());
+        }
         for (GrammarHighlightService.Token value : tokens) {
             if (token.isCancelled()) return null;
             Color color = request.colors().get(value.scope());
@@ -584,7 +593,13 @@ final class SyntaxUiController {
         return largeFile;
     }
 
-    private record SyntaxRequest(FileBuffer buffer, VersionedTextSnapshot text, FileType fileType,
+    private LanguageProfile languageProfileFor(FileBuffer buffer, String text) {
+        if (buffer == null || buffer.getFile() == null || editor.extensionRegistry == null) return null;
+        ExtensionRegistry.Owned<LanguageProfile> profile = editor.extensionRegistry.languageProfileFor(buffer.getFile(), text);
+        return profile == null ? null : profile.value();
+    }
+
+    private record SyntaxRequest(FileBuffer buffer, VersionedTextSnapshot text, FileType fileType, LanguageProfile profile,
                                  EnumMap<GrammarHighlightService.Scope, Color> colors, boolean showWhitespace,
                                  boolean virtualized, int visibleStart, int visibleEnd, long generation) { }
     private record SyntaxResult(SyntaxRequest request, List<SyntaxSpan> spans, List<Range> trailingWhitespace) { }
@@ -916,11 +931,19 @@ final class SyntaxUiController {
 
 
     String[] lineCommentPrefixesFor(FileType fileType) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        LanguageProfile profile = languageProfileFor(buffer, buffer == null ? "" : buffer.textSnapshot().text());
+        if (profile != null) return profile.lineCommentPrefixes().toArray(String[]::new);
         return editor.syntaxHighlightService.lineCommentPrefixesFor(fileType);
     }
 
 
     String[][] blockCommentPairsFor(FileType fileType) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        LanguageProfile profile = languageProfileFor(buffer, buffer == null ? "" : buffer.textSnapshot().text());
+        if (profile != null) {
+            return profile.blockComments().stream().map(value -> new String[] {value.start(), value.end()}).toArray(String[][]::new);
+        }
         return editor.syntaxHighlightService.blockCommentPairsFor(fileType);
     }
 

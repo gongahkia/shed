@@ -34,9 +34,27 @@ class TerminalShellIntegrationTest {
     }
 
     @Test
+    void preparesAnIsolatedFishStartup() throws Exception {
+        Path directory = Files.createTempDirectory("shed-shell-");
+        TerminalShellIntegration.Launch launch = TerminalShellIntegration.prepare(List.of("fish"), true, directory);
+
+        assertTrue(launch.enabled());
+        assertEquals(List.of("fish", "-i"), launch.command());
+        assertEquals(directory.toString(), launch.environment().get("XDG_CONFIG_HOME"));
+        assertTrue(Files.readString(directory.resolve("fish.sh")).contains("fish_preexec"));
+        assertTrue(Files.readString(directory.resolve("fish").resolve("config.fish")).contains("SHED_ORIGINAL_FISH_CONFIG"));
+
+        Path fish = Path.of("/usr/bin/fish");
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.isExecutable(fish), "Fish is unavailable");
+        Process syntax = new ProcessBuilder(fish.toString(), "-n", directory.resolve("fish.sh").toString()).start();
+        assertTrue(syntax.waitFor(10, java.util.concurrent.TimeUnit.SECONDS));
+        assertEquals(0, syntax.exitValue());
+    }
+
+    @Test
     void leavesNonInteractiveCommandsAndUnsupportedShellsUnmodified() throws Exception {
         Path directory = Files.createTempDirectory("shed-shell-");
         assertFalse(TerminalShellIntegration.prepare(List.of("bash", "-c", "echo hi"), true, directory).enabled());
-        assertFalse(TerminalShellIntegration.prepare(List.of("fish"), true, directory).enabled());
+        assertFalse(TerminalShellIntegration.prepare(List.of("pwsh"), true, directory).enabled());
     }
 }

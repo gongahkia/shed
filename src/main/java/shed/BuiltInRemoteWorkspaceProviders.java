@@ -1,6 +1,7 @@
 package shed;
 
 import shed.api.RemoteWorkspace;
+import shed.api.RemoteCommandResult;
 import shed.api.RemoteWorkspaceProvider;
 import shed.api.RemoteWorkspaceRequest;
 import java.io.ByteArrayOutputStream;
@@ -56,7 +57,7 @@ final class BuiltInRemoteWorkspaceProviders {
                     }
                 }
                 Files.createDirectories(root.getParent());
-                ProcessResult result = execute(List.of("git", "clone", "--", gitUrl(uri), root.toString()), root.getParent());
+                ProcessResult result = executeProcess(List.of("git", "clone", "--", gitUrl(uri), root.toString()), root.getParent());
                 if (result.exitCode() != 0) throw new IOException("git clone failed: " + result.detail());
             }
             return new GitWorkspace(uri, root);
@@ -76,15 +77,19 @@ final class BuiltInRemoteWorkspaceProviders {
         @Override public Path localRoot() { return root; }
 
         @Override public void synchronize() throws Exception {
-            ProcessResult fetch = execute(List.of("git", "fetch", "--all", "--prune"), root);
+            ProcessResult fetch = executeProcess(List.of("git", "fetch", "--all", "--prune"), root);
             if (fetch.exitCode() != 0) throw new IOException("git fetch failed: " + fetch.detail());
-            ProcessResult pull = execute(List.of("git", "pull", "--ff-only"), root);
+            ProcessResult pull = executeProcess(List.of("git", "pull", "--ff-only"), root);
             if (pull.exitCode() != 0) throw new IOException("git pull failed: " + pull.detail());
         }
 
         @Override public void synchronizeToRemote() throws Exception {
-            ProcessResult push = execute(List.of("git", "push"), root);
+            ProcessResult push = executeProcess(List.of("git", "push"), root);
             if (push.exitCode() != 0) throw new IOException("git push failed: " + push.detail());
+        }
+
+        @Override public RemoteCommandResult execute(List<String> command) throws Exception {
+            return commandResult(executeProcess(requiredCommand(command), root));
         }
 
         @Override public void close() {
@@ -126,13 +131,24 @@ final class BuiltInRemoteWorkspaceProviders {
         @Override public Path localRoot() { return root; }
 
         @Override public void synchronize() throws Exception {
-            ProcessResult result = execute(rsync(false), root.getParent());
+            ProcessResult result = executeProcess(rsync(false), root.getParent());
             if (result.exitCode() != 0) throw new IOException("remote pull failed: " + result.detail());
         }
 
         @Override public void synchronizeToRemote() throws Exception {
-            ProcessResult result = execute(rsync(true), root.getParent());
+            ProcessResult result = executeProcess(rsync(true), root.getParent());
             if (result.exitCode() != 0) throw new IOException("remote push failed: " + result.detail());
+        }
+
+        @Override public RemoteCommandResult execute(List<String> command) throws Exception {
+            List<String> invocation = new ArrayList<>(List.of("ssh"));
+            if (uri.getPort() > 0) {
+                invocation.add("-p");
+                invocation.add(Integer.toString(uri.getPort()));
+            }
+            invocation.add(safeSshTarget(uri));
+            invocation.add(posixCommand(uri.getPath(), requiredCommand(command)));
+            return commandResult(executeProcess(invocation, root.getParent()));
         }
 
         @Override public void close() {
@@ -172,7 +188,7 @@ final class BuiltInRemoteWorkspaceProviders {
             URI uri = request.uri();
             Path root = Path.of("//wsl$/" + uri.getHost() + uri.getPath()).toAbsolutePath().normalize();
             if (!Files.isDirectory(root)) throw new IOException("WSL path is unavailable: " + root);
-            return new DirectWorkspace("WSL " + uri, root);
+            return new WslWorkspace(uri, root);
         }
     }
 
@@ -211,13 +227,19 @@ final class BuiltInRemoteWorkspaceProviders {
         @Override public Path localRoot() { return root; }
 
         @Override public void synchronize() throws Exception {
-            ProcessResult result = execute(List.of("docker", "cp", uri.getHost() + ":" + uri.getPath() + "/.", root.toString()), root.getParent());
+            ProcessResult result = executeProcess(List.of("docker", "cp", uri.getHost() + ":" + uri.getPath() + "/.", root.toString()), root.getParent());
             if (result.exitCode() != 0) throw new IOException("container pull failed: " + result.detail());
         }
 
         @Override public void synchronizeToRemote() throws Exception {
-            ProcessResult result = execute(List.of("docker", "cp", root.toString() + "/.", uri.getHost() + ":" + uri.getPath()), root.getParent());
+            ProcessResult result = executeProcess(List.of("docker", "cp", root.toString() + "/.", uri.getHost() + ":" + uri.getPath()), root.getParent());
             if (result.exitCode() != 0) throw new IOException("container push failed: " + result.detail());
+        }
+
+        @Override public RemoteCommandResult execute(List<String> command) throws Exception {
+            List<String> invocation = new ArrayList<>(List.of("docker", "exec", "--workdir", uri.getPath(), uri.getHost()));
+            invocation.addAll(requiredCommand(command));
+            return commandResult(executeProcess(invocation, root.getParent()));
         }
 
         @Override public void close() {
@@ -236,6 +258,66 @@ final class BuiltInRemoteWorkspaceProviders {
         @Override public void close() { }
     }
 
+    private static final class WslWorkspace implements RemoteWorkspace {
+        private final URI uri;
+        private final Path root;
+
+        private WslWorkspace(URI uri, Path root) {
+            this.uri = uri;
+            this.root = root;
+        }
+
+        @Override public String displayName() { return "WSL " + uri; }
+        @Override public Path localRoot() { return root; }
+        @Override public void synchronize() { }
+
+        @Override public RemoteCommandResult execute(List<String> command) throws Exception {
+            List<String> invocation = new ArrayList<>(List.of("wsl.exe", "-d", uri.getHost(), "--cd", uri.getPath(), "--"));
+            invocation.addAll(requiredCommand(command));
+            return commandResult(executeProcess(invocation, root));
+        }
+
+        @Override public void close() { }
+    }
+
+    private static List<String> requiredCommand(List<String> command) throws IOException {
+        List<String> values = command == null ? List.of() : List.copyOf(command);
+        if (values.isEmpty()) throw new IOException("remote command is required");
+        for (String value : values) {
+            if (value == null || value.isBlank() || value.indexOf('\0') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
+                throw new IOException("remote command contains an invalid argument");
+            }
+        }
+        return values;
+    }
+
+    private static RemoteCommandResult commandResult(ProcessResult value) {
+        return new RemoteCommandResult(value.exitCode(), value.stdout());
+    }
+
+    private static String safeSshTarget(URI uri) throws IOException {
+        String host = uri == null ? null : uri.getHost();
+        String user = uri == null ? null : uri.getUserInfo();
+        if (host == null || !host.matches("[A-Za-z0-9][A-Za-z0-9.-]*")) {
+            throw new IOException("SSH command execution requires a DNS host name");
+        }
+        if (user != null && !user.matches("[A-Za-z0-9][A-Za-z0-9._-]*")) {
+            throw new IOException("SSH command execution requires a simple SSH user name");
+        }
+        return user == null || user.isBlank() ? host : user + "@" + host;
+    }
+
+    private static String posixCommand(String directory, List<String> command) throws IOException {
+        if (!safeRemotePath(directory)) throw new IOException("remote command directory is invalid");
+        StringBuilder result = new StringBuilder("cd -- ").append(posixQuote(directory)).append(" && exec");
+        for (String argument : command) result.append(' ').append(posixQuote(argument));
+        return result.toString();
+    }
+
+    private static String posixQuote(String value) {
+        return "'" + value.replace("'", "'\"'\"'") + "'";
+    }
+
     private record ProcessResult(int exitCode, String stdout, String stderr) {
         String detail() {
             String value = stdout == null || stdout.isBlank() ? stderr : stdout;
@@ -243,7 +325,7 @@ final class BuiltInRemoteWorkspaceProviders {
         }
     }
 
-    private static ProcessResult execute(List<String> command, Path directory) throws IOException {
+    private static ProcessResult executeProcess(List<String> command, Path directory) throws IOException {
         Path output = Files.createTempFile("shed-remote-command-", ".log");
         try {
             Process process = new ProcessBuilder(command).directory(directory == null ? null : directory.toFile())

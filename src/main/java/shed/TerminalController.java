@@ -206,7 +206,7 @@ final class TerminalController {
             }
         }
         output.append("\nShell integration: ").append(editor.configManager.getTerminalShellIntegrationEnabled()
-            ? "enabled for newly opened Bash and Zsh terminals" : "disabled").append(".\n");
+            ? "enabled for newly opened Bash, Zsh, and Fish terminals" : "disabled").append(".\n");
         output.append("Use :terminal commands, :terminal cwd, or :terminal profile <extension:id>.\n");
         editor.showScratchBuffer("[terminal profiles]", output.toString());
         return "Showing terminal profiles";

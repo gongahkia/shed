@@ -1,5 +1,6 @@
 package shed;
 
+import shed.api.LanguageProfile;
 import javax.swing.*;
 import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
@@ -636,7 +637,7 @@ final class EditorUiController {
         EditorMode modeForStatus = editor.editorState.mode == null ? EditorMode.NORMAL : editor.editorState.mode;
         status.append(modeForStatus.getDisplayName()).append("  ");
         if (buffer != null) {
-            status.append(buffer.getFileType().getDisplayName()).append("  ");
+            status.append(languageDisplayName(buffer)).append("  ");
             status.append(buffer.getEncoding()).append("/").append(buffer.getLineEndingLabel()).append("  ");
             appendLspStatus(status, buffer);
         }
@@ -681,6 +682,14 @@ final class EditorUiController {
             statusRefreshTimer.setRepeats(false);
         }
         statusRefreshTimer.restart();
+    }
+
+    private String languageDisplayName(FileBuffer buffer) {
+        if (buffer == null || buffer.getFile() == null || editor.extensionRegistry == null) {
+            return buffer == null ? "text" : buffer.getFileType().getDisplayName();
+        }
+        ExtensionRegistry.Owned<LanguageProfile> profile = editor.extensionRegistry.languageProfileFor(buffer.getFile(), buffer.textSnapshot().text());
+        return profile == null ? buffer.getFileType().getDisplayName() : profile.value().displayName();
     }
 
     private void setCommandBarDisplay(String text) {

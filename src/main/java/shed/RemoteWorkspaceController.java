@@ -1,6 +1,7 @@
 package shed;
 
 import shed.api.RemoteWorkspace;
+import shed.api.RemoteCommandResult;
 import shed.api.RemoteWorkspaceProvider;
 import shed.api.RemoteWorkspaceRequest;
 import java.net.URI;
@@ -38,9 +39,10 @@ final class RemoteWorkspaceController {
             case "open", "connect" -> connect(tokens.size() == 2 ? tokens.get(1) : "");
             case "pull", "refresh" -> synchronize(tokens.size() == 2 ? tokens.get(1) : "", false);
             case "push" -> synchronize(tokens.size() == 2 ? tokens.get(1) : "", true);
+            case "exec" -> execute(tokens);
             case "close", "disconnect" -> close(tokens.size() == 2 ? tokens.get(1) : "");
             case "providers" -> showProviders();
-            default -> "Usage: :remote [list|providers|open <uri>|pull <id>|push <id>|close <id>]";
+            default -> "Usage: :remote [list|providers|open <uri>|pull <id>|push <id>|exec <id> <command...>|close <id>]";
         };
     }
 
@@ -107,6 +109,32 @@ final class RemoteWorkspaceController {
         }
     }
 
+    private String execute(List<String> tokens) {
+        if (tokens.size() < 3) return "Usage: :remote exec <id> <command...>";
+        Connection connection = connection(tokens.get(1));
+        if (connection == null) return "Remote workspace not connected: " + tokens.get(1);
+        List<String> command = List.copyOf(tokens.subList(2, tokens.size()));
+        int job = editor.asyncJobService.submit("remote exec: " + connection.id(), token -> connection.workspace().execute(command),
+            (snapshot, result, error) -> showExecutionResult(connection, result, error));
+        return "Remote command requested (job " + job + ").";
+    }
+
+    private void showExecutionResult(Connection connection, RemoteCommandResult result, Exception error) {
+        if (error != null) {
+            editor.showMessage("Remote command failed: " + detail(error.getMessage()));
+            return;
+        }
+        if (result == null) {
+            editor.showMessage("Remote command failed: no result");
+            return;
+        }
+        String output = capOutput(result.output());
+        String content = "Remote command: " + connection.id() + "\nExit: " + result.exitCode() + "\n\n" + output;
+        editor.showScratchBuffer("[remote exec " + connection.id() + "]", content);
+        editor.showMessage(result.exitCode() == 0 ? "Remote command complete: " + connection.id()
+            : "Remote command exited " + result.exitCode() + ": " + connection.id());
+    }
+
     private String showStatus() {
         StringBuilder output = new StringBuilder("Remote Workspaces\n\n");
         List<Connection> values;
@@ -171,4 +199,9 @@ final class RemoteWorkspaceController {
 
     private static String normalizeId(String value) { return value == null ? "" : value.trim().toLowerCase(Locale.ROOT); }
     private static String detail(String value) { return value == null || value.isBlank() ? "unknown error" : value.replace('\n', ' ').replace('\r', ' '); }
+    private static String capOutput(String value) {
+        String output = value == null ? "" : value;
+        int maximum = 1024 * 1024;
+        return output.length() <= maximum ? output : output.substring(0, maximum) + "\n[shed: output truncated]\n";
+    }
 }

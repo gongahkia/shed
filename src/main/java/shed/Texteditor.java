@@ -88,6 +88,7 @@ public class Texteditor extends JFrame implements KeyListener {
     ExtensionManager extensionManager;
     ScmController scmController;
     CustomEditorController customEditorController;
+    NotebookController notebookController;
     RemoteWorkspaceController remoteWorkspaceController;
     TreeGitController treeGitController;
     GitHubCapabilityController gitHubCapabilityController;
@@ -238,6 +239,7 @@ public class Texteditor extends JFrame implements KeyListener {
         extensionRegistry = new ExtensionRegistry();
         scmController = new ScmController(this, extensionRegistry);
         customEditorController = new CustomEditorController(this);
+        notebookController = new NotebookController(this);
         remoteWorkspaceController = new RemoteWorkspaceController(this);
         helpService = new HelpService();
         gitService = new GitService();
@@ -1795,8 +1797,12 @@ public class Texteditor extends JFrame implements KeyListener {
         return customEditorController.handle(argument);
     }
 
+    String handleNotebookCommand(String argument) {
+        return notebookController.handle(argument);
+    }
+
     boolean showCustomEditorIfAvailable(EditorPane pane, FileBuffer buffer) {
-        return customEditorController.showIfAvailable(pane, buffer);
+        return notebookController.showIfAvailable(pane, buffer) || customEditorController.showIfAvailable(pane, buffer);
     }
 
     String handleRemoteWorkspaceCommand(String argument) {

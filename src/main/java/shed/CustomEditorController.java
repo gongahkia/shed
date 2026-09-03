@@ -1,10 +1,13 @@
 package shed;
 
 import java.awt.Component;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import javax.swing.SwingUtilities;
 import javax.swing.JComponent;
 import shed.api.CustomEditorContribution;
+import shed.api.CustomEditorDocument;
 
 /** Chooses an installed custom editor without replacing Shed's buffer and save model. */
 final class CustomEditorController {
@@ -25,7 +28,7 @@ final class CustomEditorController {
         for (ExtensionRegistry.Owned<CustomEditorContribution> owned : editor.extensionManager.customEditors()) {
             try {
                 if (!owned.value().supports(file)) continue;
-                JComponent component = owned.value().createComponent(file, buffer.textSnapshot().text());
+                JComponent component = owned.value().createComponent(new Document(file, pane, buffer));
                 if (component == null) {
                     editor.showMessage("Custom editor " + name(owned) + " returned no component");
                     return false;
@@ -51,7 +54,7 @@ final class CustomEditorController {
             else for (ExtensionRegistry.Owned<CustomEditorContribution> candidate : editors) {
                 output.append("  ").append(name(candidate)).append("  ").append(candidate.value().displayName()).append("\n");
             }
-            output.append("\nCustom editors are selected when a file is opened. They receive the file path and current buffer text; Shed remains the owner of persistence.\n");
+            output.append("\nCustom editors are selected when a file is opened. They receive a byte-backed resource model and may explicitly save that one resource atomically.\n");
             editor.showScratchBuffer("[custom editors]", output.toString());
             return "Showing custom editors";
         }
@@ -75,5 +78,78 @@ final class CustomEditorController {
     private static String concise(Exception error) {
         String message = error.getMessage();
         return message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' ');
+    }
+
+    private final class Document implements CustomEditorDocument {
+        private final Path file;
+        private final EditorPane pane;
+        private final FileBuffer buffer;
+
+        private Document(Path file, EditorPane pane, FileBuffer buffer) {
+            this.file = file;
+            this.pane = pane;
+            this.buffer = buffer;
+        }
+
+        @Override public Path file() { return file; }
+
+        @Override public byte[] bytes() throws IOException {
+            return java.nio.file.Files.readAllBytes(file);
+        }
+
+        @Override public boolean isBinary() throws IOException {
+            return CustomEditorController.isBinary(bytes());
+        }
+
+        @Override public void write(byte[] replacement) throws IOException {
+            byte[] contents = replacement == null ? new byte[0] : replacement.clone();
+            if (SwingUtilities.isEventDispatchThread()) {
+                writeOnEventThread(contents);
+                return;
+            }
+            final IOException[] failure = new IOException[1];
+            try {
+                SwingUtilities.invokeAndWait(() -> {
+                    try { writeOnEventThread(contents); } catch (IOException error) { failure[0] = error; }
+                });
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                throw new IOException("custom editor save interrupted", error);
+            } catch (java.lang.reflect.InvocationTargetException error) {
+                throw new IOException("custom editor save failed", error.getCause());
+            }
+            if (failure[0] != null) throw failure[0];
+        }
+
+        private void writeOnEventThread(byte[] contents) throws IOException {
+            if (pane.getBuffer() != buffer || !file.equals(Path.of(buffer.getFilePath()).toAbsolutePath().normalize())) {
+                throw new IOException("custom editor document is no longer active");
+            }
+            editor.paneBufferController.backupBeforeSave(buffer);
+            AtomicFileWriter.write(file, contents);
+            try {
+                editor.withSuppressedDocumentEvents(() -> {
+                    try { buffer.load(editor.configManager); } catch (IOException error) { throw new ReloadFailure(error); }
+                });
+            } catch (ReloadFailure error) {
+                throw (IOException) error.getCause();
+            }
+            editor.syncLspOpen(buffer);
+            editor.updateStatusBar();
+            editor.showMessage("Custom editor saved " + file.getFileName());
+        }
+    }
+
+    static boolean isBinary(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) return false;
+        for (byte value : bytes) {
+            int unsigned = Byte.toUnsignedInt(value);
+            if (unsigned == 0 || unsigned < 0x09 || unsigned > 0x0D && unsigned < 0x20) return true;
+        }
+        return false;
+    }
+
+    private static final class ReloadFailure extends RuntimeException {
+        private ReloadFailure(IOException cause) { super(cause); }
     }
 }

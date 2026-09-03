@@ -87,6 +87,8 @@ public class Texteditor extends JFrame implements KeyListener {
     ExtensionRegistry extensionRegistry;
     ExtensionManager extensionManager;
     ScmController scmController;
+    CustomEditorController customEditorController;
+    RemoteWorkspaceController remoteWorkspaceController;
     TreeGitController treeGitController;
     GitHubCapabilityController gitHubCapabilityController;
     LspController lspController;
@@ -235,6 +237,8 @@ public class Texteditor extends JFrame implements KeyListener {
         configManager = new ConfigManager();
         extensionRegistry = new ExtensionRegistry();
         scmController = new ScmController(this, extensionRegistry);
+        customEditorController = new CustomEditorController(this);
+        remoteWorkspaceController = new RemoteWorkspaceController(this);
         helpService = new HelpService();
         gitService = new GitService();
         treeService = new TreeService();
@@ -378,6 +382,9 @@ public class Texteditor extends JFrame implements KeyListener {
         pluginManager = new PluginManager(configManager, this);
         extensionManager = new ExtensionManager(configManager, extensionRegistry);
         extensionManager.loadInstalled();
+        if (toolWindowHost != null) {
+            toolWindowHost.refreshExtensionViews();
+        }
 
         // Open file from command line or landing page
         if (args.length > 0) {
@@ -425,6 +432,9 @@ public class Texteditor extends JFrame implements KeyListener {
             return "Extension host is unavailable";
         }
         String result = extensionManager.handle(argument);
+        if (toolWindowHost != null) {
+            toolWindowHost.refreshExtensionViews();
+        }
         if (result != null && (argument == null || argument.isBlank() || "list".equalsIgnoreCase(argument.trim()) || "status".equalsIgnoreCase(argument.trim()))) {
             showScratchBuffer("[extensions]", result);
             return "Showing extensions";
@@ -438,6 +448,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     List<String> extensionCommandIds() {
         return extensionManager == null ? List.of() : extensionManager.commandIds();
+    }
+
+    String handleExtensionViewCommand(String argument) {
+        return toolWindowHost == null ? "Tool window host is unavailable" : toolWindowHost.showExtensionView(argument);
     }
 
     EditorPane createEditorPane(Dimension screenSize) {
@@ -1775,6 +1789,18 @@ public class Texteditor extends JFrame implements KeyListener {
 
     String handleScmCommand(String argument) {
         return scmController.handle(argument);
+    }
+
+    String handleCustomEditorCommand(String argument) {
+        return customEditorController.handle(argument);
+    }
+
+    boolean showCustomEditorIfAvailable(EditorPane pane, FileBuffer buffer) {
+        return customEditorController.showIfAvailable(pane, buffer);
+    }
+
+    String handleRemoteWorkspaceCommand(String argument) {
+        return remoteWorkspaceController.handle(argument);
     }
 
     public String handleGitHubCommand(String argument) {
@@ -3220,6 +3246,9 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         if (extensionManager != null) {
             extensionManager.close();
+        }
+        if (remoteWorkspaceController != null) {
+            remoteWorkspaceController.closeAll();
         }
         dispose();
         System.exit(0);

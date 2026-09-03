@@ -1,0 +1,174 @@
+package shed;
+
+import shed.api.RemoteWorkspace;
+import shed.api.RemoteWorkspaceProvider;
+import shed.api.RemoteWorkspaceRequest;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/** Explicit remote-workspace operations. Connections are local mirrors unless a provider says otherwise. */
+final class RemoteWorkspaceController {
+    private record Connection(String id, String provider, URI uri, RemoteWorkspace workspace) { }
+
+    private final Texteditor editor;
+    private final Map<String, Connection> connections = new LinkedHashMap<>();
+
+    RemoteWorkspaceController(Texteditor editor) {
+        this.editor = editor;
+    }
+
+    String handle(String argument) {
+        String value = argument == null ? "" : argument.trim();
+        if (value.isEmpty() || "list".equalsIgnoreCase(value) || "status".equalsIgnoreCase(value)) return showStatus();
+        List<String> tokens;
+        try {
+            tokens = ShellCommand.directCommand(value);
+        } catch (IllegalArgumentException error) {
+            return "Remote command invalid: " + error.getMessage();
+        }
+        String operation = tokens.getFirst().toLowerCase(Locale.ROOT);
+        return switch (operation) {
+            case "open", "connect" -> connect(tokens.size() == 2 ? tokens.get(1) : "");
+            case "pull", "refresh" -> synchronize(tokens.size() == 2 ? tokens.get(1) : "", false);
+            case "push" -> synchronize(tokens.size() == 2 ? tokens.get(1) : "", true);
+            case "close", "disconnect" -> close(tokens.size() == 2 ? tokens.get(1) : "");
+            case "providers" -> showProviders();
+            default -> "Usage: :remote [list|providers|open <uri>|pull <id>|push <id>|close <id>]";
+        };
+    }
+
+    private String connect(String rawUri) {
+        URI uri;
+        try {
+            uri = URI.create(rawUri);
+        } catch (IllegalArgumentException error) {
+            return "Remote URI is invalid";
+        }
+        if (uri.getScheme() == null || uri.getScheme().isBlank()) return "Remote URI requires a scheme";
+        RemoteWorkspaceProvider provider = providerFor(uri);
+        if (provider == null) return "No remote workspace provider supports: " + uri.getScheme();
+        int job = editor.asyncJobService.submit("remote connect: " + uri, token -> {
+            Path storage = Path.of(editor.configManager.getShedDirectoryPath());
+            RemoteWorkspace workspace = provider.connect(new RemoteWorkspaceRequest(uri, storage));
+            Path root = workspace.localRoot() == null ? null : workspace.localRoot().toAbsolutePath().normalize();
+            if (root == null || !Files.isDirectory(root)) {
+                try { workspace.close(); } catch (Exception ignored) { }
+                throw new IllegalStateException("remote provider did not return an existing local workspace directory");
+            }
+            return new Connection(connectionId(uri), provider.id(), uri, workspace);
+        }, (snapshot, result, error) -> {
+            if (error != null || result == null) {
+                editor.showMessage("Remote connect failed: " + detail(error == null ? snapshot.getErrorMessage() : error.getMessage()));
+                return;
+            }
+            Connection prior;
+            synchronized (connections) { prior = connections.put(result.id(), result); }
+            if (prior != null) {
+                try { prior.workspace().close(); } catch (Exception ignored) { }
+            }
+            editor.workspaceController.add(result.workspace().localRoot().toString(), true);
+            editor.showMessage("Remote workspace connected: " + result.id());
+        });
+        return "Remote connection requested (job " + job + ").";
+    }
+
+    private String synchronize(String id, boolean push) {
+        Connection connection = connection(id);
+        if (connection == null) return "Remote workspace not connected: " + id;
+        int job = editor.asyncJobService.submit("remote " + (push ? "push" : "pull") + ": " + connection.id(), token -> {
+            if (push) connection.workspace().synchronizeToRemote();
+            else connection.workspace().synchronize();
+            return connection;
+        }, (snapshot, result, error) -> {
+            if (error != null) editor.showMessage("Remote " + (push ? "push" : "pull") + " failed: " + detail(error.getMessage()));
+            else editor.showMessage("Remote " + (push ? "push" : "pull") + " complete: " + connection.id());
+        });
+        return "Remote " + (push ? "push" : "pull") + " requested (job " + job + ").";
+    }
+
+    private String close(String id) {
+        Connection connection;
+        synchronized (connections) { connection = connections.remove(normalizeId(id)); }
+        if (connection == null) return "Remote workspace not connected: " + id;
+        try {
+            connection.workspace().close();
+            editor.workspaceController.remove(connection.workspace().localRoot().toString());
+            return "Remote workspace closed: " + connection.id();
+        } catch (Exception error) {
+            synchronized (connections) { connections.put(connection.id(), connection); }
+            return "Remote workspace close failed: " + detail(error.getMessage());
+        }
+    }
+
+    private String showStatus() {
+        StringBuilder output = new StringBuilder("Remote Workspaces\n\n");
+        List<Connection> values;
+        synchronized (connections) { values = connections.values().stream().sorted(Comparator.comparing(Connection::id)).toList(); }
+        if (values.isEmpty()) output.append("No remote workspaces connected.\n");
+        for (Connection connection : values) {
+            output.append(connection.id()).append("  ").append(connection.provider()).append("\n  ").append(connection.uri())
+                .append("\n  local: ").append(connection.workspace().localRoot()).append("\n");
+        }
+        output.append("\nConnections use a local working tree. Pull and push are explicit operations; remote URI passwords are rejected.\n");
+        editor.showScratchBuffer("[remote workspaces]", output.toString());
+        return "Showing remote workspaces";
+    }
+
+    private String showProviders() {
+        StringBuilder output = new StringBuilder("Remote Workspace Providers\n\n");
+        for (RemoteWorkspaceProvider provider : providers()) output.append("  ").append(provider.id()).append("  ").append(provider.displayName()).append("\n");
+        output.append("\nBuilt in: git/Git-over-HTTPS-or-SSH, ssh mirror, and WSL on Windows. Extensions can register more URI schemes.\n");
+        editor.showScratchBuffer("[remote providers]", output.toString());
+        return "Showing remote workspace providers";
+    }
+
+    void closeAll() {
+        List<Connection> values;
+        synchronized (connections) {
+            values = new ArrayList<>(connections.values());
+            connections.clear();
+        }
+        for (Connection connection : values) {
+            try { connection.workspace().close(); } catch (Exception ignored) { }
+        }
+    }
+
+    private RemoteWorkspaceProvider providerFor(URI uri) {
+        for (RemoteWorkspaceProvider provider : providers()) {
+            try {
+                if (provider.supports(uri)) return provider;
+            } catch (RuntimeException ignored) {
+                // A broken provider cannot claim the URI.
+            }
+        }
+        return null;
+    }
+
+    private List<RemoteWorkspaceProvider> providers() {
+        List<RemoteWorkspaceProvider> result = new ArrayList<>();
+        if (editor.extensionManager != null) {
+            for (ExtensionRegistry.Owned<RemoteWorkspaceProvider> provider : editor.extensionManager.remoteWorkspaceProviders()) result.add(provider.value());
+        }
+        result.addAll(BuiltInRemoteWorkspaceProviders.all());
+        return List.copyOf(result);
+    }
+
+    private Connection connection(String id) {
+        synchronized (connections) { return connections.get(normalizeId(id)); }
+    }
+
+    private static String connectionId(URI uri) {
+        String value = uri.getScheme().toLowerCase(Locale.ROOT) + "-" + Integer.toUnsignedString(uri.normalize().toString().hashCode(), 36);
+        return normalizeId(value);
+    }
+
+    private static String normalizeId(String value) { return value == null ? "" : value.trim().toLowerCase(Locale.ROOT); }
+    private static String detail(String value) { return value == null || value.isBlank() ? "unknown error" : value.replace('\n', ' ').replace('\r', ' '); }
+}

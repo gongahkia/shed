@@ -3,7 +3,7 @@ package shed.api;
 import java.nio.file.Path;
 import javax.swing.JComponent;
 
-/** A custom, read/write-capable visual representation for a file type. */
+/** A custom visual representation for a file type; Shed remains the persistence owner. */
 public interface CustomEditorContribution {
     String id();
 

@@ -5,11 +5,14 @@ import java.awt.Dimension;
 import java.awt.Window;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Locale;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
+import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
@@ -20,6 +23,7 @@ final class ToolWindowHost extends JPanel {
     private final Texteditor editor;
     private final JTabbedPane tabs = new JTabbedPane();
     private final Map<Tab, ToolSurface> surfaces = new EnumMap<>(Tab.class);
+    private final Map<String, ToolSurface> extensionSurfaces = new LinkedHashMap<>();
     private final Map<Tab, JDialog> detached = new EnumMap<>(Tab.class);
     private final EnumSet<Tab> hiddenDetachedForFocusMode = EnumSet.noneOf(Tab.class);
 
@@ -86,6 +90,54 @@ final class ToolWindowHost extends JPanel {
         if (surface != null) surface.refresh();
     }
 
+    void refreshExtensionViews() {
+        Map<String, shed.api.ToolViewContribution> desired = new LinkedHashMap<>();
+        if (editor.extensionManager != null) {
+            for (ExtensionRegistry.Owned<shed.api.ToolViewContribution> owned : editor.extensionManager.toolViews()) {
+                desired.put(extensionName(owned), owned.value());
+            }
+        }
+        for (String name : java.util.List.copyOf(extensionSurfaces.keySet())) {
+            if (desired.containsKey(name)) continue;
+            ToolSurface surface = extensionSurfaces.remove(name);
+            if (surface != null) tabs.remove(surface.component());
+        }
+        for (Map.Entry<String, shed.api.ToolViewContribution> entry : desired.entrySet()) {
+            if (extensionSurfaces.containsKey(entry.getKey())) continue;
+            ToolSurface surface = new ExtensionToolSurface(entry.getValue());
+            extensionSurfaces.put(entry.getKey(), surface);
+            tabs.addTab(extensionTitle(entry.getKey(), entry.getValue()), surface.component());
+        }
+        tabs.revalidate();
+        tabs.repaint();
+    }
+
+    String showExtensionView(String requested) {
+        refreshExtensionViews();
+        String value = requested == null ? "" : requested.trim();
+        if (value.isEmpty() || "list".equalsIgnoreCase(value)) {
+            StringBuilder output = new StringBuilder("Extension Views\n\n");
+            if (extensionSurfaces.isEmpty()) output.append("No extension views installed.\n");
+            else for (String name : extensionSurfaces.keySet()) output.append("  ").append(name).append("\n");
+            editor.showScratchBuffer("[extension views]", output.toString());
+            return "Showing extension views";
+        }
+        ToolSurface selected = extensionSurfaces.get(value.toLowerCase(Locale.ROOT));
+        if (selected == null) {
+            for (Map.Entry<String, ToolSurface> entry : extensionSurfaces.entrySet()) {
+                String shortName = entry.getKey().substring(entry.getKey().indexOf(':') + 1);
+                if (!shortName.equalsIgnoreCase(value)) continue;
+                if (selected != null) return "Extension view is ambiguous: " + value;
+                selected = entry.getValue();
+            }
+        }
+        if (selected == null) return "Extension view not found: " + value;
+        editor.showToolWindow();
+        tabs.setSelectedComponent(selected.component());
+        selected.refresh();
+        return "Extension view opened";
+    }
+
     ProblemsToolPanel problemsPanel() {
         ToolSurface surface = surfaces.get(Tab.PROBLEMS);
         return surface instanceof ProblemsToolPanel panel ? panel : null;
@@ -95,6 +147,12 @@ final class ToolWindowHost extends JPanel {
         for (Map.Entry<Tab, ToolSurface> entry : surfaces.entrySet()) {
             if (tabs.getSelectedComponent() == entry.getValue().component()) {
                 entry.getValue().refresh();
+                return;
+            }
+        }
+        for (ToolSurface surface : extensionSurfaces.values()) {
+            if (tabs.getSelectedComponent() == surface.component()) {
+                surface.refresh();
                 return;
             }
         }
@@ -166,6 +224,14 @@ final class ToolWindowHost extends JPanel {
         return switch (tab) { case GIT -> "Git"; case DEBUG -> "Debug"; case TASKS -> "Tasks"; case TESTS -> "Tests"; case PROBLEMS -> "Problems"; case REPLACE -> "Replace"; };
     }
 
+    private static String extensionName(ExtensionRegistry.Owned<shed.api.ToolViewContribution> value) {
+        return (value.extensionId() + ":" + value.value().id()).toLowerCase(Locale.ROOT);
+    }
+
+    private static String extensionTitle(String name, shed.api.ToolViewContribution view) {
+        return view.title() == null || view.title().isBlank() ? name : view.title();
+    }
+
     private static WorkbenchLayout.SurfaceType surfaceType(Tab tab) {
         return switch (tab) {
             case GIT -> WorkbenchLayout.SurfaceType.GIT;
@@ -180,5 +246,42 @@ final class ToolWindowHost extends JPanel {
     interface ToolSurface {
         JPanel component();
         void refresh();
+    }
+
+    private static final class ExtensionToolSurface implements ToolSurface {
+        private final shed.api.ToolViewContribution contribution;
+        private final JPanel panel = new JPanel(new BorderLayout());
+        private boolean created;
+
+        private ExtensionToolSurface(shed.api.ToolViewContribution contribution) {
+            this.contribution = contribution;
+            panel.setBorder(BorderFactory.createEmptyBorder(5, 7, 7, 7));
+        }
+
+        @Override public JPanel component() { return panel; }
+
+        @Override public void refresh() {
+            if (!created) {
+                created = true;
+                try {
+                    JComponent component = contribution.createComponent();
+                    panel.add(component == null ? new JLabel("Extension view returned no component.") : component, BorderLayout.CENTER);
+                } catch (RuntimeException error) {
+                    panel.add(new JLabel("Extension view failed: " + concise(error)), BorderLayout.CENTER);
+                }
+            }
+            try {
+                contribution.refresh();
+            } catch (RuntimeException ignored) {
+                // The extension panel remains visible; its own UI owns diagnostics.
+            }
+            panel.revalidate();
+            panel.repaint();
+        }
+
+        private static String concise(RuntimeException error) {
+            String message = error.getMessage();
+            return message == null || message.isBlank() ? error.getClass().getSimpleName() : message;
+        }
     }
 }

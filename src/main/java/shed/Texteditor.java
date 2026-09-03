@@ -84,6 +84,8 @@ public class Texteditor extends JFrame implements KeyListener {
     QuickfixService quickfixService;
     ProblemsService problemsService;
     PluginManager pluginManager;
+    ExtensionRegistry extensionRegistry;
+    ExtensionManager extensionManager;
     TreeGitController treeGitController;
     GitHubCapabilityController gitHubCapabilityController;
     LspController lspController;
@@ -371,6 +373,9 @@ public class Texteditor extends JFrame implements KeyListener {
         registerManager = new RegisterManager();
         commandHandler = new CommandHandler(this);
         pluginManager = new PluginManager(configManager, this);
+        extensionRegistry = new ExtensionRegistry();
+        extensionManager = new ExtensionManager(configManager, extensionRegistry);
+        extensionManager.loadInstalled();
 
         // Open file from command line or landing page
         if (args.length > 0) {
@@ -411,6 +416,26 @@ public class Texteditor extends JFrame implements KeyListener {
     // Initialize UI components
     void initializeUI() {
         editorUiController.initializeUI();
+    }
+
+    String handleExtensionCommand(String argument) {
+        if (extensionManager == null) {
+            return "Extension host is unavailable";
+        }
+        String result = extensionManager.handle(argument);
+        if (result != null && (argument == null || argument.isBlank() || "list".equalsIgnoreCase(argument.trim()) || "status".equalsIgnoreCase(argument.trim()))) {
+            showScratchBuffer("[extensions]", result);
+            return "Showing extensions";
+        }
+        return result;
+    }
+
+    String executeExtensionCommand(String id, String arguments) {
+        return extensionManager == null ? null : extensionManager.executeCommand(id, arguments);
+    }
+
+    List<String> extensionCommandIds() {
+        return extensionManager == null ? List.of() : extensionManager.commandIds();
     }
 
     EditorPane createEditorPane(Dimension screenSize) {

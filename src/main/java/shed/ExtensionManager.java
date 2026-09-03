@@ -18,14 +18,11 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
-import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -417,7 +414,10 @@ final class ExtensionManager implements AutoCloseable {
     private record Receipt(String id, String version, String mainClass, String jarFile, String checksum, String source, boolean enabled, long installedAt) {
         Receipt {
             id = normalizeId(id);
-            if (id == null || version == null || mainClass == null || jarFile == null || normalizeChecksum(checksum) == null || source == null) {
+            if (id == null || version == null || !version.matches("[A-Za-z0-9][A-Za-z0-9._+-]*")
+                || mainClass == null || !mainClass.matches("[A-Za-z_$][A-Za-z0-9_$.]*")
+                || jarFile == null || !jarFile.matches("[A-Za-z0-9][A-Za-z0-9._-]*\\.jar")
+                || normalizeChecksum(checksum) == null || source == null) {
                 throw new IllegalArgumentException("invalid extension receipt");
             }
             checksum = normalizeChecksum(checksum);

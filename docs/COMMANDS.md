@@ -355,8 +355,12 @@ See [Update Checks](UPDATES.md) for endpoint/key configuration and metadata vali
 | `:workspace add <folder>` | Add a local folder without changing the active tree |
 | `:workspace open <folder>`, `:workspace switch <folder\|index>` | Make a workspace folder active and show its tree |
 | `:workspace remove <folder\|index>` | Remove a folder from the workspace; files are retained |
+| `:workspace import <manifest>` | Replace folders from a validated `.shed-workspace` or `.code-workspace` folder list |
+| `:workspace export <manifest>` | Write the current folders as a portable manifest |
 
 For a file inside a configured workspace folder, task discovery, extension SCM, Dev Container commands, and extension workspace integrations use the deepest folder containing that file. For a scratch or outside file, they use the selected workspace folder. The Tests panel intentionally exposes its own root selector, so a user can inspect or run a sibling project's tests without changing editors.
+
+Portable-manifest format, safety boundary, and its distinction from private session profiles: [Workspace Manifests](WORKSPACE_MANIFESTS.md).
 
 ## Markdown and Writing Commands
 

@@ -44,8 +44,10 @@ final class WorkspaceController {
             case "open" -> add(value, true);
             case "remove", "rm" -> remove(value);
             case "switch", "use" -> activate(value, true);
+            case "import" -> importManifest(value);
+            case "export" -> exportManifest(value);
             case "symbols", "sym" -> editor.showWorkspaceSymbols(value);
-            default -> "Usage: :workspace [list|ui|add <folder>|open <folder>|remove <folder|index>|switch <folder|index>|symbols <query>]";
+            default -> "Usage: :workspace [list|ui|add <folder>|open <folder>|remove <folder|index>|switch <folder|index>|import <manifest>|export <manifest>|symbols <query>]";
         };
     }
 
@@ -112,6 +114,33 @@ final class WorkspaceController {
 
     List<String> serializeRoots() {
         return roots.all().stream().map(Path::toString).toList();
+    }
+
+    private String importManifest(String value) {
+        if (value == null || value.isBlank()) return "Usage: :workspace import <manifest>";
+        try {
+            List<Path> imported = WorkspaceManifest.read(Path.of(value));
+            roots.replace(imported, imported.getFirst());
+            syncTreeRoot(roots.active(), true);
+            return "Imported " + imported.size() + " workspace folder" + (imported.size() == 1 ? "" : "s");
+        } catch (IOException | RuntimeException error) {
+            return "Could not import workspace manifest: " + concise(error);
+        }
+    }
+
+    private String exportManifest(String value) {
+        if (value == null || value.isBlank()) return "Usage: :workspace export <manifest.shed-workspace>";
+        try {
+            WorkspaceManifest.write(Path.of(value), roots.all());
+            return "Exported " + roots.all().size() + " workspace folder" + (roots.all().size() == 1 ? "" : "s");
+        } catch (IOException | RuntimeException error) {
+            return "Could not export workspace manifest: " + concise(error);
+        }
+    }
+
+    private static String concise(Exception error) {
+        String message = error.getMessage();
+        return message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' ');
     }
 
     private String showRoots() {

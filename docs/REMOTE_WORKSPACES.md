@@ -46,3 +46,5 @@ For a workspace containing `.devcontainer/devcontainer.json`, Shed also exposes 
 ```
 
 `up` and `exec` use the user-installed `devcontainer` CLI as direct argv and run as cancellable jobs; `terminal` opens a PTY using `devcontainer exec`. Shed does not install the CLI, create a configuration, invoke these commands during workspace open, or claim to run an extension host in the container. `open` creates the same explicit Docker-copy mirror described above.
+
+In a multi-root workspace, Dev Container commands use the deepest configured folder containing the current file. A scratch or outside file uses the Explorer-selected folder.

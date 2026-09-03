@@ -2,6 +2,7 @@ package shed;
 
 import javax.swing.text.BadLocationException;
 import java.io.*;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.List;
@@ -196,12 +197,19 @@ final class JobQuickfixController {
             return null;
         }
         File cursor = file.isDirectory() ? file : file.getParentFile();
+        Path configuredRoot = null;
+        if (cursor != null && editor.workspaceController != null) {
+            configuredRoot = editor.workspaceController.rootFor(cursor.toPath());
+        }
         File fallback = cursor;
         while (cursor != null) {
             if (new File(cursor, ".shedtasks").isFile()) {
                 return cursor;
             }
             if (new File(cursor, ".git").exists()) {
+                return cursor;
+            }
+            if (configuredRoot != null && configuredRoot.equals(cursor.toPath().toAbsolutePath().normalize())) {
                 return cursor;
             }
             fallback = cursor;

@@ -56,6 +56,8 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `RecoveryController` | file watching, recovery snapshots, conflicts | `FileWatcherService`, `FileBuffer` |
 | `FocusModeController` | Goyo layout, Limelight, minimap | Swing UI state |
 
+`WorkspaceController` owns the ordered folder set and the Explorer's selected folder. Resource-scoped controllers resolve the deepest configured folder containing the current file before falling back to that selection. This keeps sibling projects isolated for task discovery, extension SCM, Dev Container actions, and extension workspace tools without changing the Explorer merely by switching files.
+
 ## Dependency rules
 
 - Do not add a controller-to-controller field, constructor parameter, static lookup, or callback registration. Coordinate through a narrow `Texteditor` operation or extract shared non-UI behavior into a service.

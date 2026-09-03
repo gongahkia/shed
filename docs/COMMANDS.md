@@ -356,6 +356,8 @@ See [Update Checks](UPDATES.md) for endpoint/key configuration and metadata vali
 | `:workspace open <folder>`, `:workspace switch <folder\|index>` | Make a workspace folder active and show its tree |
 | `:workspace remove <folder\|index>` | Remove a folder from the workspace; files are retained |
 
+For a file inside a configured workspace folder, task discovery, extension SCM, Dev Container commands, and extension workspace integrations use the deepest folder containing that file. For a scratch or outside file, they use the selected workspace folder. The Tests panel intentionally exposes its own root selector, so a user can inspect or run a sibling project's tests without changing editors.
+
 ## Markdown and Writing Commands
 
 | Command | Action |

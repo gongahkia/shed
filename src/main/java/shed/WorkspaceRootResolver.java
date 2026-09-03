@@ -20,4 +20,14 @@ final class WorkspaceRootResolver {
         return roots.stream().filter(root -> root != null).map(root -> root.toAbsolutePath().normalize())
             .filter(normalized::startsWith).max(Comparator.comparingInt(Path::getNameCount)).orElse(null);
     }
+
+    /**
+     * Uses the deepest workspace folder for a resource and otherwise retains the
+     * user's selected folder.  This avoids treating a sibling project as the
+     * active project merely because it was selected in the Explorer.
+     */
+    static Path configuredOrActive(Path candidate, List<Path> roots, Path active) {
+        Path configured = configuredRoot(candidate, roots);
+        return configured == null ? active : configured;
+    }
 }

@@ -98,6 +98,11 @@ public class CommandHandler {
                 return editor.runUserCommand(resolvedCmd, shellCmd);
             }
 
+            String extensionResult = editor.executeExtensionCommand(resolvedCmd, args);
+            if (extensionResult != null) {
+                return extensionResult;
+            }
+
             try {
                 return editor.gotoLine(Integer.parseInt(resolvedCmd));
             } catch (NumberFormatException ignored) {
@@ -211,6 +216,7 @@ public class CommandHandler {
 
         // Plugin commands
         registerCommand((args, range, force) -> handlePlugin(args), "plugin", "plugins");
+        registerCommand((args, range, force) -> editor.handleExtensionCommand(args), "extension", "extensions");
     }
 
     private void registerCommand(CommandAction action, String... names) {
@@ -223,6 +229,7 @@ public class CommandHandler {
 
     public List<String> getCommandNames() {
         List<String> names = new ArrayList<>(commandRegistry.keySet());
+        names.addAll(editor.extensionCommandIds());
         Collections.sort(names);
         return names;
     }

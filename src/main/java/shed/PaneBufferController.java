@@ -85,6 +85,7 @@ final class PaneBufferController {
         } else if (editor.hasMarkdownPreviewForSource(pane)) {
             editor.closeMarkdownPreviewForSource(pane);
         }
+        pane.clearCustomEditorComponent();
 
         boolean activePane = pane == editor.getActivePane();
         if (activePane) {
@@ -458,6 +459,7 @@ final class PaneBufferController {
         FileBuffer existing = findBufferByPath(file);
         if (existing != null) {
             loadBufferIntoEditor(existing);
+            editor.showCustomEditorIfAvailable(editor.getActivePane(), existing);
             if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
                 editor.showMessage(projectConfigMessage);
             }
@@ -477,6 +479,7 @@ final class PaneBufferController {
             editor.buffers.add(buffer);
         }
         loadBufferIntoEditor(buffer);
+        editor.showCustomEditorIfAvailable(editor.getActivePane(), buffer);
         editor.addToRecentFiles(file.getAbsolutePath());
         editor.registerFileWatch(buffer);
         editor.firePluginEvent("BufOpen");

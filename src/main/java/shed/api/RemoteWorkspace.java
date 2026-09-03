@@ -8,7 +8,13 @@ public interface RemoteWorkspace extends AutoCloseable {
 
     Path localRoot();
 
+    /** Refresh the local mirror from its remote source. */
     void synchronize() throws Exception;
+
+    /** Push local changes when this provider supports an explicit upload operation. */
+    default void synchronizeToRemote() throws Exception {
+        throw new UnsupportedOperationException("this remote workspace does not support push synchronization");
+    }
 
     @Override
     void close() throws Exception;

@@ -140,6 +140,8 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleTreeCommand(args), "tree");
         registerCommand((args, range, force) -> editor.handleGitCommand(args), "git");
         registerCommand((args, range, force) -> editor.handleScmCommand(args), "scm");
+        registerCommand((args, range, force) -> editor.handleCustomEditorCommand(args), "customeditor", "custom-editor");
+        registerCommand((args, range, force) -> editor.handleRemoteWorkspaceCommand(args), "remote", "remotes");
         registerCommand((args, range, force) -> editor.handleGitHubCommand(args), "github", "gh");
         registerCommand((args, range, force) -> editor.handleUpdateCommand(args), "update", "updates");
         registerCommand((args, range, force) -> {
@@ -218,6 +220,7 @@ public class CommandHandler {
         // Plugin commands
         registerCommand((args, range, force) -> handlePlugin(args), "plugin", "plugins");
         registerCommand((args, range, force) -> editor.handleExtensionCommand(args), "extension", "extensions");
+        registerCommand((args, range, force) -> editor.handleExtensionViewCommand(args), "view", "views");
     }
 
     private void registerCommand(CommandAction action, String... names) {

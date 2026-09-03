@@ -565,6 +565,7 @@ final class TreeGitController {
 
             editor.loadBufferIntoPane(contentPane, targetBuffer, 0);
             editor.activateEditorPane(contentPane);
+            editor.showCustomEditorIfAvailable(contentPane, targetBuffer);
             contentPane.getTextArea().requestFocusInWindow();
             editor.addToRecentFiles(file.getAbsolutePath());
             return "Opened: " + file.getAbsolutePath();

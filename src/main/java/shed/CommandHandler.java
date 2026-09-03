@@ -141,6 +141,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleGitCommand(args), "git");
         registerCommand((args, range, force) -> editor.handleScmCommand(args), "scm");
         registerCommand((args, range, force) -> editor.handleCustomEditorCommand(args), "customeditor", "custom-editor");
+        registerCommand((args, range, force) -> editor.handleNotebookCommand(args), "notebook", "nb");
         registerCommand((args, range, force) -> editor.handleRemoteWorkspaceCommand(args), "remote", "remotes");
         registerCommand((args, range, force) -> editor.handleGitHubCommand(args), "github", "gh");
         registerCommand((args, range, force) -> editor.handleUpdateCommand(args), "update", "updates");

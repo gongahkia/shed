@@ -352,6 +352,22 @@ final class ManagedLanguageCatalog {
             URI.create("https://github.com/microsoft/vscode/blob/main/LICENSE.txt"), "MIT License", "Node.js", "none",
             RuntimeRequirementKind.NONE, RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
     );
+    private static final Entry HTML = new Entry(
+        "html", Set.of("html", "htm", "xhtml"), "VS Code HTML Language Server",
+        "vscode-html-language-server", "vscode-html-language-server.cmd",
+        new InstallMetadata(new ManagedLanguageSupportTrust.ArtifactCoordinate("html.zed-vscode-langservers-extracted", "4.10.8"),
+            URI.create("https://www.npmjs.com/package/@zed-industries/vscode-langservers-extracted"),
+            URI.create("https://github.com/microsoft/vscode/blob/main/LICENSE.txt"), "MIT License", "Node.js", "none",
+            RuntimeRequirementKind.NONE, RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
+    );
+    private static final Entry CSS = new Entry(
+        "css", Set.of("css", "scss", "less"), "VS Code CSS Language Server",
+        "vscode-css-language-server", "vscode-css-language-server.cmd",
+        new InstallMetadata(new ManagedLanguageSupportTrust.ArtifactCoordinate("css.zed-vscode-langservers-extracted", "4.10.8"),
+            URI.create("https://www.npmjs.com/package/@zed-industries/vscode-langservers-extracted"),
+            URI.create("https://github.com/microsoft/vscode/blob/main/LICENSE.txt"), "MIT License", "Node.js", "none",
+            RuntimeRequirementKind.NONE, RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
+    );
     private static final Entry MARKDOWN = new Entry(
         "markdown", Set.of("md", "markdown"), "remark-language-server",
         "remark-language-server", "remark-language-server.cmd",
@@ -360,7 +376,7 @@ final class ManagedLanguageCatalog {
             URI.create("https://github.com/remarkjs/remark-language-server/blob/main/license"), "MIT License", "Node.js", "16",
             RuntimeRequirementKind.MINIMUM_VERSION, RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
     );
-    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT, GO, RUST, C_CPP, JSON, MARKDOWN);
+    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT, GO, RUST, C_CPP, JSON, HTML, CSS, MARKDOWN);
 
     private ManagedLanguageCatalog() {
     }
@@ -379,6 +395,14 @@ final class ManagedLanguageCatalog {
 
     static Entry typescriptJavascript() {
         return TYPESCRIPT_JAVASCRIPT;
+    }
+
+    static Entry html() {
+        return HTML;
+    }
+
+    static Entry css() {
+        return CSS;
     }
 
     static Entry go() {

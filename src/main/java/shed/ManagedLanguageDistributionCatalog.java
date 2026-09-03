@@ -71,6 +71,12 @@ final class ManagedLanguageDistributionCatalog {
     private static final Distribution JSON = npm("vscode-json-language-server",
         List.of("@zed-industries/vscode-langservers-extracted@4.10.8"), List.of("--stdio"),
         "npm resolves the exact requested Zed-maintained VS Code language-server bundle and records package-integrity values in its local lockfile. This is not an independently published archive checksum. npm lifecycle scripts, audit, funding, and update-notifier requests are disabled.");
+    private static final Distribution HTML = npm("vscode-html-language-server",
+        List.of("@zed-industries/vscode-langservers-extracted@4.10.8"), List.of("--stdio"),
+        "npm resolves the exact requested Zed-maintained VS Code language-server bundle and records package-integrity values in its local lockfile. This is not an independently published archive checksum. npm lifecycle scripts, audit, funding, and update-notifier requests are disabled.");
+    private static final Distribution CSS = npm("vscode-css-language-server",
+        List.of("@zed-industries/vscode-langservers-extracted@4.10.8"), List.of("--stdio"),
+        "npm resolves the exact requested Zed-maintained VS Code language-server bundle and records package-integrity values in its local lockfile. This is not an independently published archive checksum. npm lifecycle scripts, audit, funding, and update-notifier requests are disabled.");
     private static final Distribution MARKDOWN = npm("remark-language-server", List.of("remark-language-server@3.0.0"),
         List.of("--stdio"), "npm resolves the exact requested remark-language-server version and records package-integrity values in its local lockfile. This is not an independently published archive checksum. npm lifecycle scripts, audit, funding, and update-notifier requests are disabled.");
 
@@ -79,6 +85,8 @@ final class ManagedLanguageDistributionCatalog {
         "python", PYRIGHT,
         "typescript-javascript", TYPESCRIPT_JAVASCRIPT,
         "json", JSON,
+        "html", HTML,
+        "css", CSS,
         "markdown", MARKDOWN
     );
 

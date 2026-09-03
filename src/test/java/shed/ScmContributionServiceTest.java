@@ -29,4 +29,17 @@ class ScmContributionServiceTest {
         assertTrue(service.handle(workspace, "sample:fossil sync origin").document().contains("sync:origin"));
         assertEquals("Action is not declared by sample:fossil: delete", service.handle(workspace, "sample:fossil delete").message());
     }
+
+    @Test
+    void exposesNativeMercurialAndSubversionProvidersWhenTheirMarkersExist() throws Exception {
+        Path mercurial = java.nio.file.Files.createTempDirectory("shed-hg-");
+        Path subversion = java.nio.file.Files.createTempDirectory("shed-svn-");
+        java.nio.file.Files.createDirectory(mercurial.resolve(".hg"));
+        java.nio.file.Files.createDirectory(subversion.resolve(".svn"));
+        ScmContributionService service = new ScmContributionService(new ExtensionRegistry());
+
+        assertTrue(service.handle(mercurial, "list").document().contains("builtin:mercurial"));
+        assertTrue(service.handle(subversion, "list").document().contains("builtin:subversion"));
+        assertEquals("Action is not declared by builtin:mercurial: remove", service.handle(mercurial, "mercurial remove").message());
+    }
 }

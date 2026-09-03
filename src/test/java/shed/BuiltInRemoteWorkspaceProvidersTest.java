@@ -12,10 +12,13 @@ class BuiltInRemoteWorkspaceProvidersTest {
         var providers = BuiltInRemoteWorkspaceProviders.all();
         var git = providers.stream().filter(provider -> provider.id().equals("git")).findFirst().orElseThrow();
         var ssh = providers.stream().filter(provider -> provider.id().equals("ssh")).findFirst().orElseThrow();
+        var container = providers.stream().filter(provider -> provider.id().equals("container")).findFirst().orElseThrow();
 
         assertTrue(git.supports(URI.create("git+https://example.test/group/project.git")));
         assertTrue(ssh.supports(URI.create("ssh://developer@example.test/var/project")));
         assertFalse(git.supports(URI.create("https://user:secret@example.test/group/project.git")));
         assertFalse(ssh.supports(URI.create("ssh://developer@example.test/var/../project")));
+        assertTrue(container.supports(URI.create("container://dev-api/workspace")));
+        assertFalse(container.supports(URI.create("container://dev-api/workspace/../etc")));
     }
 }

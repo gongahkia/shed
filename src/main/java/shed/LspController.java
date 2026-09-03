@@ -1594,6 +1594,11 @@ final class LspController {
         if (Files.isRegularFile(current)) {
             current = current.getParent();
         }
+        Path configured = editor == null || editor.workspaceController == null ? null
+            : WorkspaceRootResolver.configuredRoot(current, editor.workspaceController.roots());
+        if (configured != null) {
+            return configured.toRealPath();
+        }
         for (Path candidate = current; candidate != null; candidate = candidate.getParent()) {
             if (Files.exists(candidate.resolve(".git"))
                 || Files.exists(candidate.resolve("pom.xml"))

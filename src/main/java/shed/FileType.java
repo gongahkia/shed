@@ -69,8 +69,12 @@ public enum FileType {
                         return JAVA;
                     case "html":
                     case "htm":
+                    case "xhtml":
+                    case "xml":
                         return HTML;
                     case "css":
+                    case "scss":
+                    case "less":
                         return CSS;
                     case "json":
                     case "jsonc":

@@ -22,7 +22,7 @@ final class BuiltInRemoteWorkspaceProviders {
     }
 
     static List<RemoteWorkspaceProvider> all() {
-        return List.of(new GitProvider(), new SshProvider(), new WslProvider());
+        return List.of(new GitProvider(), new SshProvider(), new ContainerProvider(), new WslProvider());
     }
 
     static Path workspaceStorage(Path shedDirectory, URI uri) throws IOException {
@@ -50,7 +50,11 @@ final class BuiltInRemoteWorkspaceProviders {
             Path root = workspaceStorage(request.storageDirectory(), uri);
             if (Files.exists(root) && Files.isSymbolicLink(root)) throw new IOException("remote workspace directory is symbolic-link based");
             if (!Files.isDirectory(root.resolve(".git"))) {
-                if (Files.exists(root) && Files.list(root).findAny().isPresent()) throw new IOException("remote workspace directory is not an empty Git clone");
+                if (Files.exists(root)) {
+                    try (var entries = Files.list(root)) {
+                        if (entries.findAny().isPresent()) throw new IOException("remote workspace directory is not an empty Git clone");
+                    }
+                }
                 Files.createDirectories(root.getParent());
                 ProcessResult result = execute(List.of("git", "clone", "--", gitUrl(uri), root.toString()), root.getParent());
                 if (result.exitCode() != 0) throw new IOException("git clone failed: " + result.detail());
@@ -169,6 +173,55 @@ final class BuiltInRemoteWorkspaceProviders {
             Path root = Path.of("//wsl$/" + uri.getHost() + uri.getPath()).toAbsolutePath().normalize();
             if (!Files.isDirectory(root)) throw new IOException("WSL path is unavailable: " + root);
             return new DirectWorkspace("WSL " + uri, root);
+        }
+    }
+
+    private static final class ContainerProvider implements RemoteWorkspaceProvider {
+        @Override public String id() { return "container"; }
+        @Override public String displayName() { return "Docker container mirror"; }
+
+        @Override public boolean supports(URI uri) {
+            if (uri == null || uri.getScheme() == null || uri.getHost() == null || !safeRemotePath(uri.getPath())) return false;
+            String scheme = uri.getScheme().toLowerCase(Locale.ROOT);
+            return ("container".equals(scheme) || "docker".equals(scheme)) && uri.getHost().matches("[A-Za-z0-9][A-Za-z0-9_.-]*");
+        }
+
+        @Override public RemoteWorkspace connect(RemoteWorkspaceRequest request) throws Exception {
+            URI uri = request.uri();
+            if (!supports(uri)) throw new IOException("container URI must be container://<name>/<absolute-path>");
+            Path root = workspaceStorage(request.storageDirectory(), uri);
+            if (Files.exists(root) && Files.isSymbolicLink(root)) throw new IOException("remote workspace directory is symbolic-link based");
+            Files.createDirectories(root);
+            ContainerWorkspace workspace = new ContainerWorkspace(uri, root);
+            workspace.synchronize();
+            return workspace;
+        }
+    }
+
+    private static final class ContainerWorkspace implements RemoteWorkspace {
+        private final URI uri;
+        private final Path root;
+
+        private ContainerWorkspace(URI uri, Path root) {
+            this.uri = uri;
+            this.root = root;
+        }
+
+        @Override public String displayName() { return "Container " + uri; }
+        @Override public Path localRoot() { return root; }
+
+        @Override public void synchronize() throws Exception {
+            ProcessResult result = execute(List.of("docker", "cp", uri.getHost() + ":" + uri.getPath() + "/.", root.toString()), root.getParent());
+            if (result.exitCode() != 0) throw new IOException("container pull failed: " + result.detail());
+        }
+
+        @Override public void synchronizeToRemote() throws Exception {
+            ProcessResult result = execute(List.of("docker", "cp", root.toString() + "/.", uri.getHost() + ":" + uri.getPath()), root.getParent());
+            if (result.exitCode() != 0) throw new IOException("container push failed: " + result.detail());
+        }
+
+        @Override public void close() {
+            // Docker copy does not leave an attached process or an implicit container lifecycle.
         }
     }
 

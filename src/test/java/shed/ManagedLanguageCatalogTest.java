@@ -21,6 +21,8 @@ public class ManagedLanguageCatalogTest {
         assertEquals(ManagedLanguageCatalog.python(), ManagedLanguageCatalog.forExtension("py"));
         assertEquals(ManagedLanguageCatalog.rust(), ManagedLanguageCatalog.forExtension("rs"));
         assertEquals(ManagedLanguageCatalog.markdown(), ManagedLanguageCatalog.forExtension("md"));
+        assertEquals(ManagedLanguageCatalog.html(), ManagedLanguageCatalog.forExtension("xhtml"));
+        assertEquals(ManagedLanguageCatalog.css(), ManagedLanguageCatalog.forExtension("scss"));
         assertNull(ManagedLanguageCatalog.forExtension("lua"));
         assertEquals("jdtls", entry.commandFor(ManagedLanguageSupportTrust.Platform.MACOS));
         assertEquals("jdtls", entry.commandFor(ManagedLanguageSupportTrust.Platform.LINUX));

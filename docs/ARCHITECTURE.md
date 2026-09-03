@@ -56,7 +56,7 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `RecoveryController` | file watching, recovery snapshots, conflicts | `FileWatcherService`, `FileBuffer` |
 | `FocusModeController` | Goyo layout, Limelight, minimap | Swing UI state |
 
-`WorkspaceController` owns the ordered folder set and the Explorer's selected folder. Resource-scoped controllers resolve the deepest configured folder containing the current file before falling back to that selection. This keeps sibling projects isolated for task discovery, extension SCM, Dev Container actions, and extension workspace tools without changing the Explorer merely by switching files.
+`WorkspaceController` owns the ordered folder set and the Explorer's selected folder. `WorkspaceManifest` is its folder-only portable import/export boundary; it accepts only validated local folder entries and deliberately ignores a VS Code manifest's settings and executable configuration. Resource-scoped controllers resolve the deepest configured folder containing the current file before falling back to that selection. This keeps sibling projects isolated for task discovery, extension SCM, Dev Container actions, and extension workspace tools without changing the Explorer merely by switching files.
 
 ## Dependency rules
 

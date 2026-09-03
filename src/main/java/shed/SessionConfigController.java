@@ -612,7 +612,8 @@ final class SessionConfigController {
         String subcommand = split < 0 ? trimmed.toLowerCase(Locale.ROOT) : trimmed.substring(0, split).toLowerCase(Locale.ROOT);
         String args = split < 0 ? "" : trimmed.substring(split + 1).trim();
         if (subcommand.equals("roots") || subcommand.equals("ui") || subcommand.equals("folders") || subcommand.equals("add")
-            || subcommand.equals("open") || subcommand.equals("remove") || subcommand.equals("rm") || subcommand.equals("switch") || subcommand.equals("use")) {
+            || subcommand.equals("open") || subcommand.equals("remove") || subcommand.equals("rm") || subcommand.equals("switch") || subcommand.equals("use")
+            || subcommand.equals("import") || subcommand.equals("export")) {
             return editor.workspaceController.handle(trimmed);
         }
         if ("index".equals(subcommand)) {
@@ -630,7 +631,7 @@ final class SessionConfigController {
             case "list":
                 return listWorkspaceProfiles();
             default:
-                return "Usage: :workspace [list|ui|add <folder>|open <folder>|remove <folder|index>|switch <folder|index>|save|load|index]";
+                return "Usage: :workspace [list|ui|add <folder>|open <folder>|remove <folder|index>|switch <folder|index>|import|export|save|load|index]";
         }
     }
 

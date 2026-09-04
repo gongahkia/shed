@@ -14,7 +14,8 @@ final class BuiltInDebugAdapterSupport {
     static DebugAdapterRegistry.Validation effective(DebugAdapterRegistry.Validation base) {
         DebugAdapterRegistry.Adapter debugpy = new DebugAdapterRegistry.Adapter(PYTHON_DEBUGPY, DebugAdapterRegistry.Transport.STDIO,
             "debugpy-adapter", List.of(), Set.of(DebugAdapterRegistry.Capability.LAUNCH, DebugAdapterRegistry.Capability.CONFIGURATION_DONE,
-                DebugAdapterRegistry.Capability.BREAKPOINTS, DebugAdapterRegistry.Capability.CONDITIONAL_BREAKPOINTS,
+                DebugAdapterRegistry.Capability.BREAKPOINTS, DebugAdapterRegistry.Capability.EXCEPTION_BREAKPOINTS,
+                DebugAdapterRegistry.Capability.CONDITIONAL_BREAKPOINTS,
                 DebugAdapterRegistry.Capability.HIT_CONDITIONAL_BREAKPOINTS, DebugAdapterRegistry.Capability.LOG_POINTS,
                 DebugAdapterRegistry.Capability.THREADS, DebugAdapterRegistry.Capability.STACK_TRACE,
                 DebugAdapterRegistry.Capability.SCOPES, DebugAdapterRegistry.Capability.VARIABLES, DebugAdapterRegistry.Capability.EVALUATE,

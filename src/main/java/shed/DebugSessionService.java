@@ -37,6 +37,15 @@ final class DebugSessionService {
     }
     private record BreakpointSynchronization(boolean attempted, List<String> diagnostics) { }
     private record SourceBreakpointRequest(List<BreakpointStore.Breakpoint> breakpoints, List<Map<String, Object>> arguments) { }
+    record ExceptionFilter(String id, String label, boolean defaultEnabled) {
+        ExceptionFilter {
+            id = id == null ? "" : id.trim();
+            label = label == null ? "" : label.trim();
+            if (!id.matches("[A-Za-z0-9._-]{1,128}") || label.isEmpty() || label.length() > 512) {
+                throw new IllegalArgumentException("exception breakpoint filter is invalid");
+            }
+        }
+    }
     record InspectionResult(DebugInspection.Snapshot snapshot, boolean succeeded) { }
     record ConsoleResult(DebugConsole.Snapshot snapshot, boolean succeeded) { }
     record ControlResult(Snapshot snapshot, boolean succeeded) { }
@@ -75,6 +84,7 @@ final class DebugSessionService {
         private DebugAdapterRegistry.Plan plan;
         private DebugFeatureSettings features;
         private Set<DebugAdapterRegistry.Capability> runtimeCapabilities = Set.of();
+        private List<ExceptionFilter> exceptionFilters = List.of();
         private final DebugInspection inspection = new DebugInspection();
         private final DebugConsole console = new DebugConsole();
         private long generation;
@@ -106,8 +116,19 @@ final class DebugSessionService {
         return start(workspace, new DebugAdapterRegistry.LaunchContext(activeFile, "", null), validation, features, requestedConfiguration, timeout, starter, breakpointStore);
     }
 
+    Result start(Path workspace, Path activeFile, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
+        String requestedConfiguration, Duration timeout, Starter starter, BreakpointStore breakpointStore, ExceptionBreakpointStore exceptionBreakpointStore) {
+        return start(workspace, new DebugAdapterRegistry.LaunchContext(activeFile, "", null), validation, features, requestedConfiguration, timeout,
+            starter, breakpointStore, exceptionBreakpointStore);
+    }
+
     Result start(Path workspace, DebugAdapterRegistry.LaunchContext context, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
         String requestedConfiguration, Duration timeout, Starter starter, BreakpointStore breakpointStore) {
+        return start(workspace, context, validation, features, requestedConfiguration, timeout, starter, breakpointStore, null);
+    }
+
+    Result start(Path workspace, DebugAdapterRegistry.LaunchContext context, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
+        String requestedConfiguration, Duration timeout, Starter starter, BreakpointStore breakpointStore, ExceptionBreakpointStore exceptionBreakpointStore) {
         Path root = root(workspace);
         DebugFeatureSettings settings = features == null ? DebugFeatureSettings.defaults() : features;
         String name;
@@ -149,6 +170,7 @@ final class DebugSessionService {
             DebugAdapterTransport.Response initialize = connection.request("initialize", initializeArguments(plan), timeout);
             if (!initialize.success()) throw new IOException(responseFailure("initialize", initialize));
             Set<DebugAdapterRegistry.Capability> runtimeCapabilities = runtimeCapabilities(plan, initialize);
+            List<ExceptionFilter> exceptionFilters = exceptionFilters(plan, initialize);
             String command = plan.configuration().request() == DebugAdapterRegistry.Request.LAUNCH ? "launch" : "attach";
             Connection activeConnection = connection;
             CompletableFuture<DebugAdapterTransport.Response> startRequest = CompletableFuture.supplyAsync(() -> {
@@ -163,6 +185,8 @@ final class DebugSessionService {
             List<String> synchronizationDiagnostics = new ArrayList<>();
             if (configurationReady) {
                 synchronizationDiagnostics.addAll(synchronizeBreakpoints(plan, settings, runtimeCapabilities, connection, breakpointStore, timeout).diagnostics());
+                synchronizationDiagnostics.addAll(synchronizeExceptionBreakpoints(plan, settings, exceptionFilters, connection,
+                    exceptionBreakpointStore, timeout).diagnostics());
                 if (supportsConfigurationDone(plan, initialize)) {
                     DebugAdapterTransport.Response configurationDone = connection.request("configurationDone", Map.of(), timeout);
                     if (!configurationDone.success()) throw new IOException(responseFailure("configurationDone", configurationDone));
@@ -176,6 +200,8 @@ final class DebugSessionService {
                     synchronizationDiagnostics.add("Debug adapter did not emit initialized; source breakpoints synchronized after " + command + ".");
                 }
                 synchronizationDiagnostics.addAll(synchronization.diagnostics());
+                synchronizationDiagnostics.addAll(synchronizeExceptionBreakpoints(plan, settings, exceptionFilters, connection,
+                    exceptionBreakpointStore, timeout).diagnostics());
             }
             synchronized (this) {
                 if (session.generation != generation || session.lifecycle != Lifecycle.STARTING) {
@@ -186,6 +212,7 @@ final class DebugSessionService {
                 session.plan = plan;
                 session.features = settings;
                 session.runtimeCapabilities = runtimeCapabilities;
+                session.exceptionFilters = exceptionFilters;
                 session.lifecycle = Lifecycle.RUNNING;
                 session.detail = "Debug " + command + " request succeeded for '" + name + "'.";
                 session.diagnostics.addAll(synchronizationDiagnostics);
@@ -228,6 +255,10 @@ final class DebugSessionService {
         return snapshot(root, session);
     }
 
+    synchronized List<ExceptionFilter> exceptionFilters(Path workspace) {
+        return session(root(workspace)).exceptionFilters;
+    }
+
     synchronized List<Snapshot> snapshots() {
         List<Snapshot> result = new ArrayList<>();
         for (Map.Entry<Path, Session> entry : sessions.entrySet()) result.add(snapshot(entry.getKey(), entry.getValue()));
@@ -236,11 +267,16 @@ final class DebugSessionService {
     }
 
     Result synchronizeBreakpoints(Path workspace, BreakpointStore breakpointStore, Duration timeout) {
+        return synchronizeBreakpoints(workspace, breakpointStore, null, timeout);
+    }
+
+    Result synchronizeBreakpoints(Path workspace, BreakpointStore breakpointStore, ExceptionBreakpointStore exceptionBreakpointStore, Duration timeout) {
         Path root = root(workspace);
         Connection connection;
         DebugAdapterRegistry.Plan plan;
         DebugFeatureSettings settings;
         Set<DebugAdapterRegistry.Capability> runtimeCapabilities;
+        List<ExceptionFilter> exceptionFilters;
         synchronized (this) {
             Session session = session(root);
             if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null) {
@@ -250,8 +286,10 @@ final class DebugSessionService {
             plan = session.plan;
             settings = session.features;
             runtimeCapabilities = session.runtimeCapabilities;
+            exceptionFilters = session.exceptionFilters;
         }
-        List<String> diagnostics = synchronizeBreakpoints(plan, settings, runtimeCapabilities, connection, breakpointStore, timeout).diagnostics();
+        List<String> diagnostics = new ArrayList<>(synchronizeBreakpoints(plan, settings, runtimeCapabilities, connection, breakpointStore, timeout).diagnostics());
+        diagnostics.addAll(synchronizeExceptionBreakpoints(plan, settings, exceptionFilters, connection, exceptionBreakpointStore, timeout).diagnostics());
         synchronized (this) {
             Session session = session(root);
             if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING) return new Result(snapshot(root, session), false);
@@ -636,6 +674,49 @@ final class DebugSessionService {
         return new BreakpointSynchronization(true, diagnostics);
     }
 
+    private static BreakpointSynchronization synchronizeExceptionBreakpoints(DebugAdapterRegistry.Plan plan, DebugFeatureSettings settings,
+        List<ExceptionFilter> filters, Connection connection, ExceptionBreakpointStore exceptionBreakpointStore, Duration timeout) {
+        if (exceptionBreakpointStore == null || settings == null || !settings.breakpoints() || plan == null || connection == null
+            || !plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.EXCEPTION_BREAKPOINTS)) {
+            return new BreakpointSynchronization(false, List.of());
+        }
+        List<ExceptionFilter> available = filters == null ? List.of() : filters;
+        if (available.isEmpty()) return new BreakpointSynchronization(false, List.of());
+        try {
+            Map<String, ExceptionBreakpointStore.Setting> settingsByFilter = exceptionBreakpointStore.settings(plan.workspace());
+            List<String> requested = new ArrayList<>();
+            for (ExceptionFilter filter : available) {
+                ExceptionBreakpointStore.Setting setting = settingsByFilter.get(filter.id());
+                if (setting == null ? filter.defaultEnabled() : setting.enabled()) requested.add(filter.id());
+            }
+            DebugAdapterTransport.Response response = connection.request("setExceptionBreakpoints", Map.of("filters", List.copyOf(requested)), timeout);
+            if (!response.success()) {
+                return new BreakpointSynchronization(true, List.of("DAP setExceptionBreakpoints failed"
+                    + (response.message().isBlank() ? "." : ": " + response.message())));
+            }
+            return new BreakpointSynchronization(true, exceptionBreakpointDiagnostics(response.body(), requested));
+        } catch (IOException | TimeoutException error) {
+            return new BreakpointSynchronization(true, List.of("Exception breakpoint synchronization failed: " + message(error)));
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            return new BreakpointSynchronization(true, List.of("Exception breakpoint synchronization interrupted."));
+        }
+    }
+
+    private static List<String> exceptionBreakpointDiagnostics(Object responseBody, List<String> requested) {
+        Map<String, Object> body = MiniJson.asObject(responseBody);
+        List<Object> returned = MiniJson.asArray(body == null ? null : body.get("breakpoints"));
+        if (returned == null) return List.of();
+        List<String> diagnostics = new ArrayList<>();
+        for (int index = 0; index < returned.size() && index < (requested == null ? 0 : requested.size()); index++) {
+            Map<String, Object> breakpoint = MiniJson.asObject(returned.get(index));
+            if (breakpoint == null || !Boolean.FALSE.equals(breakpoint.get("verified"))) continue;
+            String detail = string(breakpoint.get("message"));
+            diagnostics.add("Exception breakpoint '" + requested.get(index) + "' was rejected" + (detail.isBlank() ? "." : ": " + detail));
+        }
+        return List.copyOf(diagnostics);
+    }
+
     private static SourceBreakpointRequest sourceBreakpointRequest(DebugAdapterRegistry.Plan plan, Set<DebugAdapterRegistry.Capability> runtimeCapabilities,
         BreakpointStore store, Path source, List<BreakpointStore.Breakpoint> breakpoints, List<String> diagnostics) throws IOException {
         List<BreakpointStore.Breakpoint> routed = new ArrayList<>();
@@ -729,6 +810,30 @@ final class DebugSessionService {
             if (extension != null && !extension.isBlank() && fileName.endsWith(extension.toLowerCase(java.util.Locale.ROOT))) return python.name();
         }
         return "";
+    }
+
+    private static List<ExceptionFilter> exceptionFilters(DebugAdapterRegistry.Plan plan, DebugAdapterTransport.Response initialize) throws IOException {
+        if (plan == null || plan.adapter() == null || !plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.EXCEPTION_BREAKPOINTS)) {
+            return List.of();
+        }
+        Map<String, Object> capabilities = initialize == null ? null : MiniJson.asObject(initialize.body());
+        List<Object> values = MiniJson.asArray(capabilities == null ? null : capabilities.get("exceptionBreakpointFilters"));
+        if (values == null || values.isEmpty()) return List.of();
+        Map<String, ExceptionFilter> filters = new LinkedHashMap<>();
+        for (Object value : values) {
+            Map<String, Object> fields = MiniJson.asObject(value);
+            String id = fields == null ? null : MiniJson.asString(fields.get("filter"));
+            String label = fields == null ? null : MiniJson.asString(fields.get("label"));
+            if (id == null || label == null) throw new IOException("DAP initialize returned an invalid exception breakpoint filter");
+            ExceptionFilter filter;
+            try {
+                filter = new ExceptionFilter(id, label, Boolean.TRUE.equals(fields.get("default")));
+            } catch (IllegalArgumentException error) {
+                throw new IOException("DAP initialize returned an invalid exception breakpoint filter", error);
+            }
+            if (filters.put(filter.id(), filter) != null) throw new IOException("DAP initialize returned duplicate exception breakpoint filters");
+        }
+        return List.copyOf(filters.values());
     }
 
     private static Set<DebugAdapterRegistry.Capability> runtimeCapabilities(DebugAdapterRegistry.Plan plan, DebugAdapterTransport.Response initialize) {

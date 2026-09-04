@@ -34,6 +34,7 @@ final class DebugSessionService {
         }
     }
     private record BreakpointSynchronization(boolean attempted, List<String> diagnostics) { }
+    private record SourceBreakpointRequest(List<BreakpointStore.Breakpoint> breakpoints, List<Map<String, Object>> arguments) { }
     record InspectionResult(DebugInspection.Snapshot snapshot, boolean succeeded) { }
     record ConsoleResult(DebugConsole.Snapshot snapshot, boolean succeeded) { }
     record ControlResult(Snapshot snapshot, boolean succeeded) { }
@@ -607,14 +608,14 @@ final class DebugSessionService {
             Map<Path, List<BreakpointStore.Breakpoint>> sources = breakpointStore.sources(plan.workspace());
             if (sources.isEmpty()) return new BreakpointSynchronization(false, diagnostics);
             for (Map.Entry<Path, List<BreakpointStore.Breakpoint>> entry : sources.entrySet()) {
-                List<Map<String, Object>> requested = entry.getValue().stream().map(breakpoint -> Map.<String, Object>of("line", breakpoint.line())).toList();
+                SourceBreakpointRequest requested = sourceBreakpointRequest(plan, breakpointStore, entry.getKey(), entry.getValue(), diagnostics);
                 DebugAdapterTransport.Response response = connection.request("setBreakpoints",
-                    Map.of("source", Map.of("path", entry.getKey().toString()), "breakpoints", requested), timeout);
+                    Map.of("source", Map.of("path", entry.getKey().toString()), "breakpoints", requested.arguments()), timeout);
                 if (!response.success()) {
                     diagnostics.add("DAP setBreakpoints failed for " + entry.getKey() + (response.message().isBlank() ? "." : ": " + response.message()));
                     continue;
                 }
-                diagnostics.addAll(breakpointStore.apply(plan.workspace(), entry.getKey(), entry.getValue(), response.body()).diagnostics());
+                diagnostics.addAll(breakpointStore.apply(plan.workspace(), entry.getKey(), requested.breakpoints(), response.body()).diagnostics());
             }
         } catch (IOException | TimeoutException error) {
             diagnostics.add("Source breakpoint synchronization failed: " + message(error));
@@ -623,6 +624,44 @@ final class DebugSessionService {
             diagnostics.add("Source breakpoint synchronization interrupted.");
         }
         return new BreakpointSynchronization(true, diagnostics);
+    }
+
+    private static SourceBreakpointRequest sourceBreakpointRequest(DebugAdapterRegistry.Plan plan, BreakpointStore store, Path source,
+        List<BreakpointStore.Breakpoint> breakpoints, List<String> diagnostics) throws IOException {
+        List<BreakpointStore.Breakpoint> routed = new ArrayList<>();
+        List<Map<String, Object>> arguments = new ArrayList<>();
+        for (BreakpointStore.Breakpoint breakpoint : breakpoints == null ? List.<BreakpointStore.Breakpoint>of() : breakpoints) {
+            if (!breakpoint.enabled()) continue;
+            String unsupported = unsupportedBreakpointOption(plan.adapter(), breakpoint);
+            if (unsupported != null) {
+                String message = "Breakpoint option is unsupported by adapter " + plan.adapter().id() + ": " + unsupported + ".";
+                store.reject(plan.workspace(), source, breakpoint, message);
+                diagnostics.add(source + ":" + breakpoint.line() + " " + message);
+                continue;
+            }
+            Map<String, Object> value = new LinkedHashMap<>();
+            value.put("line", breakpoint.line());
+            if (!breakpoint.condition().isBlank()) value.put("condition", breakpoint.condition());
+            if (!breakpoint.hitCondition().isBlank()) value.put("hitCondition", breakpoint.hitCondition());
+            if (!breakpoint.logMessage().isBlank()) value.put("logMessage", breakpoint.logMessage());
+            routed.add(breakpoint);
+            arguments.add(Map.copyOf(value));
+        }
+        return new SourceBreakpointRequest(List.copyOf(routed), List.copyOf(arguments));
+    }
+
+    private static String unsupportedBreakpointOption(DebugAdapterRegistry.Adapter adapter, BreakpointStore.Breakpoint breakpoint) {
+        if (adapter == null || breakpoint == null) return "source breakpoint";
+        if (!breakpoint.condition().isBlank() && !adapter.capabilities().contains(DebugAdapterRegistry.Capability.CONDITIONAL_BREAKPOINTS)) {
+            return "condition";
+        }
+        if (!breakpoint.hitCondition().isBlank() && !adapter.capabilities().contains(DebugAdapterRegistry.Capability.HIT_CONDITIONAL_BREAKPOINTS)) {
+            return "hit condition";
+        }
+        if (!breakpoint.logMessage().isBlank() && !adapter.capabilities().contains(DebugAdapterRegistry.Capability.LOG_POINTS)) {
+            return "log message";
+        }
+        return null;
     }
 
     private static boolean waitForInitializationOrStart(CompletableFuture<Void> initialized, CompletableFuture<DebugAdapterTransport.Response> start,

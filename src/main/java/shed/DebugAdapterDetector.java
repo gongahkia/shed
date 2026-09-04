@@ -147,7 +147,7 @@ final class DebugAdapterDetector {
     private static boolean featureEnabled(DebugAdapterRegistry.Capability capability, DebugFeatureSettings settings) {
         return switch (capability) {
             case ATTACH -> settings.attach();
-            case BREAKPOINTS -> settings.breakpoints();
+            case BREAKPOINTS, CONDITIONAL_BREAKPOINTS, HIT_CONDITIONAL_BREAKPOINTS, LOG_POINTS -> settings.breakpoints();
             case THREADS -> settings.threads();
             case STACK_TRACE -> settings.stackTrace();
             case SCOPES -> settings.scopes();

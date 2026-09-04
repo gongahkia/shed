@@ -229,6 +229,10 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:debug text [subcommand]` | Open legacy debug scratch output |
 | `:debug select <name>`, `:debug start [name]`, `:debug stop`, `:debug restart [name]` | Control an explicit DAP session, including the user-installed `python-debugpy` profile |
 | `:debug continue`, `:debug next`, `:debug stepin`, `:debug stepout`, `:debug pause` | Send a capability-declared DAP execution control; Continue/step require a paused thread |
+| `:debug breakpoint list` | Open persisted source breakpoints for the selected workspace |
+| `:debug breakpoint enable\|disable\|remove <line>` | Update the active file's source breakpoint |
+| `:debug breakpoint condition\|hit\|log <line> <value>` | Set a bounded condition, hit condition, or log message on the active-file breakpoint |
+| `:debug breakpoint clear-condition\|clear-hit\|clear-log <line>` | Clear one active-file breakpoint option |
 
 ## LSP and Symbol Commands
 

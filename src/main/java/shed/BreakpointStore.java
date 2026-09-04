@@ -15,17 +15,32 @@ import java.util.Objects;
 
 final class BreakpointStore {
     enum State { REQUESTED, VERIFIED, CHANGED, REJECTED }
+    record Marker(State state, boolean enabled) {
+        Marker { state = state == null ? State.REQUESTED : state; }
+    }
 
-    record Breakpoint(Path source, int line, State state, Integer actualLine, String message) {
+    record Breakpoint(Path source, int line, State state, Integer actualLine, String message, boolean enabled, String condition,
+        String hitCondition, String logMessage) {
         Breakpoint {
             source = source == null ? null : source.toAbsolutePath().normalize();
             if (source == null || line < 1) throw new IllegalArgumentException("source breakpoint requires an absolute path and positive line");
             state = state == null ? State.REQUESTED : state;
             if (actualLine != null && actualLine < 1) throw new IllegalArgumentException("source breakpoint actual line must be positive");
             message = message == null ? "" : message;
+            condition = option(condition, "condition");
+            hitCondition = option(hitCondition, "hit condition");
+            logMessage = option(logMessage, "log message");
+        }
+
+        Breakpoint(Path source, int line, State state, Integer actualLine, String message) {
+            this(source, line, state, actualLine, message, true, "", "", "");
         }
 
         int displayLine() { return actualLine == null ? line : actualLine; }
+
+        @Override public String toString() {
+            return (enabled ? "● " : "○ ") + source.getFileName() + ":" + line + "  " + state;
+        }
     }
 
     record Toggle(Breakpoint breakpoint, boolean added) { }
@@ -36,7 +51,7 @@ final class BreakpointStore {
         }
     }
 
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private final Path directory;
     private final Map<Path, List<Breakpoint>> workspaces = new LinkedHashMap<>();
 
@@ -73,14 +88,58 @@ final class BreakpointStore {
         return Map.copyOf(sources);
     }
 
-    synchronized Map<Integer, State> markers(Path workspace, Path source) throws IOException {
+    synchronized Map<Integer, Marker> markers(Path workspace, Path source) throws IOException {
         Path root = workspace(workspace);
         Path file = source(root, source);
-        Map<Integer, State> markers = new LinkedHashMap<>();
+        Map<Integer, Marker> markers = new LinkedHashMap<>();
         for (Breakpoint breakpoint : loaded(root)) {
-            if (breakpoint.source().equals(file)) markers.put(breakpoint.displayLine() - 1, breakpoint.state());
+            if (breakpoint.source().equals(file)) markers.put(breakpoint.displayLine() - 1, new Marker(breakpoint.state(), breakpoint.enabled()));
         }
         return Map.copyOf(markers);
+    }
+
+    synchronized Breakpoint configure(Path workspace, Path source, int line, boolean enabled, String condition, String hitCondition,
+        String logMessage) throws IOException {
+        Path root = workspace(workspace);
+        Path file = source(root, source);
+        List<Breakpoint> breakpoints = loaded(root);
+        for (int index = 0; index < breakpoints.size(); index++) {
+            Breakpoint current = breakpoints.get(index);
+            if (!current.source().equals(file) || current.line() != line) continue;
+            Breakpoint updated = new Breakpoint(file, current.line(), State.REQUESTED, null, "", enabled, condition, hitCondition, logMessage);
+            breakpoints.set(index, updated);
+            save(root, breakpoints);
+            return updated;
+        }
+        throw new IllegalArgumentException("source breakpoint is unavailable");
+    }
+
+    synchronized boolean remove(Path workspace, Path source, int line) throws IOException {
+        Path root = workspace(workspace);
+        Path file = source(root, source);
+        List<Breakpoint> breakpoints = loaded(root);
+        for (int index = 0; index < breakpoints.size(); index++) {
+            Breakpoint current = breakpoints.get(index);
+            if (!current.source().equals(file) || (current.line() != line && current.displayLine() != line)) continue;
+            breakpoints.remove(index);
+            save(root, breakpoints);
+            return true;
+        }
+        return false;
+    }
+
+    synchronized void reject(Path workspace, Path source, Breakpoint requested, String message) throws IOException {
+        if (requested == null) return;
+        Path root = workspace(workspace);
+        Path file = source(root, source);
+        List<Breakpoint> breakpoints = loaded(root);
+        for (int index = 0; index < breakpoints.size(); index++) {
+            Breakpoint current = breakpoints.get(index);
+            if (!current.source().equals(file) || current.line() != requested.line()) continue;
+            breakpoints.set(index, copy(current, file, State.REJECTED, null, message));
+            save(root, breakpoints);
+            return;
+        }
     }
 
     synchronized SyncResult apply(Path workspace, Path source, List<Breakpoint> requested, Object responseBody) throws IOException {
@@ -109,13 +168,13 @@ final class BreakpointStore {
     }
 
     private static Breakpoint fromAdapter(Path source, Breakpoint requested, Map<String, Object> result) {
-        if (result == null) return new Breakpoint(source, requested.line(), State.REJECTED, null, "Adapter omitted the breakpoint result");
+        if (result == null) return copy(requested, source, State.REJECTED, null, "Adapter omitted the breakpoint result");
         boolean verified = !Boolean.FALSE.equals(result.get("verified"));
         Integer actualLine = positiveInteger(result.get("line"));
         String message = MiniJson.asString(result.get("message"));
-        if (!verified) return new Breakpoint(source, requested.line(), State.REJECTED, actualLine, message);
-        if (actualLine != null && actualLine != requested.line()) return new Breakpoint(source, requested.line(), State.CHANGED, actualLine, message);
-        return new Breakpoint(source, requested.line(), State.VERIFIED, actualLine, message);
+        if (!verified) return copy(requested, source, State.REJECTED, actualLine, message);
+        if (actualLine != null && actualLine != requested.line()) return copy(requested, source, State.CHANGED, actualLine, message);
+        return copy(requested, source, State.VERIFIED, actualLine, message);
     }
 
     private void replace(Path workspace, Path source, List<Breakpoint> updated) throws IOException {
@@ -149,7 +208,8 @@ final class BreakpointStore {
             if (root == null || root.size() != 3 || !root.containsKey("version") || !root.containsKey("workspace") || !root.containsKey("breakpoints")) {
                 throw new IllegalArgumentException("root fields are invalid");
             }
-            if (!(root.get("version") instanceof Number number) || number.intValue() != VERSION || number.doubleValue() != VERSION) {
+            if (!(root.get("version") instanceof Number number) || (number.intValue() != 1 && number.intValue() != VERSION)
+                || number.doubleValue() != number.intValue()) {
                 throw new IllegalArgumentException("version is unsupported");
             }
             String persistedWorkspace = MiniJson.asString(root.get("workspace"));
@@ -159,7 +219,7 @@ final class BreakpointStore {
             List<Object> values = MiniJson.asArray(root.get("breakpoints"));
             if (values == null) throw new IllegalArgumentException("breakpoints is not an array");
             List<Breakpoint> result = new ArrayList<>();
-            for (Object value : values) result.add(parse(workspace, value));
+            for (Object value : values) result.add(parse(workspace, value, number.intValue()));
             sort(result);
             return result;
         } catch (RuntimeException error) {
@@ -167,9 +227,10 @@ final class BreakpointStore {
         }
     }
 
-    private static Breakpoint parse(Path workspace, Object value) {
+    private static Breakpoint parse(Path workspace, Object value, int version) {
         Map<String, Object> fields = MiniJson.asObject(value);
-        if (fields == null || fields.size() != 5 || !fields.containsKey("path") || !fields.containsKey("line") || !fields.containsKey("state")
+        int fieldCount = version == 1 ? 5 : 9;
+        if (fields == null || fields.size() != fieldCount || !fields.containsKey("path") || !fields.containsKey("line") || !fields.containsKey("state")
             || !fields.containsKey("actualLine") || !fields.containsKey("message")) throw new IllegalArgumentException("breakpoint fields are invalid");
         String path = MiniJson.asString(fields.get("path"));
         String state = MiniJson.asString(fields.get("state"));
@@ -179,7 +240,13 @@ final class BreakpointStore {
         if (path == null || state == null || message == null || line == null || (fields.get("actualLine") != null && actualLine == null)) {
             throw new IllegalArgumentException("breakpoint values are invalid");
         }
-        return new Breakpoint(source(workspace, Path.of(path)), line, State.valueOf(state), actualLine, message);
+        if (version == 1) return new Breakpoint(source(workspace, Path.of(path)), line, State.valueOf(state), actualLine, message);
+        if (!(fields.get("enabled") instanceof Boolean enabled)) throw new IllegalArgumentException("breakpoint enabled is invalid");
+        String condition = MiniJson.asString(fields.get("condition"));
+        String hitCondition = MiniJson.asString(fields.get("hitCondition"));
+        String logMessage = MiniJson.asString(fields.get("logMessage"));
+        if (condition == null || hitCondition == null || logMessage == null) throw new IllegalArgumentException("breakpoint options are invalid");
+        return new Breakpoint(source(workspace, Path.of(path)), line, State.valueOf(state), actualLine, message, enabled, condition, hitCondition, logMessage);
     }
 
     private void save(Path workspace, List<Breakpoint> breakpoints) throws IOException {
@@ -192,6 +259,10 @@ final class BreakpointStore {
             value.put("state", breakpoint.state().name());
             value.put("actualLine", breakpoint.actualLine());
             value.put("message", breakpoint.message());
+            value.put("enabled", breakpoint.enabled());
+            value.put("condition", breakpoint.condition());
+            value.put("hitCondition", breakpoint.hitCondition());
+            value.put("logMessage", breakpoint.logMessage());
             values.add(value);
         }
         Map<String, Object> root = new LinkedHashMap<>();
@@ -218,6 +289,16 @@ final class BreakpointStore {
     }
     private static void sort(List<Breakpoint> breakpoints) {
         breakpoints.sort(Comparator.comparing((Breakpoint value) -> value.source().toString()).thenComparingInt(Breakpoint::line));
+    }
+    private static Breakpoint copy(Breakpoint source, Path path, State state, Integer actualLine, String message) {
+        return new Breakpoint(path, source.line(), state, actualLine, message, source.enabled(), source.condition(), source.hitCondition(), source.logMessage());
+    }
+    private static String option(String value, String name) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.length() > 4096 || normalized.indexOf('\0') >= 0 || normalized.indexOf('\n') >= 0 || normalized.indexOf('\r') >= 0) {
+            throw new IllegalArgumentException("breakpoint " + name + " is invalid");
+        }
+        return normalized;
     }
     private static String hash(String value) {
         try {

@@ -157,8 +157,50 @@ public class DebugSessionServiceTest {
         assertTrue(result.succeeded());
         assertEquals(List.of("initialize", "launch", "setBreakpoints"), connection.commands);
         assertEquals(file.toString(), ((Map<?, ?>) connection.arguments.get(2).get("source")).get("path"));
-        assertEquals(BreakpointStore.State.CHANGED, store.markers(workspace, file).get(3));
+        assertEquals(BreakpointStore.State.CHANGED, store.markers(workspace, file).get(3).state());
         assertTrue(result.snapshot().diagnostics().stream().anyMatch(value -> value.contains("moved to line 4")));
+    }
+
+    @Test
+    void sendsDeclaredConditionalHitAndLogBreakpointFields(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        BreakpointStore store = new BreakpointStore(tempDir.resolve("state"));
+        store.toggle(workspace, file, 3);
+        store.configure(workspace, file, 3, true, "value > 1", "5", "value={value}");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("setBreakpoints", response("setBreakpoints", true, Map.of("breakpoints", List.of(Map.of("verified", true))), ""));
+
+        DebugSessionService.Result result = service.start(workspace, file,
+            validation("launch,breakpoints,conditional_breakpoints,hit_conditional_breakpoints,log_points"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, listener) -> connection, store);
+
+        assertTrue(result.succeeded());
+        Map<?, ?> arguments = connection.arguments.get(2);
+        List<?> requested = (List<?>) arguments.get("breakpoints");
+        assertEquals(Map.of("line", 3, "condition", "value > 1", "hitCondition", "5", "logMessage", "value={value}"), requested.getFirst());
+    }
+
+    @Test
+    void rejectsRichBreakpointSettingsWhenTheAdapterDoesNotDeclareThem(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        BreakpointStore store = new BreakpointStore(tempDir.resolve("state"));
+        store.toggle(workspace, file, 3);
+        store.configure(workspace, file, 3, true, "value > 1", "", "");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("setBreakpoints", response("setBreakpoints", true, Map.of("breakpoints", List.of()), ""));
+
+        DebugSessionService.Result result = service.start(workspace, file, validation("launch,breakpoints"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, listener) -> connection, store);
+
+        assertTrue(result.succeeded());
+        assertEquals(List.of(), ((List<?>) connection.arguments.get(2).get("breakpoints")));
+        BreakpointStore.Breakpoint rejected = store.sources(workspace).get(file).getFirst();
+        assertEquals(BreakpointStore.State.REJECTED, rejected.state());
+        assertTrue(rejected.message().contains("condition"));
     }
 
     @Test

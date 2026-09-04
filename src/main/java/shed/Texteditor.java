@@ -1976,6 +1976,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return paletteController.showLspSymbols(symbols, query, workspace);
     }
 
+    String showWorkspaceHeuristicSymbols(List<WorkspaceSymbolService.Match> symbols, String query, boolean truncated) {
+        return paletteController.showWorkspaceHeuristicSymbols(symbols, query, truncated);
+    }
+
     String openLspSymbol(LspClient.NavigationSymbol symbol) {
         return lspController.openLspSymbol(symbol);
     }

@@ -22,6 +22,7 @@ final class LspController {
     private static final int MAX_INLINE_INLAY_HINTS = 160;
     private final Texteditor editor;
     private final ManagedLanguageSupportService managedLanguageSupport;
+    private final WorkspaceSymbolCoordinator workspaceSymbolCoordinator;
     private final Map<String, LspDocumentSyncState> documentSyncStates = new HashMap<>();
     private final Map<LspServerKey, RemoteLspEndpoint> remoteLspEndpoints = new HashMap<>();
     private Timer lspChangeTimer;
@@ -45,6 +46,7 @@ final class LspController {
         this.managedLanguageSupport = new ManagedLanguageSupportService(new LanguageServerDetector(null, null, null),
             ManagedLanguageDistributionCatalog.trust(), managedLanguageDirectory,
             ManagedLanguageSupportService.platformFor(System.getProperty("os.name")));
+        this.workspaceSymbolCoordinator = new WorkspaceSymbolCoordinator(editor);
     }
 
     String getWordAtCaret() {
@@ -668,18 +670,25 @@ final class LspController {
 
     String showWorkspaceSymbols(String argument) {
         String query = argument == null ? "" : argument.trim();
-        if (query.isBlank()) return "Usage: :workspace symbols <query>";
+        if (query.isBlank() || query.indexOf('\0') >= 0 || query.indexOf('\n') >= 0 || query.indexOf('\r') >= 0) {
+            return "Usage: :workspace symbols <query>";
+        }
+        int generation = ++workspaceSymbolQueryGeneration;
+        workspaceSymbolCoordinator.cancel();
         FileBuffer active = editor.getCurrentBuffer();
         if (active != null && active.hasFilePath() && !active.isLargeFile()) syncLspOpen(active);
         List<LspClient> clients = new ArrayList<>(new LinkedHashSet<>(editor.lspClients.values()));
         clients.removeIf(client -> client == null || !client.isAlive() || !client.supports(LspCapability.WORKSPACE_SYMBOLS));
-        if (clients.isEmpty()) return "No active LSP server supports workspace symbols";
-        int generation = ++workspaceSymbolQueryGeneration;
+        if (clients.isEmpty()) return workspaceSymbolCoordinator.search(query);
         int jobId = editor.asyncJobService.submit("lsp workspace symbols", token -> collectWorkspaceSymbols(clients, query, token),
             (snapshot, symbols, error) -> {
                 if (generation != workspaceSymbolQueryGeneration || snapshot.getStatus() == AsyncJobService.Status.CANCELLED) return;
-                if (error != null) { editor.showMessage("Workspace symbol search failed: " + error.getMessage()); return; }
-                if (symbols == null || symbols.isEmpty()) { editor.showMessage("No workspace symbols found: " + query); return; }
+                if (error != null || symbols == null || symbols.isEmpty()) {
+                    String localStatus = workspaceSymbolCoordinator.search(query);
+                    String reason = error == null ? "No LSP workspace symbols found" : "LSP workspace-symbol search failed: " + error.getMessage();
+                    editor.showMessage(reason + "; " + localStatus);
+                    return;
+                }
                 editor.showLspSymbols(symbols, query, true);
             });
         return "Loading workspace symbols (job " + jobId + ")";

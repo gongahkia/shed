@@ -291,7 +291,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | Command | Action |
 | :--- | :--- |
 | `:symbols [query]`, `:sym [query]` | Asynchronous LSP document-symbol picker for the current file; falls back to local heuristics when unavailable |
-| `:workspace symbols <query>`, `:workspace sym <query>` | Explicit asynchronous query across active LSP workspace servers; no background symbol index is built |
+| `:workspace symbols <query>`, `:workspace sym <query>` | Explicit asynchronous LSP workspace-symbol query; when no usable LSP result is available, searches ignored-filtered local files with bounded lexical outlines. It never builds a background symbol index. |
 | `:45` | Go to line 45 (any numeric command) |
 
 ## Git Commands

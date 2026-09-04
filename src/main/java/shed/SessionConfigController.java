@@ -630,7 +630,7 @@ final class SessionConfigController {
             case "list":
                 return listWorkspaceProfiles();
             default:
-                return "Usage: :workspace [list|ui|add <folder>|open <folder>|remove <folder|index>|switch <folder|index>|import|export|save|load|index]";
+                return "Usage: :workspace [list|ui|add <folder>|open <folder>|remove <folder|index>|switch <folder|index>|import|reload|export|save|load|index]";
         }
     }
 

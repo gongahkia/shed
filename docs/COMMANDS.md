@@ -227,7 +227,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | :--- | :--- |
 | `:debug`, `:debug ui` | Open the docked Debug panel |
 | `:debug text [subcommand]` | Open legacy debug scratch output |
-| `:debug select <name>`, `:debug start [name]`, `:debug stop`, `:debug restart [name]` | Control an explicitly configured DAP session |
+| `:debug select <name>`, `:debug start [name]`, `:debug stop`, `:debug restart [name]` | Control an explicit DAP session, including the user-installed `python-debugpy` profile |
 
 ## LSP and Symbol Commands
 

@@ -331,6 +331,13 @@ final class DebugAdapterRegistry {
         return true;
     }
 
+    private static boolean matchesFileExtension(Path program, List<String> extensions) {
+        if (extensions == null || extensions.isEmpty()) return true;
+        if (program == null || program.getFileName() == null) return false;
+        String name = program.getFileName().toString().toLowerCase(Locale.ROOT);
+        return extensions.stream().anyMatch(name::endsWith);
+    }
+
     private static Path resolveWorkspacePath(Path workspace, String configured, Path activeFile) {
         if ("${file}".equals(configured)) {
             if (activeFile == null) return null;

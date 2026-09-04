@@ -4,8 +4,9 @@ Shed's debug architecture is adapter-capability driven. The Debug Adapter Protoc
 
 ## Safe Defaults
 
-- `debug.enabled = false`; no adapter or configuration is built in.
-- Adapters are user-managed and configured only in global `~/.shed/config.toml` by default.
+- `debug.enabled = false`; selecting a profile or opening the Debug panel does not start a process.
+- Shed includes one narrow profile, `python-debugpy`, for the separately user-installed `debugpy-adapter` executable. Shed neither bundles, downloads, nor probes `debugpy`; the profile is unavailable until that executable is on `PATH`.
+- Other adapters are user-managed and configured only in global `~/.shed/config.toml` by default.
 - Project `.shed.toml` debug settings are unsafe and remain blocked until `project.config.allow.unsafe = true` and the project config is trusted.
 - Adapter commands are direct executable tokens plus whitespace-separated arguments; Shed does not invoke a shell.
 - Configuration scope is always `workspace`; `cwd` and launch `program` must remain under `${workspaceFolder}`, except `${file}` for the active workspace file.
@@ -42,7 +43,9 @@ For an explicit test-debug target, map an adapter in workspace `.shedtests` to o
 
 Adapter identifiers and configuration names are `[A-Za-z0-9_-]+`. `transport` is `stdio` (default) or `tcp`; `stdio` requires `command`, while `tcp` must not set one. Capabilities are comma-separated: `launch`, `attach`, `configuration_done`, `breakpoints`, `threads`, `stack_trace`, `scopes`, `variables`, and `evaluate`.
 
-Each configuration requires `adapter` and `request` (`launch` or `attach`). A launch requires a workspace-scoped `program`. An attach requires a loopback `host` and `port` from `1..65535`. Invalid fields are reported with TOML line and column during config loading; Shed retains safe defaults and does not create a launch plan.
+Each configuration requires `adapter` and `request` (`launch` or `attach`). A launch requires a workspace-scoped `program`. An attach requires a loopback `host` and `port` from `1..65535`. An optional `file_extensions` value is a comma-separated allowlist such as `.py,.pyw`; it rejects a launch whose resolved program has another extension. Invalid fields are reported with TOML line and column during config loading; Shed retains safe defaults and does not create a launch plan.
+
+`python-debugpy` launches the current `.py` or `.pyw` file with the upstream `debugpy-adapter` DAP executable. Its request carries only `program`, `cwd`, and `args`, which debugpy accepts for program launch. This is local Python launch support, not a bundled Python runtime, environment manager, test-debugger integration, remote debugger, or general debugger marketplace.
 
 ## Future Session Boundary
 

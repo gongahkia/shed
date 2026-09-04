@@ -259,7 +259,7 @@ Update checks require a global consent receipt, HTTPS metadata endpoint, and Bas
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `debug.enabled` | `false` | bool | Enables explicit debug-session planning; M0 has no launch surface |
+| `debug.enabled` | `false` | bool | Enables explicit debug sessions; no process starts until `:debug start` |
 | `debug.breakpoints.enabled` | `true` | bool | Enables breakpoint configuration when a session exists |
 | `debug.threads.enabled` | `true` | bool | Enables thread presentation when adapter-supported |
 | `debug.stacktrace.enabled` | `true` | bool | Enables stack-trace presentation when adapter-supported |
@@ -268,7 +268,7 @@ Update checks require a global consent receipt, HTTPS metadata endpoint, and Bas
 | `debug.evaluate.enabled` | `true` | bool | Enables expression evaluation when adapter-supported |
 | `debug.attach.enabled` | `true` | bool | Enables attach planning when adapter-supported |
 
-See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/attach schema, capability declarations, and M0 no-launch boundary.
+Shed includes a Python-only `python-debugpy` profile for a separately installed `debugpy-adapter` executable; it does not bundle or download that adapter. See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/attach schema, and capability declarations.
 
 ## Undo History Policy
 
@@ -328,7 +328,7 @@ When `project.config.allow.unsafe=false`, project-local config only applies:
 | `formatter.<ext>.args` | Quoted direct argv text; `${file}` allowed | `"formatter.py.args" = "format -"` |
 | `formatter.<ext>.format.on.save` | Per-extension format-on-save override | `"formatter.py.format.on.save" = true` |
 | `debug.adapter.<id>.<field>` | User-managed DAP adapter (`command`, `args`, `transport`, `capabilities`) | `"debug.adapter.java.command" = "java-debug-adapter"` |
-| `debug.configuration.<name>.<field>` | DAP launch/attach configuration | `"debug.configuration.main.request" = "launch"` |
+| `debug.configuration.<name>.<field>` | DAP launch/attach configuration (`file_extensions` can restrict a profile to file types) | `"debug.configuration.main.request" = "launch"` |
 
 Supported keybind scopes: `normal`, `insert`, `visual`, `visual_line`, `replace`, `command`, `search`, `global`.
 

@@ -192,7 +192,8 @@ final class DebugSessionController {
     }
 
     private DebugAdapterRegistry.Validation validation() {
-        return ExtensionDebugAdapterSupport.effective(editor.configManager.getDebugConfiguration(), editor.extensionRegistry);
+        return ExtensionDebugAdapterSupport.effective(BuiltInDebugAdapterSupport.effective(editor.configManager.getDebugConfiguration()),
+            editor.extensionRegistry);
     }
 
     private String stop() {

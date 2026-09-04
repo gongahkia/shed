@@ -62,6 +62,31 @@ public class SnippetService {
         add("try", "try {\n    $0\n} catch ($1 e) {\n    \n}", "try-catch", FileType.JAVA);
         add("class", "public class $1 {\n    $0\n}", "class declaration", FileType.JAVA);
 
+        // Kotlin snippets
+        add("fun", "fun $1($2): $3 {\n    $0\n}", "function", FileType.KOTLIN);
+        add("main", "fun main() {\n    $0\n}", "main function", FileType.KOTLIN);
+        add("class", "class $1 {\n    $0\n}", "class", FileType.KOTLIN);
+
+        // C# snippets
+        add("class", "public class $1 {\n    $0\n}", "class", FileType.CSHARP);
+        add("main", "internal static void Main(string[] args) {\n    $0\n}", "main method", FileType.CSHARP);
+        add("prop", "public $1 $2 { get; set; }", "property", FileType.CSHARP);
+
+        // PHP snippets
+        add("fn", "function $1($2): $3 {\n    $0\n}", "function", FileType.PHP);
+        add("class", "class $1 {\n    $0\n}", "class", FileType.PHP);
+        add("foreach", "foreach ($1 as $2) {\n    $0\n}", "foreach loop", FileType.PHP);
+
+        // Ruby snippets
+        add("def", "def $1($2)\n  $0\nend", "method", FileType.RUBY);
+        add("class", "class $1\n  $0\nend", "class", FileType.RUBY);
+        add("each", "$1.each do |$2|\n  $0\nend", "each block", FileType.RUBY);
+
+        // Swift snippets
+        add("func", "func $1($2) -> $3 {\n    $0\n}", "function", FileType.SWIFT);
+        add("struct", "struct $1 {\n    $0\n}", "struct", FileType.SWIFT);
+        add("guard", "guard $1 else {\n    return\n}", "guard statement", FileType.SWIFT);
+
         // Python snippets
         add("def", "def $1($2):\n    $0", "function", FileType.PYTHON);
         add("class", "class $1:\n    def __init__(self$2):\n        $0", "class", FileType.PYTHON);

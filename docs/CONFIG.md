@@ -158,7 +158,7 @@ Each extension defaults to `lsp`. Use `:formatter` for the active extension or s
 
 Use **Open Snippets** in Settings or `:snippets open` to create and open `snippets.json`. Snippets reload when the completion menu, `Ctrl-j`, or `:snippets` next uses them; no restart is needed.
 
-`snippets.json` and `*.code-snippets` are global. A lowercase language file scopes snippets to that language (`java.json`, `python.json`, `typescript.json`, `markdown.json`); a snippet's optional comma-separated `scope` overrides that file scope. Shed accepts VS Code-shaped `prefix` (string or array), `body` (string or array), and `description` fields.
+`snippets.json` and `*.code-snippets` are global. A lowercase language file scopes snippets to that language (`java.json`, `python.json`, `typescript.json`, `markdown.json`); a snippet's optional comma-separated `scope` overrides that file scope. Shed accepts VS Code-shaped `prefix` (string or array), `body` (string or array), and `description` fields. Built-in starters include Kotlin, C#, PHP, Ruby, and Swift function/type templates alongside the existing language templates; they are ordinary editable snippets, not language-server or grammar support.
 
 ```json
 {

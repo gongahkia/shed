@@ -305,6 +305,59 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void terminalProfilesReportActiveRemoteExecutionSession() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-terminal-remote-session");
+        Path workspace = Files.createDirectories(tempDir.resolve("terminal-remote-session-project"));
+        Path source = workspace.resolve("Main.java");
+        Files.createDirectories(home);
+        Files.writeString(source, "class Main {}\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, source);
+        try {
+            onEdt(() -> {
+                editor.remoteWorkspaceSessions.activate("ssh-project", new shed.api.RemoteWorkspace() {
+                    @Override public String displayName() { return "test SSH workspace"; }
+                    @Override public Path localRoot() { return workspace; }
+                    @Override public String executionRoot() { return "/srv/project"; }
+                    @Override public void synchronize() { }
+                    @Override public void close() { }
+                });
+                return null;
+            });
+
+            assertEquals("Showing terminal profiles", onEdt(() -> editor.commandHandler.execute("terminal list")));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent().contains("New terminals for this file use remote session: ssh-project.")));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void commandCompletionUsesTheRegisteredCommandSurface() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-command-completion");
+        Path file = tempDir.resolve("command-completion.txt");
+        Path directory = Files.createDirectories(tempDir.resolve("command-completion-path"));
+        Path candidate = directory.resolve("candidate.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "local\n", StandardCharsets.UTF_8);
+        Files.writeString(candidate, "candidate\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertEquals(":remote", onEdt(() -> editor.completeCommand(":rem")));
+            assertEquals(":container", onEdt(() -> editor.completeCommand(":cont")));
+            assertEquals(":notebook", onEdt(() -> editor.completeCommand(":noteb")));
+            assertEquals(":extension", onEdt(() -> editor.completeCommand(":extens")));
+            assertEquals(":edit " + candidate, onEdt(() -> editor.completeCommand(":edit " + directory.resolve("cand"))));
+            assertEquals(":write " + candidate, onEdt(() -> editor.completeCommand(":write " + directory.resolve("cand"))));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void remoteForwardListIsExplicitAndProcessFree() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-remote-forward-list");

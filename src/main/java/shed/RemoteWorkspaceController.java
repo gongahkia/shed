@@ -276,6 +276,8 @@ final class RemoteWorkspaceController {
     }
 
     void closeAll() {
+        // application shutdown waits for every tracked forward; ordinary workspace close does not block the EDT.
+        portForwards.close();
         List<Connection> values;
         synchronized (connections) {
             values = new ArrayList<>(connections.values());
@@ -288,7 +290,6 @@ final class RemoteWorkspaceController {
             editor.remoteWorkspaceTaskTargets.unregister(connection.id());
             try { connection.workspace().close(); } catch (Exception ignored) { }
         }
-        portForwards.close();
         editor.remoteWorkspaceSessions.close();
     }
 

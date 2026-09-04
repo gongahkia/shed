@@ -148,9 +148,13 @@ public class CommandParsingTest {
         assertTrue(matcher.matchStrings("Workspace Folders", actions, 0).contains("Workspace Folders"));
         assertTrue(matcher.matchStrings("Code Actions", actions, 0).contains("Code Actions"));
         assertTrue(matcher.matchStrings("Import Coverage Report", actions, 0).contains("Import Coverage Report"));
+        assertTrue(matcher.matchStrings("Remote Workspaces", actions, 0).contains("Remote Workspaces"));
+        assertTrue(matcher.matchStrings("Dev Container", actions, 0).contains("Dev Container"));
         assertEquals("workspace ui", PaletteController.surfaceActionCommand("Workspace Folders"));
         assertEquals("lsp codeaction", PaletteController.surfaceActionCommand("Code Actions"));
         assertEquals("snippets edit", PaletteController.surfaceActionCommand("Edit Snippets"));
+        assertEquals("remote list", PaletteController.surfaceActionCommand("Remote Workspaces"));
+        assertEquals("container status", PaletteController.surfaceActionCommand("Dev Container"));
         assertEquals(actions.size(), new java.util.HashSet<>(actions).size());
         for (String action : actions) {
             String command = PaletteController.surfaceActionCommand(action);

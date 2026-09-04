@@ -15,7 +15,7 @@ This is the complete built-in command reference for command mode in `Shed`.
 | `:!cmd` | Run shell command asynchronously |
 | `:N,M!cmd` | Filter a line range through shell command asynchronously |
 
-In the `:` prompt, paste with `Cmd`/`Ctrl` + `V` and use Left/Right to move the block cursor. Typing a path argument for `:e`, `:edit`, `:w`, `:write`, or `:tree` shows local path suggestions; click one or press Tab to insert it.
+In the `:` prompt, paste with `Cmd`/`Ctrl` + `V` and use Left/Right to move the block cursor. Press Tab after a partial command to complete from the registered built-in, extension, or configured user-command surface. Typing a path argument for `:e`, `:edit`, `:w`, or `:write` shows local path suggestions; click one or press Tab to insert it.
 
 ## Core File + Buffer Commands
 

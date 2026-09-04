@@ -37,15 +37,15 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `EditorUiController` | UI assembly, painting, diagnostics | `QuickfixService`, `PerfService` |
 | `SyntaxUiController` | syntax and breadcrumb presentation | `SyntaxHighlightService`, `SymbolService`, `PerfService` |
 | `SearchReplaceController` | search and substitution UI effects | `SearchManager`, `SubstituteService` |
-| `JobQuickfixController` | tasks, shell jobs, quickfix navigation | `AsyncJobService`, `TaskService`, `QuickfixService` |
+| `JobQuickfixController` | tasks, shell jobs, quickfix navigation | `AsyncJobService`, `TaskService`, `QuickfixService`, explicit remote/Dev Container session services |
 | `ProblemsController` | live diagnostic and retained quickfix aggregation | `ProblemsService`, `LspClient`, tool-window host |
 | `TestController` | explicit test discovery/run session state and Problems projection | `TestService`, `TestAdapterRegistry`, `AsyncJobService` |
-| `TerminalController` | PTY terminal panes and lifecycle | `PtyTerminalPane`, pane/buffer state |
+| `TerminalController` | PTY terminal panes and lifecycle | `PtyTerminalPane`, pane/buffer state, explicit remote/Dev Container session services |
 | `NotebookController` | local Jupyter notebook presentation/save/explicit execution | `NotebookDocument`, `NotebookPanel`, `AsyncJobService` |
 | `CustomEditorController` | extension text/binary custom-editor resource bridge | `CustomEditorDocument`, `AtomicFileWriter` |
 | `ScmController` | extension and built-in SCM command routing | `ScmContributionService` |
-| `RemoteWorkspaceController` | explicit mirror lifecycle and provider-owned remote command requests | `RemoteWorkspaceProvider`, `AsyncJobService`, workspace roots |
-| `DevContainerController` | explicit local Dev Container CLI bridge | `AsyncJobService`, `TerminalController`, remote workspace mirrors |
+| `RemoteWorkspaceController` | explicit mirror lifecycle, session activation, and loopback SSH forwards | `RemoteWorkspaceProvider`, `AsyncJobService`, `RemoteWorkspaceSessionService`, `SshPortForwardService`, workspace roots |
+| `DevContainerController` | explicit local Dev Container CLI bridge | `AsyncJobService`, `DevContainerSessionService`, remote workspace mirrors |
 | `WorkspaceToolController` | declared workspace integration actions | `WorkspaceToolContribution`, extension registry, workspace roots |
 | `ExtensionManager` / `ExtensionRegistry` | checksum-verified Java extension lifecycle and typed contributions | `shed.api`, isolated JAR class loaders, workbench controllers |
 | `TreeGitController` | file tree and Git actions | `TreeService`, `GitService` |
@@ -57,6 +57,12 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `FocusModeController` | Goyo layout, Limelight, minimap | Swing UI state |
 
 `WorkspaceController` owns the ordered folder set and the Explorer's selected folder. `WorkspaceManifest` is its folder-only portable import/export boundary; it accepts only validated local folder entries and deliberately ignores a VS Code manifest's settings and executable configuration. Resource-scoped controllers resolve the deepest configured folder containing the current file before falling back to that selection. This keeps sibling projects isolated for task discovery, extension SCM, Dev Container actions, and extension workspace tools without changing the Explorer merely by switching files.
+
+## Explicit remote-session ownership
+
+`RemoteWorkspaceController` owns remote connection lifecycle and the `SshPortForwardService` processes associated with SSH connections. `RemoteWorkspaceSessionService` separately records only user-activated provider execution mappings. `TerminalController` and `JobQuickfixController` query that service through `Texteditor` for the deepest matching local mirror; they do not call the remote controller. A session is removed by `:remote unuse`, remote close/replacement, or application exit.
+
+`DevContainerSessionService` has the equivalent narrow role for an explicitly connected local Dev Container. Both services are in-memory routing state, not remote-server, credential, or reconnect managers. The task/terminal lookup gives an active remote workspace precedence over an overlapping Dev Container, then falls back to the local process path. This preserves explicit execution selection without creating controller-to-controller dependencies.
 
 ## Dependency rules
 

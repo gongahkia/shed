@@ -53,6 +53,11 @@ public class SymbolService {
     private static final Pattern RUST_IMPL = Pattern.compile("^\\s*impl(?:<[^>{}]*>)?\\s+([A-Za-z_][A-Za-z0-9_]*)");
     private static final Pattern C_CPP_TYPE = Pattern.compile("^\\s*(?:class|struct|enum|namespace)\\s+([A-Za-z_][A-Za-z0-9_]*)\\b");
     private static final Pattern C_CPP_FUNCTION = Pattern.compile("^\\s*(?!if\\b|for\\b|while\\b|switch\\b|catch\\b)(?:[A-Za-z_][A-Za-z0-9_:<>]*\\s*[*&]?\\s+)+([A-Za-z_][A-Za-z0-9_]*)\\s*\\([^;{}]*\\)\\s*(?:const\\s*)?(?:\\{|$)");
+    private static final Pattern KOTLIN_FUNCTION = Pattern.compile("^\\s*(?:public|private|protected|internal|open|override|abstract|suspend|inline|tailrec|operator|infix|external|\\s)*fun\\s+(?:<[^>{}]*>\\s*)?([A-Za-z_][A-Za-z0-9_]*)\\s*\\(");
+    private static final Pattern PHP_FUNCTION = Pattern.compile("^\\s*(?:(?:public|protected|private|static|final|abstract)\\s+)*function\\s+&?([A-Za-z_][A-Za-z0-9_]*)\\s*\\(");
+    private static final Pattern RUBY_TYPE = Pattern.compile("^\\s*(?:class|module)\\s+([A-Za-z_][A-Za-z0-9_:]*)\\b");
+    private static final Pattern RUBY_FUNCTION = Pattern.compile("^\\s*def\\s+(?:self\\.)?([A-Za-z_][A-Za-z0-9_!?=]*)");
+    private static final Pattern SWIFT_FUNCTION = Pattern.compile("^\\s*(?:public|private|fileprivate|internal|open|static|class|mutating|nonmutating|override|final|async|throws|rethrows|\\s)*func\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(");
     private static final Pattern YAML_KEY = Pattern.compile("^(\\s*)(?:-\\s+)?([A-Za-z0-9_.-]+):");
     private static final Pattern TOML_TABLE = Pattern.compile("^\\s*\\[\\[?\\s*([^\\]]+?)\\s*\\]\\]?\\s*(?:#.*)?$");
     private static final Pattern SQL_DEFINITION = Pattern.compile("^\\s*create\\s+(?:or\\s+replace\\s+)?(?:table|view|index|schema|function|procedure)\\s+(?:if\\s+not\\s+exists\\s+)?([A-Za-z_][A-Za-z0-9_.$]*)\\b", Pattern.CASE_INSENSITIVE);
@@ -129,6 +134,73 @@ public class SymbolService {
                         return true;
                     }
                 }
+            }
+            return false;
+        }
+        if (fileType == FileType.KOTLIN) {
+            Matcher classLike = CLASS_LIKE.matcher(value);
+            if (classLike.find()) {
+                symbols.add(new Symbol(classLike.group(2), "class", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            Matcher function = KOTLIN_FUNCTION.matcher(value);
+            if (function.find()) {
+                symbols.add(new Symbol(function.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            return false;
+        }
+        if (fileType == FileType.CSHARP) {
+            Matcher classLike = CLASS_LIKE.matcher(value);
+            if (classLike.find()) {
+                symbols.add(new Symbol(classLike.group(2), "class", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            if (value.indexOf('(') >= 0 && value.indexOf(';') < 0) {
+                Matcher method = JAVA_METHOD.matcher(value);
+                if (method.find() && !isControlKeyword(method.group(1))) {
+                    symbols.add(new Symbol(method.group(1), "method", lineNumber, Math.max(2, braceDepth + 1)));
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (fileType == FileType.PHP) {
+            Matcher classLike = CLASS_LIKE.matcher(value);
+            if (classLike.find()) {
+                symbols.add(new Symbol(classLike.group(2), "class", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            Matcher function = PHP_FUNCTION.matcher(value);
+            if (function.find()) {
+                symbols.add(new Symbol(function.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            return false;
+        }
+        if (fileType == FileType.RUBY) {
+            Matcher type = RUBY_TYPE.matcher(value);
+            if (type.find()) {
+                symbols.add(new Symbol(type.group(1), "type", lineNumber, Math.max(1, leadingSpaces(value) / 2 + 1)));
+                return true;
+            }
+            Matcher function = RUBY_FUNCTION.matcher(value);
+            if (function.find()) {
+                symbols.add(new Symbol(function.group(1), "function", lineNumber, Math.max(1, leadingSpaces(value) / 2 + 1)));
+                return true;
+            }
+            return false;
+        }
+        if (fileType == FileType.SWIFT) {
+            Matcher classLike = CLASS_LIKE.matcher(value);
+            if (classLike.find()) {
+                symbols.add(new Symbol(classLike.group(2), "type", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            Matcher function = SWIFT_FUNCTION.matcher(value);
+            if (function.find()) {
+                symbols.add(new Symbol(function.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
             }
             return false;
         }

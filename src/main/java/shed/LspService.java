@@ -19,6 +19,16 @@ public class LspService {
                 return "cpp";
             case JAVA:
                 return "java";
+            case KOTLIN:
+                return "kotlin";
+            case CSHARP:
+                return "csharp";
+            case PHP:
+                return "php";
+            case RUBY:
+                return "ruby";
+            case SWIFT:
+                return "swift";
             case HTML:
                 return "html";
             case CSS:

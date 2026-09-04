@@ -74,7 +74,7 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:jobcancel <id>`, `:jobkill <id>` | Cancel running async job |
 | `:task`, `:task ui` | Open graphical Tasks/Jobs panel |
 | `:task text`, `:task text list` | Show legacy task scratch buffer |
-| `:task vscode` | Inspect the strict runtime-only `.vscode/tasks.json` compatibility report; accepted process tasks are session-only and still require explicit run |
+| `:task vscode` | Inspect strict runtime-only `.vscode/tasks.json` and imported `.code-workspace` task compatibility; accepted process and POSIX-shell tasks are session-only and still require explicit run |
 | `:task add <name> <command>` | Save task |
 | `:task remove <name>`, `:task rm <name>`, `:task delete <name>` | Remove task |
 | `:task dry-run <name>` | Resolve and show task execution plan without starting it |
@@ -97,7 +97,7 @@ Notes:
 | `:test refresh` | Explicitly detect runners and discover tests; a selected SSH, Docker, WSL, or already-running Dev Container root runs dynamic discovery in that environment |
 | `:test run` | Run every detected/configured adapter in the selected workspace root; a selected SSH, Docker, WSL, or already-running Dev Container root runs them in that environment |
 | `:test run <test-id>` | Run one discovered test by its exact id |
-| `:test debug <test-id>` | Start the adapter explicitly mapped by that test adapter's `.shedtests` `debug_configuration`; connected SSH, Docker, WSL, and an already-running Dev Container workspace may use an already-installed configured stdio adapter |
+| `:test debug <test-id>` | Start the adapter explicitly mapped by that test adapter's `.shedtests` `debug_configuration`, including an accepted runtime-only `vscode:<name>` profile; connected SSH, Docker, WSL, and an already-running Dev Container workspace may use an already-installed configured stdio adapter |
 | `:test failed`, `:test rerun-failed` | Run the failed tests retained for this session |
 | `:test cancel` | Cancel running test jobs for the selected root |
 | `:test text` | Open a text summary of the session-local test state |
@@ -228,8 +228,8 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | :--- | :--- |
 | `:debug`, `:debug ui` | Open the docked Debug panel |
 | `:debug text [subcommand]` | Open legacy debug scratch output |
-| `:debug vscode` | Inspect the strict runtime-only `.vscode/launch.json` compatibility report; accepted profiles are named `vscode:<name>` and still require explicit selection/start |
-| `:debug select <name>`, `:debug start [name]`, `:debug stop`, `:debug restart [name]` | Control an explicit DAP session, including the user-installed `python-debugpy` profile; a configured pre-launch workspace task must succeed before its adapter starts |
+| `:debug vscode` | Inspect strict runtime-only `.vscode/launch.json` and imported `.code-workspace` launch compatibility; accepted profiles are named `vscode:<name>` and still require explicit selection/start |
+| `:debug select <name>`, `:debug start [name]`, `:debug stop`, `:debug restart [name]` | Control an explicit DAP session, including the user-installed `python-debugpy` profile; a configured pre-launch workspace task, or a label mapped from an accepted VS Code process or POSIX-shell task, must succeed before its adapter starts |
 | `:debug continue`, `:debug next`, `:debug stepin`, `:debug stepout`, `:debug pause` | Send a capability-declared DAP execution control; Continue/step require a paused thread |
 | `:debug goto [line]` | Run the paused thread to the active file's caret or one-based line when the adapter declares and advertises standard DAP `gotoTargets` support |
 | `:debug breakpoint list` | Open persisted source breakpoints for the selected workspace |
@@ -292,8 +292,8 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 
 | Command | Action |
 | :--- | :--- |
-| `:symbols [query]`, `:sym [query]` | Asynchronous LSP document-symbol picker for the current file; falls back to local heuristics when unavailable |
-| `:workspace symbols <query>`, `:workspace sym <query>` | Explicit asynchronous LSP workspace-symbol query; when no usable LSP result is available, searches ignored-filtered local files with bounded lexical outlines. It never builds a background symbol index. |
+| `:symbols [query]`, `:sym [query]` | Asynchronous LSP document-symbol picker for the current file; falls back to a local Java AST declaration scan or lexical outlines when unavailable |
+| `:workspace symbols <query>`, `:workspace sym <query>` | Explicit asynchronous LSP workspace-symbol query; when no usable LSP result is available, searches ignored-filtered local files with bounded Java declaration parsing and lexical outlines. It never builds a background symbol index or resolves project types. |
 | `:45` | Go to line 45 (any numeric command) |
 
 ## Git Commands
@@ -370,7 +370,7 @@ See [Update Checks](UPDATES.md) for endpoint/key configuration and metadata vali
 | `:workspace add <folder>` | Add a local folder without changing the active tree |
 | `:workspace open <folder>`, `:workspace switch <folder\|index>` | Make a workspace folder active and show its tree |
 | `:workspace remove <folder\|index>` | Remove a folder from the workspace; files are retained |
-| `:workspace import <manifest>` | Replace folders from a validated `.shed-workspace` or `.code-workspace` folder list |
+| `:workspace import <manifest>` | Replace folders from a validated `.shed-workspace` or `.code-workspace` list; the latter can additionally expose strict session-only VS Code task/launch compatibility |
 | `:workspace export <manifest>` | Write the current folders as a portable manifest |
 
 For a file inside a configured workspace folder, task discovery, extension SCM, Dev Container commands, and extension workspace integrations use the deepest folder containing that file. For a scratch or outside file, they use the selected workspace folder. The Tests panel intentionally exposes its own root selector, so a user can inspect or run a sibling project's tests without changing editors.

@@ -10,6 +10,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class SymbolService {
+    private final JavaStructuralService javaStructuralService;
+
     public static final class Symbol {
         private final String name;
         private final String kind;
@@ -67,9 +69,21 @@ public class SymbolService {
             + "(?:[A-Za-z_][A-Za-z0-9_<>,\\[\\]?\\s\\.]*\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s*\\([^;{}]*\\)\\s*(?:\\{|=>|$)"
     );
 
+    public SymbolService() {
+        this(new JavaStructuralService());
+    }
+
+    SymbolService(JavaStructuralService javaStructuralService) {
+        this.javaStructuralService = javaStructuralService == null ? new JavaStructuralService() : javaStructuralService;
+    }
+
     public List<Symbol> collectSymbols(String text, FileType fileType) {
         if (text == null || text.isEmpty()) {
             return Collections.emptyList();
+        }
+        if (fileType == FileType.JAVA) {
+            JavaStructuralService.Result result = javaStructuralService.collectSymbols(text);
+            if (result.parserAvailable()) return result.symbols();
         }
         String[] lines = text.split("\\n", -1);
         if (fileType == FileType.MARKDOWN) {

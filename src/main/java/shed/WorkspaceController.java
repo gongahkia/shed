@@ -11,6 +11,8 @@ import javax.swing.JFileChooser;
 final class WorkspaceController {
     private final Texteditor editor;
     private final WorkspaceRoots roots = new WorkspaceRoots();
+    private Path importedManifest;
+    private WorkspaceEditorSettings.Snapshot importedEditorSettings = WorkspaceEditorSettings.empty();
 
     WorkspaceController(Texteditor editor) {
         this.editor = editor;
@@ -29,6 +31,15 @@ final class WorkspaceController {
         return WorkspaceRootResolver.configuredOrActive(resource, roots.all(), roots.active());
     }
 
+    WorkspaceEditorSettings.Preferences editorSettingsFor(FileBuffer buffer, String languageId) {
+        if (buffer == null || buffer.getFile() == null) return WorkspaceEditorSettings.Preferences.EMPTY;
+        try {
+            return importedEditorSettings.preferencesFor(buffer.getFile().toPath(), languageId);
+        } catch (RuntimeException error) {
+            return WorkspaceEditorSettings.Preferences.EMPTY;
+        }
+    }
+
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "list".equalsIgnoreCase(trimmed) || "roots".equalsIgnoreCase(trimmed)) return showRoots();
@@ -45,9 +56,10 @@ final class WorkspaceController {
             case "remove", "rm" -> remove(value);
             case "switch", "use" -> activate(value, true);
             case "import" -> importManifest(value);
+            case "reload", "refresh" -> reloadManifest();
             case "export" -> exportManifest(value);
             case "symbols", "sym" -> editor.showWorkspaceSymbols(value);
-            default -> "Usage: :workspace [list|ui|add <folder>|open <folder>|remove <folder|index>|switch <folder|index>|import <manifest>|export <manifest>|symbols <query>]";
+            default -> "Usage: :workspace [list|ui|add <folder>|open <folder>|remove <folder|index>|switch <folder|index>|import <manifest>|reload|export <manifest>|symbols <query>]";
         };
     }
 
@@ -55,6 +67,7 @@ final class WorkspaceController {
         Path root = existingDirectory(value);
         if (root == null) return "Workspace folder must be an existing directory";
         boolean added = roots.add(root);
+        if (added) clearImportedManifest();
         if (activate) roots.activate(root);
         syncTreeRoot(roots.active(), activate);
         return (added ? "Added workspace folder: " : "Workspace folder already added: ") + root;
@@ -69,6 +82,7 @@ final class WorkspaceController {
         if (root == null) return "Workspace folder not found: " + value;
         boolean wasActive = root.equals(roots.active());
         roots.remove(root);
+        clearImportedManifest();
         syncTreeRoot(roots.active(), wasActive);
         return "Removed workspace folder: " + root;
     }
@@ -85,11 +99,15 @@ final class WorkspaceController {
         if (root == null || !root.isDirectory()) return;
         Path path = realDirectory(root.toPath());
         if (path == null) return;
-        roots.add(path);
+        if (roots.add(path)) clearImportedManifest();
         roots.activate(path);
     }
 
     void restore(Object serializedRoots, String serializedActive, File legacyTreeRoot) {
+        restore(serializedRoots, serializedActive, legacyTreeRoot, null);
+    }
+
+    void restore(Object serializedRoots, String serializedActive, File legacyTreeRoot, String serializedManifest) {
         List<Path> restored = new ArrayList<>();
         List<Object> values = MiniJson.asArray(serializedRoots);
         if (values != null) {
@@ -110,21 +128,68 @@ final class WorkspaceController {
         } else {
             syncTreeRoot(null, false);
         }
+        restoreImportedManifest(serializedManifest);
     }
 
     List<String> serializeRoots() {
         return roots.all().stream().map(Path::toString).toList();
     }
 
+    String serializeManifestSource() {
+        return importedManifest == null ? "" : importedManifest.toString();
+    }
+
+    /**
+     * Returns the live imported manifest configuration only while its folder membership still
+     * exactly matches this workspace. A changed manifest must be explicitly imported again.
+     */
+    WorkspaceManifest.ImportedConfiguration manifestConfiguration() {
+        Path source = importedManifest;
+        if (source == null) return new WorkspaceManifest.ImportedConfiguration(null, false, null, false, null, "");
+        try {
+            WorkspaceManifest.Document document = WorkspaceManifest.readDocument(source);
+            if (!roots.all().equals(document.folders())) {
+                return new WorkspaceManifest.ImportedConfiguration(source, false, null, false, null,
+                    "The manifest folder set changed; import it again before using its tasks or launch configurations.");
+            }
+            if (!document.standardVsCodeWorkspace()) {
+                return new WorkspaceManifest.ImportedConfiguration(null, false, null, false, null, "");
+            }
+            return new WorkspaceManifest.ImportedConfiguration(source, document.hasTasks(), document.tasks(), document.hasLaunch(), document.launch(), "");
+        } catch (IOException | RuntimeException error) {
+            return new WorkspaceManifest.ImportedConfiguration(source, false, null, false, null,
+                "Workspace manifest could not be read: " + concise(error));
+        }
+    }
+
     private String importManifest(String value) {
         if (value == null || value.isBlank()) return "Usage: :workspace import <manifest>";
         try {
-            List<Path> imported = WorkspaceManifest.read(Path.of(value));
+            WorkspaceManifest.Document document = WorkspaceManifest.readDocument(Path.of(value));
+            List<Path> imported = document.folders();
             roots.replace(imported, imported.getFirst());
+            importedManifest = document.source();
+            importedEditorSettings = WorkspaceEditorSettings.read(document);
+            refreshEditorIndentation();
             syncTreeRoot(roots.active(), true);
             return "Imported " + imported.size() + " workspace folder" + (imported.size() == 1 ? "" : "s");
         } catch (IOException | RuntimeException error) {
             return "Could not import workspace manifest: " + concise(error);
+        }
+    }
+
+    private String reloadManifest() {
+        if (importedManifest == null) return "No imported workspace manifest to reload";
+        try {
+            WorkspaceManifest.Document document = WorkspaceManifest.readDocument(importedManifest);
+            if (!roots.all().equals(document.folders())) {
+                return "The manifest folder set changed; import it again before reloading editor settings.";
+            }
+            importedEditorSettings = WorkspaceEditorSettings.read(document);
+            refreshEditorIndentation();
+            return "Reloaded imported workspace editor settings";
+        } catch (IOException | RuntimeException error) {
+            return "Could not reload workspace manifest: " + concise(error);
         }
     }
 
@@ -154,7 +219,12 @@ final class WorkspaceController {
                 text.append(root.equals(roots.active()) ? "* " : "  ").append(index + 1).append(". ").append(root).append('\n');
             }
         }
-        text.append("\nUse :workspace add <folder>, switch <folder|index>, remove <folder|index>, or ui.\n");
+        if (importedManifest != null) text.append("\nManifest: ").append(importedManifest).append('\n');
+        if (!importedEditorSettings.diagnostics().isEmpty()) {
+            text.append("\nEditor settings diagnostics:\n");
+            for (String diagnostic : importedEditorSettings.diagnostics()) text.append("- ").append(diagnostic).append('\n');
+        }
+        text.append("\nUse :workspace add <folder>, switch <folder|index>, remove <folder|index>, reload, or ui.\n");
         editor.showScratchBuffer("[workspace folders]", text.toString());
         return "Showing workspace folders";
     }
@@ -194,5 +264,32 @@ final class WorkspaceController {
 
     private void syncTreeRoot(Path root, boolean showTree) {
         editor.treeGitController.setWorkspaceTreeRoot(root == null ? null : root.toFile(), showTree);
+    }
+
+    private void clearImportedManifest() {
+        importedManifest = null;
+        importedEditorSettings = WorkspaceEditorSettings.empty();
+        refreshEditorIndentation();
+    }
+
+    private void restoreImportedManifest(String serializedManifest) {
+        importedManifest = null;
+        if (serializedManifest == null || serializedManifest.isBlank()) return;
+        try {
+            WorkspaceManifest.Document document = WorkspaceManifest.readDocument(Path.of(serializedManifest));
+            if (roots.all().equals(document.folders())) {
+                importedManifest = document.source();
+                importedEditorSettings = WorkspaceEditorSettings.read(document);
+                refreshEditorIndentation();
+            }
+        } catch (IOException | RuntimeException ignored) {
+            // A session may restore its folders even when the portable source has moved or changed.
+        }
+    }
+
+    private void refreshEditorIndentation() {
+        for (EditorPane pane : editor.editorPanes) {
+            pane.getTextArea().setTabSize(editor.effectiveTabSize(pane.getBuffer()));
+        }
     }
 }

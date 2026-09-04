@@ -51,6 +51,53 @@ class VsCodeLaunchConfigurationImporterTest {
     }
 
     @Test
+    void translatesPreLaunchTaskLabelsOnlyWhenTheyResolveToAcceptedProcessTasks() throws Exception {
+        Path root = Files.createDirectories(temporaryDirectory.resolve("workspace"));
+        Path launch = Files.createDirectories(root.resolve(".vscode")).resolve("launch.json");
+        Files.writeString(launch, """
+            {"configurations":[{
+              "name":"Run app", "type":"python", "request":"launch", "program":"${file}", "preLaunchTask":"Build app"
+            }]}
+            """);
+        DebugAdapterRegistry.Validation base = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
+
+        VsCodeLaunchConfigurationImporter.Report accepted = VsCodeLaunchConfigurationImporter.read(root, base,
+            Map.of("Build app", "vscode-build-app"));
+        VsCodeLaunchConfigurationImporter.Report rejected = VsCodeLaunchConfigurationImporter.read(root, base, Map.of());
+
+        assertEquals("vscode-build-app", accepted.configurations().get("vscode:Run app").prelaunchTask());
+        assertTrue(rejected.configurations().isEmpty());
+        assertTrue(rejected.skipped().getFirst().contains("accepted compatible VS Code task label"));
+    }
+
+    @Test
+    void retainsTestPlaceholdersForTheExplicitTestDebugContextOnly() throws Exception {
+        Path root = Files.createDirectories(temporaryDirectory.resolve("workspace"));
+        Path source = Files.writeString(root.resolve("sample_test.py"), "def test_one(): pass\n");
+        Path launch = Files.createDirectories(root.resolve(".vscode")).resolve("launch.json");
+        Files.writeString(launch, """
+            {"configurations":[{
+              "name":"Debug selected test", "type":"python", "request":"launch", "program":"${testFile}",
+              "args":["--exact", "${testId}"]
+            }]}
+            """);
+        DebugAdapterRegistry.Validation base = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
+        DebugAdapterRegistry.Validation effective = DebugAdapterRegistry.withExternalConfigurations(base,
+            VsCodeLaunchConfigurationImporter.read(root, base).configurations());
+        TestService.TestCase test = new TestService.TestCase("pytest", "sample_test.py::test_one", "test_one", "sample_test.py", source, 1,
+            TestService.Status.UNKNOWN, 0, "");
+
+        DebugAdapterRegistry.PlanResult testPlan = DebugAdapterRegistry.plan(effective, "vscode:Debug selected test", root,
+            new DebugAdapterRegistry.LaunchContext(source, test.id(), source));
+        DebugAdapterRegistry.PlanResult ordinaryPlan = DebugAdapterRegistry.plan(effective, "vscode:Debug selected test", root, source);
+
+        assertTrue(testPlan.launchable());
+        assertEquals(source, testPlan.plan().program());
+        assertEquals(java.util.List.of("--exact", test.id()), testPlan.plan().args());
+        assertFalse(ordinaryPlan.launchable());
+    }
+
+    @Test
     void reportsUnsupportedOrUnsafeProfilesWithoutAddingThemToTheLaunchRegistry() throws Exception {
         Path root = Files.createDirectories(temporaryDirectory.resolve("workspace"));
         Path launch = Files.createDirectories(root.resolve(".vscode")).resolve("launch.json");
@@ -75,7 +122,7 @@ class VsCodeLaunchConfigurationImporterTest {
         assertTrue(report.skipped().stream().anyMatch(value -> value.contains("no matching configured Shed adapter")));
         assertTrue(report.skipped().stream().anyMatch(value -> value.contains("program must remain")));
         assertTrue(report.skipped().stream().anyMatch(value -> value.contains("unsupported field env")));
-        assertTrue(report.skipped().stream().anyMatch(value -> value.contains("variable other than")));
+        assertTrue(report.skipped().stream().anyMatch(value -> value.contains("unsupported VS Code variable")));
         assertFalse(effective.configurations().containsKey("vscode:Missing adapter"));
     }
 
@@ -107,5 +154,24 @@ class VsCodeLaunchConfigurationImporterTest {
         assertTrue(report.present());
         assertFalse(report.readable());
         assertTrue(report.failure().contains("not a regular directory"));
+    }
+
+    @Test
+    void importsTheSameValidatedLaunchSubsetFromAnExplicitWorkspaceDocument() throws Exception {
+        Path root = Files.createDirectories(temporaryDirectory.resolve("workspace"));
+        Path manifest = temporaryDirectory.resolve("team.code-workspace");
+        DebugAdapterRegistry.Validation base = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
+        Map<String, Object> launch = Jsonc.parseObject("""
+            {"configurations":[{"name":"Run workspace","type":"python","request":"launch","program":"${file}","args":["--extension","${fileExtname}"]}]}
+            """);
+
+        VsCodeLaunchConfigurationImporter.Report report = VsCodeLaunchConfigurationImporter.readWorkspaceConfiguration(manifest, launch, base, Map.of());
+        DebugAdapterRegistry.Validation effective = DebugAdapterRegistry.withExternalConfigurations(base, report.configurations());
+
+        assertTrue(report.readable());
+        assertEquals(java.util.List.of("vscode:Run workspace"), report.accepted());
+        DebugAdapterRegistry.PlanResult plan = DebugAdapterRegistry.plan(effective, "vscode:Run workspace", root, root.resolve("Main.py"));
+        assertTrue(plan.launchable());
+        assertEquals(java.util.List.of("--extension", ".py"), plan.plan().args());
     }
 }

@@ -111,6 +111,9 @@ final class DebugAdapterRegistry {
         "debug.open.source.on.stop");
     private static final Set<String> ADAPTER_FIELDS = Set.of("transport", "command", "args", "capabilities");
     private static final Set<String> CONFIGURATION_FIELDS = Set.of("adapter", "request", "scope", "program", "module", "code", "cwd", "args", "prelaunch_task", "host", "port", "file_extensions");
+    private static final Set<String> FILE_ARGUMENT_VARIABLES = Set.of("${file}", "${fileWorkspaceFolder}", "${relativeFile}",
+        "${relativeFileDirname}", "${fileBasename}", "${fileBasenameNoExtension}", "${fileExtname}", "${fileDirname}",
+        "${fileDirnameBasename}");
     private final Map<String, Adapter> adapters;
 
     private DebugAdapterRegistry(Map<String, Adapter> adapters) {
@@ -256,9 +259,9 @@ final class DebugAdapterRegistry {
         if (workspace == null) return new PlanResult(null, "Workspace root is required; no process will be launched.");
         Path root = workspace.toAbsolutePath().normalize();
         LaunchContext launchContext = context == null ? new LaunchContext(null, "", null) : context;
-        Path cwd = resolveWorkspacePath(root, configuration.cwd(), launchContext.activeFile());
+        Path cwd = resolveWorkspacePath(root, configuration.cwd(), launchContext);
         Path program = configuration.request() == Request.LAUNCH && !configuration.program().isBlank()
-            ? resolveWorkspacePath(root, configuration.program(), launchContext.activeFile()) : null;
+            ? resolveWorkspacePath(root, configuration.program(), launchContext) : null;
         if (cwd == null || (configuration.request() == Request.LAUNCH && !configuration.program().isBlank() && program == null)) {
             return new PlanResult(null, "Debug configuration escapes the workspace scope; no process will be launched.");
         }
@@ -430,7 +433,7 @@ final class DebugAdapterRegistry {
 
     private static boolean workspaceScoped(String value, boolean program) {
         if (!safeText(value)) return false;
-        if (program && "${file}".equals(value)) return true;
+        if (program && ("${file}".equals(value) || "${testFile}".equals(value))) return true;
         String prefix = "${workspaceFolder}";
         if (!value.startsWith(prefix)) return false;
         String suffix = value.substring(prefix.length());
@@ -449,10 +452,11 @@ final class DebugAdapterRegistry {
         return extensions.stream().anyMatch(name::endsWith);
     }
 
-    private static Path resolveWorkspacePath(Path workspace, String configured, Path activeFile) {
-        if ("${file}".equals(configured)) {
-            if (activeFile == null) return null;
-            Path file = activeFile.toAbsolutePath().normalize();
+    private static Path resolveWorkspacePath(Path workspace, String configured, LaunchContext context) {
+        if ("${file}".equals(configured) || "${testFile}".equals(configured)) {
+            Path selected = "${file}".equals(configured) ? context.activeFile() : context.testFile();
+            if (selected == null) return null;
+            Path file = selected.toAbsolutePath().normalize();
             return file.startsWith(workspace) ? file : null;
         }
         String suffix = configured.substring("${workspaceFolder}".length());
@@ -473,13 +477,7 @@ final class DebugAdapterRegistry {
                 int end = argument.indexOf('}', start + 2);
                 if (end < 0) return null;
                 String token = argument.substring(start, end + 1);
-                String replacement = switch (token) {
-                    case "${workspaceFolder}" -> workspace.toString();
-                    case "${file}" -> workspaceFile(workspace, context.activeFile());
-                    case "${testFile}" -> workspaceFile(workspace, context.testFile());
-                    case "${testId}" -> safeTestId(context.testId()) ? context.testId() : null;
-                    default -> null;
-                };
+                String replacement = resolveArgumentVariable(token, workspace, context);
                 if (replacement == null) return null;
                 output.append(replacement);
                 index = end + 1;
@@ -489,10 +487,48 @@ final class DebugAdapterRegistry {
         return List.copyOf(resolved);
     }
 
+    private static String resolveArgumentVariable(String token, Path workspace, LaunchContext context) {
+        if ("${workspaceFolder}".equals(token)) return workspace.toString();
+        if ("${workspaceFolderBasename}".equals(token)) {
+            Path name = workspace.getFileName();
+            return name == null ? null : name.toString();
+        }
+        if ("${testFile}".equals(token)) return workspaceFile(workspace, context.testFile());
+        if ("${testId}".equals(token)) return safeTestId(context.testId()) ? context.testId() : null;
+        if (!FILE_ARGUMENT_VARIABLES.contains(token)) return null;
+        Path file = workspaceFilePath(workspace, context.activeFile());
+        if (file == null) return null;
+        if ("${file}".equals(token)) return file.toString();
+        if ("${fileWorkspaceFolder}".equals(token)) return workspace.toString();
+        Path relative = workspace.relativize(file);
+        if ("${relativeFile}".equals(token)) return relative.toString();
+        if ("${relativeFileDirname}".equals(token)) {
+            Path parent = relative.getParent();
+            return parent == null ? "." : parent.toString();
+        }
+        Path name = file.getFileName();
+        if (name == null) return null;
+        String basename = name.toString();
+        if ("${fileBasename}".equals(token)) return basename;
+        int extension = basename.lastIndexOf('.');
+        if ("${fileBasenameNoExtension}".equals(token)) return extension <= 0 ? basename : basename.substring(0, extension);
+        if ("${fileExtname}".equals(token)) return extension <= 0 ? "" : basename.substring(extension);
+        Path parent = file.getParent();
+        if (parent == null) return null;
+        if ("${fileDirname}".equals(token)) return parent.toString();
+        Path parentName = parent.getFileName();
+        return parentName == null ? null : parentName.toString();
+    }
+
     private static String workspaceFile(Path workspace, Path file) {
+        Path normalized = workspaceFilePath(workspace, file);
+        return normalized == null ? null : normalized.toString();
+    }
+
+    private static Path workspaceFilePath(Path workspace, Path file) {
         if (file == null) return null;
         Path normalized = file.toAbsolutePath().normalize();
-        return normalized.startsWith(workspace) ? normalized.toString() : null;
+        return normalized.startsWith(workspace) ? normalized : null;
     }
 
     private static boolean safeTestId(String value) {

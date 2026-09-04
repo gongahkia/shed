@@ -14,7 +14,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Reads the small, lossless DAP subset of a workspace {@code .vscode/launch.json}.
+ * Reads the small, lossless DAP subset of a workspace {@code .vscode/launch.json}
+ * or the {@code launch} object of an explicitly imported standard {@code .code-workspace}.
  *
  * <p>The file is never persisted into Shed configuration and never supplies an
  * adapter command. A profile can only refer to an adapter the user or an extension
@@ -27,6 +28,9 @@ final class VsCodeLaunchConfigurationImporter {
     private static final int MAX_CONFIGURATIONS = 100;
     private static final Set<String> SUPPORTED_FIELDS = Set.of("name", "type", "request", "program", "module", "code", "cwd", "args",
         "preLaunchTask", "host", "port");
+    private static final Set<String> SUPPORTED_ARGUMENT_VARIABLES = Set.of("${workspaceFolder}", "${workspaceFolderBasename}",
+        "${file}", "${fileWorkspaceFolder}", "${relativeFile}", "${relativeFileDirname}", "${fileBasename}",
+        "${fileBasenameNoExtension}", "${fileExtname}", "${fileDirname}", "${fileDirnameBasename}", "${testFile}", "${testId}");
 
     record Report(Path source, Map<String, DebugAdapterRegistry.Configuration> configurations, List<String> accepted, List<String> skipped,
         String failure) {
@@ -46,6 +50,14 @@ final class VsCodeLaunchConfigurationImporter {
     }
 
     static Report read(Path workspace, DebugAdapterRegistry.Validation base) {
+        return read(workspace, base, Map.of());
+    }
+
+    /**
+     * Reads profiles against a verified VS Code task-label map. Only task labels that
+     * resolved to accepted compatible tasks may be translated into pre-launch ids.
+     */
+    static Report read(Path workspace, DebugAdapterRegistry.Validation base, Map<String, String> taskNamesByLabel) {
         if (workspace == null || !Files.isDirectory(workspace)) return new Report(null, Map.of(), List.of(), List.of(), "Workspace root is unavailable.");
         Path root = workspace.toAbsolutePath().normalize();
         Path source = root.resolve(".vscode").resolve("launch.json").normalize();
@@ -61,7 +73,7 @@ final class VsCodeLaunchConfigurationImporter {
             if (size > MAX_BYTES) return new Report(source, Map.of(), List.of(), List.of(), "launch.json exceeds the 1 MiB import limit.");
             String text = Files.readString(source, StandardCharsets.UTF_8);
             Map<String, Object> document = Jsonc.parseObject(text);
-            return importDocument(source, document, base);
+            return importDocument(source, document, base, taskNamesByLabel, "launch.json");
         } catch (IOException | IllegalArgumentException error) {
             String detail = error.getMessage();
             if (detail == null || detail.isBlank()) detail = error.getClass().getSimpleName();
@@ -69,12 +81,23 @@ final class VsCodeLaunchConfigurationImporter {
         }
     }
 
-    private static Report importDocument(Path source, Map<String, Object> document, DebugAdapterRegistry.Validation base) {
+    /** Reads the same strict launch subset when it is embedded in an imported .code-workspace document. */
+    static Report readWorkspaceConfiguration(Path source, Object configuration, DebugAdapterRegistry.Validation base,
+                                             Map<String, String> taskNamesByLabel) {
+        Map<String, Object> document = MiniJson.asObject(configuration);
+        if (document == null) {
+            return new Report(source, Map.of(), List.of(), List.of(), "workspace launch must be an object.");
+        }
+        return importDocument(source, document, base, taskNamesByLabel, "workspace launch");
+    }
+
+    private static Report importDocument(Path source, Map<String, Object> document, DebugAdapterRegistry.Validation base,
+                                         Map<String, String> taskNamesByLabel, String subject) {
         Object entriesValue = document == null ? null : document.get("configurations");
         List<Object> entries = MiniJson.asArray(entriesValue);
-        if (entries == null) return new Report(source, Map.of(), List.of(), List.of(), "launch.json must contain a configurations array.");
+        if (entries == null) return new Report(source, Map.of(), List.of(), List.of(), subject + " must contain a configurations array.");
         if (entries.size() > MAX_CONFIGURATIONS) {
-            return new Report(source, Map.of(), List.of(), List.of(), "launch.json has more than " + MAX_CONFIGURATIONS + " configurations.");
+            return new Report(source, Map.of(), List.of(), List.of(), subject + " has more than " + MAX_CONFIGURATIONS + " configurations.");
         }
         DebugAdapterRegistry.Validation validation = base == null ? DebugAdapterRegistry.validate(Map.of()) : base;
         Map<String, DebugAdapterRegistry.Configuration> imported = new LinkedHashMap<>();
@@ -88,7 +111,7 @@ final class VsCodeLaunchConfigurationImporter {
                 skipped.add(prefix + ": entry must be an object.");
                 continue;
             }
-            ImportResult result = importEntry(entry, validation, names);
+            ImportResult result = importEntry(entry, validation, names, taskNamesByLabel);
             if (result.error() != null) skipped.add(prefix + ": " + result.error());
             else {
                 imported.put(result.configuration().name(), result.configuration());
@@ -103,7 +126,8 @@ final class VsCodeLaunchConfigurationImporter {
         static ImportResult rejected(String error) { return new ImportResult(null, error); }
     }
 
-    private static ImportResult importEntry(Map<String, Object> entry, DebugAdapterRegistry.Validation validation, Set<String> names) {
+    private static ImportResult importEntry(Map<String, Object> entry, DebugAdapterRegistry.Validation validation, Set<String> names,
+                                            Map<String, String> taskNamesByLabel) {
         Set<String> unsupported = new LinkedHashSet<>(entry.keySet());
         unsupported.removeAll(SUPPORTED_FIELDS);
         if (!unsupported.isEmpty()) return ImportResult.rejected("uses unsupported field" + (unsupported.size() == 1 ? " " : "s ")
@@ -131,19 +155,23 @@ final class VsCodeLaunchConfigurationImporter {
             || host == null && entry.containsKey("host")) {
             return ImportResult.rejected("program, module, code, cwd, preLaunchTask, and host must be strings when present.");
         }
+        String mappedPreLaunchTask = preLaunchTask == null ? "" : taskNamesByLabel == null ? null : taskNamesByLabel.get(preLaunchTask);
+        if (preLaunchTask != null && mappedPreLaunchTask == null && !TaskService.isValidTaskName(preLaunchTask)) {
+            return ImportResult.rejected("preLaunchTask must name a Shed task identifier or an accepted compatible VS Code task label.");
+        }
         List<String> args = stringArray(entry.get("args"));
         if (args == null || entry.containsKey("args") && MiniJson.asArray(entry.get("args")) == null) {
             return ImportResult.rejected("args must be an array of strings when present.");
         }
         if (!supportedArgumentVariables(args)) {
-            return ImportResult.rejected("args use a variable other than ${workspaceFolder} or ${file}.");
+            return ImportResult.rejected("args use an unsupported VS Code variable.");
         }
         Integer port = integer(entry.get("port"));
         if (port == null && entry.containsKey("port")) return ImportResult.rejected("port must be an integer when present.");
         String name = uniqueName(label, names);
         DebugAdapterRegistry.Configuration configuration = new DebugAdapterRegistry.Configuration(name, adapter, request, "workspace",
             program == null ? "" : program, module == null ? "" : module, code == null ? "" : code,
-            cwd == null || cwd.isBlank() ? "${workspaceFolder}" : cwd, args, preLaunchTask == null ? "" : preLaunchTask,
+            cwd == null || cwd.isBlank() ? "${workspaceFolder}" : cwd, args, mappedPreLaunchTask == null ? preLaunchTask : mappedPreLaunchTask,
             host == null || host.isBlank() ? "127.0.0.1" : host, port == null ? 0 : port, List.of());
         String error = DebugAdapterRegistry.externalConfigurationError(configuration,
             validation == null ? Map.of() : validation.registry().adapters());
@@ -215,7 +243,7 @@ final class VsCodeLaunchConfigurationImporter {
                 int end = argument.indexOf('}', start + 2);
                 if (end < 0) return false;
                 String variable = argument.substring(start, end + 1);
-                if (!"${workspaceFolder}".equals(variable) && !"${file}".equals(variable)) return false;
+                if (!SUPPORTED_ARGUMENT_VARIABLES.contains(variable)) return false;
                 index = end + 1;
             }
         }

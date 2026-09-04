@@ -75,4 +75,14 @@ public class ShellCommandTest {
         );
         assertThrows(IllegalArgumentException.class, () -> ShellCommand.directCommand("tool 'unterminated"));
     }
+
+    @Test
+    void nonLoginShellAndPosixQuotingPreserveLiteralArguments() {
+        assertEquals(
+            java.util.List.of("/usr/bin/bash", "-c", "echo ok"),
+            ShellCommand.nonLoginForCommand("echo ok", Map.of("SHELL", "/usr/bin/bash"), "/usr/bin/bash"::equals)
+        );
+        assertEquals("'printf' '%s' 'file'\"'\"'s value' '$HOME'",
+            ShellCommand.posixQuotedCommand(java.util.List.of("printf", "%s", "file's value", "$HOME")));
+    }
 }

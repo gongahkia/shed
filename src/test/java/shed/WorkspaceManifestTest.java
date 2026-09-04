@@ -1,6 +1,7 @@
 package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,7 +38,7 @@ class WorkspaceManifestTest {
     }
 
     @Test
-    void readsCodeWorkspaceJsoncFoldersWithoutApplyingSettingsTasksOrLaunch() throws IOException {
+    void preservesCodeWorkspaceTaskAndLaunchDocumentsForASeparateExplicitCompatibilityImport() throws IOException {
         Path project = Files.createDirectory(tempDir.resolve("project-jsonc"));
         Path manifest = tempDir.resolve("sample-jsonc.code-workspace");
         Files.writeString(manifest, """
@@ -50,6 +51,12 @@ class WorkspaceManifestTest {
             }
             """);
 
+        WorkspaceManifest.Document document = WorkspaceManifest.readDocument(manifest);
+
+        assertEquals(List.of(project.toRealPath()), document.folders());
+        assertTrue(document.standardVsCodeWorkspace());
+        assertTrue(document.hasTasks());
+        assertTrue(document.hasLaunch());
         assertEquals(List.of(project.toRealPath()), WorkspaceManifest.read(manifest));
     }
 
@@ -61,5 +68,20 @@ class WorkspaceManifestTest {
 
         assertThrows(IOException.class, () -> WorkspaceManifest.write(unsupported, List.of(tempDir)));
         assertThrows(IOException.class, () -> WorkspaceManifest.read(missing));
+    }
+
+    @Test
+    void keepsShedWorkspaceDocumentsFoldersOnly() throws IOException {
+        Path project = Files.createDirectory(tempDir.resolve("shed-project"));
+        Path manifest = tempDir.resolve("sample.shed-workspace");
+        Files.writeString(manifest, """
+            {"folders":[{"path":"shed-project"}],"tasks":{"version":"2.0.0","tasks":[]},"launch":{"configurations":[]}}
+            """);
+
+        WorkspaceManifest.Document document = WorkspaceManifest.readDocument(manifest);
+
+        assertFalse(document.standardVsCodeWorkspace());
+        assertTrue(document.hasTasks());
+        assertTrue(document.hasLaunch());
     }
 }

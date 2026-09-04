@@ -5,6 +5,7 @@ import org.tomlj.Toml;
 import org.tomlj.TomlParseError;
 import org.tomlj.TomlParseResult;
 import org.tomlj.TomlTable;
+import org.tomlj.TomlArray;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,9 +27,11 @@ public class TaskService {
     private static final Pattern TASK_NAME = Pattern.compile("[A-Za-z0-9_-]+");
     private static final Pattern ENVIRONMENT_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final Pattern VARIABLE = Pattern.compile("\\$\\{([^}]+)}");
+    private static final int MAX_DEPENDENCIES = 100;
 
     enum ShellPolicy {
         LOGIN,
+        SHELL,
         DIRECT;
 
         static ShellPolicy parse(Object value) {
@@ -36,8 +39,9 @@ public class TaskService {
             if (!(value instanceof String)) throw new IllegalArgumentException("shell must be TOML string");
             return switch (((String) value).trim().toLowerCase(Locale.ROOT)) {
                 case "login" -> LOGIN;
+                case "shell" -> SHELL;
                 case "direct" -> DIRECT;
-                default -> throw new IllegalArgumentException("shell must be login or direct");
+                default -> throw new IllegalArgumentException("shell must be login, shell, or direct");
             };
         }
 
@@ -99,15 +103,19 @@ public class TaskService {
         private final ProblemMatcher problemMatcher;
         private final Presentation presentation;
         private final List<String> directArguments;
+        private final List<String> shellArguments;
+        private final boolean sessionOnly;
+        private final List<String> dependencies;
 
         WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                       ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation) {
-            this(name, command, cwd, environment, shell, problemMatcher, presentation, null);
+            this(name, command, cwd, environment, shell, problemMatcher, presentation, null, null, false, List.of());
         }
 
         private WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                               ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation,
-                              List<String> directArguments) {
+                              List<String> directArguments, List<String> shellArguments, boolean sessionOnly,
+                              List<String> dependencies) {
             this.name = name;
             this.command = command;
             this.cwd = cwd;
@@ -116,6 +124,9 @@ public class TaskService {
             this.problemMatcher = problemMatcher;
             this.presentation = presentation;
             this.directArguments = directArguments == null ? null : Collections.unmodifiableList(new ArrayList<>(directArguments));
+            this.shellArguments = shellArguments == null ? null : Collections.unmodifiableList(new ArrayList<>(shellArguments));
+            this.sessionOnly = sessionOnly;
+            this.dependencies = Collections.unmodifiableList(new ArrayList<>(dependencies == null ? List.of() : dependencies));
         }
 
         String name() { return name; }
@@ -127,6 +138,10 @@ public class TaskService {
         Presentation presentation() { return presentation; }
         boolean hasDirectArguments() { return directArguments != null; }
         List<String> directArguments() { return directArguments == null ? List.of() : directArguments; }
+        boolean hasShellArguments() { return shellArguments != null; }
+        List<String> shellArguments() { return shellArguments == null ? List.of() : shellArguments; }
+        boolean sessionOnly() { return sessionOnly; }
+        List<String> dependencies() { return dependencies; }
     }
 
     static final class TaskLoadResult {
@@ -167,6 +182,20 @@ public class TaskService {
         List<String> processCommand() { return processCommand; }
         File workingDirectory() { return workingDirectory; }
         Map<String, String> environment() { return environment; }
+    }
+
+    /** Builds a dependency-first, sequential execution plan without starting any task. */
+    List<TaskExecutionPlan> buildExecutionPlans(String taskName, Map<String, WorkspaceTask> tasks,
+                                                File projectRoot, File activeFile) throws IOException {
+        if (taskName == null || taskName.isBlank()) throw new IOException("task name required");
+        Map<String, WorkspaceTask> available = tasks == null ? Map.of() : tasks;
+        List<WorkspaceTask> ordered = new ArrayList<>();
+        List<String> path = new ArrayList<>();
+        java.util.HashSet<String> completed = new java.util.HashSet<>();
+        resolveTaskDependencies(taskName, available, path, completed, ordered);
+        List<TaskExecutionPlan> plans = new ArrayList<>(ordered.size());
+        for (WorkspaceTask task : ordered) plans.add(buildExecutionPlan(task, projectRoot, activeFile));
+        return List.copyOf(plans);
     }
 
     public Map<String, String> loadTasks(File projectRoot) {
@@ -214,8 +243,10 @@ public class TaskService {
     TaskExecutionPlan buildExecutionPlan(WorkspaceTask task, File projectRoot, File activeFile) throws IOException {
         if (task == null) throw new IOException("task required");
         File workspace = canonicalDirectory(projectRoot, "workspace directory required");
-        String command = task.hasDirectArguments() ? "" : expandVariables(task.command(), workspace, activeFile);
-        if (!task.hasDirectArguments()) validateCommand(command);
+        String command = task.hasDirectArguments() ? "" : task.hasShellArguments()
+            ? ShellCommand.posixQuotedCommand(expandShellArguments(task.shellArguments(), workspace, activeFile))
+            : expandVariables(task.command(), workspace, activeFile);
+        if (!task.hasDirectArguments() && !task.hasShellArguments()) validateCommand(command);
         String cwdValue = expandVariables(task.cwd(), workspace, activeFile);
         File cwd = resolveWorkspaceDirectory(workspace, cwdValue);
         Map<String, String> environment = new LinkedHashMap<>();
@@ -228,6 +259,8 @@ public class TaskService {
             ? expandDirectArguments(task.directArguments(), workspace, activeFile)
             : task.shell() == ShellPolicy.LOGIN
                 ? ShellCommand.forCommand(command, shellEnvironment, path -> new File(path).canExecute())
+                : task.shell() == ShellPolicy.SHELL
+                    ? ShellCommand.nonLoginForCommand(command, shellEnvironment, path -> new File(path).canExecute())
                 : ShellCommand.directCommand(command);
         if (processCommand.isEmpty()) throw new IOException("task command required");
         return new TaskExecutionPlan(task, workspace, task.hasDirectArguments() ? displayDirectCommand(processCommand) : command,
@@ -241,14 +274,18 @@ public class TaskService {
         Path workingDirectory = plan.workingDirectory().toPath().toAbsolutePath().normalize();
         if (!workingDirectory.startsWith(root)) throw new IOException("task directory is outside the connected workspace");
         String relativeDirectory = root.relativize(workingDirectory).toString().replace(File.separatorChar, '/');
-        String remoteCommand = plan.task().hasDirectArguments() ? "" : expandRemoteVariables(plan.task().command(), plan.workspace(), activeFile, root, executionRoot);
+        String remoteCommand = plan.task().hasDirectArguments() ? "" : plan.task().hasShellArguments()
+            ? ShellCommand.posixQuotedCommand(expandRemoteShellArguments(plan.task().shellArguments(), plan.workspace(), activeFile, root, executionRoot))
+            : expandRemoteVariables(plan.task().command(), plan.workspace(), activeFile, root, executionRoot);
         Map<String, String> environment = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : plan.task().environment().entrySet()) {
             environment.put(entry.getKey(), expandRemoteVariables(entry.getValue(), plan.workspace(), activeFile, root, executionRoot));
         }
         List<String> command = plan.task().hasDirectArguments()
             ? expandRemoteDirectArguments(plan.task().directArguments(), plan.workspace(), activeFile, root, executionRoot)
-            : plan.task().shell() == ShellPolicy.LOGIN ? List.of("sh", "-lc", remoteCommand) : ShellCommand.directCommand(remoteCommand);
+            : plan.task().shell() == ShellPolicy.LOGIN ? List.of("sh", "-lc", remoteCommand)
+                : plan.task().shell() == ShellPolicy.SHELL ? List.of("sh", "-c", remoteCommand)
+                    : ShellCommand.directCommand(remoteCommand);
         return new RemoteCommandRequest(command, relativeDirectory, environment);
     }
 
@@ -287,6 +324,10 @@ public class TaskService {
             }
             if (task.presentation() != Presentation.ON_FAILURE) {
                 lines.add("presentation = " + tomlString(task.presentation().configValue()));
+            }
+            if (!task.dependencies().isEmpty()) {
+                lines.add("depends_on = [" + task.dependencies().stream().map(this::tomlString)
+                    .collect(java.util.stream.Collectors.joining(", ")) + "]");
             }
             if (!task.environment().isEmpty()) {
                 lines.add("");
@@ -403,7 +444,45 @@ public class TaskService {
             validateSingleLine(entry.getValue(), "environment value");
         }
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
-        return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.DIRECT, problemMatcher, presentation, values);
+        return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.DIRECT, problemMatcher, presentation,
+            values, null, true, List.of());
+    }
+
+    /**
+     * Creates an ephemeral POSIX shell task from separately held command and arguments.
+     * It is intentionally not serializable: the original values must be expanded then
+     * quoted at the execution boundary, rather than flattened into a shell string.
+     */
+    static WorkspaceTask shellWorkspaceTask(String name, List<String> arguments, String cwd, Map<String, String> environment,
+                                            ProblemMatcher problemMatcher, Presentation presentation) {
+        if (!isValidTaskName(name)) throw new IllegalArgumentException("invalid task name: " + name);
+        List<String> values = validatedArguments(arguments, "shell task argument");
+        if (cwd == null || cwd.isBlank()) throw new IllegalArgumentException("cwd must not be empty");
+        validateSingleLine(cwd, "cwd");
+        Map<String, String> valuesEnvironment = validatedEnvironment(environment);
+        if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
+        return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.SHELL, problemMatcher, presentation,
+            null, values, true, List.of());
+    }
+
+    /** Creates an ephemeral shell task whose sole command is intentionally raw shell syntax. */
+    static WorkspaceTask rawShellWorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
+                                                ProblemMatcher problemMatcher, Presentation presentation) {
+        if (!isValidTaskName(name)) throw new IllegalArgumentException("invalid task name: " + name);
+        validateCommand(command);
+        if (cwd == null || cwd.isBlank()) throw new IllegalArgumentException("cwd must not be empty");
+        validateSingleLine(cwd, "cwd");
+        Map<String, String> valuesEnvironment = validatedEnvironment(environment);
+        if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
+        return new WorkspaceTask(name, command.trim(), cwd, valuesEnvironment, ShellPolicy.SHELL, problemMatcher, presentation,
+            null, null, true, List.of());
+    }
+
+    static WorkspaceTask withDependencies(WorkspaceTask task, List<String> dependencies) {
+        if (task == null) throw new IllegalArgumentException("task required");
+        List<String> values = validatedDependencies(dependencies);
+        return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), values);
     }
 
     private WorkspaceTask structuredTask(String name, TomlTable table) {
@@ -421,14 +500,16 @@ public class TaskService {
             throw new IllegalArgumentException("env must be a TOML table");
         }
         Map<String, String> environment = environment((TomlTable) environmentValue);
-        return new WorkspaceTask(name, ((String) command).trim(), cwdValue, environment,
+        return withDependencies(new WorkspaceTask(name, ((String) command).trim(), cwdValue, environment,
             ShellPolicy.parse(table.get("shell")), ProblemMatcher.parse(table.get("problem_matcher")),
-            Presentation.parse(table.get("presentation")));
+            Presentation.parse(table.get("presentation"))), dependencies(table));
     }
 
     private void validateTask(WorkspaceTask task) {
         if (!isValidTaskName(task.name())) throw new IllegalArgumentException("invalid task name: " + task.name());
-        if (task.hasDirectArguments()) throw new IllegalArgumentException("ephemeral direct-argument tasks cannot be written to .shedtasks");
+        if (task.sessionOnly()) {
+            throw new IllegalArgumentException("ephemeral imported tasks cannot be written to .shedtasks");
+        }
         validateCommand(task.command());
         if (task.cwd() == null || task.cwd().isBlank()) throw new IllegalArgumentException("cwd must not be empty");
         validateSingleLine(task.cwd(), "cwd");
@@ -439,12 +520,14 @@ public class TaskService {
             if (!ENVIRONMENT_NAME.matcher(entry.getKey()).matches()) throw new IllegalArgumentException("invalid env name: " + entry.getKey());
             validateEnvironmentValue(entry.getValue());
         }
+        validatedDependencies(task.dependencies());
     }
 
     private void rejectUnknownFields(TomlTable table, String name) {
         for (String field : table.keySet()) {
             if (!"command".equals(field) && !"cwd".equals(field) && !"env".equals(field)
-                && !"shell".equals(field) && !"problem_matcher".equals(field) && !"presentation".equals(field)) {
+                && !"shell".equals(field) && !"problem_matcher".equals(field) && !"presentation".equals(field)
+                && !"depends_on".equals(field)) {
                 throw new IllegalArgumentException("unknown field " + field);
             }
         }
@@ -461,6 +544,60 @@ public class TaskService {
             environment.put(key, (String) value);
         }
         return environment;
+    }
+
+    private List<String> dependencies(TomlTable table) {
+        Object value = table.get("depends_on");
+        if (value == null) return List.of();
+        if (!(value instanceof TomlArray values)) throw new IllegalArgumentException("depends_on must be a TOML array of task names");
+        if (values.size() > MAX_DEPENDENCIES) throw new IllegalArgumentException("depends_on has more than " + MAX_DEPENDENCIES + " entries");
+        List<String> result = new ArrayList<>();
+        for (int index = 0; index < values.size(); index++) {
+            Object entry = values.get(index);
+            if (!(entry instanceof String)) throw new IllegalArgumentException("depends_on entries must be task names");
+            result.add((String) entry);
+        }
+        return validatedDependencies(result);
+    }
+
+    private static List<String> validatedDependencies(List<String> dependencies) {
+        if (dependencies == null || dependencies.isEmpty()) return List.of();
+        if (dependencies.size() > MAX_DEPENDENCIES) throw new IllegalArgumentException("task has more than " + MAX_DEPENDENCIES + " dependencies");
+        List<String> result = new ArrayList<>();
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        for (String dependency : dependencies) {
+            if (!isValidTaskName(dependency)) throw new IllegalArgumentException("invalid dependency task name: " + dependency);
+            if (!seen.add(dependency)) throw new IllegalArgumentException("duplicate dependency task: " + dependency);
+            result.add(dependency);
+        }
+        return List.copyOf(result);
+    }
+
+    private void resolveTaskDependencies(String name, Map<String, WorkspaceTask> tasks, List<String> path,
+                                         java.util.Set<String> completed, List<WorkspaceTask> ordered) throws IOException {
+        if (completed.contains(name)) return;
+        int cycleStart = path.indexOf(name);
+        if (cycleStart >= 0) {
+            List<String> cycle = new ArrayList<>(path.subList(cycleStart, path.size()));
+            cycle.add(name);
+            throw new IOException("task dependency cycle: " + String.join(" -> ", cycle));
+        }
+        WorkspaceTask task = tasks.get(name);
+        if (task == null) {
+            String parent = path.isEmpty() ? "requested task" : "task " + path.get(path.size() - 1);
+            throw new IOException("task dependency not found: " + name + " (required by " + parent + ")");
+        }
+        if (path.size() >= MAX_DEPENDENCIES) throw new IOException("task dependency graph exceeds " + MAX_DEPENDENCIES + " tasks");
+        path.add(name);
+        try {
+            for (String dependency : task.dependencies()) {
+                resolveTaskDependencies(dependency, tasks, path, completed, ordered);
+            }
+            completed.add(name);
+            ordered.add(task);
+        } finally {
+            path.remove(path.size() - 1);
+        }
     }
 
     private static void validateCommand(String command) {
@@ -492,9 +629,16 @@ public class TaskService {
         while (matcher.find()) {
             String replacement = switch (matcher.group(1)) {
                 case "workspaceFolder" -> workspace.getPath();
+                case "workspaceFolderBasename" -> workspaceBasename(workspace);
                 case "file" -> activeFilePath(activeFile);
+                case "fileWorkspaceFolder" -> fileWorkspaceFolder(workspace, activeFile);
                 case "relativeFile" -> relativeFilePath(workspace, activeFile);
+                case "relativeFileDirname" -> relativeFileDirectory(workspace, activeFile);
                 case "fileBasename" -> activeFileName(activeFile);
+                case "fileBasenameNoExtension" -> activeFileBasenameWithoutExtension(activeFile);
+                case "fileExtname" -> activeFileExtension(activeFile);
+                case "fileDirname" -> activeFileDirectory(activeFile);
+                case "fileDirnameBasename" -> activeFileDirectoryBasename(activeFile);
                 default -> throw new IOException("unsupported task variable: ${" + matcher.group(1) + "}");
             };
             matcher.appendReplacement(expanded, java.util.regex.Matcher.quoteReplacement(replacement));
@@ -504,10 +648,18 @@ public class TaskService {
     }
 
     private List<String> expandDirectArguments(List<String> values, File workspace, File activeFile) throws IOException {
+        return expandArguments(values, workspace, activeFile, "direct task argument");
+    }
+
+    private List<String> expandShellArguments(List<String> values, File workspace, File activeFile) throws IOException {
+        return expandArguments(values, workspace, activeFile, "shell task argument");
+    }
+
+    private List<String> expandArguments(List<String> values, File workspace, File activeFile, String label) throws IOException {
         List<String> result = new ArrayList<>();
         for (String value : values) {
             String expanded = expandVariables(value, workspace, activeFile);
-            validateSingleLine(expanded, "direct task argument");
+            validateSingleLine(expanded, label);
             result.add(expanded);
         }
         if (result.isEmpty()) throw new IOException("task command required");
@@ -516,10 +668,20 @@ public class TaskService {
 
     private List<String> expandRemoteDirectArguments(List<String> values, File workspace, File activeFile, Path connectionRoot,
                                                       String executionRoot) throws IOException {
+        return expandRemoteArguments(values, workspace, activeFile, connectionRoot, executionRoot, "direct task argument");
+    }
+
+    private List<String> expandRemoteShellArguments(List<String> values, File workspace, File activeFile, Path connectionRoot,
+                                                     String executionRoot) throws IOException {
+        return expandRemoteArguments(values, workspace, activeFile, connectionRoot, executionRoot, "shell task argument");
+    }
+
+    private List<String> expandRemoteArguments(List<String> values, File workspace, File activeFile, Path connectionRoot,
+                                               String executionRoot, String label) throws IOException {
         List<String> result = new ArrayList<>();
         for (String value : values) {
             String expanded = expandRemoteVariables(value, workspace, activeFile, connectionRoot, executionRoot);
-            validateSingleLine(expanded, "direct task argument");
+            validateSingleLine(expanded, label);
             result.add(expanded);
         }
         if (result.isEmpty()) throw new IOException("task command required");
@@ -538,9 +700,19 @@ public class TaskService {
         while (matcher.find()) {
             String replacement = switch (matcher.group(1)) {
                 case "workspaceFolder" -> remotePath(executionRoot, connectionRoot.relativize(workspacePath));
+                case "workspaceFolderBasename" -> remotePathBasename(remotePath(executionRoot, connectionRoot.relativize(workspacePath)));
                 case "file" -> remoteFilePath(activeFile, connectionRoot, executionRoot);
+                case "fileWorkspaceFolder" -> {
+                    fileWorkspaceFolder(workspace, activeFile);
+                    yield remotePath(executionRoot, connectionRoot.relativize(workspacePath));
+                }
                 case "relativeFile" -> relativeFilePath(workspace, activeFile);
+                case "relativeFileDirname" -> relativeFileDirectory(workspace, activeFile);
                 case "fileBasename" -> activeFileName(activeFile);
+                case "fileBasenameNoExtension" -> activeFileBasenameWithoutExtension(activeFile);
+                case "fileExtname" -> activeFileExtension(activeFile);
+                case "fileDirname" -> remoteFileDirectory(activeFile, connectionRoot, executionRoot);
+                case "fileDirnameBasename" -> activeFileDirectoryBasename(activeFile);
                 default -> throw new IOException("unsupported task variable: ${" + matcher.group(1) + "}");
             };
             matcher.appendReplacement(expanded, java.util.regex.Matcher.quoteReplacement(replacement));
@@ -566,8 +738,23 @@ public class TaskService {
     }
 
     private String activeFilePath(File activeFile) throws IOException {
-        if (activeFile == null) throw new IOException("${file} requires a file-backed active buffer");
-        return activeFile.getCanonicalPath();
+        return canonicalActiveFile(activeFile, "${file} requires a file-backed active buffer").getPath();
+    }
+
+    private String workspaceBasename(File workspace) throws IOException {
+        File canonical = canonicalDirectory(workspace, "${workspaceFolderBasename} requires a workspace directory");
+        String name = canonical.getName();
+        if (name.isEmpty()) throw new IOException("${workspaceFolderBasename} is unavailable for this workspace");
+        return name;
+    }
+
+    private String fileWorkspaceFolder(File workspace, File activeFile) throws IOException {
+        File file = canonicalActiveFile(activeFile, "${fileWorkspaceFolder} requires a file-backed active buffer");
+        File canonicalWorkspace = canonicalDirectory(workspace, "${fileWorkspaceFolder} requires a workspace directory");
+        if (!file.toPath().startsWith(canonicalWorkspace.toPath())) {
+            throw new IOException("${fileWorkspaceFolder} requires the active file to be inside workspace");
+        }
+        return canonicalWorkspace.getPath();
     }
 
     private String relativeFilePath(File workspace, File activeFile) throws IOException {
@@ -577,9 +764,60 @@ public class TaskService {
         return workspacePath.relativize(file.toPath()).toString();
     }
 
+    private String relativeFileDirectory(File workspace, File activeFile) throws IOException {
+        File file = canonicalActiveFile(activeFile, "${relativeFileDirname} requires a file-backed active buffer");
+        Path workspacePath = workspace.toPath();
+        if (!file.toPath().startsWith(workspacePath)) throw new IOException("${relativeFileDirname} must be inside workspace");
+        Path relative = workspacePath.relativize(file.toPath());
+        Path parent = relative.getParent();
+        return parent == null ? "." : parent.toString();
+    }
+
     private String activeFileName(File activeFile) throws IOException {
         File file = canonicalActiveFile(activeFile, "${fileBasename} requires a file-backed active buffer");
         return file.getName();
+    }
+
+    private String activeFileBasenameWithoutExtension(File activeFile) throws IOException {
+        String name = canonicalActiveFile(activeFile, "${fileBasenameNoExtension} requires a file-backed active buffer").getName();
+        int extension = name.lastIndexOf('.');
+        return extension <= 0 ? name : name.substring(0, extension);
+    }
+
+    private String activeFileExtension(File activeFile) throws IOException {
+        String name = canonicalActiveFile(activeFile, "${fileExtname} requires a file-backed active buffer").getName();
+        int extension = name.lastIndexOf('.');
+        return extension <= 0 ? "" : name.substring(extension);
+    }
+
+    private String activeFileDirectory(File activeFile) throws IOException {
+        File file = canonicalActiveFile(activeFile, "${fileDirname} requires a file-backed active buffer");
+        File parent = file.getParentFile();
+        if (parent == null) throw new IOException("${fileDirname} is unavailable for the active file");
+        return parent.getPath();
+    }
+
+    private String activeFileDirectoryBasename(File activeFile) throws IOException {
+        File file = canonicalActiveFile(activeFile, "${fileDirnameBasename} requires a file-backed active buffer");
+        File parent = file.getParentFile();
+        if (parent == null || parent.getName().isEmpty()) throw new IOException("${fileDirnameBasename} is unavailable for the active file");
+        return parent.getName();
+    }
+
+    private String remoteFileDirectory(File activeFile, Path connectionRoot, String executionRoot) throws IOException {
+        String path = remoteFilePath(activeFile, connectionRoot, executionRoot);
+        int slash = path.lastIndexOf('/');
+        if (slash <= 0) throw new IOException("${fileDirname} is unavailable for the active file");
+        return path.substring(0, slash);
+    }
+
+    private String remotePathBasename(String path) throws IOException {
+        String normalized = path == null ? "" : path.replace('\\', '/');
+        while (normalized.endsWith("/") && normalized.length() > 1) normalized = normalized.substring(0, normalized.length() - 1);
+        int slash = normalized.lastIndexOf('/');
+        String name = slash < 0 ? normalized : normalized.substring(slash + 1);
+        if (name.isEmpty()) throw new IOException("${workspaceFolderBasename} is unavailable for the remote workspace");
+        return name;
     }
 
     private File resolveWorkspaceDirectory(File workspace, String cwd) throws IOException {
@@ -617,6 +855,27 @@ public class TaskService {
             displayed.add('"' + value.replace("\\", "\\\\").replace("\"", "\\\"") + '"');
         }
         return String.join(" ", displayed);
+    }
+
+    private static List<String> validatedArguments(List<String> arguments, String label) {
+        if (arguments == null || arguments.isEmpty()) throw new IllegalArgumentException(label + "s required");
+        List<String> values = new ArrayList<>();
+        for (String argument : arguments) {
+            if (argument == null) throw new IllegalArgumentException(label + " required");
+            validateSingleLine(argument, label);
+            values.add(argument);
+        }
+        return List.copyOf(values);
+    }
+
+    private static Map<String, String> validatedEnvironment(Map<String, String> environment) {
+        Map<String, String> values = environment == null ? Map.of() : environment;
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            if (!ENVIRONMENT_NAME.matcher(entry.getKey()).matches()) throw new IllegalArgumentException("invalid env name: " + entry.getKey());
+            if (entry.getValue() == null) throw new IllegalArgumentException("environment value required");
+            validateSingleLine(entry.getValue(), "environment value");
+        }
+        return Map.copyOf(values);
     }
 
     private String location(org.tomlj.TomlPosition position) {

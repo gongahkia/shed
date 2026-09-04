@@ -28,6 +28,14 @@ import org.w3c.dom.NodeList;
 final class TestService {
     static final String CONFIG_FILE = ".shedtests";
     static final int CONFIG_SCHEMA_VERSION = 1;
+    private static final int MAX_STATIC_TEST_FILES = 4_000;
+    private static final Pattern PYTHON_UNITTEST_CLASS = Pattern.compile(
+        "^([ \\t]*)class\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(([^)]*\\b(?:[A-Za-z_][A-Za-z0-9_]*\\.)?TestCase\\b[^)]*)\\)\\s*:");
+    private static final Pattern PYTHON_TEST_METHOD = Pattern.compile("^([ \\t]+)(?:async\\s+)?def\\s+(test[A-Za-z0-9_]*)\\s*\\(");
+    private static final Pattern UNITTEST_RESULT = Pattern.compile(
+        "^([A-Za-z_][A-Za-z0-9_]*)\\s+\\(([^)]+)\\)\\s+\\.\\.\\.\\s+(ok|fail|error|skipped(?:\\s+.*)?|expected failure|unexpected success)$",
+        Pattern.CASE_INSENSITIVE);
+    private static final Pattern ANSI_ESCAPE = Pattern.compile("\\u001B\\[[0-?]*[ -/]*[@-~]");
     private final TestAdapterRegistry adapters;
     private final ExtensionRegistry extensionRegistry;
 
@@ -152,7 +160,9 @@ final class TestService {
     }
 
     List<TestCase> staticDiscovery(Path root, AdapterSpec spec) {
-        if (spec == null || !"maven".equals(spec.id()) && !"gradle".equals(spec.id())) return List.of();
+        if (spec == null) return List.of();
+        if ("unittest".equals(spec.id())) return discoverUnittestTests(root);
+        if (!"maven".equals(spec.id()) && !"gradle".equals(spec.id())) return List.of();
         return discoverJavaTests(root, spec.id());
     }
 
@@ -203,11 +213,22 @@ final class TestService {
         Object debugValue = table.get("debug_configuration");
         String debugConfiguration = "";
         if (debugValue != null) {
-            if (!(debugValue instanceof String value) || !value.matches("[A-Za-z0-9_-]+")) {
-                diagnostics.add("adapter[" + index + "].debug_configuration must be a debug configuration name");
+            if (!(debugValue instanceof String value) || !debugConfigurationReference(value)) {
+                diagnostics.add("adapter[" + index + "].debug_configuration must be a Shed configuration name or an imported vscode:<name> profile");
             } else debugConfiguration = value;
         }
         return new AdapterSpec(id, command, debugConfiguration);
+    }
+
+    private static boolean debugConfigurationReference(String value) {
+        if (value == null) return false;
+        String reference = value.trim();
+        if (reference.matches("[A-Za-z0-9_-]+")) return true;
+        if (!reference.startsWith(VsCodeLaunchConfigurationImporter.NAME_PREFIX)) return false;
+        String label = reference.substring(VsCodeLaunchConfigurationImporter.NAME_PREFIX.length());
+        if (label.isBlank() || label.length() > 120) return false;
+        for (int index = 0; index < label.length(); index++) if (Character.isISOControl(label.charAt(index))) return false;
+        return true;
     }
 
     private static String location(TomlParseError error) {
@@ -225,6 +246,145 @@ final class TestService {
         }
         result.sort(Comparator.comparing(TestCase::suite).thenComparing(TestCase::name));
         return List.copyOf(result);
+    }
+
+    /**
+     * Conservatively discovers importable unittest.TestCase methods without importing
+     * project code. Python's unittest runner has no collect-only command, so a refresh
+     * must not invoke it just to populate the Test Explorer.
+     */
+    static List<TestCase> discoverUnittestTests(Path root) {
+        if (root == null || !Files.isDirectory(root)) return List.of();
+        List<TestCase> result = new ArrayList<>();
+        try (var files = Files.walk(root, 24)) {
+            List<Path> sources = files.filter(path -> Files.isRegularFile(path) && isPythonTestFile(path))
+                .limit(MAX_STATIC_TEST_FILES).toList();
+            for (Path source : sources) result.addAll(discoverUnittestFile(root, source));
+        } catch (IOException | SecurityException ignored) {
+        }
+        result.sort(Comparator.comparing(TestCase::suite).thenComparing(TestCase::name));
+        return List.copyOf(result);
+    }
+
+    static boolean hasImportableUnittestTests(Path root) {
+        return !discoverUnittestTests(root).isEmpty();
+    }
+
+    static List<TestCase> parseUnittest(Path root, String output) {
+        List<TestCase> result = new ArrayList<>();
+        for (String rawLine : output == null ? List.<String>of() : output.lines().toList()) {
+            Matcher match = UNITTEST_RESULT.matcher(ANSI_ESCAPE.matcher(rawLine).replaceAll("").strip());
+            if (!match.matches()) continue;
+            String name = match.group(1);
+            String id = match.group(2).trim();
+            if (!id.matches("[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*){2,}")) continue;
+            String suite = id.substring(0, id.lastIndexOf('.'));
+            Path file = sourceForPython(root, id);
+            result.add(new TestCase("unittest", id, name, suite, file, lineForPythonMethod(file, name), unittestStatus(match.group(3)), 0,
+                unittestStatus(match.group(3)).failed() ? output : ""));
+        }
+        return dedupe(result);
+    }
+
+    private static List<TestCase> discoverUnittestFile(Path root, Path source) {
+        String module = pythonModuleName(root, source);
+        if (module == null) return List.of();
+        try {
+            List<TestCase> result = new ArrayList<>();
+            String activeClass = null;
+            int classIndent = -1;
+            List<String> lines = Files.readAllLines(source, StandardCharsets.UTF_8);
+            for (int index = 0; index < lines.size(); index++) {
+                String line = lines.get(index);
+                Matcher classMatch = PYTHON_UNITTEST_CLASS.matcher(line);
+                if (classMatch.find()) {
+                    activeClass = classMatch.group(2);
+                    classIndent = indentationWidth(classMatch.group(1));
+                    continue;
+                }
+                if (activeClass == null) continue;
+                int indentation = indentationWidth(line);
+                if (!line.strip().isEmpty() && indentation <= classIndent) {
+                    activeClass = null;
+                    classIndent = -1;
+                    continue;
+                }
+                Matcher methodMatch = PYTHON_TEST_METHOD.matcher(line);
+                if (!methodMatch.find() || indentationWidth(methodMatch.group(1)) <= classIndent) continue;
+                String name = methodMatch.group(2);
+                String suite = module + "." + activeClass;
+                result.add(new TestCase("unittest", suite + "." + name, name, suite, source, index + 1, Status.UNKNOWN, 0, ""));
+            }
+            return List.copyOf(result);
+        } catch (IOException | SecurityException error) {
+            return List.of();
+        }
+    }
+
+    private static boolean isPythonTestFile(Path path) {
+        Path name = path == null ? null : path.getFileName();
+        return name != null && name.toString().matches("test[A-Za-z0-9_]*\\.py");
+    }
+
+    /** Returns a module only when the source is importable by the default root discovery command. */
+    private static String pythonModuleName(Path root, Path source) {
+        try {
+            Path normalizedRoot = root.toAbsolutePath().normalize();
+            Path normalizedSource = source.toAbsolutePath().normalize();
+            if (!normalizedSource.startsWith(normalizedRoot)) return null;
+            Path relative = normalizedRoot.relativize(normalizedSource);
+            Path fileName = relative.getFileName();
+            if (fileName == null || !isPythonTestFile(fileName)) return null;
+            Path parent = relative.getParent();
+            Path cursor = parent;
+            while (cursor != null) {
+                if (!Files.isRegularFile(normalizedRoot.resolve(cursor).resolve("__init__.py"))) return null;
+                cursor = cursor.getParent();
+            }
+            String base = fileName.toString().substring(0, fileName.toString().length() - ".py".length());
+            return parent == null ? base : parent.toString().replace(java.io.File.separatorChar, '.') + "." + base;
+        } catch (RuntimeException error) {
+            return null;
+        }
+    }
+
+    private static Path sourceForPython(Path root, String id) {
+        if (root == null || id == null) return null;
+        int method = id.lastIndexOf('.');
+        int type = method <= 0 ? -1 : id.lastIndexOf('.', method - 1);
+        if (type <= 0) return null;
+        String module = id.substring(0, type);
+        try {
+            Path normalizedRoot = root.toAbsolutePath().normalize();
+            Path path = normalizedRoot.resolve(module.replace('.', java.io.File.separatorChar) + ".py").normalize();
+            return path.startsWith(normalizedRoot) && Files.isRegularFile(path) ? path : null;
+        } catch (RuntimeException error) {
+            return null;
+        }
+    }
+
+    private static int lineForPythonMethod(Path file, String method) {
+        if (file == null || method == null) return 1;
+        Pattern pattern = Pattern.compile("^\\s*(?:async\\s+)?def\\s+" + Pattern.quote(method) + "\\s*\\(");
+        try {
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            for (int index = 0; index < lines.size(); index++) if (pattern.matcher(lines.get(index)).find()) return index + 1;
+        } catch (IOException | SecurityException ignored) {
+        }
+        return 1;
+    }
+
+    private static int indentationWidth(String value) {
+        int width = 0;
+        for (int index = 0; value != null && index < value.length(); index++) width += value.charAt(index) == '\t' ? 4 : 1;
+        return width;
+    }
+
+    private static Status unittestStatus(String value) {
+        String normalized = value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
+        if (normalized.equals("ok")) return Status.PASSED;
+        if (normalized.startsWith("skipped") || normalized.equals("expected failure")) return Status.SKIPPED;
+        return normalized.equals("error") ? Status.ERRORED : Status.FAILED;
     }
 
     private static List<TestCase> discoverJavaFile(Path root, Path file, String adapterId) {

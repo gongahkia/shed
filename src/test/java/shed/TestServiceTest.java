@@ -43,6 +43,22 @@ class TestServiceTest {
     }
 
     @Test
+    void permitsAnExplicitImportedVsCodeDebugProfileForTestSelection() throws Exception {
+        Files.writeString(root.resolve(TestService.CONFIG_FILE), """
+            schema_version = 1
+
+            [[adapter]]
+            id = "pytest"
+            debug_configuration = "vscode:Debug selected test"
+            """);
+
+        TestService.LoadResult loaded = new TestService().load(root);
+
+        assertTrue(loaded.valid());
+        assertEquals("vscode:Debug selected test", loaded.specs().getFirst().debugConfiguration());
+    }
+
+    @Test
     void parsesJUnitFailuresIntoSourceLocations() throws Exception {
         Path source = root.resolve("src/test/java/demo/SampleTest.java");
         Files.createDirectories(source.getParent());
@@ -105,5 +121,49 @@ class TestServiceTest {
         assertEquals(List.of("cargo", "test", "module::works", "--", "--exact"), adapter.run(spec, List.of(test), root).argv());
         assertEquals(TestService.Status.FAILED, adapter.parseRun(root, new TestService.Command(List.of(), List.of()),
             "test module::works ... FAILED\n").getFirst().status());
+    }
+
+    @Test
+    void detectsImportableStandardLibraryUnittestWithoutExecutingDiscoveryAndParsesVerboseResults() throws Exception {
+        Path source = root.resolve("test_widget.py");
+        Files.writeString(source, """
+            import unittest
+
+            class WidgetTests(unittest.TestCase):
+                def test_passes(self):
+                    self.assertTrue(True)
+
+                def test_fails(self):
+                    self.fail("no")
+
+                def helper(self):
+                    pass
+            """);
+
+        TestService service = new TestService();
+        TestService.LoadResult loaded = service.load(root);
+        TestService.TestCase selected = service.staticDiscovery(root, loaded.specs().getFirst()).stream()
+            .filter(test -> test.name().equals("test_passes")).findFirst().orElseThrow();
+        TestAdapter adapter = service.adapter("unittest");
+
+        assertEquals(List.of("unittest"), loaded.specs().stream().map(TestService.AdapterSpec::id).toList());
+        assertEquals("test_widget.WidgetTests.test_passes", selected.id());
+        assertEquals(source, selected.file());
+        assertEquals(4, selected.line());
+        assertTrue(adapter.discovery(loaded.specs().getFirst()).argv().isEmpty());
+        assertEquals(List.of("python", "-m", "unittest", "-v", selected.id()),
+            adapter.run(loaded.specs().getFirst(), List.of(selected), root).argv());
+        assertEquals(List.of("python", "-m", "unittest", "discover", "-v"),
+            adapter.run(loaded.specs().getFirst(), List.of(), root).argv());
+
+        List<TestService.TestCase> results = adapter.parseRun(root, new TestService.Command(List.of(), List.of()), """
+            test_passes (test_widget.WidgetTests.test_passes) ... ok
+            test_fails (test_widget.WidgetTests.test_fails) ... FAIL
+            test_skipped (test_widget.WidgetTests.test_skipped) ... skipped 'not available'
+            """);
+
+        assertEquals(TestService.Status.PASSED, results.stream().filter(test -> test.name().equals("test_passes")).findFirst().orElseThrow().status());
+        assertEquals(TestService.Status.FAILED, results.stream().filter(test -> test.name().equals("test_fails")).findFirst().orElseThrow().status());
+        assertEquals(TestService.Status.SKIPPED, results.stream().filter(test -> test.name().equals("test_skipped")).findFirst().orElseThrow().status());
     }
 }

@@ -12,7 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-/** Reads folder-only portable workspace manifests without applying their editor settings or tasks. */
+/** Reads portable workspace manifests without applying editor settings or executing configuration. */
 final class WorkspaceManifest {
     private static final long MAX_BYTES = 1024L * 1024L;
     private static final int MAX_FOLDERS = 100;
@@ -20,7 +20,40 @@ final class WorkspaceManifest {
     private WorkspaceManifest() {
     }
 
+    /**
+     * A validated portable workspace document. The raw task and launch values stay inert here;
+     * their deliberately narrow compatibility importers validate them again before exposing a
+     * session-only task or debug configuration.
+     */
+    record Document(Path source, List<Path> folders, boolean standardVsCodeWorkspace,
+                    boolean hasSettings, Object settings, boolean hasTasks, Object tasks, boolean hasLaunch, Object launch) {
+        Document {
+            source = source == null ? null : source.toAbsolutePath().normalize();
+            folders = folders == null ? List.of() : List.copyOf(folders);
+        }
+    }
+
+    /** Runtime state for the constrained task/launch bridge of an imported VS Code workspace. */
+    record ImportedConfiguration(Path source, boolean hasTasks, Object tasks, boolean hasLaunch, Object launch, String failure) {
+        ImportedConfiguration {
+            source = source == null ? null : source.toAbsolutePath().normalize();
+            failure = failure == null ? "" : failure;
+        }
+
+        boolean present() {
+            return source != null;
+        }
+
+        boolean usable() {
+            return present() && failure.isEmpty();
+        }
+    }
+
     static List<Path> read(Path source) throws IOException {
+        return readDocument(source).folders();
+    }
+
+    static Document readDocument(Path source) throws IOException {
         Path manifest = regularManifest(source);
         if (Files.size(manifest) > MAX_BYTES) throw new IOException("Workspace manifest exceeds 1 MiB");
         Map<String, Object> root = Jsonc.parseObject(Files.readString(manifest, StandardCharsets.UTF_8));
@@ -43,7 +76,10 @@ final class WorkspaceManifest {
             if (!Files.isDirectory(resolved)) throw new IOException("Workspace folder is not an existing directory: " + raw);
             unique.add(resolved.toRealPath());
         }
-        return List.copyOf(unique);
+        return new Document(manifest, List.copyOf(unique), manifest.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".code-workspace"),
+            root.containsKey("settings"), root.get("settings"),
+            root.containsKey("tasks"), root.get("tasks"),
+            root.containsKey("launch"), root.get("launch"));
     }
 
     static void write(Path target, List<Path> roots) throws IOException {

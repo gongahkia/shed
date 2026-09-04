@@ -197,8 +197,9 @@ final class ShedWelcomePanel extends JPanel {
         button.setLayout(new BorderLayout(18, 0));
         button.setText(null);
         button.setFocusPainted(true);
-        button.setContentAreaFilled(false);
-        button.setOpaque(false);
+        button.setContentAreaFilled(true);
+        button.setOpaque(true);
+        button.setBackground(surface);
         button.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(blend(surface, foreground, 0.13)),
             BorderFactory.createEmptyBorder(11, 13, 11, 13)
@@ -220,7 +221,6 @@ final class ShedWelcomePanel extends JPanel {
             }
 
             @Override public void mouseExited(java.awt.event.MouseEvent event) {
-                button.setOpaque(false);
                 button.setBackground(surface);
             }
         });

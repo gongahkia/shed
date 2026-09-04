@@ -83,6 +83,24 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void customizedLegacyDefaultLandingRemainsAnEditableBuffer() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-custom-landing");
+        Path landing = home.resolve(".shed/landing.md");
+        Files.createDirectories(landing.getParent());
+        Files.writeString(landing, "# My start page\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEmptyEditor(home);
+        try {
+            assertFalse(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
+            assertEquals(landing.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
+            assertEquals("# My start page\n", onEdt(() -> editor.getCurrentBuffer().getContent()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void vimLineMotionRetainsCaretAndCurrentLineHighlightAcrossLargeBuffer() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-motion");

@@ -245,6 +245,47 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void sendsAdapterDefaultExceptionBreakpointFiltersAndPersistsExplicitOverrides(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        ExceptionBreakpointStore store = new ExceptionBreakpointStore(tempDir.resolve("state"));
+        store.configure(workspace, "raised", true);
+        store.configure(workspace, "uncaught", false);
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true, Map.of("exceptionBreakpointFilters", List.of(
+            Map.of("filter", "raised", "label", "Raised Exceptions", "default", false),
+            Map.of("filter", "uncaught", "label", "Uncaught Exceptions", "default", true))), ""));
+        connection.responses.put("setExceptionBreakpoints", response("setExceptionBreakpoints", true, Map.of(), ""));
+
+        DebugSessionService.Result result = service.start(workspace, file, validation("launch,exception_breakpoints"), enabled(), "main",
+            Duration.ofSeconds(1), (plan, features, listener) -> connection, null, store);
+
+        assertTrue(result.succeeded());
+        assertEquals(List.of("initialize", "launch", "setExceptionBreakpoints"), connection.commands);
+        assertEquals(List.of("raised"), connection.arguments.get(2).get("filters"));
+        assertEquals(List.of(new DebugSessionService.ExceptionFilter("raised", "Raised Exceptions", false),
+            new DebugSessionService.ExceptionFilter("uncaught", "Uncaught Exceptions", true)), service.exceptionFilters(workspace));
+    }
+
+    @Test
+    void doesNotSendExceptionBreakpointConfigurationWithoutAdapterFilters(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        ExceptionBreakpointStore store = new ExceptionBreakpointStore(tempDir.resolve("state"));
+        store.configure(workspace, "uncaught", true);
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true, Map.of("exceptionBreakpointFilters", List.of()), ""));
+
+        DebugSessionService.Result result = service.start(workspace, file, validation("launch,exception_breakpoints"), enabled(), "main",
+            Duration.ofSeconds(1), (plan, features, listener) -> connection, null, store);
+
+        assertTrue(result.succeeded());
+        assertEquals(List.of("initialize", "launch"), connection.commands);
+    }
+
+    @Test
     void doesNotSynchronizeWhenBreakpointCapabilityIsUndeclared(@TempDir Path tempDir) throws Exception {
         DebugSessionService service = new DebugSessionService();
         Path workspace = tempDir.resolve("workspace");

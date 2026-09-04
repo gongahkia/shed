@@ -13,27 +13,36 @@ final class DebugSessionController {
     private final Texteditor editor;
     private final DebugSessionService sessions;
     private final BreakpointStore breakpoints;
+    private final ExceptionBreakpointStore exceptionBreakpoints;
     private Path lastWorkspace;
     private Path lastActiveFile;
 
     DebugSessionController(Texteditor editor) {
-        this(editor, new DebugSessionService(), new BreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
+        this(editor, new DebugSessionService(), new BreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")),
+            new ExceptionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
     }
 
     DebugSessionController(Texteditor editor, DebugSessionService sessions) {
-        this(editor, sessions, new BreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
+        this(editor, sessions, new BreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")),
+            new ExceptionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
     }
 
     DebugSessionController(Texteditor editor, DebugSessionService sessions, BreakpointStore breakpoints) {
+        this(editor, sessions, breakpoints, new ExceptionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
+    }
+
+    DebugSessionController(Texteditor editor, DebugSessionService sessions, BreakpointStore breakpoints, ExceptionBreakpointStore exceptionBreakpoints) {
         this.editor = editor;
         this.sessions = sessions == null ? new DebugSessionService() : sessions;
         this.breakpoints = breakpoints == null ? new BreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")) : breakpoints;
+        this.exceptionBreakpoints = exceptionBreakpoints == null
+            ? new ExceptionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")) : exceptionBreakpoints;
     }
 
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|console [clear]|stack|variables|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|exception list|enable|disable|console [clear]|stack|variables|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -51,6 +60,7 @@ final class DebugSessionController {
             case "stepout", "step-out" -> submitControl(DebugSessionService.Control.STEP_OUT);
             case "pause" -> submitControl(DebugSessionService.Control.PAUSE);
             case "breakpoint", "breakpoints", "bp" -> breakpoint(args);
+            case "exception", "exceptions" -> exceptionBreakpoint(args);
             case "console", "output" -> console(args);
             case "stack", "frames", "variables", "inspect", "refresh" -> submitInspection();
             case "frame" -> selectFrame(args);
@@ -202,7 +212,7 @@ final class DebugSessionController {
         String name = requested == null ? "" : requested.trim();
         int jobId = editor.asyncJobService.submit("debug " + operation, token -> sessions.start(workspace, context,
             validation(), editor.configManager.getDebugFeatureSettings(), name,
-            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs())), this::startTransport, breakpoints), (job, result, error) -> {
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs())), this::startTransport, breakpoints, exceptionBreakpoints), (job, result, error) -> {
                 if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
                     editor.showMessage("Debug " + operation + " cancelled.");
                     return;
@@ -356,6 +366,52 @@ final class DebugSessionController {
         return "Usage: :debug breakpoint list|enable <line>|disable <line>|remove <line>|condition <line> <value>|hit <line> <value>|log <line> <value>|clear-condition|clear-hit|clear-log <line>";
     }
 
+    private String exceptionBreakpoint(String argument) {
+        String trimmed = argument == null ? "" : argument.trim();
+        if (trimmed.isEmpty() || "list".equalsIgnoreCase(trimmed)) {
+            showExceptionBreakpoints();
+            return "Showing exception breakpoints.";
+        }
+        int split = trimmed.indexOf(' ');
+        String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase(java.util.Locale.ROOT);
+        String filterId = split < 0 ? "" : trimmed.substring(split + 1).trim();
+        if (!"enable".equals(command) && !"disable".equals(command)) return "Usage: :debug exception list|enable <filter>|disable <filter>";
+        DebugSessionService.ExceptionFilter filter = sessions.exceptionFilters(workspace()).stream()
+            .filter(value -> value.id().equals(filterId)).findFirst().orElse(null);
+        if (filter == null) return "Exception breakpoint filter is unavailable; start a compatible debug session and use :debug exception list.";
+        try {
+            exceptionBreakpoints.configure(workspace(), filter.id(), "enable".equals(command));
+            if (sessions.snapshot(workspace()).lifecycle() == DebugSessionService.Lifecycle.RUNNING) synchronizeBreakpoints(workspace());
+            return "Exception breakpoint '" + filter.label() + "' " + ("enable".equals(command) ? "enabled." : "disabled.");
+        } catch (IOException | IllegalArgumentException error) {
+            return "Unable to update exception breakpoint: " + error.getMessage();
+        }
+    }
+
+    private void showExceptionBreakpoints() {
+        Path workspace = workspace();
+        StringBuilder text = new StringBuilder("Exception Breakpoints\n\n");
+        List<DebugSessionService.ExceptionFilter> filters = sessions.exceptionFilters(workspace);
+        if (filters.isEmpty()) {
+            text.append("No exception breakpoint filters are available. Start a compatible debug session first.\n");
+        } else {
+            try {
+                Map<String, ExceptionBreakpointStore.Setting> settings = exceptionBreakpoints.settings(workspace);
+                for (DebugSessionService.ExceptionFilter filter : filters) {
+                    ExceptionBreakpointStore.Setting setting = settings.get(filter.id());
+                    boolean enabled = setting == null ? filter.defaultEnabled() : setting.enabled();
+                    text.append(enabled ? "enabled  " : "disabled ").append(filter.id()).append("  ").append(filter.label());
+                    if (setting == null) text.append("  (adapter default)");
+                    text.append("\n");
+                }
+            } catch (IOException | IllegalArgumentException error) {
+                text.append("Unable to load exception breakpoint settings: ").append(error.getMessage()).append("\n");
+            }
+        }
+        text.append("\nActions: :debug exception enable <filter> | :debug exception disable <filter>\n");
+        editor.showScratchBuffer("[debug exception breakpoints]", text.toString());
+    }
+
     private BreakpointStore.Breakpoint breakpointAtActiveFile(String value) {
         int line;
         try { line = Integer.parseInt(value == null ? "" : value.trim()); }
@@ -437,7 +493,7 @@ final class DebugSessionController {
     }
 
     private void synchronizeBreakpoints(Path workspace) {
-        editor.asyncJobService.submit("debug breakpoints", token -> sessions.synchronizeBreakpoints(workspace, breakpoints,
+        editor.asyncJobService.submit("debug breakpoints", token -> sessions.synchronizeBreakpoints(workspace, breakpoints, exceptionBreakpoints,
             Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
                 refreshBreakpointMarkers();
                 if (error != null || result == null || !result.succeeded()) {

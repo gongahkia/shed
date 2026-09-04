@@ -15,7 +15,9 @@ final class BuiltInDebugAdapterSupport {
         DebugAdapterRegistry.Adapter debugpy = new DebugAdapterRegistry.Adapter(PYTHON_DEBUGPY, DebugAdapterRegistry.Transport.STDIO,
             "debugpy-adapter", List.of(), Set.of(DebugAdapterRegistry.Capability.LAUNCH, DebugAdapterRegistry.Capability.CONFIGURATION_DONE,
                 DebugAdapterRegistry.Capability.BREAKPOINTS, DebugAdapterRegistry.Capability.THREADS, DebugAdapterRegistry.Capability.STACK_TRACE,
-                DebugAdapterRegistry.Capability.SCOPES, DebugAdapterRegistry.Capability.VARIABLES, DebugAdapterRegistry.Capability.EVALUATE));
+                DebugAdapterRegistry.Capability.SCOPES, DebugAdapterRegistry.Capability.VARIABLES, DebugAdapterRegistry.Capability.EVALUATE,
+                DebugAdapterRegistry.Capability.CONTINUE, DebugAdapterRegistry.Capability.NEXT, DebugAdapterRegistry.Capability.STEP_IN,
+                DebugAdapterRegistry.Capability.STEP_OUT, DebugAdapterRegistry.Capability.PAUSE));
         DebugAdapterRegistry.Configuration python = new DebugAdapterRegistry.Configuration(PYTHON_DEBUGPY, PYTHON_DEBUGPY,
             DebugAdapterRegistry.Request.LAUNCH, "workspace", "${file}", "${workspaceFolder}", List.of(), "127.0.0.1", 0, List.of(".py", ".pyw"));
         return DebugAdapterRegistry.withAdapterDefaults(base, Map.of(PYTHON_DEBUGPY, debugpy), Map.of(PYTHON_DEBUGPY, python));

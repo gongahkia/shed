@@ -52,8 +52,13 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         JButton start = button("Start", () -> message(editor.debugSessionController.startForPanel()));
         JButton stop = button("Stop", () -> message(editor.debugSessionController.stopForPanel()));
         JButton restart = button("Restart", () -> message(editor.debugSessionController.restartForPanel()));
+        JButton resume = button("Continue", () -> message(editor.debugSessionController.continueForPanel()));
+        JButton next = button("Next", () -> message(editor.debugSessionController.nextForPanel()));
+        JButton stepIn = button("Step In", () -> message(editor.debugSessionController.stepInForPanel()));
+        JButton stepOut = button("Step Out", () -> message(editor.debugSessionController.stepOutForPanel()));
+        JButton pause = button("Pause", () -> message(editor.debugSessionController.pauseForPanel()));
         JButton inspect = button("Refresh", () -> message(editor.debugSessionController.refreshInspectionForPanel()));
-        controls.add(start); controls.add(stop); controls.add(restart); controls.add(inspect);
+        controls.add(start); controls.add(stop); controls.add(restart); controls.add(resume); controls.add(next); controls.add(stepIn); controls.add(stepOut); controls.add(pause); controls.add(inspect);
         panel.add(controls, BorderLayout.WEST);
         panel.add(state, BorderLayout.CENTER);
         return panel;

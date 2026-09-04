@@ -31,7 +31,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|select [name]|start [name]|stop|restart|console [clear]|stack|variables|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|console [clear]|stack|variables|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -43,6 +43,11 @@ final class DebugSessionController {
             case "start", "launch", "attach" -> start(args);
             case "stop" -> stop();
             case "restart" -> restart(args);
+            case "continue", "cont", "c" -> submitControl(DebugSessionService.Control.CONTINUE);
+            case "next", "stepover", "step-over" -> submitControl(DebugSessionService.Control.NEXT);
+            case "stepin", "step-in" -> submitControl(DebugSessionService.Control.STEP_IN);
+            case "stepout", "step-out" -> submitControl(DebugSessionService.Control.STEP_OUT);
+            case "pause" -> submitControl(DebugSessionService.Control.PAUSE);
             case "console", "output" -> console(args);
             case "stack", "frames", "variables", "inspect", "refresh" -> submitInspection();
             case "frame" -> selectFrame(args);
@@ -80,6 +85,12 @@ final class DebugSessionController {
     String stopForPanel() { return stop(); }
 
     String restartForPanel() { return restart(""); }
+
+    String continueForPanel() { return submitControl(DebugSessionService.Control.CONTINUE); }
+    String nextForPanel() { return submitControl(DebugSessionService.Control.NEXT); }
+    String stepInForPanel() { return submitControl(DebugSessionService.Control.STEP_IN); }
+    String stepOutForPanel() { return submitControl(DebugSessionService.Control.STEP_OUT); }
+    String pauseForPanel() { return submitControl(DebugSessionService.Control.PAUSE); }
 
     String refreshInspectionForPanel() {
         Path workspace = workspace();
@@ -262,6 +273,23 @@ final class DebugSessionController {
             });
         showInspection(workspace);
         return "Debug inspection requested (job " + jobId + ").";
+    }
+
+    private String submitControl(DebugSessionService.Control control) {
+        Path workspace = workspace();
+        String operation = control == null ? "control" : control.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+        int jobId = editor.asyncJobService.submit("debug " + operation, token -> sessions.control(workspace, control,
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                if (editor.toolWindowHost != null && editor.toolWindowHost.isSelected(ToolWindowHost.Tab.DEBUG)) {
+                    editor.toolWindowHost.refresh(ToolWindowHost.Tab.DEBUG);
+                } else {
+                    showStatus(workspace);
+                }
+                if (error != null || result == null || !result.succeeded()) {
+                    editor.showMessage("Debug " + operation + " failed; inspect :debug status.");
+                } else editor.showMessage(result.snapshot().detail());
+            });
+        return "Debug " + operation + " requested (job " + jobId + ").";
     }
 
     void toggleBreakpoint(FileBuffer buffer, int zeroBasedLine) {

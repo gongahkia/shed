@@ -11,7 +11,7 @@ import java.util.Set;
 
 final class DebugAdapterRegistry {
     enum Transport { STDIO, TCP }
-    enum Capability { LAUNCH, ATTACH, CONFIGURATION_DONE, BREAKPOINTS, THREADS, STACK_TRACE, SCOPES, VARIABLES, EVALUATE }
+    enum Capability { LAUNCH, ATTACH, CONFIGURATION_DONE, BREAKPOINTS, THREADS, STACK_TRACE, SCOPES, VARIABLES, EVALUATE, CONTINUE, NEXT, STEP_IN, STEP_OUT, PAUSE }
     enum Request { LAUNCH, ATTACH }
 
     record Adapter(String id, Transport transport, String command, List<String> args, Set<Capability> capabilities) {

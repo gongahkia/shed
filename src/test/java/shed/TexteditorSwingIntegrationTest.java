@@ -227,6 +227,25 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void remoteForwardListIsExplicitAndProcessFree() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-remote-forward-list");
+        Path file = tempDir.resolve("remote-forward-list.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "local\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertEquals("Showing remote workspaces", onEdt(() -> editor.commandHandler.execute("remote forward list")));
+            String output = onEdt(() -> editor.getCurrentBuffer().getContent());
+            assertTrue(output.contains("SSH loopback forwards"));
+            assertTrue(output.contains("No SSH forwards active."));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void quickfixJumpOpensTargetAndMovesCaret() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-quickfix");

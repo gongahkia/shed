@@ -326,11 +326,9 @@ final class TestController {
 
     private int startDevContainer(State state, String operation, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command,
                                   Path reportCache) {
-        DevContainerController containers = editor.devContainerController;
-        if (containers == null) return 0;
         int jobId = editor.asyncJobService.submit("dev container test " + spec.id() + " " + operation, token -> {
             try {
-                String remoteRoot = containers.remoteWorkingDirectory(state.root);
+                String remoteRoot = DevContainerRuntime.remoteWorkingDirectory(state.root);
                 DevContainerTestExecution.Plan plan = DevContainerTestExecution.prepare(state.root, remoteRoot, command);
                 CommandResult result = editor.jobQuickfixController.runExternalCommand(plan.invocation(), state.root.toFile(), null, token,
                     editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true);
@@ -464,7 +462,7 @@ final class TestController {
     }
 
     private boolean usesDevContainer(Path root) {
-        return editor.devContainerController != null && editor.devContainerController.hasConfiguration(root);
+        return DevContainerRuntime.hasConfiguration(root);
     }
 
     private Path remoteDiscoveryCache(State state, TestService.AdapterSpec spec, TestService.Command command) throws IOException {

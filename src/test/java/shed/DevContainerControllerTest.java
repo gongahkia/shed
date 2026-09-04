@@ -40,4 +40,13 @@ class DevContainerControllerTest {
             DevContainerController.debugAdapterInvocation(workspace, List.of("debugpy-adapter")));
         assertThrows(java.io.IOException.class, () -> DevContainerController.debugAdapterInvocation(workspace, List.of("debugpy-adapter\nbad")));
     }
+
+    @Test
+    void buildsOnlyValidatedDirectArgvTestCommands() throws Exception {
+        Path workspace = Files.createDirectory(tempDir.resolve("test-project"));
+
+        assertEquals(List.of("devcontainer", "exec", "--workspace-folder", workspace.toAbsolutePath().normalize().toString(), "pytest", "-q"),
+            DevContainerController.testInvocation(workspace, List.of("pytest", "-q")));
+        assertThrows(java.io.IOException.class, () -> DevContainerController.testInvocation(workspace, List.of("pytest\nbad")));
+    }
 }

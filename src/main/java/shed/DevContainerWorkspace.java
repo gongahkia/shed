@@ -10,9 +10,17 @@ final class DevContainerWorkspace {
         for (String line : output.split("\\R")) {
             if (line.startsWith("/")) candidate = line;
         }
-        if (!candidate.startsWith("/") || candidate.indexOf('\u0000') >= 0 || candidate.indexOf('\n') >= 0 || candidate.indexOf('\r') >= 0) {
+        return requireAbsolutePosixPath(candidate);
+    }
+
+    static String requireAbsolutePosixPath(String value) {
+        if (value == null || value.isBlank() || value.indexOf('\u0000') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
             throw new IllegalArgumentException("devcontainer exec did not report an absolute POSIX workspace path");
         }
-        return candidate;
+        String candidate = value.trim();
+        if (!candidate.startsWith("/") || candidate.length() > 16 * 1024) {
+            throw new IllegalArgumentException("devcontainer exec did not report an absolute POSIX workspace path");
+        }
+        return candidate.length() > 1 && candidate.endsWith("/") ? candidate.substring(0, candidate.length() - 1) : candidate;
     }
 }

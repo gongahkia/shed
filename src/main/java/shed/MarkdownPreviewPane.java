@@ -24,6 +24,7 @@ import javax.swing.event.HyperlinkEvent;
 
 final class MarkdownPreviewPane extends JPanel {
     private static final int RENDER_DEBOUNCE_MS = 120;
+    private static final int MAX_DEFERRED_SCROLL_SYNCS = 3;
     private final FileBuffer source;
     private final Supplier<Font> fontSupplier;
     private final Supplier<Color> backgroundSupplier;
@@ -44,6 +45,7 @@ final class MarkdownPreviewPane extends JPanel {
     private boolean disposed;
     private boolean syncQueued;
     private boolean syncToCaret;
+    private int deferredScrollSyncs;
 
     MarkdownPreviewPane(FileBuffer source, Supplier<Font> fontSupplier, Supplier<Color> backgroundSupplier,
                         Supplier<Color> foregroundSupplier, Consumer<String> linkHandler, Runnable focusHandler,
@@ -170,25 +172,45 @@ final class MarkdownPreviewPane extends JPanel {
         if (!syncQueued) {
             syncQueued = true;
             syncToCaret = caret;
-            SwingUtilities.invokeLater(() -> {
-                syncQueued = false;
-                syncPreviewToSource(syncToCaret);
-            });
+            SwingUtilities.invokeLater(this::runQueuedSourceSync);
         } else if (!caret) {
             syncToCaret = false;
         }
     }
 
-    private void syncPreviewToSource(boolean caret) {
+    private void runQueuedSourceSync() {
+        syncQueued = false;
         if (disposed || !isScrollSyncEnabled()) return;
+        if (syncPreviewToSource(syncToCaret)) {
+            deferredScrollSyncs = 0;
+            return;
+        }
+        if (deferredScrollSyncs++ < MAX_DEFERRED_SCROLL_SYNCS) {
+            queueSourceSync(syncToCaret);
+        }
+    }
+
+    /**
+     * The HTML view may not have its scroll range when a source event first
+     * arrives, particularly while a newly created split is being laid out.
+     * Returning false lets the bounded deferred path retry after Swing has had
+     * a chance to size the viewport.
+     */
+    private boolean syncPreviewToSource(boolean caret) {
+        if (disposed || !isScrollSyncEnabled()) return true;
         JScrollBar sourceBar = sourcePane.getScrollPane().getVerticalScrollBar();
         JScrollBar previewBar = scrollPane.getVerticalScrollBar();
         int sourceMaximum = Math.max(0, sourceBar.getMaximum() - sourceBar.getVisibleAmount());
         int previewMaximum = Math.max(0, previewBar.getMaximum() - previewBar.getVisibleAmount());
-        if (previewMaximum == 0) return;
+        if (previewMaximum == 0) {
+            preview.revalidate();
+            scrollPane.revalidate();
+            return false;
+        }
         int sourcePosition = caret ? caretVerticalPosition(sourceMaximum) : sourceBar.getValue();
         double progress = sourceMaximum == 0 ? caretDocumentProgress() : (double) sourcePosition / sourceMaximum;
         previewBar.setValue((int) Math.round(Math.max(0.0, Math.min(1.0, progress)) * previewMaximum));
+        return true;
     }
 
     private int caretVerticalPosition(int sourceMaximum) {

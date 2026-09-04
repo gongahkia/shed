@@ -59,7 +59,22 @@ final class TerminalController {
         List<String> command = profile == null ? ShellCommand.interactiveCommand() : profile.value().command();
         String message = profile == null ? (defaultMessage == null ? "Terminal opened" : defaultMessage)
             : "Terminal opened with " + profile.extensionId() + ":" + profile.value().id();
-        return openTerminal(label, resolveTerminalStartDirectory(), command, message, null, orientation);
+        File startDirectory = resolveTerminalStartDirectory();
+        DevContainerSessionService.Connection connection = editor.devContainerSessions == null
+            ? null : editor.devContainerSessions.connectionFor(startDirectory.toPath());
+        if (connection == null) {
+            return openTerminal(label, startDirectory, command, message, null, orientation);
+        }
+        try {
+            List<String> invocation = DevContainerRuntime.terminalInvocation(connection.workspace(), command);
+            String containerLabel = "Dev Container — " + label;
+            String containerMessage = profile == null ? "Dev Container terminal opened" : "Dev Container terminal opened with "
+                + profile.extensionId() + ":" + profile.value().id();
+            return openTerminal(containerLabel, connection.workspace().toFile(), invocation, containerMessage,
+                connection.sourcePathMapper(), orientation);
+        } catch (IOException error) {
+            return "Dev Container terminal unavailable: " + error.getMessage();
+        }
     }
 
     private String openTerminal(String label, File startDirectory, List<String> command, String successMessage) {

@@ -5,15 +5,20 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /** Explicit local Dev Container CLI integration; it never installs or starts a container implicitly. */
 final class DevContainerController {
     private final Texteditor editor;
+    private final DevContainerSessionService sessions;
+    private final Set<Path> pendingConnections = new HashSet<>();
 
     DevContainerController(Texteditor editor) {
         this.editor = editor;
+        this.sessions = editor.devContainerSessions;
     }
 
     String handle(String argument) {
@@ -28,10 +33,12 @@ final class DevContainerController {
         String operation = tokens.getFirst().toLowerCase(java.util.Locale.ROOT);
         return switch (operation) {
             case "up", "start" -> submit("up", List.of("devcontainer", "up", "--workspace-folder", workspace().toString()));
+            case "connect", "reopen" -> connect();
+            case "disconnect" -> disconnect();
             case "exec", "run" -> execute(tokens.subList(1, tokens.size()));
             case "terminal", "shell" -> openTerminal(tokens.subList(1, tokens.size()));
             case "open" -> openMirror(tokens.subList(1, tokens.size()));
-            default -> "Usage: :container [status|up|exec <command...>|terminal [command...]|open <container> <absolute-path>]";
+            default -> "Usage: :container [status|up|connect|disconnect|exec <command...>|terminal [command...]|open <container> <absolute-path>]";
         };
     }
 
@@ -40,15 +47,62 @@ final class DevContainerController {
         if (configuration == null) return "No .devcontainer/devcontainer.json in the active workspace";
         try {
             String text = Files.readString(configuration, StandardCharsets.UTF_8);
+            DevContainerSessionService.Connection connection = sessions == null ? null : sessions.connectionFor(workspace());
             String output = "Dev Container\n\nWorkspace: " + workspace() + "\nConfiguration: " + configuration
-                + "\n\nDev Container actions are explicit and require an installed devcontainer CLI.\n"
-                + "\n:container up\n:container exec <command...>\n:container terminal [command...]\n"
+                + "\nConnection: " + (connection == null ? "not connected" : "connected for this application session")
+                + (connection == null ? "\nRun :container connect to route normal terminals and tasks through this container.\n"
+                    : "\nContainer workspace: " + connection.remoteWorkingDirectory() + "\n")
+                + "\nDev Container actions are explicit and require an installed devcontainer CLI.\n"
+                + "\n:container up\n:container connect\n:container disconnect\n:container exec <command...>\n:container terminal [command...]\n"
                 + "\nConfiguration:\n\n" + text;
             editor.showScratchBuffer("[dev container]", output);
             return "Showing Dev Container configuration";
         } catch (IOException error) {
             return "Could not read Dev Container configuration: " + concise(error);
         }
+    }
+
+    private String connect() {
+        Path root = workspace().toAbsolutePath().normalize();
+        if (configuration() == null) return "No .devcontainer/devcontainer.json in the active workspace";
+        if (sessions != null && sessions.isConnected(root)) return "Dev Container is already connected for this workspace";
+        if (!pendingConnections.add(root)) return "Dev Container connection is already requested";
+        int job = editor.asyncJobService.submit("dev container connect", token -> connect(root, token),
+            (snapshot, result, error) -> completeConnect(root, result, error));
+        return "Dev Container connection requested (job " + job + ").";
+    }
+
+    private ConnectResult connect(Path root, AsyncJobService.JobToken token) throws Exception {
+        String startup = run(List.of("devcontainer", "up", "--workspace-folder", root.toString()), root, token);
+        String remoteRoot = DevContainerWorkspace.remoteWorkingDirectory(run(
+            List.of("devcontainer", "exec", "--workspace-folder", root.toString(), "pwd"), root, token));
+        return new ConnectResult(root, remoteRoot, startup);
+    }
+
+    private void completeConnect(Path root, ConnectResult result, Exception error) {
+        pendingConnections.remove(root);
+        if (error != null || result == null || sessions == null) {
+            String detail = error == null ? "Dev Container connection returned no result" : concise(error);
+            editor.showScratchBuffer("[dev container connect]", detail + "\n");
+            editor.showMessage("Dev Container connection failed");
+            return;
+        }
+        try {
+            sessions.connect(result.workspace(), result.remoteWorkingDirectory());
+            String output = result.startupOutput().isBlank() ? "(no startup output)\n" : result.startupOutput();
+            editor.showScratchBuffer("[dev container connect]", "Connected workspace: " + result.workspace()
+                + "\nContainer workspace: " + result.remoteWorkingDirectory() + "\n\n" + output);
+            editor.showMessage("Dev Container connected; new terminals and tasks use it");
+        } catch (IllegalArgumentException failure) {
+            editor.showScratchBuffer("[dev container connect]", "Connection rejected: " + concise(failure) + "\n");
+            editor.showMessage("Dev Container connection failed");
+        }
+    }
+
+    private String disconnect() {
+        Path root = workspace().toAbsolutePath().normalize();
+        if (sessions == null || !sessions.disconnect(root)) return "Dev Container is not connected for this workspace";
+        return "Dev Container disconnected; the container remains running";
     }
 
     private String execute(List<String> arguments) {
@@ -183,5 +237,8 @@ final class DevContainerController {
     private static String concise(Exception error) {
         String message = error == null ? null : error.getMessage();
         return message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' ');
+    }
+
+    private record ConnectResult(Path workspace, String remoteWorkingDirectory, String startupOutput) {
     }
 }

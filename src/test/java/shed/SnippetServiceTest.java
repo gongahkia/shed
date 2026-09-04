@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+import shed.api.SnippetContribution;
 import java.util.List;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -121,5 +122,26 @@ class SnippetServiceTest {
         assertTrue(loaded.errors().isEmpty());
         assertEquals("log", service.findExact(FileType.JAVA, "log").description);
         assertNotNull(service.findExact(FileType.PYTHON, "todo"));
+    }
+
+    @Test
+    void extensionSnippetsAreLanguageScopedAndFollowUserSnippetPrecedence() {
+        SnippetContribution contribution = new SnippetContribution("log", "example", "log", "extension", "extension log");
+        assertEquals("extension", service.findExact(FileType.UNKNOWN, "example", "log", List.of(contribution)).body);
+        assertNull(service.findExact(FileType.UNKNOWN, "other", "log", List.of(contribution)));
+
+        service.addUserSnippet("log", "user", "user log", FileType.JAVA);
+        SnippetService.Snippet selected = service.findExact(FileType.JAVA, "java", "log", List.of(
+            new SnippetContribution("java-log", "java", "log", "extension", "extension log")));
+        assertEquals("user", selected.body);
+        assertTrue(service.listSnippets(FileType.UNKNOWN, "example", List.of(contribution)).contains("[example]"));
+    }
+
+    @Test
+    void snippetContributionRejectsUnsafeFields() {
+        assertThrows(IllegalArgumentException.class, () -> new SnippetContribution("bad id", "example", "log", "body", "description"));
+        assertThrows(IllegalArgumentException.class, () -> new SnippetContribution("log", "example", "contains space", "body", "description"));
+        assertThrows(IllegalArgumentException.class, () -> new SnippetContribution("log", "example", "log", "", "description"));
+        assertThrows(IllegalArgumentException.class, () -> new SnippetContribution("log", "example", "log", "body", "line\nbreak"));
     }
 }

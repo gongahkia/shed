@@ -31,4 +31,13 @@ class DevContainerControllerTest {
             DevContainerController.languageServerInvocation(workspace, List.of("pylsp", "--stdio")));
         assertThrows(java.io.IOException.class, () -> DevContainerController.languageServerInvocation(workspace, List.of("pylsp\nbad")));
     }
+
+    @Test
+    void buildsOnlyValidatedDirectArgvDebugAdapterCommands() throws Exception {
+        Path workspace = Files.createDirectory(tempDir.resolve("debug-project"));
+
+        assertEquals(List.of("devcontainer", "exec", "--workspace-folder", workspace.toAbsolutePath().normalize().toString(), "debugpy-adapter"),
+            DevContainerController.debugAdapterInvocation(workspace, List.of("debugpy-adapter")));
+        assertThrows(java.io.IOException.class, () -> DevContainerController.debugAdapterInvocation(workspace, List.of("debugpy-adapter\nbad")));
+    }
 }

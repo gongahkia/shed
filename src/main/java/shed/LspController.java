@@ -2377,6 +2377,12 @@ final class LspController {
 
 
     String bufferExtension(FileBuffer buffer) {
+        ExtensionRegistry.Owned<shed.api.LanguageProfile> profile = editor == null ? null : editor.languageProfileOwnership(buffer);
+        if (profile != null) {
+            ExtensionRegistry.Owned<shed.api.LanguageContribution> contribution = editor.extensionManager == null ? null
+                : editor.extensionManager.languageForId(profile.extensionId(), profile.value().languageId());
+            if (contribution != null) return contribution.value().id();
+        }
         String path = buffer.getFilePath();
         if (path == null) {
             return "";
@@ -2404,7 +2410,24 @@ final class LspController {
     }
 
     private ExtensionRegistry.Owned<shed.api.LanguageContribution> extensionLanguage(String extension) {
-        return editor.extensionManager == null ? null : editor.extensionManager.languageForExtension(extension);
+        if (editor.extensionManager == null) return null;
+        ExtensionRegistry.Owned<shed.api.LanguageContribution> byId = editor.extensionManager.languageForId(extension);
+        return byId == null ? editor.extensionManager.languageForExtension(extension) : byId;
+    }
+
+    void profileSelectionChanged(FileBuffer buffer) {
+        if (buffer == null || !buffer.hasFilePath()) return;
+        try {
+            Path root = workspaceRootPath(buffer);
+            stopServersForWorkspace(root);
+            for (FileBuffer candidate : editor.buffers) {
+                if (candidate == null || !candidate.hasFilePath()) continue;
+                Path path = Path.of(candidate.getFilePath()).toAbsolutePath().normalize();
+                if (path.startsWith(root)) syncLspOpen(candidate);
+            }
+        } catch (IOException ignored) {
+            // The normal LSP path records the root-resolution diagnostic on demand.
+        }
     }
 
 

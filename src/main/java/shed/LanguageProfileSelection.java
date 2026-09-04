@@ -12,16 +12,21 @@ final class LanguageProfileSelection {
     private final Map<FileBuffer, String> selected = Collections.synchronizedMap(new WeakHashMap<>());
 
     LanguageProfile profileFor(FileBuffer buffer, ExtensionRegistry registry) {
+        ExtensionRegistry.Owned<LanguageProfile> profile = ownedProfileFor(buffer, registry);
+        return profile == null ? null : profile.value();
+    }
+
+    ExtensionRegistry.Owned<LanguageProfile> ownedProfileFor(FileBuffer buffer, ExtensionRegistry registry) {
         if (buffer == null || registry == null) return null;
         String requested = selected.get(buffer);
         if (requested != null) {
             ExtensionRegistry.Owned<LanguageProfile> profile = find(registry, requested);
-            if (profile != null) return profile.value();
+            if (profile != null) return profile;
             selected.remove(buffer);
         }
         if (buffer.getFile() == null) return null;
         ExtensionRegistry.Owned<LanguageProfile> automatic = registry.languageProfileFor(buffer.getFile(), buffer.textSnapshot().text());
-        return automatic == null ? null : automatic.value();
+        return automatic;
     }
 
     LanguageProfile select(FileBuffer buffer, ExtensionRegistry registry, String requested) {

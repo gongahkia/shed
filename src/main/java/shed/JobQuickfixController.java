@@ -387,16 +387,41 @@ final class JobQuickfixController {
                 + editor.taskService.taskFile(workspace).getAbsolutePath() + ": " + taskName));
         }
         TaskService.TaskExecutionPlan plan;
+        File activeFile = debugPlan.program() == null ? null : debugPlan.program().toFile();
         try {
-            File activeFile = debugPlan.program() == null ? null : debugPlan.program().toFile();
             plan = editor.taskService.buildExecutionPlan(task, workspace, activeFile);
         } catch (IOException | IllegalArgumentException error) {
             return new DebugSessionService.PreLaunchResult(false, List.of("Debug pre-launch task validation failed: " + error.getMessage()));
         }
         String validationError = validateTaskPlan(plan);
         if (validationError != null) return new DebugSessionService.PreLaunchResult(false, List.of(validationError));
-        CommandResult result = runExternalCommand(plan.processCommand(), plan.workingDirectory(), null, token,
-            editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true, plan.environment());
+        CommandResult result;
+        RemoteWorkspaceTaskTargets.Target remote = editor.remoteWorkspaceTaskTargets == null ? null
+            : editor.remoteWorkspaceTaskTargets.targetForPath(debugPlan.workspace());
+        if (remote != null && remote.workspace().executionRoot() != null
+            && !remote.workspace().executionRoot().trim().equals(remote.localRoot().toString())) {
+            try {
+                RemoteCommandRequest request = editor.taskService.buildRemoteCommandRequest(plan, remote.localRoot(), remote.workspace().executionRoot(), activeFile);
+                result = remoteCommandResult(remote.workspace().execute(request));
+            } catch (IOException | IllegalArgumentException error) {
+                return new DebugSessionService.PreLaunchResult(false, List.of("Remote debug pre-launch task validation failed: " + error.getMessage()));
+            } catch (Exception error) {
+                String message = error.getMessage();
+                return new DebugSessionService.PreLaunchResult(false, List.of("Remote debug pre-launch task failed: "
+                    + (message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' '))));
+            }
+        } else if (editor.devContainerController != null && editor.devContainerController.hasConfiguration(debugPlan.workspace())) {
+            try {
+                result = runContainerTaskProcess(plan, workspace, activeFile, token);
+            } catch (Exception error) {
+                String message = error.getMessage();
+                return new DebugSessionService.PreLaunchResult(false, List.of("Dev Container debug pre-launch task failed: "
+                    + (message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' '))));
+            }
+        } else {
+            result = runExternalCommand(plan.processCommand(), plan.workingDirectory(), null, token,
+                editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true, plan.environment());
+        }
         if (result.exitCode != 0) {
             String detail = taskOutput(result);
             return new DebugSessionService.PreLaunchResult(false, List.of("Debug pre-launch task '" + taskName + "' failed"

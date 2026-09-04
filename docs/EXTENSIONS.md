@@ -43,20 +43,21 @@ main_class = "example.ProviderExtension"
 | `ExtensionCommand` | Command palette and `:<extension-id>.<command>` dispatch |
 | `LanguageContribution` | File-extension routing and an optional direct-argv LSP launch |
 | `LanguageProfile` | File-name, extension, or first-line detection plus literal lexical metadata |
+| `SnippetContribution` | One bounded language-scoped TextMate-subset snippet |
 | `DebugAdapterContribution` | DAP configuration validation and explicit debug launch |
 | `TestContribution` | Tests view discovery, run results, Problems locations, and debug configuration mapping |
 | `ScmContribution` | `:scm` provider status and declared actions |
 | `TerminalProfile` | Named direct-argv terminal profiles |
 | `ToolViewContribution` | Docked workbench view opened through `:view` |
 | `CustomEditorContribution` | Alternate text or binary editor component |
-| `RemoteWorkspaceProvider` | Explicit `:remote open <uri>` schemes; its connected workspace may opt into remote terminals, `:remote exec`, and structured remote-task requests |
+| `RemoteWorkspaceProvider` | Explicit `:remote open <uri>` schemes; its connected workspace may opt into remote terminals, `:remote exec`, structured remote-task requests, and bounded workspace-relative artifact retrieval for remote test reports |
 | `WorkspaceToolContribution` | Declared database, deployment, collaboration, or container actions through `:integration` |
 
 Command ids are namespaced to their extension id and cannot overwrite a built-in or another extension's command. SCM actions are allowlisted by the provider's declared action list; Shed does not turn them into shell strings.
 
 ## Language profiles
 
-`LanguageContribution` selects an LSP language id and optional server command. `LanguageProfile` independently makes an extension language visible in the editor: it can match extensions, exact file names, or literal first-line prefixes, and supplies keywords, line/block comments, and string delimiters. The selected profile drives status-bar language naming, lexical highlighting, comment/uncomment commands, indentation, and LSP formatting options.
+`LanguageContribution` selects an LSP language id and optional server command. `LanguageProfile` independently makes an extension language visible in the editor: it can match extensions, exact file names, or literal first-line prefixes, and supplies keywords, line/block comments, and string delimiters. When the same extension registers a contribution with the profile's `languageId`, the selected profile also routes that buffer to the contribution's LSP server and language id; changing `:language` safely restarts clients for that workspace. A profile without that matching contribution remains lexical-only. The selected profile drives status-bar language naming, lexical highlighting, comment/uncomment commands, indentation, and LSP formatting options.
 
 Profiles intentionally use bounded literal tokens rather than arbitrary regular expressions. This keeps their typing-path cost predictable and avoids executing extension-supplied patterns in the editor. A profile may overlap a built-in file type; the extension profile then controls lexical display for its declared match, while the built-in type continues to supply any built-in editor behavior not represented by the profile.
 
@@ -72,11 +73,17 @@ context.registerLanguageProfile(new LanguageProfile(
 ));
 ```
 
-This is lexical support only. It does not provide a TextMate grammar, injection grammar, folding query, parser, formatter, semantic tokens, symbols, or extension-defined snippets. Those capabilities remain separate implementation work; an LSP may supply semantic navigation and diagnostics when configured through `LanguageContribution`.
+This is lexical support only. It does not provide a TextMate grammar, injection grammar, folding query, parser, formatter, semantic tokens, or symbols. Those capabilities remain separate implementation work; an LSP may supply semantic navigation and diagnostics when configured through `LanguageContribution`.
+
+`SnippetContribution` registers one bounded VS Code/TextMate-subset body for one language id. Its id and trigger are literal identifiers, its body is limited to 64 KiB and cannot contain NUL, and its description is single-line. The active language profile id takes precedence; otherwise Shed uses the current LSP language id. Contributed snippets participate in completion, explicit expansion, and `:snippets`; user snippets take precedence over contributed snippets, which take precedence over built-ins. A snippet contribution is not a grammar, parser, or formatter.
 
 `WorkspaceToolContribution` is the workspace-aware command boundary for database consoles, deployment workflows, collaboration clients, and container controls; `ToolViewContribution` adds their docked UI. Java extension code remains responsible for credentials, process/network policy, cancellation, and UI. Details: [Workspace Integrations](WORKSPACE_INTEGRATIONS.md).
 
 `RemoteWorkspace.execute(RemoteCommandRequest)` receives direct argv, a validated directory relative to the connected workspace root, and validated environment values. `terminalCommand(RemoteTerminalRequest)` returns the direct argv PTY bridge for an explicitly requested remote terminal. Providers that support `${workspaceFolder}` or `${file}` in an explicit remote task must return their absolute execution root from `executionRoot()` so Shed can map the local mirror path correctly. The API-v1 `execute(List<String>)` method remains available for command-only providers. Providers that do not override a newer request form reject it rather than silently ignoring options.
+
+`fetchWorkspacePath(relativePath, destinationDirectory)` is optional for API-v1 compatibility. A provider that implements it receives only one validated workspace-relative path and must return the fetched regular file or directory under the app-owned destination directory; it must reject traversal and symbolic-link escapes. Shed uses this boundary only after an explicit remote test action to retrieve declared result artifacts. It does not grant a provider broad local filesystem access or automatic source synchronization.
+
+`debugAdapterCommand(command)` and `debugAdapterRoot()` are separate opt-in methods for a remote stdio DAP adapter. The command must be a direct local bridge whose standard streams are the already-installed remote adapter, and the root must be an absolute POSIX path matching the provider's local mirror. Shed maps only launch paths, source breakpoints, Run to Cursor, and stack-frame paths beneath those roots. TCP DAP, adapter installation, port forwarding, background server setup, and remote extension execution are deliberately outside this API.
 
 ## Custom editors
 

@@ -93,10 +93,10 @@ Notes:
 | Command | Action |
 | :--- | :--- |
 | `:test`, `:test ui` | Open the docked Tests panel; this does not scan or start a process |
-| `:test refresh` | Explicitly detect configured/local runners and discover tests |
-| `:test run` | Run every detected/configured adapter in the selected workspace root |
+| `:test refresh` | Explicitly detect runners and discover tests; a selected SSH, Docker, or WSL workspace root runs dynamic discovery remotely |
+| `:test run` | Run every detected/configured adapter in the selected workspace root; a selected SSH, Docker, or WSL root runs them in its remote environment |
 | `:test run <test-id>` | Run one discovered test by its exact id |
-| `:test debug <test-id>` | Start the adapter explicitly mapped by that test adapter's `.shedtests` `debug_configuration` |
+| `:test debug <test-id>` | Start the adapter explicitly mapped by that test adapter's `.shedtests` `debug_configuration`; connected SSH, Docker, WSL, and an already-running Dev Container workspace may use an already-installed configured stdio adapter |
 | `:test failed`, `:test rerun-failed` | Run the failed tests retained for this session |
 | `:test cancel` | Cancel running test jobs for the selected root |
 | `:test text` | Open a text summary of the session-local test state |
@@ -104,7 +104,7 @@ Notes:
 | `:coverage clear` | Clear imported session-local coverage for the selected root |
 | `:coverage text` | Open imported coverage totals and per-file line summaries |
 
-The Tests panel supports root selection, status/text filtering, Refresh, Run All, Run Selection, Debug Selection, Rerun Failed, Cancel, **Import Coverage**, **Clear Coverage**, output inspection, and source navigation. Imports are explicit and local; covered/uncovered lines render in the active editor gutter. Tests are discovered only after an explicit refresh. Failure locations are also published to Problems under `test:<adapter>` without replacing quickfix entries. Adapter declarations, direct argv overrides, debug mappings, report-cache policy, and supported built-ins are in [Testing](TESTS.md).
+The Tests panel supports root selection, status/text filtering, Refresh, Run All, Run Selection, Debug Selection, Rerun Failed, Cancel, **Import Coverage**, **Clear Coverage**, output inspection, and source navigation. An SSH, Docker, or WSL root inside a connected workspace runs explicit discovery and tests remotely and retrieves only declared results into Shed's private cache; Debug Selection can likewise use a configured already-installed remote or Dev Container stdio adapter. Imports are explicit and local; covered/uncovered lines render in the active editor gutter. Tests are discovered only after an explicit refresh. Failure locations are also published to Problems under `test:<adapter>` without replacing quickfix entries. Adapter declarations, direct argv overrides, debug mappings, report-cache policy, remote boundary, and supported built-ins are in [Testing](TESTS.md).
 
 ## Settings and Configuration
 
@@ -183,7 +183,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:goyo` | Toggle the distraction-free layout without changing Limelight; hides status/line numbers/minimap/tree/tool windows while retaining every pane and split |
 | `:limelight` | Toggle paragraph focus dimming; the current paragraph or selected text stays bright |
 | `:minimap` | Toggle minimap panel |
-| `:term`, `:terminal` | Open integrated terminal split; terminal input owns focus, uses the system clipboard (`Cmd-C`/`Cmd-V` on macOS, `Ctrl-Shift-C`/`Ctrl-Shift-V` elsewhere), recognizes existing local `path:line[:column]` and HTTP(S) output links, and ignores zero-size resize events |
+| `:term`, `:terminal` | Open an integrated terminal in a bottom split; terminal input owns focus, uses the system clipboard (`Cmd-C`/`Cmd-V` on macOS, `Ctrl-Shift-C`/`Ctrl-Shift-V` elsewhere), recognizes existing local `path:line[:column]` and HTTP(S) output links, and ignores zero-size resize events |
 
 ## Workspace Index Commands
 
@@ -229,6 +229,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:debug text [subcommand]` | Open legacy debug scratch output |
 | `:debug select <name>`, `:debug start [name]`, `:debug stop`, `:debug restart [name]` | Control an explicit DAP session, including the user-installed `python-debugpy` profile; a configured pre-launch workspace task must succeed before its adapter starts |
 | `:debug continue`, `:debug next`, `:debug stepin`, `:debug stepout`, `:debug pause` | Send a capability-declared DAP execution control; Continue/step require a paused thread |
+| `:debug goto [line]` | Run the paused thread to the active file's caret or one-based line when the adapter declares and advertises standard DAP `gotoTargets` support |
 | `:debug breakpoint list` | Open persisted source breakpoints for the selected workspace |
 | `:debug breakpoint enable\|disable\|remove <line>` | Update the active file's source breakpoint |
 | `:debug breakpoint condition\|hit\|log <line> <value>` | Set a bounded condition, hit condition, or log message on the active-file breakpoint |
@@ -394,7 +395,7 @@ Portable-manifest format, safety boundary, and its distinction from private sess
 | `:link` | Insert markdown link template |
 | `:img`, `:image` | Insert markdown image template |
 | `:conceal 0|1|2`, `:conceallevel 0|1|2` | Set markdown conceal level |
-| `:snippets`, `:snippet` | Show snippets for current file type |
+| `:snippets`, `:snippet` | Show user, extension, and built-in snippets for the current language |
 | `:snippets open`, `:snippets edit` | Create if needed and open global user snippets |
 | `:bracketcolor`, `:bracketcolors` | Toggle bracket pair colorization |
 
@@ -449,7 +450,7 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:remote exec <id> <command...>` | Explicitly run a direct-argv command in a connection when its provider supports execution |
 | `:remote terminal <id> [command...]` | Open an explicit interactive terminal at the connection root when its provider supports it |
 | `:language`, `:language list` | List installed extension language profiles and the active buffer's profile mode |
-| `:language <extension-id:language-id>`, `:language auto` | Override lexical profile detection for the current buffer, or restore automatic detection |
+| `:language <extension-id:language-id>`, `:language auto` | Override profile detection for the current buffer, or restore automatic detection; a matching same-extension language contribution retargets its LSP client |
 | `:container status` | Show the active workspace's `.devcontainer/devcontainer.json` when present |
 | `:container up` | Explicitly run the local `devcontainer up` workflow as a cancellable job |
 | `:container exec <command...>`, `:container terminal [command...]` | Explicitly run/open a direct-argv command through the local Dev Container CLI |
@@ -467,6 +468,7 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:integration <extension:id> <action> [arguments]` | Run an explicitly declared workspace-integration action |
 | `:notebook open`, `:notebook run [kernel]`, `:notebook kernels`, `:notebook select`, `:notebook kernel [name]`, `:notebook console [kernel]`, `:notebook raw` | Open, execute with the persisted or one-shot local kernelspec, discover or select installed local kernels, persist a known kernel name, open a local Jupyter Console, or show raw JSON for the current `.ipynb` file |
 | `:terminal list`, `:terminal profile <id>` | Show/open terminal profiles |
+| `:terminal split <side|bottom>` | Open the default shell beside the active pane or below it |
 | `:terminal commands`, `:terminal cwd` | Show in-memory Bash/Zsh/Fish shell-integration events or latest reported cwd |
 
 See [Java Extensions](EXTENSIONS.md), [Workspace Integrations](WORKSPACE_INTEGRATIONS.md), [Remote Workspaces](REMOTE_WORKSPACES.md), [Jupyter Notebooks](NOTEBOOKS.md), and [Terminal](TERMINAL.md).

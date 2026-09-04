@@ -34,7 +34,16 @@ final class TestController {
         State(Path root) { this.root = root; }
     }
 
-    private record Execution(Path root, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command, CommandResult result) { }
+    private record Execution(Path root, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command, CommandResult result,
+                             List<String> diagnostics, Path devContainerReportCache) {
+        Execution {
+            diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
+        }
+        Execution(Path root, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command, CommandResult result,
+                  List<String> diagnostics) {
+            this(root, spec, adapter, command, result, diagnostics, null);
+        }
+    }
     private record StaticDiscovery(Path root, TestService.AdapterSpec spec, List<TestService.TestCase> tests) { }
     private record CoverageImport(Path root, CoverageService.ImportResult imported) { }
 
@@ -121,9 +130,17 @@ final class TestController {
             if ("maven".equals(spec.id()) || "gradle".equals(spec.id())) started += startStaticDiscovery(state, spec);
             TestService.Command command = adapter.discovery(state.root, spec);
             if (!command.executable()) continue;
-            started += start(state, "discover", spec, adapter, command);
+            try {
+                started += start(state, "discover", spec, adapter, command, remoteDiscoveryCache(state, spec, command));
+            } catch (IOException error) {
+                state.output = "Remote test report cache failed: " + error.getMessage();
+                refreshPanel();
+            }
         }
-        if (started == 0) { state.output = "No runnable discovery command."; refreshPanel(); }
+        if (started == 0) {
+            if ("Discovery requested.".equals(state.output)) state.output = "No runnable discovery command.";
+            refreshPanel();
+        }
         return new Result(started == 0 ? "Test discovery complete" : "Test discovery requested (" + started + " job" + (started == 1 ? "" : "s") + ")");
     }
 
@@ -220,7 +237,20 @@ final class TestController {
             editor.lineNumberPanel.updateCoverageMarkers(Map.of());
             return;
         }
-        editor.lineNumberPanel.updateCoverageMarkers(state(selectedRoot()).coverage.hits(buffer.getFile().toPath()));
+        Path file = buffer.getFile().toPath().toAbsolutePath().normalize();
+        Path root = coverageRootFor(file, rootsForPanel(), selectedRoot());
+        editor.lineNumberPanel.updateCoverageMarkers(root == null ? Map.of() : state(root).coverage.hits(file));
+    }
+
+    /** Routes coverage to the workspace folder owning the file, not the Tests-panel selection. */
+    static Path coverageRootFor(Path file, List<Path> roots, Path selectedRoot) {
+        if (file == null) return null;
+        Path normalized = file.toAbsolutePath().normalize();
+        Path configured = WorkspaceRootResolver.configuredRoot(normalized, roots);
+        if (configured != null) return configured;
+        if (selectedRoot == null) return null;
+        Path selected = selectedRoot.toAbsolutePath().normalize();
+        return normalized.startsWith(selected) ? selected : null;
     }
 
     private void completeCoverageImport(AsyncJobService.JobSnapshot job, Path root, CoverageImport imported, Exception error) {
@@ -257,10 +287,17 @@ final class TestController {
             return started;
         }
         try {
-            Path cache = tests.reportCache(state.root, spec.id(), Path.of(editor.configManager.getShedDirectoryPath()));
+            Path cache;
+            if (remoteExecutionTarget(state.root) != null) {
+                cache = Files.createTempDirectory(tests.reportCache(state.root, spec.id(), Path.of(editor.configManager.getShedDirectoryPath())), "remote-");
+            } else if (usesDevContainer(state.root)) {
+                cache = DevContainerTestExecution.createReportCache(state.root);
+            } else {
+                cache = tests.reportCache(state.root, spec.id(), Path.of(editor.configManager.getShedDirectoryPath()));
+            }
             TestService.Command command = adapter.run(state.root, spec, selection == null ? List.of() : selection, cache);
             if (!command.executable()) return 0;
-            return start(state, "run", spec, adapter, command);
+            return start(state, "run", spec, adapter, command, cache);
         } catch (IOException error) {
             state.output = "Test report cache failed: " + error.getMessage();
             refreshPanel();
@@ -269,13 +306,69 @@ final class TestController {
     }
 
     private int start(State state, String operation, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command) {
+        return start(state, operation, spec, adapter, command, null);
+    }
+
+    private int start(State state, String operation, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command, Path reportCache) {
+        RemoteWorkspaceTaskTargets.Target remote = remoteExecutionTarget(state.root);
+        if (remote != null) return startRemote(state, operation, spec, adapter, command, reportCache, remote);
+        if (usesDevContainer(state.root)) return startDevContainer(state, operation, spec, adapter, command, reportCache);
         int jobId = editor.asyncJobService.submit("test " + spec.id() + " " + operation, token -> {
             CommandResult result = editor.jobQuickfixController.runExternalCommand(command.argv(), state.root.toFile(), null, token,
                 editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true);
-            return new Execution(state.root, spec, adapter, command, result);
-        }, (job, execution, error) -> complete(job, execution, error));
+            return new Execution(state.root, spec, adapter, command, result, List.of());
+        }, (job, execution, error) -> complete(state, job, execution, error));
         state.jobs.put(jobId, spec.id());
         state.output = operation + " " + spec.id() + " running (job " + jobId + ")";
+        refreshPanel();
+        return 1;
+    }
+
+    private int startDevContainer(State state, String operation, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command,
+                                  Path reportCache) {
+        DevContainerController containers = editor.devContainerController;
+        if (containers == null) return 0;
+        int jobId = editor.asyncJobService.submit("dev container test " + spec.id() + " " + operation, token -> {
+            try {
+                String remoteRoot = containers.remoteWorkingDirectory(state.root);
+                DevContainerTestExecution.Plan plan = DevContainerTestExecution.prepare(state.root, remoteRoot, command);
+                CommandResult result = editor.jobQuickfixController.runExternalCommand(plan.invocation(), state.root.toFile(), null, token,
+                    editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true);
+                List<String> diagnostics = new ArrayList<>();
+                TestService.Command safeCommand = DevContainerTestExecution.validatedCommand(command, reportCache, diagnostics);
+                if (result.stdout != null && result.stdout.contains("[shed: output truncated]")) {
+                    diagnostics.add("Dev Container test output was truncated; stdout-derived results may be incomplete.");
+                }
+                return new Execution(state.root, spec, adapter, safeCommand, result, diagnostics, reportCache);
+            } catch (Exception error) {
+                String message = error.getMessage();
+                CommandResult result = new CommandResult(-1, "", "Dev Container test unavailable: "
+                    + (message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' ')));
+                return new Execution(state.root, spec, adapter, command, result, List.of(), reportCache);
+            }
+        }, (job, execution, error) -> complete(state, job, execution, error));
+        state.jobs.put(jobId, spec.id());
+        state.output = operation + " " + spec.id() + " running in the Dev Container (job " + jobId + ")";
+        refreshPanel();
+        return 1;
+    }
+
+    private int startRemote(State state, String operation, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command,
+                            Path reportCache, RemoteWorkspaceTaskTargets.Target remote) {
+        RemoteTestExecution.Plan plan;
+        try {
+            plan = RemoteTestExecution.prepare(remote, state.root, command, reportCache);
+        } catch (IOException error) {
+            state.output = "Remote " + spec.id() + " " + operation + " unavailable: " + error.getMessage();
+            refreshPanel();
+            return 0;
+        }
+        int jobId = editor.asyncJobService.submit("remote test " + spec.id() + " " + operation, token -> {
+            RemoteTestExecution.Result result = RemoteTestExecution.execute(plan);
+            return new Execution(state.root, spec, adapter, result.command(), result.result(), result.diagnostics());
+        }, (job, execution, error) -> complete(state, job, execution, error));
+        state.jobs.put(jobId, spec.id());
+        state.output = operation + " " + spec.id() + " running remotely in " + remote.id() + " (job " + jobId + ")";
         refreshPanel();
         return 1;
     }
@@ -303,14 +396,14 @@ final class TestController {
         refreshPanel();
     }
 
-    private void complete(AsyncJobService.JobSnapshot job, Execution execution, Exception error) {
-        if (execution == null) return;
-        State state = state(execution.root());
+    private void complete(State expectedState, AsyncJobService.JobSnapshot job, Execution execution, Exception error) {
+        State state = execution == null ? expectedState : state(execution.root());
         state.jobs.remove(job.getId());
         if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
-            state.output = execution.spec().id() + " cancelled";
-        } else if (error != null || execution.result() == null) {
-            state.output = execution.spec().id() + " failed: " + (error == null ? job.getErrorMessage() : error.getMessage());
+            state.output = execution == null ? "Test job cancelled" : execution.spec().id() + " cancelled";
+        } else if (execution == null || error != null || execution.result() == null) {
+            String adapter = execution == null ? "Test job" : execution.spec().id();
+            state.output = adapter + " failed: " + (error == null ? job.getErrorMessage() : error.getMessage());
         } else {
             String output = execution.result().stdout == null ? "" : execution.result().stdout;
             List<TestService.TestCase> parsed = "discover".equals(operation(job))
@@ -323,7 +416,12 @@ final class TestController {
             if (!parsed.isEmpty()) merge(state, parsed);
             state.output = output.isBlank() ? execution.result().stderr : output;
             if (state.output.isBlank()) state.output = execution.spec().id() + " exited " + execution.result().exitCode;
+            if (!execution.diagnostics().isEmpty()) state.output += "\n" + String.join("\n", execution.diagnostics());
             if (!"discover".equals(operation(job))) publishProblems(state, execution.spec().id());
+        }
+        if (execution != null && execution.devContainerReportCache() != null) {
+            String cleanup = DevContainerTestExecution.cleanupReportCache(execution.root(), execution.devContainerReportCache());
+            if (!cleanup.isBlank()) state.output = state.output.isBlank() ? cleanup : state.output + "\n" + cleanup;
         }
         refreshPanel();
     }
@@ -356,6 +454,23 @@ final class TestController {
     private State state(Path root) {
         Path normalized = (root == null ? selectedRoot() : root).toAbsolutePath().normalize();
         return states.computeIfAbsent(normalized, State::new);
+    }
+
+    private RemoteWorkspaceTaskTargets.Target remoteExecutionTarget(Path root) {
+        RemoteWorkspaceTaskTargets.Target target = editor.remoteWorkspaceTaskTargets == null ? null : editor.remoteWorkspaceTaskTargets.targetForPath(root);
+        if (target == null || target.workspace().executionRoot() == null) return null;
+        String executionRoot = target.workspace().executionRoot().trim();
+        return executionRoot.equals(target.localRoot().toString()) ? null : target;
+    }
+
+    private boolean usesDevContainer(Path root) {
+        return editor.devContainerController != null && editor.devContainerController.hasConfiguration(root);
+    }
+
+    private Path remoteDiscoveryCache(State state, TestService.AdapterSpec spec, TestService.Command command) throws IOException {
+        if (remoteExecutionTarget(state.root) == null || command == null || command.reports().isEmpty()) return null;
+        Path cache = tests.reportCache(state.root, spec.id(), Path.of(editor.configManager.getShedDirectoryPath()));
+        return Files.createTempDirectory(cache, "remote-");
     }
 
     private static void merge(State state, List<TestService.TestCase> incoming) {

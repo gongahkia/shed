@@ -30,4 +30,14 @@ class WorkspaceRootResolverTest {
         assertEquals(client, WorkspaceRootResolver.configuredOrActive(Path.of("/work/client/src/App.java"), List.of(client, server), server));
         assertEquals(server, WorkspaceRootResolver.configuredOrActive(Path.of("/unrelated/file.txt"), List.of(client, server), server));
     }
+
+    @Test
+    void routesCoverageToTheRootOwningTheOpenFile() {
+        Path client = Path.of("/work/client");
+        Path server = Path.of("/work/server");
+
+        assertEquals(client, TestController.coverageRootFor(Path.of("/work/client/src/App.java"), List.of(client, server), server));
+        assertEquals(server, TestController.coverageRootFor(Path.of("/work/server/src/Main.java"), List.of(client, server), client));
+        assertNull(TestController.coverageRootFor(Path.of("/outside/Main.java"), List.of(client, server), client));
+    }
 }

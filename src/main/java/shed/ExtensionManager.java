@@ -8,6 +8,7 @@ import shed.api.LanguageContribution;
 import shed.api.LanguageProfile;
 import shed.api.RemoteWorkspaceProvider;
 import shed.api.ScmContribution;
+import shed.api.SnippetContribution;
 import shed.api.ShedExtension;
 import shed.api.TerminalProfile;
 import shed.api.TestContribution;
@@ -120,7 +121,12 @@ final class ExtensionManager implements AutoCloseable {
     }
 
     synchronized List<ExtensionRegistry.Owned<LanguageContribution>> languages() { return registry.languages(); }
+    synchronized ExtensionRegistry.Owned<LanguageContribution> languageForId(String languageId) { return registry.languageForId(languageId); }
+    synchronized ExtensionRegistry.Owned<LanguageContribution> languageForId(String extensionId, String languageId) {
+        return registry.languageForId(extensionId, languageId);
+    }
     synchronized List<ExtensionRegistry.Owned<LanguageProfile>> languageProfiles() { return registry.languageProfiles(); }
+    synchronized List<ExtensionRegistry.Owned<SnippetContribution>> snippets() { return registry.snippets(); }
     synchronized List<ExtensionRegistry.Owned<DebugAdapterContribution>> debuggers() { return registry.debuggers(); }
     synchronized List<ExtensionRegistry.Owned<TestContribution>> tests() { return registry.tests(); }
     synchronized List<ExtensionRegistry.Owned<ScmContribution>> scmProviders() { return registry.scmProviders(); }
@@ -480,6 +486,7 @@ final class ExtensionManager implements AutoCloseable {
         @Override public void registerCommand(String id, ExtensionCommand command) { registry.registerCommand(extensionId, id, command); }
         @Override public void registerLanguage(LanguageContribution contribution) { registry.registerLanguage(extensionId, contribution); }
         @Override public void registerLanguageProfile(LanguageProfile profile) { registry.registerLanguageProfile(extensionId, profile); }
+        @Override public void registerSnippet(SnippetContribution contribution) { registry.registerSnippet(extensionId, contribution); }
         @Override public void registerDebugger(DebugAdapterContribution contribution) { registry.registerDebugger(extensionId, contribution); }
         @Override public void registerTestProvider(TestContribution contribution) { registry.registerTest(extensionId, contribution); }
         @Override public void registerScmProvider(ScmContribution contribution) { registry.registerScm(extensionId, contribution); }

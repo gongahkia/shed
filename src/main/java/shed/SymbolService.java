@@ -46,6 +46,17 @@ public class SymbolService {
     private static final Pattern PY_DEF = Pattern.compile("^\\s*(?:async\\s+)?def\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(");
     private static final Pattern JS_FUNCTION = Pattern.compile("^\\s*(?:export\\s+)?(?:async\\s+)?function\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(");
     private static final Pattern JS_ARROW = Pattern.compile("^\\s*(?:export\\s+)?(?:const|let|var)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?:async\\s*)?(?:\\([^)]*\\)|[A-Za-z_][A-Za-z0-9_]*)\\s*=>");
+    private static final Pattern GO_TYPE = Pattern.compile("^\\s*type\\s+([A-Za-z_][A-Za-z0-9_]*)\\b");
+    private static final Pattern GO_FUNCTION = Pattern.compile("^\\s*func\\s*(?:\\([^)]*\\)\\s*)?([A-Za-z_][A-Za-z0-9_]*)\\s*\\(");
+    private static final Pattern RUST_ITEM = Pattern.compile("^\\s*(?:pub(?:\\([^)]*\\))?\\s+)?(?:struct|enum|trait|mod)\\s+([A-Za-z_][A-Za-z0-9_]*)\\b");
+    private static final Pattern RUST_FUNCTION = Pattern.compile("^\\s*(?:pub(?:\\([^)]*\\))?\\s+)?(?:async\\s+)?(?:unsafe\\s+)?fn\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(");
+    private static final Pattern RUST_IMPL = Pattern.compile("^\\s*impl(?:<[^>{}]*>)?\\s+([A-Za-z_][A-Za-z0-9_]*)");
+    private static final Pattern C_CPP_TYPE = Pattern.compile("^\\s*(?:class|struct|enum|namespace)\\s+([A-Za-z_][A-Za-z0-9_]*)\\b");
+    private static final Pattern C_CPP_FUNCTION = Pattern.compile("^\\s*(?!if\\b|for\\b|while\\b|switch\\b|catch\\b)(?:[A-Za-z_][A-Za-z0-9_:<>]*\\s*[*&]?\\s+)+([A-Za-z_][A-Za-z0-9_]*)\\s*\\([^;{}]*\\)\\s*(?:const\\s*)?(?:\\{|$)");
+    private static final Pattern YAML_KEY = Pattern.compile("^(\\s*)(?:-\\s+)?([A-Za-z0-9_.-]+):");
+    private static final Pattern TOML_TABLE = Pattern.compile("^\\s*\\[\\[?\\s*([^\\]]+?)\\s*\\]\\]?\\s*(?:#.*)?$");
+    private static final Pattern SQL_DEFINITION = Pattern.compile("^\\s*create\\s+(?:or\\s+replace\\s+)?(?:table|view|index|schema|function|procedure)\\s+(?:if\\s+not\\s+exists\\s+)?([A-Za-z_][A-Za-z0-9_.$]*)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SHELL_FUNCTION = Pattern.compile("^\\s*(?:function\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s*(?:\\(\\s*\\))?\\s*\\{");
     private static final Pattern JAVA_METHOD = Pattern.compile(
         "^\\s*(?:public|private|protected|internal|static|final|abstract|synchronized|native|inline|virtual|override|sealed|open|extern|async|unsafe|mut|const|default|\\s)+"
             + "(?:[A-Za-z_][A-Za-z0-9_<>,\\[\\]?\\s\\.]*\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s*\\([^;{}]*\\)\\s*(?:\\{|=>|$)"
@@ -84,7 +95,7 @@ public class SymbolService {
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
             String trimmed = line == null ? "" : line.trim();
-            if (trimmed.isEmpty() || trimmed.startsWith("//") || trimmed.startsWith("# ")) {
+            if (trimmed.isEmpty() || trimmed.startsWith("//") || trimmed.startsWith("#")) {
                 braceDepth += netBraceDelta(trimmed);
                 continue;
             }
@@ -148,6 +159,83 @@ public class SymbolService {
             Matcher jsArrow = JS_ARROW.matcher(value);
             if (jsArrow.find()) {
                 symbols.add(new Symbol(jsArrow.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            return false;
+        }
+        if (fileType == FileType.GO) {
+            Matcher type = GO_TYPE.matcher(value);
+            if (type.find()) {
+                symbols.add(new Symbol(type.group(1), "type", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            Matcher function = GO_FUNCTION.matcher(value);
+            if (function.find()) {
+                symbols.add(new Symbol(function.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            return false;
+        }
+        if (fileType == FileType.RUST) {
+            Matcher item = RUST_ITEM.matcher(value);
+            if (item.find()) {
+                symbols.add(new Symbol(item.group(1), "item", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            Matcher function = RUST_FUNCTION.matcher(value);
+            if (function.find()) {
+                symbols.add(new Symbol(function.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            Matcher implementation = RUST_IMPL.matcher(value);
+            if (implementation.find()) {
+                symbols.add(new Symbol("impl " + implementation.group(1), "implementation", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            return false;
+        }
+        if (fileType == FileType.C || fileType == FileType.CPP) {
+            Matcher type = C_CPP_TYPE.matcher(value);
+            if (type.find()) {
+                symbols.add(new Symbol(type.group(1), "type", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            Matcher function = C_CPP_FUNCTION.matcher(value);
+            if (function.find()) {
+                symbols.add(new Symbol(function.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
+                return true;
+            }
+            return false;
+        }
+        if (fileType == FileType.YAML) {
+            Matcher key = YAML_KEY.matcher(value);
+            if (key.find()) {
+                int level = Math.max(1, leadingSpaces(key.group(1)) / 2 + 1);
+                symbols.add(new Symbol(key.group(2), "key", lineNumber, level));
+                return true;
+            }
+            return false;
+        }
+        if (fileType == FileType.TOML) {
+            Matcher table = TOML_TABLE.matcher(value);
+            if (table.find()) {
+                symbols.add(new Symbol(table.group(1), "table", lineNumber, 1));
+                return true;
+            }
+            return false;
+        }
+        if (fileType == FileType.SQL) {
+            Matcher definition = SQL_DEFINITION.matcher(value);
+            if (definition.find()) {
+                symbols.add(new Symbol(definition.group(1), "definition", lineNumber, 1));
+                return true;
+            }
+            return false;
+        }
+        if (fileType == FileType.SHELL) {
+            Matcher function = SHELL_FUNCTION.matcher(value);
+            if (function.find() && !isControlKeyword(function.group(1))) {
+                symbols.add(new Symbol(function.group(1), "function", lineNumber, 1));
                 return true;
             }
             return false;

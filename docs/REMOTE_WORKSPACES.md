@@ -56,7 +56,11 @@ For a connected SSH, Docker-container, or WSL workspace, Shed carries that confi
 
 Remote terminal output can open a source location only when its absolute remote path is beneath that same declared remote root and its mapped local-mirror file exists. This supports compiler-style `path:line[:column]` output without exposing remote paths outside the mirror. Relative links assume the terminal began at the remote workspace root; Shed does not infer a later remote `cd` for SSH/container terminals.
 
-The bridge supports only ordinary absolute `file:` URIs inside the connected workspace root. It does not support SSH login banners on stdout, remote URI schemes, port-forwarded language servers, remote extension hosts, remote test/debug placement, or a server bootstrap/reconnect protocol.
+### Explicit remote tests
+
+When the Tests panel selects a connected workspace root, explicit test discovery and test runs use that provider's remote command environment. Shed maps configured direct argv paths from the local mirror to the declared remote root and maps absolute remote output paths back before parsing. It retrieves only the declared report files/directories into a fresh app-owned cache; it does not pull the complete project after a test run. See [Testing](TESTS.md#connected-remote-roots) for report, size, cleanup, and cancellation boundaries.
+
+The bridges support only ordinary absolute `file:` URIs and DAP source paths inside the connected workspace root. An explicit configured stdio adapter can run remotely through SSH, Docker, or WSL; it does not support SSH login banners on stdout, remote URI schemes, remote TCP DAP, port-forwarded language servers, remote extension hosts, or a server bootstrap/reconnect protocol.
 
 ## Semantics and limitations
 
@@ -64,7 +68,7 @@ The bridge supports only ordinary absolute `file:` URIs inside the connected wor
 - SSH mirroring deliberately omits `--delete`; a pull cannot silently delete an unrelated local mirror file.
 - Container remote-workspace support itself is file synchronization. It does not run an extension host inside a container; the separate local Dev Container CLI bridge below is explicit and does not alter that mirror model.
 - WSL support is Windows-only and uses the local WSL filesystem bridge rather than a remote server.
-- This is not VS Code or Zed remote-development parity: there is no remote extension host, remote test/debug placement, automatic task placement, SSH server bootstrap, port-forwarding UI, Codespaces service, browser editor, persistent remote-server/reconnect protocol, or automatic conflict resolver. Remote LSP is a narrow explicit process bridge, not a remote workbench host.
+- This is not VS Code or Zed remote-development parity: there is no remote extension host, automatic task placement, SSH server bootstrap, port-forwarding UI, Codespaces service, browser editor, persistent remote-server/reconnect protocol, or automatic conflict resolver. Remote LSP, testing, and debugging are narrow explicit process bridges, not a remote workbench host.
 
 Extensions can add URI schemes using `RemoteWorkspaceProvider`; they must disclose their own authentication, synchronization, and network behavior.
 
@@ -81,6 +85,6 @@ For a workspace containing `.devcontainer/devcontainer.json`, Shed also exposes 
 :container open <container> <absolute-path>
 ```
 
-`up`, `exec`, and `:task container` use the user-installed `devcontainer` CLI as explicit, cancellable local processes; `terminal` opens a PTY using `devcontainer exec`. A container task first resolves the runtime workspace path, applies task environment values as `--remote-env`, and then runs the validated task. With global `remote.lsp.enabled=true` and a user-configured `lsp.<ext>.command`, opening a matching file in an already running container likewise probes that path and starts only that LSP process through `devcontainer exec`; it does not start the container or install the server. Direct tasks require the workspace-root cwd because the CLI exposes no cwd option; login-shell tasks may explicitly change into a subdirectory. Shed does not install the CLI, create a configuration, invoke these commands during workspace open, or claim to run an extension host in the container. `open` creates the same explicit Docker-copy mirror described above.
+`up`, `exec`, and `:task container` use the user-installed `devcontainer` CLI as explicit, cancellable local processes; `terminal` opens a PTY using `devcontainer exec`. A container task first resolves the runtime workspace path, applies task environment values as `--remote-env`, and then runs the validated task. With global `remote.lsp.enabled=true` and a user-configured `lsp.<ext>.command`, opening a matching file in an already running container likewise probes that path and starts only that LSP process through `devcontainer exec`. An explicit configured stdio DAP adapter can use the same probe and bridge, including a configured pre-launch task; adapter discovery remains process-free. Shed does not start or rebuild a container for LSP or debugging, install a server/adapter, expose remote TCP DAP or port forwarding, invoke these commands during workspace open, or claim to run an extension host in the container. Direct tasks require the workspace-root cwd because the CLI exposes no cwd option; login-shell tasks may explicitly change into a subdirectory. `open` creates the same explicit Docker-copy mirror described above.
 
 In a multi-root workspace, Dev Container commands use the deepest configured folder containing the current file. A scratch or outside file uses the Explorer-selected folder.

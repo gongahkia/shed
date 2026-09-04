@@ -46,6 +46,16 @@ public interface RemoteWorkspace extends AutoCloseable {
     }
 
     /**
+     * Copies one existing regular file or directory from a workspace-relative
+     * remote path into an app-owned local directory and returns the resulting
+     * local path. Implementations must reject traversal and symbolic-link
+     * escapes. The default retains API-v1 provider compatibility.
+     */
+    default Path fetchWorkspacePath(String relativePath, Path destinationDirectory) throws Exception {
+        throw new UnsupportedOperationException("this remote workspace does not support artifact retrieval");
+    }
+
+    /**
      * Builds the local direct-argv process used to attach a PTY to an explicitly
      * selected terminal in this workspace. The process inherits no task
      * environment; providers decide how to enter their remote environment.
@@ -65,6 +75,18 @@ public interface RemoteWorkspace extends AutoCloseable {
 
     /** Absolute POSIX root used by {@link #languageServerCommand(List)}. */
     default String languageServerRoot() { return ""; }
+
+    /**
+     * Builds the local direct-argv process whose standard streams carry one
+     * user-configured remote DAP adapter. The provider must not install an
+     * adapter or silently fall back to local execution.
+     */
+    default List<String> debugAdapterCommand(List<String> command) throws Exception {
+        throw new UnsupportedOperationException("this remote workspace does not support remote debug adapters");
+    }
+
+    /** Absolute POSIX root used by {@link #debugAdapterCommand(List)}. */
+    default String debugAdapterRoot() { return ""; }
 
     @Override
     void close() throws Exception;

@@ -64,6 +64,25 @@ class GrammarHighlightServiceTest {
     }
 
     @Test
+    void lexesCommonConfigurationSqlAndShellFilesWithoutEnablingAnLsp() throws Exception {
+        String yaml = "enabled: true # local comment";
+        assertTrue(has(highlight("service.yaml", yaml), yaml, "true", GrammarHighlightService.Scope.KEYWORD));
+        assertTrue(has(highlight("service.yaml", yaml), yaml, "# local comment", GrammarHighlightService.Scope.COMMENT));
+
+        String toml = "enabled = false # local comment";
+        assertTrue(has(highlight("config.toml", toml), toml, "false", GrammarHighlightService.Scope.KEYWORD));
+        assertTrue(has(highlight("config.toml", toml), toml, "# local comment", GrammarHighlightService.Scope.COMMENT));
+
+        String sql = "SELECT id FROM users -- local comment";
+        assertTrue(has(highlight("query.sql", sql), sql, "SELECT", GrammarHighlightService.Scope.KEYWORD));
+        assertTrue(has(highlight("query.sql", sql), sql, "-- local comment", GrammarHighlightService.Scope.COMMENT));
+
+        String shell = "if true; then # local comment";
+        assertTrue(has(highlight("deploy.sh", shell), shell, "if", GrammarHighlightService.Scope.KEYWORD));
+        assertTrue(has(highlight("deploy.sh", shell), shell, "# local comment", GrammarHighlightService.Scope.COMMENT));
+    }
+
+    @Test
     void virtualizedCodeRangeRetainsMultilineCommentState() {
         String text = "class Demo {\n/* open\nstill comment\n*/\nint value = 1;\n}";
         int start = text.indexOf("still comment");

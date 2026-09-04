@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 final class DebugSessionController {
     record ExceptionBreakpointView(DebugSessionService.ExceptionFilter filter, boolean enabled, boolean adapterDefault) {
@@ -25,6 +26,7 @@ final class DebugSessionController {
     private final DebugSessionService sessions;
     private final BreakpointStore breakpoints;
     private final ExceptionBreakpointStore exceptionBreakpoints;
+    private final Map<Path, Boolean> openSourceOnStop = new ConcurrentHashMap<>();
     private Path lastWorkspace;
     private Path lastActiveFile;
 
@@ -53,7 +55,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|exception list|enable|disable|console [clear]|stack|variables|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|goto [line]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|exception list|enable|disable|console [clear]|stack|variables|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -70,6 +72,7 @@ final class DebugSessionController {
             case "stepin", "step-in" -> submitControl(DebugSessionService.Control.STEP_IN);
             case "stepout", "step-out" -> submitControl(DebugSessionService.Control.STEP_OUT);
             case "pause" -> submitControl(DebugSessionService.Control.PAUSE);
+            case "goto", "run-to-cursor", "runtocursor" -> runToCursor(args);
             case "breakpoint", "breakpoints", "bp" -> breakpoint(args);
             case "exception", "exceptions" -> exceptionBreakpoint(args);
             case "console", "output" -> console(args);
@@ -80,7 +83,11 @@ final class DebugSessionController {
         };
     }
 
-    void shutdown() { sessions.stop(workspace()); }
+    void shutdown() {
+        Path workspace = workspace();
+        sessions.stop(workspace);
+        openSourceOnStop.remove(workspace);
+    }
 
     List<String> configurationNamesForPanel() {
         DebugAdapterRegistry.Validation validation = validation();
@@ -115,6 +122,7 @@ final class DebugSessionController {
     String stepInForPanel() { return submitControl(DebugSessionService.Control.STEP_IN); }
     String stepOutForPanel() { return submitControl(DebugSessionService.Control.STEP_OUT); }
     String pauseForPanel() { return submitControl(DebugSessionService.Control.PAUSE); }
+    String runToCursorForPanel() { return runToCursor(""); }
 
     List<BreakpointStore.Breakpoint> breakpointsForPanel() {
         try {
@@ -207,8 +215,19 @@ final class DebugSessionController {
 
     private String configurations() {
         Path workspace = workspace();
-        DebugAdapterDetector.WorkspaceReport report = new DebugAdapterDetector(null).detect(workspace, validation(),
-            editor.configManager.getDebugFeatureSettings());
+        DebugAdapterRegistry.Validation validation = validation();
+        java.util.Set<String> remote = new java.util.LinkedHashSet<>();
+        if (validation != null) for (DebugAdapterRegistry.Adapter adapter : validation.registry().adapters().values()) {
+            if (adapter.transport() != DebugAdapterRegistry.Transport.STDIO) continue;
+            try {
+                List<String> command = new ArrayList<>();
+                command.add(adapter.command());
+                command.addAll(adapter.args());
+                if (remoteDebugAdapterAvailable(workspace, command)) remote.add(adapter.id());
+            } catch (IOException ignored) { }
+        }
+        DebugAdapterDetector.WorkspaceReport report = new DebugAdapterDetector(null).detect(workspace, validation,
+            editor.configManager.getDebugFeatureSettingsForWorkspace(workspace), remote);
         StringBuilder output = new StringBuilder("Debug Configurations\n\nWorkspace: ").append(workspace).append("\nEditing remains available: ")
             .append(report.normalEditingAvailable()).append("\n\nAdapters:\n");
         if (report.adapters().isEmpty()) output.append("  (none)\n");
@@ -260,8 +279,11 @@ final class DebugSessionController {
 
     private String submitStart(Path workspace, DebugAdapterRegistry.LaunchContext context, String requested, boolean restart, String operation) {
         String name = requested == null ? "" : requested.trim();
+        DebugAdapterRegistry.Validation configuration = validation(workspace);
+        DebugFeatureSettings features = editor.configManager.getDebugFeatureSettingsForWorkspace(workspace);
+        openSourceOnStop.put(workspace.toAbsolutePath().normalize(), editor.configManager.getDebugOpenSourceOnStopForWorkspace(workspace));
         int jobId = editor.asyncJobService.submit("debug " + operation, token -> sessions.start(workspace, context,
-            validation(), editor.configManager.getDebugFeatureSettings(), name,
+            configuration, features, name,
             Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs())), this::startTransport, breakpoints, exceptionBreakpoints,
             plan -> editor.jobQuickfixController.runDebugPreLaunchTask(plan, token)), (job, result, error) -> {
                 if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
@@ -298,20 +320,31 @@ final class DebugSessionController {
                 listener.onDiagnostic(diagnostic);
             }
         };
-        DebugAdapterTransport transport = DebugAdapterTransport.start(plan, features, combinedListener, new DiagnosticLog(editor.errorReporter.getLogPath()));
+        List<String> adapterCommand = new ArrayList<>();
+        adapterCommand.add(plan.adapter().command());
+        adapterCommand.addAll(plan.adapter().args());
+        RemoteDebugEndpoint remote = plan.adapter().transport() != DebugAdapterRegistry.Transport.STDIO ? null
+            : remoteDebugAdapterEndpoint(plan.workspace(), adapterCommand);
+        DebugAdapterTransport transport = remote == null
+            ? DebugAdapterTransport.start(plan, features, combinedListener, new DiagnosticLog(editor.errorReporter.getLogPath()))
+            : DebugAdapterTransport.startRemote(plan, remote.command(), features, combinedListener, new DiagnosticLog(editor.errorReporter.getLogPath()));
         return new DebugSessionService.Connection() {
             @Override public DebugAdapterTransport.Response request(String command, Map<String, Object> arguments, Duration timeout)
                 throws IOException, java.util.concurrent.TimeoutException, InterruptedException { return transport.request(command, arguments, timeout); }
             @Override public DebugAdapterTransport.State state() { return transport.state(); }
+            @Override public String adapterPath(Path localPath) {
+                return remote == null ? DebugSessionService.Connection.super.adapterPath(localPath) : remote.remotePathFor(localPath);
+            }
+            @Override public Path localPath(String adapterPath) { return remote == null ? null : remote.localPathFor(adapterPath); }
             @Override public void close() { transport.close(); }
         };
     }
 
     private void scheduleStoppedInspection(Path workspace) {
-        if (workspace == null || !editor.configManager.getDebugOpenSourceOnStop()) return;
+        if (workspace == null || !opensSourceOnStop(workspace)) return;
         Duration timeout = Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()));
         editor.asyncJobService.submit("debug stopped inspection", token -> sessions.refreshInspection(workspace, timeout), (job, result, error) -> {
-            if (error != null || result == null || !result.succeeded() || !editor.configManager.getDebugOpenSourceOnStop()) {
+            if (error != null || result == null || !result.succeeded() || !opensSourceOnStop(workspace)) {
                 refreshDebugPanel();
                 return;
             }
@@ -339,12 +372,34 @@ final class DebugSessionController {
     }
 
     private DebugAdapterRegistry.Validation validation() {
-        return ExtensionDebugAdapterSupport.effective(BuiltInDebugAdapterSupport.effective(editor.configManager.getDebugConfiguration()),
+        return validation(workspace());
+    }
+
+    private DebugAdapterRegistry.Validation validation(Path workspace) {
+        return ExtensionDebugAdapterSupport.effective(BuiltInDebugAdapterSupport.effective(editor.configManager.getDebugConfigurationForWorkspace(workspace)),
             editor.extensionRegistry);
     }
 
+    private boolean remoteDebugAdapterAvailable(Path workspace, List<String> command) throws IOException {
+        if (editor.remoteWorkspaceController != null && editor.remoteWorkspaceController.debugAdapterEndpoint(workspace, command) != null) return true;
+        return editor.devContainerController != null && editor.devContainerController.supportsDebugAdapter(workspace, command);
+    }
+
+    private RemoteDebugEndpoint remoteDebugAdapterEndpoint(Path workspace, List<String> command) throws IOException {
+        if (editor.remoteWorkspaceController != null) {
+            RemoteDebugEndpoint endpoint = editor.remoteWorkspaceController.debugAdapterEndpoint(workspace, command);
+            if (endpoint != null) return endpoint;
+        }
+        if (editor.devContainerController != null && editor.devContainerController.hasConfiguration(workspace)) {
+            return editor.devContainerController.debugAdapterEndpoint(workspace, command);
+        }
+        return null;
+    }
+
     private String stop() {
-        DebugSessionService.Result result = sessions.stop(workspace());
+        Path workspace = workspace();
+        DebugSessionService.Result result = sessions.stop(workspace);
+        openSourceOnStop.remove(workspace);
         if (editor.toolWindowHost != null && editor.toolWindowHost.isSelected(ToolWindowHost.Tab.DEBUG)) {
             editor.toolWindowHost.refresh(ToolWindowHost.Tab.DEBUG);
         } else {
@@ -426,6 +481,38 @@ final class DebugSessionController {
                 } else editor.showMessage(result.snapshot().detail());
             });
         return "Debug " + operation + " requested (job " + jobId + ").";
+    }
+
+    private String runToCursor(String argument) {
+        Path source = activeFile();
+        if (source == null) return "Run to cursor requires an active file-backed editor buffer.";
+        int line;
+        String value = argument == null ? "" : argument.trim();
+        try {
+            line = value.isBlank() ? editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition()) + 1 : Integer.parseInt(value);
+        } catch (Exception error) {
+            return "Usage: :debug goto [positive-line]";
+        }
+        if (line < 1) return "Usage: :debug goto [positive-line]";
+        int column = 1;
+        if (value.isBlank()) {
+            try {
+                int lineStart = editor.writingArea.getLineStartOffset(line - 1);
+                column = editor.writingArea.getCaretPosition() - lineStart + 1;
+            } catch (Exception error) {
+                return "Run to cursor could not resolve the active caret location.";
+            }
+        }
+        Path workspace = workspace();
+        int requestedLine = line;
+        int requestedColumn = column;
+        int jobId = editor.asyncJobService.submit("debug run to cursor", token -> sessions.runToCursor(workspace, source, requestedLine, requestedColumn,
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                refreshDebugPanel();
+                if (error != null || result == null || !result.succeeded()) editor.showMessage("Debug run to cursor failed; inspect :debug status.");
+                else editor.showMessage(result.snapshot().detail());
+            });
+        return "Debug run to cursor requested (job " + jobId + ").";
     }
 
     private String breakpoint(String argument) {
@@ -691,6 +778,12 @@ final class DebugSessionController {
     private Path activeFile() {
         workspace();
         return lastActiveFile;
+    }
+
+    private boolean opensSourceOnStop(Path workspace) {
+        if (workspace == null) return false;
+        Boolean configured = openSourceOnStop.get(workspace.toAbsolutePath().normalize());
+        return configured == null ? editor.configManager.getDebugOpenSourceOnStopForWorkspace(workspace) : configured;
     }
     private static String diagnosticSuffix(DebugSessionService.Snapshot snapshot) {
         return snapshot.diagnostics().isEmpty() ? "" : " Diagnostics: " + String.join("; ", snapshot.diagnostics());

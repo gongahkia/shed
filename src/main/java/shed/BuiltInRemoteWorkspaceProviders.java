@@ -13,6 +13,10 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.FileVisitResult;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -101,6 +105,10 @@ final class BuiltInRemoteWorkspaceProviders {
             return commandResult(executeProcess(requiredCommand(request.command()), localDirectory(root, request), request.environment()));
         }
 
+        @Override public Path fetchWorkspacePath(String relativePath, Path destinationDirectory) throws Exception {
+            return copyWorkspacePath(root, relativePath, destinationDirectory);
+        }
+
         @Override public List<String> terminalCommand(RemoteTerminalRequest request) {
             RemoteTerminalRequest terminal = requiredTerminalRequest(request);
             return terminal.command().isEmpty() ? ShellCommand.interactiveCommand() : terminal.command();
@@ -170,6 +178,16 @@ final class BuiltInRemoteWorkspaceProviders {
             return commandResult(executeProcess(invocation, root.getParent()));
         }
 
+        @Override public Path fetchWorkspacePath(String relativePath, Path destinationDirectory) throws Exception {
+            String source = remoteDirectory(uri.getPath(), requiredWorkspaceRelativePath(relativePath));
+            boolean directory = sshDirectory(uri, source, root.getParent());
+            List<String> invocation = sshFetchInvocation(uri, source, destinationDirectory, directory);
+            ProcessResult result = executeProcess(invocation, root.getParent());
+            if (result.exitCode() != 0) throw new IOException("remote artifact retrieval failed: " + result.detail());
+            Path destination = preparedDestination(destinationDirectory);
+            return validateFetchedArtifact(directory ? destination : destination.resolve(Path.of(source).getFileName().toString()), destination);
+        }
+
         @Override public List<String> terminalCommand(RemoteTerminalRequest request) throws Exception {
             RemoteTerminalRequest terminal = requiredTerminalRequest(request);
             List<String> invocation = new ArrayList<>(List.of("ssh", "-tt"));
@@ -187,7 +205,12 @@ final class BuiltInRemoteWorkspaceProviders {
             return sshLanguageServerInvocation(uri, command);
         }
 
+        @Override public List<String> debugAdapterCommand(List<String> command) throws Exception {
+            return sshLanguageServerInvocation(uri, command);
+        }
+
         @Override public String languageServerRoot() { return uri.getPath(); }
+        @Override public String debugAdapterRoot() { return uri.getPath(); }
 
         @Override public void close() {
             // No daemon is left running; mirror files remain available offline.
@@ -290,6 +313,16 @@ final class BuiltInRemoteWorkspaceProviders {
             return commandResult(executeProcess(invocation, root.getParent()));
         }
 
+        @Override public Path fetchWorkspacePath(String relativePath, Path destinationDirectory) throws Exception {
+            String source = remoteDirectory(uri.getPath(), requiredWorkspaceRelativePath(relativePath));
+            boolean directory = containerDirectory(uri, source, root.getParent());
+            List<String> invocation = containerFetchInvocation(uri, source, destinationDirectory, directory);
+            ProcessResult result = executeProcess(invocation, root.getParent());
+            if (result.exitCode() != 0) throw new IOException("container artifact retrieval failed: " + result.detail());
+            Path destination = preparedDestination(destinationDirectory);
+            return validateFetchedArtifact(directory ? destination : destination.resolve(Path.of(source).getFileName().toString()), destination);
+        }
+
         @Override public List<String> terminalCommand(RemoteTerminalRequest request) throws Exception {
             RemoteTerminalRequest terminal = requiredTerminalRequest(request);
             List<String> invocation = new ArrayList<>(List.of("docker", "exec", "-it", "--workdir",
@@ -302,7 +335,12 @@ final class BuiltInRemoteWorkspaceProviders {
             return containerLanguageServerInvocation(uri, command);
         }
 
+        @Override public List<String> debugAdapterCommand(List<String> command) throws Exception {
+            return containerLanguageServerInvocation(uri, command);
+        }
+
         @Override public String languageServerRoot() { return uri.getPath(); }
+        @Override public String debugAdapterRoot() { return uri.getPath(); }
 
         @Override public void close() {
             // Docker copy does not leave an attached process or an implicit container lifecycle.
@@ -318,6 +356,9 @@ final class BuiltInRemoteWorkspaceProviders {
         @Override public String executionRoot() { return root.toString(); }
         @Override public void synchronize() { }
         @Override public void synchronizeToRemote() { }
+        @Override public Path fetchWorkspacePath(String relativePath, Path destinationDirectory) throws Exception {
+            return copyWorkspacePath(root, relativePath, destinationDirectory);
+        }
         @Override public List<String> terminalCommand(RemoteTerminalRequest request) {
             RemoteTerminalRequest terminal = requiredTerminalRequest(request);
             return terminal.command().isEmpty() ? ShellCommand.interactiveCommand() : terminal.command();
@@ -355,6 +396,10 @@ final class BuiltInRemoteWorkspaceProviders {
             return commandResult(executeProcess(invocation, root));
         }
 
+        @Override public Path fetchWorkspacePath(String relativePath, Path destinationDirectory) throws Exception {
+            return copyWorkspacePath(root, relativePath, destinationDirectory);
+        }
+
         @Override public List<String> terminalCommand(RemoteTerminalRequest request) throws Exception {
             RemoteTerminalRequest terminal = requiredTerminalRequest(request);
             List<String> invocation = new ArrayList<>(List.of("wsl.exe", "-d", uri.getHost(), "--cd",
@@ -370,7 +415,12 @@ final class BuiltInRemoteWorkspaceProviders {
             return wslLanguageServerInvocation(uri, command);
         }
 
+        @Override public List<String> debugAdapterCommand(List<String> command) throws Exception {
+            return wslLanguageServerInvocation(uri, command);
+        }
+
         @Override public String languageServerRoot() { return uri.getPath(); }
+        @Override public String debugAdapterRoot() { return uri.getPath(); }
 
         @Override public void close() { }
     }
@@ -401,6 +451,19 @@ final class BuiltInRemoteWorkspaceProviders {
         return List.copyOf(invocation);
     }
 
+    static List<String> sshFetchInvocation(URI uri, String source, Path destinationDirectory, boolean directory) throws IOException {
+        if (uri == null || !safeRemotePath(source)) throw new IOException("SSH artifact retrieval requires an absolute remote path");
+        Path destination = preparedDestination(destinationDirectory);
+        List<String> invocation = new ArrayList<>(List.of("rsync", "-az", "--protect-args", "--safe-links"));
+        if (uri.getPort() > 0) {
+            invocation.add("-e");
+            invocation.add("ssh -p " + uri.getPort());
+        }
+        invocation.add(safeSshTarget(uri) + ":" + source + (directory ? "/" : ""));
+        invocation.add(destination + "/");
+        return List.copyOf(invocation);
+    }
+
     static List<String> containerLanguageServerInvocation(URI uri, List<String> command) throws IOException {
         if (uri == null || !safeRemotePath(uri.getPath()) || uri.getHost() == null || !uri.getHost().matches("[A-Za-z0-9][A-Za-z0-9_.-]*")) {
             throw new IOException("container language server requires a valid container workspace URI");
@@ -408,6 +471,14 @@ final class BuiltInRemoteWorkspaceProviders {
         List<String> invocation = new ArrayList<>(List.of("docker", "exec", "-i", "--workdir", uri.getPath(), uri.getHost()));
         invocation.addAll(requiredCommand(command));
         return List.copyOf(invocation);
+    }
+
+    static List<String> containerFetchInvocation(URI uri, String source, Path destinationDirectory, boolean directory) throws IOException {
+        if (uri == null || uri.getHost() == null || !uri.getHost().matches("[A-Za-z0-9][A-Za-z0-9_.-]*") || !safeRemotePath(source)) {
+            throw new IOException("container artifact retrieval requires a valid container path");
+        }
+        Path destination = preparedDestination(destinationDirectory);
+        return List.of("docker", "cp", uri.getHost() + ":" + source + (directory ? "/." : ""), destination.toString());
     }
 
     static List<String> wslLanguageServerInvocation(URI uri, List<String> command) throws IOException {
@@ -422,6 +493,115 @@ final class BuiltInRemoteWorkspaceProviders {
     private static RemoteTerminalRequest requiredTerminalRequest(RemoteTerminalRequest request) {
         if (request == null) throw new IllegalArgumentException("remote terminal request is required");
         return request;
+    }
+
+    static Path copyWorkspacePath(Path root, String relativePath, Path destinationDirectory) throws IOException {
+        Path source = localWorkspacePath(root, relativePath);
+        Path destination = preparedDestination(destinationDirectory);
+        if (Files.isSymbolicLink(source)) throw new IOException("remote artifact source is symbolic-link based");
+        if (Files.isDirectory(source)) {
+            Files.walkFileTree(source, new SimpleFileVisitor<>() {
+                @Override public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException {
+                    if (Files.isSymbolicLink(directory)) throw new IOException("remote artifact contains a symbolic link");
+                    Path target = destination.resolve(source.relativize(directory).toString()).normalize();
+                    if (!target.startsWith(destination) || Files.isSymbolicLink(target)) throw new IOException("remote artifact destination is unsafe");
+                    Files.createDirectories(target);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                    if (Files.isSymbolicLink(file) || !attributes.isRegularFile()) throw new IOException("remote artifact contains an unsafe file");
+                    Path target = destination.resolve(source.relativize(file).toString()).normalize();
+                    if (!target.startsWith(destination) || Files.isSymbolicLink(target)) throw new IOException("remote artifact destination is unsafe");
+                    Files.createDirectories(target.getParent());
+                    Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+            return destination;
+        }
+        if (!Files.isRegularFile(source)) throw new IOException("remote artifact is not a regular file or directory");
+        Path target = destination.resolve(source.getFileName().toString()).normalize();
+        if (!target.startsWith(destination) || Files.isSymbolicLink(target)) throw new IOException("remote artifact destination is unsafe");
+        Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+        return target;
+    }
+
+    private static boolean sshDirectory(URI uri, String source, Path directory) throws IOException {
+        List<String> invocation = new ArrayList<>(List.of("ssh"));
+        if (uri.getPort() > 0) {
+            invocation.add("-p");
+            invocation.add(Integer.toString(uri.getPort()));
+        }
+        invocation.add(safeSshTarget(uri));
+        invocation.add("test -d -- " + posixQuote(source));
+        ProcessResult result = executeProcess(invocation, directory);
+        if (result.exitCode() == 0) return true;
+        List<String> exists = new ArrayList<>(List.of("ssh"));
+        if (uri.getPort() > 0) {
+            exists.add("-p");
+            exists.add(Integer.toString(uri.getPort()));
+        }
+        exists.add(safeSshTarget(uri));
+        exists.add("test -f -- " + posixQuote(source));
+        ProcessResult file = executeProcess(exists, directory);
+        if (file.exitCode() != 0) throw new IOException("remote artifact does not exist");
+        return false;
+    }
+
+    private static boolean containerDirectory(URI uri, String source, Path directory) throws IOException {
+        ProcessResult result = executeProcess(List.of("docker", "exec", uri.getHost(), "test", "-d", source), directory);
+        if (result.exitCode() == 0) return true;
+        ProcessResult file = executeProcess(List.of("docker", "exec", uri.getHost(), "test", "-f", source), directory);
+        if (file.exitCode() != 0) throw new IOException("container artifact does not exist");
+        return false;
+    }
+
+    private static Path localWorkspacePath(Path root, String relativePath) throws IOException {
+        Path workspace = root == null ? null : root.toAbsolutePath().normalize();
+        if (workspace == null || !Files.isDirectory(workspace)) throw new IOException("local workspace is unavailable");
+        String relative = requiredWorkspaceRelativePath(relativePath);
+        Path source = workspace.resolve(relative).normalize();
+        if (!source.startsWith(workspace) || !Files.exists(source)) throw new IOException("remote artifact is unavailable");
+        return source;
+    }
+
+    private static Path preparedDestination(Path destinationDirectory) throws IOException {
+        if (destinationDirectory == null) throw new IOException("artifact destination is required");
+        Path destination = destinationDirectory.toAbsolutePath().normalize();
+        if (Files.exists(destination) && Files.isSymbolicLink(destination)) throw new IOException("artifact destination is symbolic-link based");
+        Files.createDirectories(destination);
+        if (!Files.isDirectory(destination) || Files.isSymbolicLink(destination)) throw new IOException("artifact destination is unavailable");
+        return destination;
+    }
+
+    private static Path validateFetchedArtifact(Path artifact, Path destinationDirectory) throws IOException {
+        Path destination = destinationDirectory.toAbsolutePath().normalize();
+        Path result = artifact == null ? null : artifact.toAbsolutePath().normalize();
+        if (result == null || !result.startsWith(destination) || !Files.exists(result)) throw new IOException("retrieved artifact is unavailable");
+        Files.walkFileTree(result, new SimpleFileVisitor<>() {
+            @Override public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException {
+                if (Files.isSymbolicLink(directory)) throw new IOException("retrieved artifact contains a symbolic link");
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                if (Files.isSymbolicLink(file) || !attributes.isRegularFile()) throw new IOException("retrieved artifact contains an unsafe file");
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return result;
+    }
+
+    private static String requiredWorkspaceRelativePath(String value) throws IOException {
+        String normalized = value == null ? "" : value.trim().replace('\\', '/');
+        if (normalized.isEmpty() || normalized.startsWith("/") || normalized.indexOf('\0') >= 0 || normalized.indexOf('\n') >= 0 || normalized.indexOf('\r') >= 0) {
+            throw new IOException("remote artifact path must be workspace-relative");
+        }
+        for (String part : normalized.split("/")) {
+            if (part.isBlank() || ".".equals(part) || "..".equals(part)) throw new IOException("remote artifact path is invalid");
+        }
+        return normalized;
     }
 
     private static RemoteCommandResult commandResult(ProcessResult value) {
@@ -507,16 +687,21 @@ final class BuiltInRemoteWorkspaceProviders {
         }
     }
 
-    private static String readCapped(InputStream input) throws IOException {
+    static String readCapped(InputStream input) throws IOException {
         try (InputStream value = input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];
+            boolean truncated = false;
             for (int total = 0, read; (read = value.read(buffer)) >= 0;) {
                 int accepted = Math.min(read, 128 * 1024 - total);
                 if (accepted > 0) output.write(buffer, 0, accepted);
                 total += read;
-                if (total > 128 * 1024) break;
+                if (total > 128 * 1024) {
+                    truncated = true;
+                    break;
+                }
             }
-            return output.toString(StandardCharsets.UTF_8);
+            String text = output.toString(StandardCharsets.UTF_8);
+            return truncated ? text + "\n[shed: output truncated]\n" : text;
         }
     }
 

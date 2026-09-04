@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import shed.api.LanguageContribution;
 import shed.api.LanguageProfile;
+import shed.api.SnippetContribution;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
@@ -43,6 +44,25 @@ class ExtensionRegistryTest {
     }
 
     @Test
+    void languageContributionsResolveTheirDeclaredLanguageId() {
+        ExtensionRegistry registry = new ExtensionRegistry();
+        registry.registerLanguage("sample", new LanguageContribution("example", "Example", Set.of("ex"), List.of("example-lsp"), List.of()));
+
+        assertEquals("sample", registry.languageForId("example").extensionId());
+        assertEquals("example", registry.languageForId("example").value().id());
+    }
+
+    @Test
+    void languageContributionLookupCanBeQualifiedByExtensionOwner() {
+        ExtensionRegistry registry = new ExtensionRegistry();
+        registry.registerLanguage("alpha", new LanguageContribution("example", "Alpha", Set.of("aex"), List.of("alpha-lsp"), List.of()));
+        registry.registerLanguage("zeta", new LanguageContribution("example", "Zeta", Set.of("zex"), List.of("zeta-lsp"), List.of()));
+
+        assertEquals("zeta", registry.languageForId("zeta", "example").extensionId());
+        assertNull(registry.languageForId("missing", "example"));
+    }
+
+    @Test
     void languageProfilesResolveFileNamesExtensionsAndFirstLinesDeterministically() {
         ExtensionRegistry registry = new ExtensionRegistry();
         LanguageProfile alpha = new LanguageProfile("alpha", "Alpha", Set.of("alp"), Set.of("Alphafile"),
@@ -71,5 +91,16 @@ class ExtensionRegistryTest {
         assertEquals(false, configured.insertSpaces());
         assertThrows(IllegalArgumentException.class, () -> new LanguageProfile("invalid", "Invalid", Set.of("bad"), Set.of(), Set.of(),
             List.of(), List.of(), List.of(), Set.of(), 17, true));
+    }
+
+    @Test
+    void snippetsAreOwnedAndRemovedWithTheirExtension() {
+        ExtensionRegistry registry = new ExtensionRegistry();
+        registry.registerSnippet("sample", new SnippetContribution("log", "example", "log", "print(${1:value})", "log value"));
+
+        assertEquals(1, registry.snippets().size());
+        assertEquals("sample", registry.snippets().getFirst().extensionId());
+        registry.removeExtension("sample");
+        assertEquals(List.of(), registry.snippets());
     }
 }

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 public class DebugAdapterDetectorTest {
@@ -23,6 +24,14 @@ public class DebugAdapterDetectorTest {
         assertEquals(DebugAdapterDetector.CapabilityState.AVAILABLE, adapter.capabilities().get(DebugAdapterRegistry.Capability.LAUNCH));
         assertTrue(adapter.remediation().contains("debug.adapter.java.command"));
         assertFalse(report.configurations().getFirst().usable());
+    }
+
+    @Test
+    void reportsConfiguredRemoteStdioAdapterWithoutLocalExecutable() {
+        DebugAdapterDetector detector = new DebugAdapterDetector((command, workspace) -> null);
+        DebugAdapterDetector.WorkspaceReport report = detector.detect(Path.of("build/debug-detect"), validation("launch"), enabled(), Set.of("java"));
+        assertEquals(DebugAdapterDetector.Availability.AVAILABLE, report.adapters().getFirst().availability());
+        assertEquals("remote", report.adapters().getFirst().executable());
     }
 
     @Test

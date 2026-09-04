@@ -2676,6 +2676,21 @@ public class Texteditor extends JFrame implements KeyListener {
         return languageProfileSelection == null ? null : languageProfileSelection.profileFor(buffer, extensionRegistry);
     }
 
+    ExtensionRegistry.Owned<LanguageProfile> languageProfileOwnership(FileBuffer buffer) {
+        return languageProfileSelection == null ? null : languageProfileSelection.ownedProfileFor(buffer, extensionRegistry);
+    }
+
+    String snippetLanguageId(FileBuffer buffer) {
+        LanguageProfile profile = languageProfileFor(buffer);
+        if (profile != null) return profile.languageId();
+        if (buffer == null) return "text";
+        return lspController == null ? lspService.languageId(buffer.getFileType()) : lspController.languageId(buffer);
+    }
+
+    List<shed.api.SnippetContribution> snippetContributions() {
+        return extensionRegistry.snippets().stream().map(ExtensionRegistry.Owned::value).toList();
+    }
+
     String handleLanguageCommand(String argument) {
         FileBuffer buffer = getCurrentBuffer();
         if (buffer == null) return "Current buffer is unavailable";
@@ -2698,12 +2713,14 @@ public class Texteditor extends JFrame implements KeyListener {
         if ("auto".equalsIgnoreCase(value) || "automatic".equalsIgnoreCase(value)) {
             languageProfileSelection.automatic(buffer);
             applySyntaxHighlighting();
+            if (lspController != null) lspController.profileSelectionChanged(buffer);
             updateStatusBar();
             return "Language profile detection restored";
         }
         try {
             LanguageProfile profile = languageProfileSelection.select(buffer, extensionRegistry, value);
             applySyntaxHighlighting();
+            if (lspController != null) lspController.profileSelectionChanged(buffer);
             updateStatusBar();
             return "Language profile selected: " + profile.displayName();
         } catch (IllegalArgumentException error) {

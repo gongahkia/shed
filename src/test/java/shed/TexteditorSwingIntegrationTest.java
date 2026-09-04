@@ -193,6 +193,40 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void connectedDevContainerRoutesNormalTaskDryRunsWithoutStartingAnotherCliProcess() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-connected-dev-container-task");
+        Path workspace = Files.createDirectories(tempDir.resolve("connected-dev-container-project"));
+        Path source = workspace.resolve("Main.java");
+        Files.createDirectories(workspace.resolve(".devcontainer"));
+        Files.createDirectories(home);
+        Files.writeString(source, "class Main {}\n", StandardCharsets.UTF_8);
+        Files.writeString(workspace.resolve(".devcontainer/devcontainer.json"), "{}\n", StandardCharsets.UTF_8);
+        Files.writeString(workspace.resolve(".shedtasks"), """
+            schema_version = 1
+            [task.check]
+            command = "printf check"
+            shell = "direct"
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, source);
+        try {
+            String result = onEdt(() -> {
+                editor.devContainerSessions.connect(workspace, "/workspaces/project");
+                return editor.handleTaskCommand("dry-run check");
+            });
+
+            assertEquals("Dev Container task dry run shown (not started)", result);
+            String output = onEdt(() -> editor.getCurrentBuffer().getContent());
+            assertTrue(output.contains("Connected Dev Container task dry run: check"));
+            assertTrue(output.contains("container workspace: /workspaces/project"));
+            assertTrue(output.contains("this dry run starts nothing"));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void quickfixJumpOpensTargetAndMovesCaret() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-quickfix");

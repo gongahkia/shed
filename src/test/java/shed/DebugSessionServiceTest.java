@@ -34,6 +34,22 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void explicitlyStartingAnActivePythonFileSelectsTheBuiltInProfileWhenNoSelectionExists() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-python-context").toAbsolutePath();
+        Path file = workspace.resolve("main.py");
+        DebugAdapterRegistry.Validation validation = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
+        FakeConnection connection = new FakeConnection();
+
+        DebugSessionService.Result result = service.start(workspace, file, validation, enabled(), "", Duration.ofSeconds(1),
+            (plan, features, listener) -> connection);
+
+        assertTrue(result.succeeded());
+        assertEquals(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY, result.snapshot().configuration());
+        assertEquals(List.of("initialize", "launch"), connection.commands);
+    }
+
+    @Test
     void launchesOnlyWhenExplicitlyStartedThenStopsAndRestarts() {
         DebugSessionService service = new DebugSessionService();
         Path workspace = Path.of("build/debug-session").toAbsolutePath();

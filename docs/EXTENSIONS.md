@@ -49,7 +49,7 @@ main_class = "example.ProviderExtension"
 | `TerminalProfile` | Named direct-argv terminal profiles |
 | `ToolViewContribution` | Docked workbench view opened through `:view` |
 | `CustomEditorContribution` | Alternate text or binary editor component |
-| `RemoteWorkspaceProvider` | Explicit `:remote open <uri>` schemes; its connected workspace may opt into `:remote exec` and structured remote-task requests |
+| `RemoteWorkspaceProvider` | Explicit `:remote open <uri>` schemes; its connected workspace may opt into remote terminals, `:remote exec`, and structured remote-task requests |
 | `WorkspaceToolContribution` | Declared database, deployment, collaboration, or container actions through `:integration` |
 
 Command ids are namespaced to their extension id and cannot overwrite a built-in or another extension's command. SCM actions are allowlisted by the provider's declared action list; Shed does not turn them into shell strings.
@@ -76,7 +76,7 @@ This is lexical support only. It does not provide a TextMate grammar, injection 
 
 `WorkspaceToolContribution` is the workspace-aware command boundary for database consoles, deployment workflows, collaboration clients, and container controls; `ToolViewContribution` adds their docked UI. Java extension code remains responsible for credentials, process/network policy, cancellation, and UI. Details: [Workspace Integrations](WORKSPACE_INTEGRATIONS.md).
 
-`RemoteWorkspace.execute(RemoteCommandRequest)` receives direct argv, a validated directory relative to the connected workspace root, and validated environment values. Providers that support `${workspaceFolder}` or `${file}` in an explicit remote task must return their absolute execution root from `executionRoot()` so Shed can map the local mirror path correctly. The API-v1 `execute(List<String>)` method remains available for command-only providers. Providers that do not override the request form reject non-root working directories and environment values rather than silently ignoring them.
+`RemoteWorkspace.execute(RemoteCommandRequest)` receives direct argv, a validated directory relative to the connected workspace root, and validated environment values. `terminalCommand(RemoteTerminalRequest)` returns the direct argv PTY bridge for an explicitly requested remote terminal. Providers that support `${workspaceFolder}` or `${file}` in an explicit remote task must return their absolute execution root from `executionRoot()` so Shed can map the local mirror path correctly. The API-v1 `execute(List<String>)` method remains available for command-only providers. Providers that do not override a newer request form reject it rather than silently ignoring options.
 
 ## Custom editors
 

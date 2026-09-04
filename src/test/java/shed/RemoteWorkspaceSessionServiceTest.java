@@ -3,6 +3,7 @@ package shed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import shed.api.RemoteTerminalRequest;
@@ -26,6 +27,11 @@ class RemoteWorkspaceSessionServiceTest {
         assertEquals(List.of("ssh", "nested"), connection.terminalInvocation(Path.of("/mirror/nested/src"), List.of("bash", "-l")));
         assertEquals("src", nested.lastTerminalRequest.relativeWorkingDirectory());
         assertEquals(List.of("bash", "-l"), nested.lastTerminalRequest.command());
+
+        TerminalLinkResolver.SourcePathMapper mapper = connection.sourcePathMapper(Path.of("/mirror/nested/src"));
+        assertNotNull(mapper);
+        assertEquals(Path.of("/mirror/nested/src/Main.java"), mapper.map("Main.java", Path.of("/ignored")));
+        assertEquals(Path.of("/mirror/nested/src/Main.java"), mapper.map("/srv/project/nested/src/Main.java", Path.of("/ignored")));
     }
 
     @Test

@@ -62,11 +62,26 @@ final class RemoteWorkspaceSessionService {
             return workspace.terminalCommand(new RemoteTerminalRequest(relativeDirectory(workingDirectory), command));
         }
 
-        TerminalLinkResolver.SourcePathMapper sourcePathMapper() {
+        TerminalLinkResolver.SourcePathMapper sourcePathMapper(Path terminalWorkingDirectory) {
             String remoteRoot = workspace.languageServerRoot();
             if (remoteRoot == null || remoteRoot.isBlank()) return null;
             try {
-                return new RemoteLspEndpoint(localRoot, remoteRoot, List.of()).terminalSourcePathMapper();
+                RemoteLspEndpoint endpoint = new RemoteLspEndpoint(localRoot, remoteRoot, List.of());
+                Path startDirectory = normalizedPath(terminalWorkingDirectory);
+                if (startDirectory == null || !startDirectory.startsWith(localRoot)) return null;
+                return (sourcePath, ignoredWorkingDirectory) -> mapTerminalSource(endpoint, startDirectory, sourcePath);
+            } catch (IllegalArgumentException error) {
+                return null;
+            }
+        }
+
+        private Path mapTerminalSource(RemoteLspEndpoint endpoint, Path startDirectory, String sourcePath) {
+            if (sourcePath == null || sourcePath.isBlank() || sourcePath.indexOf('\0') >= 0) return null;
+            try {
+                Path reported = Path.of(sourcePath);
+                if (reported.isAbsolute()) return endpoint.localPathForRemotePath(reported.normalize().toString());
+                Path candidate = startDirectory.resolve(reported).normalize();
+                return candidate.startsWith(localRoot) ? candidate : null;
             } catch (IllegalArgumentException error) {
                 return null;
             }

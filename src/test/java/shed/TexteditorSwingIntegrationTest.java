@@ -265,6 +265,46 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void activeRemoteSessionTakesPrecedenceOverOverlappingDevContainerTaskRouting() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-remote-session-precedence");
+        Path workspace = Files.createDirectories(tempDir.resolve("remote-session-precedence-project"));
+        Path source = workspace.resolve("Main.java");
+        Files.createDirectories(home);
+        Files.createDirectories(workspace.resolve(".devcontainer"));
+        Files.writeString(source, "class Main {}\n", StandardCharsets.UTF_8);
+        Files.writeString(workspace.resolve(".devcontainer/devcontainer.json"), "{}\n", StandardCharsets.UTF_8);
+        Files.writeString(workspace.resolve(".shedtasks"), """
+            schema_version = 1
+            [task.check]
+            command = "printf check"
+            shell = "direct"
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, source);
+        try {
+            String result = onEdt(() -> {
+                editor.devContainerSessions.connect(workspace, "/workspaces/project");
+                editor.remoteWorkspaceSessions.activate("ssh-project", new shed.api.RemoteWorkspace() {
+                    @Override public String displayName() { return "test SSH workspace"; }
+                    @Override public Path localRoot() { return workspace; }
+                    @Override public String executionRoot() { return "/srv/project"; }
+                    @Override public void synchronize() { }
+                    @Override public void close() { }
+                });
+                return editor.handleTaskCommand("dry-run check");
+            });
+
+            assertEquals("Remote task dry run shown (not started)", result);
+            String output = onEdt(() -> editor.getCurrentBuffer().getContent());
+            assertTrue(output.contains("connection: ssh-project"));
+            assertFalse(output.contains("Connected Dev Container task dry run"));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void remoteForwardListIsExplicitAndProcessFree() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-remote-forward-list");

@@ -61,9 +61,10 @@ For a workspace containing `.devcontainer/devcontainer.json`, Shed also exposes 
 :container up
 :container exec <command...>
 :container terminal [command...]
+:task container <name>
 :container open <container> <absolute-path>
 ```
 
-`up` and `exec` use the user-installed `devcontainer` CLI as direct argv and run as cancellable jobs; `terminal` opens a PTY using `devcontainer exec`. Shed does not install the CLI, create a configuration, invoke these commands during workspace open, or claim to run an extension host in the container. `open` creates the same explicit Docker-copy mirror described above.
+`up`, `exec`, and `:task container` use the user-installed `devcontainer` CLI as explicit, cancellable local processes; `terminal` opens a PTY using `devcontainer exec`. A container task first resolves the runtime workspace path, applies task environment values as `--remote-env`, and then runs the validated task. Direct tasks require the workspace-root cwd because the CLI exposes no cwd option; login-shell tasks may explicitly change into a subdirectory. Shed does not install the CLI, create a configuration, invoke these commands during workspace open, or claim to run an extension host in the container. `open` creates the same explicit Docker-copy mirror described above.
 
 In a multi-root workspace, Dev Container commands use the deepest configured folder containing the current file. A scratch or outside file uses the Explorer-selected folder.

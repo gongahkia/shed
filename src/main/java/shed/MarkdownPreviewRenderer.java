@@ -80,6 +80,26 @@ final class MarkdownPreviewRenderer {
             + ".blocked-image{font-style:italic;color:#6e7681;}</style></head><body>" + body + "</body></html>";
     }
 
+    /** Renders safe Markdown without creating preview assets for math or Mermaid. */
+    static String renderBasic(String markdown, String title, Font font, Color background, Color foreground, File sourceFile) {
+        String safeTitle = title == null || title.isBlank() ? "Markdown Preview" : title;
+        Font safeFont = font == null ? new Font(Font.DIALOG, Font.PLAIN, 13) : font;
+        Color safeBackground = background == null ? Color.WHITE : background;
+        Color safeForeground = foreground == null ? Color.BLACK : foreground;
+        String body = restrictImageSources(RAW_HTML_POLICY.sanitize(HTML.render(PARSER.parse(normalize(markdown == null ? "" : markdown)))), sourceFile);
+        return "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + escapeHtml(safeTitle) + "</title><style>"
+            + "body{margin:0;padding:12px;font-family:'" + escapeCss(safeFont.getFamily()) + "';font-size:"
+            + Math.max(8, safeFont.getSize()) + "pt;line-height:1.45;background:" + colorHex(safeBackground) + ";color:"
+            + colorHex(safeForeground) + ";}h1,h2,h3,h4,h5,h6{line-height:1.2;margin:1.1em 0 .4em;}"
+            + "h1{font-size:1.8em;border-bottom:1px solid #888;padding-bottom:.25em;}p{margin:.5em 0;}a{color:#2780e3;}"
+            + "pre{padding:10px;overflow:auto;background:#20242b;color:#f4f4f4;border-radius:4px;}pre code{background:transparent;padding:0;}"
+            + "code{font-family:monospace;background:#00000018;padding:1px 3px;border-radius:3px;}blockquote{margin:.7em 0;padding:.1em .8em;border-left:4px solid #8b949e;color:#6e7681;}"
+            + "table{border-collapse:collapse;margin:.8em 0;}th,td{border:1px solid #8b949e;padding:5px 8px;}th{background:#00000014;}"
+            + "hr{border:0;border-top:1px solid #8b949e;margin:1.2em 0;}img{max-width:100%;height:auto;}"
+            + ".task-list-item{list-style-type:none;}.task-list-item input{margin-right:.45em;}.markdown-alert{padding:.5em .8em;border-left:4px solid #2780e3;background:#0000000d;}"
+            + ".blocked-image{font-style:italic;color:#6e7681;}</style></head><body>" + body + "</body></html>";
+    }
+
     private static String prepare(String markdown, MarkdownPreviewAssets assets, Color foreground) {
         return replaceMath(replaceMermaid(normalize(markdown), assets), assets, foreground);
     }

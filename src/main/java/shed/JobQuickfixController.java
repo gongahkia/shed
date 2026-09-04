@@ -174,6 +174,18 @@ final class JobQuickfixController {
                     return "Usage: :task remote-dry-run <connection-id> <name>";
                 }
                 return runRemoteTask(args.get(1), args.get(2), projectRoot, loaded.tasks(), true);
+            case "container":
+            case "devcontainer":
+                if (args.size() < 2) {
+                    return "Usage: :task container <name>";
+                }
+                return runContainerTask(args.get(1), projectRoot, loaded.tasks(), false);
+            case "container-dry-run":
+            case "devcontainer-dry-run":
+                if (args.size() < 2) {
+                    return "Usage: :task container-dry-run <name>";
+                }
+                return runContainerTask(args.get(1), projectRoot, loaded.tasks(), true);
             case "cancel":
                 if (args.size() < 2) {
                     return "Usage: :task cancel <job-id>";
@@ -367,9 +379,10 @@ final class JobQuickfixController {
         if (normalizedName.isEmpty()) return "Task name required";
         TaskService.WorkspaceTask task = resolveTask(normalizedName, projectRoot, tasks);
         if (task == null) return "Task not found: " + normalizedName + " (use :task list or :task add)";
+        File activeFile = activeTaskFile();
         TaskService.TaskExecutionPlan plan;
         try {
-            plan = editor.taskService.buildExecutionPlan(task, projectRoot, activeTaskFile());
+            plan = editor.taskService.buildExecutionPlan(task, projectRoot, activeFile);
         } catch (IOException | IllegalArgumentException error) {
             return "Task validation failed: " + error.getMessage();
         }
@@ -380,7 +393,7 @@ final class JobQuickfixController {
         if (target == null) return "Remote task requires a connected workspace containing: " + projectRoot.getAbsolutePath();
         RemoteCommandRequest request;
         try {
-            request = editor.taskService.buildRemoteCommandRequest(plan, target.localRoot(), target.workspace().executionRoot(), activeTaskFile());
+            request = editor.taskService.buildRemoteCommandRequest(plan, target.localRoot(), target.workspace().executionRoot(), activeFile);
         } catch (IllegalArgumentException | IOException error) {
             return "Remote task validation failed: " + error.getMessage();
         }
@@ -391,6 +404,116 @@ final class JobQuickfixController {
             (snapshot, result, error) -> handleTaskJobCompletion(normalizedName, plan, snapshot, result, error)
         );
         return "Remote task job " + jobId + " started (" + target.id() + ":" + normalizedName + ")";
+    }
+
+    private String runContainerTask(String taskName, File projectRoot,
+                                    Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun) {
+        String normalizedName = taskName == null ? "" : taskName.trim();
+        if (normalizedName.isEmpty()) return "Task name required";
+        if (!new File(projectRoot, ".devcontainer/devcontainer.json").isFile()) {
+            return "Dev Container task requires .devcontainer/devcontainer.json in: " + projectRoot.getAbsolutePath();
+        }
+        TaskService.WorkspaceTask task = resolveTask(normalizedName, projectRoot, tasks);
+        if (task == null) return "Task not found: " + normalizedName + " (use :task list or :task add)";
+        File activeFile = activeTaskFile();
+        TaskService.TaskExecutionPlan plan;
+        try {
+            plan = editor.taskService.buildExecutionPlan(task, projectRoot, activeFile);
+        } catch (IOException | IllegalArgumentException error) {
+            return "Task validation failed: " + error.getMessage();
+        }
+        String validationError = validateTaskPlan(plan);
+        if (validationError != null) return validationError;
+        RemoteCommandRequest request;
+        try {
+            request = editor.taskService.buildRemoteCommandRequest(plan, projectRoot.toPath(), "/<remote-workspace>", activeFile);
+            devContainerInvocation(plan.workspace().toPath(), "/<remote-workspace>", request, plan.task().shell());
+        } catch (IOException | IllegalArgumentException error) {
+            return "Dev Container task validation failed: " + error.getMessage();
+        }
+        if (dryRun) return showContainerTaskDryRun(plan, request);
+        int jobId = editor.asyncJobService.submit(
+            "task container " + normalizedName,
+            token -> runContainerTaskProcess(plan, projectRoot, activeFile, token),
+            (snapshot, result, error) -> handleTaskJobCompletion(normalizedName, plan, snapshot, result, error)
+        );
+        return "Dev Container task job " + jobId + " started (" + normalizedName + ")";
+    }
+
+    private CommandResult runContainerTaskProcess(TaskService.TaskExecutionPlan plan, File projectRoot, File activeFile,
+                                                  AsyncJobService.JobToken token) throws Exception {
+        int timeout = editor.configManager.getProcessTimeoutMs();
+        int outputLimit = editor.configManager.getProcessOutputMaxBytes();
+        CommandResult rootProbe = runExternalCommand(devContainerPrefix(projectRoot.toPath()), projectRoot, null, token,
+            timeout, outputLimit, true);
+        if (rootProbe.exitCode != 0) return rootProbe;
+        String remoteRoot;
+        try {
+            remoteRoot = remoteWorkingDirectory(rootProbe.stdout);
+        } catch (IllegalArgumentException error) {
+            return new CommandResult(-1, "", "Dev Container workspace probe failed: " + error.getMessage());
+        }
+        RemoteCommandRequest request = editor.taskService.buildRemoteCommandRequest(plan, projectRoot.toPath(), remoteRoot, activeFile);
+        List<String> invocation = devContainerInvocation(plan.workspace().toPath(), remoteRoot, request, plan.task().shell());
+        return runExternalCommand(invocation, projectRoot, null, token, timeout, outputLimit, true);
+    }
+
+    private List<String> devContainerPrefix(Path workspace) {
+        List<String> command = new ArrayList<>(List.of("devcontainer", "exec", "--workspace-folder", workspace.toString()));
+        command.add("pwd");
+        return command;
+    }
+
+    static List<String> devContainerInvocation(Path workspace, String remoteRoot, RemoteCommandRequest request,
+                                                TaskService.ShellPolicy shell) throws IOException {
+        if (workspace == null || remoteRoot == null || remoteRoot.isBlank() || request == null || shell == null) {
+            throw new IOException("Dev Container task requires workspace, remote root, command, and shell policy");
+        }
+        List<String> command = new ArrayList<>(List.of("devcontainer", "exec", "--workspace-folder", workspace.toString()));
+        for (Map.Entry<String, String> entry : request.environment().entrySet()) {
+            command.add("--remote-env");
+            command.add(entry.getKey() + "=" + entry.getValue());
+        }
+        if (request.relativeWorkingDirectory().isEmpty()) {
+            command.addAll(request.command());
+            return List.copyOf(command);
+        }
+        if (shell == TaskService.ShellPolicy.DIRECT) {
+            throw new IOException("direct Dev Container tasks require cwd to be the workspace root; use shell=login for a subdirectory");
+        }
+        String directory = remoteDirectory(remoteRoot, request.relativeWorkingDirectory());
+        command.add("/bin/sh");
+        command.add("-lc");
+        command.add("cd -- " + posixQuote(directory) + " && exec " + posixCommand(request.command()));
+        return List.copyOf(command);
+    }
+
+    static String remoteWorkingDirectory(String output) {
+        if (output == null) throw new IllegalArgumentException("devcontainer exec produced no workspace path");
+        String candidate = "";
+        for (String line : output.split("\\R")) {
+            if (line.startsWith("/")) candidate = line;
+        }
+        if (!candidate.startsWith("/") || candidate.indexOf('\u0000') >= 0 || candidate.indexOf('\n') >= 0 || candidate.indexOf('\r') >= 0) {
+            throw new IllegalArgumentException("devcontainer exec did not report an absolute POSIX workspace path");
+        }
+        return candidate;
+    }
+
+    private static String remoteDirectory(String root, String relative) throws IOException {
+        String normalizedRoot = root.replace('\\', '/');
+        if (!normalizedRoot.startsWith("/") || normalizedRoot.indexOf('\n') >= 0 || normalizedRoot.indexOf('\r') >= 0 || normalizedRoot.indexOf('\u0000') >= 0) {
+            throw new IOException("Dev Container workspace root must be an absolute POSIX path");
+        }
+        return normalizedRoot.endsWith("/") ? normalizedRoot + relative : normalizedRoot + "/" + relative;
+    }
+
+    private static String posixCommand(List<String> command) {
+        return command.stream().map(JobQuickfixController::posixQuote).collect(java.util.stream.Collectors.joining(" "));
+    }
+
+    private static String posixQuote(String value) {
+        return "'" + value.replace("'", "'\\\"'\\\"'") + "'";
     }
 
     private TaskService.WorkspaceTask resolveTask(String name, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks) {
@@ -448,6 +571,18 @@ final class JobQuickfixController {
         output.append("env keys: ").append(request.environment().isEmpty() ? "(none)" : String.join(", ", request.environment().keySet())).append("\n");
         editor.showScratchBuffer("[remote task dry-run " + plan.task().name() + "]", output.toString());
         return "Remote task dry run shown (not started)";
+    }
+
+    private String showContainerTaskDryRun(TaskService.TaskExecutionPlan plan, RemoteCommandRequest request) {
+        StringBuilder output = new StringBuilder("Dev Container task dry run: ").append(plan.task().name()).append("\n\n");
+        output.append("host workspace: ").append(plan.workspace().getAbsolutePath()).append("\n");
+        output.append("remote cwd: ").append(request.relativeWorkingDirectory().isEmpty() ? "(workspace root)" : request.relativeWorkingDirectory()).append("\n");
+        output.append("command: ").append(String.join(" ", request.command())).append("\n");
+        output.append("shell: ").append(plan.task().shell().configValue()).append("\n");
+        output.append("env keys: ").append(request.environment().isEmpty() ? "(none)" : String.join(", ", request.environment().keySet())).append("\n\n");
+        output.append("The remote workspace path is resolved by an explicit devcontainer exec call when this task runs.\n");
+        editor.showScratchBuffer("[container task dry-run " + plan.task().name() + "]", output.toString());
+        return "Dev Container task dry run shown (not started)";
     }
 
 

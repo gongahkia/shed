@@ -3,6 +3,8 @@ package shed;
 import java.awt.Component;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
@@ -106,9 +108,12 @@ final class CustomEditorController {
         private final FileBuffer buffer;
         private final CopyOnWriteArrayList<ChangeListener> changeListeners = new CopyOnWriteArrayList<>();
         private final CopyOnWriteArrayList<Runnable> disposeListeners = new CopyOnWriteArrayList<>();
+        private final CopyOnWriteArrayList<ExternalChangeListener> externalChangeListeners = new CopyOnWriteArrayList<>();
         private final ByteHistory history = new ByteHistory();
+        private final FileWatcherService.WatchRegistration fileWatch;
         private volatile long revision;
         private volatile boolean disposed;
+        private volatile FileState observedState;
 
         private Document(Path file, EditorPane pane, FileBuffer buffer) {
             this.file = file;
@@ -116,6 +121,8 @@ final class CustomEditorController {
             this.buffer = buffer;
             this.revision = 0L;
             this.disposed = false;
+            this.observedState = FileState.read(file);
+            this.fileWatch = editor.fileWatcherService.watch(file.toFile(), ignored -> externalFileChanged());
         }
 
         @Override public long revision() { return revision; }
@@ -182,6 +189,13 @@ final class CustomEditorController {
             return () -> disposeListeners.remove(listener);
         }
 
+        @Override public Subscription onDidExternalChange(ExternalChangeListener listener) {
+            if (listener == null) throw new IllegalArgumentException("custom editor external change listener is required");
+            if (disposed) return Subscription.noop();
+            externalChangeListeners.add(listener);
+            return () -> externalChangeListeners.remove(listener);
+        }
+
         private void writeOnEventThread(byte[] contents) throws IOException {
             ensureActive();
             byte[] before = java.nio.file.Files.readAllBytes(file);
@@ -218,6 +232,7 @@ final class CustomEditorController {
                 throw (IOException) error.getCause();
             }
             editor.syncLspOpen(buffer);
+            observedState = FileState.read(file);
         }
 
         private void changed(String action) {
@@ -234,14 +249,41 @@ final class CustomEditorController {
             }
         }
 
+        private void externalFileChanged() {
+            if (disposed) return;
+            SwingUtilities.invokeLater(() -> {
+                if (disposed) return;
+                FileState next = FileState.read(file);
+                if (next.equals(observedState)) return;
+                observedState = next;
+                ExternalChange change = new ExternalChange(revision, next.exists());
+                for (ExternalChangeListener listener : externalChangeListeners) {
+                    try { listener.changed(change); } catch (RuntimeException ignored) { }
+                }
+            });
+        }
+
         private void dispose() {
             if (disposed) return;
             disposed = true;
+            fileWatch.close();
             changeListeners.clear();
+            externalChangeListeners.clear();
             for (Runnable listener : disposeListeners) {
                 try { listener.run(); } catch (RuntimeException ignored) { }
             }
             disposeListeners.clear();
+        }
+
+        private record FileState(boolean exists, long size, FileTime modified) {
+            private static FileState read(Path file) {
+                try {
+                    if (file == null || !Files.isRegularFile(file)) return new FileState(false, 0L, null);
+                    return new FileState(true, Files.size(file), Files.getLastModifiedTime(file));
+                } catch (IOException | SecurityException error) {
+                    return new FileState(false, 0L, null);
+                }
+            }
         }
     }
 

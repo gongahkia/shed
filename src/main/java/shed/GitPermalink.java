@@ -12,6 +12,10 @@ final class GitPermalink {
     }
 
     static String create(String remote, String revision, String relativePath, int line) {
+        return create(remote, revision, relativePath, line, line);
+    }
+
+    static String create(String remote, String revision, String relativePath, int startLine, int endLine) {
         Repository repository = parseRemote(remote);
         if (repository == null) throw new IllegalArgumentException("origin is not a supported GitHub, GitLab, or Bitbucket remote");
         if (revision == null || !revision.matches("[0-9a-fA-F]{7,64}")) throw new IllegalArgumentException("HEAD revision is unavailable");
@@ -24,13 +28,23 @@ final class GitPermalink {
             path.add(encode(part));
         }
         String encodedPath = String.join("/", path);
-        int selectedLine = Math.max(1, line);
+        int start = Math.max(1, startLine);
+        int end = Math.max(1, endLine);
+        if (end < start) throw new IllegalArgumentException("permalink range end must not precede its start");
         return switch (repository.host()) {
-            case "github.com" -> "https://" + repository.host() + "/" + repository.path() + "/blob/" + revision + "/" + encodedPath + "#L" + selectedLine;
-            case "gitlab.com" -> "https://" + repository.host() + "/" + repository.path() + "/-/blob/" + revision + "/" + encodedPath + "#L" + selectedLine;
-            case "bitbucket.org" -> "https://" + repository.host() + "/" + repository.path() + "/src/" + revision + "/" + encodedPath + "#lines-" + selectedLine;
+            case "github.com" -> "https://" + repository.host() + "/" + repository.path() + "/blob/" + revision + "/" + encodedPath + githubAnchor(start, end);
+            case "gitlab.com" -> "https://" + repository.host() + "/" + repository.path() + "/-/blob/" + revision + "/" + encodedPath + gitlabAnchor(start, end);
+            case "bitbucket.org" -> bitbucketLink(repository, revision, encodedPath, path.getLast(), start, end);
             default -> throw new IllegalArgumentException("origin is not a supported GitHub, GitLab, or Bitbucket remote");
         };
+    }
+
+    private static String githubAnchor(int start, int end) { return end == start ? "#L" + start : "#L" + start + "-L" + end; }
+    private static String gitlabAnchor(int start, int end) { return end == start ? "#L" + start : "#L" + start + "-" + end; }
+
+    private static String bitbucketLink(Repository repository, String revision, String encodedPath, String fileName, int start, int end) {
+        if (end != start) throw new IllegalArgumentException("Bitbucket range permalink format is not supported; select one line");
+        return "https://" + repository.host() + "/" + repository.path() + "/src/" + revision + "/" + encodedPath + "#" + encode(fileName) + "-" + start;
     }
 
     private static Repository parseRemote(String remote) {

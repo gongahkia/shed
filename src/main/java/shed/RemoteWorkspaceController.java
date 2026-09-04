@@ -72,6 +72,7 @@ final class RemoteWorkspaceController {
             }
             Connection prior;
             synchronized (connections) { prior = connections.put(result.id(), result); }
+            editor.remoteWorkspaceTaskTargets.register(result.id(), result.workspace());
             if (prior != null) {
                 try { prior.workspace().close(); } catch (Exception ignored) { }
             }
@@ -99,12 +100,14 @@ final class RemoteWorkspaceController {
         Connection connection;
         synchronized (connections) { connection = connections.remove(normalizeId(id)); }
         if (connection == null) return "Remote workspace not connected: " + id;
+        editor.remoteWorkspaceTaskTargets.unregister(connection.id());
         try {
             connection.workspace().close();
             editor.workspaceController.remove(connection.workspace().localRoot().toString());
             return "Remote workspace closed: " + connection.id();
         } catch (Exception error) {
             synchronized (connections) { connections.put(connection.id(), connection); }
+            editor.remoteWorkspaceTaskTargets.register(connection.id(), connection.workspace());
             return "Remote workspace close failed: " + detail(error.getMessage());
         }
     }
@@ -164,6 +167,7 @@ final class RemoteWorkspaceController {
             connections.clear();
         }
         for (Connection connection : values) {
+            editor.remoteWorkspaceTaskTargets.unregister(connection.id());
             try { connection.workspace().close(); } catch (Exception ignored) { }
         }
     }

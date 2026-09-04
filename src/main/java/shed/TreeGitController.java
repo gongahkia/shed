@@ -678,6 +678,11 @@ final class TreeGitController {
             }
 
             @Override
+            public String permalink(File root, String args) {
+                return showGitPermalink(root, args);
+            }
+
+            @Override
             public String help() {
                 return showGitHelp();
             }
@@ -1569,6 +1574,33 @@ final class TreeGitController {
         return "Switch complete";
     }
 
+    String showGitPermalink(File gitRoot, String argument) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) return ":git permalink requires a file-backed buffer";
+        String relativePath = relativizeAgainstGitRoot(gitRoot, new File(buffer.getFilePath()));
+        if (relativePath == null || relativePath.isBlank()) return "Current file is outside git root";
+        int line = editor.getCurrentLineNumber();
+        if (argument != null && !argument.isBlank()) {
+            try {
+                line = Integer.parseInt(argument.strip());
+                if (line < 1) throw new NumberFormatException();
+            } catch (NumberFormatException error) {
+                return "Usage: :git permalink [positive-line]";
+            }
+        }
+        CommandResult remote = runCommand(gitRoot, List.of("git", "remote", "get-url", "origin"));
+        if (remote.exitCode != 0 || remote.stdout == null || remote.stdout.isBlank()) return "Git permalink requires an origin remote";
+        CommandResult revision = runCommand(gitRoot, List.of("git", "rev-parse", "--verify", "HEAD"));
+        if (revision.exitCode != 0 || revision.stdout == null || revision.stdout.isBlank()) return "Git permalink requires a committed HEAD";
+        try {
+            String link = GitPermalink.create(remote.stdout.strip(), revision.stdout.strip(), relativePath.replace(File.separatorChar, '/'), line);
+            editor.showScratchBuffer("[git permalink]", link + "\n");
+            return "Showing immutable Git permalink";
+        } catch (IllegalArgumentException error) {
+            return "Git permalink unavailable: " + error.getMessage();
+        }
+    }
+
 
     String runGitHunkCommand(File gitRoot, String argument) {
         List<String> args = splitWhitespaceArgs(argument);
@@ -1754,7 +1786,8 @@ final class TreeGitController {
                 + ":git commit <msg>     Commit staged changes\n"
                 + ":git amend <msg>      Amend last commit message/content\n"
                 + ":git checkout <arg>   Checkout branch/path\n"
-                + ":git switch <branch>  Switch branch\n");
+                + ":git switch <branch>  Switch branch\n"
+                + ":git permalink [line] Show an immutable GitHub/GitLab/Bitbucket source link\n");
         return "Showing git help";
     }
 

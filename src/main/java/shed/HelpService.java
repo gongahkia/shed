@@ -263,11 +263,12 @@ public class HelpService {
             case "task":
             case "tasks":
                 return "Help: tasks\n\n"
-                    + "Tasks are saved per project in .shedtasks as name=command lines.\n"
+                    + "Tasks are saved per project in .shedtasks; canonical files use validated TOML.\n"
                     + ":task list shows saved tasks.\n"
                     + ":task add <name> <command> saves a task.\n"
                     + ":task remove <name> removes a task.\n"
                     + ":task <name> or :task run <name> executes a task asynchronously.\n"
+                    + ":task remote <connection-id> <name> explicitly runs a task in a matching connected workspace.\n"
                     + "Output is parsed into quickfix when lines match file:line:col:message.\n"
                     + "Built-in fallback names are supported: :task test and :task build.\n";
             case "git":
@@ -276,6 +277,7 @@ public class HelpService {
                     + ":git diff [args], :git log [count], :git branch show repository state.\n"
                     + ":git add|stage <paths...>, :git restore|unstage <paths...> modify staging.\n"
                     + ":git checkout <arg>, :git switch <branch> move HEAD.\n"
+                    + ":git permalink [line] shows an immutable link for the current GitHub/GitLab/Bitbucket file.\n"
                     + ":git commit <message>, :git amend <message|--no-edit> create/update commits.\n";
             case "update":
             case "updates":

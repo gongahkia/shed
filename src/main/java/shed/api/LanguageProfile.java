@@ -22,7 +22,9 @@ public record LanguageProfile(
     List<String> lineCommentPrefixes,
     List<BlockComment> blockComments,
     List<StringDelimiter> stringDelimiters,
-    Set<String> keywords
+    Set<String> keywords,
+    Integer tabSize,
+    Boolean insertSpaces
 ) {
     private static final int MAX_ITEMS = 128;
     private static final int MAX_TOKEN_LENGTH = 64;
@@ -44,6 +46,20 @@ public record LanguageProfile(
         blockComments = blockComments(blockComments);
         stringDelimiters = stringDelimiters(stringDelimiters);
         keywords = strings(keywords, "keyword", false);
+        if (tabSize != null && (tabSize < 1 || tabSize > 16)) {
+            throw new IllegalArgumentException("tab size must be between 1 and 16 when specified");
+        }
+    }
+
+    /**
+     * Source- and binary-compatible API-v1 constructor without language-local
+     * indentation preferences. The editor then keeps the user's settings.
+     */
+    public LanguageProfile(String languageId, String displayName, Set<String> fileExtensions, Set<String> fileNames,
+                           Set<String> firstLinePrefixes, List<String> lineCommentPrefixes, List<BlockComment> blockComments,
+                           List<StringDelimiter> stringDelimiters, Set<String> keywords) {
+        this(languageId, displayName, fileExtensions, fileNames, firstLinePrefixes, lineCommentPrefixes, blockComments,
+            stringDelimiters, keywords, null, null);
     }
 
     /** A literal start/end comment pair. */

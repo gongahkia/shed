@@ -85,6 +85,7 @@ final class PaneBufferController {
         } else if (editor.hasMarkdownPreviewForSource(pane)) {
             editor.closeMarkdownPreviewForSource(pane);
         }
+        editor.customEditorController.dispose(pane);
         pane.clearCustomEditorComponent();
 
         boolean activePane = pane == editor.getActivePane();
@@ -105,6 +106,7 @@ final class PaneBufferController {
             pane.closeTerminalPane();
         }
         pane.setBuffer(buffer);
+        pane.getTextArea().setTabSize(editor.effectiveTabSize(buffer));
         pane.setLargeFileProjection(buffer.isLargeFile() && !buffer.isLargeFileUnavailable() ? new LargeFileProjection(buffer) : null);
         if (pane.getLargeFileProjection() != null) {
             try {
@@ -672,6 +674,7 @@ final class PaneBufferController {
         }
         editor.closeTerminalSession(closingBuffer);
         paneToClose.closeTerminalPane();
+        editor.customEditorController.dispose(paneToClose);
         editor.detachMarkdownPreview(paneToClose);
         if (editor.isTreeBuffer(closingBuffer)) {
             editor.treeLineTargets.remove(closingBuffer);

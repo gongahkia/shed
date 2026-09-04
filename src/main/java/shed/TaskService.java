@@ -1,5 +1,6 @@
 package shed;
 
+import shed.api.RemoteCommandRequest;
 import org.tomlj.Toml;
 import org.tomlj.TomlParseError;
 import org.tomlj.TomlParseResult;
@@ -134,14 +135,16 @@ public class TaskService {
 
     static final class TaskExecutionPlan {
         private final WorkspaceTask task;
+        private final File workspace;
         private final String expandedCommand;
         private final List<String> processCommand;
         private final File workingDirectory;
         private final Map<String, String> environment;
 
-        TaskExecutionPlan(WorkspaceTask task, String expandedCommand, List<String> processCommand,
+        TaskExecutionPlan(WorkspaceTask task, File workspace, String expandedCommand, List<String> processCommand,
                           File workingDirectory, Map<String, String> environment) {
             this.task = task;
+            this.workspace = workspace;
             this.expandedCommand = expandedCommand;
             this.processCommand = Collections.unmodifiableList(new ArrayList<>(processCommand));
             this.workingDirectory = workingDirectory;
@@ -149,6 +152,7 @@ public class TaskService {
         }
 
         WorkspaceTask task() { return task; }
+        File workspace() { return workspace; }
         String expandedCommand() { return expandedCommand; }
         List<String> processCommand() { return processCommand; }
         File workingDirectory() { return workingDirectory; }
@@ -214,7 +218,24 @@ public class TaskService {
             ? ShellCommand.forCommand(command, shellEnvironment, path -> new File(path).canExecute())
             : ShellCommand.directCommand(command);
         if (processCommand.isEmpty()) throw new IOException("task command required");
-        return new TaskExecutionPlan(task, command, processCommand, cwd, environment);
+        return new TaskExecutionPlan(task, workspace, command, processCommand, cwd, environment);
+    }
+
+    RemoteCommandRequest buildRemoteCommandRequest(TaskExecutionPlan plan, Path connectionRoot, String executionRoot,
+                                                   File activeFile) throws IOException {
+        if (plan == null || connectionRoot == null) throw new IOException("remote task plan and connection root are required");
+        Path root = connectionRoot.toAbsolutePath().normalize();
+        Path workingDirectory = plan.workingDirectory().toPath().toAbsolutePath().normalize();
+        if (!workingDirectory.startsWith(root)) throw new IOException("task directory is outside the connected workspace");
+        String relativeDirectory = root.relativize(workingDirectory).toString().replace(File.separatorChar, '/');
+        String remoteCommand = expandRemoteVariables(plan.task().command(), plan.workspace(), activeFile, root, executionRoot);
+        Map<String, String> environment = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : plan.task().environment().entrySet()) {
+            environment.put(entry.getKey(), expandRemoteVariables(entry.getValue(), plan.workspace(), activeFile, root, executionRoot));
+        }
+        List<String> command = plan.task().shell() == ShellPolicy.LOGIN
+            ? List.of("sh", "-lc", remoteCommand) : ShellCommand.directCommand(remoteCommand);
+        return new RemoteCommandRequest(command, relativeDirectory, environment);
     }
 
     public void saveTasks(File projectRoot, Map<String, String> tasks) throws IOException {
@@ -442,6 +463,45 @@ public class TaskService {
         }
         matcher.appendTail(expanded);
         return expanded.toString();
+    }
+
+    private String expandRemoteVariables(String value, File workspace, File activeFile, Path connectionRoot,
+                                         String executionRoot) throws IOException {
+        if (value == null) throw new IOException("task value required");
+        Path workspacePath = workspace.toPath().toAbsolutePath().normalize();
+        if (!workspacePath.startsWith(connectionRoot)) {
+            throw new IOException("task workspace is outside the connected workspace");
+        }
+        java.util.regex.Matcher matcher = VARIABLE.matcher(value);
+        StringBuffer expanded = new StringBuffer();
+        while (matcher.find()) {
+            String replacement = switch (matcher.group(1)) {
+                case "workspaceFolder" -> remotePath(executionRoot, connectionRoot.relativize(workspacePath));
+                case "file" -> remoteFilePath(activeFile, connectionRoot, executionRoot);
+                case "relativeFile" -> relativeFilePath(workspace, activeFile);
+                case "fileBasename" -> activeFileName(activeFile);
+                default -> throw new IOException("unsupported task variable: ${" + matcher.group(1) + "}");
+            };
+            matcher.appendReplacement(expanded, java.util.regex.Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(expanded);
+        return expanded.toString();
+    }
+
+    private String remoteFilePath(File activeFile, Path connectionRoot, String executionRoot) throws IOException {
+        File file = canonicalActiveFile(activeFile, "${file} requires a file-backed active buffer");
+        Path path = file.toPath().toAbsolutePath().normalize();
+        if (!path.startsWith(connectionRoot)) throw new IOException("${file} must be inside the connected workspace");
+        return remotePath(executionRoot, connectionRoot.relativize(path));
+    }
+
+    private String remotePath(String executionRoot, Path relative) throws IOException {
+        String root = executionRoot == null ? "" : executionRoot.trim().replace('\\', '/');
+        if (root.isEmpty() || root.indexOf('\0') >= 0 || root.indexOf('\n') >= 0 || root.indexOf('\r') >= 0) {
+            throw new IOException("remote provider does not expose an execution root for workspace variables");
+        }
+        String suffix = relative == null ? "" : relative.toString().replace(File.separatorChar, '/');
+        return suffix.isEmpty() ? root : (root.endsWith("/") ? root + suffix : root + "/" + suffix);
     }
 
     private String activeFilePath(File activeFile) throws IOException {

@@ -1,5 +1,7 @@
 package shed;
 
+import shed.api.RemoteCommandRequest;
+import shed.api.RemoteCommandResult;
 import javax.swing.text.BadLocationException;
 import java.io.*;
 import java.nio.file.Path;
@@ -161,6 +163,17 @@ final class JobQuickfixController {
                     return "Usage: :task dry-run <name>";
                 }
                 return runLoadedTask(args.get(1), projectRoot, loaded.tasks(), true);
+            case "remote":
+            case "run-remote":
+                if (args.size() < 3) {
+                    return "Usage: :task remote <connection-id> <name>";
+                }
+                return runRemoteTask(args.get(1), args.get(2), projectRoot, loaded.tasks(), false);
+            case "remote-dry-run":
+                if (args.size() < 3) {
+                    return "Usage: :task remote-dry-run <connection-id> <name>";
+                }
+                return runRemoteTask(args.get(1), args.get(2), projectRoot, loaded.tasks(), true);
             case "cancel":
                 if (args.size() < 2) {
                     return "Usage: :task cancel <job-id>";
@@ -315,13 +328,7 @@ final class JobQuickfixController {
     String runLoadedTask(String taskName, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun) {
         String normalizedName = taskName == null ? "" : taskName.trim();
         if (normalizedName.isEmpty()) return "Task name required";
-        TaskService.WorkspaceTask task = tasks.get(normalizedName);
-        if (task == null) {
-            String taskCommand = inferBuiltInTaskCommand(normalizedName, projectRoot);
-            if (taskCommand != null && !taskCommand.isBlank()) {
-                task = TaskService.defaultWorkspaceTask(normalizedName, taskCommand);
-            }
-        }
+        TaskService.WorkspaceTask task = resolveTask(normalizedName, projectRoot, tasks);
         if (task == null) {
             return "Task not found: " + normalizedName + " (use :task list or :task add)";
         }
@@ -354,6 +361,50 @@ final class JobQuickfixController {
         return "Task job " + jobId + " started (" + normalizedName + ")";
     }
 
+    private String runRemoteTask(String connectionId, String taskName, File projectRoot,
+                                 Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun) {
+        String normalizedName = taskName == null ? "" : taskName.trim();
+        if (normalizedName.isEmpty()) return "Task name required";
+        TaskService.WorkspaceTask task = resolveTask(normalizedName, projectRoot, tasks);
+        if (task == null) return "Task not found: " + normalizedName + " (use :task list or :task add)";
+        TaskService.TaskExecutionPlan plan;
+        try {
+            plan = editor.taskService.buildExecutionPlan(task, projectRoot, activeTaskFile());
+        } catch (IOException | IllegalArgumentException error) {
+            return "Task validation failed: " + error.getMessage();
+        }
+        String validationError = validateTaskPlan(plan);
+        if (validationError != null) return validationError;
+        RemoteWorkspaceTaskTargets.Target target = editor.remoteWorkspaceTaskTargets == null ? null
+            : editor.remoteWorkspaceTaskTargets.targetFor(connectionId, projectRoot.toPath());
+        if (target == null) return "Remote task requires a connected workspace containing: " + projectRoot.getAbsolutePath();
+        RemoteCommandRequest request;
+        try {
+            request = editor.taskService.buildRemoteCommandRequest(plan, target.localRoot(), target.workspace().executionRoot(), activeTaskFile());
+        } catch (IllegalArgumentException | IOException error) {
+            return "Remote task validation failed: " + error.getMessage();
+        }
+        if (dryRun) return showRemoteTaskDryRun(target, plan, request);
+        int jobId = editor.asyncJobService.submit(
+            "task remote " + target.id() + " " + normalizedName,
+            token -> remoteCommandResult(target.workspace().execute(request)),
+            (snapshot, result, error) -> handleTaskJobCompletion(normalizedName, plan, snapshot, result, error)
+        );
+        return "Remote task job " + jobId + " started (" + target.id() + ":" + normalizedName + ")";
+    }
+
+    private TaskService.WorkspaceTask resolveTask(String name, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks) {
+        TaskService.WorkspaceTask task = tasks.get(name);
+        if (task != null) return task;
+        String command = inferBuiltInTaskCommand(name, projectRoot);
+        return command == null || command.isBlank() ? null : TaskService.defaultWorkspaceTask(name, command);
+    }
+
+    private CommandResult remoteCommandResult(RemoteCommandResult result) {
+        if (result == null) return new CommandResult(-1, "", "remote workspace returned no result");
+        return new CommandResult(result.exitCode(), result.output(), "");
+    }
+
 
     File activeTaskFile() {
         FileBuffer buffer = editor.getCurrentBuffer();
@@ -383,6 +434,20 @@ final class JobQuickfixController {
         output.append("env keys: ").append(plan.environment().isEmpty() ? "(none)" : String.join(", ", plan.environment().keySet())).append("\n");
         editor.showScratchBuffer("[task dry-run " + plan.task().name() + "]", output.toString());
         return "Task dry run shown (not started)";
+    }
+
+    private String showRemoteTaskDryRun(RemoteWorkspaceTaskTargets.Target target, TaskService.TaskExecutionPlan plan,
+                                        RemoteCommandRequest request) {
+        StringBuilder output = new StringBuilder("Remote task dry run: ").append(plan.task().name()).append("\n\n");
+        output.append("connection: ").append(target.id()).append("\n");
+        output.append("remote cwd: /").append(request.relativeWorkingDirectory()).append(" (relative to connection root)\n");
+        output.append("command: ").append(String.join(" ", request.command())).append("\n");
+        output.append("shell: ").append(plan.task().shell().configValue()).append("\n");
+        output.append("problem_matcher: ").append(plan.task().problemMatcher().configValue()).append("\n");
+        output.append("presentation: ").append(plan.task().presentation().configValue()).append("\n");
+        output.append("env keys: ").append(request.environment().isEmpty() ? "(none)" : String.join(", ", request.environment().keySet())).append("\n");
+        editor.showScratchBuffer("[remote task dry-run " + plan.task().name() + "]", output.toString());
+        return "Remote task dry run shown (not started)";
     }
 
 
@@ -429,7 +494,7 @@ final class JobQuickfixController {
 
     void handleTaskJobCompletion(String taskName, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
         TaskService.WorkspaceTask task = TaskService.defaultWorkspaceTask(taskName, "true");
-        TaskService.TaskExecutionPlan plan = new TaskService.TaskExecutionPlan(task, "true", List.of("true"), new File("."), Map.of());
+        TaskService.TaskExecutionPlan plan = new TaskService.TaskExecutionPlan(task, new File("."), "true", List.of("true"), new File("."), Map.of());
         handleTaskJobCompletion(taskName, plan, snapshot, result, error);
     }
 

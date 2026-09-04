@@ -105,6 +105,18 @@ public class CommandParsingTest {
     }
 
     @Test
+    void routesPermalinkAndLinkAlias() {
+        GitService service = new GitService();
+        RecordingHandler handler = new RecordingHandler();
+
+        assertEquals("ok-permalink", service.handle("permalink 12", new File("."), handler));
+        assertEquals("permalink", handler.lastCall);
+        assertEquals("12", handler.lastArgs);
+        assertEquals("ok-permalink", service.handle("link", new File("."), handler));
+        assertEquals("permalink", handler.lastCall);
+    }
+
+    @Test
     void returnsNotInsideRepositoryWhenRootMissing() {
         GitService service = new GitService();
         RecordingHandler handler = new RecordingHandler();
@@ -231,6 +243,13 @@ public class CommandParsingTest {
             lastCall = "switch";
             lastArgs = args == null ? "" : args;
             return "ok-switch";
+        }
+
+        @Override
+        public String permalink(File root, String args) {
+            lastCall = "permalink";
+            lastArgs = args == null ? "" : args;
+            return "ok-permalink";
         }
 
         @Override

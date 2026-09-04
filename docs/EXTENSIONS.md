@@ -49,16 +49,18 @@ main_class = "example.ProviderExtension"
 | `TerminalProfile` | Named direct-argv terminal profiles |
 | `ToolViewContribution` | Docked workbench view opened through `:view` |
 | `CustomEditorContribution` | Alternate text or binary editor component |
-| `RemoteWorkspaceProvider` | Explicit `:remote open <uri>` schemes |
+| `RemoteWorkspaceProvider` | Explicit `:remote open <uri>` schemes; its connected workspace may opt into `:remote exec` and structured remote-task requests |
 | `WorkspaceToolContribution` | Declared database, deployment, collaboration, or container actions through `:integration` |
 
 Command ids are namespaced to their extension id and cannot overwrite a built-in or another extension's command. SCM actions are allowlisted by the provider's declared action list; Shed does not turn them into shell strings.
 
 ## Language profiles
 
-`LanguageContribution` selects an LSP language id and optional server command. `LanguageProfile` independently makes an extension language visible in the editor: it can match extensions, exact file names, or literal first-line prefixes, and supplies keywords, line/block comments, and string delimiters. The selected profile drives status-bar language naming, lexical highlighting, and comment/uncomment commands.
+`LanguageContribution` selects an LSP language id and optional server command. `LanguageProfile` independently makes an extension language visible in the editor: it can match extensions, exact file names, or literal first-line prefixes, and supplies keywords, line/block comments, and string delimiters. The selected profile drives status-bar language naming, lexical highlighting, comment/uncomment commands, indentation, and LSP formatting options.
 
 Profiles intentionally use bounded literal tokens rather than arbitrary regular expressions. This keeps their typing-path cost predictable and avoids executing extension-supplied patterns in the editor. A profile may overlap a built-in file type; the extension profile then controls lexical display for its declared match, while the built-in type continues to supply any built-in editor behavior not represented by the profile.
+
+The API-v1 constructor ends at `keywords` and preserves the user's `tab.size` and `expand.tab` settings. The extended constructor accepts `Integer tabSize` (`1..16`) and `Boolean insertSpaces`; pass `null` for either setting to retain that user preference. These preferences are applied per editor pane as buffers change, rather than becoming a global setting.
 
 ```java
 context.registerLanguageProfile(new LanguageProfile(
@@ -74,11 +76,13 @@ This is lexical support only. It does not provide a TextMate grammar, injection 
 
 `WorkspaceToolContribution` is the workspace-aware command boundary for database consoles, deployment workflows, collaboration clients, and container controls; `ToolViewContribution` adds their docked UI. Java extension code remains responsible for credentials, process/network policy, cancellation, and UI. Details: [Workspace Integrations](WORKSPACE_INTEGRATIONS.md).
 
+`RemoteWorkspace.execute(RemoteCommandRequest)` receives direct argv, a validated directory relative to the connected workspace root, and validated environment values. Providers that support `${workspaceFolder}` or `${file}` in an explicit remote task must return their absolute execution root from `executionRoot()` so Shed can map the local mirror path correctly. The API-v1 `execute(List<String>)` method remains available for command-only providers. Providers that do not override the request form reject non-root working directories and environment values rather than silently ignoring them.
+
 ## Custom editors
 
-`CustomEditorContribution.createComponent(CustomEditorDocument)` receives a file path, a defensive byte snapshot, binary detection, and an explicit `write(byte[])` operation. `write` replaces only that resource through Shed's atomic file writer and reloads its buffer model. It is suitable for binary previews and editors as well as text views. The earlier `createComponent(Path, String)` method remains supported for API-v1 text extensions.
+`CustomEditorContribution.createComponent(CustomEditorDocument)` receives a file path, a defensive byte snapshot, binary detection, and an explicit `write(byte[])` operation. `write` replaces only that resource through Shed's atomic file writer and reloads its buffer model. `revision()` and `onDidChange` expose successful host-mediated writes; `onDidDispose` lets a component release listeners when its pane is replaced, closed, or Shed shuts down. `canUndo`, `canRedo`, `undo`, and `redo` retain up to 100 host-mediated byte snapshots and 8 MiB per installed pane. Callback delivery is on the Swing event thread. It is suitable for binary previews and editors as well as text views. The earlier `createComponent(Path, String)` method remains supported for API-v1 text extensions.
 
-Shed currently presents one custom component per editor pane. It does not supply a generalized custom-document undo/redo, backup, serializer, or multi-view synchronization protocol; binary editor extensions own their format model and should implement those capabilities where required.
+Shed currently presents one custom component per editor pane. Its byte history covers only writes made through the installed document and is discarded when that pane is disposed. It does not supply a backup serializer, external-file-change stream, hot-exit, or multi-view synchronization protocol; binary editor extensions own their format model and should implement those capabilities where required.
 
 ## Boundaries
 

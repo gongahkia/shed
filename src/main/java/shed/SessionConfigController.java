@@ -477,11 +477,10 @@ final class SessionConfigController {
         editor.applyUiFont();
         editor.refreshMarkdownPreviews();
         Font editorFont = editor.resolveEditorFont();
-        int tabSize = Math.max(1, editor.configManager.getTabSize());
         for (EditorPane pane : editor.editorPanes) {
             JTextArea area = pane.getTextArea();
             area.setFont(editorFont);
-            area.setTabSize(tabSize);
+            area.setTabSize(Math.max(1, editor.effectiveTabSize(pane.getBuffer())));
             pane.getScrollPane().getVerticalScrollBar().setUnitIncrement(Math.max(16, area.getFontMetrics(area.getFont()).getHeight()));
         }
         if (!editor.configManager.getHighlightSearch() && editor.searchManager != null) {

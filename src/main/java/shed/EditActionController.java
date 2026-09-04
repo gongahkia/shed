@@ -46,7 +46,7 @@ final class EditActionController {
             if (selEnd == editor.writingArea.getLineStartOffset(endLine) && endLine > startLine) {
                 endLine--;
             }
-            String indent = editor.configManager.getExpandTab() ? " ".repeat(editor.writingArea.getTabSize()) : "\t";
+            String indent = editor.effectiveExpandTab() ? " ".repeat(editor.writingArea.getTabSize()) : "\t";
             String text = editor.writingArea.getText();
             int replaceStart = editor.writingArea.getLineStartOffset(startLine);
             int replaceEnd = editor.writingArea.getLineEndOffset(endLine);
@@ -1316,7 +1316,7 @@ final class EditActionController {
             String text = editor.writingArea.getText().substring(start, end);
             switch (operator) {
                 case '>':
-                    String indent = editor.configManager.getExpandTab() ? " ".repeat(editor.writingArea.getTabSize()) : "\t";
+                    String indent = editor.effectiveExpandTab() ? " ".repeat(editor.writingArea.getTabSize()) : "\t";
                     editor.writingArea.replaceRange(indent + text, start, end);
                     break;
                 case '<':

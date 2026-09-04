@@ -110,7 +110,7 @@ final class FormatOnSaveController {
         String content = current;
         LspClient formatter = client;
         editor.asyncJobService.submit("LSP format before save", token -> new FormatResult(request, uri, version, content,
-            formatter.formattingChecked(uri, editor.writingArea.getTabSize(), editor.configManager.getExpandTab())), this::completeFormat);
+            formatter.formattingChecked(uri, editor.writingArea.getTabSize(), editor.effectiveExpandTab())), this::completeFormat);
     }
 
     private void beginExternalFormatting(Request request, FormatterPolicy policy) {

@@ -44,7 +44,7 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `NotebookController` | local Jupyter notebook presentation/save/explicit execution | `NotebookDocument`, `NotebookPanel`, `AsyncJobService` |
 | `CustomEditorController` | extension text/binary custom-editor resource bridge | `CustomEditorDocument`, `AtomicFileWriter` |
 | `ScmController` | extension and built-in SCM command routing | `ScmContributionService` |
-| `RemoteWorkspaceController` | explicit local-mirror remote workspace lifecycle | `RemoteWorkspaceProvider`, `AsyncJobService`, workspace roots |
+| `RemoteWorkspaceController` | explicit mirror lifecycle and provider-owned remote command requests | `RemoteWorkspaceProvider`, `AsyncJobService`, workspace roots |
 | `DevContainerController` | explicit local Dev Container CLI bridge | `AsyncJobService`, `TerminalController`, remote workspace mirrors |
 | `WorkspaceToolController` | declared workspace integration actions | `WorkspaceToolContribution`, extension registry, workspace roots |
 | `ExtensionManager` / `ExtensionRegistry` | checksum-verified Java extension lifecycle and typed contributions | `shed.api`, isolated JAR class loaders, workbench controllers |

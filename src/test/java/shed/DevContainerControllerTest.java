@@ -49,4 +49,13 @@ class DevContainerControllerTest {
             DevContainerController.testInvocation(workspace, List.of("pytest", "-q")));
         assertThrows(java.io.IOException.class, () -> DevContainerController.testInvocation(workspace, List.of("pytest\nbad")));
     }
+
+    @Test
+    void buildsOnlyValidatedDirectArgvTerminalCommands() throws Exception {
+        Path workspace = Files.createDirectory(tempDir.resolve("terminal-project"));
+
+        assertEquals(List.of("devcontainer", "exec", "--workspace-folder", workspace.toAbsolutePath().normalize().toString(), "zsh", "-l"),
+            DevContainerRuntime.terminalInvocation(workspace, List.of("zsh", "-l")));
+        assertThrows(java.io.IOException.class, () -> DevContainerRuntime.terminalInvocation(workspace, List.of("zsh\nbad")));
+    }
 }

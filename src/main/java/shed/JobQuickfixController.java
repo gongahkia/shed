@@ -355,6 +355,11 @@ final class JobQuickfixController {
         if (validationError != null) {
             return validationError;
         }
+        DevContainerSessionService.Connection connection = editor.devContainerSessions == null
+            ? null : editor.devContainerSessions.connectionFor(projectRoot.toPath());
+        if (connection != null) {
+            return runConnectedContainerTask(normalizedName, plan, activeFile, connection, dryRun, false);
+        }
         if (dryRun) return showTaskDryRun(plan);
         int jobId = editor.asyncJobService.submit(
             "task " + normalizedName + ": " + plan.expandedCommand(),
@@ -408,6 +413,14 @@ final class JobQuickfixController {
             } catch (Exception error) {
                 String message = error.getMessage();
                 return new DebugSessionService.PreLaunchResult(false, List.of("Remote debug pre-launch task failed: "
+                    + (message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' '))));
+            }
+        } else if (editor.devContainerSessions != null && editor.devContainerSessions.connectionFor(debugPlan.workspace()) != null) {
+            try {
+                result = runConnectedContainerTaskProcess(plan, activeFile, editor.devContainerSessions.connectionFor(debugPlan.workspace()), token);
+            } catch (Exception error) {
+                String message = error.getMessage();
+                return new DebugSessionService.PreLaunchResult(false, List.of("Dev Container debug pre-launch task failed: "
                     + (message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' '))));
             }
         } else if (editor.devContainerController != null && editor.devContainerController.hasConfiguration(debugPlan.workspace())) {
@@ -481,6 +494,11 @@ final class JobQuickfixController {
         }
         String validationError = validateTaskPlan(plan);
         if (validationError != null) return validationError;
+        DevContainerSessionService.Connection connection = editor.devContainerSessions == null
+            ? null : editor.devContainerSessions.connectionFor(projectRoot.toPath());
+        if (connection != null) {
+            return runConnectedContainerTask(normalizedName, plan, activeFile, connection, dryRun, true);
+        }
         RemoteCommandRequest request;
         try {
             request = editor.taskService.buildRemoteCommandRequest(plan, projectRoot.toPath(), "/<remote-workspace>", activeFile);
@@ -495,6 +513,27 @@ final class JobQuickfixController {
             (snapshot, result, error) -> handleTaskJobCompletion(normalizedName, plan, snapshot, result, error)
         );
         return "Dev Container task job " + jobId + " started (" + normalizedName + ")";
+    }
+
+    /** Runs a task through an already verified, explicitly connected Dev Container without re-probing it. */
+    private String runConnectedContainerTask(String taskName, TaskService.TaskExecutionPlan plan, File activeFile,
+                                             DevContainerSessionService.Connection connection, boolean dryRun,
+                                             boolean explicitlyRequested) {
+        RemoteCommandRequest request;
+        try {
+            request = editor.taskService.buildRemoteCommandRequest(plan, connection.workspace(), connection.remoteWorkingDirectory(), activeFile);
+            devContainerInvocation(connection.workspace(), connection.remoteWorkingDirectory(), request, plan.task().shell());
+        } catch (IOException | IllegalArgumentException error) {
+            return "Dev Container task validation failed: " + error.getMessage();
+        }
+        if (dryRun) return showConnectedContainerTaskDryRun(plan, request, connection);
+        int jobId = editor.asyncJobService.submit(
+            "task container " + taskName,
+            token -> runConnectedContainerTaskProcess(plan, activeFile, connection, token),
+            (snapshot, result, error) -> handleTaskJobCompletion(taskName, plan, snapshot, result, error)
+        );
+        return explicitlyRequested ? "Dev Container task job " + jobId + " started (" + taskName + ")"
+            : "Task job " + jobId + " started in Dev Container (" + taskName + ")";
     }
 
     private CommandResult runContainerTaskProcess(TaskService.TaskExecutionPlan plan, File projectRoot, File activeFile,
@@ -513,6 +552,17 @@ final class JobQuickfixController {
         RemoteCommandRequest request = editor.taskService.buildRemoteCommandRequest(plan, projectRoot.toPath(), remoteRoot, activeFile);
         List<String> invocation = devContainerInvocation(plan.workspace().toPath(), remoteRoot, request, plan.task().shell());
         return runExternalCommand(invocation, projectRoot, null, token, timeout, outputLimit, true);
+    }
+
+    private CommandResult runConnectedContainerTaskProcess(TaskService.TaskExecutionPlan plan, File activeFile,
+                                                           DevContainerSessionService.Connection connection,
+                                                           AsyncJobService.JobToken token) throws Exception {
+        if (connection == null) throw new IOException("Dev Container session is unavailable");
+        RemoteCommandRequest request = editor.taskService.buildRemoteCommandRequest(plan, connection.workspace(),
+            connection.remoteWorkingDirectory(), activeFile);
+        List<String> invocation = devContainerInvocation(connection.workspace(), connection.remoteWorkingDirectory(), request, plan.task().shell());
+        return runExternalCommand(invocation, connection.workspace().toFile(), null, token,
+            editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true);
     }
 
     private List<String> devContainerPrefix(Path workspace) {
@@ -626,6 +676,20 @@ final class JobQuickfixController {
         output.append("shell: ").append(plan.task().shell().configValue()).append("\n");
         output.append("env keys: ").append(request.environment().isEmpty() ? "(none)" : String.join(", ", request.environment().keySet())).append("\n\n");
         output.append("The remote workspace path is resolved by an explicit devcontainer exec call when this task runs.\n");
+        editor.showScratchBuffer("[container task dry-run " + plan.task().name() + "]", output.toString());
+        return "Dev Container task dry run shown (not started)";
+    }
+
+    private String showConnectedContainerTaskDryRun(TaskService.TaskExecutionPlan plan, RemoteCommandRequest request,
+                                                    DevContainerSessionService.Connection connection) {
+        StringBuilder output = new StringBuilder("Connected Dev Container task dry run: ").append(plan.task().name()).append("\n\n");
+        output.append("host workspace: ").append(connection.workspace()).append("\n");
+        output.append("container workspace: ").append(connection.remoteWorkingDirectory()).append("\n");
+        output.append("remote cwd: ").append(request.relativeWorkingDirectory().isEmpty() ? "(workspace root)" : request.relativeWorkingDirectory()).append("\n");
+        output.append("command: ").append(String.join(" ", request.command())).append("\n");
+        output.append("shell: ").append(plan.task().shell().configValue()).append("\n");
+        output.append("env keys: ").append(request.environment().isEmpty() ? "(none)" : String.join(", ", request.environment().keySet())).append("\n\n");
+        output.append("The container was explicitly connected earlier in this application session; this dry run starts nothing.\n");
         editor.showScratchBuffer("[container task dry-run " + plan.task().name() + "]", output.toString());
         return "Dev Container task dry run shown (not started)";
     }

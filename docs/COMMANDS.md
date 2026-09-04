@@ -77,7 +77,7 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:task add <name> <command>` | Save task |
 | `:task remove <name>`, `:task rm <name>`, `:task delete <name>` | Remove task |
 | `:task dry-run <name>` | Resolve and show task execution plan without starting it |
-| `:task run <name>` | Explicitly run named task |
+| `:task run <name>` | Explicitly run named task; routes through an explicitly connected Dev Container when the task root is inside that session |
 | `:task remote <connection-id> <name>` | Explicitly run named task through a matching connected remote workspace |
 | `:task remote-dry-run <connection-id> <name>` | Resolve and show remote task plan without starting it |
 | `:task container <name>` | Explicitly run named task through the active project's running Dev Container |
@@ -451,8 +451,10 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:remote terminal <id> [command...]` | Open an explicit interactive terminal at the connection root when its provider supports it |
 | `:language`, `:language list` | List installed extension language profiles and the active buffer's profile mode |
 | `:language <extension-id:language-id>`, `:language auto` | Override profile detection for the current buffer, or restore automatic detection; a matching same-extension language contribution retargets its LSP client |
-| `:container status` | Show the active workspace's `.devcontainer/devcontainer.json` when present |
+| `:container status` | Show the active workspace's `.devcontainer/devcontainer.json` and whether it is connected for this application session |
 | `:container up` | Explicitly run the local `devcontainer up` workflow as a cancellable job |
+| `:container connect`, `:container reopen` | Explicitly start/verify the Dev Container, then route new ordinary terminals and tasks for that workspace through it for this application session |
+| `:container disconnect` | Stop that routing without stopping or deleting the container |
 | `:container exec <command...>`, `:container terminal [command...]` | Explicitly run/open a direct-argv command through the local Dev Container CLI |
 | `:container open <container> <absolute-path>` | Open an explicit Docker container mirror |
 | `:compose`, `:compose status` | Show the nearest workspace-root local Compose configuration without contacting Docker |

@@ -63,14 +63,18 @@ Generic task diagnostics still resolve against the local mirror, so remote tools
 
 ## Explicit Dev Container tasks
 
-For a project with `.devcontainer/devcontainer.json`, first start its container and then choose it explicitly:
+For a project with `.devcontainer/devcontainer.json`, either run a single task through the container explicitly, or connect the workspace for the current application session:
 
 ```text
 :container up
 :task container check
+
+# or: starts/verifies the container, then routes ordinary tasks for this workspace
+:container connect
+:task run check
 ```
 
-Shed probes the running container's workspace path through `devcontainer exec pwd`, then expands task workspace/file variables against that container path. Declared task environment values become repeated `devcontainer exec --remote-env name=value` arguments. The probe and task are cancellable local CLI processes; Shed does not start a container merely because a task exists.
+` :container connect` is an explicit, cancellable `devcontainer up` followed by `devcontainer exec pwd`. On success, Shed retains only the validated host-workspace/container-workspace mapping in memory for that application process. New `:task run` invocations rooted in that workspace use the same container mapping without another root probe. `:container disconnect` removes that routing but does not stop, delete, or rebuild the container; restarting Shed also clears it. Declared task environment values become repeated `devcontainer exec --remote-env name=value` arguments. Shed does not start a container merely because a task exists or a workspace is opened.
 
 The Dev Container CLI executes its command at the configured remote workspace root and has no working-directory argument. A `direct` task therefore remains direct argv only when its task cwd is that root. A `login` task with a subdirectory runs an explicit, safely quoted `/bin/sh -lc` wrapper to change directory before the task's inner login shell. This is a compatibility boundary, not a general remote task scheduler.
 

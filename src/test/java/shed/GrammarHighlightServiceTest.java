@@ -83,6 +83,30 @@ class GrammarHighlightServiceTest {
     }
 
     @Test
+    void lexesAdditionalLanguageFilesWithoutClaimingGrammarOrServerParity() throws Exception {
+        String kotlin = "class Engine { fun run() { val value = 1 } // local comment }";
+        assertTrue(has(highlight("Engine.kt", kotlin), kotlin, "fun", GrammarHighlightService.Scope.KEYWORD));
+        assertTrue(has(highlight("Engine.kt", kotlin), kotlin, "// local comment }", GrammarHighlightService.Scope.COMMENT));
+
+        String csharp = "[Fact]\npublic class Engine { public void Run() {} // local comment }";
+        assertTrue(has(highlight("Engine.cs", csharp), csharp, "[Fact", GrammarHighlightService.Scope.ANNOTATION));
+        assertTrue(has(highlight("Engine.cs", csharp), csharp, "// local comment }", GrammarHighlightService.Scope.COMMENT));
+
+        String php = "#[Route]\nclass Engine { public function run() {} # local comment }";
+        assertTrue(has(highlight("index.php", php), php, "#[Route]", GrammarHighlightService.Scope.ANNOTATION));
+        assertTrue(has(highlight("index.php", php), php, "function", GrammarHighlightService.Scope.KEYWORD));
+        assertTrue(has(highlight("index.php", php), php, "# local comment }", GrammarHighlightService.Scope.COMMENT));
+
+        String ruby = "class Engine\n  def run\n  end\nend # local comment";
+        assertTrue(has(highlight("engine.rb", ruby), ruby, "def", GrammarHighlightService.Scope.KEYWORD));
+        assertTrue(has(highlight("engine.rb", ruby), ruby, "# local comment", GrammarHighlightService.Scope.COMMENT));
+
+        String swift = "struct Engine { func run() {} }\nlet message = \"\"\"one\ntwo\"\"\"";
+        assertTrue(has(highlight("Engine.swift", swift), swift, "func", GrammarHighlightService.Scope.KEYWORD));
+        assertTrue(has(highlight("Engine.swift", swift), swift, "two\"\"\"", GrammarHighlightService.Scope.STRING));
+    }
+
+    @Test
     void virtualizedCodeRangeRetainsMultilineCommentState() {
         String text = "class Demo {\n/* open\nstill comment\n*/\nint value = 1;\n}";
         int start = text.indexOf("still comment");

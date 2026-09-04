@@ -746,7 +746,7 @@ final class SyntaxUiController {
                 continue;
             }
 
-            if (fileType == FileType.JAVA && matchesAt(text, i, "\"\"\"")) {
+            if ((fileType == FileType.JAVA || fileType == FileType.KOTLIN || fileType == FileType.SWIFT) && matchesAt(text, i, "\"\"\"")) {
                 int closeIndex = text.indexOf("\"\"\"", i + 3);
                 int end = closeIndex < 0 ? text.length() : closeIndex + 3;
                 addSyntaxHighlight(i, end, editor.syntaxStringColor, masked);

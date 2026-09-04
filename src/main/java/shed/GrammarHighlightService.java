@@ -363,6 +363,11 @@ final class GrammarHighlightService {
             case "go" -> FileType.GO;
             case "c" -> FileType.C;
             case "cpp", "c++", "cxx" -> FileType.CPP;
+            case "kt", "kotlin", "kts" -> FileType.KOTLIN;
+            case "cs", "csharp", "c#" -> FileType.CSHARP;
+            case "php" -> FileType.PHP;
+            case "rb", "ruby" -> FileType.RUBY;
+            case "swift" -> FileType.SWIFT;
             case "html", "xml" -> FileType.HTML;
             case "css" -> FileType.CSS;
             case "json" -> FileType.JSON;
@@ -496,7 +501,23 @@ final class GrammarHighlightService {
                 index = end;
                 continue;
             }
-            if ((type == FileType.PYTHON || type == FileType.YAML || type == FileType.TOML || type == FileType.SHELL) && current == '#') {
+            if (type == FileType.CSHARP && current == '[') {
+                int end = index + 1;
+                while (end < to && (isIdentifier(text.charAt(end)) || text.charAt(end) == '.')) end++;
+                if (end > index + 1) {
+                    add(tokens, index, end, Scope.ANNOTATION);
+                    index = end;
+                    continue;
+                }
+            }
+            if (type == FileType.PHP && current == '#' && index + 1 < to && text.charAt(index + 1) == '[') {
+                int close = text.indexOf(']', index + 2);
+                int end = close < 0 || close >= to ? to : close + 1;
+                add(tokens, index, end, Scope.ANNOTATION);
+                index = end;
+                continue;
+            }
+            if ((type == FileType.PYTHON || type == FileType.PHP || type == FileType.RUBY || type == FileType.YAML || type == FileType.TOML || type == FileType.SHELL) && current == '#') {
                 add(tokens, index, to, Scope.COMMENT);
                 break;
             }
@@ -508,7 +529,7 @@ final class GrammarHighlightService {
                 index = end;
                 continue;
             }
-            if (current == '@' && (type == FileType.JAVA || type == FileType.PYTHON || type == FileType.JAVASCRIPT || type == FileType.TYPESCRIPT)) {
+            if (current == '@' && (type == FileType.JAVA || type == FileType.KOTLIN || type == FileType.SWIFT || type == FileType.PYTHON || type == FileType.JAVASCRIPT || type == FileType.TYPESCRIPT)) {
                 int end = identifierEnd(text, index + 1, to);
                 add(tokens, index, end, Scope.ANNOTATION);
                 index = end;
@@ -566,7 +587,7 @@ final class GrammarHighlightService {
     }
 
     private Mode quoteMode(String text, int index, FileType type, int limit) {
-        if (type == FileType.JAVA && startsWith(text, index, "\"\"\"")) return Mode.TRIPLE_DOUBLE;
+        if ((type == FileType.JAVA || type == FileType.KOTLIN || type == FileType.SWIFT) && startsWith(text, index, "\"\"\"")) return Mode.TRIPLE_DOUBLE;
         if (type == FileType.PYTHON && startsWith(text, index, "\"\"\"")) return Mode.TRIPLE_DOUBLE;
         if (type == FileType.PYTHON && startsWith(text, index, "'''") ) return Mode.TRIPLE_SINGLE;
         char current = text.charAt(index);
@@ -649,12 +670,14 @@ final class GrammarHighlightService {
     }
 
     private boolean supportsLineComments(FileType type) {
-        return type == FileType.JAVA || type == FileType.JAVASCRIPT || type == FileType.TYPESCRIPT || type == FileType.RUST
+        return type == FileType.JAVA || type == FileType.KOTLIN || type == FileType.CSHARP || type == FileType.PHP
+            || type == FileType.SWIFT || type == FileType.JAVASCRIPT || type == FileType.TYPESCRIPT || type == FileType.RUST
             || type == FileType.GO || type == FileType.C || type == FileType.CPP;
     }
 
     private boolean supportsBlockComments(FileType type) {
-        return type == FileType.JAVA || type == FileType.JAVASCRIPT || type == FileType.TYPESCRIPT || type == FileType.RUST
+        return type == FileType.JAVA || type == FileType.KOTLIN || type == FileType.CSHARP || type == FileType.PHP
+            || type == FileType.SWIFT || type == FileType.JAVASCRIPT || type == FileType.TYPESCRIPT || type == FileType.RUST
             || type == FileType.GO || type == FileType.C || type == FileType.CPP || type == FileType.CSS || type == FileType.SQL;
     }
 

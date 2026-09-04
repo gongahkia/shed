@@ -227,6 +227,11 @@ public class LspServiceTest {
         assertEquals("python", service.languageId(FileType.PYTHON));
         assertEquals("c", service.languageId(FileType.C));
         assertEquals("cpp", service.languageId(FileType.CPP));
+        assertEquals("kotlin", service.languageId(FileType.KOTLIN));
+        assertEquals("csharp", service.languageId(FileType.CSHARP));
+        assertEquals("php", service.languageId(FileType.PHP));
+        assertEquals("ruby", service.languageId(FileType.RUBY));
+        assertEquals("swift", service.languageId(FileType.SWIFT));
         assertEquals(FileType.JAVASCRIPT, FileType.detect(new java.io.File("component.jsx"), ""));
         assertEquals(FileType.TYPESCRIPT, FileType.detect(new java.io.File("component.tsx"), ""));
         assertEquals(FileType.JSON, FileType.detect(new java.io.File("settings.jsonc"), ""));
@@ -234,6 +239,11 @@ public class LspServiceTest {
         assertEquals(FileType.TOML, FileType.detect(new java.io.File("Cargo.toml"), ""));
         assertEquals(FileType.SQL, FileType.detect(new java.io.File("schema.sql"), ""));
         assertEquals(FileType.SHELL, FileType.detect(new java.io.File("deploy"), "#!/usr/bin/env bash"));
+        assertEquals(FileType.KOTLIN, FileType.detect(new java.io.File("build.gradle.kts"), ""));
+        assertEquals(FileType.CSHARP, FileType.detect(new java.io.File("Program.csx"), ""));
+        assertEquals(FileType.PHP, FileType.detect(new java.io.File("index.phtml"), ""));
+        assertEquals(FileType.RUBY, FileType.detect(new java.io.File("Rakefile"), ""));
+        assertEquals(FileType.SWIFT, FileType.detect(new java.io.File("App.swift"), ""));
         assertEquals("text", service.languageId(FileType.UNKNOWN));
     }
 
@@ -251,6 +261,11 @@ public class LspServiceTest {
         assertArrayEquals(new String[] {"vscode-css-language-server", "--stdio"}, service.builtinCommand("scss"));
         assertArrayEquals(new String[] {"remark-language-server", "--stdio"}, service.builtinCommand("md"));
         assertArrayEquals(new String[] {"clangd"}, service.builtinCommand("cpp"));
+        assertNull(service.builtinCommand("kt"));
+        assertNull(service.builtinCommand("cs"));
+        assertNull(service.builtinCommand("php"));
+        assertNull(service.builtinCommand("rb"));
+        assertNull(service.builtinCommand("swift"));
         assertNull(service.builtinCommand("lua"));
     }
 

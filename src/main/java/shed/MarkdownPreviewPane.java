@@ -225,6 +225,21 @@ final class MarkdownPreviewPane extends JPanel {
         int width = extent.width > 0 ? extent.width : Math.max(1, preferred.width);
         preview.setSize(width, Math.max(1, preferred.height));
         scrollPane.doLayout();
+        JScrollBar bar = scrollPane.getVerticalScrollBar();
+        if (bar.getMaximum() - bar.getVisibleAmount() > 0) return;
+
+        // An unshown Swing split can report no viewport range even though this
+        // preview has rendered content. Seed a temporary model range from the
+        // source line count so source synchronization is not dropped before
+        // the first real layout replaces it with the HTML view's range.
+        Font previewFont = preview.getFont();
+        if (previewFont == null) previewFont = new Font(Font.DIALOG, Font.PLAIN, 13);
+        int lineHeight = Math.max(1, preview.getFontMetrics(previewFont).getHeight());
+        long lineCount = Math.max(1L, source.getFullContent().lines().count());
+        long estimatedHeight = Math.min(Integer.MAX_VALUE - 1L, lineCount * (long) lineHeight);
+        int visible = Math.max(0, bar.getVisibleAmount());
+        int maximum = Math.max(bar.getMaximum(), visible + (int) Math.max(1L, estimatedHeight));
+        bar.setMaximum(maximum);
     }
 
     private int caretVerticalPosition(int sourceMaximum) {

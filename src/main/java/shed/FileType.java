@@ -16,6 +16,11 @@ public enum FileType {
     C("c"),
     CPP("cpp"),
     JAVA("java"),
+    KOTLIN("kotlin"),
+    CSHARP("csharp"),
+    PHP("php"),
+    RUBY("ruby"),
+    SWIFT("swift"),
     HTML("html"),
     CSS("css"),
     JSON("json"),
@@ -40,6 +45,9 @@ public enum FileType {
     public static FileType detect(File file, String content) {
         if (file != null) {
             String name = file.getName().toLowerCase();
+            if (name.equals("rakefile") || name.equals("gemfile") || name.equals("guardfile") || name.equals("capfile")) {
+                return RUBY;
+            }
             int dot = name.lastIndexOf('.');
             if (dot >= 0 && dot < name.length() - 1) {
                 String extension = name.substring(dot + 1);
@@ -71,6 +79,25 @@ public enum FileType {
                         return CPP;
                     case "java":
                         return JAVA;
+                    case "kt":
+                    case "kts":
+                        return KOTLIN;
+                    case "cs":
+                    case "csx":
+                        return CSHARP;
+                    case "php":
+                    case "phtml":
+                    case "php3":
+                    case "php4":
+                    case "php5":
+                    case "phps":
+                        return PHP;
+                    case "rb":
+                    case "rake":
+                    case "gemspec":
+                        return RUBY;
+                    case "swift":
+                        return SWIFT;
                     case "html":
                     case "htm":
                     case "xhtml":
@@ -113,6 +140,12 @@ public enum FileType {
             }
             if (firstLine.contains("node")) {
                 return JAVASCRIPT;
+            }
+            if (firstLine.contains("ruby")) {
+                return RUBY;
+            }
+            if (firstLine.contains("php")) {
+                return PHP;
             }
             if (firstLine.contains("sh") || firstLine.contains("bash") || firstLine.contains("zsh") || firstLine.contains("fish")) {
                 return SHELL;

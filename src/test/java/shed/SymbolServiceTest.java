@@ -83,4 +83,24 @@ public class SymbolServiceTest {
         List<SymbolService.Symbol> shell = service.collectSymbols("deploy() { echo deploy; }\nif true; then :; fi\n", FileType.SHELL);
         assertEquals(List.of("deploy"), shell.stream().map(SymbolService.Symbol::getName).toList());
     }
+
+    @Test
+    void collectsCautiousOutlinesForAdditionalBuiltInLexicalLanguages() {
+        SymbolService service = new SymbolService();
+
+        List<SymbolService.Symbol> kotlin = service.collectSymbols("class Engine {\n  fun run() {}\n}\n", FileType.KOTLIN);
+        assertEquals(List.of("Engine", "run"), kotlin.stream().map(SymbolService.Symbol::getName).toList());
+
+        List<SymbolService.Symbol> csharp = service.collectSymbols("public class Engine {\n  public void Run() {}\n}\n", FileType.CSHARP);
+        assertEquals(List.of("Engine", "Run"), csharp.stream().map(SymbolService.Symbol::getName).toList());
+
+        List<SymbolService.Symbol> php = service.collectSymbols("class Engine {\n  public function run() {}\n}\n", FileType.PHP);
+        assertEquals(List.of("Engine", "run"), php.stream().map(SymbolService.Symbol::getName).toList());
+
+        List<SymbolService.Symbol> ruby = service.collectSymbols("class Engine\n  def run\n  end\nend\n", FileType.RUBY);
+        assertEquals(List.of("Engine", "run"), ruby.stream().map(SymbolService.Symbol::getName).toList());
+
+        List<SymbolService.Symbol> swift = service.collectSymbols("struct Engine {\n  func run() {}\n}\n", FileType.SWIFT);
+        assertEquals(List.of("Engine", "run"), swift.stream().map(SymbolService.Symbol::getName).toList());
+    }
 }

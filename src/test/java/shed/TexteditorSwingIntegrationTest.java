@@ -258,7 +258,7 @@ public class TexteditorSwingIntegrationTest {
             String output = onEdt(() -> editor.getCurrentBuffer().getContent());
             assertTrue(output.contains("Remote task dry run: check"));
             assertTrue(output.contains("connection: ssh-project"));
-            assertTrue(output.contains("this dry run starts nothing"));
+            assertTrue(output.contains("This dry run starts nothing."));
         } finally {
             disposeEditor(editor);
         }

@@ -11,6 +11,8 @@ Remote workspaces are explicit local working-tree connections. They do not insta
 :remote push <connection-id>
 :remote exec <connection-id> <command...>
 :remote terminal <connection-id> [command...]
+:remote use <connection-id>
+:remote unuse <connection-id>
 :remote forward <connection-id> <local-port> <remote-host> <remote-port>
 :remote forward list
 :remote forward close <local-port>
@@ -33,6 +35,12 @@ SSH, Git, and Docker credentials remain with the user-installed tools and their 
 `:remote exec <id> <command...>` runs only after a user requests it. The command is parsed as direct argv; Shed does not invoke a local shell to process it. The result opens in a scratch buffer and has a capped output size.
 
 `:remote terminal <id> [command...]` opens an explicit interactive terminal at the connection root. SSH receives a PTY (`ssh -tt`) and a safely quoted remote shell/command; Docker receives `docker exec -it`; WSL starts the selected distribution shell. An optional command is direct argv. Terminal session state and remote command history are not restored.
+
+## Activated remote execution
+
+`:remote use <id>` explicitly activates an in-memory execution session for a connected SSH, Docker-container, WSL, or contributed workspace that reports a distinct remote execution root. After that command, new ordinary `:terminal` panes and `:task run`/`:task dry-run` for files beneath that workspace use the provider's remote terminal or task boundary. A default terminal lets the provider choose its normal remote shell; an extension terminal profile retains its direct argv. `:remote unuse <id>` stops this routing but leaves the connection and mirror intact. `:remote close <id>` also stops it.
+
+Opening a remote workspace alone still does not change ordinary task or terminal placement. The activation is process-local, has no automatic reconnect or persistence, does not move the editor, extension host, file watcher, or shell session to the remote host, and does not synchronize files on a timer. When both an active remote session and an explicitly connected local Dev Container could contain a task, the active remote session takes precedence by execution-routing order.
 
 ## Explicit SSH port forwarding
 
@@ -77,7 +85,7 @@ The bridges support only ordinary absolute `file:` URIs and DAP source paths ins
 - SSH mirroring deliberately omits `--delete`; a pull cannot silently delete an unrelated local mirror file.
 - Container remote-workspace support itself is file synchronization. It does not run an extension host inside a container; the separate local Dev Container CLI bridge below is explicit and does not alter that mirror model.
 - WSL support is Windows-only and uses the local WSL filesystem bridge rather than a remote server.
-- This is not VS Code or Zed remote-development parity: there is no remote extension host, automatic SSH task placement, SSH server bootstrap, port discovery or forwarding UI, Codespaces service, browser editor, persistent remote-server/reconnect protocol, or automatic conflict resolver. Remote LSP, testing, and debugging are narrow explicit process bridges, not a remote workbench host. An explicitly connected local Dev Container is the limited exception: its new normal terminals and task runs route through `devcontainer exec` for the current application session.
+- This is not VS Code or Zed remote-development parity: there is no remote extension host, automatic remote task placement without `:remote use`, SSH server bootstrap, port discovery or forwarding UI, Codespaces service, browser editor, persistent remote-server/reconnect protocol, or automatic conflict resolver. Remote LSP, testing, and debugging are narrow explicit process bridges, not a remote workbench host. An explicitly connected local Dev Container and an explicitly activated remote session can route new normal terminals and task runs only for the current application session.
 
 Extensions can add URI schemes using `RemoteWorkspaceProvider`; they must disclose their own authentication, synchronization, and network behavior.
 

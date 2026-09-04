@@ -15,6 +15,7 @@ final class RemoteWorkspaceSessionService {
 
     synchronized void activate(String id, RemoteWorkspace workspace) {
         Connection connection = new Connection(id, workspace);
+        connections.entrySet().removeIf(entry -> entry.getValue().id().equals(connection.id()));
         connections.put(connection.localRoot(), connection);
     }
 

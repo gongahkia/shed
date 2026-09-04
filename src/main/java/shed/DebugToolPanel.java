@@ -28,10 +28,13 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
     private final JList<DebugInspection.Watch> watchList = new JList<>(watches);
     private final DefaultListModel<BreakpointStore.Breakpoint> breakpoints = new DefaultListModel<>();
     private final JList<BreakpointStore.Breakpoint> breakpointList = new JList<>(breakpoints);
+    private final DefaultListModel<DebugSessionController.ExceptionBreakpointView> exceptionBreakpoints = new DefaultListModel<>();
+    private final JList<DebugSessionController.ExceptionBreakpointView> exceptionBreakpointList = new JList<>(exceptionBreakpoints);
     private final JCheckBox breakpointEnabled = new JCheckBox("Enabled", true);
     private final JTextField breakpointCondition = new JTextField();
     private final JTextField breakpointHitCondition = new JTextField();
     private final JTextField breakpointLogMessage = new JTextField();
+    private final JCheckBox exceptionBreakpointEnabled = new JCheckBox("Enabled", true);
     private final JTextArea inspector = textArea();
     private final JTextArea console = textArea();
     private final JTextField watchInput = new JTextField();
@@ -45,8 +48,12 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         AccessibilitySupport.describe(frameList, "Debug call stack", "Select a paused stack frame to inspect variables.");
         AccessibilitySupport.describe(watchList, "Debug watches", "Session-local watch expressions.");
         AccessibilitySupport.describe(breakpointList, "Source breakpoints", "Configure enabled, condition, hit-count, or log-message settings for a source breakpoint.");
+        AccessibilitySupport.describe(exceptionBreakpointList, "Exception breakpoints", "Enable or disable exception breakpoint filters advertised by the active debug adapter.");
         breakpointList.addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting()) loadBreakpoint(breakpointList.getSelectedValue());
+        });
+        exceptionBreakpointList.addListSelectionListener(event -> {
+            if (!event.getValueIsAdjusting()) loadExceptionBreakpoint(exceptionBreakpointList.getSelectedValue());
         });
     }
 
@@ -109,8 +116,16 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         breakpointBottom.add(breakpointActions, BorderLayout.SOUTH);
         breakpointPanel.add(breakpointBottom, BorderLayout.SOUTH);
 
-        JPanel left = new JPanel(new GridLayout(3, 1, 4, 4));
-        left.add(framesPanel); left.add(watchPanel); left.add(breakpointPanel);
+        JPanel exceptionBreakpointPanel = new JPanel(new BorderLayout(3, 3));
+        exceptionBreakpointPanel.setBorder(BorderFactory.createTitledBorder("Exception Breakpoints"));
+        exceptionBreakpointPanel.add(new JScrollPane(exceptionBreakpointList), BorderLayout.CENTER);
+        JPanel exceptionBreakpointActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 3, 0));
+        exceptionBreakpointActions.add(exceptionBreakpointEnabled);
+        exceptionBreakpointActions.add(button("Apply", this::applyExceptionBreakpoint));
+        exceptionBreakpointPanel.add(exceptionBreakpointActions, BorderLayout.SOUTH);
+
+        JPanel left = new JPanel(new GridLayout(4, 1, 4, 4));
+        left.add(framesPanel); left.add(watchPanel); left.add(breakpointPanel); left.add(exceptionBreakpointPanel);
         inspector.setBorder(BorderFactory.createTitledBorder("Variables and Scopes"));
         console.setBorder(BorderFactory.createTitledBorder("Debug Console"));
         JSplitPane right = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(inspector), new JScrollPane(console));
@@ -150,6 +165,21 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
                 }
             }
             if (breakpointList.getSelectedIndex() < 0) loadBreakpoint(null);
+            DebugSessionController.ExceptionBreakpointView selectedExceptionBreakpoint = exceptionBreakpointList.getSelectedValue();
+            exceptionBreakpoints.clear();
+            for (DebugSessionController.ExceptionBreakpointView breakpoint : editor.debugSessionController.exceptionBreakpointsForPanel()) {
+                exceptionBreakpoints.addElement(breakpoint);
+            }
+            if (selectedExceptionBreakpoint != null) {
+                for (int index = 0; index < exceptionBreakpoints.size(); index++) {
+                    DebugSessionController.ExceptionBreakpointView breakpoint = exceptionBreakpoints.get(index);
+                    if (breakpoint.filter().id().equals(selectedExceptionBreakpoint.filter().id())) {
+                        exceptionBreakpointList.setSelectedIndex(index);
+                        break;
+                    }
+                }
+            }
+            if (exceptionBreakpointList.getSelectedIndex() < 0) loadExceptionBreakpoint(null);
             inspector.setText(renderInspection(snapshot));
             DebugConsole.Snapshot output = editor.debugSessionController.consoleForPanel();
             console.setText(output.output());
@@ -174,11 +204,17 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
             breakpointHitCondition.getText(), breakpointLogMessage.getText()));
     }
     private void removeBreakpoint() { message(editor.debugSessionController.removeBreakpointForPanel(breakpointList.getSelectedValue())); }
+    private void applyExceptionBreakpoint() {
+        message(editor.debugSessionController.configureExceptionBreakpointForPanel(exceptionBreakpointList.getSelectedValue(), exceptionBreakpointEnabled.isSelected()));
+    }
     private void loadBreakpoint(BreakpointStore.Breakpoint breakpoint) {
         breakpointEnabled.setSelected(breakpoint == null || breakpoint.enabled());
         breakpointCondition.setText(breakpoint == null ? "" : breakpoint.condition());
         breakpointHitCondition.setText(breakpoint == null ? "" : breakpoint.hitCondition());
         breakpointLogMessage.setText(breakpoint == null ? "" : breakpoint.logMessage());
+    }
+    private void loadExceptionBreakpoint(DebugSessionController.ExceptionBreakpointView breakpoint) {
+        exceptionBreakpointEnabled.setSelected(breakpoint == null || breakpoint.enabled());
     }
 
     private void message(String text) { editor.showMessage(text); refresh(); }

@@ -13,6 +13,8 @@ final class DatabaseController {
     private static final String TABLES_QUERY = "select table_schema, table_name from information_schema.tables "
         + "where table_type = 'BASE TABLE' and table_schema not in ('pg_catalog', 'information_schema') "
         + "order by table_schema, table_name";
+    private static final String SQLITE_TABLES_QUERY = "select name from sqlite_master where type in ('table', 'view') "
+        + "and name not like 'sqlite_%' order by name";
     private final Texteditor editor;
 
     DatabaseController(Texteditor editor) {
@@ -34,7 +36,8 @@ final class DatabaseController {
             case "tables" -> submit("tables", queryCommand(TABLES_QUERY));
             case "file" -> executeFile(tokens.subList(1, tokens.size()));
             case "terminal", "console" -> editor.terminalController.openDirect("PostgreSQL", workspace().toFile(), baseCommand());
-            default -> "Usage: :database [status|query <quoted-sql>|tables|file <workspace-relative.sql>|terminal]";
+            case "sqlite", "sqlite3" -> sqlite(tokens.subList(1, tokens.size()));
+            default -> "Usage: :database [status|query <quoted-sql>|tables|file <workspace-relative.sql>|terminal|sqlite query <workspace-relative.db> <quoted-sql>|sqlite tables <workspace-relative.db>|sqlite terminal <workspace-relative.db>]";
         };
     }
 
@@ -48,6 +51,14 @@ final class DatabaseController {
         command.add("--command");
         command.add(sql);
         return List.copyOf(command);
+    }
+
+    static List<String> sqliteQueryCommand(Path database, String sql) {
+        if (database == null) throw new IllegalArgumentException("SQLite database is required");
+        if (sql == null || sql.isBlank() || sql.indexOf('\u0000') >= 0 || sql.indexOf('\n') >= 0 || sql.indexOf('\r') >= 0) {
+            throw new IllegalArgumentException("SQL must be a non-empty single line");
+        }
+        return List.of("sqlite3", "-batch", "-bail", database.toAbsolutePath().normalize().toString(), sql);
     }
 
     private static List<String> baseCommand() {
@@ -87,12 +98,48 @@ final class DatabaseController {
         return submit("file " + file.getFileName(), command);
     }
 
+    private String sqlite(List<String> arguments) {
+        if (arguments.isEmpty()) return "Usage: :database sqlite query <workspace-relative.db> <quoted-sql>|tables <workspace-relative.db>|terminal <workspace-relative.db>";
+        String operation = arguments.getFirst().toLowerCase(Locale.ROOT);
+        if ("query".equals(operation)) {
+            if (arguments.size() < 3) return "Usage: :database sqlite query <workspace-relative.db> <quoted-sql>";
+            Path database = sqliteDatabase(arguments.get(1));
+            if (database == null) return "SQLite database must be an existing file inside the workspace";
+            try {
+                return submitSqlite("query", sqliteQueryCommand(database, String.join(" ", arguments.subList(2, arguments.size()))));
+            } catch (IllegalArgumentException error) {
+                return "SQLite query invalid: " + error.getMessage();
+            }
+        }
+        if ("tables".equals(operation)) {
+            if (arguments.size() != 2) return "Usage: :database sqlite tables <workspace-relative.db>";
+            Path database = sqliteDatabase(arguments.get(1));
+            return database == null ? "SQLite database must be an existing file inside the workspace"
+                : submitSqlite("tables", sqliteQueryCommand(database, SQLITE_TABLES_QUERY));
+        }
+        if ("terminal".equals(operation) || "console".equals(operation)) {
+            if (arguments.size() != 2) return "Usage: :database sqlite terminal <workspace-relative.db>";
+            Path database = sqliteDatabase(arguments.get(1));
+            return database == null ? "SQLite database must be an existing file inside the workspace"
+                : editor.terminalController.openDirect("SQLite", workspace().toFile(), List.of("sqlite3", database.toString()));
+        }
+        return "Usage: :database sqlite query <workspace-relative.db> <quoted-sql>|tables <workspace-relative.db>|terminal <workspace-relative.db>";
+    }
+
     private String submit(String operation, List<String> command) {
         Path root = workspace();
         int job = editor.asyncJobService.submit("database " + operation, token -> editor.runExternalCommand(command, root.toFile(), null, token,
             editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true),
             (snapshot, result, error) -> complete(operation, snapshot, result, error));
         return "PostgreSQL " + operation + " requested (job " + job + ").";
+    }
+
+    private String submitSqlite(String operation, List<String> command) {
+        Path root = workspace();
+        int job = editor.asyncJobService.submit("sqlite " + operation, token -> editor.runExternalCommand(command, root.toFile(), null, token,
+            editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true),
+            (snapshot, result, error) -> completeSqlite(operation, snapshot, result, error));
+        return "SQLite " + operation + " requested (job " + job + ").";
     }
 
     private String showStatus() {
@@ -106,6 +153,7 @@ final class DatabaseController {
         }
         output.append(selectors.isEmpty() ? "(none)" : String.join(", ", selectors)).append("\n\n");
         output.append(":database query \"select 1\"\n:database tables\n:database file migrations/check.sql\n:database terminal\n\n");
+        output.append(":database sqlite query app.db \"select 1\"\n:database sqlite tables app.db\n:database sqlite terminal app.db\n\n");
         output.append("Shed does not store credentials or connection strings. Prefer a libpq password/service file over PGPASSWORD.\n");
         editor.showScratchBuffer("[database]", output.toString());
         return "Showing PostgreSQL CLI status";
@@ -124,6 +172,36 @@ final class DatabaseController {
             editor.showMessage("PostgreSQL " + operation + " failed: " + detail);
         } else {
             editor.showMessage("PostgreSQL " + operation + " completed");
+        }
+    }
+
+    private void completeSqlite(String operation, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
+        if (editor.closingDown) return;
+        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
+            editor.showMessage("SQLite " + operation + " cancelled");
+            return;
+        }
+        String output = output(result);
+        if (!output.isBlank()) editor.showScratchBuffer("[sqlite " + operation + "]", output + "\n");
+        if (error != null || result == null || result.exitCode != 0) {
+            String detail = error != null ? concise(error) : result == null ? "unknown error" : output.isBlank() ? "exit " + result.exitCode : output.strip();
+            editor.showMessage("SQLite " + operation + " failed: " + detail);
+        } else {
+            editor.showMessage("SQLite " + operation + " completed");
+        }
+    }
+
+    private Path sqliteDatabase(String value) {
+        Path root = workspace();
+        try {
+            Path requested = Path.of(value == null ? "" : value);
+            if (requested.isAbsolute()) return null;
+            Path database = root.resolve(requested).normalize();
+            if (!database.startsWith(root) || !Files.isRegularFile(database)) return null;
+            database = database.toRealPath();
+            return database.startsWith(root.toRealPath()) ? database : null;
+        } catch (IOException | RuntimeException error) {
+            return null;
         }
     }
 

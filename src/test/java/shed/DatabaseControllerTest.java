@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 class DatabaseControllerTest {
@@ -17,5 +18,11 @@ class DatabaseControllerTest {
     void rejectsUnsafeOrEmptySqlCommandText() {
         assertThrows(IllegalArgumentException.class, () -> DatabaseController.queryCommand(""));
         assertThrows(IllegalArgumentException.class, () -> DatabaseController.queryCommand("select 1\nselect 2"));
+    }
+
+    @Test
+    void buildsDirectSqliteQueryAgainstAnExplicitDatabaseFile() {
+        assertEquals(List.of("sqlite3", "-batch", "-bail", "/project/app.db", "select name from sqlite_master"),
+            DatabaseController.sqliteQueryCommand(Path.of("/project/app.db"), "select name from sqlite_master"));
     }
 }

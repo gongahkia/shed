@@ -9,6 +9,7 @@ interface TestAdapter {
     List<String> defaultCommand(Path root);
     TestService.Command discovery(TestService.AdapterSpec spec);
     TestService.Command run(TestService.AdapterSpec spec, List<TestService.TestCase> selection, Path cacheDirectory);
+    default boolean supportsMultipleSelection() { return true; }
     default TestService.Command discovery(Path root, TestService.AdapterSpec spec) { return discovery(spec); }
     default TestService.Command run(Path root, TestService.AdapterSpec spec, List<TestService.TestCase> selection, Path cacheDirectory) {
         return run(spec, selection, cacheDirectory);

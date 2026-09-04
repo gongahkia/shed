@@ -594,9 +594,7 @@ final class SyntaxUiController {
     }
 
     private LanguageProfile languageProfileFor(FileBuffer buffer, String text) {
-        if (buffer == null || buffer.getFile() == null || editor.extensionRegistry == null) return null;
-        ExtensionRegistry.Owned<LanguageProfile> profile = editor.extensionRegistry.languageProfileFor(buffer.getFile(), text);
-        return profile == null ? null : profile.value();
+        return editor.languageProfileFor(buffer);
     }
 
     private record SyntaxRequest(FileBuffer buffer, VersionedTextSnapshot text, FileType fileType, LanguageProfile profile,

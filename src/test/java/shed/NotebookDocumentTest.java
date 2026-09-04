@@ -38,4 +38,11 @@ class NotebookDocumentTest {
         assertEquals("done", NotebookDocument.outputText(merged.cells().getFirst()));
         assertEquals("second", merged.cells().get(1).source());
     }
+
+    @Test
+    void buildsOnlyValidatedDirectArgvJupyterConsoleCommands() {
+        assertEquals(List.of("jupyter", "console"), NotebookController.consoleCommand(""));
+        assertEquals(List.of("jupyter", "console", "--kernel", "python3"), NotebookController.consoleCommand("python3"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> NotebookController.consoleCommand("python3; bad"));
+    }
 }

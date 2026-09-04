@@ -686,11 +686,9 @@ final class EditorUiController {
     }
 
     private String languageDisplayName(FileBuffer buffer) {
-        if (buffer == null || buffer.getFile() == null || editor.extensionRegistry == null) {
-            return buffer == null ? "text" : buffer.getFileType().getDisplayName();
-        }
-        ExtensionRegistry.Owned<LanguageProfile> profile = editor.extensionRegistry.languageProfileFor(buffer.getFile(), buffer.textSnapshot().text());
-        return profile == null ? buffer.getFileType().getDisplayName() : profile.value().displayName();
+        if (buffer == null) return "text";
+        LanguageProfile profile = editor.languageProfileFor(buffer);
+        return profile == null ? buffer.getFileType().getDisplayName() : profile.displayName();
     }
 
     private void setCommandBarDisplay(String text) {

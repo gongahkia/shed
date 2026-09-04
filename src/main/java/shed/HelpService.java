@@ -271,6 +271,12 @@ public class HelpService {
                     + ":task remote <connection-id> <name> explicitly runs a task in a matching connected workspace.\n"
                     + "Output is parsed into quickfix when lines match file:line:col:message.\n"
                     + "Built-in fallback names are supported: :task test and :task build.\n";
+            case "language":
+            case "lang":
+                return "Help: language\n\n"
+                    + ":language lists installed extension language profiles.\n"
+                    + ":language <extension-id:language-id> selects lexical metadata for the current buffer.\n"
+                    + ":language auto restores filename/shebang detection.\n";
             case "git":
                 return "Help: git\n\n"
                     + ":git shows status.\n"

@@ -465,7 +465,7 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:integration`, `:integration list` | List supporting database, deployment, collaboration, and container extension integrations |
 | `:integration <extension:id> help` | Show provider-declared actions |
 | `:integration <extension:id> <action> [arguments]` | Run an explicitly declared workspace-integration action |
-| `:notebook open`, `:notebook run`, `:notebook console [kernel]`, `:notebook raw` | Open, explicitly execute, open an interactive local Jupyter Console, or show raw JSON for the current `.ipynb` file |
+| `:notebook open`, `:notebook run [kernel]`, `:notebook console [kernel]`, `:notebook raw` | Open, explicitly execute with Jupyter's default or a selected local kernelspec, open an interactive local Jupyter Console, or show raw JSON for the current `.ipynb` file |
 | `:terminal list`, `:terminal profile <id>` | Show/open terminal profiles |
 | `:terminal commands`, `:terminal cwd` | Show in-memory Bash/Zsh/Fish shell-integration events or latest reported cwd |
 

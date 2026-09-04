@@ -284,7 +284,9 @@ class LineNumberPanel extends JPanel {
                 continue;
             }
             try {
-                int y = textArea.modelToView2D(textArea.getLineStartOffset(line)).getBounds().y;
+                java.awt.geom.Rectangle2D bounds = textArea.modelToView2D(textArea.getLineStartOffset(line));
+                if (bounds == null) continue;
+                int y = bounds.getBounds().y;
                 repaint(0, y, getWidth(), lineHeight);
             } catch (BadLocationException ignored) {
             }

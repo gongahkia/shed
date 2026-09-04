@@ -4,16 +4,18 @@ Opening a local `.ipynb` file presents Shed's native notebook surface. It presen
 
 ```text
 :notebook open
-:notebook run
+:notebook run [kernel]
 :notebook console [kernel]
 :notebook raw
 ```
 
-`Run all` and `:notebook run` first save the notebook, then explicitly run:
+`Run all` and `:notebook run [kernel]` first save the notebook, then explicitly run:
 
 ```text
 jupyter nbconvert --to notebook --execute --inplace <notebook>
 ```
+
+Passing an installed kernelspec name to `:notebook run` adds `--ExecutePreprocessor.kernel_name=<kernel>` to that direct command. Omitting it delegates kernel selection to Jupyter. The selection applies only to that one execution.
 
 Each cell also has **Run to here**. It saves the notebook, creates a temporary prefix notebook in the project directory, runs that prefix with a fresh local kernel, and merges its outputs back into those cells. This is useful for a sequential checkpoint, not persistent per-cell kernel state.
 
@@ -21,4 +23,4 @@ Each cell also has **Run to here**. It saves the notebook, creates a temporary p
 
 The command is direct argv, runs as an asynchronous job, has a ten-minute limit, and requires the local `jupyter` CLI. Notebook execution is subject to the existing project-trust decision. Shed does not download Jupyter, create kernels, or execute a notebook automatically.
 
-The native surface displays plain-text stream/error output, `text/plain` display data, and bounded PNG/JPEG display images. It validates image format/dimensions before decoding and scales large valid images for the view. It does not execute HTML/JavaScript output, render SVG or arbitrary rich MIME output, keep a persistent kernel, provide kernel selection/control, manage notebooks over a remote kernel protocol, or implement a general notebook extension API. Use `:notebook raw` to return to the JSON text buffer.
+The native surface displays plain-text stream/error output, `text/plain` display data, and bounded PNG/JPEG display images. It validates image format/dimensions before decoding and scales large valid images for the view. It does not execute HTML/JavaScript output, render SVG or arbitrary rich MIME output, keep a persistent kernel, provide kernel lifecycle controls (interrupt, restart, shutdown), manage notebooks over a remote kernel protocol, or implement a general notebook extension API. Use `:notebook raw` to return to the JSON text buffer.

@@ -89,7 +89,7 @@ Shed sends one DAP `setBreakpoints` request per source only when `debug.breakpoi
 
 ## Exception Breakpoints
 
-When the selected adapter declares `exception_breakpoints` and returns `exceptionBreakpointFilters` during DAP initialization, Shed sends `setExceptionBreakpoints` before `configurationDone`. Adapter defaults apply unless the user explicitly changes a filter with `:debug exception enable <filter>` or `:debug exception disable <filter>`; only those workspace-scoped overrides are persisted beneath `session.dir/breakpoints/`. `:debug exception list` exposes the adapter-provided filter IDs and labels after a compatible session starts. Unknown or unavailable filters are not sent.
+When the selected adapter declares `exception_breakpoints` and returns `exceptionBreakpointFilters` during DAP initialization, Shed sends `setExceptionBreakpoints` before `configurationDone`. Adapter defaults apply unless the user explicitly changes a filter with `:debug exception enable <filter>`, `:debug exception disable <filter>`, or the Debug panel's **Exception Breakpoints** control; only those workspace-scoped overrides are persisted beneath `session.dir/breakpoints/`. `:debug exception list` and the panel expose the adapter-provided filter IDs and labels after a compatible session starts. Unknown or unavailable filters are not sent. Shed supports only the DAP filter enable/disable state here, not adapter-specific exception conditions or options.
 
 This is intentionally limited to enable/disable filter selection. Shed does not yet expose exception-filter conditions, exception options, function breakpoints, data breakpoints, or an exception-breakpoint UI panel.
 

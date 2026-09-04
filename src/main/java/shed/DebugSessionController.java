@@ -10,6 +10,17 @@ import java.util.List;
 import java.util.Map;
 
 final class DebugSessionController {
+    record ExceptionBreakpointView(DebugSessionService.ExceptionFilter filter, boolean enabled, boolean adapterDefault) {
+        ExceptionBreakpointView {
+            if (filter == null) throw new IllegalArgumentException("exception breakpoint filter is required");
+        }
+
+        @Override public String toString() {
+            return (enabled ? "enabled  " : "disabled ") + filter.label() + " (" + filter.id() + ")"
+                + (adapterDefault ? "  [adapter default]" : "");
+        }
+    }
+
     private final Texteditor editor;
     private final DebugSessionService sessions;
     private final BreakpointStore breakpoints;
@@ -119,6 +130,26 @@ final class DebugSessionController {
     String configureBreakpointForPanel(BreakpointStore.Breakpoint breakpoint, boolean enabled, String condition, String hitCondition, String logMessage) {
         if (breakpoint == null) return "Select a source breakpoint.";
         return configureBreakpoint(breakpoint.source(), breakpoint.line(), enabled, condition, hitCondition, logMessage);
+    }
+
+    List<ExceptionBreakpointView> exceptionBreakpointsForPanel() {
+        Path workspace = workspace();
+        try {
+            Map<String, ExceptionBreakpointStore.Setting> settings = exceptionBreakpoints.settings(workspace);
+            List<ExceptionBreakpointView> result = new ArrayList<>();
+            for (DebugSessionService.ExceptionFilter filter : sessions.exceptionFilters(workspace)) {
+                ExceptionBreakpointStore.Setting setting = settings.get(filter.id());
+                result.add(new ExceptionBreakpointView(filter, setting == null ? filter.defaultEnabled() : setting.enabled(), setting == null));
+            }
+            return List.copyOf(result);
+        } catch (IOException | IllegalArgumentException error) {
+            return List.of();
+        }
+    }
+
+    String configureExceptionBreakpointForPanel(ExceptionBreakpointView breakpoint, boolean enabled) {
+        if (breakpoint == null) return "Select an exception breakpoint.";
+        return configureExceptionBreakpoint(breakpoint.filter(), enabled);
     }
 
     String removeBreakpointForPanel(BreakpointStore.Breakpoint breakpoint) {
@@ -380,10 +411,15 @@ final class DebugSessionController {
         DebugSessionService.ExceptionFilter filter = sessions.exceptionFilters(workspace()).stream()
             .filter(value -> value.id().equals(filterId)).findFirst().orElse(null);
         if (filter == null) return "Exception breakpoint filter is unavailable; start a compatible debug session and use :debug exception list.";
+        return configureExceptionBreakpoint(filter, "enable".equals(command));
+    }
+
+    private String configureExceptionBreakpoint(DebugSessionService.ExceptionFilter filter, boolean enabled) {
+        if (filter == null) return "Select an exception breakpoint.";
         try {
-            exceptionBreakpoints.configure(workspace(), filter.id(), "enable".equals(command));
+            exceptionBreakpoints.configure(workspace(), filter.id(), enabled);
             if (sessions.snapshot(workspace()).lifecycle() == DebugSessionService.Lifecycle.RUNNING) synchronizeBreakpoints(workspace());
-            return "Exception breakpoint '" + filter.label() + "' " + ("enable".equals(command) ? "enabled." : "disabled.");
+            return "Exception breakpoint '" + filter.label() + "' " + (enabled ? "enabled." : "disabled.");
         } catch (IOException | IllegalArgumentException error) {
             return "Unable to update exception breakpoint: " + error.getMessage();
         }

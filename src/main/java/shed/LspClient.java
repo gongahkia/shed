@@ -533,17 +533,20 @@ public class LspClient {
     }
 
     LspClient(String command, String[] args, Path rootPath, LspFeatureSettings featureSettings) throws IOException {
-        List<String> commandLine = new ArrayList<>();
-        commandLine.add(command);
-        if (args != null) {
-            for (String arg : args) {
-                if (arg != null && !arg.isBlank()) {
-                    commandLine.add(arg);
-                }
+        this(commandLine(command, args), rootPath, localRootUri(rootPath), featureSettings);
+    }
+
+    LspClient(List<String> commandLine, Path rootPath, String rootUri, LspFeatureSettings featureSettings) throws IOException {
+        if (rootPath == null || rootUri == null || rootUri.isBlank()) throw new IOException("LSP workspace root is required");
+        List<String> invocation = commandLine == null ? List.of() : List.copyOf(commandLine);
+        if (invocation.isEmpty() || invocation.getFirst() == null || invocation.getFirst().isBlank()) throw new IOException("LSP command is required");
+        for (String argument : invocation) {
+            if (argument == null || argument.indexOf('\0') >= 0 || argument.indexOf('\n') >= 0 || argument.indexOf('\r') >= 0) {
+                throw new IOException("LSP command contains an invalid argument");
             }
         }
 
-        ProcessBuilder processBuilder = new ProcessBuilder(commandLine);
+        ProcessBuilder processBuilder = new ProcessBuilder(invocation);
         processBuilder.directory(rootPath.toFile());
         this.process = processBuilder.start();
         this.stdin = new BufferedOutputStream(process.getOutputStream());
@@ -560,7 +563,25 @@ public class LspClient {
         this.completionTriggerCharacters = Set.of();
         this.completionResolveSupported = false;
         startReaderThread();
-        initialize(rootPath);
+        initialize(rootUri);
+    }
+
+    private static List<String> commandLine(String command, String[] args) {
+        List<String> commandLine = new ArrayList<>();
+        if (command != null && !command.isBlank()) commandLine.add(command);
+        if (args != null) {
+            for (String arg : args) {
+                if (arg != null && !arg.isBlank()) {
+                    commandLine.add(arg);
+                }
+            }
+        }
+        return List.copyOf(commandLine);
+    }
+
+    private static String localRootUri(Path rootPath) throws IOException {
+        if (rootPath == null) throw new IOException("LSP workspace root is required");
+        return rootPath.toAbsolutePath().normalize().toUri().toString();
     }
 
     public void setWorkspaceEditHandler(WorkspaceEditHandler workspaceEditHandler) {
@@ -1251,7 +1272,7 @@ public class LspClient {
         process.destroy();
     }
 
-    private void initialize(Path rootPath) throws IOException {
+    private void initialize(String rootUri) throws IOException {
         Map<String, Object> capabilities = new LinkedHashMap<>();
 
         Map<String, Object> completionItem = new LinkedHashMap<>();
@@ -1302,7 +1323,7 @@ public class LspClient {
 
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("processId", ProcessHandle.current().pid());
-        params.put("rootUri", rootPath.toAbsolutePath().toUri().toString());
+        params.put("rootUri", rootUri);
         params.put("capabilities", capabilities);
 
         Map<String, Object> response = sendRequest("initialize", params, 5000L);

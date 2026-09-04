@@ -4,6 +4,7 @@ import shed.api.RemoteWorkspace;
 import shed.api.RemoteCommandResult;
 import shed.api.RemoteWorkspaceProvider;
 import shed.api.RemoteWorkspaceRequest;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -101,6 +102,7 @@ final class RemoteWorkspaceController {
         Connection connection;
         synchronized (connections) { connection = connections.remove(normalizeId(id)); }
         if (connection == null) return "Remote workspace not connected: " + id;
+        if (editor.lspController != null) editor.lspController.stopServersForWorkspace(connection.workspace().localRoot());
         editor.remoteWorkspaceTaskTargets.unregister(connection.id());
         try {
             connection.workspace().close();
@@ -182,9 +184,52 @@ final class RemoteWorkspaceController {
             connections.clear();
         }
         for (Connection connection : values) {
+            if (editor.lspController != null) editor.lspController.stopServersForWorkspace(connection.workspace().localRoot());
             editor.remoteWorkspaceTaskTargets.unregister(connection.id());
             try { connection.workspace().close(); } catch (Exception ignored) { }
         }
+    }
+
+    RemoteLspEndpoint languageServerEndpoint(Path localWorkspace, List<String> serverCommand) throws IOException {
+        Connection connection = connectionForLocalPath(localWorkspace);
+        if (connection == null) return null;
+        String remoteRoot = connection.workspace().languageServerRoot();
+        if (remoteRoot == null || remoteRoot.isBlank()) return null;
+        try {
+            return new RemoteLspEndpoint(connection.workspace().localRoot(), remoteRoot, connection.workspace().languageServerCommand(serverCommand));
+        } catch (IOException error) {
+            throw error;
+        } catch (Exception error) {
+            throw new IOException("Remote language server is unavailable: " + detail(error.getMessage()), error);
+        }
+    }
+
+    String remoteLanguageServerUri(Path localFile) {
+        Connection connection = connectionForLocalPath(localFile);
+        if (connection == null) return null;
+        String remoteRoot = connection.workspace().languageServerRoot();
+        if (remoteRoot == null || remoteRoot.isBlank()) return null;
+        try {
+            return new RemoteLspEndpoint(connection.workspace().localRoot(), remoteRoot, List.of()).uriFor(localFile);
+        } catch (IllegalArgumentException error) {
+            return null;
+        }
+    }
+
+    Path localPathForRemoteLanguageServerUri(String uri) {
+        List<Connection> values;
+        synchronized (connections) { values = List.copyOf(connections.values()); }
+        for (Connection connection : values) {
+            String remoteRoot = connection.workspace().languageServerRoot();
+            if (remoteRoot == null || remoteRoot.isBlank()) continue;
+            try {
+                Path path = new RemoteLspEndpoint(connection.workspace().localRoot(), remoteRoot, List.of()).localPathFor(uri);
+                if (path != null) return path;
+            } catch (IllegalArgumentException ignored) {
+                // A contributed provider cannot make unrelated LSP locations unopenable.
+            }
+        }
+        return null;
     }
 
     private RemoteWorkspaceProvider providerFor(URI uri) {
@@ -209,6 +254,23 @@ final class RemoteWorkspaceController {
 
     private Connection connection(String id) {
         synchronized (connections) { return connections.get(normalizeId(id)); }
+    }
+
+    private Connection connectionForLocalPath(Path candidate) {
+        Path path = candidate == null ? null : candidate.toAbsolutePath().normalize();
+        if (path == null) return null;
+        Connection selected = null;
+        synchronized (connections) {
+            for (Connection connection : connections.values()) {
+                Path root = connection.workspace().localRoot();
+                if (root == null) continue;
+                Path normalized = root.toAbsolutePath().normalize();
+                if (path.startsWith(normalized) && (selected == null || normalized.getNameCount() > selected.workspace().localRoot().getNameCount())) {
+                    selected = connection;
+                }
+            }
+        }
+        return selected;
     }
 
     private static String connectionId(URI uri) {

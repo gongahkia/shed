@@ -1814,6 +1814,10 @@ final class LspController {
         if (uri == null || uri.isBlank()) {
             return null;
         }
+        if (editor != null && editor.configManager.getRemoteLspEnabled() && editor.remoteWorkspaceController != null) {
+            Path remotePath = editor.remoteWorkspaceController.localPathForRemoteLanguageServerUri(uri);
+            if (remotePath != null) return remotePath.toFile().getAbsolutePath();
+        }
         if (!uri.startsWith("file:")) {
             return null;
         }
@@ -1927,6 +1931,29 @@ final class LspController {
         return keys.size();
     }
 
+    void stopServersForWorkspace(Path workspace) {
+        Path root = workspace == null ? null : workspace.toAbsolutePath().normalize();
+        if (root == null) return;
+        List<LspServerKey> keys = new ArrayList<>();
+        for (LspServerKey key : editor.lspClients.keySet()) {
+            Path serverRoot = key.workspaceRoot();
+            if (serverRoot != null && serverRoot.startsWith(root)) keys.add(key);
+        }
+        for (LspServerKey key : keys) {
+            LspClient client = editor.lspClients.remove(key);
+            if (client != null) client.stop();
+        }
+        editor.lspErrors.entrySet().removeIf(entry -> entry.getKey().workspaceRoot() != null && entry.getKey().workspaceRoot().startsWith(root));
+        for (FileBuffer buffer : editor.buffers) {
+            if (buffer == null || !buffer.hasFilePath()) continue;
+            Path path = new File(buffer.getFilePath()).toPath().toAbsolutePath().normalize();
+            if (!path.startsWith(root)) continue;
+            String uri = bufferUri(buffer);
+            editor.lspDocumentVersions.remove(uri);
+            documentSyncStates.remove(uri);
+        }
+    }
+
     private void removeErrorsForExtension(String extension) {
         editor.lspErrors.entrySet().removeIf(entry -> entry.getKey().extension().equalsIgnoreCase(extension));
     }
@@ -1968,6 +1995,7 @@ final class LspController {
 
         String command = editor.configManager.getLspCommand(extension);
         String[] args = editor.configManager.getLspArgs(extension);
+        boolean userConfigured = command != null && !command.isBlank();
         if (command == null || command.isBlank()) {
             String[] contributed = contributedLspCommand(extension);
             if (contributed != null && contributed.length == 0) {
@@ -1984,7 +2012,25 @@ final class LspController {
         }
 
         try {
-            LspClient client = new LspClient(command, args, workspaceRoot, editor.configManager.getLspFeatureSettings());
+            List<String> invocation = new ArrayList<>();
+            invocation.add(command);
+            if (args != null) java.util.Collections.addAll(invocation, args);
+            RemoteLspEndpoint remote = null;
+            if (editor.configManager.getRemoteLspEnabled() && editor.remoteWorkspaceController != null
+                && editor.remoteWorkspaceController.remoteLanguageServerUri(workspaceRoot) != null) {
+                if (!userConfigured) {
+                    editor.lspErrors.put(key, "remote LSP requires an explicit global lsp." + extension + ".command configured for the remote environment");
+                    return null;
+                }
+                remote = editor.remoteWorkspaceController.languageServerEndpoint(workspaceRoot, invocation);
+                if (remote == null) {
+                    editor.lspErrors.put(key, "the selected remote workspace does not support remote language servers");
+                    return null;
+                }
+            }
+            LspClient client = remote == null
+                ? new LspClient(command, args, workspaceRoot, editor.configManager.getLspFeatureSettings())
+                : new LspClient(remote.command(), workspaceRoot, remote.rootUri(), editor.configManager.getLspFeatureSettings());
             client.setWorkspaceEditHandler(this::applyWorkspaceEditFromServer);
             client.setDiagnosticsChangedHandler(() -> SwingUtilities.invokeLater(() -> {
                 scheduleDiagnosticRefresh();
@@ -2294,7 +2340,12 @@ final class LspController {
 
 
     String bufferUri(FileBuffer buffer) {
-        return new File(buffer.getFilePath()).toPath().toAbsolutePath().normalize().toUri().toString();
+        Path path = new File(buffer.getFilePath()).toPath().toAbsolutePath().normalize();
+        if (editor != null && editor.configManager.getRemoteLspEnabled() && editor.remoteWorkspaceController != null) {
+            String remoteUri = editor.remoteWorkspaceController.remoteLanguageServerUri(path);
+            if (remoteUri != null) return remoteUri;
+        }
+        return path.toUri().toString();
     }
 
 

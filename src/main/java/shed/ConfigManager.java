@@ -305,6 +305,7 @@ public class ConfigManager {
         defineDefault("lsp.command.execution.enabled", lspFeatures.commandExecution());
         defineDefault("lsp.formatting.enabled", lspFeatures.formatting());
         defineDefault("lsp.format.on.save.enabled", false);
+        defineDefault("remote.lsp.enabled", false);
         defineDefault("ui.whichkey.hints", DEFAULT_UI_WHICHKEY_HINTS);
         defineDefault("project.config.enabled", DEFAULT_PROJECT_CONFIG_ENABLED);
         defineDefault("project.config.allow.unsafe", DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE);
@@ -430,6 +431,7 @@ public class ConfigManager {
             case "lsp.command.execution.enabled" -> "Enable LSP execute-command requests";
             case "lsp.formatting.enabled" -> "Enable LSP document-formatting requests";
             case "lsp.format.on.save.enabled" -> "Format with LSP before saving; failed formatting leaves the buffer unsaved";
+            case "remote.lsp.enabled" -> "Run explicitly configured LSP servers through connected SSH, container, or WSL workspaces";
             case "ui.whichkey.hints" -> "Show prefix-key hint overlays";
             case "project.config.enabled" -> "Enable project-local configuration";
             case "project.config.allow.unsafe" -> "Allow unsafe project-local keys";
@@ -1023,6 +1025,10 @@ public class ConfigManager {
 
     public boolean getLspFormatOnSaveEnabled() {
         return getBoolean("lsp.format.on.save.enabled", false);
+    }
+
+    public boolean getRemoteLspEnabled() {
+        return getBoolean("remote.lsp.enabled", false);
     }
 
     public boolean getLspSemanticTokensInline() {

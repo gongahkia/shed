@@ -380,6 +380,36 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void debugBreakpointCommandsConfigureTheActiveSourceBreakpoint() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-debug-breakpoints");
+        Path file = tempDir.resolve("debug-breakpoints.py");
+        Files.createDirectories(home);
+        Files.writeString(file, "value = 1\nprint(value)\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                editor.debugSessionController.toggleBreakpoint(editor.getCurrentBuffer(), 0);
+                editor.debugSessionController = new DebugSessionController(editor);
+                return null;
+            });
+            assertEquals("Source breakpoint updated.", onEdt(() -> editor.commandHandler.execute("debug breakpoint condition 1 value > 0")));
+            assertEquals("Source breakpoint updated.", onEdt(() -> editor.commandHandler.execute("debug breakpoint hit 1 3")));
+            assertEquals("Source breakpoint updated.", onEdt(() -> editor.commandHandler.execute("debug breakpoint log 1 value={value}")));
+            assertEquals("Source breakpoint updated.", onEdt(() -> editor.commandHandler.execute("debug breakpoint disable 1")));
+
+            BreakpointStore.Breakpoint breakpoint = onEdt(() -> editor.debugSessionController.breakpointsForPanel().getFirst());
+            assertFalse(breakpoint.enabled());
+            assertEquals("value > 0", breakpoint.condition());
+            assertEquals("3", breakpoint.hitCondition());
+            assertEquals("value={value}", breakpoint.logMessage());
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void managedLspCommandsExposeInertStatusAndManualRemediation() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-managed-lsp");

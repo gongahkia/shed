@@ -49,7 +49,7 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `WorkspaceToolController` | declared workspace integration actions | `WorkspaceToolContribution`, extension registry, workspace roots |
 | `ExtensionManager` / `ExtensionRegistry` | checksum-verified Java extension lifecycle and typed contributions | `shed.api`, isolated JAR class loaders, workbench controllers |
 | `TreeGitController` | file tree and Git actions | `TreeService`, `GitService` |
-| `LspController` | language-server requests, diagnostics, edits, symbols | `LspService`, `LspClient`, `QuickfixService` |
+| `LspController` | language-server requests, diagnostics, edits, symbols | `LspService`, `LspClient`, `QuickfixService`, `WorkspaceSymbolCoordinator` |
 | `MarkdownController` | Markdown tables, folds, snippets, brackets | `MarkdownService`, `SnippetService`, `BracketColorService` |
 | `PaletteController` | file, buffer, symbol, and command palettes | `FuzzyMatchService`, `SymbolService` |
 | `SessionConfigController` | sessions, workspaces, config and help | `ConfigManager`, `HelpService` |
@@ -57,6 +57,8 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `FocusModeController` | Goyo layout, Limelight, minimap | Swing UI state |
 
 `WorkspaceController` owns the ordered folder set and the Explorer's selected folder. `WorkspaceManifest` is its folder-only portable import/export boundary; it accepts only validated local folder entries and deliberately ignores a VS Code manifest's settings and executable configuration. Resource-scoped controllers resolve the deepest configured folder containing the current file before falling back to that selection. This keeps sibling projects isolated for task discovery, extension SCM, Dev Container actions, and extension workspace tools without changing the Explorer merely by switching files.
+
+`WorkspaceSymbolCoordinator` owns only explicit local fallback requests for `:workspace symbols`. Its `WorkspaceSymbolService` is controller-free and scans the existing ignore-filtered file index off the EDT, with per-file and result limits. `LspController` remains the preferred LSP-symbol path and cancels stale local work before each new request; neither component creates a background project-symbol index.
 
 ## Explicit remote-session ownership
 

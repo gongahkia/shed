@@ -213,6 +213,33 @@ final class PaletteController {
         return selected == null ? "Invalid symbol selection" : editor.openLspSymbol(selected);
     }
 
+    String showWorkspaceHeuristicSymbols(List<WorkspaceSymbolService.Match> symbols, String argument, boolean truncated) {
+        if (symbols == null || symbols.isEmpty()) return "No local workspace symbols found";
+        Map<String, WorkspaceSymbolService.Match> candidates = new LinkedHashMap<>();
+        for (WorkspaceSymbolService.Match symbol : symbols) {
+            if (symbol == null || symbol.name().isBlank()) continue;
+            String candidate = formatWorkspaceSymbolCandidate(symbol);
+            int duplicate = 2;
+            String unique = candidate;
+            while (candidates.containsKey(unique)) unique = candidate + "  [#" + duplicate++ + "]";
+            candidates.put(unique, symbol);
+        }
+        if (candidates.isEmpty()) return "No local workspace symbols found";
+        String title = truncated ? "Workspace Symbols (local, limited)" : "Workspace Symbols (local)";
+        String selection = showPaletteDialog(title, new ArrayList<>(candidates.keySet()), value -> describeWorkspaceSymbol(value, candidates));
+        if (selection == null || selection.isEmpty()) return "Workspace symbols cancelled";
+        WorkspaceSymbolService.Match selected = candidates.get(selection);
+        if (selected == null) return "Invalid workspace symbol selection";
+        try {
+            File file = new File(selected.filePath());
+            if (!file.isFile()) return "Workspace symbol file is no longer available: " + selected.relativePath();
+            editor.openFile(file);
+            return editor.gotoLine(selected.line());
+        } catch (IOException error) {
+            return "Could not open workspace symbol: " + error.getMessage();
+        }
+    }
+
 
     String formatSymbolCandidate(SymbolService.Symbol symbol) {
         StringBuilder indent = new StringBuilder();
@@ -233,6 +260,18 @@ final class PaletteController {
         String path = workspace ? "  " + displayUriPath(symbol.getUri()) : "";
         return String.format("%4d  %-10s  %s%s%s%s", symbol.getLine() + 1, symbolKind(symbol.getKind()), indent,
             symbol.getName(), detail, path);
+    }
+
+    private String formatWorkspaceSymbolCandidate(WorkspaceSymbolService.Match symbol) {
+        StringBuilder indent = new StringBuilder();
+        for (int index = 1; index < symbol.level(); index++) indent.append("  ");
+        return String.format("%4d  %-10s  %s%s  %s", symbol.line(), symbol.kind(), indent, symbol.name(), symbol.relativePath());
+    }
+
+    private String describeWorkspaceSymbol(String selection, Map<String, WorkspaceSymbolService.Match> candidates) {
+        WorkspaceSymbolService.Match symbol = candidates.get(selection);
+        if (symbol == null) return selection == null ? "Select a symbol to jump." : selection;
+        return "Line " + symbol.line() + " [" + symbol.kind() + "]\n" + symbol.relativePath();
     }
 
     private String describeLspSymbol(String selection, Map<String, LspClient.NavigationSymbol> candidates) {

@@ -40,6 +40,10 @@ final class DevContainerRuntime {
         return processInvocation(workspace, command, "test command");
     }
 
+    static List<String> terminalInvocation(Path workspace, List<String> command) throws IOException {
+        return processInvocation(workspace, command, "terminal");
+    }
+
     static String readCapped(Path path) throws IOException {
         try (InputStream input = Files.newInputStream(path); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];

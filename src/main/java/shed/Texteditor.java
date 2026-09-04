@@ -91,6 +91,7 @@ public class Texteditor extends JFrame implements KeyListener {
     ScmController scmController;
     CustomEditorController customEditorController;
     NotebookController notebookController;
+    DevContainerSessionService devContainerSessions;
     DevContainerController devContainerController;
     ComposeController composeController;
     DatabaseController databaseController;
@@ -245,6 +246,7 @@ public class Texteditor extends JFrame implements KeyListener {
         configManager = new ConfigManager();
         extensionRegistry = new ExtensionRegistry();
         languageProfileSelection = new LanguageProfileSelection();
+        devContainerSessions = new DevContainerSessionService();
         scmController = new ScmController(this, extensionRegistry);
         customEditorController = new CustomEditorController(this);
         notebookController = new NotebookController(this);

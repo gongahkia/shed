@@ -1,6 +1,6 @@
 # Markdown Preview
 
-Open a live native preview with `:markdown preview` or `:mdpreview`; use `:markdown refresh` and `:markdown close` to control it. The preview shares the source buffer, re-renders after edits, and follows source scrolling or caret movement by default. Set `"markdown.preview.scroll.sync" = false` in `~/.shed/config.toml`, or uncheck it in Settings → Markdown Preview, to disable source-to-preview scrolling.
+Open a live native preview with `:markdown preview` or `:mdpreview`; use `:markdown refresh` and `:markdown close` to control it. The preview shares the source buffer, re-renders after edits, and follows source scrolling or caret movement by default. If a new preview has not yet received its Swing layout, source synchronization retries through a small bounded layout-settling window instead of silently dropping that first event. Set `"markdown.preview.scroll.sync" = false` in `~/.shed/config.toml`, or uncheck it in Settings → Markdown Preview, to disable source-to-preview scrolling.
 
 ## Syntax
 

@@ -177,6 +177,68 @@ final class DebugAdapterRegistry {
         return new Validation(new DebugAdapterRegistry(adapters), configurations, source.errors());
     }
 
+    /**
+     * Adds externally supplied, already-validated launch profiles without changing the
+     * adapter registry. This is intentionally package-private: callers must retain a
+     * report for profiles that fail {@link #externalConfigurationError} rather than
+     * converting a workspace file into executable configuration silently.
+     */
+    static Validation withExternalConfigurations(Validation base, Map<String, Configuration> external) {
+        Validation source = base == null ? validate(Map.of()) : base;
+        if (!source.valid() || external == null || external.isEmpty()) return source;
+        Map<String, Configuration> configurations = new LinkedHashMap<>(source.configurations());
+        for (Map.Entry<String, Configuration> entry : external.entrySet()) {
+            String name = entry.getKey();
+            Configuration configuration = entry.getValue();
+            if (name == null || name.isBlank() || configuration == null || configurations.containsKey(name)
+                || externalConfigurationError(configuration, source.registry().adapters()) != null) continue;
+            configurations.put(name, configuration);
+        }
+        return new Validation(source.registry(), configurations, source.errors());
+    }
+
+    /** Returns a non-empty reason when a direct, non-TOML profile is unsafe or incomplete. */
+    static String externalConfigurationError(Configuration configuration, Map<String, Adapter> availableAdapters) {
+        if (configuration == null) return "configuration is missing";
+        Adapter adapter = availableAdapters == null ? null : availableAdapters.get(configuration.adapter());
+        if (adapter == null) return "the referenced Shed adapter is not registered";
+        if (!adapter.supports(configuration.request())) return "the referenced Shed adapter does not support "
+            + configuration.request().name().toLowerCase(Locale.ROOT);
+        if (!"workspace".equals(configuration.scope())) return "only workspace-scoped configurations are supported";
+        if (!workspaceScoped(configuration.cwd(), false)) return "cwd must remain within ${workspaceFolder}";
+        int launchTargets = (configuration.program().isBlank() ? 0 : 1) + (configuration.module().isBlank() ? 0 : 1)
+            + (configuration.code().isBlank() ? 0 : 1);
+        if (configuration.request() == Request.LAUNCH) {
+            if (launchTargets != 1) return "launch requires exactly one of program, module, or code";
+            if (!configuration.program().isBlank() && !workspaceScoped(configuration.program(), true)) {
+                return "program must remain within ${workspaceFolder} or ${file}";
+            }
+            if (!configuration.module().isBlank() && !safeModule(configuration.module())) {
+                return "module must be a dotted identifier";
+            }
+            if (!configuration.code().isBlank() && !safeCode(configuration.code())) {
+                return "code must be non-empty, contain no NUL, and be at most 64 KiB";
+            }
+        } else if (!configuration.module().isBlank() || !configuration.code().isBlank()) {
+            return "module and code are launch-only";
+        }
+        if (!safeArguments(configuration.args())) return "args contain an invalid control character or exceed 64 KiB";
+        if (!configuration.prelaunchTask().isEmpty() && !identifier(configuration.prelaunchTask())) {
+            return "preLaunchTask must name a Shed task identifier";
+        }
+        if (configuration.request() == Request.ATTACH) {
+            if (!loopback(configuration.host())) return "attach host must be loopback";
+            if (configuration.port() < 1 || configuration.port() > 65535) return "attach port must be between 1 and 65535";
+        }
+        if (configuration.request() == Request.LAUNCH && configuration.program().isBlank() && !configuration.fileExtensions().isEmpty()) {
+            return "file extensions require a program launch target";
+        }
+        for (String extension : configuration.fileExtensions()) {
+            if (extension == null || !extension.matches("\\.[a-z0-9][a-z0-9_-]*")) return "file extensions are invalid";
+        }
+        return null;
+    }
+
     static PlanResult plan(Validation validation, String configurationName, Path workspace) {
         return plan(validation, configurationName, workspace, new LaunchContext(null, "", null));
     }
@@ -347,6 +409,15 @@ final class DebugAdapterRegistry {
 
     private static boolean identifier(String value) { return value != null && value.matches("[A-Za-z0-9_-]+"); }
     private static boolean safeText(String value) { return value != null && !value.isBlank() && value.indexOf('\u0000') < 0 && value.indexOf('\n') < 0 && value.indexOf('\r') < 0; }
+    private static boolean safeArguments(List<String> values) {
+        int length = 0;
+        for (String value : values == null ? List.<String>of() : values) {
+            if (value == null || value.indexOf('\u0000') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0 || value.length() > 8 * 1024) return false;
+            length += value.length();
+            if (length > 64 * 1024) return false;
+        }
+        return true;
+    }
     private static boolean safeModule(String value) { return value != null && value.matches("[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*"); }
     private static boolean safeCode(String value) { return value != null && !value.isBlank() && value.length() <= 64 * 1024 && value.indexOf('\u0000') < 0; }
     private static boolean loopback(String host) { return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host) || "::1".equals(host); }

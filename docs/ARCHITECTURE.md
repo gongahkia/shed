@@ -50,6 +50,7 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `ExtensionManager` / `ExtensionRegistry` | checksum-verified Java extension lifecycle and typed contributions | `shed.api`, isolated JAR class loaders, workbench controllers |
 | `TreeGitController` | file tree and Git actions | `TreeService`, `GitService` |
 | `LspController` | language-server requests, diagnostics, edits, symbols | `LspService`, `LspClient`, `QuickfixService`, `WorkspaceSymbolCoordinator` |
+| `DebugSessionController` | explicit DAP lifecycle, breakpoints, inspection, and configuration selection | `DebugSessionService`, `DebugAdapterRegistry`, `VsCodeLaunchConfigurationImporter`, `AsyncJobService` |
 | `MarkdownController` | Markdown tables, folds, snippets, brackets | `MarkdownService`, `SnippetService`, `BracketColorService` |
 | `PaletteController` | file, buffer, symbol, and command palettes | `FuzzyMatchService`, `SymbolService` |
 | `SessionConfigController` | sessions, workspaces, config and help | `ConfigManager`, `HelpService` |
@@ -59,6 +60,8 @@ All current `*Controller` classes are package-private. Each is constructed with 
 `WorkspaceController` owns the ordered folder set and the Explorer's selected folder. `WorkspaceManifest` is its folder-only portable import/export boundary; it accepts only validated local folder entries and deliberately ignores a VS Code manifest's settings and executable configuration. Resource-scoped controllers resolve the deepest configured folder containing the current file before falling back to that selection. This keeps sibling projects isolated for task discovery, extension SCM, Dev Container actions, and extension workspace tools without changing the Explorer merely by switching files.
 
 `WorkspaceSymbolCoordinator` owns only explicit local fallback requests for `:workspace symbols`. Its `WorkspaceSymbolService` is controller-free and scans the existing ignore-filtered file index off the EDT, with per-file and result limits. `LspController` remains the preferred LSP-symbol path and cancels stale local work before each new request; neither component creates a background project-symbol index.
+
+`VsCodeLaunchConfigurationImporter` is deterministic, controller-free JSONC parsing and profile translation for `.vscode/launch.json`. It contributes only validated in-memory configuration objects to `DebugAdapterRegistry`; it neither reads adapter commands from the project file nor writes global or project configuration. `DebugSessionController` owns its presentation and makes every resulting launch remain explicit.
 
 ## Explicit remote-session ownership
 

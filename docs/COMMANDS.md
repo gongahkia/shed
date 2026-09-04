@@ -227,6 +227,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | :--- | :--- |
 | `:debug`, `:debug ui` | Open the docked Debug panel |
 | `:debug text [subcommand]` | Open legacy debug scratch output |
+| `:debug vscode` | Inspect the strict runtime-only `.vscode/launch.json` compatibility report; accepted profiles are named `vscode:<name>` and still require explicit selection/start |
 | `:debug select <name>`, `:debug start [name]`, `:debug stop`, `:debug restart [name]` | Control an explicit DAP session, including the user-installed `python-debugpy` profile; a configured pre-launch workspace task must succeed before its adapter starts |
 | `:debug continue`, `:debug next`, `:debug stepin`, `:debug stepout`, `:debug pause` | Send a capability-declared DAP execution control; Continue/step require a paused thread |
 | `:debug goto [line]` | Run the paused thread to the active file's caret or one-based line when the adapter declares and advertises standard DAP `gotoTargets` support |

@@ -410,6 +410,54 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void debugPreLaunchTaskRunsBeforeAnAdapterProcessIsOpened() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-debug-prelaunch");
+        Path workspace = tempDir.resolve("debug-prelaunch-workspace");
+        Path file = workspace.resolve("Main.java");
+        Path marker = workspace.resolve("prelaunch.marker");
+        Path adapter = tempDir.resolve("closed-debug-adapter.sh");
+        Files.createDirectories(home.resolve(".shed"));
+        Files.createDirectories(workspace);
+        Files.writeString(file, "class Main {}\n", StandardCharsets.UTF_8);
+        Files.writeString(adapter, "#!/bin/sh\nexit 0\n", StandardCharsets.UTF_8);
+        assertTrue(adapter.toFile().setExecutable(true));
+        Files.writeString(home.resolve(".shed/config.toml"), """
+            schema_version = 1
+            "debug.enabled" = true
+            "debug.adapter.closed.command" = "%s"
+            "debug.adapter.closed.capabilities" = "launch"
+            "debug.configuration.main.adapter" = "closed"
+            "debug.configuration.main.request" = "launch"
+            "debug.configuration.main.scope" = "workspace"
+            "debug.configuration.main.program" = "${file}"
+            "debug.configuration.main.cwd" = "${workspaceFolder}"
+            "debug.configuration.main.prelaunch_task" = "prepare"
+            "process.timeout.ms" = 1000
+            """.formatted(adapter));
+        Files.writeString(workspace.resolve(".shedtasks"), """
+            schema_version = 1
+
+            [task.prepare]
+            command = "touch prelaunch.marker"
+            shell = "direct"
+            problem_matcher = "none"
+            presentation = "never"
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            String requested = onEdt(() -> editor.commandHandler.execute("debug start main"));
+            int jobId = Integer.parseInt(requested.replaceAll(".*\\(job ([0-9]+)\\)\\.", "$1"));
+            assertTrue(awaitJobCompletion(editor, jobId));
+            assertTrue(Files.isRegularFile(marker));
+            assertEquals(DebugSessionService.Lifecycle.FAILED, onEdt(() -> editor.debugSessionController.snapshotForPanel().lifecycle()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void managedLspCommandsExposeInertStatusAndManualRemediation() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-managed-lsp");
@@ -502,6 +550,16 @@ public class TexteditorSwingIntegrationTest {
                 && snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED) {
                 return false;
             }
+            Thread.sleep(20);
+        }
+        return false;
+    }
+
+    private static boolean awaitJobCompletion(Texteditor editor, int jobId) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            AsyncJobService.JobSnapshot snapshot = onEdt(() -> editor.asyncJobService.get(jobId));
+            if (snapshot != null && snapshot.getStatus() != AsyncJobService.Status.RUNNING) return true;
             Thread.sleep(20);
         }
         return false;

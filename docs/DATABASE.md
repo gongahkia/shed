@@ -1,6 +1,6 @@
-# PostgreSQL
+# Database CLI bridges
 
-Shed has an explicit PostgreSQL CLI bridge for a user-installed `psql`. It is a narrow local-workbench feature, not a general database explorer or connection manager.
+Shed has explicit PostgreSQL and SQLite CLI bridges for user-installed `psql` and `sqlite3`. They are narrow local-workbench features, not a general database explorer or connection manager.
 
 ```text
 :database status
@@ -8,6 +8,10 @@ Shed has an explicit PostgreSQL CLI bridge for a user-installed `psql`. It is a 
 :database tables
 :database file migrations/check.sql
 :database terminal
+
+:database sqlite query app.db "select name from sqlite_master"
+:database sqlite tables app.db
+:database sqlite terminal app.db
 ```
 
 `status` is local-only: it opens no connection and reports only whether non-secret libpq selectors such as `PGHOST`, `PGDATABASE`, `PGUSER`, `PGSERVICE`, or `PGPASSFILE` are present. It never displays a connection string, password, or `PGPASSWORD` state. Query, table, and file operations run only after their explicit command, using direct argv equivalent to:
@@ -20,4 +24,12 @@ psql --no-psqlrc --set ON_ERROR_STOP=on --command <sql>
 
 SQL files must be existing `.sql` files inside the active workspace, including after symbolic-link resolution. Their contents are intentionally not parsed or restricted: running a query or file is an explicit database action with the authenticated database role's permissions. `tables` uses a fixed `information_schema` query. `terminal` opens interactive `psql` in Shed's terminal and leaves subsequent commands to the user.
 
-Shed does not include JDBC drivers, connection persistence, credential storage, schema diff/migration UI, result editing, query plans, database-specific language services, SQLite/MySQL/MSSQL/Oracle support, cloud-database auth, or collaborative database sessions. Use a Java extension integration for another database provider.
+SQLite commands require an existing database file inside the active workspace after symbolic-link resolution. Query text is a single explicit command and runs with direct argv equivalent to:
+
+```text
+sqlite3 -batch -bail <workspace-database> <sql>
+```
+
+`tables` uses a fixed `sqlite_master` query. `terminal` opens interactive `sqlite3` for the selected file. Shed does not create database files, persist SQLite connection settings, or accept paths outside the workspace.
+
+Shed does not include JDBC drivers, connection persistence, credential storage, schema diff/migration UI, result editing, query plans, database-specific language services, MySQL/MSSQL/Oracle support, cloud-database auth, or collaborative database sessions. Use a Java extension integration for another database provider.

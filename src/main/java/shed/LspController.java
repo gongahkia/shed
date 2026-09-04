@@ -2020,13 +2020,16 @@ final class LspController {
             invocation.add(command);
             if (args != null) java.util.Collections.addAll(invocation, args);
             RemoteLspEndpoint remote = null;
-            if (editor.configManager.getRemoteLspEnabled() && editor.remoteWorkspaceController != null
-                && editor.remoteWorkspaceController.remoteLanguageServerUri(workspaceRoot) != null) {
+            boolean remoteWorkspace = editor.remoteWorkspaceController != null
+                && editor.remoteWorkspaceController.remoteLanguageServerUri(workspaceRoot) != null;
+            boolean devContainer = !remoteWorkspace && editor.devContainerController != null && editor.devContainerController.hasConfiguration(workspaceRoot);
+            if (editor.configManager.getRemoteLspEnabled() && (remoteWorkspace || devContainer)) {
                 if (!userConfigured) {
                     editor.lspErrors.put(key, "remote LSP requires an explicit global lsp." + extension + ".command configured for the remote environment");
                     return null;
                 }
-                remote = editor.remoteWorkspaceController.languageServerEndpoint(workspaceRoot, invocation);
+                remote = remoteWorkspace ? editor.remoteWorkspaceController.languageServerEndpoint(workspaceRoot, invocation)
+                    : editor.devContainerController.languageServerEndpoint(workspaceRoot, invocation);
                 if (remote == null) {
                     editor.lspErrors.put(key, "the selected remote workspace does not support remote language servers");
                     return null;

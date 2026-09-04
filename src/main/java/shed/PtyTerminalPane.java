@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import javax.swing.JComponent;
 
 final class PtyTerminalPane implements AutoCloseable {
@@ -43,6 +44,11 @@ final class PtyTerminalPane implements AutoCloseable {
     }
 
     static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font terminalFont, List<String> requestedCommand) throws IOException {
+        return open(workingDirectory, configManager, terminalFont, requestedCommand, null);
+    }
+
+    static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font terminalFont, List<String> requestedCommand,
+                                Consumer<TerminalLinkResolver.Link> linkOpener) throws IOException {
         List<String> requested = validateCommand(requestedCommand);
         TerminalShellIntegration.Launch launch = TerminalShellIntegration.prepare(requested, configManager);
         List<String> command = launch.command();
@@ -68,8 +74,12 @@ final class PtyTerminalPane implements AutoCloseable {
         widget.setTtyConnector(connector);
         TerminalShellIntegrationTracker shellIntegration = launch.enabled() ? new TerminalShellIntegrationTracker() : null;
         if (shellIntegration != null) widget.getTerminal().addCustomCommandListener(shellIntegration::accept);
+        PtyTerminalPane pane = new PtyTerminalPane(widget, connector, process, cwd, shellIntegration);
+        if (linkOpener != null) {
+            widget.addHyperlinkFilter(TerminalLinkResolver.create(pane::linkWorkingDirectory, linkOpener));
+        }
         widget.start();
-        return new PtyTerminalPane(widget, connector, process, cwd, shellIntegration);
+        return pane;
     }
 
     JComponent getComponent() {
@@ -98,6 +108,20 @@ final class PtyTerminalPane implements AutoCloseable {
 
     String detectedWorkingDirectory() {
         return shellIntegration == null ? null : shellIntegration.currentDirectory();
+    }
+
+    private java.nio.file.Path linkWorkingDirectory() {
+        String detected = detectedWorkingDirectory();
+        if (detected != null && !detected.isBlank()) {
+            try {
+                java.nio.file.Path path = java.nio.file.Path.of(detected);
+                if (java.nio.file.Files.isDirectory(path)) {
+                    return path.toRealPath();
+                }
+            } catch (IOException | RuntimeException ignored) {
+            }
+        }
+        return workingDirectory.toPath();
     }
 
     void onExit(Runnable callback) {

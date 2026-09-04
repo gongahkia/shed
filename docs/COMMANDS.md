@@ -183,7 +183,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:goyo` | Toggle the distraction-free layout without changing Limelight; hides status/line numbers/minimap/tree/tool windows while retaining every pane and split |
 | `:limelight` | Toggle paragraph focus dimming; the current paragraph or selected text stays bright |
 | `:minimap` | Toggle minimap panel |
-| `:term`, `:terminal` | Open integrated terminal split; terminal input owns focus, uses the system clipboard (`Cmd-C`/`Cmd-V` on macOS, `Ctrl-Shift-C`/`Ctrl-Shift-V` elsewhere), and ignores zero-size resize events |
+| `:term`, `:terminal` | Open integrated terminal split; terminal input owns focus, uses the system clipboard (`Cmd-C`/`Cmd-V` on macOS, `Ctrl-Shift-C`/`Ctrl-Shift-V` elsewhere), recognizes existing local `path:line[:column]` and HTTP(S) output links, and ignores zero-size resize events |
 
 ## Workspace Index Commands
 
@@ -465,7 +465,7 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:integration`, `:integration list` | List supporting database, deployment, collaboration, and container extension integrations |
 | `:integration <extension:id> help` | Show provider-declared actions |
 | `:integration <extension:id> <action> [arguments]` | Run an explicitly declared workspace-integration action |
-| `:notebook open`, `:notebook run [kernel]`, `:notebook console [kernel]`, `:notebook raw` | Open, explicitly execute with Jupyter's default or a selected local kernelspec, open an interactive local Jupyter Console, or show raw JSON for the current `.ipynb` file |
+| `:notebook open`, `:notebook run [kernel]`, `:notebook kernels`, `:notebook console [kernel]`, `:notebook raw` | Open, explicitly execute with Jupyter's default or a selected local kernelspec, discover installed local kernels, open an interactive local Jupyter Console, or show raw JSON for the current `.ipynb` file |
 | `:terminal list`, `:terminal profile <id>` | Show/open terminal profiles |
 | `:terminal commands`, `:terminal cwd` | Show in-memory Bash/Zsh/Fish shell-integration events or latest reported cwd |
 

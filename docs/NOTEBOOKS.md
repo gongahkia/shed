@@ -5,6 +5,7 @@ Opening a local `.ipynb` file presents Shed's native notebook surface. It presen
 ```text
 :notebook open
 :notebook run [kernel]
+:notebook kernels
 :notebook console [kernel]
 :notebook raw
 ```
@@ -17,10 +18,12 @@ jupyter nbconvert --to notebook --execute --inplace <notebook>
 
 Passing an installed kernelspec name to `:notebook run` adds `--ExecutePreprocessor.kernel_name=<kernel>` to that direct command. Omitting it delegates kernel selection to Jupyter. The selection applies only to that one execution.
 
+`:notebook kernels` is an explicit, trusted-workspace discovery job. It runs `jupyter kernelspec list --json`, shows the installed names, display names, and declared languages in a scratch buffer, and never changes Jupyter configuration or selects a default kernel.
+
 Each cell also has **Run to here**. It saves the notebook, creates a temporary prefix notebook in the project directory, runs that prefix with a fresh local kernel, and merges its outputs back into those cells. This is useful for a sequential checkpoint, not persistent per-cell kernel state.
 
 `:notebook console [kernel]` opens `jupyter console` in an explicit terminal at the notebook's directory. Passing a simple installed kernelspec name adds `--kernel <name>`; omitting it delegates selection to Jupyter. This gives an interactive local kernel session without embedding a terminal or kernel protocol in the notebook editor.
 
 The command is direct argv, runs as an asynchronous job, has a ten-minute limit, and requires the local `jupyter` CLI. Notebook execution is subject to the existing project-trust decision. Shed does not download Jupyter, create kernels, or execute a notebook automatically.
 
-The native surface displays plain-text stream/error output, `text/plain` display data, and bounded PNG/JPEG display images. It validates image format/dimensions before decoding and scales large valid images for the view. It does not execute HTML/JavaScript output, render SVG or arbitrary rich MIME output, keep a persistent kernel, provide kernel lifecycle controls (interrupt, restart, shutdown), manage notebooks over a remote kernel protocol, or implement a general notebook extension API. Use `:notebook raw` to return to the JSON text buffer.
+The native surface displays plain-text stream/error output, `text/plain` display data, and bounded PNG/JPEG display images. It validates image format/dimensions before decoding and scales large valid images for the view. It does not provide an in-editor kernel picker or persistent kernel selection, execute HTML/JavaScript output, render SVG or arbitrary rich MIME output, keep a persistent kernel, provide kernel lifecycle controls (interrupt, restart, shutdown), manage notebooks over a remote kernel protocol, or implement a general notebook extension API. Use `:notebook raw` to return to the JSON text buffer.

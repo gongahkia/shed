@@ -120,7 +120,7 @@ Open **Language Services** in Settings or run `:lsp manage` for local detection 
 
 Shed keeps an independent client for each `(extension, workspace root)` pair, so files from separate projects do not replace each other's server. A server that advertises incremental document synchronization receives debounced range changes; others receive a full-document update for compatibility. Semantic tokens and inlay hints render automatically when supported, with inline rendering controlled separately below. Document symbols use an on-demand LSP request with local fallback; workspace symbols run only after `:workspace symbols <query>`, so Shed does not build a background project index.
 
-`remote.lsp.enabled` is a global opt-in for a connected SSH, Docker-container, or WSL workspace. It requires an explicit global `lsp.<ext>.command` for a server already installed in that remote environment. Shed starts that one direct-argv server through the provider and translates only files under the local mirror to its remote `file:` URIs. Run `:lsp restart <ext>` after changing this setting; a live client retains the URI mode it started with. It does not install a remote server, run managed local artifacts remotely, bootstrap a host, or make test/debug/extension hosts remote. An SSH login banner on stdout corrupts the LSP stream and must be disabled in the user's SSH setup.
+`remote.lsp.enabled` is a global opt-in for a connected SSH, Docker-container, or WSL workspace, or for an already running local Dev Container. It requires an explicit global `lsp.<ext>.command` for a server already installed in that remote environment. Shed starts that one direct-argv server through the provider and translates only files under the local mirror to its remote `file:` URIs; for a Dev Container it first asks the user-installed CLI for the mounted workspace path. Run `:lsp restart <ext>` after changing this setting; a live client retains the URI mode it started with. It does not install a remote server, run managed local artifacts remotely, bootstrap a host, or make test/debug/extension hosts remote. An SSH login banner on stdout corrupts the LSP stream and must be disabled in the user's SSH setup.
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
@@ -148,7 +148,7 @@ Shed keeps an independent client for each `(extension, workspace root)` pair, so
 | `lsp.command.execution.enabled` | `true` | bool | Actions: execute-command requests |
 | `lsp.formatting.enabled` | `true` | bool | Document-formatting requests |
 | `lsp.format.on.save.enabled` | `false` | bool | Default format-on-save policy for extensions without an override; an unavailable, failed, or stale formatting request leaves the buffer unsaved |
-| `remote.lsp.enabled` | `false` | bool | Globally opt in to explicitly configured LSP servers running through connected SSH/container/WSL workspaces; project configuration cannot enable it |
+| `remote.lsp.enabled` | `false` | bool | Globally opt in to explicitly configured LSP servers running through connected SSH/container/WSL workspaces or an already running Dev Container; project configuration cannot enable it |
 
 ## Formatter policy
 

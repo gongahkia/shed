@@ -43,6 +43,6 @@ class DevContainerTaskCommandTest {
 
     @Test
     void acceptsLastWorkspacePathFromCliOutput() {
-        assertEquals("/workspaces/project", JobQuickfixController.remoteWorkingDirectory("[22 ms] Start: Run\n/workspaces/project\n"));
+        assertEquals("/workspaces/project", DevContainerWorkspace.remoteWorkingDirectory("[22 ms] Start: Run\n/workspaces/project\n"));
     }
 }

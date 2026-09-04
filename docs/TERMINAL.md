@@ -19,3 +19,9 @@ The integration is unavailable for noninteractive commands and unsupported shell
 `TerminalConformanceFixtureTest` feeds deterministic characters into Jediterm's emulator without launching a shell. It covers plain output, ANSI SGR, newline output, Up-arrow and Enter input codes, and an unsupported private CSI sequence. The fixture requires surrounding output to remain intact and escape control bytes not to leak into terminal text.
 
 Shed retains Jediterm/PTy4J behavior for terminal emulation. The fixture is a regression boundary, not a claim of complete xterm-sequence support.
+
+## Output links
+
+Shed makes an existing local source location such as `src/Main.java:12:4` clickable, resolving a relative path against the terminal's latest shell-reported directory when available, otherwise its startup directory. Clicking opens that regular local file at the reported one-based line and column. It also makes `http://` and `https://` output clickable for an explicit system-browser handoff.
+
+It does not link a missing file, invent a remote-file mapping, parse every compiler's diagnostic format, or open arbitrary URI schemes. Link detection itself makes no network request; a browser handoff occurs only after the user clicks an HTTP(S) link.

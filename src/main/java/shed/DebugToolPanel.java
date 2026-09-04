@@ -87,7 +87,11 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         framesPanel.setBorder(BorderFactory.createTitledBorder("Call Stack"));
         framesPanel.add(new JScrollPane(frameList), BorderLayout.CENTER);
         JButton selectFrame = button("Inspect Frame", this::selectFrame);
-        framesPanel.add(selectFrame, BorderLayout.SOUTH);
+        JButton openFrameSource = button("Open Source", this::openFrameSource);
+        JPanel frameActions = new JPanel(new GridLayout(1, 2, 3, 0));
+        frameActions.add(selectFrame);
+        frameActions.add(openFrameSource);
+        framesPanel.add(frameActions, BorderLayout.SOUTH);
 
         JPanel watchPanel = new JPanel(new BorderLayout(3, 3));
         watchPanel.setBorder(BorderFactory.createTitledBorder("Watches"));
@@ -191,6 +195,11 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         DebugInspection.Frame frame = frameList.getSelectedValue();
         if (frame == null) { message("Select a stack frame."); return; }
         message(editor.debugSessionController.selectFrameForPanel(frame.id()));
+    }
+
+    private void openFrameSource() {
+        DebugInspection.Frame frame = frameList.getSelectedValue();
+        message(editor.debugSessionController.openFrameSourceForPanel(frame));
     }
 
     private void addWatch() { message(editor.debugSessionController.addWatchForPanel(watchInput.getText())); watchInput.setText(""); }

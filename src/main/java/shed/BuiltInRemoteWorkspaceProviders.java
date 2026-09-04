@@ -183,6 +183,12 @@ final class BuiltInRemoteWorkspaceProviders {
             return List.copyOf(invocation);
         }
 
+        @Override public List<String> languageServerCommand(List<String> command) throws Exception {
+            return sshLanguageServerInvocation(uri, command);
+        }
+
+        @Override public String languageServerRoot() { return uri.getPath(); }
+
         @Override public void close() {
             // No daemon is left running; mirror files remain available offline.
         }
@@ -292,6 +298,12 @@ final class BuiltInRemoteWorkspaceProviders {
             return List.copyOf(invocation);
         }
 
+        @Override public List<String> languageServerCommand(List<String> command) throws Exception {
+            return containerLanguageServerInvocation(uri, command);
+        }
+
+        @Override public String languageServerRoot() { return uri.getPath(); }
+
         @Override public void close() {
             // Docker copy does not leave an attached process or an implicit container lifecycle.
         }
@@ -354,6 +366,12 @@ final class BuiltInRemoteWorkspaceProviders {
             return List.copyOf(invocation);
         }
 
+        @Override public List<String> languageServerCommand(List<String> command) throws Exception {
+            return wslLanguageServerInvocation(uri, command);
+        }
+
+        @Override public String languageServerRoot() { return uri.getPath(); }
+
         @Override public void close() { }
     }
 
@@ -367,6 +385,38 @@ final class BuiltInRemoteWorkspaceProviders {
             }
         }
         return values;
+    }
+
+    static List<String> sshLanguageServerInvocation(URI uri, List<String> command) throws IOException {
+        if (uri == null || !"ssh".equalsIgnoreCase(uri.getScheme()) || !safeRemotePath(uri.getPath())) {
+            throw new IOException("SSH language server requires an absolute remote workspace path");
+        }
+        List<String> invocation = new ArrayList<>(List.of("ssh"));
+        if (uri.getPort() > 0) {
+            invocation.add("-p");
+            invocation.add(Integer.toString(uri.getPort()));
+        }
+        invocation.add(safeSshTarget(uri));
+        invocation.add(posixCommand(uri.getPath(), requiredCommand(command), Map.of()));
+        return List.copyOf(invocation);
+    }
+
+    static List<String> containerLanguageServerInvocation(URI uri, List<String> command) throws IOException {
+        if (uri == null || !safeRemotePath(uri.getPath()) || uri.getHost() == null || !uri.getHost().matches("[A-Za-z0-9][A-Za-z0-9_.-]*")) {
+            throw new IOException("container language server requires a valid container workspace URI");
+        }
+        List<String> invocation = new ArrayList<>(List.of("docker", "exec", "-i", "--workdir", uri.getPath(), uri.getHost()));
+        invocation.addAll(requiredCommand(command));
+        return List.copyOf(invocation);
+    }
+
+    static List<String> wslLanguageServerInvocation(URI uri, List<String> command) throws IOException {
+        if (uri == null || !safeRemotePath(uri.getPath()) || uri.getHost() == null || uri.getHost().isBlank()) {
+            throw new IOException("WSL language server requires a valid distribution workspace URI");
+        }
+        List<String> invocation = new ArrayList<>(List.of("wsl.exe", "-d", uri.getHost(), "--cd", uri.getPath(), "--"));
+        invocation.addAll(requiredCommand(command));
+        return List.copyOf(invocation);
     }
 
     private static RemoteTerminalRequest requiredTerminalRequest(RemoteTerminalRequest request) {

@@ -54,6 +54,18 @@ public interface RemoteWorkspace extends AutoCloseable {
         throw new UnsupportedOperationException("this remote workspace does not support interactive terminals");
     }
 
+    /**
+     * Builds the local direct-argv process that carries one user-configured
+     * language server in this workspace's execution environment. Providers
+     * must not install a server or leave a background host running.
+     */
+    default List<String> languageServerCommand(List<String> command) throws Exception {
+        throw new UnsupportedOperationException("this remote workspace does not support remote language servers");
+    }
+
+    /** Absolute POSIX root used by {@link #languageServerCommand(List)}. */
+    default String languageServerRoot() { return ""; }
+
     @Override
     void close() throws Exception;
 }

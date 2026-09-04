@@ -59,6 +59,17 @@ public class NetworkConsentAuditTest {
     }
 
     @Test
+    void remoteLanguageServersRemainDisabledUntilExplicitlyEnabled() throws IOException {
+        System.setProperty("user.home", tempDir.resolve("home-remote-lsp").toString());
+        ConfigManager config = new ConfigManager();
+
+        assertFalse(config.getRemoteLspEnabled());
+        assertFalse(config.isProjectConfigKeyAllowed("remote.lsp.enabled"));
+        config.set("remote.lsp.enabled", "true");
+        assertTrue(config.getRemoteLspEnabled());
+    }
+
+    @Test
     void appOwnedOutboundPrimitivesRemainDocumented() throws IOException {
         assertEquals(Set.of("ExtensionManager.java", "ManagedLanguageSupportService.java", "PluginManager.java"), sourcesContaining("openConnection("));
         assertEquals(Set.of("LandingPageRemoteTransport.java", "UpdateMetadataTransport.java"), sourcesContaining("HttpClient.newBuilder("));

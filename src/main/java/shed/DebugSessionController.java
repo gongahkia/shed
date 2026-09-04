@@ -532,7 +532,10 @@ final class DebugSessionController {
         catch (IOException ignored) { return Path.of(".").toAbsolutePath().normalize(); }
     }
 
-    private Path activeFile() { return lastActiveFile; }
+    private Path activeFile() {
+        workspace();
+        return lastActiveFile;
+    }
     private static String diagnosticSuffix(DebugSessionService.Snapshot snapshot) {
         return snapshot.diagnostics().isEmpty() ? "" : " Diagnostics: " + String.join("; ", snapshot.diagnostics());
     }

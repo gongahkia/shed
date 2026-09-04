@@ -36,7 +36,15 @@ command = ["./node_modules/.bin/vitest"]
 
 `schema_version` must be `1`. Each `[[adapter]]` requires one unique built-in id. `command` is optional; when supplied it is a non-empty direct argv array, never a shell string. `debug_configuration` is optional and names one global `debug.configuration.<name>` mapping. It enables only explicit **Debug Selection** and `:test debug <test-id>`; Shed does not infer or automatically launch a test debugger. DAP launch args may use `${testId}` and `${testFile}` for that explicit mapping; unknown placeholders and files outside the selected workspace are rejected. Supported ids are `maven`, `gradle`, `pytest`, `jest`, `vitest`, `go`, `dotnet`, and `cargo`. Invalid files block testing for that root and report exact diagnostics; Shed does not fall back to auto-detection.
 
-Results are session-only. Pytest/Jest/Vitest report files go under the configured Shed data directory's `test-reports/` cache (default `~/.shed/test-reports/`); source project files are not changed by local tests. Maven/Gradle use the XML reports their normal test tasks produce. Failed tests with a source location appear in Problems as `test:<adapter>`; no test failure replaces the quickfix list.
+Results are session-only. Pytest/Jest/Vitest report files go under the configured Shed data directory's `test-reports/` cache (default `~/.shed/test-reports/`); ordinary local tests do not make app-owned changes to source projects. Maven/Gradle use the XML reports their normal test tasks produce. Failed tests with a source location appear in Problems as `test:<adapter>`; no test failure replaces the quickfix list.
+
+## Local Dev Containers
+
+For a selected root with `.devcontainer/devcontainer.json`, explicit dynamic discovery, Run All, Run Selection, and rerun-failed run through the user-installed `devcontainer exec` CLI in the already-running container. Auto-detection and Maven/Gradle's static Java source scan stay on the local mounted workspace. **Debug Selection** remains an explicit configured stdio DAP bridge; it does not infer a test debugger.
+
+For report-based adapters, Shed creates one generated `.shed-devcontainer-test-reports/run-…` directory under the selected project so that it is visible through the mounted workspace. It maps only exact workspace-path argv prefixes to the container's probed POSIX workspace root, parses the resulting reports locally, rejects cache report trees containing symbolic links, non-regular files, more than 10,000 files, a file over 8 MiB, or more than 32 MiB total, and then removes only that generated run directory. Cleanup failures are shown in test output and can leave that generated directory behind. Maven and Gradle keep using their normal workspace-relative report locations.
+
+This route does not start or rebuild a container, install a dependency, perform a full workspace synchronization, or create a remote extension host. An explicit refresh or run is what invokes the CLI; a stopped or misconfigured container is reported in that job.
 
 ## Connected remote roots
 

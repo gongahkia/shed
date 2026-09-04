@@ -42,7 +42,7 @@ final class DevContainerTestExecution {
         Path root = workspaceRoot(workspace);
         if (command == null || !command.executable()) throw new IOException("Dev Container test command is unavailable");
         List<String> mapped = RemoteTestExecution.mapWorkspaceCommand(command.argv(), root, remoteRoot);
-        return new Plan(command, DevContainerController.testInvocation(root, mapped));
+        return new Plan(command, DevContainerRuntime.testInvocation(root, mapped));
     }
 
     /** Keeps only cache reports that are safe for Shed's parsers to consume. */

@@ -93,8 +93,8 @@ Notes:
 | Command | Action |
 | :--- | :--- |
 | `:test`, `:test ui` | Open the docked Tests panel; this does not scan or start a process |
-| `:test refresh` | Explicitly detect runners and discover tests; a selected SSH, Docker, or WSL workspace root runs dynamic discovery remotely |
-| `:test run` | Run every detected/configured adapter in the selected workspace root; a selected SSH, Docker, or WSL root runs them in its remote environment |
+| `:test refresh` | Explicitly detect runners and discover tests; a selected SSH, Docker, WSL, or already-running Dev Container root runs dynamic discovery in that environment |
+| `:test run` | Run every detected/configured adapter in the selected workspace root; a selected SSH, Docker, WSL, or already-running Dev Container root runs them in that environment |
 | `:test run <test-id>` | Run one discovered test by its exact id |
 | `:test debug <test-id>` | Start the adapter explicitly mapped by that test adapter's `.shedtests` `debug_configuration`; connected SSH, Docker, WSL, and an already-running Dev Container workspace may use an already-installed configured stdio adapter |
 | `:test failed`, `:test rerun-failed` | Run the failed tests retained for this session |
@@ -104,7 +104,7 @@ Notes:
 | `:coverage clear` | Clear imported session-local coverage for the selected root |
 | `:coverage text` | Open imported coverage totals and per-file line summaries |
 
-The Tests panel supports root selection, status/text filtering, Refresh, Run All, Run Selection, Debug Selection, Rerun Failed, Cancel, **Import Coverage**, **Clear Coverage**, output inspection, and source navigation. An SSH, Docker, or WSL root inside a connected workspace runs explicit discovery and tests remotely and retrieves only declared results into Shed's private cache; Debug Selection can likewise use a configured already-installed remote or Dev Container stdio adapter. Imports are explicit and local; covered/uncovered lines render in the active editor gutter. Tests are discovered only after an explicit refresh. Failure locations are also published to Problems under `test:<adapter>` without replacing quickfix entries. Adapter declarations, direct argv overrides, debug mappings, report-cache policy, remote boundary, and supported built-ins are in [Testing](TESTS.md).
+The Tests panel supports root selection, status/text filtering, Refresh, Run All, Run Selection, Debug Selection, Rerun Failed, Cancel, **Import Coverage**, **Clear Coverage**, output inspection, and source navigation. An SSH, Docker, or WSL root inside a connected workspace runs explicit discovery and tests remotely and retrieves only declared results into Shed's private cache. A selected root with an already-running Dev Container runs explicit dynamic discovery and tests through `devcontainer exec`, using a generated project-mounted report cache only for that run. Debug Selection can likewise use a configured already-installed remote or Dev Container stdio adapter. Imports are explicit and local; covered/uncovered lines render in the active editor gutter. Tests are discovered only after an explicit refresh. Failure locations are also published to Problems under `test:<adapter>` without replacing quickfix entries. Adapter declarations, direct argv overrides, debug mappings, report-cache policy, remote boundary, and supported built-ins are in [Testing](TESTS.md).
 
 ## Settings and Configuration
 

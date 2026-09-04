@@ -72,6 +72,28 @@ class NotebookDocumentTest {
     }
 
     @Test
+    void persistsASelectedKernelspecAndUsesItWhenNoOneShotOverrideIsProvided() {
+        NotebookDocument document = NotebookDocument.parse("{\"nbformat\":4,\"nbformat_minor\":5,\"metadata\":{\"custom\":true},\"cells\":[]}")
+            .withKernelSpec("python3", "Python 3", "python");
+
+        assertEquals("python3", document.kernelName());
+        assertEquals("python3", NotebookController.selectedKernel(document, ""));
+        assertEquals("typescript", NotebookController.selectedKernel(document, "typescript"));
+        assertTrue(document.serialize().contains("\"custom\":true"));
+        assertTrue(document.serialize().contains("\"kernelspec\""));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> document.withKernelSpec("python3; bad", "", ""));
+    }
+
+    @Test
+    void notebookSurfaceStagesAPickerSelectionWithTheEditableDocument() {
+        NotebookPanel panel = new NotebookPanel(NotebookDocument.empty(), ignored -> { }, ignored -> { }, (ignored, count) -> { }, null, () -> { });
+
+        panel.selectKernel(new NotebookController.KernelSpec("python3", "Python 3", "python"));
+
+        assertEquals("python3", panel.selectedKernelName());
+    }
+
+    @Test
     void extractsOnlyBoundedPngAndJpegDisplayData() {
         NotebookDocument document = NotebookDocument.empty().withCells(List.of(new NotebookDocument.Cell("code", "", Map.of("outputs", List.of(
             Map.of("data", Map.of("image/png", "aGVsbG8=", "image/svg+xml", "PHN2Zz4=")))))));

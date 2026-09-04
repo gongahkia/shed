@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -19,6 +20,14 @@ final class NotebookController {
             name = kernelName(name);
             displayName = displayName == null || displayName.isBlank() ? name : displayName.trim();
             language = language == null ? "" : language.trim();
+        }
+
+        @Override public String toString() {
+            return displayName.equals(name) ? name + languageLabel(language) : displayName + " (" + name + ")" + languageLabel(language);
+        }
+
+        private static String languageLabel(String language) {
+            return language == null || language.isBlank() ? "" : " [" + language + "]";
         }
     }
     private final Texteditor editor;
@@ -34,7 +43,8 @@ final class NotebookController {
             pane.setCustomEditorComponent(new NotebookPanel(document,
                 updated -> save(pane, buffer, updated),
                 updated -> run(pane, buffer, updated),
-                (updated, cellCount) -> runThrough(pane, buffer, updated, cellCount), buffer.getFile()));
+                (updated, cellCount) -> runThrough(pane, buffer, updated, cellCount), buffer.getFile(),
+                () -> editor.showMessage(chooseKernel(pane, buffer))));
             editor.renderWindowLayout();
             editor.showMessage("Opened Jupyter notebook");
             return true;
@@ -50,19 +60,44 @@ final class NotebookController {
         EditorPane pane = editor.getActivePane();
         FileBuffer buffer = editor.getCurrentBuffer();
         if (!isNotebook(buffer)) return "The current buffer is not a .ipynb notebook";
-        if (operation.equals("console") || operation.startsWith("console ")) return openConsole(buffer, raw.substring("console".length()).trim());
+        if (operation.equals("console") || operation.startsWith("console ")) return openConsole(buffer, selectedKernel(buffer, raw.substring("console".length()).trim()));
         if (operation.equals("run") || operation.startsWith("run ")) return runCurrent(pane, buffer, raw.substring("run".length()).trim());
         return switch (operation) {
             case "", "open", "reopen" -> showIfAvailable(pane, buffer) ? "Notebook opened" : "Notebook view unavailable";
             case "runall", "run-all" -> runCurrent(pane, buffer, "");
-            case "kernels", "kernel", "kernelspecs" -> listKernels(buffer);
+            case "kernels", "kernelspecs" -> listKernels(buffer);
+            case "select", "picker" -> chooseKernel(pane, buffer);
+            case "kernel" -> currentKernel(buffer);
             case "raw", "text" -> {
                 pane.clearCustomEditorComponent();
                 editor.renderWindowLayout();
                 yield "Opened notebook JSON source";
             }
-            default -> "Usage: :notebook [open|run [kernel]|kernels|console [kernel]|raw]";
+            default -> selectNamedKernel(pane, buffer, raw);
         };
+    }
+
+    private String currentKernel(FileBuffer buffer) {
+        try {
+            String selected = selectedKernel(buffer, "");
+            return selected.isBlank() ? "Notebook kernel: Jupyter default (none selected)" : "Notebook kernel: " + selected;
+        } catch (IllegalArgumentException error) {
+            return "Notebook kernelspec metadata is invalid";
+        }
+    }
+
+    private String selectNamedKernel(EditorPane pane, FileBuffer buffer, String raw) {
+        String value = raw == null ? "" : raw.trim();
+        if (!value.regionMatches(true, 0, "kernel ", 0, 7)) {
+            return "Usage: :notebook [open|run [kernel]|kernels|select|kernel [name]|console [kernel]|raw]";
+        }
+        String name = value.substring(7).trim();
+        try {
+            KernelSpec selected = new KernelSpec(name, name, "");
+            return persistKernel(pane, buffer, selected);
+        } catch (IllegalArgumentException error) {
+            return "Jupyter kernel name is invalid";
+        }
     }
 
     private String listKernels(FileBuffer buffer) {
@@ -78,6 +113,47 @@ final class NotebookController {
                 editor.showMessage("Jupyter kernel discovery completed");
             });
         return "Jupyter kernel discovery started (job " + job + ").";
+    }
+
+    private String chooseKernel(EditorPane pane, FileBuffer buffer) {
+        if (!editor.ensureProjectTrustForFile(buffer.getFile())) return "Jupyter kernel selection blocked: workspace is untrusted";
+        Path directory = buffer.getFile().toPath().toAbsolutePath().normalize().getParent();
+        int job = editor.asyncJobService.submit("Discover Jupyter kernels", token -> discoverKernels(directory, token),
+            (snapshot, kernels, error) -> {
+                if (error != null) {
+                    editor.showMessage("Jupyter kernel discovery failed: " + concise(error));
+                    return;
+                }
+                if (kernels == null || kernels.isEmpty()) {
+                    editor.showMessage("No installed Jupyter kernels were found");
+                    return;
+                }
+                Map<String, KernelSpec> byLabel = new LinkedHashMap<>();
+                for (KernelSpec kernel : kernels) byLabel.put(kernel.toString(), kernel);
+                String selected = editor.showPaletteDialog("Jupyter Kernels", new ArrayList<>(byLabel.keySet()));
+                KernelSpec kernel = selected == null ? null : byLabel.get(selected);
+                if (kernel == null || pane.getBuffer() != buffer) return;
+                if (pane.getCustomEditorComponent() instanceof NotebookPanel panel) {
+                    panel.selectKernel(kernel);
+                    editor.showMessage("Notebook kernel selected: " + kernel.name() + "; save or run to persist it");
+                    return;
+                }
+                editor.showMessage(persistKernel(pane, buffer, kernel));
+            });
+        return "Jupyter kernel discovery started (job " + job + ").";
+    }
+
+    private String persistKernel(EditorPane pane, FileBuffer buffer, KernelSpec kernel) {
+        if (!editor.ensureProjectTrustForFile(buffer.getFile())) return "Jupyter kernel selection blocked: workspace is untrusted";
+        try {
+            NotebookDocument document = NotebookDocument.parse(buffer.getContent())
+                .withKernelSpec(kernel.name(), kernel.displayName(), kernel.language());
+            write(buffer, document);
+            showIfAvailable(pane, buffer);
+            return "Notebook kernel selected and saved: " + kernel.name();
+        } catch (IOException | IllegalArgumentException | IllegalStateException error) {
+            return "Notebook kernel selection failed: " + concise(error);
+        }
     }
 
     private String openConsole(FileBuffer buffer, String kernel) {
@@ -149,7 +225,14 @@ final class NotebookController {
             return;
         }
         Path source = buffer.getFile().toPath().toAbsolutePath().normalize();
-        int job = editor.asyncJobService.submit("Execute notebook through cell " + cellCount, token -> executeThrough(source, cellCount, token),
+        String kernel;
+        try {
+            kernel = document.kernelName();
+        } catch (IllegalArgumentException error) {
+            editor.showMessage("Notebook kernelspec metadata is invalid");
+            return;
+        }
+        int job = editor.asyncJobService.submit("Execute notebook through cell " + cellCount, token -> executeThrough(source, cellCount, kernel, token),
             (snapshot, executed, error) -> {
                 if (error != null) {
                     editor.showMessage("Notebook cell execution failed: " + concise(error));
@@ -163,14 +246,14 @@ final class NotebookController {
                     editor.showMessage("Notebook executed but could not save output: " + concise(writeError));
                 }
             });
-        editor.showMessage("Notebook cell execution started (job " + job + ", fresh kernel)");
+        editor.showMessage("Notebook cell execution started (job " + job + ", fresh " + (kernel.isBlank() ? "default" : kernel) + " kernel)");
     }
 
     private String runCurrent(EditorPane pane, FileBuffer buffer, String kernel) {
         if (!editor.ensureProjectTrustForFile(buffer.getFile())) return "Notebook execution blocked: workspace is untrusted";
         String selectedKernel;
         try {
-            selectedKernel = kernelName(kernel);
+            selectedKernel = selectedKernel(buffer, kernel);
         } catch (IllegalArgumentException error) {
             return "Jupyter kernel name is invalid";
         }
@@ -207,6 +290,18 @@ final class NotebookController {
         String name = kernel == null ? "" : kernel.trim();
         if (!name.isEmpty() && !name.matches("[A-Za-z0-9._-]+")) throw new IllegalArgumentException("kernel name is invalid");
         return name;
+    }
+
+    static String selectedKernel(NotebookDocument document, String requested) {
+        String explicit = kernelName(requested);
+        return explicit.isBlank() && document != null ? kernelName(document.kernelName()) : explicit;
+    }
+
+    private static String selectedKernel(FileBuffer buffer, String requested) {
+        String explicit = kernelName(requested);
+        if (!explicit.isBlank()) return explicit;
+        if (buffer == null) return "";
+        return selectedKernel(NotebookDocument.parse(buffer.getContent()), "");
     }
 
     private static String execute(Path source, String kernel, AsyncJobService.JobToken token) throws Exception {
@@ -252,13 +347,13 @@ final class NotebookController {
         }
     }
 
-    private static NotebookDocument executeThrough(Path source, int cellCount, AsyncJobService.JobToken token) throws Exception {
+    private static NotebookDocument executeThrough(Path source, int cellCount, String kernel, AsyncJobService.JobToken token) throws Exception {
         NotebookDocument document = NotebookDocument.parse(Files.readString(source, StandardCharsets.UTF_8));
         NotebookDocument prefix = document.through(cellCount);
         Path temporary = Files.createTempFile(source.getParent(), ".shed-notebook-", ".ipynb");
         try {
             Files.writeString(temporary, prefix.serialize(), StandardCharsets.UTF_8);
-            execute(temporary, "", token);
+            execute(temporary, kernel, token);
             return document.withExecutedPrefix(NotebookDocument.parse(Files.readString(temporary, StandardCharsets.UTF_8)), cellCount);
         } finally {
             Files.deleteIfExists(temporary);
@@ -293,7 +388,7 @@ final class NotebookController {
             if (!kernel.language().isBlank()) text.append("  [").append(kernel.language()).append("]");
             text.append('\n');
         }
-        text.append("\nUse :notebook run <kernel> or :notebook console <kernel>. Selection remains one-shot.\n");
+        text.append("\nUse :notebook select for a picker, :notebook kernel <name> to persist a selection, or :notebook run/console <kernel> for a one-shot override.\n");
         return text.toString();
     }
 

@@ -71,6 +71,28 @@ final class NotebookDocument {
         return new NotebookDocument(root, replacement == null ? List.of() : replacement);
     }
 
+    /** Returns the standard Jupyter kernelspec name when it is safe to pass as one direct argv value. */
+    String kernelName() {
+        Map<String, Object> metadata = MiniJson.asObject(root.get("metadata"));
+        Map<String, Object> kernelspec = MiniJson.asObject(metadata == null ? null : metadata.get("kernelspec"));
+        String name = MiniJson.asString(kernelspec == null ? null : kernelspec.get("name"));
+        return validKernelName(name) ? name.trim() : "";
+    }
+
+    /** Persists a selected installed kernelspec without discarding other notebook metadata. */
+    NotebookDocument withKernelSpec(String name, String displayName, String language) {
+        String selected = normalizedKernelName(name);
+        Map<String, Object> updatedRoot = new LinkedHashMap<>(root);
+        Map<String, Object> metadata = copyMap(MiniJson.asObject(updatedRoot.get("metadata")));
+        Map<String, Object> kernelspec = copyMap(MiniJson.asObject(metadata.get("kernelspec")));
+        kernelspec.put("name", selected);
+        if (displayName != null && !displayName.isBlank()) kernelspec.put("display_name", displayName.trim());
+        if (language != null && !language.isBlank()) kernelspec.put("language", language.trim());
+        metadata.put("kernelspec", kernelspec);
+        updatedRoot.put("metadata", metadata);
+        return new NotebookDocument(updatedRoot, cells);
+    }
+
     /** Returns a standalone notebook containing cells through the requested one-based index. */
     NotebookDocument through(int cellCount) {
         if (cellCount < 1 || cellCount > cells.size()) throw new IllegalArgumentException("notebook cell index is unavailable");
@@ -177,5 +199,18 @@ final class NotebookDocument {
             if (text != null) result.append(text);
         }
         return result.toString();
+    }
+
+    private static boolean validKernelName(String name) {
+        return name != null && name.trim().matches("[A-Za-z0-9._-]+");
+    }
+
+    private static String normalizedKernelName(String name) {
+        if (!validKernelName(name)) throw new IllegalArgumentException("kernel name is invalid");
+        return name.trim();
+    }
+
+    private static Map<String, Object> copyMap(Map<String, Object> value) {
+        return value == null ? new LinkedHashMap<>() : new LinkedHashMap<>(value);
     }
 }

@@ -98,6 +98,14 @@ public class DebugAdapterRegistryTest {
         assertTrue(validation.errors().stream().anyMatch(error -> error.key().equals("debug.configuration.main.prelaunch_task")));
     }
 
+    @Test
+    void acceptsTheStoppedFrameSourceNavigationPreferenceAsACoreSetting() {
+        Map<String, Object> values = configuration("launch");
+        values.put("debug.open.source.on.stop", "false");
+
+        assertTrue(DebugAdapterRegistry.validate(values).valid());
+    }
+
     private static Map<String, Object> configuration(String request) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("debug.adapter.java.command", "java-debug-adapter");

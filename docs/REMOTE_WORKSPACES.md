@@ -42,13 +42,27 @@ SSH, Git, and Docker credentials remain with the user-installed tools and their 
 
 SSH necessarily passes a safely quoted command to the remote POSIX shell. For that route, Shed accepts DNS host names and simple SSH user names only; use a normal SSH config alias if the endpoint needs a more complex connection setup. This command path is explicit process execution, so it inherits the remote account/container's permissions and must be treated like opening a terminal there.
 
+## Opt-in remote language servers
+
+Set this **global** setting and configure the server command that already exists in the remote environment:
+
+```toml
+remote.lsp.enabled = true
+"lsp.py.command" = "pyright-langserver"
+"lsp.py.args" = "--stdio"
+```
+
+For a connected SSH, Docker-container, or WSL workspace, Shed carries that configured LSP process through `ssh`, `docker exec -i`, or `wsl.exe`; it initializes the server and document requests with the URI path from the remote workspace, while the editor keeps its local mirror. Run `:lsp restart <ext>` after changing `remote.lsp.enabled`; a running client retains the URI mode it started with. Remote LSP is never enabled by a project `.shed.toml`, and Shed neither downloads the server nor runs managed local language-service artifacts remotely. Closing the remote workspace stops its associated LSP clients.
+
+The bridge supports only ordinary absolute `file:` URIs inside the connected workspace root. It does not support SSH login banners on stdout, remote URI schemes, port-forwarded language servers, remote extension hosts, remote test/debug placement, or a server bootstrap/reconnect protocol.
+
 ## Semantics and limitations
 
 - Pull and push never happen on a timer. `:remote close` disconnects the workspace and retains its local mirror.
 - SSH mirroring deliberately omits `--delete`; a pull cannot silently delete an unrelated local mirror file.
 - Container remote-workspace support itself is file synchronization. It does not run an extension host inside a container; the separate local Dev Container CLI bridge below is explicit and does not alter that mirror model.
 - WSL support is Windows-only and uses the local WSL filesystem bridge rather than a remote server.
-- This is not VS Code or Zed remote-development parity: there is no remote extension host, remote LSP/debug/test placement, automatic task placement, SSH server bootstrap, port-forwarding UI, Codespaces service, browser editor, or automatic conflict resolver.
+- This is not VS Code or Zed remote-development parity: there is no remote extension host, remote test/debug placement, automatic task placement, SSH server bootstrap, port-forwarding UI, Codespaces service, browser editor, persistent remote-server/reconnect protocol, or automatic conflict resolver. Remote LSP is a narrow explicit process bridge, not a remote workbench host.
 
 Extensions can add URI schemes using `RemoteWorkspaceProvider`; they must disclose their own authentication, synchronization, and network behavior.
 

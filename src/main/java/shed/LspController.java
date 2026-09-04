@@ -23,6 +23,7 @@ final class LspController {
     private final Texteditor editor;
     private final ManagedLanguageSupportService managedLanguageSupport;
     private final Map<String, LspDocumentSyncState> documentSyncStates = new HashMap<>();
+    private final Map<LspServerKey, RemoteLspEndpoint> remoteLspEndpoints = new HashMap<>();
     private Timer lspChangeTimer;
     private FileBuffer pendingLspChange;
     private Timer lspDecorationTimer;
@@ -1814,7 +1815,7 @@ final class LspController {
         if (uri == null || uri.isBlank()) {
             return null;
         }
-        if (editor != null && editor.configManager.getRemoteLspEnabled() && editor.remoteWorkspaceController != null) {
+        if (editor != null && editor.remoteWorkspaceController != null) {
             Path remotePath = editor.remoteWorkspaceController.localPathForRemoteLanguageServerUri(uri);
             if (remotePath != null) return remotePath.toFile().getAbsolutePath();
         }
@@ -1927,6 +1928,7 @@ final class LspController {
         for (LspServerKey key : keys) {
             LspClient client = editor.lspClients.remove(key);
             if (client != null) client.stop();
+            remoteLspEndpoints.remove(key);
         }
         return keys.size();
     }
@@ -1942,6 +1944,7 @@ final class LspController {
         for (LspServerKey key : keys) {
             LspClient client = editor.lspClients.remove(key);
             if (client != null) client.stop();
+            remoteLspEndpoints.remove(key);
         }
         editor.lspErrors.entrySet().removeIf(entry -> entry.getKey().workspaceRoot() != null && entry.getKey().workspaceRoot().startsWith(root));
         for (FileBuffer buffer : editor.buffers) {
@@ -1991,6 +1994,7 @@ final class LspController {
         if (existing != null) {
             existing.stop();
             editor.lspClients.remove(key);
+            remoteLspEndpoints.remove(key);
         }
 
         String command = editor.configManager.getLspCommand(extension);
@@ -2037,9 +2041,12 @@ final class LspController {
                 editor.problemsController.diagnosticsChanged();
             }));
             editor.lspClients.put(key, client);
+            if (remote == null) remoteLspEndpoints.remove(key);
+            else remoteLspEndpoints.put(key, remote);
             editor.lspErrors.remove(key);
             return client;
         } catch (IOException e) {
+            remoteLspEndpoints.remove(key);
             editor.lspErrors.put(key, e.getMessage());
             return null;
         }
@@ -2341,11 +2348,21 @@ final class LspController {
 
     String bufferUri(FileBuffer buffer) {
         Path path = new File(buffer.getFilePath()).toPath().toAbsolutePath().normalize();
-        if (editor != null && editor.configManager.getRemoteLspEnabled() && editor.remoteWorkspaceController != null) {
-            String remoteUri = editor.remoteWorkspaceController.remoteLanguageServerUri(path);
+        RemoteLspEndpoint endpoint = remoteLspEndpointFor(buffer);
+        if (endpoint != null) {
+            String remoteUri = endpoint.uriFor(path);
             if (remoteUri != null) return remoteUri;
         }
         return path.toUri().toString();
+    }
+
+    private RemoteLspEndpoint remoteLspEndpointFor(FileBuffer buffer) {
+        if (buffer == null || !buffer.hasFilePath()) return null;
+        try {
+            return remoteLspEndpoints.get(new LspServerKey(bufferExtension(buffer), workspaceRootPath(buffer)));
+        } catch (IOException ignored) {
+            return null;
+        }
     }
 
 

@@ -270,6 +270,7 @@ Update checks require a global consent receipt, HTTPS metadata endpoint, and Bas
 | `debug.variables.enabled` | `true` | bool | Enables variable presentation when adapter-supported |
 | `debug.evaluate.enabled` | `true` | bool | Enables expression evaluation when adapter-supported |
 | `debug.attach.enabled` | `true` | bool | Enables attach planning when adapter-supported |
+| `debug.open.source.on.stop` | `true` | bool | Opens the selected existing local source frame after a paused-frame inspection; disable to keep navigation manual |
 
 Shed includes a Python-only `python-debugpy` profile for a separately installed `debugpy-adapter` executable; it does not bundle or download that adapter. See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/attach schema, and capability declarations.
 

@@ -62,6 +62,7 @@ public class ConfigManagerTest {
         assertFalse(config.getSessionRestoreOnStart());
         assertFalse(config.getTerminalSessionRestoreEnabled());
         assertTrue(config.getMarkdownPreviewScrollSync());
+        assertTrue(config.getDebugOpenSourceOnStop());
         assertEquals(home.resolve(".shed/landing.md").toString(), config.getLandingSource());
         assertEquals(home.resolve(".shed/landing.remote.md").toString(), config.getLandingRemoteCachePath());
         assertEquals(5000, config.getLandingRemoteTimeoutMs());

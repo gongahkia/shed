@@ -126,6 +126,7 @@ public class ConfigManager {
     private static final String DEFAULT_UPDATES_METADATA_URL = "";
     private static final String DEFAULT_UPDATES_METADATA_PUBLIC_KEY = "";
     private static final int DEFAULT_UPDATES_CHECK_TIMEOUT_MS = 5000;
+    private static final boolean DEFAULT_DEBUG_OPEN_SOURCE_ON_STOP = true;
     private static final int DEFAULT_LANDING_REMOTE_TIMEOUT_MS = 5000;
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "config.toml";
@@ -343,6 +344,7 @@ public class ConfigManager {
         defineDefault("debug.variables.enabled", debugFeatures.variables());
         defineDefault("debug.evaluate.enabled", debugFeatures.evaluate());
         defineDefault("debug.attach.enabled", debugFeatures.attach());
+        defineDefault("debug.open.source.on.stop", DEFAULT_DEBUG_OPEN_SOURCE_ON_STOP);
         settings.reset();
         defaultConfig.clear();
         defaultConfig.putAll(config);
@@ -468,6 +470,7 @@ public class ConfigManager {
             case "debug.variables.enabled" -> "Enable debug variable presentation";
             case "debug.evaluate.enabled" -> "Enable debug expression evaluation";
             case "debug.attach.enabled" -> "Enable debug attach planning";
+            case "debug.open.source.on.stop" -> "Open the selected local source frame when debugging pauses";
             default -> key;
         };
     }
@@ -1177,6 +1180,10 @@ public class ConfigManager {
             getBoolean("debug.threads.enabled", defaults.threads()), getBoolean("debug.stacktrace.enabled", defaults.stackTrace()),
             getBoolean("debug.scopes.enabled", defaults.scopes()), getBoolean("debug.variables.enabled", defaults.variables()),
             getBoolean("debug.evaluate.enabled", defaults.evaluate()), getBoolean("debug.attach.enabled", defaults.attach()));
+    }
+
+    public boolean getDebugOpenSourceOnStop() {
+        return getBoolean("debug.open.source.on.stop", DEFAULT_DEBUG_OPEN_SOURCE_ON_STOP);
     }
 
     DebugAdapterRegistry.Validation getDebugConfiguration() {

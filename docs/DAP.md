@@ -25,6 +25,7 @@ schema_version = 1
 "debug.variables.enabled" = true
 "debug.evaluate.enabled" = true
 "debug.attach.enabled" = true
+"debug.open.source.on.stop" = true
 
 "debug.adapter.java.command" = "java-debug-adapter"
 "debug.adapter.java.args" = "--stdio"
@@ -95,7 +96,7 @@ This is intentionally limited to enable/disable filter selection. Shed does not 
 
 ## Paused-frame Inspection
 
-On a DAP `stopped` event, use the Debug panel or `:debug stack` / `:debug variables` to inspect state; loading, unavailable capability, and error states remain visible. `:debug frame <id>` selects a returned frame before reloading its scopes and variables. The panel's **Open Source** action opens a selected frame only when its adapter-provided source path names an existing local regular file; it records a jump and positions the caret from DAP's one-based line and column. `:debug watch add <expression>`, `:debug watch remove <expression>`, `:debug watch list`, and `:debug watch clear` manage session-local watches; evaluation uses DAP `evaluate` with `context: watch` for the selected paused frame.
+On a DAP `stopped` event, Shed requests paused-frame inspection. With `debug.open.source.on.stop=true` (the default), it opens the adapter-selected frame only when its adapter-provided source path names an existing local regular file; it records a jump and positions the caret from DAP's one-based line and column. Disable that setting to keep navigation manual. The Debug panel's **Open Source** action remains available, and `:debug frame <id>` selects a returned frame before reloading its scopes and variables. Loading, unavailable-capability, and error states remain visible. `:debug watch add <expression>`, `:debug watch remove <expression>`, `:debug watch list`, and `:debug watch clear` manage session-local watches; evaluation uses DAP `evaluate` with `context: watch` for the selected paused frame.
 
 Shed sends `threads`, `stackTrace`, `scopes`, `variables`, and `evaluate` only when their corresponding configured adapter capabilities and feature settings are enabled. A later `continued`, `terminated`, or `exited` event invalidates paused-frame references and leaves watches pending until the next stop; stale responses from a prior suspended state are discarded.
 

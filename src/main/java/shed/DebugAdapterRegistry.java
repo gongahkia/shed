@@ -93,7 +93,8 @@ final class DebugAdapterRegistry {
     }
 
     private static final Set<String> CORE_KEYS = Set.of("debug.enabled", "debug.breakpoints.enabled", "debug.threads.enabled",
-        "debug.stacktrace.enabled", "debug.scopes.enabled", "debug.variables.enabled", "debug.evaluate.enabled", "debug.attach.enabled");
+        "debug.stacktrace.enabled", "debug.scopes.enabled", "debug.variables.enabled", "debug.evaluate.enabled", "debug.attach.enabled",
+        "debug.open.source.on.stop");
     private static final Set<String> ADAPTER_FIELDS = Set.of("transport", "command", "args", "capabilities");
     private static final Set<String> CONFIGURATION_FIELDS = Set.of("adapter", "request", "scope", "program", "cwd", "args", "prelaunch_task", "host", "port", "file_extensions");
     private final Map<String, Adapter> adapters;

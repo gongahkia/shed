@@ -273,6 +273,9 @@ final class DebugSessionController {
                     return;
                 }
                 refreshBreakpointMarkers();
+                if (result.succeeded() && sessions.inspection(workspace).paused()) {
+                    scheduleStoppedInspection(workspace);
+                }
                 if (editor.toolWindowHost != null && editor.toolWindowHost.isSelected(ToolWindowHost.Tab.DEBUG)) {
                     editor.toolWindowHost.refresh(ToolWindowHost.Tab.DEBUG);
                 } else {
@@ -285,13 +288,54 @@ final class DebugSessionController {
 
     private DebugSessionService.Connection startTransport(DebugAdapterRegistry.Plan plan, DebugFeatureSettings features,
         DebugAdapterTransport.Listener listener) throws IOException {
-        DebugAdapterTransport transport = DebugAdapterTransport.start(plan, features, listener, new DiagnosticLog(editor.errorReporter.getLogPath()));
+        DebugAdapterTransport.Listener combinedListener = new DebugAdapterTransport.Listener() {
+            @Override public void onEvent(DebugAdapterTransport.Event event) {
+                listener.onEvent(event);
+                if (event != null && "stopped".equals(event.event())) scheduleStoppedInspection(plan.workspace());
+            }
+
+            @Override public void onDiagnostic(DebugAdapterTransport.Diagnostic diagnostic) {
+                listener.onDiagnostic(diagnostic);
+            }
+        };
+        DebugAdapterTransport transport = DebugAdapterTransport.start(plan, features, combinedListener, new DiagnosticLog(editor.errorReporter.getLogPath()));
         return new DebugSessionService.Connection() {
             @Override public DebugAdapterTransport.Response request(String command, Map<String, Object> arguments, Duration timeout)
                 throws IOException, java.util.concurrent.TimeoutException, InterruptedException { return transport.request(command, arguments, timeout); }
             @Override public DebugAdapterTransport.State state() { return transport.state(); }
             @Override public void close() { transport.close(); }
         };
+    }
+
+    private void scheduleStoppedInspection(Path workspace) {
+        if (workspace == null || !editor.configManager.getDebugOpenSourceOnStop()) return;
+        Duration timeout = Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()));
+        editor.asyncJobService.submit("debug stopped inspection", token -> sessions.refreshInspection(workspace, timeout), (job, result, error) -> {
+            if (error != null || result == null || !result.succeeded() || !editor.configManager.getDebugOpenSourceOnStop()) {
+                refreshDebugPanel();
+                return;
+            }
+            DebugInspection.Frame frame = selectedStoppedFrame(sessions.inspection(workspace));
+            if (frame != null) {
+                String message = openFrameSourceForPanel(frame);
+                if (!"Opened debug frame source.".equals(message)) editor.showMessage(message);
+            }
+            refreshDebugPanel();
+        });
+    }
+
+    static DebugInspection.Frame selectedStoppedFrame(DebugInspection.Snapshot snapshot) {
+        if (snapshot == null || !snapshot.paused()) return null;
+        for (DebugInspection.Frame frame : snapshot.frames()) {
+            if (frame.id() == snapshot.frameId()) return frame;
+        }
+        return snapshot.frames().isEmpty() ? null : snapshot.frames().getFirst();
+    }
+
+    private void refreshDebugPanel() {
+        if (editor.toolWindowHost != null && editor.toolWindowHost.isSelected(ToolWindowHost.Tab.DEBUG)) {
+            editor.toolWindowHost.refresh(ToolWindowHost.Tab.DEBUG);
+        }
     }
 
     private DebugAdapterRegistry.Validation validation() {

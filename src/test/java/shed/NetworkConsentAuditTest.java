@@ -74,7 +74,7 @@ public class NetworkConsentAuditTest {
         assertEquals(Set.of("ExtensionManager.java", "ManagedLanguageSupportService.java", "PluginManager.java"), sourcesContaining("openConnection("));
         assertEquals(Set.of("LandingPageRemoteTransport.java", "UpdateMetadataTransport.java"), sourcesContaining("HttpClient.newBuilder("));
         assertEquals(Set.of("DebugAdapterTransport.java"), sourcesContaining("new Socket("));
-        assertEquals(Set.of("EditActionController.java", "MarkdownController.java", "UpdateController.java"), sourcesContaining(".browse("));
+        assertEquals(Set.of("EditActionController.java", "MarkdownController.java", "TerminalController.java", "UpdateController.java"), sourcesContaining(".browse("));
         assertEquals(Set.of(
             "BuiltInRemoteWorkspaceProviders.java", "BuiltInScmContributions.java", "DebugAdapterTransport.java", "DevContainerController.java", "ExternalFormatter.java",
             "JobQuickfixController.java", "LanguageServerDetector.java", "LspClient.java", "LuaEngine.java", "NotebookController.java",

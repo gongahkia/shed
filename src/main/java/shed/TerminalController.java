@@ -69,7 +69,7 @@ final class TerminalController {
                 String remoteMessage = profile == null ? "Remote terminal opened: " + remoteConnection.id()
                     : "Remote terminal opened with " + profile.extensionId() + ":" + profile.value().id();
                 return openTerminal(remoteLabel, remoteConnection.localRoot().toFile(), invocation, remoteMessage,
-                    remoteConnection.sourcePathMapper(), orientation);
+                    remoteConnection.sourcePathMapper(startDirectory.toPath()), orientation);
             } catch (Exception error) {
                 return "Remote terminal unavailable: " + safeMessage(error);
             }

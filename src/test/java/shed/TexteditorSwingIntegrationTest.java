@@ -66,6 +66,7 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEmptyEditor(home);
         try {
             assertTrue(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
+            assertSame(onEdt(() -> editor.getActivePane().getComponent()), onEdt(() -> editor.renderedLayoutComponent));
             assertEquals("[landing]", onEdt(() -> editor.getCurrentBuffer().getDisplayName()));
             assertFalse(Files.exists(home.resolve(".shed/landing.md")));
 
@@ -76,6 +77,7 @@ public class TexteditorSwingIntegrationTest {
 
             assertEquals(file.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
             assertFalse(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
+            assertSame(onEdt(() -> editor.getActivePane().getScrollPane()), onEdt(() -> editor.renderedLayoutComponent));
             assertEquals(1, onEdt(() -> editor.buffers.size()));
         } finally {
             disposeEditor(editor);
@@ -95,6 +97,28 @@ public class TexteditorSwingIntegrationTest {
             assertFalse(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
             assertEquals(landing.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
             assertEquals("# My start page\n", onEdt(() -> editor.getCurrentBuffer().getContent()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void configuredLandingSourceRemainsAnEditableBuffer() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-configured-landing");
+        Path config = home.resolve(".shed/config.toml");
+        Files.createDirectories(config.getParent());
+        Files.writeString(config, """
+            schema_version = 1
+            "landing.source" = "pages/start.md"
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEmptyEditor(home);
+        try {
+            Path landing = home.resolve("pages/start.md").toAbsolutePath();
+            assertFalse(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
+            assertEquals(landing.toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
+            assertTrue(Files.exists(landing));
         } finally {
             disposeEditor(editor);
         }

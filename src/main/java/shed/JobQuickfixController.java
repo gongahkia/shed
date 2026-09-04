@@ -355,6 +355,11 @@ final class JobQuickfixController {
         if (validationError != null) {
             return validationError;
         }
+        RemoteWorkspaceSessionService.Connection remoteConnection = editor.remoteWorkspaceSessions == null
+            ? null : editor.remoteWorkspaceSessions.connectionFor(projectRoot.toPath());
+        if (remoteConnection != null) {
+            return runActivatedRemoteTask(normalizedName, plan, activeFile, remoteConnection, dryRun);
+        }
         DevContainerSessionService.Connection connection = editor.devContainerSessions == null
             ? null : editor.devContainerSessions.connectionFor(projectRoot.toPath());
         if (connection != null) {
@@ -474,6 +479,24 @@ final class JobQuickfixController {
             (snapshot, result, error) -> handleTaskJobCompletion(normalizedName, plan, snapshot, result, error)
         );
         return "Remote task job " + jobId + " started (" + target.id() + ":" + normalizedName + ")";
+    }
+
+    private String runActivatedRemoteTask(String taskName, TaskService.TaskExecutionPlan plan, File activeFile,
+                                          RemoteWorkspaceSessionService.Connection connection, boolean dryRun) {
+        RemoteCommandRequest request;
+        try {
+            request = editor.taskService.buildRemoteCommandRequest(plan, connection.localRoot(), connection.workspace().executionRoot(), activeFile);
+        } catch (IllegalArgumentException | IOException error) {
+            return "Remote task validation failed: " + error.getMessage();
+        }
+        RemoteWorkspaceTaskTargets.Target target = new RemoteWorkspaceTaskTargets.Target(connection.id(), connection.workspace(), connection.localRoot());
+        if (dryRun) return showRemoteTaskDryRun(target, plan, request);
+        int jobId = editor.asyncJobService.submit(
+            "task remote " + connection.id() + " " + taskName,
+            token -> remoteCommandResult(connection.workspace().execute(request)),
+            (snapshot, result, error) -> handleTaskJobCompletion(taskName, plan, snapshot, result, error)
+        );
+        return "Task job " + jobId + " started remotely (" + connection.id() + ":" + taskName + ")";
     }
 
     private String runContainerTask(String taskName, File projectRoot,

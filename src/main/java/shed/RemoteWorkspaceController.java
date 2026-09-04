@@ -44,9 +44,11 @@ final class RemoteWorkspaceController {
             case "exec" -> execute(tokens);
             case "terminal", "term" -> openTerminal(tokens);
             case "forward" -> forward(tokens);
+            case "use", "activate" -> activate(tokens.size() == 2 ? tokens.get(1) : "");
+            case "unuse", "deactivate" -> deactivate(tokens.size() == 2 ? tokens.get(1) : "");
             case "close", "disconnect" -> close(tokens.size() == 2 ? tokens.get(1) : "");
             case "providers" -> showProviders();
-            default -> "Usage: :remote [list|providers|open <uri>|pull <id>|push <id>|exec <id> <command...>|terminal <id> [command...]|forward <id> <local-port> <remote-host> <remote-port>|forward list|forward close <local-port>|close <id>]";
+            default -> "Usage: :remote [list|providers|open <uri>|pull <id>|push <id>|exec <id> <command...>|terminal <id> [command...]|use <id>|unuse <id>|forward <id> <local-port> <remote-host> <remote-port>|forward list|forward close <local-port>|close <id>]";
         };
     }
 
@@ -79,6 +81,7 @@ final class RemoteWorkspaceController {
             editor.remoteWorkspaceTaskTargets.register(result.id(), result.workspace());
             if (prior != null) {
                 portForwards.closeForConnection(prior.id());
+                editor.remoteWorkspaceSessions.deactivate(prior.id());
                 try { prior.workspace().close(); } catch (Exception ignored) { }
             }
             editor.workspaceController.add(result.workspace().localRoot().toString(), true);
@@ -110,6 +113,7 @@ final class RemoteWorkspaceController {
         try {
             connection.workspace().close();
             portForwards.closeForConnection(connection.id());
+            editor.remoteWorkspaceSessions.deactivate(connection.id());
             editor.workspaceController.remove(connection.workspace().localRoot().toString());
             return "Remote workspace closed: " + connection.id();
         } catch (Exception error) {
@@ -127,6 +131,28 @@ final class RemoteWorkspaceController {
         int job = editor.asyncJobService.submit("remote exec: " + connection.id(), token -> connection.workspace().execute(command),
             (snapshot, result, error) -> showExecutionResult(connection, result, error));
         return "Remote command requested (job " + job + ").";
+    }
+
+    private String activate(String id) {
+        Connection connection = connection(id);
+        if (connection == null) return "Remote workspace not connected: " + id;
+        String remoteRoot = connection.workspace().executionRoot();
+        if (remoteRoot == null || remoteRoot.isBlank() || remoteRoot.trim().equals(connection.workspace().localRoot().toString())) {
+            return "Remote execution session requires a connected provider with a distinct remote workspace";
+        }
+        try {
+            editor.remoteWorkspaceSessions.activate(connection.id(), connection.workspace());
+            return "Remote execution session active: " + connection.id() + " (new terminals and :task run use it)";
+        } catch (IllegalArgumentException error) {
+            return "Remote execution session unavailable: " + detail(error.getMessage());
+        }
+    }
+
+    private String deactivate(String id) {
+        if (id == null || id.isBlank()) return "Usage: :remote unuse <connection-id>";
+        return editor.remoteWorkspaceSessions.deactivate(id)
+            ? "Remote execution session stopped: " + normalizeId(id)
+            : "Remote execution session is not active: " + id;
     }
 
     private String forward(List<String> tokens) {
@@ -219,7 +245,15 @@ final class RemoteWorkspaceController {
         if (values.isEmpty()) output.append("No remote workspaces connected.\n");
         for (Connection connection : values) {
             output.append(connection.id()).append("  ").append(connection.provider()).append("\n  ").append(connection.uri())
-                .append("\n  local: ").append(connection.workspace().localRoot()).append("\n");
+                .append("\n  local: ").append(connection.workspace().localRoot())
+                .append("\n  ordinary terminals/tasks: ").append(editor.remoteWorkspaceSessions.isActive(connection.id()) ? "remote" : "local")
+                .append("\n");
+        }
+        output.append("\nActive remote execution sessions\n");
+        List<RemoteWorkspaceSessionService.Connection> sessions = editor.remoteWorkspaceSessions.activeConnections();
+        if (sessions.isEmpty()) output.append("No remote execution sessions active.\n");
+        for (RemoteWorkspaceSessionService.Connection session : sessions) {
+            output.append(session.id()).append("  ").append(session.localRoot()).append("\n");
         }
         List<SshPortForwardService.ForwardInfo> forwards = portForwards.list();
         output.append("\nSSH loopback forwards\n");
@@ -249,11 +283,13 @@ final class RemoteWorkspaceController {
         }
         for (Connection connection : values) {
             portForwards.closeForConnection(connection.id());
+            editor.remoteWorkspaceSessions.deactivate(connection.id());
             if (editor.lspController != null) editor.lspController.stopServersForWorkspace(connection.workspace().localRoot());
             editor.remoteWorkspaceTaskTargets.unregister(connection.id());
             try { connection.workspace().close(); } catch (Exception ignored) { }
         }
         portForwards.close();
+        editor.remoteWorkspaceSessions.close();
     }
 
     RemoteLspEndpoint languageServerEndpoint(Path localWorkspace, List<String> serverCommand) throws IOException {

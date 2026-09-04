@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 final class DebugAdapterDetector {
     enum Availability { AVAILABLE, DISABLED, EXECUTABLE_MISSING, INVALID_CONFIGURATION }
@@ -69,6 +70,10 @@ final class DebugAdapterDetector {
     }
 
     WorkspaceReport detect(Path workspace, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features) {
+        return detect(workspace, validation, features, Set.of());
+    }
+
+    WorkspaceReport detect(Path workspace, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features, Set<String> remoteStdioAdapters) {
         Path root = workspace == null ? null : workspace.toAbsolutePath().normalize();
         DebugFeatureSettings settings = features == null ? DebugFeatureSettings.defaults() : features;
         if (validation == null) {
@@ -76,7 +81,8 @@ final class DebugAdapterDetector {
         }
         Map<String, AdapterReport> adapters = new LinkedHashMap<>();
         for (Map.Entry<String, DebugAdapterRegistry.Adapter> entry : validation.registry().adapters().entrySet()) {
-            adapters.put(entry.getKey(), inspectAdapter(entry.getValue(), root, settings));
+            boolean remote = remoteStdioAdapters != null && remoteStdioAdapters.stream().anyMatch(id -> entry.getKey().equalsIgnoreCase(id));
+            adapters.put(entry.getKey(), inspectAdapter(entry.getValue(), root, settings, remote));
         }
         List<ConfigurationReport> configurations = new ArrayList<>();
         for (DebugAdapterRegistry.Configuration configuration : validation.configurations().values()) {
@@ -87,11 +93,15 @@ final class DebugAdapterDetector {
         return new WorkspaceReport(root, true, new ArrayList<>(adapters.values()), configurations, errors);
     }
 
-    private AdapterReport inspectAdapter(DebugAdapterRegistry.Adapter adapter, Path workspace, DebugFeatureSettings settings) {
+    private AdapterReport inspectAdapter(DebugAdapterRegistry.Adapter adapter, Path workspace, DebugFeatureSettings settings, boolean remote) {
         String id = adapter.id();
         if (!settings.enabled()) {
             return new AdapterReport(id, adapter.command(), "", Availability.DISABLED, VersionState.NOT_PROBED,
                 capabilities(adapter, settings), "Set debug.enabled=true before detecting or starting this adapter.");
+        }
+        if (remote && adapter.transport() == DebugAdapterRegistry.Transport.STDIO) {
+            return new AdapterReport(id, adapter.command(), "remote", Availability.AVAILABLE, VersionState.NOT_PROBED,
+                capabilities(adapter, settings), "Configured remote stdio adapter is not probed during inspection.");
         }
         Path executable = resolver.resolve(adapter.command(), workspace);
         if (executable == null) {
@@ -153,7 +163,7 @@ final class DebugAdapterDetector {
             case SCOPES -> settings.scopes();
             case VARIABLES -> settings.variables();
             case EVALUATE -> settings.evaluate();
-            case LAUNCH, CONFIGURATION_DONE, CONTINUE, NEXT, STEP_IN, STEP_OUT, PAUSE -> true;
+            case LAUNCH, CONFIGURATION_DONE, CONTINUE, NEXT, STEP_IN, STEP_OUT, PAUSE, GOTO -> true;
         };
     }
 

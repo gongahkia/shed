@@ -2579,7 +2579,8 @@ final class InputController {
         while (start > 0 && isSnippetTriggerCharacter(text.charAt(start - 1))) start--;
         if (start == caret) return "No trigger word";
         String trigger = text.substring(start, caret);
-        SnippetService.Snippet snippet = editor.snippetService.findExact(buffer.getFileType(), trigger);
+        SnippetService.Snippet snippet = editor.snippetService.findExact(buffer.getFileType(), editor.snippetLanguageId(buffer), trigger,
+            editor.snippetContributions());
         if (snippet == null) return "No snippet: " + trigger;
         SnippetExpansion.Result expansion = SnippetExpansion.parse(snippet.body, snippetVariables(buffer));
         if (expansion == null) return "Invalid snippet: " + trigger;
@@ -2635,7 +2636,8 @@ final class InputController {
         FileBuffer buffer = editor.getCurrentBuffer();
         if (buffer == null) return List.of();
         List<LspClient.CompletionItem> items = new ArrayList<>();
-        for (SnippetService.Snippet snippet : editor.snippetService.getSnippetsFor(buffer.getFileType(), prefix)) {
+        for (SnippetService.Snippet snippet : editor.snippetService.getSnippetsFor(buffer.getFileType(), editor.snippetLanguageId(buffer), prefix,
+            editor.snippetContributions())) {
             items.add(new LspClient.CompletionItem(snippet.trigger, snippet.description, 15, snippet.description, snippet.body, true, List.of()));
         }
         return items;

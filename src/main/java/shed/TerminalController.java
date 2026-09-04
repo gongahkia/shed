@@ -37,18 +37,29 @@ final class TerminalController {
         if ("list".equalsIgnoreCase(value) || "profiles".equalsIgnoreCase(value) || "status".equalsIgnoreCase(value)) return showProfiles();
         if ("commands".equalsIgnoreCase(value) || "history".equalsIgnoreCase(value)) return showShellEvents();
         if ("cwd".equalsIgnoreCase(value)) return showDetectedDirectory();
+        if ("split".equalsIgnoreCase(value) || value.regionMatches(true, 0, "split ", 0, 6)) {
+            WindowLayoutNode.Orientation orientation = splitOrientation(value.length() == 5 ? "" : value.substring(6));
+            if (orientation == null) return "Usage: :terminal split <side|bottom>";
+            String placement = orientation == WindowLayoutNode.Orientation.HORIZONTAL ? "side" : "bottom";
+            return openTerminal(null, orientation, "Terminal opened in " + placement + " split");
+        }
         String profile = value.regionMatches(true, 0, "profile ", 0, 8) ? value.substring(8).trim() : value;
-        if (profile.isBlank()) return "Usage: :terminal [list|commands|cwd|profile <extension:id|id>]";
+        if (profile.isBlank()) return "Usage: :terminal [list|commands|cwd|split <side|bottom>|profile <extension:id|id>]";
         ExtensionRegistry.Owned<TerminalProfile> selected = resolveProfile(profile);
         if (selected == null) return "Terminal profile not found: " + profile;
         return openTerminal(selected);
     }
 
     private String openTerminal(ExtensionRegistry.Owned<TerminalProfile> profile) {
+        return openTerminal(profile, WindowLayoutNode.Orientation.VERTICAL, null);
+    }
+
+    private String openTerminal(ExtensionRegistry.Owned<TerminalProfile> profile, WindowLayoutNode.Orientation orientation, String defaultMessage) {
         String label = profile == null ? "Terminal" : profile.value().displayName();
         List<String> command = profile == null ? ShellCommand.interactiveCommand() : profile.value().command();
-        String message = profile == null ? "Terminal opened" : "Terminal opened with " + profile.extensionId() + ":" + profile.value().id();
-        return openTerminal(label, resolveTerminalStartDirectory(), command, message, null);
+        String message = profile == null ? (defaultMessage == null ? "Terminal opened" : defaultMessage)
+            : "Terminal opened with " + profile.extensionId() + ":" + profile.value().id();
+        return openTerminal(label, resolveTerminalStartDirectory(), command, message, null, orientation);
     }
 
     private String openTerminal(String label, File startDirectory, List<String> command, String successMessage) {
@@ -57,6 +68,11 @@ final class TerminalController {
 
     private String openTerminal(String label, File startDirectory, List<String> command, String successMessage,
                                 TerminalLinkResolver.SourcePathMapper sourcePathMapper) {
+        return openTerminal(label, startDirectory, command, successMessage, sourcePathMapper, WindowLayoutNode.Orientation.VERTICAL);
+    }
+
+    private String openTerminal(String label, File startDirectory, List<String> command, String successMessage,
+                                TerminalLinkResolver.SourcePathMapper sourcePathMapper, WindowLayoutNode.Orientation orientation) {
         String title = nextTerminalTitle(label);
         PtyTerminalPane terminalPane;
         try {
@@ -83,7 +99,8 @@ final class TerminalController {
         if (editor.windowLayoutRoot == null) {
             editor.windowLayoutRoot = WindowLayoutNode.leaf(activePane);
         }
-        editor.windowLayoutRoot.splitLeaf(activePane, terminalEditorPane, WindowLayoutNode.Orientation.VERTICAL, false, 0.5);
+        editor.windowLayoutRoot.splitLeaf(activePane, terminalEditorPane,
+            orientation == null ? WindowLayoutNode.Orientation.VERTICAL : orientation, false, 0.5);
         editor.ptyTerminalPanes.put(termBuffer, terminalPane);
         terminalPane.onExit(() -> SwingUtilities.invokeLater(() -> closeExitedTerminal(termBuffer)));
         editor.renderWindowLayout();
@@ -91,6 +108,15 @@ final class TerminalController {
         editor.setMode(EditorMode.INSERT);
         terminalPane.requestFocusInWindow();
         return successMessage;
+    }
+
+    static WindowLayoutNode.Orientation splitOrientation(String placement) {
+        if (placement == null) return null;
+        return switch (placement.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "side" -> WindowLayoutNode.Orientation.HORIZONTAL;
+            case "bottom" -> WindowLayoutNode.Orientation.VERTICAL;
+            default -> null;
+        };
     }
 
 

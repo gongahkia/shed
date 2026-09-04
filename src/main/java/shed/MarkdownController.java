@@ -765,7 +765,7 @@ final class MarkdownController {
         }
         if (wordStart == pos) return "No trigger word";
         String trigger = text.substring(wordStart, pos);
-        SnippetService.Snippet snippet = editor.snippetService.findExact(ft, trigger);
+        SnippetService.Snippet snippet = editor.snippetService.findExact(ft, editor.snippetLanguageId(buf), trigger, editor.snippetContributions());
         if (snippet == null) return "No snippet: " + trigger;
         String expanded = editor.snippetService.expand(snippet);
         int cursorOffset = editor.snippetService.cursorOffset(snippet);
@@ -783,7 +783,7 @@ final class MarkdownController {
     public String listSnippets() {
         FileBuffer buf = editor.getCurrentBuffer();
         FileType ft = buf != null ? buf.getFileType() : null;
-        String listing = editor.snippetService.listSnippets(ft);
+        String listing = editor.snippetService.listSnippets(ft, editor.snippetLanguageId(buf), editor.snippetContributions());
         FileBuffer snippetBuf = FileBuffer.createScratch("[Snippets]", listing);
         editor.buffers.add(snippetBuf);
         editor.loadBufferIntoEditor(snippetBuf);

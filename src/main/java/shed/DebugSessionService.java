@@ -49,6 +49,7 @@ final class DebugSessionService {
     record InspectionResult(DebugInspection.Snapshot snapshot, boolean succeeded) { }
     record ConsoleResult(DebugConsole.Snapshot snapshot, boolean succeeded) { }
     record ControlResult(Snapshot snapshot, boolean succeeded) { }
+    record RunToCursorResult(Snapshot snapshot, boolean succeeded) { }
     private record InspectionPayload(List<DebugInspection.ThreadInfo> threads, List<DebugInspection.Frame> frames, int frameId,
         List<DebugInspection.Scope> scopes, List<DebugInspection.Watch> watches, String detail, DebugInspection.State state) { }
 
@@ -56,6 +57,8 @@ final class DebugSessionService {
         DebugAdapterTransport.Response request(String command, Map<String, Object> arguments, Duration timeout)
             throws IOException, TimeoutException, InterruptedException;
         DebugAdapterTransport.State state();
+        default String adapterPath(Path localPath) { return localPath == null ? null : localPath.toAbsolutePath().normalize().toString(); }
+        default Path localPath(String adapterPath) { return null; }
         @Override void close();
     }
 
@@ -208,7 +211,7 @@ final class DebugSessionService {
             Connection activeConnection = connection;
             CompletableFuture<DebugAdapterTransport.Response> startRequest = CompletableFuture.supplyAsync(() -> {
                 try {
-                    return activeConnection.request(command, startArguments(plan), timeout);
+                    return activeConnection.request(command, startArguments(plan, activeConnection), timeout);
                 } catch (IOException | TimeoutException | InterruptedException error) {
                     if (error instanceof InterruptedException) Thread.currentThread().interrupt();
                     throw new java.util.concurrent.CompletionException(error);
@@ -389,6 +392,70 @@ final class DebugSessionService {
             Thread.currentThread().interrupt();
             synchronized (this) {
                 return controlFailure(root, session(root), "Debug " + requested.dapCommand + " interrupted.");
+            }
+        }
+    }
+
+    RunToCursorResult runToCursor(Path workspace, Path source, int line, int column, Duration timeout) {
+        Path root = root(workspace);
+        Path requestedSource = source == null ? null : source.toAbsolutePath().normalize();
+        Connection connection;
+        DebugAdapterRegistry.Plan plan;
+        DebugInspection.Snapshot inspection;
+        synchronized (this) {
+            Session session = session(root);
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null) {
+                return runToCursorFailure(root, session, "No running debug session is available.");
+            }
+            if (!session.plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.GOTO)) {
+                return runToCursorFailure(root, session, "Debug adapter does not declare support for run to cursor.");
+            }
+            if (!session.runtimeCapabilities.contains(DebugAdapterRegistry.Capability.GOTO)) {
+                return runToCursorFailure(root, session, "Debug adapter did not advertise gotoTargets support during initialization.");
+            }
+            if (requestedSource == null || !requestedSource.startsWith(root) || line < 1 || column < 1) {
+                return runToCursorFailure(root, session, "Run to cursor requires a positive location in the active workspace file.");
+            }
+            inspection = session.inspection.snapshot();
+            if (!inspection.paused() || inspection.threadId() < 1) {
+                return runToCursorFailure(root, session, "Run to cursor requires a paused thread.");
+            }
+            connection = session.connection;
+            plan = session.plan;
+        }
+        try {
+            String adapterSource = requireAdapterPath(connection, requestedSource);
+            DebugAdapterTransport.Response targets = connection.request("gotoTargets", Map.of("source", Map.of("path", adapterSource),
+                "line", line, "column", column), timeout);
+            int targetId = selectGotoTarget(targets, line, column);
+            if (targetId < 1) {
+                synchronized (this) {
+                    return runToCursorFailure(root, session(root), "DAP gotoTargets returned no unambiguous target for the requested location.");
+                }
+            }
+            DebugAdapterTransport.Response response = connection.request("goto", Map.of("threadId", inspection.threadId(), "targetId", targetId), timeout);
+            if (!response.success()) {
+                synchronized (this) {
+                    return runToCursorFailure(root, session(root), responseFailure("goto", response));
+                }
+            }
+            synchronized (this) {
+                Session session = session(root);
+                if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING || session.plan != plan) {
+                    return new RunToCursorResult(snapshot(root, session), false);
+                }
+                session.inspection.invalidated("Debug run to cursor requested.");
+                session.detail = "Debug run to cursor requested.";
+                return new RunToCursorResult(snapshot(root, session), true);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) {
+                return runToCursorFailure(root, session(root), "Debug run to cursor failed: " + message(error));
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) {
+                return runToCursorFailure(root, session(root), "Debug run to cursor interrupted.");
             }
         }
     }
@@ -583,6 +650,8 @@ final class DebugSessionService {
             Map<String, Object> source = MiniJson.asObject(frame.get("source"));
             String path = source == null ? "" : string(source.get("path"));
             if (path.isBlank() && source != null) path = string(source.get("name"));
+            Path localPath = connection.localPath(path);
+            if (localPath != null) path = localPath.toString();
             frames.add(new DebugInspection.Frame(id, string(frame.get("name")), path, integer(frame.get("line")), integer(frame.get("column"))));
         }
         return List.copyOf(frames);
@@ -690,8 +759,9 @@ final class DebugSessionService {
             if (sources.isEmpty()) return new BreakpointSynchronization(false, diagnostics);
             for (Map.Entry<Path, List<BreakpointStore.Breakpoint>> entry : sources.entrySet()) {
                 SourceBreakpointRequest requested = sourceBreakpointRequest(plan, runtimeCapabilities, breakpointStore, entry.getKey(), entry.getValue(), diagnostics);
+                String adapterPath = requireAdapterPath(connection, entry.getKey());
                 DebugAdapterTransport.Response response = connection.request("setBreakpoints",
-                    Map.of("source", Map.of("path", entry.getKey().toString()), "breakpoints", requested.arguments()), timeout);
+                    Map.of("source", Map.of("path", adapterPath), "breakpoints", requested.arguments()), timeout);
                 if (!response.success()) {
                     diagnostics.add("DAP setBreakpoints failed for " + entry.getKey() + (response.message().isBlank() ? "." : ": " + response.message()));
                     continue;
@@ -877,6 +947,7 @@ final class DebugSessionService {
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.CONDITIONAL_BREAKPOINTS, "supportsConditionalBreakpoints");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.HIT_CONDITIONAL_BREAKPOINTS, "supportsHitConditionalBreakpoints");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.LOG_POINTS, "supportsLogPoints");
+        retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.GOTO, "supportsGotoTargetsRequest");
         return Set.copyOf(result);
     }
 
@@ -919,6 +990,32 @@ final class DebugSessionService {
         session.diagnostics.add(message);
         return new ControlResult(snapshot(root, session), false);
     }
+    private static RunToCursorResult runToCursorFailure(Path root, Session session, String detail) {
+        String message = detail == null || detail.isBlank() ? "Debug run to cursor failed." : detail;
+        session.diagnostics.add(message);
+        return new RunToCursorResult(snapshot(root, session), false);
+    }
+    private static int selectGotoTarget(DebugAdapterTransport.Response response, int line, int column) throws IOException {
+        Map<String, Object> body = body(response, "gotoTargets");
+        List<Object> values = MiniJson.asArray(body.get("targets"));
+        if (values == null || values.isEmpty()) return 0;
+        List<Integer> valid = new ArrayList<>();
+        List<Integer> exactLine = new ArrayList<>();
+        List<Integer> exactLocation = new ArrayList<>();
+        for (Object value : values) {
+            Map<String, Object> target = MiniJson.asObject(value);
+            int id = integer(target == null ? null : target.get("id"));
+            int targetLine = integer(target == null ? null : target.get("line"));
+            int targetColumn = integer(target == null ? null : target.get("column"));
+            if (id < 1 || targetLine < 1) continue;
+            valid.add(id);
+            if (targetLine == line) exactLine.add(id);
+            if (targetLine == line && (targetColumn == 0 || targetColumn == column)) exactLocation.add(id);
+        }
+        if (exactLocation.size() == 1) return exactLocation.getFirst();
+        if (exactLine.size() == 1) return exactLine.getFirst();
+        return valid.size() == 1 ? valid.getFirst() : 0;
+    }
     private static String message(Throwable error) { return error == null || error.getMessage() == null ? "Unknown debug adapter failure" : error.getMessage(); }
     private static String responseFailure(String command, DebugAdapterTransport.Response response) {
         String detail = response == null ? "no response" : response.message();
@@ -928,11 +1025,19 @@ final class DebugSessionService {
         return Map.of("clientID", "shed", "clientName", "Shed", "adapterID", plan.adapter().id(), "pathFormat", "path",
             "linesStartAt1", true, "columnsStartAt1", true);
     }
-    private static Map<String, Object> startArguments(DebugAdapterRegistry.Plan plan) {
+    private static Map<String, Object> startArguments(DebugAdapterRegistry.Plan plan, Connection connection) throws IOException {
         DebugAdapterRegistry.Configuration configuration = plan.configuration();
         if (configuration.request() == DebugAdapterRegistry.Request.ATTACH) {
-            return Map.of("host", configuration.host(), "port", configuration.port(), "cwd", plan.cwd().toString(), "args", plan.args());
+            return Map.of("host", configuration.host(), "port", configuration.port(), "cwd", requireAdapterPath(connection, plan.cwd()), "args", plan.args());
         }
-        return Map.of("program", plan.program().toString(), "cwd", plan.cwd().toString(), "args", plan.args());
+        return Map.of("program", requireAdapterPath(connection, plan.program()), "cwd", requireAdapterPath(connection, plan.cwd()), "args", plan.args());
+    }
+
+    private static String requireAdapterPath(Connection connection, Path localPath) throws IOException {
+        String path = connection == null ? null : connection.adapterPath(localPath);
+        if (path == null || path.isBlank() || path.indexOf('\0') >= 0 || path.indexOf('\n') >= 0 || path.indexOf('\r') >= 0) {
+            throw new IOException("Debug source path cannot be mapped into the adapter environment");
+        }
+        return path;
     }
 }

@@ -6,8 +6,8 @@ Shed's debug architecture is adapter-capability driven. The Debug Adapter Protoc
 
 - `debug.enabled = false`; selecting a profile or opening the Debug panel does not start a process.
 - Shed includes one narrow profile, `python-debugpy`, for the separately user-installed `debugpy-adapter` executable. Shed neither bundles, downloads, nor probes `debugpy`; the profile is unavailable until that executable is on `PATH`.
-- Other adapters are user-managed and configured only in global `~/.shed/config.toml` by default.
-- Project `.shed.toml` debug settings are unsafe and remain blocked until `project.config.allow.unsafe = true` and the project config is trusted.
+- Other adapters are user-managed and configured in global `~/.shed/config.toml` by default.
+- Project `.shed.toml` debug settings, adapters, and configuration declarations are unsafe and remain blocked until `project.config.allow.unsafe = true` and the project config is trusted. When enabled, Shed resolves the file at the selected workspace root, merges it with global declarations for that root only, captures its feature flags for the session, and never mutates the active editor configuration to do so.
 - Adapter commands are direct executable tokens plus whitespace-separated arguments; Shed does not invoke a shell.
 - Configuration scope is always `workspace`; `cwd` and launch `program` must remain under `${workspaceFolder}`, except `${file}` for the active workspace file.
 - Attach targets are loopback-only (`localhost`, `127.0.0.1`, or `::1`) in M0.
@@ -30,7 +30,7 @@ schema_version = 1
 "debug.adapter.java.command" = "java-debug-adapter"
 "debug.adapter.java.args" = "--stdio"
 "debug.adapter.java.transport" = "stdio"
-"debug.adapter.java.capabilities" = "launch,attach,configuration_done,breakpoints,exception_breakpoints,conditional_breakpoints,hit_conditional_breakpoints,log_points,threads,stack_trace,scopes,variables,evaluate,continue,next,step_in,step_out,pause"
+"debug.adapter.java.capabilities" = "launch,attach,configuration_done,breakpoints,exception_breakpoints,conditional_breakpoints,hit_conditional_breakpoints,log_points,threads,stack_trace,scopes,variables,evaluate,continue,next,step_in,step_out,pause,goto"
 
 "debug.configuration.main.adapter" = "java"
 "debug.configuration.main.request" = "launch"
@@ -41,13 +41,13 @@ schema_version = 1
 "debug.configuration.main.prelaunch_task" = "build"
 ```
 
-For an explicit test-debug target, map an adapter in workspace `.shedtests` to one of these global configurations with `debug_configuration = "main"`. During `:test debug <test-id>` or **Debug Selection**, `${testId}` and `${testFile}` are available in `debug.configuration.<name>.args`; unknown placeholders and test files outside the selected workspace reject the launch before an adapter process starts.
+For an explicit test-debug target, map an adapter in workspace `.shedtests` to one of these global or permitted root-local configurations with `debug_configuration = "main"`. During `:test debug <test-id>` or **Debug Selection**, the selected Tests root determines its DAP declaration set, and `${testId}` and `${testFile}` are available in `debug.configuration.<name>.args`; unknown placeholders and test files outside the selected workspace reject the launch before an adapter process starts.
 
-Adapter identifiers and configuration names are `[A-Za-z0-9_-]+`. `transport` is `stdio` (default) or `tcp`; `stdio` requires `command`, while `tcp` must not set one. Capabilities are comma-separated: `launch`, `attach`, `configuration_done`, `breakpoints`, `exception_breakpoints`, `conditional_breakpoints`, `hit_conditional_breakpoints`, `log_points`, `threads`, `stack_trace`, `scopes`, `variables`, `evaluate`, `continue`, `next`, `step_in`, `step_out`, and `pause`.
+Adapter identifiers and configuration names are `[A-Za-z0-9_-]+`. `transport` is `stdio` (default) or `tcp`; `stdio` requires `command`, while `tcp` must not set one. Capabilities are comma-separated: `launch`, `attach`, `configuration_done`, `breakpoints`, `exception_breakpoints`, `conditional_breakpoints`, `hit_conditional_breakpoints`, `log_points`, `threads`, `stack_trace`, `scopes`, `variables`, `evaluate`, `continue`, `next`, `step_in`, `step_out`, `pause`, and `goto`.
 
-Each configuration requires `adapter` and `request` (`launch` or `attach`). A launch requires a workspace-scoped `program`. An attach requires a loopback `host` and `port` from `1..65535`. An optional `file_extensions` value is a comma-separated allowlist such as `.py,.pyw`; it rejects a launch whose resolved program has another extension. An optional `prelaunch_task` is a task identifier from the selected workspace’s `.shedtasks`. For an explicit debug start, Shed validates and runs that local task before opening the debug adapter; a missing, invalid, cancelled, timed-out, or non-zero task stops the session before any adapter process starts. Invalid fields are reported with TOML line and column during config loading; Shed retains safe defaults and does not create a launch plan.
+Each configuration requires `adapter` and `request` (`launch` or `attach`). A launch requires a workspace-scoped `program`. An attach requires a loopback `host` and `port` from `1..65535`. An optional `file_extensions` value is a comma-separated allowlist such as `.py,.pyw`; it rejects a launch whose resolved program has another extension. An optional `prelaunch_task` is a task identifier from the selected workspace’s `.shedtasks`. For an explicit debug start, Shed validates and runs that task in the local workspace or through the selected remote/Dev Container bridge before opening the adapter; a missing, invalid, cancelled, timed-out, or non-zero task stops the session before any adapter process starts. Invalid fields are reported with TOML line and column during config loading; Shed retains safe defaults and does not create a launch plan.
 
-`python-debugpy` launches the current `.py` or `.pyw` file with the upstream `debugpy-adapter` DAP executable. Its request carries only `program`, `cwd`, and `args`, which debugpy accepts for program launch. This is local Python launch support, not a bundled Python runtime, environment manager, test-debugger integration, remote debugger, or general debugger marketplace.
+`python-debugpy` launches the current `.py` or `.pyw` file with the upstream `debugpy-adapter` DAP executable. Its request carries only `program`, `cwd`, and `args`, which debugpy accepts for program launch. This is not a bundled Python runtime, environment manager, or debugger marketplace.
 
 ## Future Session Boundary
 
@@ -66,11 +66,19 @@ A debug session may only give the transport a validated `Plan`: selected adapter
 
 The transport has no UI dependency and records to `DiagnosticLog` only when its caller supplies one; it performs no telemetry or network access other than an explicitly configured loopback TCP connection.
 
+## Explicit remote stdio adapters
+
+An explicit debug start in a connected SSH, Docker, or WSL workspace, or an already-running local Dev Container, can run an already-installed stdio DAP adapter through that bridge. Shed translates launch paths, breakpoints, Run to Cursor, and stack-frame source paths only between the declared remote root and the local mirror or mounted workspace; a configured pre-launch task executes through that same target. The editor remains the local DAP client.
+
+TCP DAP remains local-loopback-only. The bridge does not install adapters, start or rebuild a Dev Container, forward ports, create a remote host service, automatically synchronize files, or run extensions remotely. SSH stdout must be a clean DAP byte stream; a login banner fails the session. Extension providers opt in only by implementing `debugAdapterCommand` and `debugAdapterRoot`; the Dev Container bridge first verifies its mounted workspace path with the user-installed CLI.
+
 ## Adapter Detection
 
 `DebugAdapterDetector` reports configured adapter and configuration availability for one workspace without starting an adapter, opening a socket, or modifying workspace state. Missing executables and invalid debug settings are remediation states only; `normalEditingAvailable` remains true.
 
 Adapter versions are `NOT_PROBED`: the published DAP schema has no adapter-discovery or version request, and Shed does not invoke a configured adapter with guessed arguments during read-only detection. The report exposes each declared capability as `AVAILABLE`, `DISABLED` by the corresponding debug setting, or `UNDECLARED`, plus launch/attach configuration availability. Resolution is skipped while `debug.enabled=false`.
+
+For a connected SSH, Docker, or WSL workspace, or a workspace with a Dev Container configuration, a configured stdio adapter that Shed can bridge is shown as available with executable `remote`. This validates only that Shed can construct the local bridge command; it does not invoke the Dev Container CLI, probe the remote adapter binary, or establish a debug session. An explicit start is still required to validate the remote runtime.
 
 ## Explicit Session Lifecycle
 
@@ -80,7 +88,7 @@ Shed never starts a debug adapter while inspecting configurations or selecting o
 
 ## Execution controls
 
-`:debug continue`, `:debug next`, `:debug stepin`, and `:debug stepout` work only while the adapter has reported a paused thread and has declared the corresponding capability. `:debug pause` requires declared `pause` and `threads` capabilities; Shed asks the adapter for its current thread list instead of assuming a thread ID. The Debug panel exposes the same controls. A request is explicit, asynchronous, and diagnostic on failure. Shed does not claim support for reverse execution, run-to-cursor, data breakpoints, function breakpoints, disassembly, or adapter-specific debug console input.
+`:debug continue`, `:debug next`, `:debug stepin`, and `:debug stepout` work only while the adapter has reported a paused thread and has declared the corresponding capability. `:debug pause` requires declared `pause` and `threads` capabilities; Shed asks the adapter for its current thread list instead of assuming a thread ID. `:debug goto [line]` and **Run to Cursor** send standard DAP `gotoTargets` then `goto` for the active local workspace file and caret (or the supplied positive one-based line). They require a paused thread, locally declared `goto`, and `supportsGotoTargetsRequest=true` in the adapter's initialize response. Shed only uses an unambiguous returned target; it does not choose among ambiguous adapter locations. The Debug panel exposes the same controls. A request is explicit, asynchronous, and diagnostic on failure. Shed does not claim support for reverse execution, data breakpoints, function breakpoints, disassembly, or adapter-specific debug console input.
 
 ## Source Breakpoints
 
@@ -96,7 +104,7 @@ This is intentionally limited to enable/disable filter selection. Shed does not 
 
 ## Paused-frame Inspection
 
-On a DAP `stopped` event, Shed requests paused-frame inspection. With `debug.open.source.on.stop=true` (the default), it opens the adapter-selected frame only when its adapter-provided source path names an existing local regular file; it records a jump and positions the caret from DAP's one-based line and column. Disable that setting to keep navigation manual. The Debug panel's **Open Source** action remains available, and `:debug frame <id>` selects a returned frame before reloading its scopes and variables. Loading, unavailable-capability, and error states remain visible. `:debug watch add <expression>`, `:debug watch remove <expression>`, `:debug watch list`, and `:debug watch clear` manage session-local watches; evaluation uses DAP `evaluate` with `context: watch` for the selected paused frame.
+On a DAP `stopped` event, Shed requests paused-frame inspection. With `debug.open.source.on.stop=true` (the default), it opens the adapter-selected frame only when its source maps to an existing local regular file; remote paths must be under the connected mirror's declared root. It records a jump and positions the caret from DAP's one-based line and column. Disable that setting to keep navigation manual. The Debug panel's **Open Source** action remains available, and `:debug frame <id>` selects a returned frame before reloading its scopes and variables. Loading, unavailable-capability, and error states remain visible. `:debug watch add <expression>`, `:debug watch remove <expression>`, `:debug watch list`, and `:debug watch clear` manage session-local watches; evaluation uses DAP `evaluate` with `context: watch` for the selected paused frame.
 
 Shed sends `threads`, `stackTrace`, `scopes`, `variables`, and `evaluate` only when their corresponding configured adapter capabilities and feature settings are enabled. A later `continued`, `terminated`, or `exited` event invalidates paused-frame references and leaves watches pending until the next stop; stale responses from a prior suspended state are discarded.
 

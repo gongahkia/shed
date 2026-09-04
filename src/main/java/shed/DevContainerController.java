@@ -119,22 +119,61 @@ final class DevContainerController {
     RemoteLspEndpoint languageServerEndpoint(Path workspace, List<String> serverCommand) throws IOException {
         Path root = workspace == null ? null : workspace.toAbsolutePath().normalize();
         if (root == null || !hasConfiguration(root)) throw new IOException("Dev Container language server requires .devcontainer/devcontainer.json");
-        String remoteRoot = DevContainerWorkspace.remoteWorkingDirectory(probeWorkspaceRoot(root));
+        String remoteRoot = remoteWorkingDirectory(root);
         return new RemoteLspEndpoint(root, remoteRoot, languageServerInvocation(root, serverCommand));
     }
 
+    /** Builds an explicit stdio DAP bridge after verifying the running container's mounted workspace root. */
+    RemoteDebugEndpoint debugAdapterEndpoint(Path workspace, List<String> adapterCommand) throws IOException {
+        Path root = workspace == null ? null : workspace.toAbsolutePath().normalize();
+        if (root == null || !hasConfiguration(root)) throw new IOException("Dev Container debug adapter requires .devcontainer/devcontainer.json");
+        String remoteRoot = remoteWorkingDirectory(root);
+        return new RemoteDebugEndpoint(root, remoteRoot, debugAdapterInvocation(root, adapterCommand));
+    }
+
+    /** Probes the already-running container only for an explicit operation that needs its mounted workspace path. */
+    String remoteWorkingDirectory(Path workspace) throws IOException {
+        Path root = workspace == null ? null : workspace.toAbsolutePath().normalize();
+        if (root == null || !hasConfiguration(root)) throw new IOException("Dev Container workspace requires .devcontainer/devcontainer.json");
+        return DevContainerWorkspace.remoteWorkingDirectory(probeWorkspaceRoot(root));
+    }
+
+    /** Inspection must not start the CLI or probe the container. */
+    boolean supportsDebugAdapter(Path workspace, List<String> adapterCommand) {
+        Path root = workspace == null ? null : workspace.toAbsolutePath().normalize();
+        if (root == null || !hasConfiguration(root)) return false;
+        try {
+            debugAdapterInvocation(root, adapterCommand);
+            return true;
+        } catch (IOException | RuntimeException error) {
+            return false;
+        }
+    }
+
     static List<String> languageServerInvocation(Path workspace, List<String> serverCommand) throws IOException {
+        return processInvocation(workspace, serverCommand, "language server");
+    }
+
+    static List<String> debugAdapterInvocation(Path workspace, List<String> adapterCommand) throws IOException {
+        return processInvocation(workspace, adapterCommand, "debug adapter");
+    }
+
+    static List<String> testInvocation(Path workspace, List<String> testCommand) throws IOException {
+        return processInvocation(workspace, testCommand, "test command");
+    }
+
+    private static List<String> processInvocation(Path workspace, List<String> processCommand, String purpose) throws IOException {
         if (workspace == null) throw new IOException("Dev Container workspace is required");
         List<String> command = new ArrayList<>(List.of("devcontainer", "exec", "--workspace-folder", workspace.toAbsolutePath().normalize().toString()));
-        if (serverCommand == null || serverCommand.isEmpty() || serverCommand.getFirst() == null || serverCommand.getFirst().isBlank()) {
-            throw new IOException("Dev Container language server command is required");
+        if (processCommand == null || processCommand.isEmpty() || processCommand.getFirst() == null || processCommand.getFirst().isBlank()) {
+            throw new IOException("Dev Container " + purpose + " command is required");
         }
-        for (String argument : serverCommand) {
+        for (String argument : processCommand) {
             if (argument == null || argument.indexOf('\0') >= 0 || argument.indexOf('\n') >= 0 || argument.indexOf('\r') >= 0) {
-                throw new IOException("Dev Container language server command is invalid");
+                throw new IOException("Dev Container " + purpose + " command is invalid");
             }
         }
-        command.addAll(serverCommand);
+        command.addAll(processCommand);
         return List.copyOf(command);
     }
 

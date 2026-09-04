@@ -366,6 +366,10 @@ final class GrammarHighlightService {
             case "html", "xml" -> FileType.HTML;
             case "css" -> FileType.CSS;
             case "json" -> FileType.JSON;
+            case "yaml", "yml" -> FileType.YAML;
+            case "toml" -> FileType.TOML;
+            case "sql" -> FileType.SQL;
+            case "sh", "shell", "bash", "zsh", "fish" -> FileType.SHELL;
             default -> FileType.TEXT;
         };
     }
@@ -480,6 +484,10 @@ final class GrammarHighlightService {
                 add(tokens, index, to, Scope.COMMENT);
                 break;
             }
+            if (type == FileType.SQL && current == '-' && index + 1 < to && text.charAt(index + 1) == '-') {
+                add(tokens, index, to, Scope.COMMENT);
+                break;
+            }
             if (supportsBlockComments(type) && current == '/' && index + 1 < to && text.charAt(index + 1) == '*') {
                 int close = text.indexOf("*/", index + 2);
                 int end = close < 0 ? to : Math.min(to, close + 2);
@@ -488,7 +496,7 @@ final class GrammarHighlightService {
                 index = end;
                 continue;
             }
-            if (type == FileType.PYTHON && current == '#') {
+            if ((type == FileType.PYTHON || type == FileType.YAML || type == FileType.TOML || type == FileType.SHELL) && current == '#') {
                 add(tokens, index, to, Scope.COMMENT);
                 break;
             }
@@ -544,7 +552,7 @@ final class GrammarHighlightService {
     private boolean isKeyword(String text, int start, int end, FileType type) {
         int length = end - start;
         for (String keyword : keywords.getOrDefault(type, Set.of())) {
-            if (keyword.length() == length && text.regionMatches(start, keyword, 0, length)) return true;
+            if (keyword.length() == length && text.regionMatches(type == FileType.SQL, start, keyword, 0, length)) return true;
         }
         return false;
     }
@@ -647,7 +655,7 @@ final class GrammarHighlightService {
 
     private boolean supportsBlockComments(FileType type) {
         return type == FileType.JAVA || type == FileType.JAVASCRIPT || type == FileType.TYPESCRIPT || type == FileType.RUST
-            || type == FileType.GO || type == FileType.C || type == FileType.CPP || type == FileType.CSS;
+            || type == FileType.GO || type == FileType.C || type == FileType.CPP || type == FileType.CSS || type == FileType.SQL;
     }
 
     private boolean isDollarLanguage(FileType type) {

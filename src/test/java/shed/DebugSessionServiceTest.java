@@ -197,6 +197,73 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void sendsRunToCursorOnlyWhenDeclaredAndAdvertised() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-goto").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsGotoTargetsRequest", true), ""));
+        connection.responses.put("gotoTargets", response("gotoTargets", true, Map.of("targets", List.of(Map.of("id", 91, "label", "line 12", "line", 12, "column", 4))), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,goto"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+
+        DebugSessionService.RunToCursorResult result = service.runToCursor(workspace, file, 12, 4, Duration.ofSeconds(1));
+
+        assertTrue(result.succeeded());
+        assertEquals("gotoTargets", connection.commands.get(connection.commands.size() - 2));
+        assertEquals(Map.of("source", Map.of("path", file.toString()), "line", 12, "column", 4), connection.arguments.get(connection.arguments.size() - 2));
+        assertEquals("goto", connection.commands.getLast());
+        assertEquals(Map.of("threadId", 7, "targetId", 91), connection.arguments.getLast());
+    }
+
+    @Test
+    void rejectsRunToCursorWhenTheAdapterDidNotAdvertiseGotoTargets() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-goto-unadvertised").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+
+        assertTrue(service.start(workspace, file, validation("launch,goto"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+
+        DebugSessionService.RunToCursorResult result = service.runToCursor(workspace, file, 12, 1, Duration.ofSeconds(1));
+
+        assertFalse(result.succeeded());
+        assertTrue(result.snapshot().diagnostics().stream().anyMatch(value -> value.contains("did not advertise gotoTargets")));
+        assertFalse(connection.commands.contains("gotoTargets"));
+    }
+
+    @Test
+    void refusesAmbiguousRunToCursorTargetsInsteadOfChoosingOne() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-goto-ambiguous").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsGotoTargetsRequest", true), ""));
+        connection.responses.put("gotoTargets", response("gotoTargets", true, Map.of("targets", List.of(
+            Map.of("id", 14, "label", "first", "line", 12, "column", 2),
+            Map.of("id", 15, "label", "second", "line", 12, "column", 8)
+        )), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,goto"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+
+        DebugSessionService.RunToCursorResult result = service.runToCursor(workspace, file, 12, 4, Duration.ofSeconds(1));
+
+        assertFalse(result.succeeded());
+        assertTrue(result.snapshot().diagnostics().stream().anyMatch(value -> value.contains("no unambiguous target")));
+        assertEquals("gotoTargets", connection.commands.getLast());
+        assertFalse(connection.commands.contains("goto"));
+    }
+
+    @Test
     void synchronizesPersistedSourceBreakpointsOnlyForDeclaredAdapterCapability(@TempDir Path tempDir) throws Exception {
         DebugSessionService service = new DebugSessionService();
         Path workspace = tempDir.resolve("workspace");
@@ -214,6 +281,24 @@ public class DebugSessionServiceTest {
         assertEquals(file.toString(), ((Map<?, ?>) connection.arguments.get(2).get("source")).get("path"));
         assertEquals(BreakpointStore.State.CHANGED, store.markers(workspace, file).get(3).state());
         assertTrue(result.snapshot().diagnostics().stream().anyMatch(value -> value.contains("moved to line 4")));
+    }
+
+    @Test
+    void mapsLaunchAndBreakpointPathsForARemoteAdapter(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("mirror");
+        Path file = workspace.resolve("src/Main.java");
+        BreakpointStore store = new BreakpointStore(tempDir.resolve("state"));
+        store.toggle(workspace, file, 3);
+        FakeConnection connection = new FakeConnection(workspace, "/srv/project");
+        connection.responses.put("setBreakpoints", response("setBreakpoints", true, Map.of("breakpoints", List.of(Map.of("verified", true))), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,breakpoints"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, listener) -> connection, store).succeeded());
+
+        assertEquals("/srv/project/src/Main.java", connection.arguments.get(1).get("program"));
+        assertEquals("/srv/project", connection.arguments.get(1).get("cwd"));
+        assertEquals("/srv/project/src/Main.java", ((Map<?, ?>) connection.arguments.get(2).get("source")).get("path"));
     }
 
     @Test
@@ -534,6 +619,14 @@ public class DebugSessionServiceTest {
         private final Map<String, DebugAdapterTransport.Response> responses = new LinkedHashMap<>();
         private Consumer<String> requestHook;
         private boolean closed;
+        private final Path localRoot;
+        private final String remoteRoot;
+
+        FakeConnection() { this(null, ""); }
+        FakeConnection(Path localRoot, String remoteRoot) {
+            this.localRoot = localRoot == null ? null : localRoot.toAbsolutePath().normalize();
+            this.remoteRoot = remoteRoot == null ? "" : remoteRoot;
+        }
 
         @Override public DebugAdapterTransport.Response request(String command, Map<String, Object> arguments, Duration timeout) {
             commands.add(command); this.arguments.add(arguments);
@@ -541,6 +634,16 @@ public class DebugSessionServiceTest {
             return responses.getOrDefault(command, response(command, true, ""));
         }
         @Override public DebugAdapterTransport.State state() { return closed ? DebugAdapterTransport.State.CLOSED : DebugAdapterTransport.State.RUNNING; }
+        @Override public String adapterPath(Path localPath) {
+            if (localRoot == null || localPath == null) return DebugSessionService.Connection.super.adapterPath(localPath);
+            Path path = localPath.toAbsolutePath().normalize();
+            return path.startsWith(localRoot) ? remoteRoot + (localRoot.relativize(path).toString().isEmpty() ? "" : "/" + localRoot.relativize(path).toString().replace('\\', '/')) : null;
+        }
+        @Override public Path localPath(String adapterPath) {
+            if (localRoot == null || adapterPath == null || !adapterPath.startsWith(remoteRoot)) return null;
+            String suffix = adapterPath.substring(remoteRoot.length()).replaceFirst("^/", "");
+            return localRoot.resolve(suffix).normalize();
+        }
         @Override public void close() { closed = true; }
     }
 }

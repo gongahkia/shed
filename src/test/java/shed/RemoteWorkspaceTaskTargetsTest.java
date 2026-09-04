@@ -25,7 +25,9 @@ class RemoteWorkspaceTaskTargetsTest {
         targets.register("SSH-Example", workspace);
 
         assertEquals("ssh-example", targets.targetFor("ssh-example", root.resolve("project")).id());
+        assertEquals("ssh-example", targets.targetForPath(root.resolve("project")).id());
         assertNull(targets.targetFor("ssh-example", root.getParent()));
+        assertNull(targets.targetForPath(root.getParent()));
         targets.unregister("SSH-Example");
         assertNull(targets.targetFor("ssh-example", root));
     }

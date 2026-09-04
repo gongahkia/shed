@@ -7,6 +7,7 @@ import shed.api.LanguageContribution;
 import shed.api.LanguageProfile;
 import shed.api.RemoteWorkspaceProvider;
 import shed.api.ScmContribution;
+import shed.api.SnippetContribution;
 import shed.api.TerminalProfile;
 import shed.api.TestContribution;
 import shed.api.ToolViewContribution;
@@ -28,6 +29,7 @@ final class ExtensionRegistry {
     private final Map<String, Owned<ExtensionCommand>> commands = new LinkedHashMap<>();
     private final Map<String, Owned<LanguageContribution>> languages = new LinkedHashMap<>();
     private final Map<String, Owned<LanguageProfile>> languageProfiles = new LinkedHashMap<>();
+    private final Map<String, Owned<SnippetContribution>> snippets = new LinkedHashMap<>();
     private final Map<String, Owned<DebugAdapterContribution>> debuggers = new LinkedHashMap<>();
     private final Map<String, Owned<TestContribution>> tests = new LinkedHashMap<>();
     private final Map<String, Owned<ScmContribution>> scm = new LinkedHashMap<>();
@@ -47,6 +49,10 @@ final class ExtensionRegistry {
 
     synchronized void registerLanguageProfile(String extensionId, LanguageProfile profile) {
         languageProfiles.put(unique(extensionId, require(profile, "language profile").languageId()), new Owned<>(extensionId, profile));
+    }
+
+    synchronized void registerSnippet(String extensionId, SnippetContribution contribution) {
+        snippets.put(unique(extensionId, require(contribution, "snippet contribution").id()), new Owned<>(extensionId, contribution));
     }
 
     synchronized void registerDebugger(String extensionId, DebugAdapterContribution contribution) {
@@ -93,6 +99,7 @@ final class ExtensionRegistry {
     synchronized List<Owned<LanguageContribution>> languages() { return sortedValues(languages); }
 
     synchronized List<Owned<LanguageProfile>> languageProfiles() { return sortedValues(languageProfiles); }
+    synchronized List<Owned<SnippetContribution>> snippets() { return sortedValues(snippets); }
 
     synchronized Owned<LanguageProfile> languageProfileFor(java.io.File file, String content) {
         String name = file == null ? "" : file.getName().toLowerCase(Locale.ROOT);
@@ -119,6 +126,25 @@ final class ExtensionRegistry {
         }
         return null;
     }
+
+    synchronized Owned<LanguageContribution> languageForId(String languageId) {
+        String normalized = languageId == null ? "" : languageId.trim();
+        if (normalized.isEmpty()) return null;
+        for (Owned<LanguageContribution> candidate : sortedValues(languages)) {
+            if (candidate.value().id().equalsIgnoreCase(normalized)) return candidate;
+        }
+        return null;
+    }
+
+    synchronized Owned<LanguageContribution> languageForId(String extensionId, String languageId) {
+        String owner = extensionId == null ? "" : extensionId.trim();
+        String id = languageId == null ? "" : languageId.trim();
+        if (owner.isEmpty() || id.isEmpty()) return null;
+        for (Owned<LanguageContribution> candidate : sortedValues(languages)) {
+            if (candidate.extensionId().equalsIgnoreCase(owner) && candidate.value().id().equalsIgnoreCase(id)) return candidate;
+        }
+        return null;
+    }
     synchronized List<Owned<DebugAdapterContribution>> debuggers() { return sortedValues(debuggers); }
     synchronized List<Owned<TestContribution>> tests() { return sortedValues(tests); }
     synchronized List<Owned<ScmContribution>> scmProviders() { return sortedValues(scm); }
@@ -133,6 +159,7 @@ final class ExtensionRegistry {
         commands.values().removeIf(value -> value.extensionId().equals(normalized));
         languages.values().removeIf(value -> value.extensionId().equals(normalized));
         languageProfiles.values().removeIf(value -> value.extensionId().equals(normalized));
+        snippets.values().removeIf(value -> value.extensionId().equals(normalized));
         debuggers.values().removeIf(value -> value.extensionId().equals(normalized));
         tests.values().removeIf(value -> value.extensionId().equals(normalized));
         scm.values().removeIf(value -> value.extensionId().equals(normalized));

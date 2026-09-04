@@ -205,6 +205,20 @@ final class RemoteWorkspaceController {
         }
     }
 
+    RemoteDebugEndpoint debugAdapterEndpoint(Path localWorkspace, List<String> adapterCommand) throws IOException {
+        Connection connection = connectionForLocalPath(localWorkspace);
+        if (connection == null) return null;
+        String remoteRoot = connection.workspace().debugAdapterRoot();
+        if (remoteRoot == null || remoteRoot.isBlank()) return null;
+        try {
+            return new RemoteDebugEndpoint(connection.workspace().localRoot(), remoteRoot, connection.workspace().debugAdapterCommand(adapterCommand));
+        } catch (IOException error) {
+            throw error;
+        } catch (Exception error) {
+            throw new IOException("Remote debug adapter is unavailable: " + detail(error.getMessage()), error);
+        }
+    }
+
     String remoteLanguageServerUri(Path localFile) {
         Connection connection = connectionForLocalPath(localFile);
         if (connection == null) return null;

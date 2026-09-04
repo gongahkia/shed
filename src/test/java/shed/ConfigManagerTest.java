@@ -1017,6 +1017,87 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void resolvesUnsafeProjectDebugConfigurationsPerWorkspaceWithoutLeakingAcrossRoots() throws IOException {
+        Path home = tempDir.resolve("home-project-debug-workspaces");
+        Path configPath = home.resolve(".shed/config.toml");
+        Files.createDirectories(configPath.getParent());
+        Files.writeString(configPath, """
+            schema_version = 1
+            "project.config.allow.unsafe" = true
+            "project.config.require.trusted.file" = false
+            "debug.adapter.shared.command" = "shared-adapter"
+            "debug.adapter.shared.capabilities" = "launch"
+            """);
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        Path first = tempDir.resolve("project-debug-first");
+        Path second = tempDir.resolve("project-debug-second");
+        Files.createDirectories(first.resolve("src"));
+        Files.createDirectories(second.resolve("src"));
+        Files.writeString(first.resolve(".shed.toml"), """
+            schema_version = 1
+            "debug.enabled" = true
+            "debug.open.source.on.stop" = false
+            "debug.configuration.first.adapter" = "shared"
+            "debug.configuration.first.request" = "launch"
+            "debug.configuration.first.program" = "${file}"
+            """);
+        Files.writeString(second.resolve(".shed.toml"), """
+            schema_version = 1
+            "debug.configuration.second.adapter" = "shared"
+            "debug.configuration.second.request" = "launch"
+            "debug.configuration.second.program" = "${file}"
+            """);
+        File firstFile = first.resolve("src/Main.java").toFile();
+        Files.writeString(firstFile.toPath(), "class Main {}\n");
+
+        assertTrue(config.applyProjectConfigForFile(firstFile).contains("Project config loaded"));
+        DebugAdapterRegistry.Validation firstValidation = config.getDebugConfigurationForWorkspace(first);
+        DebugAdapterRegistry.Validation secondValidation = config.getDebugConfigurationForWorkspace(second);
+
+        assertTrue(firstValidation.valid());
+        assertTrue(secondValidation.valid());
+        assertTrue(firstValidation.configurations().containsKey("first"));
+        assertFalse(firstValidation.configurations().containsKey("second"));
+        assertTrue(secondValidation.configurations().containsKey("second"));
+        assertFalse(secondValidation.configurations().containsKey("first"));
+        assertTrue(config.getDebugConfiguration().configurations().isEmpty());
+        assertTrue(config.getDebugFeatureSettingsForWorkspace(first).enabled());
+        assertFalse(config.getDebugOpenSourceOnStopForWorkspace(first));
+        assertFalse(config.getDebugFeatureSettingsForWorkspace(second).enabled());
+    }
+
+    @Test
+    void blocksProjectDebugConfigurationsUntilUnsafeProjectKeysAreEnabled() throws IOException {
+        Path home = tempDir.resolve("home-project-debug-safe");
+        Path configPath = home.resolve(".shed/config.toml");
+        Files.createDirectories(configPath.getParent());
+        Files.writeString(configPath, """
+            schema_version = 1
+            "project.config.require.trusted.file" = false
+            "debug.adapter.shared.command" = "shared-adapter"
+            "debug.adapter.shared.capabilities" = "launch"
+            """);
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        Path project = tempDir.resolve("project-debug-safe");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve(".shed.toml"), """
+            schema_version = 1
+            "debug.configuration.project.adapter" = "shared"
+            "debug.configuration.project.request" = "launch"
+            "debug.configuration.project.program" = "${file}"
+            """);
+
+        DebugAdapterRegistry.Validation validation = config.getDebugConfigurationForWorkspace(project);
+
+        assertTrue(validation.valid());
+        assertTrue(validation.configurations().isEmpty());
+    }
+
+    @Test
     void projectLocalConfigCanBeDisabledAtRuntime() throws IOException {
         Path home = tempDir.resolve("home-project-local-disabled");
         System.setProperty("user.home", home.toString());

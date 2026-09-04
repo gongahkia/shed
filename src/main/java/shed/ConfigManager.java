@@ -482,7 +482,7 @@ public class ConfigManager {
         List<String> errors = new ArrayList<>();
         Map<String, Object> parsed;
         try {
-            parsed = parseTomlConfig(path, errors);
+            parsed = parseTomlConfig(path, errors, true);
         } catch (java.nio.file.NoSuchFileException error) {
             configLoadReport = "Configuration not found: " + path
                 + "\nSafe defaults are active. Run :config save to create it.";
@@ -506,7 +506,7 @@ public class ConfigManager {
         configLoadReport = "Configuration loaded: " + path;
     }
 
-    private Map<String, Object> parseTomlConfig(Path path, List<String> errors) throws IOException {
+    private Map<String, Object> parseTomlConfig(Path path, List<String> errors, boolean validateDebug) throws IOException {
         TomlParseResult result = Toml.parse(path);
         for (TomlParseError error : result.errors()) {
             errors.add(tomlLocation(error.position()) + error.getMessage());
@@ -552,9 +552,11 @@ public class ConfigManager {
                 errors.add(tomlLocation(result.inputPositionOf(entry.getKey())) + error.getMessage() + fallbackDescription(key));
             }
         }
-        DebugAdapterRegistry.Validation debug = DebugAdapterRegistry.validate(parsed);
-        for (DebugAdapterRegistry.Error error : debug.errors()) {
-            errors.add(tomlLocation(debugTomlPosition(result, error.key())) + error.message() + fallbackDescription(error.key()));
+        if (validateDebug) {
+            DebugAdapterRegistry.Validation debug = DebugAdapterRegistry.validate(parsed);
+            for (DebugAdapterRegistry.Error error : debug.errors()) {
+                errors.add(tomlLocation(debugTomlPosition(result, error.key())) + error.message() + fallbackDescription(error.key()));
+            }
         }
         return parsed;
     }
@@ -1182,12 +1184,37 @@ public class ConfigManager {
             getBoolean("debug.evaluate.enabled", defaults.evaluate()), getBoolean("debug.attach.enabled", defaults.attach()));
     }
 
+    DebugFeatureSettings getDebugFeatureSettingsForWorkspace(Path workspace) {
+        return debugFeatureSettings(debugValuesForWorkspaceOrGlobal(workspace));
+    }
+
     public boolean getDebugOpenSourceOnStop() {
         return getBoolean("debug.open.source.on.stop", DEFAULT_DEBUG_OPEN_SOURCE_ON_STOP);
     }
 
+    boolean getDebugOpenSourceOnStopForWorkspace(Path workspace) {
+        return debugBoolean(debugValuesForWorkspaceOrGlobal(workspace), "debug.open.source.on.stop", DEFAULT_DEBUG_OPEN_SOURCE_ON_STOP);
+    }
+
     DebugAdapterRegistry.Validation getDebugConfiguration() {
         return debugConfiguration;
+    }
+
+    /**
+     * Resolves DAP declarations for exactly one workspace root without changing
+     * the active editor configuration. Project declarations are executable
+     * configuration, so they remain behind the existing unsafe-and-trusted
+     * project-config gate.
+     */
+    DebugAdapterRegistry.Validation getDebugConfigurationForWorkspace(Path workspace) {
+        try {
+            return DebugAdapterRegistry.validate(debugValuesForWorkspace(workspace));
+        } catch (IOException | RuntimeException error) {
+            String detail = error.getMessage();
+            if (detail == null || detail.isBlank()) detail = error.getClass().getSimpleName();
+            return new DebugAdapterRegistry.Validation(debugConfiguration.registry(), debugConfiguration.configurations(), List.of(
+                new DebugAdapterRegistry.Error("project", "Project debug configuration is invalid: " + detail.replace('\n', ' ').replace('\r', ' '))));
+        }
     }
 
     public boolean isProjectConfigKeyAllowed(String key) {
@@ -1716,7 +1743,7 @@ public class ConfigManager {
 
     private Map<String, String> parseConfigFile(File file) throws IOException {
         List<String> errors = new ArrayList<>();
-        Map<String, Object> typed = parseTomlConfig(file.toPath(), errors);
+        Map<String, Object> typed = parseTomlConfig(file.toPath(), errors, false);
         if (!errors.isEmpty()) {
             throw new IOException(String.join("; ", errors));
         }
@@ -1725,6 +1752,83 @@ public class ConfigManager {
             parsed.put(entry.getKey(), settings.stringify(entry.getValue()));
         }
         return parsed;
+    }
+
+    private Map<String, Object> globalDebugValues() {
+        Map<String, Object> values = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : persistedConfig.entrySet()) {
+            if (entry.getKey().startsWith("debug.")) values.put(entry.getKey(), entry.getValue());
+        }
+        return values;
+    }
+
+    private Map<String, Object> debugValuesForWorkspaceOrGlobal(Path workspace) {
+        try {
+            return debugValuesForWorkspace(workspace);
+        } catch (IOException | RuntimeException error) {
+            return globalDebugValues();
+        }
+    }
+
+    private Map<String, Object> debugValuesForWorkspace(Path workspace) throws IOException {
+        Map<String, Object> effective = globalDebugValues();
+        if (!globalProjectConfigEnabled() || !globalProjectConfigAllowsUnsafe()) return effective;
+        File projectConfigFile = workspaceDebugConfigFile(workspace);
+        if (projectConfigFile == null) return effective;
+        if (globalProjectConfigRequiresTrustedFile() && !isTrustedProjectConfigFile(projectConfigFile)) return effective;
+        for (Map.Entry<String, String> entry : parseConfigFile(projectConfigFile).entrySet()) {
+            if (entry.getKey().startsWith("debug.")) effective.put(entry.getKey(), entry.getValue());
+        }
+        return effective;
+    }
+
+    private static DebugFeatureSettings debugFeatureSettings(Map<String, Object> values) {
+        DebugFeatureSettings defaults = DebugFeatureSettings.defaults();
+        return new DebugFeatureSettings(debugBoolean(values, "debug.enabled", defaults.enabled()),
+            debugBoolean(values, "debug.breakpoints.enabled", defaults.breakpoints()),
+            debugBoolean(values, "debug.threads.enabled", defaults.threads()),
+            debugBoolean(values, "debug.stacktrace.enabled", defaults.stackTrace()),
+            debugBoolean(values, "debug.scopes.enabled", defaults.scopes()),
+            debugBoolean(values, "debug.variables.enabled", defaults.variables()),
+            debugBoolean(values, "debug.evaluate.enabled", defaults.evaluate()),
+            debugBoolean(values, "debug.attach.enabled", defaults.attach()));
+    }
+
+    private static boolean debugBoolean(Map<String, Object> values, String key, boolean fallback) {
+        Object value = values == null ? null : values.get(key);
+        if (value instanceof Boolean) return (Boolean) value;
+        if (value instanceof String && "true".equalsIgnoreCase((String) value)) return true;
+        if (value instanceof String && "false".equalsIgnoreCase((String) value)) return false;
+        return fallback;
+    }
+
+    private File workspaceDebugConfigFile(Path workspace) {
+        if (workspace == null) return null;
+        try {
+            Path root = workspace.toAbsolutePath().normalize();
+            if (!Files.isDirectory(root)) return null;
+            File file = root.resolve(PROJECT_CONFIG_NAME).toFile();
+            return file.isFile() ? file.getCanonicalFile() : null;
+        } catch (IOException | RuntimeException error) {
+            return null;
+        }
+    }
+
+    private boolean globalProjectConfigEnabled() {
+        return globalBoolean("project.config.enabled", DEFAULT_PROJECT_CONFIG_ENABLED);
+    }
+
+    private boolean globalProjectConfigAllowsUnsafe() {
+        return globalBoolean("project.config.allow.unsafe", DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE);
+    }
+
+    private boolean globalProjectConfigRequiresTrustedFile() {
+        return globalBoolean("project.config.require.trusted.file", DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE);
+    }
+
+    private boolean globalBoolean(String key, boolean fallback) {
+        String value = projectPreviousValues.containsKey(key) ? projectPreviousValues.get(key) : config.get(key);
+        return value == null ? fallback : Boolean.parseBoolean(value);
     }
 
     private String normalizePersistedKey(String rawKey) throws IOException {

@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -125,6 +126,27 @@ final class DebugAdapterTransport implements AutoCloseable {
             command.add(argument);
         }
         Process process = new ProcessBuilder(command).directory(plan.cwd().toFile()).start();
+        return new DebugAdapterTransport(process.getInputStream(), process.getOutputStream(), process, null, listener, diagnosticLog, terminateDebuggee);
+    }
+
+    static DebugAdapterTransport startRemote(DebugAdapterRegistry.Plan plan, List<String> command, DebugFeatureSettings features, Listener listener,
+                                             DiagnosticLog diagnosticLog) throws IOException {
+        if (plan == null || plan.adapter() == null || plan.configuration() == null || plan.workspace() == null) {
+            throw new IOException("A validated remote debug adapter plan is required");
+        }
+        validatePlanPaths(plan);
+        DebugFeatureSettings settings = features == null ? DebugFeatureSettings.defaults() : features;
+        if (!settings.enabled()) throw new IOException("Debugging is disabled by settings");
+        if (plan.adapter().transport() != DebugAdapterRegistry.Transport.STDIO) {
+            throw new IOException("Remote debugging requires a stdio debug adapter; TCP remains local-only");
+        }
+        List<String> invocation = command == null ? List.of() : List.copyOf(command);
+        if (invocation.isEmpty()) throw new IOException("Remote debug adapter command is unavailable");
+        for (String argument : invocation) {
+            if (argument == null || argument.isBlank() || containsControl(argument)) throw new IOException("Remote debug adapter command is invalid");
+        }
+        Process process = new ProcessBuilder(invocation).directory(plan.workspace().toFile()).start();
+        boolean terminateDebuggee = plan.configuration().request() == DebugAdapterRegistry.Request.LAUNCH;
         return new DebugAdapterTransport(process.getInputStream(), process.getOutputStream(), process, null, listener, diagnosticLog, terminateDebuggee);
     }
 

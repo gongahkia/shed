@@ -91,6 +91,14 @@ public class SyntaxHighlightService {
                 return new String[] {"true", "false", "null"};
             case MARKDOWN:
                 return new String[] {"# ", "## ", "### ", "#### ", "##### ", "###### ", "- ", "* ", "> ", "```"};
+            case YAML:
+                return new String[] {"true", "false", "null", "yes", "no", "on", "off"};
+            case TOML:
+                return new String[] {"true", "false"};
+            case SQL:
+                return new String[] {"select", "from", "where", "join", "left", "right", "inner", "outer", "on", "as", "insert", "into", "values", "update", "set", "delete", "create", "alter", "drop", "table", "index", "view", "with", "group", "by", "order", "having", "limit", "offset", "union", "all", "distinct", "null", "and", "or", "not", "case", "when", "then", "else", "end"};
+            case SHELL:
+                return new String[] {"if", "then", "elif", "else", "fi", "for", "in", "do", "done", "while", "case", "esac", "function", "return", "export", "local", "readonly", "set", "unset", "true", "false"};
             default:
                 return new String[0];
         }
@@ -113,6 +121,12 @@ public class SyntaxHighlightService {
                 return new String[] {"//"};
             case PYTHON:
                 return new String[] {"#"};
+            case YAML:
+            case TOML:
+            case SHELL:
+                return new String[] {"#"};
+            case SQL:
+                return new String[] {"--"};
             default:
                 return new String[0];
         }
@@ -132,6 +146,8 @@ public class SyntaxHighlightService {
             case HTML:
             case MARKDOWN:
                 return new String[][] {{"<!--", "-->"}};
+            case SQL:
+                return new String[][] {{"/*", "*/"}};
             default:
                 return new String[0][0];
         }

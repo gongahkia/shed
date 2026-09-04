@@ -20,6 +20,10 @@ public enum FileType {
     CSS("css"),
     JSON("json"),
     MARKDOWN("markdown"),
+    YAML("yaml"),
+    TOML("toml"),
+    SQL("sql"),
+    SHELL("shell"),
     TEXT("text"),
     UNKNOWN("unknown");
 
@@ -82,6 +86,18 @@ public enum FileType {
                     case "md":
                     case "markdown":
                         return MARKDOWN;
+                    case "yml":
+                    case "yaml":
+                        return YAML;
+                    case "toml":
+                        return TOML;
+                    case "sql":
+                        return SQL;
+                    case "sh":
+                    case "bash":
+                    case "zsh":
+                    case "fish":
+                        return SHELL;
                     case "txt":
                         return TEXT;
                     default:
@@ -98,8 +114,8 @@ public enum FileType {
             if (firstLine.contains("node")) {
                 return JAVASCRIPT;
             }
-            if (firstLine.contains("sh") || firstLine.contains("bash")) {
-                return TEXT;
+            if (firstLine.contains("sh") || firstLine.contains("bash") || firstLine.contains("zsh") || firstLine.contains("fish")) {
+                return SHELL;
             }
         }
 

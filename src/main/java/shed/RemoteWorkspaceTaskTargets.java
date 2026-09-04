@@ -29,6 +29,17 @@ final class RemoteWorkspaceTaskTargets {
         return candidate.startsWith(target.localRoot()) ? target : null;
     }
 
+    synchronized Target targetForPath(Path localPath) {
+        if (localPath == null) return null;
+        Path candidate = localPath.toAbsolutePath().normalize();
+        Target selected = null;
+        for (Target target : targets.values()) {
+            if (!candidate.startsWith(target.localRoot())) continue;
+            if (selected == null || target.localRoot().getNameCount() > selected.localRoot().getNameCount()) selected = target;
+        }
+        return selected;
+    }
+
     private static String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }

@@ -1,6 +1,6 @@
 # Terminal
 
-Shed opens an interactive shell in a PTY-backed split. `:terminal list` shows the default shell and extension-provided direct-argv profiles; `:terminal profile <extension:id>` opens one. Terminal session restoration, when enabled, records only a pane's working directory and starts a fresh shell. It never restores commands, arguments, scrollback, process state, or credentials.
+Shed opens an interactive shell in a PTY-backed bottom split. `:terminal split side` places a new default-shell terminal beside the active pane, while `:terminal split bottom` makes the default placement explicit. `:terminal list` shows the default shell and extension-provided direct-argv profiles; `:terminal profile <extension:id>` opens one. Terminal session restoration, when enabled, records only a pane's working directory and starts a fresh shell. It never restores commands, arguments, scrollback, process state, or credentials.
 
 ## Shell integration
 

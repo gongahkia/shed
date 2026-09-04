@@ -1,5 +1,6 @@
 package shed;
 
+import shed.api.SnippetContribution;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -21,12 +22,18 @@ public class SnippetService {
         public final String body;
         public final String description;
         public final FileType fileType;
+        public final String languageId;
 
         public Snippet(String trigger, String body, String description, FileType fileType) {
+            this(trigger, body, description, fileType, "");
+        }
+
+        public Snippet(String trigger, String body, String description, FileType fileType, String languageId) {
             this.trigger = trigger;
             this.body = body;
             this.description = description;
             this.fileType = fileType;
+            this.languageId = languageId == null ? "" : languageId.trim();
         }
     }
 
@@ -291,15 +298,25 @@ public class SnippetService {
     }
 
     public List<Snippet> getSnippetsFor(FileType fileType, String prefix) {
+        return getSnippetsFor(fileType, "", prefix, List.of());
+    }
+
+    public List<Snippet> getSnippetsFor(FileType fileType, String languageId, String prefix, List<SnippetContribution> contributed) {
         reloadIfChanged();
         List<Snippet> results = new ArrayList<>();
         for (Snippet s : userSnippets) {
-            if ((s.fileType == fileType || s.fileType == null) && s.trigger.startsWith(prefix)) {
+            if (matches(s, fileType, languageId) && s.trigger.startsWith(prefix)) {
                 results.add(s);
             }
         }
+        for (SnippetContribution contribution : contributed == null ? List.<SnippetContribution>of() : contributed) {
+            if (contribution != null && contribution.languageId().equalsIgnoreCase(languageId == null ? "" : languageId)
+                && contribution.trigger().startsWith(prefix == null ? "" : prefix)) {
+                results.add(new Snippet(contribution.trigger(), contribution.body(), contribution.description(), null, contribution.languageId()));
+            }
+        }
         for (Snippet s : builtins) {
-            if ((s.fileType == fileType || s.fileType == null) && s.trigger.startsWith(prefix)) {
+            if (matches(s, fileType, languageId) && s.trigger.startsWith(prefix)) {
                 results.add(s);
             }
         }
@@ -307,14 +324,24 @@ public class SnippetService {
     }
 
     public Snippet findExact(FileType fileType, String trigger) {
+        return findExact(fileType, "", trigger, List.of());
+    }
+
+    public Snippet findExact(FileType fileType, String languageId, String trigger, List<SnippetContribution> contributed) {
         reloadIfChanged();
         for (Snippet s : userSnippets) {
-            if ((s.fileType == fileType || s.fileType == null) && s.trigger.equals(trigger)) {
+            if (matches(s, fileType, languageId) && s.trigger.equals(trigger)) {
                 return s;
             }
         }
+        for (SnippetContribution contribution : contributed == null ? List.<SnippetContribution>of() : contributed) {
+            if (contribution != null && contribution.languageId().equalsIgnoreCase(languageId == null ? "" : languageId)
+                && contribution.trigger().equals(trigger)) {
+                return new Snippet(contribution.trigger(), contribution.body(), contribution.description(), null, contribution.languageId());
+            }
+        }
         for (Snippet s : builtins) {
-            if ((s.fileType == fileType || s.fileType == null) && s.trigger.equals(trigger)) {
+            if (matches(s, fileType, languageId) && s.trigger.equals(trigger)) {
                 return s;
             }
         }
@@ -342,6 +369,10 @@ public class SnippetService {
     }
 
     public String listSnippets(FileType fileType) {
+        return listSnippets(fileType, "", List.of());
+    }
+
+    public String listSnippets(FileType fileType, String languageId, List<SnippetContribution> contributed) {
         reloadIfChanged();
         StringBuilder sb = new StringBuilder();
         sb.append("Snippets");
@@ -352,10 +383,15 @@ public class SnippetService {
 
         List<Snippet> all = new ArrayList<>();
         for (Snippet s : userSnippets) {
-            if (s.fileType == fileType || s.fileType == null || fileType == null) all.add(s);
+            if (fileType == null || matches(s, fileType, languageId)) all.add(s);
+        }
+        for (SnippetContribution contribution : contributed == null ? List.<SnippetContribution>of() : contributed) {
+            if (contribution != null && contribution.languageId().equalsIgnoreCase(languageId == null ? "" : languageId)) {
+                all.add(new Snippet(contribution.trigger(), contribution.body(), contribution.description(), null, contribution.languageId()));
+            }
         }
         for (Snippet s : builtins) {
-            if (s.fileType == fileType || s.fileType == null || fileType == null) all.add(s);
+            if (fileType == null || matches(s, fileType, languageId)) all.add(s);
         }
 
         if (all.isEmpty()) {
@@ -366,10 +402,17 @@ public class SnippetService {
             for (Snippet s : all) {
                 sb.append(String.format("%-" + (maxTrigger + 2) + "s %s", s.trigger, s.description));
                 if (s.fileType != null) sb.append(" [").append(s.fileType.getDisplayName()).append("]");
+                else if (!s.languageId.isBlank()) sb.append(" [").append(s.languageId).append("]");
                 sb.append("\n");
             }
         }
         sb.append("\nType a trigger then Ctrl-j, or use Ctrl-n for completion.");
         return sb.toString();
+    }
+
+    private boolean matches(Snippet snippet, FileType fileType, String languageId) {
+        if (snippet == null) return false;
+        if (!snippet.languageId.isBlank()) return snippet.languageId.equalsIgnoreCase(languageId == null ? "" : languageId);
+        return snippet.fileType == fileType || snippet.fileType == null;
     }
 }

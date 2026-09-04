@@ -12,6 +12,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 
 final class JobQuickfixController {
+    private record VsCodeTaskReports(VsCodeTaskImporter.Report folder, VsCodeTaskImporter.Report workspace) {
+        VsCodeTaskReports {
+            folder = folder == null ? new VsCodeTaskImporter.Report(null, Map.of(), Map.of(), List.of(), List.of(), "") : folder;
+            workspace = workspace == null ? new VsCodeTaskImporter.Report(null, Map.of(), Map.of(), List.of(), List.of(), "") : workspace;
+        }
+    }
+
     private final Texteditor editor;
     private final Map<Integer, String> taskOutputs = new LinkedHashMap<>();
 
@@ -121,7 +128,7 @@ final class JobQuickfixController {
         if (!loaded.isValid()) {
             return showTaskConfigurationDiagnostics(projectRoot, loaded.diagnostics());
         }
-        VsCodeTaskImporter.Report vsCodeTasks = vsCodeTaskReport(projectRoot, loaded.tasks());
+        VsCodeTaskReports vsCodeTasks = vsCodeTaskReports(projectRoot, loaded.tasks());
         Map<String, TaskService.WorkspaceTask> tasks = effectiveWorkspaceTasks(loaded.tasks(), vsCodeTasks);
         if (trimmed.isEmpty() || "list".equalsIgnoreCase(trimmed)) {
             return showWorkspaceTasks(projectRoot, tasks, vsCodeTasks);
@@ -262,7 +269,7 @@ final class JobQuickfixController {
         return showWorkspaceTasks(projectRoot, tasks, null);
     }
 
-    String showWorkspaceTasks(File projectRoot, Map<String, TaskService.WorkspaceTask> tasks, VsCodeTaskImporter.Report vsCodeTasks) {
+    String showWorkspaceTasks(File projectRoot, Map<String, TaskService.WorkspaceTask> tasks, VsCodeTaskReports vsCodeTasks) {
         StringBuilder sb = new StringBuilder();
         sb.append("Workspace tasks\n\n");
         sb.append("root: ").append(projectRoot.getAbsolutePath()).append("\n");
@@ -280,42 +287,73 @@ final class JobQuickfixController {
                     .append("  [").append(task.shell().configValue())
                     .append(", ").append(task.problemMatcher().configValue())
                     .append(", ").append(task.presentation().configValue()).append("]")
-                    .append(task.hasDirectArguments() ? "  [VS Code session only]" : "").append("\n");
+                    .append(task.sessionOnly() ? "  [VS Code session only]" : "").append("\n");
             }
         }
-        appendVsCodeTaskReport(sb, vsCodeTasks);
+        appendVsCodeTaskReports(sb, vsCodeTasks);
         editor.showScratchBuffer("[tasks]", sb.toString());
         return "Showing tasks";
     }
 
     Map<String, TaskService.WorkspaceTask> effectiveWorkspaceTasks(File projectRoot, TaskService.TaskLoadResult loaded) {
         if (loaded == null || !loaded.isValid()) return Map.of();
-        VsCodeTaskImporter.Report imported = vsCodeTaskReport(projectRoot, loaded.tasks());
-        return effectiveWorkspaceTasks(loaded.tasks(), imported);
+        return effectiveWorkspaceTasks(loaded.tasks(), vsCodeTaskReports(projectRoot, loaded.tasks()));
+    }
+
+    Map<String, String> acceptedVsCodeTaskNames(File projectRoot, TaskService.TaskLoadResult loaded) {
+        if (loaded == null || !loaded.isValid()) return Map.of();
+        VsCodeTaskReports reports = vsCodeTaskReports(projectRoot, loaded.tasks());
+        return VsCodeTaskImporter.uniqueTaskNamesByLabel(reports.folder(), reports.workspace());
     }
 
     private Map<String, TaskService.WorkspaceTask> effectiveWorkspaceTasks(Map<String, TaskService.WorkspaceTask> local,
-                                                                            VsCodeTaskImporter.Report imported) {
+                                                                            VsCodeTaskReports imported) {
         Map<String, TaskService.WorkspaceTask> result = new LinkedHashMap<>(local == null ? Map.of() : local);
-        if (imported != null) result.putAll(imported.tasks());
+        if (imported != null) {
+            result.putAll(imported.folder().tasks());
+            result.putAll(imported.workspace().tasks());
+        }
         return Map.copyOf(result);
     }
 
-    private VsCodeTaskImporter.Report vsCodeTaskReport(File projectRoot, Map<String, TaskService.WorkspaceTask> localTasks) {
+    private VsCodeTaskReports vsCodeTaskReports(File projectRoot, Map<String, TaskService.WorkspaceTask> localTasks) {
         Path root = projectRoot == null ? null : projectRoot.toPath();
-        return VsCodeTaskImporter.read(root, localTasks == null ? Set.of() : localTasks.keySet());
+        Set<String> names = new LinkedHashSet<>(localTasks == null ? Set.of() : localTasks.keySet());
+        VsCodeTaskImporter.Report folder = VsCodeTaskImporter.read(root, names);
+        names.addAll(folder.tasks().keySet());
+        return new VsCodeTaskReports(folder, workspaceTaskReport(root, names));
     }
 
-    private String showVsCodeTasks(File projectRoot, VsCodeTaskImporter.Report report) {
-        StringBuilder output = new StringBuilder("VS Code tasks.json compatibility\n\nWorkspace: ").append(projectRoot.getAbsolutePath()).append('\n');
-        appendVsCodeTaskReport(output, report);
+    private VsCodeTaskImporter.Report workspaceTaskReport(Path root, Set<String> reservedNames) {
+        if (editor.workspaceController == null || root == null || !editor.workspaceController.roots().contains(root.toAbsolutePath().normalize())) {
+            return new VsCodeTaskImporter.Report(null, Map.of(), Map.of(), List.of(), List.of(), "");
+        }
+        WorkspaceManifest.ImportedConfiguration manifest = editor.workspaceController.manifestConfiguration();
+        if (!manifest.present() || !manifest.usable() || !manifest.hasTasks()) {
+            return manifest.present() && !manifest.usable()
+                ? new VsCodeTaskImporter.Report(manifest.source(), Map.of(), Map.of(), List.of(), List.of(), manifest.failure())
+                : new VsCodeTaskImporter.Report(null, Map.of(), Map.of(), List.of(), List.of(), "");
+        }
+        return VsCodeTaskImporter.readWorkspaceConfiguration(manifest.source(), manifest.tasks(), reservedNames);
+    }
+
+    private String showVsCodeTasks(File projectRoot, VsCodeTaskReports reports) {
+        StringBuilder output = new StringBuilder("VS Code task compatibility\n\nWorkspace: ").append(projectRoot.getAbsolutePath()).append('\n');
+        appendVsCodeTaskReports(output, reports);
         editor.showScratchBuffer("[VS Code tasks.json]", output.toString());
-        return report != null && report.present() ? "Showing VS Code tasks.json compatibility" : "No .vscode/tasks.json was found for this workspace.";
+        return reports != null && (reports.folder().present() || reports.workspace().present())
+            ? "Showing VS Code task compatibility" : "No .vscode/tasks.json or imported workspace tasks were found for this workspace.";
     }
 
-    private static void appendVsCodeTaskReport(StringBuilder output, VsCodeTaskImporter.Report report) {
+    private static void appendVsCodeTaskReports(StringBuilder output, VsCodeTaskReports reports) {
+        if (reports == null) return;
+        appendVsCodeTaskReport(output, "VS Code tasks.json", reports.folder());
+        appendVsCodeTaskReport(output, "Imported VS Code workspace tasks", reports.workspace());
+    }
+
+    private static void appendVsCodeTaskReport(StringBuilder output, String title, VsCodeTaskImporter.Report report) {
         if (report == null) return;
-        output.append("\nVS Code tasks.json:\n");
+        output.append("\n").append(title).append(":\n");
         if (!report.present()) {
             output.append("  (not found; no VS Code tasks were imported)\n");
             return;
@@ -406,39 +444,31 @@ final class JobQuickfixController {
             return "Task not found: " + normalizedName + " (use :task list or :task add)";
         }
         File activeFile = activeTaskFile();
-        TaskService.TaskExecutionPlan plan;
+        List<TaskService.TaskExecutionPlan> plans;
         try {
-            plan = editor.taskService.buildExecutionPlan(task, projectRoot, activeFile);
+            plans = taskExecutionPlans(normalizedName, task, tasks, projectRoot, activeFile);
         } catch (IOException | IllegalArgumentException error) {
             return "Task validation failed: " + error.getMessage();
         }
-        String validationError = validateTaskPlan(plan);
+        String validationError = validateTaskPlans(plans);
         if (validationError != null) {
             return validationError;
         }
+        TaskService.TaskExecutionPlan plan = plans.get(plans.size() - 1);
         RemoteWorkspaceSessionService.Connection remoteConnection = editor.remoteWorkspaceSessions == null
             ? null : editor.remoteWorkspaceSessions.connectionFor(projectRoot.toPath());
         if (remoteConnection != null) {
-            return runActivatedRemoteTask(normalizedName, plan, activeFile, remoteConnection, dryRun);
+            return runActivatedRemoteTask(normalizedName, plans, activeFile, remoteConnection, dryRun);
         }
         DevContainerSessionService.Connection connection = editor.devContainerSessions == null
             ? null : editor.devContainerSessions.connectionFor(projectRoot.toPath());
         if (connection != null) {
-            return runConnectedContainerTask(normalizedName, plan, activeFile, connection, dryRun, false);
+            return runConnectedContainerTask(normalizedName, plans, activeFile, connection, dryRun, false);
         }
-        if (dryRun) return showTaskDryRun(plan);
+        if (dryRun) return showTaskDryRun(plans);
         int jobId = editor.asyncJobService.submit(
-            "task " + normalizedName + ": " + plan.expandedCommand(),
-            token -> runExternalCommand(
-                plan.processCommand(),
-                plan.workingDirectory(),
-                null,
-                token,
-                editor.configManager.getProcessTimeoutMs(),
-                editor.configManager.getProcessOutputMaxBytes(),
-                true,
-                plan.environment()
-            ),
+            "task " + normalizedName + ": " + taskPlanDescription(plans),
+            token -> runLocalTaskPlans(plans, token),
             (snapshot, result, error) -> handleTaskJobCompletion(normalizedName, plan, snapshot, result, error)
         );
         return "Task job " + jobId + " started (" + normalizedName + ")";
@@ -452,28 +482,33 @@ final class JobQuickfixController {
         File workspace = debugPlan.workspace().toFile();
         TaskService.TaskLoadResult loaded = editor.taskService.loadWorkspaceTasks(workspace);
         if (!loaded.isValid()) return new DebugSessionService.PreLaunchResult(false, loaded.diagnostics());
-        TaskService.WorkspaceTask task = loaded.tasks().get(taskName);
+        Map<String, TaskService.WorkspaceTask> tasks = effectiveWorkspaceTasks(workspace, loaded);
+        TaskService.WorkspaceTask task = tasks.get(taskName);
         if (task == null) {
             return new DebugSessionService.PreLaunchResult(false, List.of("Debug pre-launch task is not defined in "
                 + editor.taskService.taskFile(workspace).getAbsolutePath() + ": " + taskName));
         }
-        TaskService.TaskExecutionPlan plan;
+        List<TaskService.TaskExecutionPlan> plans;
         File activeFile = debugPlan.program() == null ? null : debugPlan.program().toFile();
         try {
-            plan = editor.taskService.buildExecutionPlan(task, workspace, activeFile);
+            plans = taskExecutionPlans(taskName, task, tasks, workspace, activeFile);
         } catch (IOException | IllegalArgumentException error) {
             return new DebugSessionService.PreLaunchResult(false, List.of("Debug pre-launch task validation failed: " + error.getMessage()));
         }
-        String validationError = validateTaskPlan(plan);
+        String validationError = validateTaskPlans(plans);
         if (validationError != null) return new DebugSessionService.PreLaunchResult(false, List.of(validationError));
+        TaskService.TaskExecutionPlan plan = plans.get(plans.size() - 1);
         CommandResult result;
         RemoteWorkspaceTaskTargets.Target remote = editor.remoteWorkspaceTaskTargets == null ? null
             : editor.remoteWorkspaceTaskTargets.targetForPath(debugPlan.workspace());
         if (remote != null && remote.workspace().executionRoot() != null
             && !remote.workspace().executionRoot().trim().equals(remote.localRoot().toString())) {
             try {
-                RemoteCommandRequest request = editor.taskService.buildRemoteCommandRequest(plan, remote.localRoot(), remote.workspace().executionRoot(), activeFile);
-                result = remoteCommandResult(remote.workspace().execute(request));
+                String remoteValidation = validateRemoteTaskPlans(plans, remote.localRoot(), remote.workspace().executionRoot(), activeFile);
+                if (remoteValidation != null) return new DebugSessionService.PreLaunchResult(false, List.of(remoteValidation));
+                result = runTaskPlans(plans, token, stage -> remoteCommandResult(remote.workspace().execute(
+                    editor.taskService.buildRemoteCommandRequest(stage, remote.localRoot(), remote.workspace().executionRoot(), activeFile)
+                )));
             } catch (IOException | IllegalArgumentException error) {
                 return new DebugSessionService.PreLaunchResult(false, List.of("Remote debug pre-launch task validation failed: " + error.getMessage()));
             } catch (Exception error) {
@@ -483,7 +518,10 @@ final class JobQuickfixController {
             }
         } else if (editor.devContainerSessions != null && editor.devContainerSessions.connectionFor(debugPlan.workspace()) != null) {
             try {
-                result = runConnectedContainerTaskProcess(plan, activeFile, editor.devContainerSessions.connectionFor(debugPlan.workspace()), token);
+                DevContainerSessionService.Connection connection = editor.devContainerSessions.connectionFor(debugPlan.workspace());
+                String containerValidation = validateContainerTaskPlans(plans, connection.workspace(), connection.remoteWorkingDirectory(), activeFile);
+                if (containerValidation != null) return new DebugSessionService.PreLaunchResult(false, List.of(containerValidation));
+                result = runConnectedContainerTaskPlans(plans, activeFile, connection, token);
             } catch (Exception error) {
                 String message = error.getMessage();
                 return new DebugSessionService.PreLaunchResult(false, List.of("Dev Container debug pre-launch task failed: "
@@ -491,15 +529,22 @@ final class JobQuickfixController {
             }
         } else if (editor.devContainerController != null && editor.devContainerController.hasConfiguration(debugPlan.workspace())) {
             try {
-                result = runContainerTaskProcess(plan, workspace, activeFile, token);
+                String containerValidation = validateContainerTaskPlans(plans, workspace.toPath(), "/<remote-workspace>", activeFile);
+                if (containerValidation != null) return new DebugSessionService.PreLaunchResult(false, List.of(containerValidation));
+                result = runContainerTaskPlans(plans, workspace, activeFile, token);
             } catch (Exception error) {
                 String message = error.getMessage();
                 return new DebugSessionService.PreLaunchResult(false, List.of("Dev Container debug pre-launch task failed: "
                     + (message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' '))));
             }
         } else {
-            result = runExternalCommand(plan.processCommand(), plan.workingDirectory(), null, token,
-                editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true, plan.environment());
+            try {
+                result = runLocalTaskPlans(plans, token);
+            } catch (Exception error) {
+                String message = error.getMessage();
+                return new DebugSessionService.PreLaunchResult(false, List.of("Debug pre-launch task failed: "
+                    + (message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' '))));
+            }
         }
         if (result.exitCode != 0) {
             String detail = taskOutput(result);
@@ -516,45 +561,43 @@ final class JobQuickfixController {
         TaskService.WorkspaceTask task = resolveTask(normalizedName, projectRoot, tasks);
         if (task == null) return "Task not found: " + normalizedName + " (use :task list or :task add)";
         File activeFile = activeTaskFile();
-        TaskService.TaskExecutionPlan plan;
+        List<TaskService.TaskExecutionPlan> plans;
         try {
-            plan = editor.taskService.buildExecutionPlan(task, projectRoot, activeFile);
+            plans = taskExecutionPlans(normalizedName, task, tasks, projectRoot, activeFile);
         } catch (IOException | IllegalArgumentException error) {
             return "Task validation failed: " + error.getMessage();
         }
-        String validationError = validateTaskPlan(plan);
+        String validationError = validateTaskPlans(plans);
         if (validationError != null) return validationError;
         RemoteWorkspaceTaskTargets.Target target = editor.remoteWorkspaceTaskTargets == null ? null
             : editor.remoteWorkspaceTaskTargets.targetFor(connectionId, projectRoot.toPath());
         if (target == null) return "Remote task requires a connected workspace containing: " + projectRoot.getAbsolutePath();
-        RemoteCommandRequest request;
-        try {
-            request = editor.taskService.buildRemoteCommandRequest(plan, target.localRoot(), target.workspace().executionRoot(), activeFile);
-        } catch (IllegalArgumentException | IOException error) {
-            return "Remote task validation failed: " + error.getMessage();
-        }
-        if (dryRun) return showRemoteTaskDryRun(target, plan, request);
+        String remoteValidation = validateRemoteTaskPlans(plans, target.localRoot(), target.workspace().executionRoot(), activeFile);
+        if (remoteValidation != null) return remoteValidation;
+        TaskService.TaskExecutionPlan plan = plans.get(plans.size() - 1);
+        if (dryRun) return showRemoteTaskDryRun(target, plans, activeFile);
         int jobId = editor.asyncJobService.submit(
             "task remote " + target.id() + " " + normalizedName,
-            token -> remoteCommandResult(target.workspace().execute(request)),
+            token -> runTaskPlans(plans, token, stage -> remoteCommandResult(target.workspace().execute(
+                editor.taskService.buildRemoteCommandRequest(stage, target.localRoot(), target.workspace().executionRoot(), activeFile)
+            ))),
             (snapshot, result, error) -> handleTaskJobCompletion(normalizedName, plan, snapshot, result, error)
         );
         return "Remote task job " + jobId + " started (" + target.id() + ":" + normalizedName + ")";
     }
 
-    private String runActivatedRemoteTask(String taskName, TaskService.TaskExecutionPlan plan, File activeFile,
+    private String runActivatedRemoteTask(String taskName, List<TaskService.TaskExecutionPlan> plans, File activeFile,
                                           RemoteWorkspaceSessionService.Connection connection, boolean dryRun) {
-        RemoteCommandRequest request;
-        try {
-            request = editor.taskService.buildRemoteCommandRequest(plan, connection.localRoot(), connection.workspace().executionRoot(), activeFile);
-        } catch (IllegalArgumentException | IOException error) {
-            return "Remote task validation failed: " + error.getMessage();
-        }
         RemoteWorkspaceTaskTargets.Target target = new RemoteWorkspaceTaskTargets.Target(connection.id(), connection.workspace(), connection.localRoot());
-        if (dryRun) return showRemoteTaskDryRun(target, plan, request);
+        String remoteValidation = validateRemoteTaskPlans(plans, connection.localRoot(), connection.workspace().executionRoot(), activeFile);
+        if (remoteValidation != null) return remoteValidation;
+        TaskService.TaskExecutionPlan plan = plans.get(plans.size() - 1);
+        if (dryRun) return showRemoteTaskDryRun(target, plans, activeFile);
         int jobId = editor.asyncJobService.submit(
             "task remote " + connection.id() + " " + taskName,
-            token -> remoteCommandResult(connection.workspace().execute(request)),
+            token -> runTaskPlans(plans, token, stage -> remoteCommandResult(connection.workspace().execute(
+                editor.taskService.buildRemoteCommandRequest(stage, connection.localRoot(), connection.workspace().executionRoot(), activeFile)
+            ))),
             (snapshot, result, error) -> handleTaskJobCompletion(taskName, plan, snapshot, result, error)
         );
         return "Task job " + jobId + " started remotely (" + connection.id() + ":" + taskName + ")";
@@ -570,50 +613,42 @@ final class JobQuickfixController {
         TaskService.WorkspaceTask task = resolveTask(normalizedName, projectRoot, tasks);
         if (task == null) return "Task not found: " + normalizedName + " (use :task list or :task add)";
         File activeFile = activeTaskFile();
-        TaskService.TaskExecutionPlan plan;
+        List<TaskService.TaskExecutionPlan> plans;
         try {
-            plan = editor.taskService.buildExecutionPlan(task, projectRoot, activeFile);
+            plans = taskExecutionPlans(normalizedName, task, tasks, projectRoot, activeFile);
         } catch (IOException | IllegalArgumentException error) {
             return "Task validation failed: " + error.getMessage();
         }
-        String validationError = validateTaskPlan(plan);
+        String validationError = validateTaskPlans(plans);
         if (validationError != null) return validationError;
         DevContainerSessionService.Connection connection = editor.devContainerSessions == null
             ? null : editor.devContainerSessions.connectionFor(projectRoot.toPath());
         if (connection != null) {
-            return runConnectedContainerTask(normalizedName, plan, activeFile, connection, dryRun, true);
+            return runConnectedContainerTask(normalizedName, plans, activeFile, connection, dryRun, true);
         }
-        RemoteCommandRequest request;
-        try {
-            request = editor.taskService.buildRemoteCommandRequest(plan, projectRoot.toPath(), "/<remote-workspace>", activeFile);
-            devContainerInvocation(plan.workspace().toPath(), "/<remote-workspace>", request, plan.task().shell());
-        } catch (IOException | IllegalArgumentException error) {
-            return "Dev Container task validation failed: " + error.getMessage();
-        }
-        if (dryRun) return showContainerTaskDryRun(plan, request);
+        TaskService.TaskExecutionPlan plan = plans.get(plans.size() - 1);
+        String containerValidation = validateContainerTaskPlans(plans, projectRoot.toPath(), "/<remote-workspace>", activeFile);
+        if (containerValidation != null) return containerValidation;
+        if (dryRun) return showContainerTaskDryRun(plans, activeFile);
         int jobId = editor.asyncJobService.submit(
             "task container " + normalizedName,
-            token -> runContainerTaskProcess(plan, projectRoot, activeFile, token),
+            token -> runContainerTaskPlans(plans, projectRoot, activeFile, token),
             (snapshot, result, error) -> handleTaskJobCompletion(normalizedName, plan, snapshot, result, error)
         );
         return "Dev Container task job " + jobId + " started (" + normalizedName + ")";
     }
 
     /** Runs a task through an already verified, explicitly connected Dev Container without re-probing it. */
-    private String runConnectedContainerTask(String taskName, TaskService.TaskExecutionPlan plan, File activeFile,
+    private String runConnectedContainerTask(String taskName, List<TaskService.TaskExecutionPlan> plans, File activeFile,
                                              DevContainerSessionService.Connection connection, boolean dryRun,
                                              boolean explicitlyRequested) {
-        RemoteCommandRequest request;
-        try {
-            request = editor.taskService.buildRemoteCommandRequest(plan, connection.workspace(), connection.remoteWorkingDirectory(), activeFile);
-            devContainerInvocation(connection.workspace(), connection.remoteWorkingDirectory(), request, plan.task().shell());
-        } catch (IOException | IllegalArgumentException error) {
-            return "Dev Container task validation failed: " + error.getMessage();
-        }
-        if (dryRun) return showConnectedContainerTaskDryRun(plan, request, connection);
+        String containerValidation = validateContainerTaskPlans(plans, connection.workspace(), connection.remoteWorkingDirectory(), activeFile);
+        if (containerValidation != null) return containerValidation;
+        TaskService.TaskExecutionPlan plan = plans.get(plans.size() - 1);
+        if (dryRun) return showConnectedContainerTaskDryRun(plans, activeFile, connection);
         int jobId = editor.asyncJobService.submit(
             "task container " + taskName,
-            token -> runConnectedContainerTaskProcess(plan, activeFile, connection, token),
+            token -> runConnectedContainerTaskPlans(plans, activeFile, connection, token),
             (snapshot, result, error) -> handleTaskJobCompletion(taskName, plan, snapshot, result, error)
         );
         return explicitlyRequested ? "Dev Container task job " + jobId + " started (" + taskName + ")"
@@ -638,6 +673,26 @@ final class JobQuickfixController {
         return runExternalCommand(invocation, projectRoot, null, token, timeout, outputLimit, true);
     }
 
+    private CommandResult runContainerTaskPlans(List<TaskService.TaskExecutionPlan> plans, File projectRoot, File activeFile,
+                                                AsyncJobService.JobToken token) throws Exception {
+        int timeout = editor.configManager.getProcessTimeoutMs();
+        int outputLimit = editor.configManager.getProcessOutputMaxBytes();
+        CommandResult rootProbe = runExternalCommand(devContainerPrefix(projectRoot.toPath()), projectRoot, null, token,
+            timeout, outputLimit, true);
+        if (rootProbe.exitCode != 0) return rootProbe;
+        String remoteRoot;
+        try {
+            remoteRoot = DevContainerWorkspace.remoteWorkingDirectory(rootProbe.stdout);
+        } catch (IllegalArgumentException error) {
+            return new CommandResult(-1, "", "Dev Container workspace probe failed: " + error.getMessage());
+        }
+        return runTaskPlans(plans, token, plan -> {
+            RemoteCommandRequest request = editor.taskService.buildRemoteCommandRequest(plan, projectRoot.toPath(), remoteRoot, activeFile);
+            List<String> invocation = devContainerInvocation(plan.workspace().toPath(), remoteRoot, request, plan.task().shell());
+            return runExternalCommand(invocation, projectRoot, null, token, timeout, outputLimit, true);
+        });
+    }
+
     private CommandResult runConnectedContainerTaskProcess(TaskService.TaskExecutionPlan plan, File activeFile,
                                                            DevContainerSessionService.Connection connection,
                                                            AsyncJobService.JobToken token) throws Exception {
@@ -647,6 +702,19 @@ final class JobQuickfixController {
         List<String> invocation = devContainerInvocation(connection.workspace(), connection.remoteWorkingDirectory(), request, plan.task().shell());
         return runExternalCommand(invocation, connection.workspace().toFile(), null, token,
             editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true);
+    }
+
+    private CommandResult runConnectedContainerTaskPlans(List<TaskService.TaskExecutionPlan> plans, File activeFile,
+                                                         DevContainerSessionService.Connection connection,
+                                                         AsyncJobService.JobToken token) throws Exception {
+        if (connection == null) throw new IOException("Dev Container session is unavailable");
+        return runTaskPlans(plans, token, plan -> {
+            RemoteCommandRequest request = editor.taskService.buildRemoteCommandRequest(plan, connection.workspace(),
+                connection.remoteWorkingDirectory(), activeFile);
+            List<String> invocation = devContainerInvocation(connection.workspace(), connection.remoteWorkingDirectory(), request, plan.task().shell());
+            return runExternalCommand(invocation, connection.workspace().toFile(), null, token,
+                editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true);
+        });
     }
 
     private List<String> devContainerPrefix(Path workspace) {
@@ -670,11 +738,11 @@ final class JobQuickfixController {
             return List.copyOf(command);
         }
         if (shell == TaskService.ShellPolicy.DIRECT) {
-            throw new IOException("direct Dev Container tasks require cwd to be the workspace root; use shell=login for a subdirectory");
+            throw new IOException("direct Dev Container tasks require cwd to be the workspace root; use shell=login or shell=shell for a subdirectory");
         }
         String directory = remoteDirectory(remoteRoot, request.relativeWorkingDirectory());
         command.add("/bin/sh");
-        command.add("-lc");
+        command.add(shell == TaskService.ShellPolicy.LOGIN ? "-lc" : "-c");
         command.add("cd -- " + posixQuote(directory) + " && exec " + posixCommand(request.command()));
         return List.copyOf(command);
     }
@@ -692,7 +760,7 @@ final class JobQuickfixController {
     }
 
     private static String posixQuote(String value) {
-        return "'" + value.replace("'", "'\\\"'\\\"'") + "'";
+        return "'" + value.replace("'", "'\"'\"'") + "'";
     }
 
     private TaskService.WorkspaceTask resolveTask(String name, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks) {
@@ -713,16 +781,127 @@ final class JobQuickfixController {
         return buffer != null && buffer.hasFilePath() ? new File(buffer.getFilePath()) : null;
     }
 
+    private List<TaskService.TaskExecutionPlan> taskExecutionPlans(String taskName, TaskService.WorkspaceTask task,
+                                                                    Map<String, TaskService.WorkspaceTask> tasks,
+                                                                    File projectRoot, File activeFile) throws IOException {
+        Map<String, TaskService.WorkspaceTask> available = new LinkedHashMap<>(tasks == null ? Map.of() : tasks);
+        available.putIfAbsent(taskName, task);
+        return editor.taskService.buildExecutionPlans(taskName, available, projectRoot, activeFile);
+    }
+
+    private String validateRemoteTaskPlans(List<TaskService.TaskExecutionPlan> plans, Path localRoot, String executionRoot,
+                                            File activeFile) {
+        try {
+            for (TaskService.TaskExecutionPlan plan : plans) {
+                editor.taskService.buildRemoteCommandRequest(plan, localRoot, executionRoot, activeFile);
+            }
+            return null;
+        } catch (IOException | IllegalArgumentException error) {
+            return "Remote task validation failed: " + error.getMessage();
+        }
+    }
+
+    private String validateContainerTaskPlans(List<TaskService.TaskExecutionPlan> plans, Path localRoot, String executionRoot,
+                                              File activeFile) {
+        try {
+            for (TaskService.TaskExecutionPlan plan : plans) {
+                RemoteCommandRequest request = editor.taskService.buildRemoteCommandRequest(plan, localRoot, executionRoot, activeFile);
+                devContainerInvocation(plan.workspace().toPath(), executionRoot, request, plan.task().shell());
+            }
+            return null;
+        } catch (IOException | IllegalArgumentException error) {
+            return "Dev Container task validation failed: " + error.getMessage();
+        }
+    }
+
+    private String validateTaskPlans(List<TaskService.TaskExecutionPlan> plans) {
+        if (plans == null || plans.isEmpty()) return "Task validation failed: no execution plans";
+        for (TaskService.TaskExecutionPlan plan : plans) {
+            String error = validateTaskPlan(plan);
+            if (error != null) return error + " (task " + plan.task().name() + ")";
+        }
+        return null;
+    }
+
+    private String taskPlanDescription(List<TaskService.TaskExecutionPlan> plans) {
+        if (plans == null || plans.isEmpty()) return "(no task)";
+        return plans.stream().map(plan -> plan.task().name()).collect(java.util.stream.Collectors.joining(" -> "));
+    }
+
+    private CommandResult runLocalTaskPlans(List<TaskService.TaskExecutionPlan> plans, AsyncJobService.JobToken token) throws Exception {
+        return runTaskPlans(plans, token, plan -> runExternalCommand(plan.processCommand(), plan.workingDirectory(), null, token,
+            editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true, plan.environment()));
+    }
+
+    private CommandResult runTaskPlans(List<TaskService.TaskExecutionPlan> plans, AsyncJobService.JobToken token,
+                                       TaskPlanRunner runner) throws Exception {
+        if (plans == null || plans.isEmpty()) return new CommandResult(-1, "", "Task execution plan is empty");
+        int limit = Math.max(1024, editor.configManager.getProcessOutputMaxBytes());
+        byte[] truncationMarker = "[shed: task sequence output truncated]\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        int contentLimit = Math.max(0, limit - truncationMarker.length);
+        java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+        boolean[] truncated = new boolean[] {false};
+        for (TaskService.TaskExecutionPlan plan : plans) {
+            if (token != null && token.isCancelled()) return new CommandResult(-1, output.toString(java.nio.charset.StandardCharsets.UTF_8), "Task cancelled");
+            appendTaskOutput(output, "==> task " + plan.task().name() + "\n", contentLimit, truncated);
+            CommandResult result = runner.run(plan);
+            String stageOutput = taskOutput(result);
+            if (!stageOutput.isBlank()) appendTaskOutput(output, stageOutput + "\n", contentLimit, truncated);
+            if (result.exitCode != 0) {
+                String detail = result.stderr == null || result.stderr.isBlank() ? "Task '" + plan.task().name() + "' failed" : result.stderr;
+                if (truncated[0]) output.writeBytes(truncationMarker);
+                return new CommandResult(result.exitCode, output.toString(java.nio.charset.StandardCharsets.UTF_8), detail);
+            }
+        }
+        if (truncated[0]) output.writeBytes(truncationMarker);
+        return new CommandResult(0, output.toString(java.nio.charset.StandardCharsets.UTF_8), "");
+    }
+
+    private void appendTaskOutput(java.io.ByteArrayOutputStream output, String value, int limit, boolean[] truncated) {
+        if (output == null || value == null || value.isEmpty() || truncated == null || truncated.length == 0 || truncated[0]) return;
+        byte[] bytes = value.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        int remaining = limit - output.size();
+        if (remaining <= 0) {
+            truncated[0] = true;
+            return;
+        }
+        int count = Math.min(remaining, bytes.length);
+        output.write(bytes, 0, count);
+        if (count < bytes.length) truncated[0] = true;
+    }
+
+    @FunctionalInterface
+    private interface TaskPlanRunner {
+        CommandResult run(TaskService.TaskExecutionPlan plan) throws Exception;
+    }
+
 
     String validateTaskPlan(TaskService.TaskExecutionPlan plan) {
         String command = plan.expandedCommand();
         if (command.length() > editor.configManager.getShellCommandMaxLength()) {
             return "Error: command length exceeds shell.command.max.length";
         }
-        if (plan.task().shell() == TaskService.ShellPolicy.LOGIN && !editor.configManager.getShellCommandEnabled()) {
+        if (plan.task().shell() != TaskService.ShellPolicy.DIRECT && !editor.configManager.getShellCommandEnabled()) {
             return "Error: shell tasks disabled by shell.command.enabled=false";
         }
         return null;
+    }
+
+    String showTaskDryRun(List<TaskService.TaskExecutionPlan> plans) {
+        if (plans == null || plans.isEmpty()) return "Task dry run unavailable: no execution plans";
+        if (plans.size() == 1) return showTaskDryRun(plans.get(0));
+        StringBuilder output = new StringBuilder("Task dependency dry run: ")
+            .append(plans.get(plans.size() - 1).task().name()).append("\n\n");
+        for (int index = 0; index < plans.size(); index++) {
+            TaskService.TaskExecutionPlan plan = plans.get(index);
+            output.append(index + 1).append(". ").append(plan.task().name()).append("\n");
+            output.append("   command: ").append(plan.expandedCommand()).append("\n");
+            output.append("   shell: ").append(plan.task().shell().configValue()).append("\n");
+            output.append("   cwd: ").append(plan.workingDirectory().getAbsolutePath()).append("\n");
+        }
+        output.append("\nTasks run in this exact order; this dry run starts nothing.\n");
+        editor.showScratchBuffer("[task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
+        return "Task dependency dry run shown (not started)";
     }
 
 
@@ -736,6 +915,37 @@ final class JobQuickfixController {
         output.append("env keys: ").append(plan.environment().isEmpty() ? "(none)" : String.join(", ", plan.environment().keySet())).append("\n");
         editor.showScratchBuffer("[task dry-run " + plan.task().name() + "]", output.toString());
         return "Task dry run shown (not started)";
+    }
+
+    private String showRemoteTaskDryRun(RemoteWorkspaceTaskTargets.Target target, List<TaskService.TaskExecutionPlan> plans,
+                                        File activeFile) {
+        String validation = validateRemoteTaskPlans(plans, target.localRoot(), target.workspace().executionRoot(), activeFile);
+        if (validation != null) return validation;
+        if (plans.size() == 1) {
+            try {
+                TaskService.TaskExecutionPlan plan = plans.get(0);
+                return showRemoteTaskDryRun(target, plan, editor.taskService.buildRemoteCommandRequest(plan,
+                    target.localRoot(), target.workspace().executionRoot(), activeFile));
+            } catch (IOException | IllegalArgumentException error) {
+                return "Remote task validation failed: " + error.getMessage();
+            }
+        }
+        StringBuilder output = new StringBuilder("Remote task dependency dry run: ")
+            .append(plans.get(plans.size() - 1).task().name()).append("\n\nconnection: ").append(target.id()).append("\n\n");
+        try {
+            for (int index = 0; index < plans.size(); index++) {
+                TaskService.TaskExecutionPlan plan = plans.get(index);
+                RemoteCommandRequest request = editor.taskService.buildRemoteCommandRequest(plan, target.localRoot(), target.workspace().executionRoot(), activeFile);
+                output.append(index + 1).append(". ").append(plan.task().name()).append("\n")
+                    .append("   remote cwd: /").append(request.relativeWorkingDirectory()).append(" (relative to connection root)\n")
+                    .append("   command: ").append(String.join(" ", request.command())).append("\n");
+            }
+        } catch (IOException | IllegalArgumentException error) {
+            return "Remote task validation failed: " + error.getMessage();
+        }
+        output.append("\nTasks run in this exact order; this dry run starts nothing.\n");
+        editor.showScratchBuffer("[remote task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
+        return "Remote task dependency dry run shown (not started)";
     }
 
     private String showRemoteTaskDryRun(RemoteWorkspaceTaskTargets.Target target, TaskService.TaskExecutionPlan plan,
@@ -753,6 +963,29 @@ final class JobQuickfixController {
         return "Remote task dry run shown (not started)";
     }
 
+    private String showContainerTaskDryRun(List<TaskService.TaskExecutionPlan> plans, File activeFile) {
+        if (plans.size() == 1) {
+            try {
+                TaskService.TaskExecutionPlan plan = plans.get(0);
+                RemoteCommandRequest request = editor.taskService.buildRemoteCommandRequest(plan, plan.workspace().toPath(), "/<remote-workspace>", activeFile);
+                return showContainerTaskDryRun(plan, request);
+            } catch (IOException | IllegalArgumentException error) {
+                return "Dev Container task validation failed: " + error.getMessage();
+            }
+        }
+        StringBuilder output = new StringBuilder("Dev Container task dependency dry run: ")
+            .append(plans.get(plans.size() - 1).task().name()).append("\n\n");
+        for (int index = 0; index < plans.size(); index++) {
+            TaskService.TaskExecutionPlan plan = plans.get(index);
+            output.append(index + 1).append(". ").append(plan.task().name()).append("\n")
+                .append("   command: ").append(plan.expandedCommand()).append("\n")
+                .append("   cwd: ").append(plan.workingDirectory().getAbsolutePath()).append("\n");
+        }
+        output.append("\nThe Dev Container workspace path is resolved once when this sequence runs; this dry run starts nothing.\n");
+        editor.showScratchBuffer("[container task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
+        return "Dev Container task dependency dry run shown (not started)";
+    }
+
     private String showContainerTaskDryRun(TaskService.TaskExecutionPlan plan, RemoteCommandRequest request) {
         StringBuilder output = new StringBuilder("Dev Container task dry run: ").append(plan.task().name()).append("\n\n");
         output.append("host workspace: ").append(plan.workspace().getAbsolutePath()).append("\n");
@@ -763,6 +996,32 @@ final class JobQuickfixController {
         output.append("The remote workspace path is resolved by an explicit devcontainer exec call when this task runs.\n");
         editor.showScratchBuffer("[container task dry-run " + plan.task().name() + "]", output.toString());
         return "Dev Container task dry run shown (not started)";
+    }
+
+    private String showConnectedContainerTaskDryRun(List<TaskService.TaskExecutionPlan> plans, File activeFile,
+                                                    DevContainerSessionService.Connection connection) {
+        if (plans.size() == 1) {
+            try {
+                TaskService.TaskExecutionPlan plan = plans.get(0);
+                RemoteCommandRequest request = editor.taskService.buildRemoteCommandRequest(plan, connection.workspace(),
+                    connection.remoteWorkingDirectory(), activeFile);
+                return showConnectedContainerTaskDryRun(plan, request, connection);
+            } catch (IOException | IllegalArgumentException error) {
+                return "Dev Container task validation failed: " + error.getMessage();
+            }
+        }
+        StringBuilder output = new StringBuilder("Connected Dev Container task dependency dry run: ")
+            .append(plans.get(plans.size() - 1).task().name()).append("\n\nhost workspace: ")
+            .append(connection.workspace()).append("\ncontainer workspace: ").append(connection.remoteWorkingDirectory()).append("\n\n");
+        for (int index = 0; index < plans.size(); index++) {
+            TaskService.TaskExecutionPlan plan = plans.get(index);
+            output.append(index + 1).append(". ").append(plan.task().name()).append("\n")
+                .append("   command: ").append(plan.expandedCommand()).append("\n")
+                .append("   cwd: ").append(plan.workingDirectory().getAbsolutePath()).append("\n");
+        }
+        output.append("\nTasks run in this exact order in the explicitly connected container; this dry run starts nothing.\n");
+        editor.showScratchBuffer("[container task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
+        return "Connected Dev Container task dependency dry run shown (not started)";
     }
 
     private String showConnectedContainerTaskDryRun(TaskService.TaskExecutionPlan plan, RemoteCommandRequest request,

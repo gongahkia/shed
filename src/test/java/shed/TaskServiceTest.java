@@ -216,4 +216,96 @@ public class TaskServiceTest {
         assertEquals(List.of("runner", "/srv/project/file with spaces.py", "two words"), remote.command());
         assertEquals("/srv/project", remote.environment().get("ROOT"));
     }
+
+    @Test
+    void sessionOnlyShellArgumentsExpandBeforePosixQuotingAndUseNonLoginShells() throws IOException {
+        TaskService service = new TaskService();
+        Path workspace = tempDir.resolve("workspace's name");
+        Path source = workspace.resolve("file's value.py");
+        Files.createDirectories(workspace);
+        Files.writeString(source, "print('ok')\n");
+        TaskService.WorkspaceTask task = TaskService.shellWorkspaceTask("vscode-shell",
+            List.of("printf", "%s", "${file}", "two words", "$HOME"), "${workspaceFolder}", Map.of(),
+            TaskService.ProblemMatcher.NONE, TaskService.Presentation.NEVER);
+
+        TaskService.TaskExecutionPlan plan = service.buildExecutionPlan(task, workspace.toFile(), source.toFile());
+        RemoteCommandRequest remote = service.buildRemoteCommandRequest(plan, workspace, "/srv/project", source.toFile());
+
+        assertTrue(task.sessionOnly());
+        assertEquals(TaskService.ShellPolicy.SHELL, task.shell());
+        assertEquals("-c", plan.processCommand().get(1));
+        assertEquals("'printf' '%s' '" + source.toString().replace("'", "'\"'\"'") + "' 'two words' '$HOME'", plan.expandedCommand());
+        assertEquals(List.of("sh", "-c", "'printf' '%s' '/srv/project/file'\"'\"'s value.py' 'two words' '$HOME'"), remote.command());
+        assertThrows(IllegalArgumentException.class, () -> service.saveWorkspaceTasks(workspace.toFile(), Map.of("vscode-shell", task)));
+    }
+
+    @Test
+    void taskVariablesExposeBoundedWorkspaceAndFileMetadataLocallyAndRemotely() throws IOException {
+        TaskService service = new TaskService();
+        Path mirror = tempDir.resolve("mirror");
+        Path workspace = mirror.resolve("project with spaces");
+        Path source = workspace.resolve("src/Example.test.java");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, "class Example {}\n");
+        TaskService.WorkspaceTask task = TaskService.directWorkspaceTask("vscode-metadata", List.of("runner",
+                "${workspaceFolderBasename}", "${fileWorkspaceFolder}", "${relativeFileDirname}",
+                "${fileBasenameNoExtension}", "${fileExtname}", "${fileDirname}", "${fileDirnameBasename}"),
+            "${fileDirname}", Map.of("ROOT", "${fileWorkspaceFolder}"),
+            TaskService.ProblemMatcher.NONE, TaskService.Presentation.NEVER);
+
+        TaskService.TaskExecutionPlan plan = service.buildExecutionPlan(task, workspace.toFile(), source.toFile());
+        RemoteCommandRequest remote = service.buildRemoteCommandRequest(plan, mirror, "/srv/project", source.toFile());
+
+        assertEquals(List.of("runner", "project with spaces", workspace.toString(), "src", "Example.test", ".java",
+            source.getParent().toString(), "src"), plan.processCommand());
+        assertEquals(source.getParent().toFile().getCanonicalFile(), plan.workingDirectory());
+        assertEquals(workspace.toString(), plan.environment().get("ROOT"));
+        assertEquals(List.of("runner", "project with spaces", "/srv/project/project with spaces", "src", "Example.test", ".java",
+            "/srv/project/project with spaces/src", "src"), remote.command());
+        assertEquals("/srv/project/project with spaces", remote.environment().get("ROOT"));
+    }
+
+    @Test
+    void buildsNativeDependenciesBeforeTheRequestedTaskAndPersistsThem() throws IOException {
+        TaskService service = new TaskService();
+        Path project = tempDir.resolve("dependency-project");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve(".shedtasks"), """
+            schema_version = 1
+
+            [task.compile]
+            command = "echo compile"
+
+            [task.verify]
+            command = "echo verify"
+            depends_on = ["compile"]
+            """);
+
+        TaskService.TaskLoadResult loaded = service.loadWorkspaceTasks(project.toFile());
+        List<TaskService.TaskExecutionPlan> plans = service.buildExecutionPlans("verify", loaded.tasks(), project.toFile(), null);
+
+        assertTrue(loaded.isValid());
+        assertEquals(List.of("compile"), loaded.tasks().get("verify").dependencies());
+        assertEquals(List.of("compile", "verify"), plans.stream().map(plan -> plan.task().name()).toList());
+
+        TaskService.WorkspaceTask persisted = TaskService.withDependencies(TaskService.defaultWorkspaceTask("release", "echo release"), List.of("verify"));
+        service.saveWorkspaceTasks(project.toFile(), Map.of("compile", loaded.tasks().get("compile"), "verify", loaded.tasks().get("verify"), "release", persisted));
+        assertTrue(Files.readString(project.resolve(".shedtasks")).contains("depends_on = [\"verify\"]"));
+    }
+
+    @Test
+    void rejectsUnresolvedAndCyclicDependenciesBeforeBuildingAnyPlan() throws IOException {
+        TaskService service = new TaskService();
+        Path project = tempDir.resolve("dependency-invalid");
+        Files.createDirectories(project);
+        TaskService.WorkspaceTask first = TaskService.withDependencies(TaskService.defaultWorkspaceTask("first", "echo first"), List.of("second"));
+        TaskService.WorkspaceTask second = TaskService.withDependencies(TaskService.defaultWorkspaceTask("second", "echo second"), List.of("first"));
+        TaskService.WorkspaceTask missing = TaskService.withDependencies(TaskService.defaultWorkspaceTask("missing", "echo missing"), List.of("absent"));
+
+        IOException cycle = assertThrows(IOException.class, () -> service.buildExecutionPlans("first", Map.of("first", first, "second", second), project.toFile(), null));
+        IOException unresolved = assertThrows(IOException.class, () -> service.buildExecutionPlans("missing", Map.of("missing", missing), project.toFile(), null));
+
+        assertTrue(cycle.getMessage().contains("first -> second -> first"));
+        assertTrue(unresolved.getMessage().contains("task dependency not found: absent"));
+    }
 }

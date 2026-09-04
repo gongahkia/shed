@@ -127,7 +127,9 @@ final class TestController {
             TestAdapter adapter = tests.adapter(raw.id());
             TestService.AdapterSpec spec = tests.resolvedSpec(state.root, raw);
             if (adapter == null || spec == null) continue;
-            if ("maven".equals(spec.id()) || "gradle".equals(spec.id())) started += startStaticDiscovery(state, spec);
+            if ("maven".equals(spec.id()) || "gradle".equals(spec.id()) || "unittest".equals(spec.id())) {
+                started += startStaticDiscovery(state, spec);
+            }
             TestService.Command command = adapter.discovery(state.root, spec);
             if (!command.executable()) continue;
             try {
@@ -411,7 +413,9 @@ final class TestController {
             String adapter = execution == null ? "Test job" : execution.spec().id();
             state.output = adapter + " failed: " + (error == null ? job.getErrorMessage() : error.getMessage());
         } else {
-            String output = execution.result().stdout == null ? "" : execution.result().stdout;
+            String stdout = execution.result().stdout == null ? "" : execution.result().stdout;
+            String stderr = execution.result().stderr == null ? "" : execution.result().stderr;
+            String output = stdout.isBlank() ? stderr : stderr.isBlank() ? stdout : stdout + "\n" + stderr;
             List<TestService.TestCase> parsed = "discover".equals(operation(job))
                 ? execution.adapter().parseDiscovery(execution.root(), output)
                 : execution.adapter().parseRun(execution.root(), execution.command(), output);
@@ -420,7 +424,7 @@ final class TestController {
                     TestService.Status.ERRORED, 0, output.isBlank() ? execution.result().stderr : output));
             }
             if (!parsed.isEmpty()) merge(state, parsed);
-            state.output = output.isBlank() ? execution.result().stderr : output;
+            state.output = output;
             if (state.output.isBlank()) state.output = execution.spec().id() + " exited " + execution.result().exitCode;
             if (!execution.diagnostics().isEmpty()) state.output += "\n" + String.join("\n", execution.diagnostics());
             if (!"discover".equals(operation(job))) publishProblems(state, execution.spec().id());

@@ -612,7 +612,7 @@ final class SessionConfigController {
         String args = split < 0 ? "" : trimmed.substring(split + 1).trim();
         if (subcommand.equals("roots") || subcommand.equals("ui") || subcommand.equals("folders") || subcommand.equals("add")
             || subcommand.equals("open") || subcommand.equals("remove") || subcommand.equals("rm") || subcommand.equals("switch") || subcommand.equals("use")
-            || subcommand.equals("import") || subcommand.equals("export")) {
+            || subcommand.equals("import") || subcommand.equals("reload") || subcommand.equals("refresh") || subcommand.equals("export")) {
             return editor.workspaceController.handle(trimmed);
         }
         if ("index".equals(subcommand)) {
@@ -756,6 +756,8 @@ final class SessionConfigController {
         payload.put("workspaceRoots", editor.workspaceController.serializeRoots());
         Path activeWorkspaceRoot = editor.workspaceController.activeRoot();
         if (activeWorkspaceRoot != null) payload.put("workspaceActiveRoot", activeWorkspaceRoot.toString());
+        String workspaceManifestSource = editor.workspaceController.serializeManifestSource();
+        if (!workspaceManifestSource.isBlank()) payload.put("workspaceManifestSource", workspaceManifestSource);
         payload.put("uiSettings", captureSessionUiSettings());
         payload.put("savedAt", editor.commandLogTimeFormat.format(LocalDateTime.now()));
         try {
@@ -879,7 +881,8 @@ final class SessionConfigController {
 
         String savedTreeRoot = MiniJson.asString(payload.get("treeRoot"));
         File legacyRoot = savedTreeRoot == null || savedTreeRoot.isBlank() ? null : new File(savedTreeRoot);
-        editor.workspaceController.restore(payload.get("workspaceRoots"), MiniJson.asString(payload.get("workspaceActiveRoot")), legacyRoot);
+        editor.workspaceController.restore(payload.get("workspaceRoots"), MiniJson.asString(payload.get("workspaceActiveRoot")), legacyRoot,
+            MiniJson.asString(payload.get("workspaceManifestSource")));
         editor.workbenchPlacementState = WorkbenchPlacementState.fromList(payload.get("toolPlacements"));
         applySessionUiSettings(MiniJson.asObject(payload.get("uiSettings")));
         return true;

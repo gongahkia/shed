@@ -60,6 +60,21 @@ public class DebugAdapterRegistryTest {
     }
 
     @Test
+    void expandsBoundedActiveFileMetadataInsideDebugArguments() {
+        Map<String, Object> values = configuration("launch");
+        values.put("debug.configuration.main.args", "${workspaceFolderBasename} ${fileWorkspaceFolder} ${relativeFileDirname} ${fileBasenameNoExtension} ${fileExtname} ${fileDirname} ${fileDirnameBasename}");
+        DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.validate(values);
+        Path workspace = Path.of("build/debug-argument-workspace").toAbsolutePath();
+        Path source = workspace.resolve("src/Sample.test.java");
+
+        DebugAdapterRegistry.PlanResult plan = DebugAdapterRegistry.plan(validation, "main", workspace, source);
+
+        assertTrue(plan.launchable());
+        assertEquals(java.util.List.of("debug-argument-workspace", workspace.toString(), "src", "Sample.test", ".java",
+            source.getParent().toString(), "src"), plan.plan().args());
+    }
+
+    @Test
     void acceptsOptionalConfigurationFileExtensionsAndRejectsUnsupportedPrograms() {
         Map<String, Object> values = configuration("launch");
         values.put("debug.configuration.main.file_extensions", ".py,.pyw");

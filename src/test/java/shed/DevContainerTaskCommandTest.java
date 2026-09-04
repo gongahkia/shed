@@ -34,6 +34,17 @@ class DevContainerTaskCommandTest {
     }
 
     @Test
+    void preservesNonLoginShellTaskAndQuotesSubdirectory() throws Exception {
+        List<String> command = JobQuickfixController.devContainerInvocation(
+            Path.of("/host/project"), "/workspaces/project",
+            new RemoteCommandRequest(List.of("sh", "-c", "'printf' '%s' 'two words'"), "packages/web", Map.of()),
+            TaskService.ShellPolicy.SHELL);
+
+        assertEquals(List.of("devcontainer", "exec", "--workspace-folder", "/host/project", "/bin/sh", "-c",
+            "cd -- '/workspaces/project/packages/web' && exec 'sh' '-c' ''\"'\"'printf'\"'\"' '\"'\"'%s'\"'\"' '\"'\"'two words'\"'\"''"), command);
+    }
+
+    @Test
     void rejectsSubdirectoryForDirectTask() {
         assertThrows(IOException.class, () -> JobQuickfixController.devContainerInvocation(
             Path.of("/host/project"), "/workspaces/project",

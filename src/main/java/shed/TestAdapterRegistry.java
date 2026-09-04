@@ -17,6 +17,7 @@ final class TestAdapterRegistry {
         register(new MavenAdapter());
         register(new GradleAdapter());
         register(new PytestAdapter());
+        register(new UnittestAdapter());
         register(new JestAdapter());
         register(new VitestAdapter());
         register(new GoAdapter());
@@ -40,7 +41,7 @@ final class TestAdapterRegistry {
             Path local = root.resolve(name);
             return Files.isExecutable(local) ? local : Path.of(fallback);
         }
-        final boolean packageHas(Path root, String dependency) {
+        static boolean packageHas(Path root, String dependency) {
             Path file = root.resolve("package.json");
             if (!Files.isRegularFile(file)) return false;
             try { return Files.readString(file, StandardCharsets.UTF_8).toLowerCase(Locale.ROOT).contains("\"" + dependency.toLowerCase(Locale.ROOT) + "\""); }
@@ -86,8 +87,12 @@ final class TestAdapterRegistry {
     private static final class PytestAdapter extends BuiltInAdapter {
         @Override public String id() { return "pytest"; }
         @Override public boolean supports(Path root) {
-            return Files.exists(root.resolve("pytest.ini")) || Files.exists(root.resolve("tox.ini")) || Files.exists(root.resolve("setup.cfg"))
-                || packageHas(root, "pytest") || Files.isDirectory(root.resolve("tests"));
+            return projectUsesPytest(root);
+        }
+        private static boolean projectUsesPytest(Path root) {
+            if (Files.exists(root.resolve("pytest.ini")) || Files.exists(root.resolve("tox.ini")) || Files.exists(root.resolve("setup.cfg"))
+                || packageHas(root, "pytest")) return true;
+            return Files.isDirectory(root.resolve("tests")) && !TestService.hasImportableUnittestTests(root);
         }
         @Override public List<String> defaultCommand(Path root) {
             Path virtual = root.resolve(".venv/bin/pytest");
@@ -114,6 +119,43 @@ final class TestAdapterRegistry {
             return result;
         }
         @Override public List<TestService.TestCase> parseRun(Path root, TestService.Command command, String output) { return TestService.parseJUnit(root, id(), command.reports()); }
+    }
+
+    /** Python's standard-library runner. Discovery stays source-only because unittest has no collect-only mode. */
+    private static final class UnittestAdapter extends BuiltInAdapter {
+        @Override public String id() { return "unittest"; }
+
+        @Override public boolean supports(Path root) {
+            return !PytestAdapter.projectUsesPytest(root) && TestService.hasImportableUnittestTests(root);
+        }
+
+        @Override public List<String> defaultCommand(Path root) {
+            Path unixVirtualEnvironment = root.resolve(".venv/bin/python");
+            if (Files.isExecutable(unixVirtualEnvironment)) return List.of(unixVirtualEnvironment.toString(), "-m", "unittest");
+            Path windowsVirtualEnvironment = root.resolve(".venv/Scripts/python.exe");
+            if (Files.isExecutable(windowsVirtualEnvironment)) return List.of(windowsVirtualEnvironment.toString(), "-m", "unittest");
+            return List.of("python", "-m", "unittest");
+        }
+
+        @Override public TestService.Command discovery(TestService.AdapterSpec spec) {
+            return new TestService.Command(List.of(), List.of());
+        }
+
+        @Override public TestService.Command run(TestService.AdapterSpec spec, List<TestService.TestCase> selected, Path cache) {
+            List<String> command = new ArrayList<>(base(spec));
+            if (selected == null || selected.isEmpty()) command.addAll(List.of("discover", "-v"));
+            else {
+                command.add("-v");
+                for (TestService.TestCase test : selected) command.add(test.id());
+            }
+            return new TestService.Command(command, List.of());
+        }
+
+        @Override public List<TestService.TestCase> parseDiscovery(Path root, String output) { return List.of(); }
+
+        @Override public List<TestService.TestCase> parseRun(Path root, TestService.Command command, String output) {
+            return TestService.parseUnittest(root, output);
+        }
     }
 
     private abstract static class NodeAdapter extends BuiltInAdapter {

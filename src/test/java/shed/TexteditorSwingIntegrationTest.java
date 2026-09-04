@@ -227,6 +227,42 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void localTaskDependenciesRunInDeclaredOrderAsOneJob() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-task-dependencies");
+        Path workspace = tempDir.resolve("task-dependency-workspace");
+        Path source = workspace.resolve("src/Main.java");
+        Path marker = workspace.resolve("task-order.txt");
+        Files.createDirectories(home);
+        Files.createDirectories(source.getParent());
+        Files.writeString(workspace.resolve("pom.xml"), "<project/>\n", StandardCharsets.UTF_8);
+        Files.writeString(source, "class Main {}\n", StandardCharsets.UTF_8);
+        Files.writeString(workspace.resolve(".shedtasks"), """
+            schema_version = 1
+
+            [task.prepare]
+            command = "printf prepare > task-order.txt"
+
+            [task.verify]
+            command = "grep -qx prepare task-order.txt && printf -- -verify >> task-order.txt"
+            depends_on = ["prepare"]
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, source);
+        try {
+            String requested = onEdt(() -> editor.handleTaskCommand("run verify"));
+            int jobId = Integer.parseInt(requested.replaceAll("Task job ([0-9]+) started.*", "$1"));
+
+            assertTrue(awaitJobCompletion(editor, jobId));
+            assertEquals("prepare-verify", Files.readString(marker, StandardCharsets.UTF_8));
+            assertTrue(onEdt(() -> editor.jobQuickfixController.taskOutputForPanel(jobId).contains("==> task prepare")));
+            assertTrue(onEdt(() -> editor.jobQuickfixController.taskOutputForPanel(jobId).contains("==> task verify")));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void vscodeProcessTaskDryRunIsSessionOnlyAndUsesDirectArguments() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-vscode-task");
@@ -675,6 +711,160 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void vscodeLaunchProfileCanRunOnlyItsAcceptedProcessTaskLabelBeforeOpeningAnAdapter() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-vscode-debug-prelaunch");
+        Path workspace = tempDir.resolve("vscode-debug-prelaunch-workspace");
+        Path file = workspace.resolve("Main.java");
+        Path marker = workspace.resolve("prelaunch.marker");
+        Path adapter = tempDir.resolve("closed-vscode-debug-adapter.sh");
+        Files.createDirectories(home.resolve(".shed"));
+        Files.createDirectories(workspace.resolve(".vscode"));
+        Files.writeString(file, "class Main {}\n", StandardCharsets.UTF_8);
+        Files.writeString(adapter, "#!/bin/sh\nexit 0\n", StandardCharsets.UTF_8);
+        assertTrue(adapter.toFile().setExecutable(true));
+        Files.writeString(home.resolve(".shed/config.toml"), """
+            schema_version = 1
+            "debug.enabled" = true
+            "debug.adapter.closed.command" = "%s"
+            "debug.adapter.closed.capabilities" = "launch"
+            "process.timeout.ms" = 1000
+            """.formatted(adapter));
+        Files.writeString(workspace.resolve(".vscode/tasks.json"), """
+            {"version":"2.0.0","tasks":[
+              {"label":"Prepare source","type":"process","command":"touch","args":["prelaunch.marker"],"problemMatcher":[]}
+            ]}
+            """, StandardCharsets.UTF_8);
+        Files.writeString(workspace.resolve(".vscode/launch.json"), """
+            {"configurations":[
+              {"name":"Run source","type":"closed","request":"launch","program":"${file}","preLaunchTask":"Prepare source"}
+            ]}
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            String requested = onEdt(() -> editor.handleDebugCommand("start vscode:Run source"));
+            int jobId = Integer.parseInt(requested.replaceAll(".*\\(job ([0-9]+)\\)\\.", "$1"));
+
+            assertTrue(awaitJobCompletion(editor, jobId));
+            assertTrue(Files.isRegularFile(marker));
+            assertEquals(DebugSessionService.Lifecycle.FAILED, onEdt(() -> editor.debugSessionController.snapshotForPanel().lifecycle()));
+            assertFalse(Files.exists(workspace.resolve(".shedtasks")));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void importedCodeWorkspaceCanRunItsAcceptedTaskBeforeItsAcceptedLaunchProfile() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-workspace-launch-prelaunch");
+        Path workspace = tempDir.resolve("workspace-launch-project");
+        Path file = workspace.resolve("Main.java");
+        Path marker = workspace.resolve("workspace-prelaunch.marker");
+        Path manifest = tempDir.resolve("team.code-workspace");
+        Path adapter = tempDir.resolve("closed-workspace-debug-adapter.sh");
+        Files.createDirectories(home.resolve(".shed"));
+        Files.createDirectories(workspace);
+        Files.writeString(file, "class Main {}\n", StandardCharsets.UTF_8);
+        Files.writeString(adapter, "#!/bin/sh\nexit 0\n", StandardCharsets.UTF_8);
+        assertTrue(adapter.toFile().setExecutable(true));
+        Files.writeString(home.resolve(".shed/config.toml"), """
+            schema_version = 1
+            "debug.enabled" = true
+            "debug.adapter.closed.command" = "%s"
+            "debug.adapter.closed.capabilities" = "launch"
+            "process.timeout.ms" = 1000
+            """.formatted(adapter));
+        Files.writeString(manifest, """
+            {
+              // The settings remain inert; only the bounded task and launch subsets are considered.
+              "folders": [{"path": "workspace-launch-project"}],
+              "settings": {"editor.tabSize": 2},
+              "tasks": {"version": "2.0.0", "tasks": [
+                {"label": "Prepare workspace", "type": "process", "command": "touch", "args": ["workspace-prelaunch.marker"], "problemMatcher": []}
+              ]},
+              "launch": {"configurations": [
+                {"name": "Run workspace", "type": "closed", "request": "launch", "program": "${file}", "preLaunchTask": "Prepare workspace"}
+              ]}
+            }
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertEquals("Imported 1 workspace folder", onEdt(() -> editor.handleWorkspaceProfileCommand("import " + manifest)));
+            assertEquals(2, onEdt(() -> editor.getTextArea().getTabSize()));
+            String requested = onEdt(() -> editor.handleDebugCommand("start vscode:Run workspace"));
+            int jobId = Integer.parseInt(requested.replaceAll(".*\\(job ([0-9]+)\\)\\.", "$1"));
+
+            assertTrue(awaitJobCompletion(editor, jobId));
+            assertTrue(Files.isRegularFile(marker));
+            assertEquals(DebugSessionService.Lifecycle.FAILED, onEdt(() -> editor.debugSessionController.snapshotForPanel().lifecycle()));
+            assertFalse(Files.exists(workspace.resolve(".shedtasks")));
+            assertFalse(Files.exists(workspace.resolve(".vscode")));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void testDebugCanUseAnExplicitImportedVsCodeProfileWithTestPlaceholders() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-vscode-test-debug");
+        Path workspace = tempDir.resolve("vscode-test-debug-workspace");
+        Path source = workspace.resolve("src/test/java/demo/SampleTest.java");
+        Path adapter = tempDir.resolve("closed-vscode-test-debug-adapter.sh");
+        Files.createDirectories(home.resolve(".shed"));
+        Files.createDirectories(source.getParent());
+        Files.createDirectories(workspace.resolve(".vscode"));
+        Files.writeString(workspace.resolve("pom.xml"), "<project/>\n", StandardCharsets.UTF_8);
+        Files.writeString(source, """
+            package demo;
+            class SampleTest {
+                @Test
+                void works() {}
+            }
+            """, StandardCharsets.UTF_8);
+        Files.writeString(adapter, "#!/bin/sh\nexit 0\n", StandardCharsets.UTF_8);
+        assertTrue(adapter.toFile().setExecutable(true));
+        Files.writeString(home.resolve(".shed/config.toml"), """
+            schema_version = 1
+            "debug.enabled" = true
+            "debug.adapter.closed.command" = "%s"
+            "debug.adapter.closed.capabilities" = "launch"
+            "process.timeout.ms" = 1000
+            """.formatted(adapter));
+        Files.writeString(workspace.resolve(".shedtests"), """
+            schema_version = 1
+
+            [[adapter]]
+            id = "maven"
+            debug_configuration = "vscode:Debug selected test"
+            """);
+        Files.writeString(workspace.resolve(".vscode/launch.json"), """
+            {"configurations":[
+              {"name":"Debug selected test","type":"closed","request":"launch","program":"${testFile}","args":["${testId}"]}
+            ]}
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, source);
+        try {
+            onEdt(() -> {
+                editor.testController.selectRoot(workspace);
+                return editor.handleTestCommand("refresh");
+            });
+            assertTrue(awaitTestDiscovery(editor, workspace, "demo.SampleTest#works"));
+
+            String requested = onEdt(() -> editor.handleTestCommand("debug demo.SampleTest#works"));
+            int jobId = Integer.parseInt(requested.replaceAll(".*\\(job ([0-9]+)\\)\\.", "$1"));
+            assertTrue(awaitJobCompletion(editor, jobId));
+            assertEquals(DebugSessionService.Lifecycle.FAILED, onEdt(() -> editor.debugSessionController.snapshotForPanel().lifecycle()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void managedLspCommandsExposeInertStatusAndManualRemediation() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-managed-lsp");
@@ -767,6 +957,16 @@ public class TexteditorSwingIntegrationTest {
                 && snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED) {
                 return false;
             }
+            Thread.sleep(20);
+        }
+        return false;
+    }
+
+    private static boolean awaitTestDiscovery(Texteditor editor, Path root, String testId) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            boolean found = onEdt(() -> editor.testController.snapshot(root).tests().stream().anyMatch(test -> testId.equals(test.id())));
+            if (found) return true;
             Thread.sleep(20);
         }
         return false;

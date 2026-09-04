@@ -6,11 +6,20 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 final class DebugSessionController {
+    private record VsCodeLaunchReports(VsCodeLaunchConfigurationImporter.Report folder,
+                                       VsCodeLaunchConfigurationImporter.Report workspace) {
+        VsCodeLaunchReports {
+            folder = folder == null ? new VsCodeLaunchConfigurationImporter.Report(null, Map.of(), List.of(), List.of(), "") : folder;
+            workspace = workspace == null ? new VsCodeLaunchConfigurationImporter.Report(null, Map.of(), List.of(), List.of(), "") : workspace;
+        }
+    }
+
     record ExceptionBreakpointView(DebugSessionService.ExceptionFilter filter, boolean enabled, boolean adapterDefault) {
         ExceptionBreakpointView {
             if (filter == null) throw new IllegalArgumentException("exception breakpoint filter is required");
@@ -217,7 +226,7 @@ final class DebugSessionController {
     private String configurations() {
         Path workspace = workspace();
         DebugAdapterRegistry.Validation validation = validation();
-        VsCodeLaunchConfigurationImporter.Report vsCode = vsCodeLaunchReport(workspace);
+        VsCodeLaunchReports vsCode = vsCodeLaunchReports(workspace, baseValidation(workspace));
         java.util.Set<String> remote = new java.util.LinkedHashSet<>();
         if (validation != null) for (DebugAdapterRegistry.Adapter adapter : validation.registry().adapters().values()) {
             if (adapter.transport() != DebugAdapterRegistry.Transport.STDIO) continue;
@@ -244,22 +253,29 @@ final class DebugSessionController {
                 .append(configuration.availability()).append("\n    ").append(configuration.remediation()).append("\n");
         }
         if (!report.validationErrors().isEmpty()) output.append("\nValidation:\n  ").append(String.join("\n  ", report.validationErrors())).append("\n");
-        appendVsCodeLaunchReport(output, vsCode);
+        appendVsCodeLaunchReports(output, vsCode);
         editor.showScratchBuffer("[debug configurations]", output.toString());
         return "Showing debug configurations";
     }
 
     private String showVsCodeLaunchConfigurations() {
         Path workspace = workspace();
-        VsCodeLaunchConfigurationImporter.Report report = vsCodeLaunchReport(workspace);
-        StringBuilder output = new StringBuilder("VS Code launch.json compatibility\n\nWorkspace: ").append(workspace).append('\n');
-        appendVsCodeLaunchReport(output, report);
+        VsCodeLaunchReports reports = vsCodeLaunchReports(workspace, baseValidation(workspace));
+        StringBuilder output = new StringBuilder("VS Code launch compatibility\n\nWorkspace: ").append(workspace).append('\n');
+        appendVsCodeLaunchReports(output, reports);
         editor.showScratchBuffer("[VS Code launch.json]", output.toString());
-        return report.present() ? "Showing VS Code launch.json compatibility" : "No .vscode/launch.json was found for this workspace.";
+        return reports.folder().present() || reports.workspace().present()
+            ? "Showing VS Code launch compatibility" : "No .vscode/launch.json or imported workspace launch configuration was found for this workspace.";
     }
 
-    private static void appendVsCodeLaunchReport(StringBuilder output, VsCodeLaunchConfigurationImporter.Report report) {
-        output.append("\nVS Code launch.json:\n");
+    private static void appendVsCodeLaunchReports(StringBuilder output, VsCodeLaunchReports reports) {
+        if (reports == null) return;
+        appendVsCodeLaunchReport(output, "VS Code launch.json", reports.folder());
+        appendVsCodeLaunchReport(output, "Imported VS Code workspace launch", reports.workspace());
+    }
+
+    private static void appendVsCodeLaunchReport(StringBuilder output, String title, VsCodeLaunchConfigurationImporter.Report report) {
+        output.append("\n").append(title).append(":\n");
         if (report == null || !report.present()) {
             output.append("  (not found; no VS Code profiles were imported)\n");
             return;
@@ -313,6 +329,8 @@ final class DebugSessionController {
     }
 
     private String submitStart(Path workspace, DebugAdapterRegistry.LaunchContext context, String requested, boolean restart, String operation) {
+        if (workspace != null) lastWorkspace = workspace.toAbsolutePath().normalize();
+        if (context != null && context.activeFile() != null) lastActiveFile = context.activeFile();
         String name = requested == null ? "" : requested.trim();
         DebugAdapterRegistry.Validation configuration = validation(workspace);
         DebugFeatureSettings features = editor.configManager.getDebugFeatureSettingsForWorkspace(workspace);
@@ -412,8 +430,10 @@ final class DebugSessionController {
 
     private DebugAdapterRegistry.Validation validation(Path workspace) {
         DebugAdapterRegistry.Validation base = baseValidation(workspace);
-        VsCodeLaunchConfigurationImporter.Report imported = VsCodeLaunchConfigurationImporter.read(workspace, base);
-        return DebugAdapterRegistry.withExternalConfigurations(base, imported.configurations());
+        VsCodeLaunchReports imported = vsCodeLaunchReports(workspace, base);
+        Map<String, DebugAdapterRegistry.Configuration> configurations = new LinkedHashMap<>(imported.folder().configurations());
+        configurations.putAll(imported.workspace().configurations());
+        return DebugAdapterRegistry.withExternalConfigurations(base, configurations);
     }
 
     private DebugAdapterRegistry.Validation baseValidation(Path workspace) {
@@ -421,8 +441,32 @@ final class DebugSessionController {
             editor.extensionRegistry);
     }
 
-    private VsCodeLaunchConfigurationImporter.Report vsCodeLaunchReport(Path workspace) {
-        return VsCodeLaunchConfigurationImporter.read(workspace, baseValidation(workspace));
+    private VsCodeLaunchReports vsCodeLaunchReports(Path workspace, DebugAdapterRegistry.Validation base) {
+        Map<String, String> taskNames = vsCodeTaskNames(workspace);
+        VsCodeLaunchConfigurationImporter.Report folder = VsCodeLaunchConfigurationImporter.read(workspace, base, taskNames);
+        DebugAdapterRegistry.Validation withFolder = DebugAdapterRegistry.withExternalConfigurations(base, folder.configurations());
+        return new VsCodeLaunchReports(folder, workspaceLaunchReport(workspace, withFolder, taskNames));
+    }
+
+    private VsCodeLaunchConfigurationImporter.Report workspaceLaunchReport(Path workspace, DebugAdapterRegistry.Validation base,
+                                                                             Map<String, String> taskNames) {
+        if (editor.workspaceController == null || workspace == null
+            || !editor.workspaceController.roots().contains(workspace.toAbsolutePath().normalize())) {
+            return new VsCodeLaunchConfigurationImporter.Report(null, Map.of(), List.of(), List.of(), "");
+        }
+        WorkspaceManifest.ImportedConfiguration manifest = editor.workspaceController.manifestConfiguration();
+        if (!manifest.present() || !manifest.usable() || !manifest.hasLaunch()) {
+            return manifest.present() && !manifest.usable()
+                ? new VsCodeLaunchConfigurationImporter.Report(manifest.source(), Map.of(), List.of(), List.of(), manifest.failure())
+                : new VsCodeLaunchConfigurationImporter.Report(null, Map.of(), List.of(), List.of(), "");
+        }
+        return VsCodeLaunchConfigurationImporter.readWorkspaceConfiguration(manifest.source(), manifest.launch(), base, taskNames);
+    }
+
+    private Map<String, String> vsCodeTaskNames(Path workspace) {
+        if (workspace == null) return Map.of();
+        TaskService.TaskLoadResult local = editor.taskService.loadWorkspaceTasks(workspace.toFile());
+        return editor.jobQuickfixController.acceptedVsCodeTaskNames(workspace.toFile(), local);
     }
 
     private boolean remoteDebugAdapterAvailable(Path workspace, List<String> command) throws IOException {

@@ -28,6 +28,30 @@ final class ShellCommand {
         return List.of(shell, flag, command);
     }
 
+    /** Starts the configured POSIX-like shell without loading its login startup files. */
+    static List<String> nonLoginForCommand(String command, Map<String, String> env, Predicate<String> executable) {
+        return List.of(resolveShell(env, executable), "-c", command);
+    }
+
+    /**
+     * Builds a POSIX shell command from already-separated values.  Expanding variables
+     * before this method and quoting each value here preserves arguments containing
+     * whitespace, quotes, or shell metacharacters without turning them into syntax.
+     */
+    static String posixQuotedCommand(List<String> values) {
+        if (values == null || values.isEmpty()) throw new IllegalArgumentException("task command required");
+        java.util.ArrayList<String> quoted = new java.util.ArrayList<>();
+        for (String value : values) {
+            if (value == null) throw new IllegalArgumentException("task command value required");
+            quoted.add(posixQuote(value));
+        }
+        return String.join(" ", quoted);
+    }
+
+    static String posixQuote(String value) {
+        return "'" + value.replace("'", "'\"'\"'") + "'";
+    }
+
     static List<String> directCommand(String command) {
         if (command == null || command.isBlank()) {
             throw new IllegalArgumentException("task command required");

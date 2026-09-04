@@ -15,6 +15,7 @@ cwd = "tools"
 shell = "login"
 problem_matcher = "generic"
 presentation = "on_failure"
+depends_on = ["compile"]
 
 [task.check.env]
 CI = "true"
@@ -24,19 +25,22 @@ CI = "true"
 
 | Field | Default | Values |
 | :--- | :--- | :--- |
-| `shell` | `login` | `login` uses the configured login shell and obeys `shell.command.enabled`; `direct` parses command arguments and starts no shell |
+| `shell` | `login` | `login` uses the configured login shell; `shell` uses it without login startup files; `direct` parses command arguments and starts no shell. Both shell modes obey `shell.command.enabled`. |
 | `problem_matcher` | `generic` | `generic` accepts `path:line[:column]: message` and resolves relative paths from task `cwd`; `none` leaves quickfix unchanged |
 | `presentation` | `on_failure` | `always`, `on_failure`, or `never`; controls task-output scratch buffers, not the final status or quickfix update |
+| `depends_on` | none | one to 100 distinct task names from the same `.shedtasks` file; they are validated, planned, and run once each in declared dependency-first order |
 
-Supported variables in `command`, `cwd`, and environment values are `${workspaceFolder}`, `${file}`, `${relativeFile}`, and `${fileBasename}`. File variables require a file-backed active buffer; `${relativeFile}` must remain inside the workspace. Quote `${file}` in a command when its path can contain spaces.
+Before a task process starts, Shed resolves its complete dependency graph. An unknown task, duplicate dependency, cycle, unsafe command, or invalid cwd stops the request before any stage starts. Each stage receives the same selected local, remote, or connected Dev Container target. `:task dry-run` shows the complete order, and a DAP `prelaunch_task` runs the same prerequisites before its adapter is opened. Dependency stages run sequentially; Shed does not create a parallel scheduler, background/watch lifecycle, or dependency failure policy beyond stopping at the first non-zero result.
 
-## VS Code tasks.json compatibility
+Supported variables in `command`, `cwd`, and environment values are `${workspaceFolder}`, `${workspaceFolderBasename}`, `${file}`, `${fileWorkspaceFolder}`, `${relativeFile}`, `${relativeFileDirname}`, `${fileBasename}`, `${fileBasenameNoExtension}`, `${fileExtname}`, `${fileDirname}`, and `${fileDirnameBasename}`. File variables require a file-backed active buffer and, where relevant, must remain inside the workspace. `${relativeFileDirname}` is `.` when the active file is at the workspace root. Quote `${file}` in a shell command when its path can contain spaces.
 
-When a workspace contains a regular, non-symlink `.vscode/tasks.json` no larger than 1 MiB, Shed reads a bounded JSONC subset in memory; comments and trailing commas are accepted. `:task list` includes compatible entries and `:task vscode` shows every accepted or skipped entry. Imported names use a `vscode-` prefix, such as `vscode-check-source`, and are available only for the current process. `:task run <name>` and `:task dry-run <name>` remain explicit. Shed never changes `tasks.json`, creates a `.shedtasks` file, starts a task at workspace open, or treats an imported entry as a debug pre-launch task.
+## VS Code task compatibility
 
-The accepted subset requires `"version": "2.0.0"` and an explicit `"type": "process"`. It accepts a string `label` and `command`, up to 256 string `args`, `options.cwd`, string `options.env`, an absent or empty-array `problemMatcher`, and `presentation.reveal` of `always` or `never`. The same four workspace/file placeholders above are supported. A process command and each argument remain separate argv values through local, remote, and Dev Container routing, so a path or argument with spaces is not converted into shell syntax.
+Shed reads the same bounded JSONC subset either from a regular, non-symlink `.vscode/tasks.json`, or from the `tasks` object of an explicitly imported standard `.code-workspace` whose folder set still matches the active workspace. `:task list` includes compatible entries and `:task vscode` reports both sources. Imported names use a `vscode-` prefix, such as `vscode-check-source`, and are available only for the current process. `:task run <name>` and `:task dry-run <name>` remain explicit. Shed never changes either VS Code file, creates a `.shedtasks` file, or starts a task at workspace open/import. An accepted task can be used as a debug pre-launch task only when an accepted compatible launch profile names its exact label and the user explicitly starts that profile; labels duplicated across sources do not resolve as pre-launch work.
 
-Shed rejects shell tasks, extension/provider task types, task dependencies, groups, automatic `runOn` behavior, custom problem matchers, task inputs, shell options, OS-specific overrides, and every unlisted field. Those constructs have execution, lifecycle, or output semantics that this compatibility reader does not reproduce. VS Code supports shell and process tasks, task providers, dependency graphs, auto-detected tasks, background tasks, and automatic-task policy; this is not `tasks.json` parity. [VS Code tasks](https://code.visualstudio.com/docs/debugtest/tasks), [tasks schema](https://code.visualstudio.com/docs/reference/tasks-appendix).
+The accepted subset requires `"version": "2.0.0"` and an explicit `"type": "process"` or, on a POSIX host, `"type": "shell"`. It accepts a string `label` and `command`, up to 256 string `args`, `options.cwd`, string `options.env`, an absent or empty-array `problemMatcher`, and `presentation.reveal` of `always` or `never`. It additionally accepts `dependsOn` as one string or an array of one to 100 distinct labels only when `dependsOrder` is exactly `"sequence"`. Each label must resolve to exactly one accepted task in the same imported source; a missing or ambiguous label rejects the dependent task. The same bounded workspace/file placeholders above are supported. A process command and each argument remain separate argv values through local, remote, and Dev Container routing. For a shell task with arguments, Shed expands each bounded value first, then POSIX-strong-quotes each value into a non-login shell command; spaces, apostrophes, and shell metacharacters therefore remain data. A shell task with no `args` preserves its single `command` as raw shell syntax, matching VS Code's single-command behavior. Shell tasks with `options.shell`, Windows shell semantics, argument quoting objects, or anything outside this subset are rejected rather than guessed.
+
+Shed rejects extension/provider task types, `dependsOn` object forms and default/parallel dependency execution, groups, automatic `runOn` behavior, custom problem matchers, task inputs, shell options, OS-specific overrides, and every unlisted field. Those constructs have execution, lifecycle, platform, or output semantics that this compatibility reader does not reproduce. VS Code supports task providers, parallel dependency graphs, auto-detected tasks, background tasks, and automatic-task policy; this is not `tasks.json` parity. [VS Code tasks](https://code.visualstudio.com/docs/debugtest/tasks), [tasks schema](https://code.visualstudio.com/docs/reference/tasks-appendix).
 
 ## Commands
 
@@ -44,11 +48,11 @@ Shed rejects shell tasks, extension/provider task types, task dependencies, grou
 | :--- | :--- |
 | `:task`, `:task ui` | Open the docked Tasks/Jobs panel |
 | `:task text`, `:task text list` | Show validated tasks in the legacy scratch buffer |
-| `:task vscode` | Show the runtime-only `.vscode/tasks.json` compatibility report |
+| `:task vscode` | Show the runtime-only `.vscode/tasks.json` and imported `.code-workspace` task compatibility report |
 | `:task add <name> <command>` | Add a default login-shell task and write canonical TOML |
 | `:task remove <name>` | Remove a task while preserving other task settings |
-| `:task dry-run <name>` | Resolve variables and show the command, policy, cwd, and environment keys without starting a process |
-| `:task run <name>` | Explicitly start a task; uses an active remote execution session or connected Dev Container only when the task root is inside one |
+| `:task dry-run <name>` | Resolve every dependency, variable, policy, cwd, and environment key without starting a process |
+| `:task run <name>` | Explicitly start a dependency-first task sequence; uses an active remote execution session or connected Dev Container only when the task root is inside one |
 | `:task remote <connection-id> <name>` | Explicitly run a task through a connected remote workspace that contains this task's project root |
 | `:task remote-dry-run <connection-id> <name>` | Resolve and show the remote command request without starting it |
 | `:task container <name>` | Explicitly run a task through the project Dev Container after it has been started |
@@ -66,7 +70,7 @@ Remote tasks are never selected automatically. First open a remote workspace, th
 :task remote <connection-id> check
 ```
 
-Shed resolves the normal `.shedtasks` plan from the local mirror, maps its working directory to a path relative to the connection root, and sends that relative directory plus declared environment values to the provider. Docker receives `docker exec --workdir` and `--env`; SSH uses a safely quoted remote POSIX command; WSL uses `wsl.exe --cd` and `env`. A `direct` task remains direct argv. A `login` task runs `sh -lc` in the remote environment because Shed cannot infer that environment's preferred login shell.
+Shed resolves the normal `.shedtasks` plan from the local mirror, maps its working directory to a path relative to the connection root, and sends that relative directory plus declared environment values to the provider. Docker receives `docker exec --workdir` and `--env`; SSH uses a safely quoted remote POSIX command; WSL uses `wsl.exe --cd` and `env`. A `direct` task remains direct argv. A `login` task runs `sh -lc` and a `shell` task runs `sh -c` in the remote environment because Shed cannot infer that environment's preferred shell.
 
 To make only ordinary tasks for this connected workspace use the same remote provider, opt in separately:
 
@@ -95,7 +99,7 @@ For a project with `.devcontainer/devcontainer.json`, either run a single task t
 
 `:container connect` is an explicit, cancellable `devcontainer up` followed by `devcontainer exec pwd`. On success, Shed retains only the validated host-workspace/container-workspace mapping in memory for that application process. New `:task run` invocations rooted in that workspace use the same container mapping without another root probe. `:container disconnect` removes that routing but does not stop, delete, or rebuild the container; restarting Shed also clears it. Declared task environment values become repeated `devcontainer exec --remote-env name=value` arguments. Shed does not start a container merely because a task exists or a workspace is opened.
 
-The Dev Container CLI executes its command at the configured remote workspace root and has no working-directory argument. A `direct` task therefore remains direct argv only when its task cwd is that root. A `login` task with a subdirectory runs an explicit, safely quoted `/bin/sh -lc` wrapper to change directory before the task's inner login shell. This is a compatibility boundary, not a general remote task scheduler.
+The Dev Container CLI executes its command at the configured remote workspace root and has no working-directory argument. A `direct` task therefore remains direct argv only when its task cwd is that root. A `login` or `shell` task with a subdirectory runs an explicit, safely quoted `/bin/sh` wrapper to change directory before its inner shell. This is a compatibility boundary, not a general remote task scheduler.
 
 ## Legacy files
 

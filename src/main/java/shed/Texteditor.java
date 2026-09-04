@@ -2720,6 +2720,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         if ("auto".equalsIgnoreCase(value) || "automatic".equalsIgnoreCase(value)) {
             languageProfileSelection.automatic(buffer);
+            refreshIndentationPreferences(buffer);
             applySyntaxHighlighting();
             if (lspController != null) lspController.profileSelectionChanged(buffer);
             updateStatusBar();
@@ -2727,6 +2728,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         try {
             LanguageProfile profile = languageProfileSelection.select(buffer, extensionRegistry, value);
+            refreshIndentationPreferences(buffer);
             applySyntaxHighlighting();
             if (lspController != null) lspController.profileSelectionChanged(buffer);
             updateStatusBar();
@@ -2737,13 +2739,31 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     int effectiveTabSize(FileBuffer buffer) {
+        WorkspaceEditorSettings.Preferences workspace = workspaceEditorSettings(buffer);
+        if (workspace.tabSize() != null) return workspace.tabSize();
         LanguageProfile profile = languageProfileFor(buffer);
         return profile != null && profile.tabSize() != null ? profile.tabSize() : configManager.getTabSize();
     }
 
     boolean effectiveExpandTab(FileBuffer buffer) {
+        WorkspaceEditorSettings.Preferences workspace = workspaceEditorSettings(buffer);
+        if (workspace.insertSpaces() != null) return workspace.insertSpaces();
         LanguageProfile profile = languageProfileFor(buffer);
         return profile != null && profile.insertSpaces() != null ? profile.insertSpaces() : configManager.getExpandTab();
+    }
+
+    private WorkspaceEditorSettings.Preferences workspaceEditorSettings(FileBuffer buffer) {
+        if (workspaceController == null || buffer == null) return WorkspaceEditorSettings.Preferences.EMPTY;
+        LanguageProfile profile = languageProfileFor(buffer);
+        String languageId = profile != null ? profile.languageId()
+            : lspController == null ? lspService.languageId(buffer.getFileType()) : lspController.languageId(buffer);
+        return workspaceController.editorSettingsFor(buffer, languageId);
+    }
+
+    private void refreshIndentationPreferences(FileBuffer buffer) {
+        for (EditorPane pane : editorPanes) {
+            if (pane.getBuffer() == buffer) pane.getTextArea().setTabSize(effectiveTabSize(buffer));
+        }
     }
 
     int effectiveTabSize() { return effectiveTabSize(getCurrentBuffer()); }

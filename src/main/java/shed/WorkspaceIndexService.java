@@ -25,15 +25,25 @@ final class WorkspaceIndexService {
 
     private final Path storageDirectory;
     private final IgnoreMatcher ignoreMatcher;
+    private final IgnoreMatcher additionalIgnoreMatcher;
     private volatile Status status;
 
     WorkspaceIndexService(Path storageDirectory) {
-        this(storageDirectory, new GitIgnoreMatcher());
+        this(storageDirectory, new GitIgnoreMatcher(), IgnoreMatcher.NONE);
     }
 
     WorkspaceIndexService(Path storageDirectory, IgnoreMatcher ignoreMatcher) {
+        this(storageDirectory, ignoreMatcher, IgnoreMatcher.NONE);
+    }
+
+    static WorkspaceIndexService withAdditionalIgnore(Path storageDirectory, IgnoreMatcher additionalIgnoreMatcher) {
+        return new WorkspaceIndexService(storageDirectory, new GitIgnoreMatcher(), additionalIgnoreMatcher);
+    }
+
+    private WorkspaceIndexService(Path storageDirectory, IgnoreMatcher ignoreMatcher, IgnoreMatcher additionalIgnoreMatcher) {
         this.storageDirectory = Objects.requireNonNull(storageDirectory, "storageDirectory").toAbsolutePath().normalize();
         this.ignoreMatcher = Objects.requireNonNull(ignoreMatcher, "ignoreMatcher");
+        this.additionalIgnoreMatcher = Objects.requireNonNull(additionalIgnoreMatcher, "additionalIgnoreMatcher");
         this.status = Status.disabled();
     }
 
@@ -210,18 +220,19 @@ final class WorkspaceIndexService {
         if (candidates.isEmpty()) {
             return Set.of();
         }
-        if (ignoreMatcher instanceof GitIgnoreMatcher matcher) {
-            return matcher.ignoredPaths(root, candidates, cancellation);
+        Set<String> ignored = ignoreMatcher instanceof GitIgnoreMatcher matcher
+            ? new LinkedHashSet<>(matcher.ignoredPaths(root, candidates, cancellation)) : new LinkedHashSet<>();
+        if (!(ignoreMatcher instanceof GitIgnoreMatcher)) {
+            for (Entry candidate : candidates) {
+                if (cancellation.isCancelled()) return ignored;
+                Path relative = Path.of(candidate.relativePath());
+                if (ignoreMatcher.isIgnored(root, relative)) ignored.add(candidate.relativePath());
+            }
         }
-        Set<String> ignored = new LinkedHashSet<>();
         for (Entry candidate : candidates) {
-            if (cancellation.isCancelled()) {
-                return ignored;
-            }
+            if (cancellation.isCancelled()) return ignored;
             Path relative = Path.of(candidate.relativePath());
-            if (ignoreMatcher.isIgnored(root, relative)) {
-                ignored.add(candidate.relativePath());
-            }
+            if (additionalIgnoreMatcher.isIgnored(root, relative)) ignored.add(candidate.relativePath());
         }
         return ignored;
     }
@@ -256,6 +267,8 @@ final class WorkspaceIndexService {
     }
 
     interface IgnoreMatcher {
+        IgnoreMatcher NONE = (workspaceRoot, relativePath) -> false;
+
         boolean isIgnored(Path workspaceRoot, Path relativePath) throws IOException;
     }
 

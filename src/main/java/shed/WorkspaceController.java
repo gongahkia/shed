@@ -6,12 +6,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.swing.JFileChooser;
 
 final class WorkspaceController {
     private final Texteditor editor;
     private final WorkspaceRoots roots = new WorkspaceRoots();
     private Path importedManifest;
+    private Map<Path, String> importedFolderNames = Map.of();
     private WorkspaceEditorSettings.Snapshot importedEditorSettings = WorkspaceEditorSettings.empty();
 
     WorkspaceController(Texteditor editor) {
@@ -31,13 +33,39 @@ final class WorkspaceController {
         return WorkspaceRootResolver.configuredOrActive(resource, roots.all(), roots.active());
     }
 
-    WorkspaceEditorSettings.Preferences editorSettingsFor(FileBuffer buffer, String languageId) {
-        if (buffer == null || buffer.getFile() == null) return WorkspaceEditorSettings.Preferences.EMPTY;
+    String displayRoot(Path root) {
+        if (root == null) return "";
+        String name = importedFolderNames.get(root.toAbsolutePath().normalize());
+        return name == null ? root.toString() : name + " — " + root;
+    }
+
+    WorkspaceEditorSettings.Indentation editorSettingsFor(FileBuffer buffer, String languageId) {
+        if (buffer == null || buffer.getFile() == null) return WorkspaceEditorSettings.Indentation.EMPTY;
         try {
-            return importedEditorSettings.preferencesFor(buffer.getFile().toPath(), languageId);
+            return importedEditorSettings.indentationFor(buffer.getFile().toPath(), languageId);
         } catch (RuntimeException error) {
-            return WorkspaceEditorSettings.Preferences.EMPTY;
+            return WorkspaceEditorSettings.Indentation.EMPTY;
         }
+    }
+
+    boolean isExplorerExcluded(File file) {
+        if (file == null) return false;
+        try {
+            return importedEditorSettings.excluded(file.toPath());
+        } catch (RuntimeException error) {
+            return false;
+        }
+    }
+
+    WorkspaceIndexService.IgnoreMatcher searchExclusionMatcher() {
+        return (workspaceRoot, relativePath) -> {
+            if (workspaceRoot == null || relativePath == null || relativePath.isAbsolute()) return false;
+            try {
+                return importedEditorSettings.searchExcluded(workspaceRoot.resolve(relativePath));
+            } catch (RuntimeException error) {
+                return false;
+            }
+        };
     }
 
     String handle(String argument) {
@@ -169,6 +197,7 @@ final class WorkspaceController {
             List<Path> imported = document.folders();
             roots.replace(imported, imported.getFirst());
             importedManifest = document.source();
+            importedFolderNames = document.standardVsCodeWorkspace() ? document.folderNames() : Map.of();
             importedEditorSettings = WorkspaceEditorSettings.read(document);
             refreshEditorIndentation();
             syncTreeRoot(roots.active(), true);
@@ -185,6 +214,7 @@ final class WorkspaceController {
             if (!roots.all().equals(document.folders())) {
                 return "The manifest folder set changed; import it again before reloading editor settings.";
             }
+            importedFolderNames = document.standardVsCodeWorkspace() ? document.folderNames() : Map.of();
             importedEditorSettings = WorkspaceEditorSettings.read(document);
             refreshEditorIndentation();
             return "Reloaded imported workspace editor settings";
@@ -216,7 +246,7 @@ final class WorkspaceController {
         } else {
             for (int index = 0; index < values.size(); index++) {
                 Path root = values.get(index);
-                text.append(root.equals(roots.active()) ? "* " : "  ").append(index + 1).append(". ").append(root).append('\n');
+                text.append(root.equals(roots.active()) ? "* " : "  ").append(index + 1).append(". ").append(displayRoot(root)).append('\n');
             }
         }
         if (importedManifest != null) text.append("\nManifest: ").append(importedManifest).append('\n');
@@ -268,12 +298,14 @@ final class WorkspaceController {
 
     private void clearImportedManifest() {
         importedManifest = null;
+        importedFolderNames = Map.of();
         importedEditorSettings = WorkspaceEditorSettings.empty();
         refreshEditorIndentation();
     }
 
     private void restoreImportedManifest(String serializedManifest) {
         importedManifest = null;
+        importedFolderNames = Map.of();
         importedEditorSettings = WorkspaceEditorSettings.empty();
         refreshEditorIndentation();
         if (serializedManifest == null || serializedManifest.isBlank()) return;
@@ -281,6 +313,7 @@ final class WorkspaceController {
             WorkspaceManifest.Document document = WorkspaceManifest.readDocument(Path.of(serializedManifest));
             if (roots.all().equals(document.folders())) {
                 importedManifest = document.source();
+                importedFolderNames = document.standardVsCodeWorkspace() ? document.folderNames() : Map.of();
                 importedEditorSettings = WorkspaceEditorSettings.read(document);
                 refreshEditorIndentation();
             }

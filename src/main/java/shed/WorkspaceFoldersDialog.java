@@ -81,7 +81,7 @@ final class WorkspaceFoldersDialog extends JDialog {
         int prior = list.getSelectedIndex();
         folders.clear();
         for (java.nio.file.Path root : controller.roots()) {
-            folders.addElement((root.equals(controller.activeRoot()) ? "* " : "  ") + root);
+            folders.addElement((root.equals(controller.activeRoot()) ? "* " : "  ") + controller.displayRoot(root));
         }
         if (!folders.isEmpty()) list.setSelectedIndex(Math.max(0, Math.min(prior, folders.size() - 1)));
     }

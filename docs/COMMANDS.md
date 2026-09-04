@@ -370,7 +370,7 @@ See [Update Checks](UPDATES.md) for endpoint/key configuration and metadata vali
 | `:workspace add <folder>` | Add a local folder without changing the active tree |
 | `:workspace open <folder>`, `:workspace switch <folder\|index>` | Make a workspace folder active and show its tree |
 | `:workspace remove <folder\|index>` | Remove a folder from the workspace; files are retained |
-| `:workspace import <manifest>` | Replace folders from a validated `.shed-workspace` or `.code-workspace` list; the latter can additionally expose strict session-only VS Code task/launch compatibility and the documented two-key editor-settings subset |
+| `:workspace import <manifest>` | Replace folders from a validated `.shed-workspace` or `.code-workspace` list; the latter can additionally expose strict session-only VS Code task/launch compatibility, the documented two-key editor-settings subset, Explorer-only `files.exclude` globs, and workspace Search/Project Replace `search.exclude` globs |
 | `:workspace reload`, `:workspace refresh` | Re-read the editor-settings snapshot of an imported `.code-workspace` only when its resolved folder set is unchanged; does not run tasks or a debugger |
 | `:workspace export <manifest>` | Write the current folders as a portable manifest |
 

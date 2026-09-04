@@ -33,7 +33,7 @@ final class MarkdownController {
         EditorPane sourcePane = editor.getActivePane();
         FileBuffer buffer = editor.getCurrentBuffer();
         if (sourcePane == null || buffer == null || buffer.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        if (sourcePane.isMarkdownPreview()) return "Markdown preview is already open";
+        if (sourcePane.isMarkdownPreview()) return "Markdown preview already open";
         if (buffer.isLargeFile()) return "Markdown preview unavailable for a large file";
         PreviewBinding existing = previews.get(buffer);
         if (existing != null && editor.editorPanes.contains(existing.previewPane)) {

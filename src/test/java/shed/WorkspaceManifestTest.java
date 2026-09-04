@@ -35,6 +35,7 @@ class WorkspaceManifestTest {
         Files.writeString(manifest, "{\"folders\":[{\"path\":\"project\",\"name\":\"Project\"}],\"settings\":{\"editor.fontSize\":99}}");
 
         assertEquals(List.of(project.toRealPath()), WorkspaceManifest.read(manifest));
+        assertEquals("Project", WorkspaceManifest.readDocument(manifest).folderNames().get(project.toRealPath()));
     }
 
     @Test
@@ -68,6 +69,15 @@ class WorkspaceManifestTest {
 
         assertThrows(IOException.class, () -> WorkspaceManifest.write(unsupported, List.of(tempDir)));
         assertThrows(IOException.class, () -> WorkspaceManifest.read(missing));
+    }
+
+    @Test
+    void rejectsInvalidCodeWorkspaceFolderNames() throws IOException {
+        Path project = Files.createDirectory(tempDir.resolve("named-project"));
+        Path manifest = tempDir.resolve("invalid-name.code-workspace");
+        Files.writeString(manifest, "{\"folders\":[{\"path\":\"named-project\",\"name\":\"bad\\nname\"}]}");
+
+        assertThrows(IOException.class, () -> WorkspaceManifest.readDocument(manifest));
     }
 
     @Test

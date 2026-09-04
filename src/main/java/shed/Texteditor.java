@@ -2739,21 +2739,23 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     int effectiveTabSize(FileBuffer buffer) {
-        WorkspaceEditorSettings.Preferences workspace = workspaceEditorSettings(buffer);
-        if (workspace.tabSize() != null) return workspace.tabSize();
+        WorkspaceEditorSettings.Indentation workspace = workspaceEditorSettings(buffer);
+        int result = workspace.generic().tabSize() == null ? configManager.getTabSize() : workspace.generic().tabSize();
         LanguageProfile profile = languageProfileFor(buffer);
-        return profile != null && profile.tabSize() != null ? profile.tabSize() : configManager.getTabSize();
+        if (profile != null && profile.tabSize() != null) result = profile.tabSize();
+        return workspace.language().tabSize() == null ? result : workspace.language().tabSize();
     }
 
     boolean effectiveExpandTab(FileBuffer buffer) {
-        WorkspaceEditorSettings.Preferences workspace = workspaceEditorSettings(buffer);
-        if (workspace.insertSpaces() != null) return workspace.insertSpaces();
+        WorkspaceEditorSettings.Indentation workspace = workspaceEditorSettings(buffer);
+        boolean result = workspace.generic().insertSpaces() == null ? configManager.getExpandTab() : workspace.generic().insertSpaces();
         LanguageProfile profile = languageProfileFor(buffer);
-        return profile != null && profile.insertSpaces() != null ? profile.insertSpaces() : configManager.getExpandTab();
+        if (profile != null && profile.insertSpaces() != null) result = profile.insertSpaces();
+        return workspace.language().insertSpaces() == null ? result : workspace.language().insertSpaces();
     }
 
-    private WorkspaceEditorSettings.Preferences workspaceEditorSettings(FileBuffer buffer) {
-        if (workspaceController == null || buffer == null) return WorkspaceEditorSettings.Preferences.EMPTY;
+    private WorkspaceEditorSettings.Indentation workspaceEditorSettings(FileBuffer buffer) {
+        if (workspaceController == null || buffer == null) return WorkspaceEditorSettings.Indentation.EMPTY;
         LanguageProfile profile = languageProfileFor(buffer);
         String languageId = profile != null ? profile.languageId()
             : lspController == null ? lspService.languageId(buffer.getFileType()) : lspController.languageId(buffer);

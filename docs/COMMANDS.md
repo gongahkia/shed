@@ -449,6 +449,8 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:remote pull\|push\|close <id>` | Synchronize or disconnect a remote workspace |
 | `:remote exec <id> <command...>` | Explicitly run a direct-argv command in a connection when its provider supports execution |
 | `:remote terminal <id> [command...]` | Open an explicit interactive terminal at the connection root when its provider supports it |
+| `:remote forward <id> <local-port> <remote-host> <remote-port>` | Explicitly start a loopback-only local SSH forward for a connected `ssh://` workspace |
+| `:remote forward list`, `:remote forward close <local-port>` | Show forward state or stop one explicit SSH forward |
 | `:language`, `:language list` | List installed extension language profiles and the active buffer's profile mode |
 | `:language <extension-id:language-id>`, `:language auto` | Override profile detection for the current buffer, or restore automatic detection; a matching same-extension language contribution retargets its LSP client |
 | `:container status` | Show the active workspace's `.devcontainer/devcontainer.json` and whether it is connected for this application session |

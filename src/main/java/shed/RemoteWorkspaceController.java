@@ -21,6 +21,7 @@ final class RemoteWorkspaceController {
 
     private final Texteditor editor;
     private final Map<String, Connection> connections = new LinkedHashMap<>();
+    private final SshPortForwardService portForwards = new SshPortForwardService();
 
     RemoteWorkspaceController(Texteditor editor) {
         this.editor = editor;
@@ -42,9 +43,10 @@ final class RemoteWorkspaceController {
             case "push" -> synchronize(tokens.size() == 2 ? tokens.get(1) : "", true);
             case "exec" -> execute(tokens);
             case "terminal", "term" -> openTerminal(tokens);
+            case "forward" -> forward(tokens);
             case "close", "disconnect" -> close(tokens.size() == 2 ? tokens.get(1) : "");
             case "providers" -> showProviders();
-            default -> "Usage: :remote [list|providers|open <uri>|pull <id>|push <id>|exec <id> <command...>|terminal <id> [command...]|close <id>]";
+            default -> "Usage: :remote [list|providers|open <uri>|pull <id>|push <id>|exec <id> <command...>|terminal <id> [command...]|forward <id> <local-port> <remote-host> <remote-port>|forward list|forward close <local-port>|close <id>]";
         };
     }
 
@@ -76,6 +78,7 @@ final class RemoteWorkspaceController {
             synchronized (connections) { prior = connections.put(result.id(), result); }
             editor.remoteWorkspaceTaskTargets.register(result.id(), result.workspace());
             if (prior != null) {
+                portForwards.closeForConnection(prior.id());
                 try { prior.workspace().close(); } catch (Exception ignored) { }
             }
             editor.workspaceController.add(result.workspace().localRoot().toString(), true);
@@ -106,6 +109,7 @@ final class RemoteWorkspaceController {
         editor.remoteWorkspaceTaskTargets.unregister(connection.id());
         try {
             connection.workspace().close();
+            portForwards.closeForConnection(connection.id());
             editor.workspaceController.remove(connection.workspace().localRoot().toString());
             return "Remote workspace closed: " + connection.id();
         } catch (Exception error) {
@@ -123,6 +127,58 @@ final class RemoteWorkspaceController {
         int job = editor.asyncJobService.submit("remote exec: " + connection.id(), token -> connection.workspace().execute(command),
             (snapshot, result, error) -> showExecutionResult(connection, result, error));
         return "Remote command requested (job " + job + ").";
+    }
+
+    private String forward(List<String> tokens) {
+        if (tokens.size() == 2 && ("list".equalsIgnoreCase(tokens.get(1)) || "status".equalsIgnoreCase(tokens.get(1)))) {
+            return showStatus();
+        }
+        if (tokens.size() == 3 && "close".equalsIgnoreCase(tokens.get(1))) return closeForward(tokens.get(2));
+        if (tokens.size() != 5) {
+            return "Usage: :remote forward <connection-id> <local-port> <remote-host> <remote-port>|list|close <local-port>";
+        }
+        Connection connection = connection(tokens.get(1));
+        if (connection == null) return "Remote workspace not connected: " + tokens.get(1);
+        if (!"ssh".equals(connection.provider())) return "SSH forwarding requires an ssh:// workspace connection";
+        SshPortForwardService.Spec spec;
+        try {
+            spec = new SshPortForwardService.Spec(parsePort(tokens.get(2), "local port"), tokens.get(3), parsePort(tokens.get(4), "remote port"));
+        } catch (IllegalArgumentException error) {
+            return "SSH forwarding invalid: " + detail(error.getMessage());
+        }
+        int job = editor.asyncJobService.submit("SSH forward " + spec.localPort() + ": " + connection.id(),
+            token -> {
+                if (connection(connection.id()) != connection) throw new IOException("SSH workspace is no longer connected");
+                return portForwards.start(connection.id(), connection.uri(), spec);
+            },
+            (snapshot, result, error) -> {
+                if (error != null || result == null) {
+                    editor.showMessage("SSH forward failed: " + detail(error == null ? snapshot.getErrorMessage() : error.getMessage()));
+                    return;
+                }
+                if (connection(connection.id()) != connection) {
+                    portForwards.close(result.localPort());
+                    editor.showMessage("SSH forward stopped because its workspace was closed");
+                    return;
+                }
+                editor.showMessage("SSH forward process started: 127.0.0.1:" + result.localPort() + " -> " + result.remoteHost() + ":" + result.remotePort());
+            });
+        return "SSH forward requested (job " + job + ").";
+    }
+
+    private String closeForward(String localPort) {
+        final int port;
+        try {
+            port = parsePort(localPort, "local port");
+        } catch (IllegalArgumentException error) {
+            return "SSH forwarding invalid: " + detail(error.getMessage());
+        }
+        int job = editor.asyncJobService.submit("SSH forward close " + port, token -> portForwards.close(port),
+            (snapshot, closed, error) -> {
+                if (error != null) editor.showMessage("SSH forward close failed: " + detail(error.getMessage()));
+                else editor.showMessage(Boolean.TRUE.equals(closed) ? "SSH forward closed: 127.0.0.1:" + port : "SSH forward not active: 127.0.0.1:" + port);
+            });
+        return "SSH forward close requested (job " + job + ").";
     }
 
     private String openTerminal(List<String> tokens) {
@@ -165,6 +221,13 @@ final class RemoteWorkspaceController {
             output.append(connection.id()).append("  ").append(connection.provider()).append("\n  ").append(connection.uri())
                 .append("\n  local: ").append(connection.workspace().localRoot()).append("\n");
         }
+        List<SshPortForwardService.ForwardInfo> forwards = portForwards.list();
+        output.append("\nSSH loopback forwards\n");
+        if (forwards.isEmpty()) output.append("No SSH forwards active.\n");
+        for (SshPortForwardService.ForwardInfo forward : forwards) {
+            output.append("127.0.0.1:").append(forward.localPort()).append(" -> ").append(forward.remoteHost()).append(":")
+                .append(forward.remotePort()).append("  [").append(forward.connectionId()).append("] ").append(forward.detail()).append("\n");
+        }
         output.append("\nConnections use a local working tree. Pull and push are explicit operations; remote URI passwords are rejected.\n");
         editor.showScratchBuffer("[remote workspaces]", output.toString());
         return "Showing remote workspaces";
@@ -185,10 +248,12 @@ final class RemoteWorkspaceController {
             connections.clear();
         }
         for (Connection connection : values) {
+            portForwards.closeForConnection(connection.id());
             if (editor.lspController != null) editor.lspController.stopServersForWorkspace(connection.workspace().localRoot());
             editor.remoteWorkspaceTaskTargets.unregister(connection.id());
             try { connection.workspace().close(); } catch (Exception ignored) { }
         }
+        portForwards.close();
     }
 
     RemoteLspEndpoint languageServerEndpoint(Path localWorkspace, List<String> serverCommand) throws IOException {
@@ -305,6 +370,13 @@ final class RemoteWorkspaceController {
     }
 
     private static String normalizeId(String value) { return value == null ? "" : value.trim().toLowerCase(Locale.ROOT); }
+    private static int parsePort(String value, String label) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException error) {
+            throw new IllegalArgumentException(label + " must be between 1 and 65535");
+        }
+    }
     private static String detail(String value) { return value == null || value.isBlank() ? "unknown error" : value.replace('\n', ' ').replace('\r', ' '); }
     private static String capOutput(String value) {
         String output = value == null ? "" : value;

@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -113,8 +112,9 @@ final class SshPortForwardService implements AutoCloseable {
         if (endpoint.getPort() == 0 || endpoint.getPort() > 65535) {
             throw new IOException("SSH forwarding URI port is invalid");
         }
-        List<String> command = new ArrayList<>(List.of("ssh", "-N", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=30",
-            "-o", "ServerAliveCountMax=3", "-L", "127.0.0.1:" + spec.localPort() + ":" + spec.remoteHost() + ":" + spec.remotePort()));
+        List<String> command = new ArrayList<>(List.of("ssh", "-N", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ExitOnForwardFailure=yes",
+            "-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=3", "-L",
+            "127.0.0.1:" + spec.localPort() + ":" + spec.remoteHost() + ":" + spec.remotePort()));
         if (endpoint.getPort() > 0) {
             command.add("-p");
             command.add(Integer.toString(endpoint.getPort()));
@@ -125,7 +125,7 @@ final class SshPortForwardService implements AutoCloseable {
 
     private ForwardInfo info(Forward forward) {
         boolean active = forward.process().isAlive();
-        String detail = active ? "active" : failureDetail(exitCode(forward.process()), forward.output().text());
+        String detail = active ? "running" : failureDetail(exitCode(forward.process()), forward.output().text());
         return new ForwardInfo(forward.connectionId(), forward.spec().localPort(), forward.spec().remoteHost(), forward.spec().remotePort(), active, detail);
     }
 
@@ -163,6 +163,7 @@ final class SshPortForwardService implements AutoCloseable {
     private static final class OutputCapture {
         private final StringBuilder text = new StringBuilder();
         private final Thread reader;
+        private int bytesCaptured;
 
         OutputCapture(InputStream input) {
             reader = new Thread(() -> read(input), "shed-ssh-forward-output");
@@ -195,10 +196,11 @@ final class SshPortForwardService implements AutoCloseable {
         }
 
         private synchronized void append(byte[] bytes, int length) {
-            int remaining = OUTPUT_LIMIT_BYTES - text.toString().getBytes(StandardCharsets.UTF_8).length;
+            int remaining = OUTPUT_LIMIT_BYTES - bytesCaptured;
             if (remaining <= 0) return;
             String value = new String(bytes, 0, Math.min(length, remaining), StandardCharsets.UTF_8);
             text.append(value);
+            bytesCaptured += Math.min(length, remaining);
             if (length > remaining) text.append("\n[shed: output truncated]\n");
         }
     }

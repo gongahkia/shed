@@ -117,9 +117,10 @@ final class DebugSessionService {
         synchronized (this) {
             session = session(root);
             name = requestedConfiguration == null || requestedConfiguration.isBlank() ? session.configuration : requestedConfiguration.trim();
+            if (name.isBlank()) name = contextualConfiguration(validation, context);
             if (!settings.enabled()) return fail(root, session, "Debugging is disabled by settings", List.of("Set debug.enabled=true before launch."));
             if (validation == null || !validation.valid()) return fail(root, session, "Debug configuration is invalid", validationErrors(validation));
-            if (name.isBlank()) return fail(root, session, "Select a debug configuration before launch", List.of("Use :debug select <name>."));
+            if (name.isBlank()) return fail(root, session, "Select a debug configuration before launch", List.of("Use :debug select <name>, or open a .py/.pyw file for the built-in Python profile."));
             DebugAdapterRegistry.PlanResult planned = DebugAdapterRegistry.plan(validation, name, root, context);
             if (!planned.launchable()) return fail(root, session, planned.error(), List.of(planned.error()));
             if (session.lifecycle == Lifecycle.RUNNING || session.lifecycle == Lifecycle.STARTING) {
@@ -716,6 +717,18 @@ final class DebugSessionService {
         if (!plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.CONFIGURATION_DONE)) return false;
         Map<String, Object> capabilities = initialize == null ? null : MiniJson.asObject(initialize.body());
         return Boolean.TRUE.equals(capabilities == null ? null : capabilities.get("supportsConfigurationDoneRequest"));
+    }
+
+    private static String contextualConfiguration(DebugAdapterRegistry.Validation validation, DebugAdapterRegistry.LaunchContext context) {
+        if (validation == null || !validation.valid() || context == null || context.activeFile() == null) return "";
+        DebugAdapterRegistry.Configuration python = validation.configurations().get(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY);
+        if (python == null || python.request() != DebugAdapterRegistry.Request.LAUNCH
+            || !BuiltInDebugAdapterSupport.PYTHON_DEBUGPY.equals(python.adapter())) return "";
+        String fileName = context.activeFile().getFileName() == null ? "" : context.activeFile().getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        for (String extension : python.fileExtensions()) {
+            if (extension != null && !extension.isBlank() && fileName.endsWith(extension.toLowerCase(java.util.Locale.ROOT))) return python.name();
+        }
+        return "";
     }
 
     private static Set<DebugAdapterRegistry.Capability> runtimeCapabilities(DebugAdapterRegistry.Plan plan, DebugAdapterTransport.Response initialize) {

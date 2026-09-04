@@ -49,6 +49,11 @@ final class PtyTerminalPane implements AutoCloseable {
 
     static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font terminalFont, List<String> requestedCommand,
                                 Consumer<TerminalLinkResolver.Link> linkOpener) throws IOException {
+        return open(workingDirectory, configManager, terminalFont, requestedCommand, linkOpener, null);
+    }
+
+    static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font terminalFont, List<String> requestedCommand,
+                                Consumer<TerminalLinkResolver.Link> linkOpener, TerminalLinkResolver.SourcePathMapper sourcePathMapper) throws IOException {
         List<String> requested = validateCommand(requestedCommand);
         TerminalShellIntegration.Launch launch = TerminalShellIntegration.prepare(requested, configManager);
         List<String> command = launch.command();
@@ -76,7 +81,7 @@ final class PtyTerminalPane implements AutoCloseable {
         if (shellIntegration != null) widget.getTerminal().addCustomCommandListener(shellIntegration::accept);
         PtyTerminalPane pane = new PtyTerminalPane(widget, connector, process, cwd, shellIntegration);
         if (linkOpener != null) {
-            widget.addHyperlinkFilter(TerminalLinkResolver.create(pane::linkWorkingDirectory, linkOpener));
+            widget.addHyperlinkFilter(TerminalLinkResolver.create(pane::linkWorkingDirectory, linkOpener, sourcePathMapper));
         }
         widget.start();
         return pane;

@@ -23,8 +23,12 @@ final class TerminalController {
     }
 
     String openDirect(String label, File workingDirectory, List<String> command) {
+        return openDirect(label, workingDirectory, command, null);
+    }
+
+    String openDirect(String label, File workingDirectory, List<String> command, TerminalLinkResolver.SourcePathMapper sourcePathMapper) {
         String normalizedLabel = label == null || label.isBlank() ? "Terminal" : label.trim();
-        return openTerminal(normalizedLabel, workingDirectory, command, "Terminal opened with " + normalizedLabel);
+        return openTerminal(normalizedLabel, workingDirectory, command, "Terminal opened with " + normalizedLabel, sourcePathMapper);
     }
 
     String handle(String argument) {
@@ -44,14 +48,20 @@ final class TerminalController {
         String label = profile == null ? "Terminal" : profile.value().displayName();
         List<String> command = profile == null ? ShellCommand.interactiveCommand() : profile.value().command();
         String message = profile == null ? "Terminal opened" : "Terminal opened with " + profile.extensionId() + ":" + profile.value().id();
-        return openTerminal(label, resolveTerminalStartDirectory(), command, message);
+        return openTerminal(label, resolveTerminalStartDirectory(), command, message, null);
     }
 
     private String openTerminal(String label, File startDirectory, List<String> command, String successMessage) {
+        return openTerminal(label, startDirectory, command, successMessage, null);
+    }
+
+    private String openTerminal(String label, File startDirectory, List<String> command, String successMessage,
+                                TerminalLinkResolver.SourcePathMapper sourcePathMapper) {
         String title = nextTerminalTitle(label);
         PtyTerminalPane terminalPane;
         try {
-            terminalPane = PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont(), command, this::openTerminalLink);
+            terminalPane = PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont(), command, this::openTerminalLink,
+                sourcePathMapper);
         } catch (IOException e) {
             return "Terminal failed: " + e.getMessage();
         }

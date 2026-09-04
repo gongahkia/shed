@@ -133,7 +133,8 @@ final class RemoteWorkspaceController {
             List<String> command = tokens.size() == 2 ? List.of() : List.copyOf(tokens.subList(2, tokens.size()));
             List<String> invocation = connection.workspace().terminalCommand(new shed.api.RemoteTerminalRequest("", command));
             if (invocation == null || invocation.isEmpty()) return "Remote terminal unavailable: provider returned no command";
-            return editor.terminalController.openDirect("Remote " + connection.id(), connection.workspace().localRoot().toFile(), invocation);
+            return editor.terminalController.openDirect("Remote " + connection.id(), connection.workspace().localRoot().toFile(), invocation,
+                terminalSourcePathMapper(connection.workspace()));
         } catch (Exception error) {
             return "Remote terminal unavailable: " + detail(error.getMessage());
         }
@@ -230,6 +231,17 @@ final class RemoteWorkspaceController {
             }
         }
         return null;
+    }
+
+    private TerminalLinkResolver.SourcePathMapper terminalSourcePathMapper(RemoteWorkspace workspace) {
+        if (workspace == null || workspace.localRoot() == null) return null;
+        String remoteRoot = workspace.languageServerRoot();
+        if (remoteRoot == null || remoteRoot.isBlank()) return null;
+        try {
+            return new RemoteLspEndpoint(workspace.localRoot(), remoteRoot, List.of()).terminalSourcePathMapper();
+        } catch (IllegalArgumentException error) {
+            return null;
+        }
     }
 
     private RemoteWorkspaceProvider providerFor(URI uri) {

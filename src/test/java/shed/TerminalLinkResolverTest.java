@@ -53,4 +53,23 @@ class TerminalLinkResolverTest {
         assertEquals(7, link.line());
         assertEquals(1, link.column());
     }
+
+    @Test
+    void resolvesMappedRemoteLocationsOnlyWhenTheirLocalMirrorFileExists() throws Exception {
+        Path root = Files.createTempDirectory("shed-terminal-link-");
+        Path source = root.resolve("src/Main.java");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, "class Main {}\n");
+        List<TerminalLinkResolver.Link> opened = new ArrayList<>();
+        TerminalLinkResolver.SourcePathMapper mapper = (remotePath, ignored) -> "/srv/project/src/Main.java".equals(remotePath) ? source : null;
+
+        LinkResult result = TerminalLinkResolver.resolve("/srv/project/src/Main.java:8:2", () -> root, opened::add, mapper);
+
+        assertEquals(1, result.getItems().size());
+        result.getItems().getFirst().getLinkInfo().navigate();
+        TerminalLinkResolver.SourceLink link = assertInstanceOf(TerminalLinkResolver.SourceLink.class, opened.getFirst());
+        assertEquals(source.toRealPath(), link.path());
+        assertEquals(8, link.line());
+        assertEquals(2, link.column());
+    }
 }

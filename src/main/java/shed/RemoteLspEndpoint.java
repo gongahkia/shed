@@ -46,15 +46,36 @@ final class RemoteLspEndpoint {
         try {
             URI value = new URI(uri);
             if (!"file".equalsIgnoreCase(value.getScheme()) || value.getAuthority() != null || value.getPath() == null) return null;
-            String remotePath = value.getPath();
-            if (!remotePath.equals(remoteRoot) && !remotePath.startsWith(remoteRoot + "/")) return null;
-            String relative = remotePath.equals(remoteRoot) ? "" : remotePath.substring(remoteRoot.length() + 1);
-            if (containsTraversal(relative)) return null;
-            Path candidate = localRoot.resolve(relative).normalize();
-            return candidate.startsWith(localRoot) ? candidate : null;
+            return localPathForRemotePath(value.getPath());
         } catch (URISyntaxException | IllegalArgumentException error) {
             return null;
         }
+    }
+
+    /** Maps only an absolute remote path beneath this endpoint's root into its local mirror. */
+    Path localPathForRemotePath(String remotePath) {
+        if (remotePath == null || !remotePath.startsWith("/") || containsTraversal(remotePath)) return null;
+        if (!remotePath.equals(remoteRoot) && !remotePath.startsWith(remoteRoot + "/")) return null;
+        String relative = remotePath.equals(remoteRoot) ? "" : remotePath.substring(remoteRoot.length() + 1);
+        if (containsTraversal(relative)) return null;
+        try {
+            Path candidate = localRoot.resolve(relative).normalize();
+            return candidate.startsWith(localRoot) ? candidate : null;
+        } catch (IllegalArgumentException error) {
+            return null;
+        }
+    }
+
+    TerminalLinkResolver.SourcePathMapper terminalSourcePathMapper() {
+        return (sourcePath, ignoredWorkingDirectory) -> {
+            try {
+                Path raw = Path.of(sourcePath);
+                String remotePath = raw.isAbsolute() ? raw.normalize().toString() : remoteRoot + "/" + raw.normalize();
+                return localPathForRemotePath(remotePath);
+            } catch (IllegalArgumentException error) {
+                return null;
+            }
+        };
     }
 
     private static String normalizeRemoteRoot(String value) {

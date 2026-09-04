@@ -1,6 +1,7 @@
 package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -20,6 +21,8 @@ class WorkspaceEditorSettingsTest {
         Files.writeString(server.resolve(".vscode/settings.json"), """
             {
               "editor.tabSize": 6,
+              "files.exclude": {"dist": true, "**/*.tmp": false},
+              "search.exclude": {"**/generated/**": false, "**/vendor/**": true},
               "[java]": {"editor.insertSpaces": false},
               "[python]": {"editor.tabSize": 3}
             }
@@ -31,6 +34,9 @@ class WorkspaceEditorSettingsTest {
               "settings": {
                 "editor.tabSize": 2,
                 "editor.insertSpaces": true,
+                "files.exclude": {"**/*.tmp": true, "**/generated/**": true},
+                "search.exclude": {"**/generated/**": true},
+                "[java][kotlin]": {"editor.insertSpaces": false},
                 "[java]": {"editor.tabSize": 4}
               }
             }
@@ -40,19 +46,36 @@ class WorkspaceEditorSettingsTest {
         assertTrue(document.hasSettings());
         WorkspaceEditorSettings.Snapshot settings = WorkspaceEditorSettings.read(document);
         assertEquals(2, settings.workspace().defaults().tabSize());
-        assertEquals(4, settings.workspace().languages().get("java").tabSize());
+        assertEquals(4, settings.workspace().singleLanguages().get("java").tabSize());
+        assertEquals(false, settings.workspace().combinedLanguages().get("java").insertSpaces());
 
         WorkspaceEditorSettings.Preferences clientJava = settings.preferencesFor(client.resolve("Main.java"), "java");
         assertEquals(4, clientJava.tabSize());
-        assertEquals(true, clientJava.insertSpaces());
+        assertEquals(false, clientJava.insertSpaces());
+
+        WorkspaceEditorSettings.Preferences clientKotlin = settings.preferencesFor(client.resolve("Main.kt"), "kotlin");
+        assertEquals(2, clientKotlin.tabSize());
+        assertEquals(false, clientKotlin.insertSpaces());
 
         WorkspaceEditorSettings.Preferences serverJava = settings.preferencesFor(server.resolve("Main.java"), "JAVA");
-        assertEquals(6, serverJava.tabSize());
+        assertEquals(4, serverJava.tabSize());
         assertEquals(false, serverJava.insertSpaces());
+
+        WorkspaceEditorSettings.Indentation serverJavaLayers = settings.indentationFor(server.resolve("Main.java"), "java");
+        assertEquals(6, serverJavaLayers.generic().tabSize());
+        assertEquals(4, serverJavaLayers.language().tabSize());
 
         WorkspaceEditorSettings.Preferences serverPython = settings.preferencesFor(server.resolve("main.py"), "python");
         assertEquals(3, serverPython.tabSize());
         assertEquals(true, serverPython.insertSpaces());
+
+        assertTrue(settings.excluded(client.resolve("generated/Model.java")));
+        assertTrue(settings.excluded(client.resolve("cache.tmp")));
+        assertTrue(settings.excluded(server.resolve("dist/main.js")));
+        assertFalse(settings.excluded(server.resolve("cache.tmp")));
+        assertTrue(settings.searchExcluded(client.resolve("generated/Model.java")));
+        assertFalse(settings.searchExcluded(server.resolve("generated/Model.java")));
+        assertTrue(settings.searchExcluded(server.resolve("vendor/Tool.java")));
     }
 
     @Test
@@ -62,7 +85,7 @@ class WorkspaceEditorSettingsTest {
         Files.writeString(project.resolve(".vscode/settings.json"), "{\"editor.tabSize\": \"auto\", \"editor.insertSpaces\": 1}");
         Path manifest = tempDir.resolve("project.code-workspace");
         Files.writeString(manifest, """
-            {"folders": [{"path": "project"}], "settings": {"editor.tabSize": 17, "[java][python]": {"editor.tabSize": 2}}}
+            {"folders": [{"path": "project"}], "settings": {"editor.tabSize": 17, "[java][python": {"editor.tabSize": 2}}}
             """);
 
         WorkspaceEditorSettings.Snapshot settings = WorkspaceEditorSettings.read(WorkspaceManifest.readDocument(manifest));

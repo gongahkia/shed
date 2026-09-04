@@ -33,7 +33,7 @@ final class WorkspaceSearchCoordinator {
         int jobId = editor.asyncJobService.submit("workspace search: " + query,
             token -> {
                 token.onCancel(cancellation::cancel);
-                WorkspaceIndexService index = new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
+                WorkspaceIndexService index = workspaceIndexService();
                 return new WorkspaceTextSearchService(index).search(persistentIndexEnabled, roots, query, cancellation,
                     matches -> SwingUtilities.invokeLater(() -> appendMatches(request, title, partialEntries, matches)));
             },
@@ -103,6 +103,11 @@ final class WorkspaceSearchCoordinator {
         if (!roots.isEmpty()) return roots;
         Path root = workspaceRoot();
         return root == null ? List.of() : List.of(root);
+    }
+
+    private WorkspaceIndexService workspaceIndexService() {
+        return WorkspaceIndexService.withAdditionalIgnore(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"),
+            editor.workspaceController.searchExclusionMatcher());
     }
 
     private static List<QuickfixService.Entry> entries(List<WorkspaceTextSearchService.Match> matches) {

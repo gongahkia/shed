@@ -25,11 +25,20 @@ final class WorkspaceManifest {
      * their deliberately narrow compatibility importers validate them again before exposing a
      * session-only task or debug configuration.
      */
-    record Document(Path source, List<Path> folders, boolean standardVsCodeWorkspace,
+    record Document(Path source, List<Path> folders, Map<Path, String> folderNames, boolean standardVsCodeWorkspace,
                     boolean hasSettings, Object settings, boolean hasTasks, Object tasks, boolean hasLaunch, Object launch) {
         Document {
             source = source == null ? null : source.toAbsolutePath().normalize();
             folders = folders == null ? List.of() : List.copyOf(folders);
+            Map<Path, String> normalizedNames = new LinkedHashMap<>();
+            if (folderNames != null) {
+                for (Map.Entry<Path, String> entry : folderNames.entrySet()) {
+                    if (entry.getKey() != null && entry.getValue() != null) {
+                        normalizedNames.put(entry.getKey().toAbsolutePath().normalize(), entry.getValue());
+                    }
+                }
+            }
+            folderNames = Map.copyOf(normalizedNames);
         }
     }
 
@@ -62,9 +71,12 @@ final class WorkspaceManifest {
         if (folders.size() > MAX_FOLDERS) throw new IOException("Workspace manifest has too many folders");
 
         Path base = manifest.getParent();
+        boolean standardVsCodeWorkspace = manifest.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".code-workspace");
         Set<Path> unique = new LinkedHashSet<>();
+        Map<Path, String> folderNames = new LinkedHashMap<>();
         for (int index = 0; index < folders.size(); index++) {
-            String raw = folderPath(folders.get(index));
+            Object folder = folders.get(index);
+            String raw = folderPath(folder);
             if (raw == null || raw.isBlank()) throw new IOException("Workspace folder " + (index + 1) + " requires a path");
             final Path parsed;
             try {
@@ -74,9 +86,11 @@ final class WorkspaceManifest {
             }
             Path resolved = (parsed.isAbsolute() ? parsed : base.resolve(parsed)).normalize();
             if (!Files.isDirectory(resolved)) throw new IOException("Workspace folder is not an existing directory: " + raw);
-            unique.add(resolved.toRealPath());
+            Path real = resolved.toRealPath();
+            String name = standardVsCodeWorkspace ? folderName(folder) : null;
+            if (unique.add(real) && name != null) folderNames.put(real, name);
         }
-        return new Document(manifest, List.copyOf(unique), manifest.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".code-workspace"),
+        return new Document(manifest, List.copyOf(unique), folderNames, standardVsCodeWorkspace,
             root.containsKey("settings"), root.get("settings"),
             root.containsKey("tasks"), root.get("tasks"),
             root.containsKey("launch"), root.get("launch"));
@@ -109,6 +123,16 @@ final class WorkspaceManifest {
         if (direct != null) return direct;
         Map<String, Object> object = MiniJson.asObject(value);
         return object == null ? null : MiniJson.asString(object.get("path"));
+    }
+
+    private static String folderName(Object value) throws IOException {
+        Map<String, Object> object = MiniJson.asObject(value);
+        if (object == null || !object.containsKey("name")) return null;
+        String name = MiniJson.asString(object.get("name"));
+        if (name == null || name.isBlank() || name.length() > 120 || name.indexOf('\0') >= 0 || name.indexOf('\n') >= 0 || name.indexOf('\r') >= 0) {
+            throw new IOException("Workspace folder name must be a non-empty single line of at most 120 characters");
+        }
+        return name;
     }
 
     private static String portablePath(Path base, Path root) {

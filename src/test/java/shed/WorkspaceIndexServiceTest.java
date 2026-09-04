@@ -56,6 +56,24 @@ public class WorkspaceIndexServiceTest {
     }
 
     @Test
+    void combinesAdditionalSearchExclusionsWithGitIgnoreResults() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("workspace-search-exclusions"));
+        initializeGit(root);
+        Files.writeString(root.resolve(".gitignore"), "ignored.txt\n", StandardCharsets.UTF_8);
+        write(root.resolve("visible.txt"), "visible");
+        write(root.resolve("ignored.txt"), "ignored");
+        write(root.resolve("generated.txt"), "generated");
+        WorkspaceIndexService service = WorkspaceIndexService.withAdditionalIgnore(tempDir.resolve("index-store"),
+            (workspaceRoot, relativePath) -> relativePath.toString().equals("generated.txt"));
+
+        WorkspaceIndexService.BuildResult result = service.scan(root, WorkspaceIndexService.Cancellation.NONE,
+            WorkspaceIndexService.Observer.NO_OP);
+
+        assertEquals(List.of(".gitignore", "visible.txt"), result.index().entries().stream().map(WorkspaceIndexService.Entry::relativePath).sorted().toList());
+        assertEquals(2, result.status().ignored());
+    }
+
+    @Test
     void neverIndexesPathsOutsideTheNormalizedWorkspaceRoot() throws Exception {
         Path root = Files.createDirectory(tempDir.resolve("workspace"));
         Path outside = tempDir.resolve("outside.txt");

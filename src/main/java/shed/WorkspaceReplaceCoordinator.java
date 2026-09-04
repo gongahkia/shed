@@ -101,7 +101,7 @@ final class WorkspaceReplaceCoordinator {
         int jobId = editor.asyncJobService.submit("project replace preview: " + spec.find(),
             token -> {
                 token.onCancel(cancellation::cancel);
-                WorkspaceIndexService index = new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
+                WorkspaceIndexService index = workspaceIndexService();
                 return new WorkspaceReplaceService(index).preview(persistentIndexEnabled, root, spec.find(), spec.replacement(), scopeFile, cancellation);
             },
             (snapshot, result, error) -> completePreview(request, snapshot, result, error));
@@ -137,7 +137,7 @@ final class WorkspaceReplaceCoordinator {
         int jobId = editor.asyncJobService.submit("project replace: " + spec.find(),
             token -> {
                 token.onCancel(cancellation::cancel);
-                WorkspaceIndexService index = new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
+                WorkspaceIndexService index = workspaceIndexService();
                 return new WorkspaceReplaceService(index).preview(persistentIndexEnabled, root, spec.find(), spec.replacement(), scopeFile, cancellation);
             },
             (snapshot, result, error) -> completeDirectReplace(request, policy, snapshot, result, error));
@@ -175,7 +175,7 @@ final class WorkspaceReplaceCoordinator {
         int applyJobId = editor.asyncJobService.submit("project replace apply",
             token -> {
                 token.onCancel(cancellation::cancel);
-                WorkspaceIndexService index = new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
+                WorkspaceIndexService index = workspaceIndexService();
                 return new WorkspaceReplaceService(index).apply(applying, cancellation, options);
             },
             (applySnapshot, result, applyError) -> completeApply(applySnapshot, result, applyError));
@@ -249,7 +249,7 @@ final class WorkspaceReplaceCoordinator {
         int jobId = editor.asyncJobService.submit("project replace apply",
             token -> {
                 token.onCancel(cancellation::cancel);
-                WorkspaceIndexService index = new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
+                WorkspaceIndexService index = workspaceIndexService();
                 return new WorkspaceReplaceService(index).apply(applying, cancellation, options);
             },
             (snapshot, result, error) -> completeApply(snapshot, result, error));
@@ -275,6 +275,11 @@ final class WorkspaceReplaceCoordinator {
             editor.toolWindowHost.refresh(ToolWindowHost.Tab.REPLACE);
         }
         editor.showMessage("Project replace apply complete");
+    }
+
+    private WorkspaceIndexService workspaceIndexService() {
+        return WorkspaceIndexService.withAdditionalIgnore(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"),
+            editor.workspaceController.searchExclusionMatcher());
     }
 
     private String cancel() {

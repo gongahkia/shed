@@ -1,5 +1,6 @@
 package shed;
 
+import shed.api.LanguageProfile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -11,6 +12,7 @@ import java.awt.Component;
 import java.awt.GraphicsEnvironment;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -18,6 +20,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Callable;
 import javax.swing.SwingUtilities;
@@ -779,7 +782,7 @@ public class TexteditorSwingIntegrationTest {
         Files.writeString(manifest, """
             {
               // The settings remain inert; only the bounded task and launch subsets are considered.
-              "folders": [{"path": "workspace-launch-project"}],
+              "folders": [{"path": "workspace-launch-project", "name": "Workspace launch"}],
               "settings": {"editor.tabSize": 2},
               "tasks": {"version": "2.0.0", "tasks": [
                 {"label": "Prepare workspace", "type": "process", "command": "touch", "args": ["workspace-prelaunch.marker"], "problemMatcher": []}
@@ -794,6 +797,7 @@ public class TexteditorSwingIntegrationTest {
         try {
             assertEquals("Imported 1 workspace folder", onEdt(() -> editor.handleWorkspaceProfileCommand("import " + manifest)));
             assertEquals(2, onEdt(() -> editor.getTextArea().getTabSize()));
+            assertEquals("Workspace launch — " + workspace, onEdt(() -> editor.workspaceController.displayRoot(workspace)));
             String requested = onEdt(() -> editor.handleDebugCommand("start vscode:Run workspace"));
             int jobId = Integer.parseInt(requested.replaceAll(".*\\(job ([0-9]+)\\)\\.", "$1"));
 
@@ -802,6 +806,70 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(DebugSessionService.Lifecycle.FAILED, onEdt(() -> editor.debugSessionController.snapshotForPanel().lifecycle()));
             assertFalse(Files.exists(workspace.resolve(".shedtasks")));
             assertFalse(Files.exists(workspace.resolve(".vscode")));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void importedWorkspaceFileExclusionsApplyToExplorerOnly() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-workspace-excludes");
+        Path workspace = tempDir.resolve("workspace-excludes-project");
+        Path file = workspace.resolve("Main.java");
+        Path manifest = tempDir.resolve("excludes.code-workspace");
+        Files.createDirectories(home.resolve(".shed"));
+        Files.createDirectories(workspace.resolve("generated"));
+        Files.writeString(file, "class Main {}\n", StandardCharsets.UTF_8);
+        Files.writeString(workspace.resolve("visible.txt"), "visible\n", StandardCharsets.UTF_8);
+        Files.writeString(workspace.resolve("generated/Model.java"), "class Model {}\n", StandardCharsets.UTF_8);
+        Files.writeString(manifest, """
+            {"folders": [{"path": "workspace-excludes-project"}], "settings": {"files.exclude": {"**/generated/**": true}}}
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertEquals("Imported 1 workspace folder", onEdt(() -> editor.handleWorkspaceProfileCommand("import " + manifest)));
+            List<String> visible = onEdt(() -> java.util.Arrays.stream(editor.treeGitController.listTreeChildren(workspace.toFile()))
+                .map(File::getName).toList());
+
+            assertTrue(visible.contains("visible.txt"));
+            assertFalse(visible.contains("generated"));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void importedWorkspaceLanguageIndentationOverridesGenericSettingsAndLanguageProfiles() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-workspace-language-indent");
+        Path workspace = tempDir.resolve("workspace-language-indent");
+        Path file = workspace.resolve("Main.pref");
+        Path manifest = tempDir.resolve("language-indent.code-workspace");
+        Files.createDirectories(home.resolve(".shed"));
+        Files.createDirectories(workspace);
+        Files.writeString(file, "module sample\n", StandardCharsets.UTF_8);
+        Files.writeString(manifest, """
+            {"folders": [{"path": "workspace-language-indent"}], "settings": {"editor.tabSize": 2}}
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                editor.extensionRegistry.registerLanguageProfile("profile", new LanguageProfile("sample", "Sample", Set.of("pref"), Set.of(), Set.of(),
+                    List.of(), List.of(), List.of(), Set.of(), 7, false));
+                return null;
+            });
+            assertEquals("Language profile selected: Sample", onEdt(() -> editor.handleLanguageCommand("profile:sample")));
+            assertEquals("Imported 1 workspace folder", onEdt(() -> editor.handleWorkspaceProfileCommand("import " + manifest)));
+            assertEquals(7, onEdt(() -> editor.getTextArea().getTabSize()));
+
+            Files.writeString(manifest, """
+                {"folders": [{"path": "workspace-language-indent"}], "settings": {"editor.tabSize": 2, "[sample]": {"editor.tabSize": 3}}}
+                """, StandardCharsets.UTF_8);
+            assertEquals("Reloaded imported workspace editor settings", onEdt(() -> editor.handleWorkspaceProfileCommand("reload")));
+            assertEquals(3, onEdt(() -> editor.getTextArea().getTabSize()));
         } finally {
             disposeEditor(editor);
         }
@@ -929,6 +997,39 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(2, entry.getLine());
             assertEquals(8, entry.getColumn());
             assertFalse(Files.exists(home.resolve(".shed/workspace-index")));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void importedWorkspaceSearchExclusionsFilterWorkspaceSearch() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-workspace-search-excludes");
+        Path workspace = tempDir.resolve("workspace-search-excludes");
+        Path file = workspace.resolve("Main.java");
+        Path visible = workspace.resolve("visible.txt");
+        Path excluded = workspace.resolve("generated/Hidden.txt");
+        Path manifest = tempDir.resolve("search-excludes.code-workspace");
+        Files.createDirectories(home);
+        Files.createDirectories(excluded.getParent());
+        Files.writeString(file, "class Main {}\n", StandardCharsets.UTF_8);
+        Files.writeString(visible, "needle\n", StandardCharsets.UTF_8);
+        Files.writeString(excluded, "needle\n", StandardCharsets.UTF_8);
+        initializeGit(workspace);
+        Files.writeString(manifest, """
+            {"folders": [{"path": "workspace-search-excludes"}], "settings": {"search.exclude": {"**/generated/**": true}}}
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertEquals("Imported 1 workspace folder", onEdt(() -> editor.handleWorkspaceProfileCommand("import " + manifest)));
+            String result = onEdt(() -> editor.commandHandler.execute("grep needle"));
+            int jobId = Integer.parseInt(result.substring("Started workspace search job ".length()));
+            assertTrue(awaitSearchCompletion(editor, jobId));
+
+            List<QuickfixService.Entry> entries = onEdt(() -> editor.quickfixService.entries());
+            assertEquals(List.of(visible.toString()), entries.stream().map(QuickfixService.Entry::getFilePath).toList());
         } finally {
             disposeEditor(editor);
         }

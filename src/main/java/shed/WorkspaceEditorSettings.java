@@ -3,18 +3,24 @@ package shed;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.FileSystems;
 import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The intentionally small, non-executable editor-settings subset accepted from an imported
  * VS Code workspace.  This is a snapshot made by an explicit workspace import or reload, not a
- * general settings engine or an automatic project-configuration watcher.
+ * general settings engine or an automatic project-configuration watcher. `files.exclude` is
+ * intentionally consumed only by the Explorer, while `search.exclude` is consumed by workspace
+ * search and project replace.
  */
 final class WorkspaceEditorSettings {
     private static final long MAX_FILE_BYTES = 1024L * 1024L;
@@ -37,39 +43,144 @@ final class WorkspaceEditorSettings {
         }
     }
 
-    record Scope(Preferences defaults, Map<String, Preferences> languages) {
-        Scope {
-            defaults = defaults == null ? Preferences.EMPTY : defaults;
-            languages = languages == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(languages));
-        }
+    record Indentation(Preferences generic, Preferences language) {
+        static final Indentation EMPTY = new Indentation(Preferences.EMPTY, Preferences.EMPTY);
 
-        Preferences preferencesFor(String languageId) {
-            Preferences language = languageId == null ? null : languages.get(languageId.toLowerCase(Locale.ROOT));
-            return defaults.overlay(language);
+        Indentation {
+            generic = generic == null ? Preferences.EMPTY : generic;
+            language = language == null ? Preferences.EMPTY : language;
         }
     }
 
-    record Snapshot(Scope workspace, Map<Path, Scope> folders, List<String> diagnostics) {
+    record Exclusion(String pattern, boolean excluded, PathMatcher matcher) {
+        boolean matches(Path relative) {
+            if (relative == null) return false;
+            if (matchesPattern(relative, pattern)) return true;
+            if (pattern.endsWith("/**") && matchesPattern(relative, pattern.substring(0, pattern.length() - 3))) return true;
+            for (Path parent = relative.getParent(); parent != null; parent = parent.getParent()) {
+                if (matchesPattern(parent, pattern)) return true;
+                if (pattern.endsWith("/**") && matchesPattern(parent, pattern.substring(0, pattern.length() - 3))) return true;
+            }
+            return false;
+        }
+
+        private boolean matchesPattern(Path candidate, String candidatePattern) {
+            try {
+                if (candidatePattern.equals(pattern) && matcher.matches(candidate)) return true;
+                if (matcherFor(candidatePattern).matches(candidate)) return true;
+                if (candidatePattern.startsWith("**/")) return matcherFor(candidatePattern.substring(3)).matches(candidate);
+                return false;
+            } catch (IllegalArgumentException ignored) {
+                return false;
+            }
+        }
+    }
+
+    record Scope(Preferences defaults, Map<String, Preferences> singleLanguages, Map<String, Preferences> combinedLanguages, List<Exclusion> fileExclusions,
+                 List<Exclusion> searchExclusions) {
+        Scope {
+            defaults = defaults == null ? Preferences.EMPTY : defaults;
+            singleLanguages = singleLanguages == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(singleLanguages));
+            combinedLanguages = combinedLanguages == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(combinedLanguages));
+            fileExclusions = fileExclusions == null ? List.of() : List.copyOf(fileExclusions);
+            searchExclusions = searchExclusions == null ? List.of() : List.copyOf(searchExclusions);
+        }
+
+        Preferences preferencesFor(String languageId) {
+            return defaults.overlay(languagePreferences(languageId));
+        }
+
+        Preferences languagePreferences(String languageId) {
+            String key = languageKey(languageId);
+            Preferences combined = combinedLanguages.get(key);
+            return (combined == null ? Preferences.EMPTY : combined).overlay(singleLanguages.get(key));
+        }
+
+        Boolean fileExclusion(Path relative) {
+            return exclusion(fileExclusions, relative);
+        }
+
+        Boolean searchExclusion(Path relative) {
+            return exclusion(searchExclusions, relative);
+        }
+
+        private static Boolean exclusion(List<Exclusion> exclusions, Path relative) {
+            Boolean result = null;
+            for (Exclusion exclusion : exclusions) {
+                if (exclusion.matches(relative)) result = exclusion.excluded();
+            }
+            return result;
+        }
+    }
+
+    record Snapshot(Scope workspace, List<Path> roots, Map<Path, Scope> folders, List<String> diagnostics) {
         Snapshot {
-            workspace = workspace == null ? new Scope(Preferences.EMPTY, Map.of()) : workspace;
+            workspace = workspace == null ? new Scope(Preferences.EMPTY, Map.of(), Map.of(), List.of(), List.of()) : workspace;
+            roots = roots == null ? List.of() : List.copyOf(roots);
             folders = folders == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(folders));
             diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
         }
 
         Preferences preferencesFor(Path resource, String languageId) {
-            Preferences result = workspace.preferencesFor(languageId);
-            Path root = WorkspaceRootResolver.configuredRoot(resource, List.copyOf(folders.keySet()));
+            Indentation indentation = indentationFor(resource, languageId);
+            return indentation.generic().overlay(indentation.language());
+        }
+
+        Indentation indentationFor(Path resource, String languageId) {
+            Path root = WorkspaceRootResolver.configuredRoot(resource, roots);
+            if (root == null) return Indentation.EMPTY;
+            Preferences generic = workspace.defaults();
+            Preferences language = workspace.languagePreferences(languageId);
             Scope folder = root == null ? null : folders.get(root);
-            return folder == null ? result : result.overlay(folder.preferencesFor(languageId));
+            if (folder != null) {
+                generic = generic.overlay(folder.defaults());
+                language = language.overlay(folder.languagePreferences(languageId));
+            }
+            return new Indentation(generic, language);
+        }
+
+        boolean excluded(Path resource) {
+            Path root = WorkspaceRootResolver.configuredRoot(resource, roots);
+            if (root == null) return false;
+            Path relative;
+            try {
+                relative = root.relativize(resource.toAbsolutePath().normalize());
+            } catch (IllegalArgumentException error) {
+                return false;
+            }
+            Boolean excluded = workspace.fileExclusion(relative);
+            Scope folder = folders.get(root);
+            Boolean folderValue = folder == null ? null : folder.fileExclusion(relative);
+            return folderValue != null ? folderValue : Boolean.TRUE.equals(excluded);
+        }
+
+        boolean searchExcluded(Path resource) {
+            Path root = WorkspaceRootResolver.configuredRoot(resource, roots);
+            if (root == null) return false;
+            Path relative;
+            try {
+                relative = root.relativize(resource.toAbsolutePath().normalize());
+            } catch (IllegalArgumentException error) {
+                return false;
+            }
+            Boolean excluded = workspace.searchExclusion(relative);
+            Scope folder = folders.get(root);
+            Boolean folderValue = folder == null ? null : folder.searchExclusion(relative);
+            return folderValue != null ? folderValue : Boolean.TRUE.equals(excluded);
         }
 
         boolean empty() {
-            return workspace.defaults().empty() && workspace.languages().isEmpty() && folders.isEmpty();
+            return workspace.defaults().empty() && workspace.singleLanguages().isEmpty() && workspace.combinedLanguages().isEmpty() && workspace.fileExclusions().isEmpty()
+                && workspace.searchExclusions().isEmpty() && folders.isEmpty();
         }
     }
 
     static Snapshot empty() {
-        return new Snapshot(null, Map.of(), List.of());
+        return new Snapshot(null, List.of(), Map.of(), List.of());
+    }
+
+    private static String languageKey(String languageId) {
+        return languageId == null ? "" : languageId.toLowerCase(Locale.ROOT);
     }
 
     static Snapshot read(WorkspaceManifest.Document document) {
@@ -79,43 +190,48 @@ final class WorkspaceEditorSettings {
         Map<Path, Scope> folders = new LinkedHashMap<>();
         for (Path root : document.folders()) {
             Scope scope = readFolderScope(root, diagnostics);
-            if (!scope.defaults().empty() || !scope.languages().isEmpty()) folders.put(root, scope);
+            if (!scope.defaults().empty() || !scope.singleLanguages().isEmpty() || !scope.combinedLanguages().isEmpty() || !scope.fileExclusions().isEmpty()
+                || !scope.searchExclusions().isEmpty()) folders.put(root, scope);
         }
-        return new Snapshot(workspace, folders, diagnostics);
+        return new Snapshot(workspace, document.folders(), folders, diagnostics);
     }
 
     private static Scope readFolderScope(Path root, List<String> diagnostics) {
         Path settings = root.resolve(".vscode").resolve("settings.json");
         try {
-            if (!Files.exists(settings)) return new Scope(Preferences.EMPTY, Map.of());
+            if (!Files.exists(settings)) return new Scope(Preferences.EMPTY, Map.of(), Map.of(), List.of(), List.of());
             if (!Files.isRegularFile(settings)) {
                 diagnostics.add("Ignored " + settings + ": it is not a regular file");
-                return new Scope(Preferences.EMPTY, Map.of());
+                return new Scope(Preferences.EMPTY, Map.of(), Map.of(), List.of(), List.of());
             }
             if (Files.size(settings) > MAX_FILE_BYTES) {
                 diagnostics.add("Ignored " + settings + ": it exceeds 1 MiB");
-                return new Scope(Preferences.EMPTY, Map.of());
+                return new Scope(Preferences.EMPTY, Map.of(), Map.of(), List.of(), List.of());
             }
             return readScope(Jsonc.parseObject(Files.readString(settings, StandardCharsets.UTF_8)), settings.toString(), diagnostics);
         } catch (IOException | RuntimeException error) {
             diagnostics.add("Ignored " + settings + ": " + concise(error));
-            return new Scope(Preferences.EMPTY, Map.of());
+            return new Scope(Preferences.EMPTY, Map.of(), Map.of(), List.of(), List.of());
         }
     }
 
     private static Scope readScope(Object raw, String source, List<String> diagnostics) {
         Map<String, Object> settings = MiniJson.asObject(raw);
-        if (raw == null) return new Scope(Preferences.EMPTY, Map.of());
+        if (raw == null) return new Scope(Preferences.EMPTY, Map.of(), Map.of(), List.of(), List.of());
         if (settings == null) {
             diagnostics.add("Ignored " + source + ": settings must be an object");
-            return new Scope(Preferences.EMPTY, Map.of());
+            return new Scope(Preferences.EMPTY, Map.of(), Map.of(), List.of(), List.of());
         }
         Preferences defaults = values(settings, source, diagnostics);
-        Map<String, Preferences> languages = new LinkedHashMap<>();
+        Map<String, Preferences> singleLanguages = new LinkedHashMap<>();
+        Map<String, Preferences> combinedLanguages = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : settings.entrySet()) {
-            String language = languageOverride(entry.getKey());
-            if (language == null) continue;
-            if (languages.size() >= MAX_LANGUAGE_OVERRIDES) {
+            List<String> languages = languageOverrides(entry.getKey());
+            if (languages.isEmpty()) continue;
+            Set<String> configured = new LinkedHashSet<>(singleLanguages.keySet());
+            configured.addAll(combinedLanguages.keySet());
+            long additions = languages.stream().filter(language -> !configured.contains(language)).count();
+            if (configured.size() + additions > MAX_LANGUAGE_OVERRIDES) {
                 diagnostics.add("Ignored language overrides in " + source + ": maximum is " + MAX_LANGUAGE_OVERRIDES);
                 break;
             }
@@ -125,9 +241,13 @@ final class WorkspaceEditorSettings {
                 continue;
             }
             Preferences values = values(override, source + " " + entry.getKey(), diagnostics);
-            if (!values.empty()) languages.put(language, values);
+            if (!values.empty()) {
+                Map<String, Preferences> target = languages.size() == 1 ? singleLanguages : combinedLanguages;
+                for (String language : languages) target.put(language, values);
+            }
         }
-        return new Scope(defaults, languages);
+        return new Scope(defaults, singleLanguages, combinedLanguages, exclusions(settings.get("files.exclude"), "files.exclude", source, diagnostics),
+            exclusions(settings.get("search.exclude"), "search.exclude", source, diagnostics));
     }
 
     private static Preferences values(Map<String, Object> values, String source, List<String> diagnostics) {
@@ -155,11 +275,63 @@ final class WorkspaceEditorSettings {
         return null;
     }
 
-    private static String languageOverride(String key) {
-        if (key == null || key.length() < 3 || key.charAt(0) != '[' || key.charAt(key.length() - 1) != ']') return null;
-        String language = key.substring(1, key.length() - 1);
-        if (!language.matches("[A-Za-z][A-Za-z0-9_.+-]{0,63}")) return null;
-        return language.toLowerCase(Locale.ROOT);
+    private static List<Exclusion> exclusions(Object value, String setting, String source, List<String> diagnostics) {
+        if (value == null) return List.of();
+        Map<String, Object> entries = MiniJson.asObject(value);
+        if (entries == null) {
+            diagnostics.add("Ignored " + setting + " in " + source + ": Shed accepts an object of boolean glob values");
+            return List.of();
+        }
+        List<Exclusion> result = new ArrayList<>();
+        for (Map.Entry<String, Object> entry : entries.entrySet()) {
+            if (result.size() >= 100) {
+                diagnostics.add("Ignored " + setting + " entries in " + source + ": maximum is 100");
+                break;
+            }
+            String pattern = entry.getKey();
+            if (!validPattern(pattern)) {
+                diagnostics.add("Ignored " + setting + " pattern in " + source + ": patterns must be relative slash-separated globs of at most 512 characters");
+                continue;
+            }
+            if (!(entry.getValue() instanceof Boolean enabled)) {
+                diagnostics.add("Ignored " + setting + " '" + pattern + "' in " + source + ": only boolean values are supported");
+                continue;
+            }
+            try {
+                result.add(new Exclusion(pattern, enabled, matcherFor(pattern)));
+            } catch (IllegalArgumentException error) {
+                diagnostics.add("Ignored " + setting + " '" + pattern + "' in " + source + ": invalid glob syntax");
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    private static boolean validPattern(String pattern) {
+        if (pattern == null || pattern.isBlank() || pattern.length() > 512 || pattern.startsWith("/") || pattern.indexOf('\\') >= 0
+            || pattern.indexOf('\0') >= 0 || pattern.indexOf('\n') >= 0 || pattern.indexOf('\r') >= 0) return false;
+        for (String segment : pattern.split("/", -1)) {
+            if ("..".equals(segment)) return false;
+        }
+        return true;
+    }
+
+    private static PathMatcher matcherFor(String pattern) {
+        return FileSystems.getDefault().getPathMatcher("glob:" + pattern);
+    }
+
+    private static List<String> languageOverrides(String key) {
+        if (key == null || key.length() < 3 || key.charAt(0) != '[' || key.charAt(key.length() - 1) != ']') return List.of();
+        List<String> languages = new ArrayList<>();
+        for (int index = 0; index < key.length();) {
+            if (key.charAt(index) != '[') return List.of();
+            int close = key.indexOf(']', index + 1);
+            if (close < 0) return List.of();
+            String language = key.substring(index + 1, close);
+            if (!language.matches("[A-Za-z][A-Za-z0-9_.+-]{0,63}")) return List.of();
+            if (!languages.add(language.toLowerCase(Locale.ROOT))) return List.of();
+            index = close + 1;
+        }
+        return List.copyOf(languages);
     }
 
     private static String concise(Exception error) {

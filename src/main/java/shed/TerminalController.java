@@ -60,6 +60,20 @@ final class TerminalController {
         String message = profile == null ? (defaultMessage == null ? "Terminal opened" : defaultMessage)
             : "Terminal opened with " + profile.extensionId() + ":" + profile.value().id();
         File startDirectory = resolveTerminalStartDirectory();
+        RemoteWorkspaceSessionService.Connection remoteConnection = editor.remoteWorkspaceSessions == null
+            ? null : editor.remoteWorkspaceSessions.connectionFor(startDirectory.toPath());
+        if (remoteConnection != null) {
+            try {
+                List<String> invocation = remoteConnection.terminalInvocation(startDirectory.toPath(), profile == null ? List.of() : command);
+                String remoteLabel = "Remote " + remoteConnection.id() + " — " + label;
+                String remoteMessage = profile == null ? "Remote terminal opened: " + remoteConnection.id()
+                    : "Remote terminal opened with " + profile.extensionId() + ":" + profile.value().id();
+                return openTerminal(remoteLabel, remoteConnection.localRoot().toFile(), invocation, remoteMessage,
+                    remoteConnection.sourcePathMapper(), orientation);
+            } catch (Exception error) {
+                return "Remote terminal unavailable: " + safeMessage(error);
+            }
+        }
         DevContainerSessionService.Connection connection = editor.devContainerSessions == null
             ? null : editor.devContainerSessions.connectionFor(startDirectory.toPath());
         if (connection == null) {

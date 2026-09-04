@@ -2,6 +2,7 @@ package shed;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.KeyListener;
 import java.awt.geom.Rectangle2D;
@@ -203,6 +204,10 @@ final class MarkdownPreviewPane extends JPanel {
         int sourceMaximum = Math.max(0, sourceBar.getMaximum() - sourceBar.getVisibleAmount());
         int previewMaximum = Math.max(0, previewBar.getMaximum() - previewBar.getVisibleAmount());
         if (previewMaximum == 0) {
+            establishPreviewScrollRange();
+            previewMaximum = Math.max(0, previewBar.getMaximum() - previewBar.getVisibleAmount());
+        }
+        if (previewMaximum == 0) {
             preview.revalidate();
             scrollPane.revalidate();
             return false;
@@ -211,6 +216,15 @@ final class MarkdownPreviewPane extends JPanel {
         double progress = sourceMaximum == 0 ? caretDocumentProgress() : (double) sourcePosition / sourceMaximum;
         previewBar.setValue((int) Math.round(Math.max(0.0, Math.min(1.0, progress)) * previewMaximum));
         return true;
+    }
+
+    private void establishPreviewScrollRange() {
+        Dimension preferred = preview.getPreferredSize();
+        if (preferred.height <= 0) return;
+        Dimension extent = scrollPane.getViewport().getExtentSize();
+        int width = extent.width > 0 ? extent.width : Math.max(1, preferred.width);
+        preview.setSize(width, Math.max(1, preferred.height));
+        scrollPane.doLayout();
     }
 
     private int caretVerticalPosition(int sourceMaximum) {

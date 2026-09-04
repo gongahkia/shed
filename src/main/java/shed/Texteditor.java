@@ -97,6 +97,7 @@ public class Texteditor extends JFrame implements KeyListener {
     DatabaseController databaseController;
     WorkspaceToolController workspaceToolController;
     RemoteWorkspaceController remoteWorkspaceController;
+    RemoteWorkspaceSessionService remoteWorkspaceSessions;
     RemoteWorkspaceTaskTargets remoteWorkspaceTaskTargets;
     TreeGitController treeGitController;
     GitHubCapabilityController gitHubCapabilityController;
@@ -254,6 +255,7 @@ public class Texteditor extends JFrame implements KeyListener {
         composeController = new ComposeController(this);
         databaseController = new DatabaseController(this);
         workspaceToolController = new WorkspaceToolController(this, extensionRegistry);
+        remoteWorkspaceSessions = new RemoteWorkspaceSessionService();
         remoteWorkspaceTaskTargets = new RemoteWorkspaceTaskTargets();
         remoteWorkspaceController = new RemoteWorkspaceController(this);
         helpService = new HelpService();

@@ -16,9 +16,27 @@ import java.util.function.BooleanSupplier;
 
 final class DebugSessionService {
     enum Lifecycle { IDLE, STARTING, RUNNING, STOPPED, FAILED }
+    enum Control {
+        CONTINUE("continue", DebugAdapterRegistry.Capability.CONTINUE, true),
+        NEXT("next", DebugAdapterRegistry.Capability.NEXT, true),
+        STEP_IN("stepIn", DebugAdapterRegistry.Capability.STEP_IN, true),
+        STEP_OUT("stepOut", DebugAdapterRegistry.Capability.STEP_OUT, true),
+        PAUSE("pause", DebugAdapterRegistry.Capability.PAUSE, false);
+
+        private final String dapCommand;
+        private final DebugAdapterRegistry.Capability capability;
+        private final boolean requiresPause;
+
+        Control(String dapCommand, DebugAdapterRegistry.Capability capability, boolean requiresPause) {
+            this.dapCommand = dapCommand;
+            this.capability = capability;
+            this.requiresPause = requiresPause;
+        }
+    }
     private record BreakpointSynchronization(boolean attempted, List<String> diagnostics) { }
     record InspectionResult(DebugInspection.Snapshot snapshot, boolean succeeded) { }
     record ConsoleResult(DebugConsole.Snapshot snapshot, boolean succeeded) { }
+    record ControlResult(Snapshot snapshot, boolean succeeded) { }
     private record InspectionPayload(List<DebugInspection.ThreadInfo> threads, List<DebugInspection.Frame> frames, int frameId,
         List<DebugInspection.Scope> scopes, List<DebugInspection.Watch> watches, String detail, DebugInspection.State state) { }
 
@@ -228,6 +246,68 @@ final class DebugSessionService {
             if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING) return new Result(snapshot(root, session), false);
             session.diagnostics.addAll(diagnostics);
             return new Result(snapshot(root, session), true);
+        }
+    }
+
+    ControlResult control(Path workspace, Control control, Duration timeout) {
+        Path root = root(workspace);
+        Control requested = control;
+        Connection connection;
+        DebugAdapterRegistry.Plan plan;
+        DebugInspection.Snapshot inspection;
+        synchronized (this) {
+            Session session = session(root);
+            if (requested == null) return controlFailure(root, session, "Debug control is unavailable.");
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null) {
+                return controlFailure(root, session, "No running debug session is available.");
+            }
+            if (!session.plan.adapter().capabilities().contains(requested.capability)) {
+                return controlFailure(root, session, "Debug adapter does not declare support for " + requested.dapCommand + ".");
+            }
+            inspection = session.inspection.snapshot();
+            if (requested.requiresPause && (!inspection.paused() || inspection.threadId() < 1)) {
+                return controlFailure(root, session, "Debug " + requested.dapCommand + " requires a paused thread.");
+            }
+            if (requested == Control.PAUSE && inspection.paused()) {
+                return controlFailure(root, session, "Debug session is already paused.");
+            }
+            if (requested == Control.PAUSE && !session.plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.THREADS)) {
+                return controlFailure(root, session, "Debug pause requires the adapter to declare threads support.");
+            }
+            connection = session.connection;
+            plan = session.plan;
+        }
+        try {
+            int threadId = requested == Control.PAUSE ? firstThreadId(connection, timeout) : inspection.threadId();
+            if (threadId < 1) {
+                synchronized (this) {
+                    return controlFailure(root, session(root), "Debug " + requested.dapCommand + " requires an available thread.");
+                }
+            }
+            DebugAdapterTransport.Response response = connection.request(requested.dapCommand, Map.of("threadId", threadId), timeout);
+            if (!response.success()) {
+                synchronized (this) {
+                    return controlFailure(root, session(root), responseFailure(requested.dapCommand, response));
+                }
+            }
+            synchronized (this) {
+                Session session = session(root);
+                if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING || session.plan != plan) {
+                    return new ControlResult(snapshot(root, session), false);
+                }
+                if (requested != Control.PAUSE) session.inspection.invalidated("Debug " + requested.dapCommand + " requested.");
+                session.detail = "Debug " + requested.dapCommand + " requested.";
+                return new ControlResult(snapshot(root, session), true);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) {
+                return controlFailure(root, session(root), "Debug " + requested.dapCommand + " failed: " + message(error));
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) {
+                return controlFailure(root, session(root), "Debug " + requested.dapCommand + " interrupted.");
+            }
         }
     }
 
@@ -593,6 +673,24 @@ final class DebugSessionService {
     private static Snapshot snapshot(Path workspace, Session session) { return new Snapshot(workspace, session.configuration, session.lifecycle, session.detail, session.diagnostics); }
     private static List<String> validationErrors(DebugAdapterRegistry.Validation validation) {
         return validation == null ? List.of("Debug configuration has not been loaded.") : validation.errors().stream().map(DebugAdapterRegistry.Error::message).toList();
+    }
+    private static int firstThreadId(Connection connection, Duration timeout) throws IOException, TimeoutException, InterruptedException {
+        DebugAdapterTransport.Response response = connection.request("threads", Map.of(), timeout);
+        if (!response.success()) throw new IOException(responseFailure("threads", response));
+        Map<String, Object> body = MiniJson.asObject(response.body());
+        List<Object> values = MiniJson.asArray(body == null ? null : body.get("threads"));
+        if (values == null) return 0;
+        for (Object value : values) {
+            Map<String, Object> thread = MiniJson.asObject(value);
+            int id = integer(thread == null ? null : thread.get("id"));
+            if (id > 0) return id;
+        }
+        return 0;
+    }
+    private static ControlResult controlFailure(Path root, Session session, String detail) {
+        String message = detail == null || detail.isBlank() ? "Debug control failed." : detail;
+        session.diagnostics.add(message);
+        return new ControlResult(snapshot(root, session), false);
     }
     private static String message(Throwable error) { return error == null || error.getMessage() == null ? "Unknown debug adapter failure" : error.getMessage(); }
     private static String responseFailure(String command, DebugAdapterTransport.Response response) {

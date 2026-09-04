@@ -94,6 +94,54 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void sendsDeclaredExecutionControlsToThePausedThreadAndUsesThreadsForPause() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-controls").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+        connection.responses.put("threads", response("threads", true, Map.of("threads", List.of(Map.of("id", 11, "name", "worker"))), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,threads,continue,next,step_in,step_out,pause"), enabled(), "main",
+            Duration.ofSeconds(1), (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+
+        DebugSessionService.ControlResult next = service.control(workspace, DebugSessionService.Control.NEXT, Duration.ofSeconds(1));
+        assertTrue(next.succeeded());
+        assertEquals("next", connection.commands.get(connection.commands.size() - 1));
+        assertEquals(7, connection.arguments.get(connection.arguments.size() - 1).get("threadId"));
+        listener.get().onEvent(new DebugAdapterTransport.Event(2, "stopped", Map.of("reason", "pause", "threadId", 7)));
+
+        DebugSessionService.ControlResult pause = service.control(workspace, DebugSessionService.Control.PAUSE, Duration.ofSeconds(1));
+        assertFalse(pause.succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(3, "continued", Map.of("threadId", 7)));
+        pause = service.control(workspace, DebugSessionService.Control.PAUSE, Duration.ofSeconds(1));
+        assertTrue(pause.succeeded());
+        assertEquals("threads", connection.commands.get(connection.commands.size() - 2));
+        assertEquals("pause", connection.commands.get(connection.commands.size() - 1));
+        assertEquals(11, connection.arguments.get(connection.arguments.size() - 1).get("threadId"));
+    }
+
+    @Test
+    void rejectsExecutionControlsTheAdapterDidNotDeclare() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-controls-missing").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+
+        assertTrue(service.start(workspace, file, validation("launch"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+
+        DebugSessionService.ControlResult result = service.control(workspace, DebugSessionService.Control.CONTINUE, Duration.ofSeconds(1));
+
+        assertFalse(result.succeeded());
+        assertTrue(result.snapshot().diagnostics().stream().anyMatch(value -> value.contains("does not declare support for continue")));
+        assertFalse(connection.commands.contains("continue"));
+    }
+
+    @Test
     void synchronizesPersistedSourceBreakpointsOnlyForDeclaredAdapterCapability(@TempDir Path tempDir) throws Exception {
         DebugSessionService service = new DebugSessionService();
         Path workspace = tempDir.resolve("workspace");

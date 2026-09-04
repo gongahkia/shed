@@ -138,7 +138,12 @@ final class WorkspaceEditorSettings {
 
     private static Integer tabSize(Object value, String source, List<String> diagnostics) {
         if (value == null) return null;
-        if (value instanceof Long number && number >= 1 && number <= 16) return number.intValue();
+        if (value instanceof Number number) {
+            double numeric = number.doubleValue();
+            if (Double.isFinite(numeric) && numeric >= 1 && numeric <= 16 && numeric == Math.rint(numeric)) {
+                return (int) numeric;
+            }
+        }
         diagnostics.add("Ignored editor.tabSize in " + source + ": Shed accepts an integer from 1 through 16");
         return null;
     }

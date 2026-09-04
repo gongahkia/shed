@@ -274,6 +274,8 @@ final class WorkspaceController {
 
     private void restoreImportedManifest(String serializedManifest) {
         importedManifest = null;
+        importedEditorSettings = WorkspaceEditorSettings.empty();
+        refreshEditorIndentation();
         if (serializedManifest == null || serializedManifest.isBlank()) return;
         try {
             WorkspaceManifest.Document document = WorkspaceManifest.readDocument(Path.of(serializedManifest));

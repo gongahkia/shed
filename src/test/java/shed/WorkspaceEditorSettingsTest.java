@@ -37,7 +37,10 @@ class WorkspaceEditorSettingsTest {
             """);
 
         WorkspaceManifest.Document document = WorkspaceManifest.readDocument(manifest);
+        assertTrue(document.hasSettings());
         WorkspaceEditorSettings.Snapshot settings = WorkspaceEditorSettings.read(document);
+        assertEquals(2, settings.workspace().defaults().tabSize());
+        assertEquals(4, settings.workspace().languages().get("java").tabSize());
 
         WorkspaceEditorSettings.Preferences clientJava = settings.preferencesFor(client.resolve("Main.java"), "java");
         assertEquals(4, clientJava.tabSize());

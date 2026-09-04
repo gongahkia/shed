@@ -320,7 +320,7 @@ When `project.config.allow.unsafe=false`, project-local config only applies:
 - `minimap`
 - Any key under `ui.*`, `color.*`, `font.*`
 
-With unsafe project keys enabled and the `.shed.toml` file trusted, `debug.*` settings, `debug.adapter.*`, and `debug.configuration.*` declarations are additionally resolved per workspace root for Debug and Tests actions. They merge with global DAP declarations for that one root, and their feature flags are captured when a session starts; a configuration in one multi-root folder cannot appear in or alter a sibling root. Separately, an explicitly imported standard `.code-workspace` can supply the bounded read-only compatibility subset described in [DAP Architecture](DAP.md); it does not apply workspace settings or create general VS Code configuration compatibility.
+With unsafe project keys enabled and the `.shed.toml` file trusted, `debug.*` settings, `debug.adapter.*`, and `debug.configuration.*` declarations are additionally resolved per workspace root for Debug and Tests actions. They merge with global DAP declarations for that one root, and their feature flags are captured when a session starts; a configuration in one multi-root folder cannot appear in or alter a sibling root. Separately, an explicitly imported standard `.code-workspace` can supply the bounded read-only compatibility subset described in [DAP Architecture](DAP.md) and the session-only `editor.tabSize`/`editor.insertSpaces` import described in [Portable Workspace Manifests](WORKSPACE_MANIFESTS.md). It does not create general VS Code configuration compatibility.
 
 ## Dynamic Namespaced Keys
 

@@ -40,9 +40,10 @@ final class RemoteWorkspaceController {
             case "pull", "refresh" -> synchronize(tokens.size() == 2 ? tokens.get(1) : "", false);
             case "push" -> synchronize(tokens.size() == 2 ? tokens.get(1) : "", true);
             case "exec" -> execute(tokens);
+            case "terminal", "term" -> openTerminal(tokens);
             case "close", "disconnect" -> close(tokens.size() == 2 ? tokens.get(1) : "");
             case "providers" -> showProviders();
-            default -> "Usage: :remote [list|providers|open <uri>|pull <id>|push <id>|exec <id> <command...>|close <id>]";
+            default -> "Usage: :remote [list|providers|open <uri>|pull <id>|push <id>|exec <id> <command...>|terminal <id> [command...]|close <id>]";
         };
     }
 
@@ -120,6 +121,20 @@ final class RemoteWorkspaceController {
         int job = editor.asyncJobService.submit("remote exec: " + connection.id(), token -> connection.workspace().execute(command),
             (snapshot, result, error) -> showExecutionResult(connection, result, error));
         return "Remote command requested (job " + job + ").";
+    }
+
+    private String openTerminal(List<String> tokens) {
+        if (tokens.size() < 2) return "Usage: :remote terminal <id> [command...]";
+        Connection connection = connection(tokens.get(1));
+        if (connection == null) return "Remote workspace not connected: " + tokens.get(1);
+        try {
+            List<String> command = tokens.size() == 2 ? List.of() : List.copyOf(tokens.subList(2, tokens.size()));
+            List<String> invocation = connection.workspace().terminalCommand(new shed.api.RemoteTerminalRequest("", command));
+            if (invocation == null || invocation.isEmpty()) return "Remote terminal unavailable: provider returned no command";
+            return editor.terminalController.openDirect("Remote " + connection.id(), connection.workspace().localRoot().toFile(), invocation);
+        } catch (Exception error) {
+            return "Remote terminal unavailable: " + detail(error.getMessage());
+        }
     }
 
     private void showExecutionResult(Connection connection, RemoteCommandResult result, Exception error) {

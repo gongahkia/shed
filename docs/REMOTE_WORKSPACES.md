@@ -10,6 +10,7 @@ Remote workspaces are explicit local working-tree connections. They do not insta
 :remote pull <connection-id>
 :remote push <connection-id>
 :remote exec <connection-id> <command...>
+:remote terminal <connection-id> [command...]
 :remote close <connection-id>
 ```
 
@@ -27,6 +28,8 @@ SSH, Git, and Docker credentials remain with the user-installed tools and their 
 ## Explicit remote commands
 
 `:remote exec <id> <command...>` runs only after a user requests it. The command is parsed as direct argv; Shed does not invoke a local shell to process it. The result opens in a scratch buffer and has a capped output size.
+
+`:remote terminal <id> [command...]` opens an explicit interactive terminal at the connection root. SSH receives a PTY (`ssh -tt`) and a safely quoted remote shell/command; Docker receives `docker exec -it`; WSL starts the selected distribution shell. An optional command is direct argv. Terminal session state and remote command history are not restored.
 
 `:task remote <id> <name>` is the structured equivalent for a validated `.shedtasks` entry. It transfers only the direct command argv, a path relative to the connection root, and declared environment values to a provider that supports task execution. See [Workspace Tasks](TASKS.md#explicit-remote-tasks) for shell and cancellation boundaries.
 

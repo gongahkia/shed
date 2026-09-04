@@ -3,6 +3,7 @@ package shed;
 import shed.api.RemoteWorkspace;
 import shed.api.RemoteCommandResult;
 import shed.api.RemoteCommandRequest;
+import shed.api.RemoteTerminalRequest;
 import shed.api.RemoteWorkspaceProvider;
 import shed.api.RemoteWorkspaceRequest;
 import java.io.ByteArrayOutputStream;
@@ -100,6 +101,11 @@ final class BuiltInRemoteWorkspaceProviders {
             return commandResult(executeProcess(requiredCommand(request.command()), localDirectory(root, request), request.environment()));
         }
 
+        @Override public List<String> terminalCommand(RemoteTerminalRequest request) {
+            RemoteTerminalRequest terminal = requiredTerminalRequest(request);
+            return terminal.command().isEmpty() ? ShellCommand.interactiveCommand() : terminal.command();
+        }
+
         @Override public void close() {
             // A mirror remains on disk until the user removes it explicitly.
         }
@@ -162,6 +168,19 @@ final class BuiltInRemoteWorkspaceProviders {
             invocation.add(safeSshTarget(uri));
             invocation.add(posixCommand(remoteDirectory(uri.getPath(), request.relativeWorkingDirectory()), requiredCommand(request.command()), request.environment()));
             return commandResult(executeProcess(invocation, root.getParent()));
+        }
+
+        @Override public List<String> terminalCommand(RemoteTerminalRequest request) throws Exception {
+            RemoteTerminalRequest terminal = requiredTerminalRequest(request);
+            List<String> invocation = new ArrayList<>(List.of("ssh", "-tt"));
+            if (uri.getPort() > 0) {
+                invocation.add("-p");
+                invocation.add(Integer.toString(uri.getPort()));
+            }
+            invocation.add(safeSshTarget(uri));
+            List<String> command = terminal.command().isEmpty() ? List.of("sh", "-l") : terminal.command();
+            invocation.add(posixCommand(remoteDirectory(uri.getPath(), terminal.relativeWorkingDirectory()), command, Map.of()));
+            return List.copyOf(invocation);
         }
 
         @Override public void close() {
@@ -265,6 +284,14 @@ final class BuiltInRemoteWorkspaceProviders {
             return commandResult(executeProcess(invocation, root.getParent()));
         }
 
+        @Override public List<String> terminalCommand(RemoteTerminalRequest request) throws Exception {
+            RemoteTerminalRequest terminal = requiredTerminalRequest(request);
+            List<String> invocation = new ArrayList<>(List.of("docker", "exec", "-it", "--workdir",
+                remoteDirectory(uri.getPath(), terminal.relativeWorkingDirectory()), uri.getHost()));
+            invocation.addAll(terminal.command().isEmpty() ? List.of("/bin/sh") : terminal.command());
+            return List.copyOf(invocation);
+        }
+
         @Override public void close() {
             // Docker copy does not leave an attached process or an implicit container lifecycle.
         }
@@ -279,6 +306,10 @@ final class BuiltInRemoteWorkspaceProviders {
         @Override public String executionRoot() { return root.toString(); }
         @Override public void synchronize() { }
         @Override public void synchronizeToRemote() { }
+        @Override public List<String> terminalCommand(RemoteTerminalRequest request) {
+            RemoteTerminalRequest terminal = requiredTerminalRequest(request);
+            return terminal.command().isEmpty() ? ShellCommand.interactiveCommand() : terminal.command();
+        }
         @Override public void close() { }
     }
 
@@ -312,6 +343,17 @@ final class BuiltInRemoteWorkspaceProviders {
             return commandResult(executeProcess(invocation, root));
         }
 
+        @Override public List<String> terminalCommand(RemoteTerminalRequest request) throws Exception {
+            RemoteTerminalRequest terminal = requiredTerminalRequest(request);
+            List<String> invocation = new ArrayList<>(List.of("wsl.exe", "-d", uri.getHost(), "--cd",
+                remoteDirectory(uri.getPath(), terminal.relativeWorkingDirectory())));
+            if (!terminal.command().isEmpty()) {
+                invocation.add("--");
+                invocation.addAll(terminal.command());
+            }
+            return List.copyOf(invocation);
+        }
+
         @Override public void close() { }
     }
 
@@ -325,6 +367,11 @@ final class BuiltInRemoteWorkspaceProviders {
             }
         }
         return values;
+    }
+
+    private static RemoteTerminalRequest requiredTerminalRequest(RemoteTerminalRequest request) {
+        if (request == null) throw new IllegalArgumentException("remote terminal request is required");
+        return request;
     }
 
     private static RemoteCommandResult commandResult(ProcessResult value) {

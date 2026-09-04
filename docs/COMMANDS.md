@@ -438,6 +438,7 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:remote open <uri>` | Explicitly connect a remote workspace as a local working tree/mirror |
 | `:remote pull\|push\|close <id>` | Synchronize or disconnect a remote workspace |
 | `:remote exec <id> <command...>` | Explicitly run a direct-argv command in a connection when its provider supports execution |
+| `:remote terminal <id> [command...]` | Open an explicit interactive terminal at the connection root when its provider supports it |
 | `:container status` | Show the active workspace's `.devcontainer/devcontainer.json` when present |
 | `:container up` | Explicitly run the local `devcontainer up` workflow as a cancellable job |
 | `:container exec <command...>`, `:container terminal [command...]` | Explicitly run/open a direct-argv command through the local Dev Container CLI |

@@ -45,6 +45,15 @@ public interface RemoteWorkspace extends AutoCloseable {
         return execute(request.command());
     }
 
+    /**
+     * Builds the local direct-argv process used to attach a PTY to an explicitly
+     * selected terminal in this workspace. The process inherits no task
+     * environment; providers decide how to enter their remote environment.
+     */
+    default List<String> terminalCommand(RemoteTerminalRequest request) throws Exception {
+        throw new UnsupportedOperationException("this remote workspace does not support interactive terminals");
+    }
+
     @Override
     void close() throws Exception;
 }

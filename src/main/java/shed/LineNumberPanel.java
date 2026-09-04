@@ -30,7 +30,7 @@ class LineNumberPanel extends JPanel {
     private Set<Integer> gitAddedLines = new HashSet<>();
     private Set<Integer> gitModifiedLines = new HashSet<>();
     private Set<Integer> gitDeletedAfterLines = new HashSet<>();
-    private Map<Integer, BreakpointStore.State> breakpointStateByLine = new HashMap<>();
+    private Map<Integer, BreakpointStore.Marker> breakpointStateByLine = new HashMap<>();
     private IntConsumer breakpointToggleListener = ignored -> { };
 
     public LineNumberPanel(JTextArea textArea) {
@@ -148,8 +148,9 @@ class LineNumberPanel extends JPanel {
                     g.setColor(coverageHits > 0 ? new Color(0x3F, 0xB9, 0x50) : new Color(0xF8, 0x51, 0x49));
                     g.fillRect(markerX + markerW, p.y, 1, lineH);
                 }
-                BreakpointStore.State breakpointState = breakpointStateByLine.get(i);
-                if (breakpointState != null) {
+                BreakpointStore.Marker marker = breakpointStateByLine.get(i);
+                if (marker != null) {
+                    BreakpointStore.State breakpointState = marker.state();
                     int dotSize = Math.max(7, lineH / 2);
                     int dotY = p.y + (lineH - dotSize) / 2;
                     Color breakpointColor = switch (breakpointState) {
@@ -158,7 +159,7 @@ class LineNumberPanel extends JPanel {
                         default -> new Color(0xFF, 0x55, 0x55);
                     };
                     g.setColor(breakpointColor);
-                    if (breakpointState == BreakpointStore.State.REJECTED) g.drawOval(8, dotY, dotSize - 1, dotSize - 1);
+                    if (!marker.enabled() || breakpointState == BreakpointStore.State.REJECTED) g.drawOval(8, dotY, dotSize - 1, dotSize - 1);
                     else g.fillOval(8, dotY, dotSize, dotSize);
                 }
                 // diagnostic severity icon
@@ -263,7 +264,7 @@ class LineNumberPanel extends JPanel {
         repaint();
     }
 
-    public void updateBreakpointMarkers(Map<Integer, BreakpointStore.State> states) {
+    public void updateBreakpointMarkers(Map<Integer, BreakpointStore.Marker> states) {
         breakpointStateByLine.clear();
         if (states != null) breakpointStateByLine.putAll(states);
         repaint();

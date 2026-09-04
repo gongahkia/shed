@@ -29,7 +29,7 @@ schema_version = 1
 "debug.adapter.java.command" = "java-debug-adapter"
 "debug.adapter.java.args" = "--stdio"
 "debug.adapter.java.transport" = "stdio"
-"debug.adapter.java.capabilities" = "launch,attach,configuration_done,breakpoints,threads,stack_trace,scopes,variables,evaluate,continue,next,step_in,step_out,pause"
+"debug.adapter.java.capabilities" = "launch,attach,configuration_done,breakpoints,conditional_breakpoints,hit_conditional_breakpoints,log_points,threads,stack_trace,scopes,variables,evaluate,continue,next,step_in,step_out,pause"
 
 "debug.configuration.main.adapter" = "java"
 "debug.configuration.main.request" = "launch"
@@ -41,7 +41,7 @@ schema_version = 1
 
 For an explicit test-debug target, map an adapter in workspace `.shedtests` to one of these global configurations with `debug_configuration = "main"`. During `:test debug <test-id>` or **Debug Selection**, `${testId}` and `${testFile}` are available in `debug.configuration.<name>.args`; unknown placeholders and test files outside the selected workspace reject the launch before an adapter process starts.
 
-Adapter identifiers and configuration names are `[A-Za-z0-9_-]+`. `transport` is `stdio` (default) or `tcp`; `stdio` requires `command`, while `tcp` must not set one. Capabilities are comma-separated: `launch`, `attach`, `configuration_done`, `breakpoints`, `threads`, `stack_trace`, `scopes`, `variables`, `evaluate`, `continue`, `next`, `step_in`, `step_out`, and `pause`.
+Adapter identifiers and configuration names are `[A-Za-z0-9_-]+`. `transport` is `stdio` (default) or `tcp`; `stdio` requires `command`, while `tcp` must not set one. Capabilities are comma-separated: `launch`, `attach`, `configuration_done`, `breakpoints`, `conditional_breakpoints`, `hit_conditional_breakpoints`, `log_points`, `threads`, `stack_trace`, `scopes`, `variables`, `evaluate`, `continue`, `next`, `step_in`, `step_out`, and `pause`.
 
 Each configuration requires `adapter` and `request` (`launch` or `attach`). A launch requires a workspace-scoped `program`. An attach requires a loopback `host` and `port` from `1..65535`. An optional `file_extensions` value is a comma-separated allowlist such as `.py,.pyw`; it rejects a launch whose resolved program has another extension. Invalid fields are reported with TOML line and column during config loading; Shed retains safe defaults and does not create a launch plan.
 
@@ -82,9 +82,9 @@ Shed never starts a debug adapter while inspecting configurations or selecting o
 
 ## Source Breakpoints
 
-Click the left gutter to add or remove a source breakpoint. Shed stores workspace-scoped breakpoint JSON beneath the configured `session.dir` in `breakpoints/`; it writes no source file or project metadata. The store records requested lines plus verified, rejected, or adapter-adjusted locations and uses atomic replacement.
+Click the left gutter to add or remove a source breakpoint. The Debug panel and `:debug breakpoint` command can change a selected breakpoint's enabled state, condition, hit condition, or log message. Shed stores workspace-scoped breakpoint JSON beneath the configured `session.dir` in `breakpoints/`; it writes no source file or project metadata. The store records requested lines, enabled state, bounded single-line option strings, and verified/rejected/adapter-adjusted locations with atomic replacement. Existing version-one breakpoint files migrate with enabled ordinary breakpoints.
 
-Shed sends one DAP `setBreakpoints` request per source only when `debug.breakpoints.enabled=true` and the selected adapter declares `breakpoints`. A `setBreakpoints` response replaces the displayed state for that source: rejected locations use an outlined red gutter marker, adjusted locations use yellow, and details remain in `:debug status`. The request contains the complete set for the source, not an incremental delta. If an adapter does not emit `initialized`, Shed retains the breakpoint state and performs the compatible post-start synchronization with a retained diagnostic.
+Shed sends one DAP `setBreakpoints` request per source only when `debug.breakpoints.enabled=true` and the selected adapter declares `breakpoints`. Disabled breakpoints are retained locally but omitted from that source request. Conditions, hit conditions, and log messages require the adapter's corresponding declared capability; an unsupported configured option is marked rejected with a diagnostic rather than being silently sent as an ordinary breakpoint. A `setBreakpoints` response replaces the displayed state for requested locations: rejected locations use an outlined red gutter marker, disabled locations use an outlined marker, adjusted locations use yellow, and details remain in `:debug status`. The request contains the complete enabled supported set for the source, not an incremental delta. If an adapter does not emit `initialized`, Shed retains the breakpoint state and performs the compatible post-start synchronization with a retained diagnostic.
 
 ## Paused-frame Inspection
 

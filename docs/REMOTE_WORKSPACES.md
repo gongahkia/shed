@@ -54,6 +54,8 @@ remote.lsp.enabled = true
 
 For a connected SSH, Docker-container, or WSL workspace, Shed carries that configured LSP process through `ssh`, `docker exec -i`, or `wsl.exe`; it initializes the server and document requests with the URI path from the remote workspace, while the editor keeps its local mirror. An already running local Dev Container is also supported: Shed first runs `devcontainer exec … pwd` to learn the mounted workspace path, then launches the server with `devcontainer exec`. Run `:lsp restart <ext>` after changing `remote.lsp.enabled`; a running client retains the URI mode it started with. Remote LSP is never enabled by a project `.shed.toml`, and Shed neither downloads the server nor runs managed local language-service artifacts remotely. Closing a remote workspace stops its associated LSP clients.
 
+Remote terminal output can open a source location only when its absolute remote path is beneath that same declared remote root and its mapped local-mirror file exists. This supports compiler-style `path:line[:column]` output without exposing remote paths outside the mirror. Relative links assume the terminal began at the remote workspace root; Shed does not infer a later remote `cd` for SSH/container terminals.
+
 The bridge supports only ordinary absolute `file:` URIs inside the connected workspace root. It does not support SSH login banners on stdout, remote URI schemes, port-forwarded language servers, remote extension hosts, remote test/debug placement, or a server bootstrap/reconnect protocol.
 
 ## Semantics and limitations

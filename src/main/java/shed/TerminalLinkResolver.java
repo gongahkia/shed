@@ -15,7 +15,7 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Turns concrete local source locations and HTTP(S) output into terminal hyperlinks. */
+/** Turns concrete local or explicitly mirror-mapped source locations and HTTP(S) output into terminal hyperlinks. */
 final class TerminalLinkResolver {
     private static final int MAX_LINE_LENGTH = 16 * 1024;
     private static final Pattern WEB_URL = Pattern.compile("(?i)https?://[^\\s<>()\\[\\]{}\"']+");
@@ -26,6 +26,12 @@ final class TerminalLinkResolver {
     }
 
     sealed interface Link permits BrowserLink, SourceLink {
+    }
+
+    @FunctionalInterface
+    interface SourcePathMapper {
+        /** Returns the local regular-file candidate for a terminal source path, or null when it is unmapped. */
+        Path map(String sourcePath, Path workingDirectory);
     }
 
     record BrowserLink(URI uri) implements Link {
@@ -46,13 +52,21 @@ final class TerminalLinkResolver {
     }
 
     static HyperlinkFilter create(Supplier<Path> workingDirectory, Consumer<Link> opener) {
+        return create(workingDirectory, opener, null);
+    }
+
+    static HyperlinkFilter create(Supplier<Path> workingDirectory, Consumer<Link> opener, SourcePathMapper sourcePathMapper) {
         if (workingDirectory == null || opener == null) {
             throw new IllegalArgumentException("working directory and opener are required");
         }
-        return line -> resolve(line, workingDirectory, opener);
+        return line -> resolve(line, workingDirectory, opener, sourcePathMapper);
     }
 
     static LinkResult resolve(String line, Supplier<Path> workingDirectory, Consumer<Link> opener) {
+        return resolve(line, workingDirectory, opener, null);
+    }
+
+    static LinkResult resolve(String line, Supplier<Path> workingDirectory, Consumer<Link> opener, SourcePathMapper sourcePathMapper) {
         if (line == null || line.isEmpty() || line.length() > MAX_LINE_LENGTH) {
             return null;
         }
@@ -71,7 +85,7 @@ final class TerminalLinkResolver {
             if (overlaps(matches, locations.start(), locations.end())) {
                 continue;
             }
-            SourceLink link = sourceLink(locations.group(1), locations.group(2), locations.group(3), workingDirectory.get());
+            SourceLink link = sourceLink(locations.group(1), locations.group(2), locations.group(3), workingDirectory.get(), sourcePathMapper);
             if (link != null) {
                 matches.add(new ResolvedMatch(locations.start(), locations.end(), link));
             }
@@ -95,15 +109,21 @@ final class TerminalLinkResolver {
         }
     }
 
-    private static SourceLink sourceLink(String rawPath, String rawLine, String rawColumn, Path workingDirectory) {
+    private static SourceLink sourceLink(String rawPath, String rawLine, String rawColumn, Path workingDirectory, SourcePathMapper sourcePathMapper) {
         if (rawPath == null || workingDirectory == null) {
             return null;
         }
         try {
-            Path candidate = Path.of(rawPath);
-            if (!candidate.isAbsolute()) {
-                candidate = workingDirectory.resolve(candidate);
+            Path candidate;
+            if (sourcePathMapper == null) {
+                candidate = Path.of(rawPath);
+                if (!candidate.isAbsolute()) {
+                    candidate = workingDirectory.resolve(candidate);
+                }
+            } else {
+                candidate = sourcePathMapper.map(rawPath, workingDirectory);
             }
+            if (candidate == null) return null;
             candidate = candidate.normalize();
             if (!Files.isRegularFile(candidate)) {
                 return null;

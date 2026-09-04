@@ -348,6 +348,39 @@ final class TestService {
         return List.copyOf(result);
     }
 
+    static List<TestCase> parseTrx(Path root, String adapterId, List<Path> reports) {
+        List<TestCase> result = new ArrayList<>();
+        for (Path report : expandReports(reports, ".trx")) {
+            try {
+                DocumentBuilderFactory factory = secureXmlFactory();
+                org.w3c.dom.Document document = factory.newDocumentBuilder().parse(report.toFile());
+                Map<String, DotnetDefinition> definitions = new LinkedHashMap<>();
+                NodeList defined = document.getElementsByTagName("UnitTest");
+                for (int index = 0; index < defined.getLength(); index++) {
+                    if (!(defined.item(index) instanceof Element unit)) continue;
+                    Element method = child(unit, "TestMethod");
+                    if (method == null) continue;
+                    definitions.put(unit.getAttribute("id"), new DotnetDefinition(method.getAttribute("className"), method.getAttribute("name")));
+                }
+                NodeList cases = document.getElementsByTagName("UnitTestResult");
+                for (int index = 0; index < cases.getLength(); index++) {
+                    if (!(cases.item(index) instanceof Element node)) continue;
+                    DotnetDefinition definition = definitions.get(node.getAttribute("testId"));
+                    String name = nonBlank(definition == null ? "" : definition.method(), node.getAttribute("testName"));
+                    String suite = nonBlank(definition == null ? "" : definition.className(), "dotnet");
+                    String id = nonBlank(node.getAttribute("testName"), suite + "#" + name);
+                    Path file = sourceForDotnet(root, suite);
+                    String outcome = node.getAttribute("outcome");
+                    Status status = dotnetStatus(outcome);
+                    result.add(new TestCase(adapterId, id, name, suite, file, lineForMethod(file, name), status,
+                        dotnetDurationMillis(node.getAttribute("duration")), descendantText(node, "ErrorInfo")));
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return dedupe(result);
+    }
+
     private static List<Path> expandReports(List<Path> reports, String suffix) {
         List<Path> result = new ArrayList<>();
         for (Path report : reports == null ? List.<Path>of() : reports) {
@@ -357,6 +390,16 @@ final class TestService {
             }
         }
         return result;
+    }
+    private static DocumentBuilderFactory secureXmlFactory() throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setXIncludeAware(false);
+        factory.setExpandEntityReferences(false);
+        return factory;
     }
     private static Element child(Element parent, String name) {
         NodeList children = parent.getChildNodes();
@@ -371,12 +414,41 @@ final class TestService {
         Path file = root.resolve("src/test/java").resolve(suite.replace('.', '/') + ".java");
         return Files.isRegularFile(file) ? file : null;
     }
+    private static Path sourceForDotnet(Path root, String suite) {
+        if (root == null || suite == null || suite.isBlank() || !Files.isDirectory(root)) return null;
+        String simple = suite.substring(suite.lastIndexOf('.') + 1).replaceAll("`\\d+$", "").replace('$', '.');
+        try (var paths = Files.walk(root, 16)) {
+            return paths.filter(path -> Files.isRegularFile(path) && path.getFileName().toString().equals(simple + ".cs"))
+                .limit(1).findFirst().orElse(null);
+        } catch (IOException error) {
+            return null;
+        }
+    }
     private static int lineForJavaMethod(Path file, String method) {
         if (file == null || method == null) return 1;
         try { List<String> lines = Files.readAllLines(file); for (int index = 0; index < lines.size(); index++) if (lines.get(index).matches(".*\\b" + Pattern.quote(method) + "\\s*\\(.*")) return index + 1; } catch (IOException ignored) { }
         return 1;
     }
+    private static int lineForMethod(Path file, String method) {
+        if (file == null || method == null || method.isBlank()) return 1;
+        String bare = method.contains("(") ? method.substring(0, method.indexOf('(')) : method;
+        try {
+            List<String> lines = Files.readAllLines(file);
+            for (int index = 0; index < lines.size(); index++) if (lines.get(index).matches(".*\\b" + Pattern.quote(bare) + "\\s*\\(.*")) return index + 1;
+        } catch (IOException ignored) {
+        }
+        return 1;
+    }
     private static long durationMillis(String seconds) { try { return Math.round(Double.parseDouble(seconds) * 1000); } catch (RuntimeException error) { return 0; } }
+    private static long dotnetDurationMillis(String duration) {
+        if (duration == null || !duration.matches("\\d{1,2}:\\d{2}:\\d{2}(?:\\.\\d+)?")) return 0;
+        try {
+            String[] parts = duration.split(":", -1);
+            return Math.round((Long.parseLong(parts[0]) * 3600 + Long.parseLong(parts[1]) * 60 + Double.parseDouble(parts[2])) * 1000);
+        } catch (RuntimeException error) {
+            return 0;
+        }
+    }
     private static long secondsMillis(Object seconds) { return seconds instanceof Number number ? Math.round(number.doubleValue() * 1000) : 0; }
     private static List<TestCase> dedupe(List<TestCase> cases) { Map<String, TestCase> values = new LinkedHashMap<>(); for (TestCase value : cases) values.put(value.adapterId() + "\u0000" + value.id(), value); return List.copyOf(values.values()); }
     private static String string(Object value) { return value instanceof String text ? text : ""; }
@@ -384,6 +456,7 @@ final class TestService {
     private static String nonBlank(String first, String second) { return first == null || first.isBlank() ? second == null ? "" : second : first; }
     private static String joinStrings(List<Object> values) { if (values == null) return ""; StringBuilder output = new StringBuilder(); for (Object value : values) { String text = string(value); if (!text.isBlank()) output.append(text).append('\n'); } return output.toString(); }
     static Status status(String value) { return switch (value == null ? "" : value.toLowerCase(Locale.ROOT)) { case "passed", "pass" -> Status.PASSED; case "skipped", "pending", "todo", "disabled" -> Status.SKIPPED; case "failed", "fail" -> Status.FAILED; case "error", "errored" -> Status.ERRORED; default -> Status.UNKNOWN; }; }
+    private static Status dotnetStatus(String value) { return switch (value == null ? "" : value.toLowerCase(Locale.ROOT)) { case "passed" -> Status.PASSED; case "failed" -> Status.FAILED; case "notexecuted", "notrunnable", "skipped" -> Status.SKIPPED; default -> Status.UNKNOWN; }; }
     static Path resolvePath(Path root, String value) { try { Path path = Path.of(value); if (!path.isAbsolute()) path = root.resolve(path); return Files.exists(path) ? path.normalize() : null; } catch (RuntimeException error) { return null; } }
     private static Location findGoLocation(Path root, String output) {
         Matcher match = Pattern.compile("(?:^|\\n)\\s*(.+?\\.go):(\\d+):").matcher(output == null ? "" : output);
@@ -391,6 +464,11 @@ final class TestService {
         Path file = resolvePath(root, match.group(1));
         try { return new Location(file, Integer.parseInt(match.group(2))); } catch (NumberFormatException error) { return new Location(file, 1); }
     }
+    private static String descendantText(Element parent, String tag) {
+        NodeList matches = parent.getElementsByTagName(tag);
+        return matches.getLength() == 0 ? "" : matches.item(0).getTextContent();
+    }
     private record Location(Path file, int line) { }
+    private record DotnetDefinition(String className, String method) { }
     private static final class GoCase { final String pkg; final String name; StringBuilder output = new StringBuilder(); Status status = Status.UNKNOWN; long duration; GoCase(String pkg, String name) { this.pkg = pkg; this.name = name; } }
 }

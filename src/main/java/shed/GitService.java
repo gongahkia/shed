@@ -17,6 +17,7 @@ public class GitService {
         String amend(File root, String args);
         String checkout(File root, String args);
         String switchBranch(File root, String args);
+        String permalink(File root, String args);
         String help();
     }
 
@@ -63,6 +64,9 @@ public class GitService {
             case "switch":
             case "sw":
                 return handler.switchBranch(root, rest);
+            case "permalink":
+            case "link":
+                return handler.permalink(root, rest);
             case "help":
                 return handler.help();
             default:

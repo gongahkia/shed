@@ -38,9 +38,24 @@ Supported variables in `command`, `cwd`, and environment values are `${workspace
 | `:task remove <name>` | Remove a task while preserving other task settings |
 | `:task dry-run <name>` | Resolve variables and show the command, policy, cwd, and environment keys without starting a process |
 | `:task run <name>` | Explicitly start a task |
+| `:task remote <connection-id> <name>` | Explicitly run a task through a connected remote workspace that contains this task's project root |
+| `:task remote-dry-run <connection-id> <name>` | Resolve and show the remote command request without starting it |
 | `:task cancel <job-id>` | Cancel a running task; `:jobcancel <job-id>` also works |
 
 `:jobs` reports the asynchronous task state. Cancellation destroys the running process, produces a cancelled task result, and does not parse or present partial output as a completed run.
+
+## Explicit remote tasks
+
+Remote tasks are never selected automatically. First open a remote workspace, then choose it by id:
+
+```text
+:remote open ssh://developer@host/absolute/project
+:task remote <connection-id> check
+```
+
+Shed resolves the normal `.shedtasks` plan from the local mirror, maps its working directory to a path relative to the connection root, and sends that relative directory plus declared environment values to the provider. Docker receives `docker exec --workdir` and `--env`; SSH uses a safely quoted remote POSIX command; WSL uses `wsl.exe --cd` and `env`. A `direct` task remains direct argv. A `login` task runs `sh -lc` in the remote environment because Shed cannot infer that environment's preferred login shell.
+
+Generic task diagnostics still resolve against the local mirror, so remote tools should emit workspace-relative paths for quickfix entries. A remote task may outlive a locally cancelled job if its transport cannot stop the remote process; Shed does not claim remote process-tree cancellation.
 
 ## Legacy files
 

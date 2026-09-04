@@ -9,6 +9,13 @@ public interface RemoteWorkspace extends AutoCloseable {
 
     Path localRoot();
 
+    /**
+     * Absolute root used by this provider when it executes a task. A provider
+     * that cannot map local workspace variables into its execution environment
+     * may retain the empty default.
+     */
+    default String executionRoot() { return ""; }
+
     /** Refresh the local mirror from its remote source. */
     void synchronize() throws Exception;
 
@@ -23,6 +30,19 @@ public interface RemoteWorkspace extends AutoCloseable {
      */
     default RemoteCommandResult execute(List<String> command) throws Exception {
         throw new UnsupportedOperationException("this remote workspace does not support command execution");
+    }
+
+    /**
+     * Runs a direct-argv command with an optional workspace-relative directory
+     * and declared environment. Providers should override this to support
+     * remote tasks; the default preserves API-v1 command-only providers.
+     */
+    default RemoteCommandResult execute(RemoteCommandRequest request) throws Exception {
+        if (request == null) throw new IllegalArgumentException("remote command request is required");
+        if (!request.relativeWorkingDirectory().isEmpty() || !request.environment().isEmpty()) {
+            throw new UnsupportedOperationException("this remote workspace does not support task execution options");
+        }
+        return execute(request.command());
     }
 
     @Override

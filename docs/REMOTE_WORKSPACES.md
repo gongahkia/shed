@@ -9,6 +9,7 @@ Remote workspaces are explicit local working-tree connections. They do not insta
 :remote open container://container-name/absolute/path
 :remote pull <connection-id>
 :remote push <connection-id>
+:remote exec <connection-id> <command...>
 :remote close <connection-id>
 ```
 
@@ -23,13 +24,28 @@ Remote workspaces are explicit local working-tree connections. They do not insta
 
 SSH, Git, and Docker credentials remain with the user-installed tools and their credential helpers. URI passwords are rejected. Paths must be absolute, cannot contain `..`, and mirror paths are checked against traversal and symbolic-link escapes. Git and remote-command output is capped and commands time out rather than being left attached indefinitely.
 
+## Explicit remote commands
+
+`:remote exec <id> <command...>` runs only after a user requests it. The command is parsed as direct argv; Shed does not invoke a local shell to process it. The result opens in a scratch buffer and has a capped output size.
+
+`:task remote <id> <name>` is the structured equivalent for a validated `.shedtasks` entry. It transfers only the direct command argv, a path relative to the connection root, and declared environment values to a provider that supports task execution. See [Workspace Tasks](TASKS.md#explicit-remote-tasks) for shell and cancellation boundaries.
+
+| Connection type | Execution location |
+| --- | --- |
+| SSH mirror | SSH host, after safely changing to the URI path |
+| Docker mirror | Container, through `docker exec --workdir` |
+| WSL | Selected distribution, through `wsl.exe -d … --cd` |
+| Git clone | The local clone |
+
+SSH necessarily passes a safely quoted command to the remote POSIX shell. For that route, Shed accepts DNS host names and simple SSH user names only; use a normal SSH config alias if the endpoint needs a more complex connection setup. This command path is explicit process execution, so it inherits the remote account/container's permissions and must be treated like opening a terminal there.
+
 ## Semantics and limitations
 
 - Pull and push never happen on a timer. `:remote close` disconnects the workspace and retains its local mirror.
 - SSH mirroring deliberately omits `--delete`; a pull cannot silently delete an unrelated local mirror file.
 - Container remote-workspace support itself is file synchronization. It does not run an extension host inside a container; the separate local Dev Container CLI bridge below is explicit and does not alter that mirror model.
 - WSL support is Windows-only and uses the local WSL filesystem bridge rather than a remote server.
-- This is not VS Code Remote Development: there is no remote extension host, SSH server bootstrap, port-forwarding UI, Codespaces service, browser editor, or automatic conflict resolver.
+- This is not VS Code or Zed remote-development parity: there is no remote extension host, remote LSP/task placement, SSH server bootstrap, port-forwarding UI, Codespaces service, browser editor, or automatic conflict resolver.
 
 Extensions can add URI schemes using `RemoteWorkspaceProvider`; they must disclose their own authentication, synchronization, and network behavior.
 

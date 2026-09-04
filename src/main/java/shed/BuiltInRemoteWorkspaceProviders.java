@@ -2,6 +2,7 @@ package shed;
 
 import shed.api.RemoteWorkspace;
 import shed.api.RemoteCommandResult;
+import shed.api.RemoteCommandRequest;
 import shed.api.RemoteWorkspaceProvider;
 import shed.api.RemoteWorkspaceRequest;
 import java.io.ByteArrayOutputStream;
@@ -14,8 +15,10 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /** Built-in remote providers deliberately use local mirrors; no hidden remote code is installed. */
 final class BuiltInRemoteWorkspaceProviders {
@@ -75,6 +78,7 @@ final class BuiltInRemoteWorkspaceProviders {
 
         @Override public String displayName() { return "Git " + uri; }
         @Override public Path localRoot() { return root; }
+        @Override public String executionRoot() { return root.toString(); }
 
         @Override public void synchronize() throws Exception {
             ProcessResult fetch = executeProcess(List.of("git", "fetch", "--all", "--prune"), root);
@@ -89,7 +93,11 @@ final class BuiltInRemoteWorkspaceProviders {
         }
 
         @Override public RemoteCommandResult execute(List<String> command) throws Exception {
-            return commandResult(executeProcess(requiredCommand(command), root));
+            return execute(new RemoteCommandRequest(command, "", Map.of()));
+        }
+
+        @Override public RemoteCommandResult execute(RemoteCommandRequest request) throws Exception {
+            return commandResult(executeProcess(requiredCommand(request.command()), localDirectory(root, request), request.environment()));
         }
 
         @Override public void close() {
@@ -129,6 +137,7 @@ final class BuiltInRemoteWorkspaceProviders {
 
         @Override public String displayName() { return "SSH " + uri; }
         @Override public Path localRoot() { return root; }
+        @Override public String executionRoot() { return uri.getPath(); }
 
         @Override public void synchronize() throws Exception {
             ProcessResult result = executeProcess(rsync(false), root.getParent());
@@ -141,13 +150,17 @@ final class BuiltInRemoteWorkspaceProviders {
         }
 
         @Override public RemoteCommandResult execute(List<String> command) throws Exception {
+            return execute(new RemoteCommandRequest(command, "", Map.of()));
+        }
+
+        @Override public RemoteCommandResult execute(RemoteCommandRequest request) throws Exception {
             List<String> invocation = new ArrayList<>(List.of("ssh"));
             if (uri.getPort() > 0) {
                 invocation.add("-p");
                 invocation.add(Integer.toString(uri.getPort()));
             }
             invocation.add(safeSshTarget(uri));
-            invocation.add(posixCommand(uri.getPath(), requiredCommand(command)));
+            invocation.add(posixCommand(remoteDirectory(uri.getPath(), request.relativeWorkingDirectory()), requiredCommand(request.command()), request.environment()));
             return commandResult(executeProcess(invocation, root.getParent()));
         }
 
@@ -225,6 +238,7 @@ final class BuiltInRemoteWorkspaceProviders {
 
         @Override public String displayName() { return "Container " + uri; }
         @Override public Path localRoot() { return root; }
+        @Override public String executionRoot() { return uri.getPath(); }
 
         @Override public void synchronize() throws Exception {
             ProcessResult result = executeProcess(List.of("docker", "cp", uri.getHost() + ":" + uri.getPath() + "/.", root.toString()), root.getParent());
@@ -237,8 +251,17 @@ final class BuiltInRemoteWorkspaceProviders {
         }
 
         @Override public RemoteCommandResult execute(List<String> command) throws Exception {
-            List<String> invocation = new ArrayList<>(List.of("docker", "exec", "--workdir", uri.getPath(), uri.getHost()));
-            invocation.addAll(requiredCommand(command));
+            return execute(new RemoteCommandRequest(command, "", Map.of()));
+        }
+
+        @Override public RemoteCommandResult execute(RemoteCommandRequest request) throws Exception {
+            List<String> invocation = new ArrayList<>(List.of("docker", "exec", "--workdir", remoteDirectory(uri.getPath(), request.relativeWorkingDirectory())));
+            for (Map.Entry<String, String> entry : request.environment().entrySet()) {
+                invocation.add("--env");
+                invocation.add(entry.getKey() + "=" + entry.getValue());
+            }
+            invocation.add(uri.getHost());
+            invocation.addAll(requiredCommand(request.command()));
             return commandResult(executeProcess(invocation, root.getParent()));
         }
 
@@ -253,6 +276,7 @@ final class BuiltInRemoteWorkspaceProviders {
         private DirectWorkspace(String name, Path root) { this.name = name; this.root = root; }
         @Override public String displayName() { return name; }
         @Override public Path localRoot() { return root; }
+        @Override public String executionRoot() { return root.toString(); }
         @Override public void synchronize() { }
         @Override public void synchronizeToRemote() { }
         @Override public void close() { }
@@ -269,11 +293,22 @@ final class BuiltInRemoteWorkspaceProviders {
 
         @Override public String displayName() { return "WSL " + uri; }
         @Override public Path localRoot() { return root; }
+        @Override public String executionRoot() { return uri.getPath(); }
         @Override public void synchronize() { }
 
         @Override public RemoteCommandResult execute(List<String> command) throws Exception {
-            List<String> invocation = new ArrayList<>(List.of("wsl.exe", "-d", uri.getHost(), "--cd", uri.getPath(), "--"));
-            invocation.addAll(requiredCommand(command));
+            return execute(new RemoteCommandRequest(command, "", Map.of()));
+        }
+
+        @Override public RemoteCommandResult execute(RemoteCommandRequest request) throws Exception {
+            List<String> invocation = new ArrayList<>(List.of("wsl.exe", "-d", uri.getHost(), "--cd", remoteDirectory(uri.getPath(), request.relativeWorkingDirectory()), "--"));
+            if (!request.environment().isEmpty()) {
+                invocation.add("env");
+                for (Map.Entry<String, String> entry : request.environment().entrySet()) {
+                    invocation.add(entry.getKey() + "=" + entry.getValue());
+                }
+            }
+            invocation.addAll(requiredCommand(request.command()));
             return commandResult(executeProcess(invocation, root));
         }
 
@@ -283,8 +318,9 @@ final class BuiltInRemoteWorkspaceProviders {
     private static List<String> requiredCommand(List<String> command) throws IOException {
         List<String> values = command == null ? List.of() : List.copyOf(command);
         if (values.isEmpty()) throw new IOException("remote command is required");
-        for (String value : values) {
-            if (value == null || value.isBlank() || value.indexOf('\0') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
+        for (int index = 0; index < values.size(); index++) {
+            String value = values.get(index);
+            if (value == null || (index == 0 && value.isBlank()) || value.indexOf('\0') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
                 throw new IOException("remote command contains an invalid argument");
             }
         }
@@ -307,9 +343,33 @@ final class BuiltInRemoteWorkspaceProviders {
         return user == null || user.isBlank() ? host : user + "@" + host;
     }
 
-    private static String posixCommand(String directory, List<String> command) throws IOException {
+    private static Path localDirectory(Path root, RemoteCommandRequest request) throws IOException {
+        Path directory = root.resolve(request.relativeWorkingDirectory()).normalize();
+        if (!directory.startsWith(root) || !Files.isDirectory(directory)) {
+            throw new IOException("remote task directory is unavailable in the local workspace mirror");
+        }
+        return directory;
+    }
+
+    private static String remoteDirectory(String root, String relative) throws IOException {
+        if (!safeRemotePath(root)) throw new IOException("remote command directory is invalid");
+        if (relative == null || relative.isEmpty()) return root;
+        String result = root.endsWith("/") ? root + relative : root + "/" + relative;
+        if (!safeRemotePath(result)) throw new IOException("remote command directory is invalid");
+        return result;
+    }
+
+    private static String posixCommand(String directory, List<String> command, Map<String, String> environment) throws IOException {
         if (!safeRemotePath(directory)) throw new IOException("remote command directory is invalid");
-        StringBuilder result = new StringBuilder("cd -- ").append(posixQuote(directory)).append(" && exec");
+        StringBuilder result = new StringBuilder("cd -- ").append(posixQuote(directory)).append(" && ");
+        if (!environment.isEmpty()) {
+            result.append("env");
+            for (Map.Entry<String, String> entry : environment.entrySet()) {
+                result.append(' ').append(entry.getKey()).append('=').append(posixQuote(entry.getValue()));
+            }
+            result.append(' ');
+        }
+        result.append("exec");
         for (String argument : command) result.append(' ').append(posixQuote(argument));
         return result.toString();
     }
@@ -326,9 +386,15 @@ final class BuiltInRemoteWorkspaceProviders {
     }
 
     private static ProcessResult executeProcess(List<String> command, Path directory) throws IOException {
+        return executeProcess(command, directory, Map.of());
+    }
+
+    private static ProcessResult executeProcess(List<String> command, Path directory, Map<String, String> environment) throws IOException {
         Path output = Files.createTempFile("shed-remote-command-", ".log");
         try {
-            Process process = new ProcessBuilder(command).directory(directory == null ? null : directory.toFile())
+            ProcessBuilder builder = new ProcessBuilder(command).directory(directory == null ? null : directory.toFile());
+            if (environment != null && !environment.isEmpty()) builder.environment().putAll(new LinkedHashMap<>(environment));
+            Process process = builder
                 .redirectErrorStream(true).redirectOutput(output.toFile()).start();
             boolean completed = process.waitFor(2, java.util.concurrent.TimeUnit.MINUTES);
             if (!completed) {

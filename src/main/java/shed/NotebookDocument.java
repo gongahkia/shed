@@ -57,6 +57,22 @@ final class NotebookDocument {
         return new NotebookDocument(root, replacement == null ? List.of() : replacement);
     }
 
+    /** Returns a standalone notebook containing cells through the requested one-based index. */
+    NotebookDocument through(int cellCount) {
+        if (cellCount < 1 || cellCount > cells.size()) throw new IllegalArgumentException("notebook cell index is unavailable");
+        return new NotebookDocument(root, cells.subList(0, cellCount));
+    }
+
+    /** Replaces an executed one-based cell prefix while retaining the unexecuted cells. */
+    NotebookDocument withExecutedPrefix(NotebookDocument executed, int cellCount) {
+        if (executed == null || cellCount < 1 || cellCount > cells.size() || executed.cells.size() != cellCount) {
+            throw new IllegalArgumentException("executed notebook prefix does not match this notebook");
+        }
+        List<Cell> replacement = new ArrayList<>(cells);
+        for (int index = 0; index < cellCount; index++) replacement.set(index, executed.cells.get(index));
+        return new NotebookDocument(root, replacement);
+    }
+
     String serialize() {
         Map<String, Object> result = new LinkedHashMap<>(root);
         List<Object> serialized = new ArrayList<>();

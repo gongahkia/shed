@@ -78,6 +78,8 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:task remove <name>`, `:task rm <name>`, `:task delete <name>` | Remove task |
 | `:task dry-run <name>` | Resolve and show task execution plan without starting it |
 | `:task run <name>` | Explicitly run named task |
+| `:task remote <connection-id> <name>` | Explicitly run named task through a matching connected remote workspace |
+| `:task remote-dry-run <connection-id> <name>` | Resolve and show remote task plan without starting it |
 | `:task cancel <id>` | Cancel a running task job |
 
 Notes:
@@ -308,6 +310,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:git amend <message>`, `:git amend --no-edit` | Amend latest commit |
 | `:git checkout <arg>`, `:git co <arg>` | Checkout branch/path |
 | `:git switch <branch>`, `:git sw <branch>` | Switch branch |
+| `:git permalink [line]`, `:git link [line]` | Show an immutable current-file permalink for supported GitHub, GitLab, or Bitbucket `origin` remotes |
 | `:git hunk stage [line]` | Stage hunk at current or explicit line |
 | `:git hunk unstage [line]` | Unstage hunk at current or explicit line |
 | `:git hunk revert [line]` | Revert hunk at current or explicit line |
@@ -434,6 +437,7 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:remote providers` | List built-in and contributed remote workspace providers |
 | `:remote open <uri>` | Explicitly connect a remote workspace as a local working tree/mirror |
 | `:remote pull\|push\|close <id>` | Synchronize or disconnect a remote workspace |
+| `:remote exec <id> <command...>` | Explicitly run a direct-argv command in a connection when its provider supports execution |
 | `:container status` | Show the active workspace's `.devcontainer/devcontainer.json` when present |
 | `:container up` | Explicitly run the local `devcontainer up` workflow as a cancellable job |
 | `:container exec <command...>`, `:container terminal [command...]` | Explicitly run/open a direct-argv command through the local Dev Container CLI |
@@ -443,7 +447,7 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:integration <extension:id> <action> [arguments]` | Run an explicitly declared workspace-integration action |
 | `:notebook open`, `:notebook run`, `:notebook raw` | Open, explicitly execute, or show raw JSON for the current `.ipynb` file |
 | `:terminal list`, `:terminal profile <id>` | Show/open terminal profiles |
-| `:terminal commands`, `:terminal cwd` | Show in-memory Bash/Zsh shell-integration events or latest reported cwd |
+| `:terminal commands`, `:terminal cwd` | Show in-memory Bash/Zsh/Fish shell-integration events or latest reported cwd |
 
 See [Java Extensions](EXTENSIONS.md), [Workspace Integrations](WORKSPACE_INTEGRATIONS.md), [Remote Workspaces](REMOTE_WORKSPACES.md), [Jupyter Notebooks](NOTEBOOKS.md), and [Terminal](TERMINAL.md).
 

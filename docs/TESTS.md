@@ -12,6 +12,7 @@ Shed's Test Explorer is explicit-refresh only. Opening the Tests panel performs 
 | `jest` | local `package.json` dependency | `jest --listTests` | Jest JSON in Shed's local report cache |
 | `vitest` | local `package.json` dependency | `vitest --listTests` | Vitest JSON in Shed's local report cache |
 | `go` | `go.mod` | `go test -list . ./...` | `go test -json ./...` |
+| `dotnet` | root `.sln` or `.csproj` | `dotnet test --list-tests` | `dotnet test --logger trx`; TRX results in Shed's local report cache |
 
 Auto-detection only inspects local files. It never downloads an executable or dependency. A missing runtime is reported in the selected test job output. Node adapters prefer a local `node_modules/.bin` executable; Maven and Gradle prefer executable wrappers.
 
@@ -32,7 +33,7 @@ id = "vitest"
 command = ["./node_modules/.bin/vitest"]
 ```
 
-`schema_version` must be `1`. Each `[[adapter]]` requires one unique built-in id. `command` is optional; when supplied it is a non-empty direct argv array, never a shell string. `debug_configuration` is optional and names one global `debug.configuration.<name>` mapping. It enables only explicit **Debug Selection** and `:test debug <test-id>`; Shed does not infer or launch a test debugger. DAP launch args may use `${testId}` and `${testFile}` for that explicit mapping; unknown placeholders and files outside the selected workspace are rejected. Supported ids are `maven`, `gradle`, `pytest`, `jest`, `vitest`, and `go`. Invalid files block testing for that root and report exact diagnostics; Shed does not fall back to auto-detection.
+`schema_version` must be `1`. Each `[[adapter]]` requires one unique built-in id. `command` is optional; when supplied it is a non-empty direct argv array, never a shell string. `debug_configuration` is optional and names one global `debug.configuration.<name>` mapping. It enables only explicit **Debug Selection** and `:test debug <test-id>`; Shed does not infer or launch a test debugger. DAP launch args may use `${testId}` and `${testFile}` for that explicit mapping; unknown placeholders and files outside the selected workspace are rejected. Supported ids are `maven`, `gradle`, `pytest`, `jest`, `vitest`, `go`, and `dotnet`. Invalid files block testing for that root and report exact diagnostics; Shed does not fall back to auto-detection.
 
 Results are session-only. Pytest/Jest/Vitest report files go under the configured Shed data directory's `test-reports/` cache (default `~/.shed/test-reports/`); source project files are not changed by Shed. Maven/Gradle use the XML reports their normal test tasks produce. Failed tests with a source location appear in Problems as `test:<adapter>`; no test failure replaces the quickfix list.
 

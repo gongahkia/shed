@@ -22,7 +22,8 @@ final class NotebookController {
             NotebookDocument document = NotebookDocument.parse(buffer.getContent());
             pane.setCustomEditorComponent(new NotebookPanel(document,
                 updated -> save(pane, buffer, updated),
-                updated -> run(pane, buffer, updated)));
+                updated -> run(pane, buffer, updated),
+                (updated, cellCount) -> runThrough(pane, buffer, updated, cellCount)));
             editor.renderWindowLayout();
             editor.showMessage("Opened Jupyter notebook");
             return true;
@@ -68,6 +69,35 @@ final class NotebookController {
         runCurrent(pane, buffer);
     }
 
+    private void runThrough(EditorPane pane, FileBuffer buffer, NotebookDocument document, int cellCount) {
+        try {
+            write(buffer, document);
+        } catch (IOException | IllegalStateException error) {
+            editor.showMessage("Notebook save failed: " + concise(error));
+            return;
+        }
+        if (!editor.ensureProjectTrustForFile(buffer.getFile())) {
+            editor.showMessage("Notebook execution blocked: workspace is untrusted");
+            return;
+        }
+        Path source = buffer.getFile().toPath().toAbsolutePath().normalize();
+        int job = editor.asyncJobService.submit("Execute notebook through cell " + cellCount, token -> executeThrough(source, cellCount, token),
+            (snapshot, executed, error) -> {
+                if (error != null) {
+                    editor.showMessage("Notebook cell execution failed: " + concise(error));
+                    return;
+                }
+                try {
+                    write(buffer, executed);
+                    showIfAvailable(pane, buffer);
+                    editor.showMessage("Notebook executed through cell " + cellCount);
+                } catch (IOException | IllegalStateException writeError) {
+                    editor.showMessage("Notebook executed but could not save output: " + concise(writeError));
+                }
+            });
+        editor.showMessage("Notebook cell execution started (job " + job + ", fresh kernel)");
+    }
+
     private String runCurrent(EditorPane pane, FileBuffer buffer) {
         if (!editor.ensureProjectTrustForFile(buffer.getFile())) return "Notebook execution blocked: workspace is untrusted";
         Path source = buffer.getFile().toPath().toAbsolutePath().normalize();
@@ -110,6 +140,19 @@ final class NotebookController {
             throw new IOException("Jupyter execution interrupted", error);
         } finally {
             Files.deleteIfExists(output);
+        }
+    }
+
+    private static NotebookDocument executeThrough(Path source, int cellCount, AsyncJobService.JobToken token) throws Exception {
+        NotebookDocument document = NotebookDocument.parse(Files.readString(source, StandardCharsets.UTF_8));
+        NotebookDocument prefix = document.through(cellCount);
+        Path temporary = Files.createTempFile(source.getParent(), ".shed-notebook-", ".ipynb");
+        try {
+            Files.writeString(temporary, prefix.serialize(), StandardCharsets.UTF_8);
+            execute(temporary, token);
+            return document.withExecutedPrefix(NotebookDocument.parse(Files.readString(temporary, StandardCharsets.UTF_8)), cellCount);
+        } finally {
+            Files.deleteIfExists(temporary);
         }
     }
 

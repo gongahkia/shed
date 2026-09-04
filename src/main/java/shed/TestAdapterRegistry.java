@@ -20,6 +20,7 @@ final class TestAdapterRegistry {
         register(new JestAdapter());
         register(new VitestAdapter());
         register(new GoAdapter());
+        register(new DotnetAdapter());
     }
 
     void register(TestAdapter adapter) {
@@ -183,5 +184,56 @@ final class TestAdapterRegistry {
             return result;
         }
         @Override public List<TestService.TestCase> parseRun(Path root, TestService.Command command, String output) { return TestService.parseGo(root, output); }
+    }
+
+    private static final class DotnetAdapter extends BuiltInAdapter {
+        @Override public String id() { return "dotnet"; }
+
+        @Override public boolean supports(Path root) {
+            if (root == null || !Files.isDirectory(root)) return false;
+            try (var entries = Files.list(root)) {
+                return entries.anyMatch(path -> Files.isRegularFile(path)
+                    && (path.getFileName().toString().endsWith(".sln") || path.getFileName().toString().endsWith(".csproj")));
+            } catch (IOException error) {
+                return false;
+            }
+        }
+
+        @Override public List<String> defaultCommand(Path root) { return List.of("dotnet"); }
+
+        @Override public TestService.Command discovery(TestService.AdapterSpec spec) {
+            List<String> command = new ArrayList<>(base(spec));
+            command.addAll(List.of("test", "--list-tests"));
+            return new TestService.Command(command, List.of());
+        }
+
+        @Override public TestService.Command run(TestService.AdapterSpec spec, List<TestService.TestCase> selected, Path cache) {
+            List<String> command = new ArrayList<>(base(spec));
+            command.addAll(List.of("test", "--logger", "trx", "--results-directory", cache.toString()));
+            if (selected != null && !selected.isEmpty()) {
+                String filter = selected.stream().map(TestService.TestCase::id)
+                    .map(id -> "FullyQualifiedName=" + id).collect(java.util.stream.Collectors.joining("|"));
+                command.add("--filter");
+                command.add(filter);
+            }
+            return command(command, cache);
+        }
+
+        @Override public List<TestService.TestCase> parseDiscovery(Path root, String output) {
+            List<TestService.TestCase> result = new ArrayList<>();
+            boolean listed = false;
+            for (String line : output == null ? List.<String>of() : output.lines().toList()) {
+                if (line.contains("The following Tests are available:")) { listed = true; continue; }
+                if (!listed) continue;
+                String id = line.strip();
+                if (id.isEmpty() || id.startsWith("Total") || id.startsWith("[")) continue;
+                result.add(new TestService.TestCase(id(), id, id, "dotnet", null, 1, TestService.Status.UNKNOWN, 0, ""));
+            }
+            return List.copyOf(result);
+        }
+
+        @Override public List<TestService.TestCase> parseRun(Path root, TestService.Command command, String output) {
+            return TestService.parseTrx(root, id(), command.reports());
+        }
     }
 }

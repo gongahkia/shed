@@ -427,6 +427,7 @@ final class EditorUiController {
         editor.detachActiveDocumentListener();
         editor.activePaneIndex = index;
         bindActivePane(pane);
+        editor.writingArea.setTabSize(editor.effectiveTabSize(pane.getBuffer()));
         editor.attachActiveDocumentListener();
         editor.currentBufferIndex = pane.getBuffer() == null ? -1 : editor.buffers.indexOf(pane.getBuffer());
         editor.updateCurrentLineHighlight();

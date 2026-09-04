@@ -57,4 +57,19 @@ class ExtensionRegistryTest {
         registry.removeExtension("alpha");
         assertEquals("zeta", registry.languageProfileFor(new File("demo.alp"), "").extensionId());
     }
+
+    @Test
+    void languageProfilesKeepApiV1ConstructionAndValidateIndentationPreferences() {
+        LanguageProfile legacy = new LanguageProfile("legacy", "Legacy", Set.of("legacy"), Set.of(), Set.of(),
+            List.of(), List.of(), List.of(), Set.of());
+        LanguageProfile configured = new LanguageProfile("configured", "Configured", Set.of("cfg"), Set.of(), Set.of(),
+            List.of(), List.of(), List.of(), Set.of(), 2, false);
+
+        assertNull(legacy.tabSize());
+        assertNull(legacy.insertSpaces());
+        assertEquals(2, configured.tabSize());
+        assertEquals(false, configured.insertSpaces());
+        assertThrows(IllegalArgumentException.class, () -> new LanguageProfile("invalid", "Invalid", Set.of("bad"), Set.of(), Set.of(),
+            List.of(), List.of(), List.of(), Set.of(), 17, true));
+    }
 }

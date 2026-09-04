@@ -591,7 +591,7 @@ final class LspController {
         syncLspOpen(buffer);
         String uri = bufferUri(buffer);
         Integer version = editor.lspDocumentVersions.get(uri);
-        List<LspClient.TextEdit> edits = client.formatting(uri, editor.writingArea.getTabSize(), editor.configManager.getExpandTab());
+        List<LspClient.TextEdit> edits = client.formatting(uri, editor.writingArea.getTabSize(), editor.effectiveExpandTab());
         if (!Objects.equals(version, editor.lspDocumentVersions.get(uri))) return "Formatting became stale; document was not changed";
         if (edits.isEmpty()) return "No formatting edits";
         WorkspaceEditApplyResult result = applyWorkspaceTextEdits(edits);

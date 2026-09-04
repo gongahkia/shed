@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import shed.api.RemoteCommandRequest;
 
 public class TaskServiceTest {
     @TempDir
@@ -140,6 +141,10 @@ public class TaskServiceTest {
         assertEquals(List.of("echo", project.relativize(source).toString()), plan.processCommand());
         assertEquals(scripts.toFile().getCanonicalFile(), plan.workingDirectory());
         assertEquals("check", plan.environment().get("MODE"));
+        RemoteCommandRequest remote = service.buildRemoteCommandRequest(plan, project, project.toString(), source.toFile());
+        assertEquals(List.of("echo", project.relativize(source).toString()), remote.command());
+        assertEquals("scripts", remote.relativeWorkingDirectory());
+        assertEquals("check", remote.environment().get("MODE"));
     }
 
     @Test
@@ -156,5 +161,40 @@ public class TaskServiceTest {
         TaskService.WorkspaceTask escaping = new TaskService.WorkspaceTask("check", "echo ok", "..", Map.of(),
             TaskService.ShellPolicy.DIRECT, TaskService.ProblemMatcher.GENERIC, TaskService.Presentation.ON_FAILURE);
         assertThrows(IOException.class, () -> service.buildExecutionPlan(escaping, project.toFile(), null));
+    }
+
+    @Test
+    void remoteLoginTasksUsePortableRemoteShellAndStayInsideConnectionRoot() throws IOException {
+        TaskService service = new TaskService();
+        Path project = tempDir.resolve("remote-task");
+        Files.createDirectories(project);
+        TaskService.WorkspaceTask task = TaskService.defaultWorkspaceTask("check", "echo ${workspaceFolder}");
+        TaskService.TaskExecutionPlan plan = service.buildExecutionPlan(task, project.toFile(), null);
+
+        RemoteCommandRequest request = service.buildRemoteCommandRequest(plan, project, project.toString(), null);
+
+        assertEquals(List.of("sh", "-lc", "echo " + project), request.command());
+        assertEquals("", request.relativeWorkingDirectory());
+        assertThrows(IOException.class, () -> service.buildRemoteCommandRequest(plan, tempDir.resolve("other"), project.toString(), null));
+    }
+
+    @Test
+    void remoteTaskVariablesUseProviderExecutionPathsInsteadOfLocalMirrorPaths() throws IOException {
+        TaskService service = new TaskService();
+        Path mirror = tempDir.resolve("mirror");
+        Path project = mirror.resolve("nested-project");
+        Path source = project.resolve("src/Main.java");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, "class Main {}\n");
+        TaskService.WorkspaceTask task = new TaskService.WorkspaceTask("check",
+            "echo ${workspaceFolder} ${file} ${relativeFile}", "${workspaceFolder}", Map.of("ROOT", "${workspaceFolder}"),
+            TaskService.ShellPolicy.DIRECT, TaskService.ProblemMatcher.NONE, TaskService.Presentation.NEVER);
+        TaskService.TaskExecutionPlan plan = service.buildExecutionPlan(task, project.toFile(), source.toFile());
+
+        RemoteCommandRequest request = service.buildRemoteCommandRequest(plan, mirror, "/srv/workspace", source.toFile());
+
+        assertEquals(List.of("echo", "/srv/workspace/nested-project", "/srv/workspace/nested-project/src/Main.java", "src/Main.java"), request.command());
+        assertEquals("nested-project", request.relativeWorkingDirectory());
+        assertEquals("/srv/workspace/nested-project", request.environment().get("ROOT"));
     }
 }

@@ -2,6 +2,7 @@ package shed;
 
 // SHit EDitor (Shed) Version 2.0 <Refactored Build>
 
+import shed.api.LanguageProfile;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -92,6 +93,7 @@ public class Texteditor extends JFrame implements KeyListener {
     DevContainerController devContainerController;
     WorkspaceToolController workspaceToolController;
     RemoteWorkspaceController remoteWorkspaceController;
+    RemoteWorkspaceTaskTargets remoteWorkspaceTaskTargets;
     TreeGitController treeGitController;
     GitHubCapabilityController gitHubCapabilityController;
     LspController lspController;
@@ -244,6 +246,7 @@ public class Texteditor extends JFrame implements KeyListener {
         notebookController = new NotebookController(this);
         devContainerController = new DevContainerController(this);
         workspaceToolController = new WorkspaceToolController(this, extensionRegistry);
+        remoteWorkspaceTaskTargets = new RemoteWorkspaceTaskTargets();
         remoteWorkspaceController = new RemoteWorkspaceController(this);
         helpService = new HelpService();
         gitService = new GitService();
@@ -2655,6 +2658,26 @@ public class Texteditor extends JFrame implements KeyListener {
         return paneBufferController.getCurrentBuffer();
     }
 
+    LanguageProfile languageProfileFor(FileBuffer buffer) {
+        if (buffer == null || buffer.getFile() == null || extensionRegistry == null) return null;
+        ExtensionRegistry.Owned<LanguageProfile> profile = extensionRegistry.languageProfileFor(buffer.getFile(), buffer.textSnapshot().text());
+        return profile == null ? null : profile.value();
+    }
+
+    int effectiveTabSize(FileBuffer buffer) {
+        LanguageProfile profile = languageProfileFor(buffer);
+        return profile != null && profile.tabSize() != null ? profile.tabSize() : configManager.getTabSize();
+    }
+
+    boolean effectiveExpandTab(FileBuffer buffer) {
+        LanguageProfile profile = languageProfileFor(buffer);
+        return profile != null && profile.insertSpaces() != null ? profile.insertSpaces() : configManager.getExpandTab();
+    }
+
+    int effectiveTabSize() { return effectiveTabSize(getCurrentBuffer()); }
+
+    boolean effectiveExpandTab() { return effectiveExpandTab(getCurrentBuffer()); }
+
     public JTextArea getTextArea() {
         return paneBufferController.getTextArea();
     }
@@ -3264,6 +3287,9 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         if (remoteWorkspaceController != null) {
             remoteWorkspaceController.closeAll();
+        }
+        if (customEditorController != null) {
+            customEditorController.disposeAll();
         }
         if (extensionManager != null) {
             extensionManager.close();

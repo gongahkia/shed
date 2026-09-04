@@ -1623,7 +1623,7 @@ final class InputController {
                 editor.showMessage(editor.markdownTableNextCell(e.isShiftDown()));
                 e.consume();
                 return;
-            } else if (c == '\t' && editor.configManager.getExpandTab()) {
+            } else if (c == '\t' && editor.effectiveExpandTab()) {
                 editor.writingArea.replaceSelection(" ".repeat(editor.writingArea.getTabSize()));
                 editor.lastInsertedText += " ".repeat(editor.writingArea.getTabSize());
                 e.consume();

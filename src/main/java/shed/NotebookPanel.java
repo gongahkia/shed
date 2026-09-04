@@ -5,6 +5,7 @@ import java.awt.Component;
 import java.awt.FlowLayout;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -22,12 +23,15 @@ final class NotebookPanel extends JPanel {
     private final List<CellEditor> cells = new ArrayList<>();
     private final Consumer<NotebookDocument> saveAction;
     private final Consumer<NotebookDocument> runAction;
+    private final BiConsumer<NotebookDocument, Integer> runThroughAction;
 
-    NotebookPanel(NotebookDocument document, Consumer<NotebookDocument> saveAction, Consumer<NotebookDocument> runAction) {
+    NotebookPanel(NotebookDocument document, Consumer<NotebookDocument> saveAction, Consumer<NotebookDocument> runAction,
+        BiConsumer<NotebookDocument, Integer> runThroughAction) {
         super(new BorderLayout(0, 5));
         this.baseDocument = document == null ? NotebookDocument.empty() : document;
         this.saveAction = saveAction == null ? ignored -> { } : saveAction;
         this.runAction = runAction == null ? ignored -> { } : runAction;
+        this.runThroughAction = runThroughAction == null ? (ignored, index) -> { } : runThroughAction;
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEADING, 5, 0));
         JButton save = new JButton("Save");
         save.addActionListener(event -> this.saveAction.accept(document()));
@@ -52,7 +56,8 @@ final class NotebookPanel extends JPanel {
     }
 
     private void add(NotebookDocument.Cell cell) {
-        CellEditor editor = new CellEditor(cell, cells.size() + 1);
+        int index = cells.size() + 1;
+        CellEditor editor = new CellEditor(cell, index, () -> runThroughAction.accept(document(), index));
         cells.add(editor);
         cellsPanel.add(editor);
         cellsPanel.add(Box.createVerticalStrut(8));
@@ -70,12 +75,17 @@ final class NotebookPanel extends JPanel {
         private final NotebookDocument.Cell original;
         private final JTextArea source;
 
-        private CellEditor(NotebookDocument.Cell cell, int index) {
+        private CellEditor(NotebookDocument.Cell cell, int index, Runnable runThrough) {
             super(new BorderLayout(0, 4));
             this.original = cell;
             setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(java.awt.Color.GRAY),
                 BorderFactory.createEmptyBorder(5, 5, 5, 5)));
-            add(new JLabel("Cell " + index + " · " + cell.type()), BorderLayout.NORTH);
+            JPanel header = new JPanel(new FlowLayout(FlowLayout.LEADING, 5, 0));
+            header.add(new JLabel("Cell " + index + " · " + cell.type()));
+            JButton run = new JButton("Run to here");
+            run.addActionListener(event -> runThrough.run());
+            header.add(run);
+            add(header, BorderLayout.NORTH);
             source = new JTextArea(cell.source(), "code".equals(cell.type()) ? 8 : 5, 80);
             source.setTabSize(4);
             add(new JScrollPane(source), BorderLayout.CENTER);

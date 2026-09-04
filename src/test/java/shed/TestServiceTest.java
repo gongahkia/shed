@@ -72,4 +72,22 @@ class TestServiceTest {
         assertEquals(250, results.getFirst().durationMillis());
         assertFalse(results.getFirst().output().isBlank());
     }
+
+    @Test
+    void detectsDotnetAndParsesTrxResults() throws Exception {
+        Files.writeString(root.resolve("demo.sln"), "");
+        Path source = root.resolve("Demo.Tests/WidgetTests.cs");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, "class WidgetTests { void Works() {} }");
+        Path report = root.resolve("result.trx");
+        Files.writeString(report, "<TestRun><TestDefinitions><UnitTest id=\"one\"><TestMethod className=\"Demo.WidgetTests\" name=\"Works\"/></UnitTest></TestDefinitions>"
+            + "<Results><UnitTestResult testId=\"one\" testName=\"Demo.WidgetTests.Works\" outcome=\"Passed\" duration=\"00:00:00.125\"/></Results></TestRun>");
+
+        TestService service = new TestService();
+        assertEquals(List.of("dotnet"), service.load(root).specs().stream().map(TestService.AdapterSpec::id).toList());
+        TestService.TestCase result = TestService.parseTrx(root, "dotnet", List.of(report)).getFirst();
+        assertEquals(TestService.Status.PASSED, result.status());
+        assertEquals(source, result.file());
+        assertEquals(125, result.durationMillis());
+    }
 }

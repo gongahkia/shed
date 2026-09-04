@@ -40,16 +40,17 @@ final class NotebookPanel extends JPanel {
     private static final int MAX_DISPLAY_WIDTH = 1_000;
     private static final int MAX_DISPLAY_HEIGHT = 700;
 
-    private final NotebookDocument baseDocument;
+    private NotebookDocument baseDocument;
     private final JPanel cellsPanel = new JPanel();
     private final List<CellEditor> cells = new ArrayList<>();
     private final Consumer<NotebookDocument> saveAction;
     private final Consumer<NotebookDocument> runAction;
     private final BiConsumer<NotebookDocument, Integer> runThroughAction;
     private final File sourceFile;
+    private final JButton kernelButton;
 
     NotebookPanel(NotebookDocument document, Consumer<NotebookDocument> saveAction, Consumer<NotebookDocument> runAction,
-        BiConsumer<NotebookDocument, Integer> runThroughAction, File sourceFile) {
+        BiConsumer<NotebookDocument, Integer> runThroughAction, File sourceFile, Runnable chooseKernelAction) {
         super(new BorderLayout(0, 5));
         this.baseDocument = document == null ? NotebookDocument.empty() : document;
         this.saveAction = saveAction == null ? ignored -> { } : saveAction;
@@ -61,12 +62,17 @@ final class NotebookPanel extends JPanel {
         save.addActionListener(event -> this.saveAction.accept(document()));
         JButton runAll = new JButton("Run all");
         runAll.addActionListener(event -> this.runAction.accept(document()));
+        kernelButton = new JButton(kernelLabel(baseDocument.kernelName()));
+        kernelButton.addActionListener(event -> {
+            if (chooseKernelAction != null) chooseKernelAction.run();
+        });
         JButton addCode = new JButton("+ Code");
         addCode.addActionListener(event -> add(new NotebookDocument.Cell("code", "", java.util.Map.of())));
         JButton addMarkdown = new JButton("+ Markdown");
         addMarkdown.addActionListener(event -> add(new NotebookDocument.Cell("markdown", "", java.util.Map.of())));
         toolbar.add(save);
         toolbar.add(runAll);
+        toolbar.add(kernelButton);
         toolbar.add(addCode);
         toolbar.add(addMarkdown);
         toolbar.add(new JLabel("Execution uses an installed Jupyter CLI and is explicit."));
@@ -93,6 +99,20 @@ final class NotebookPanel extends JPanel {
         List<NotebookDocument.Cell> updated = new ArrayList<>();
         for (CellEditor editor : cells) updated.add(editor.cell());
         return baseDocument.withCells(updated);
+    }
+
+    void selectKernel(NotebookController.KernelSpec kernel) {
+        if (kernel == null) return;
+        baseDocument = baseDocument.withKernelSpec(kernel.name(), kernel.displayName(), kernel.language());
+        kernelButton.setText(kernelLabel(kernel.name()));
+    }
+
+    String selectedKernelName() {
+        return baseDocument.kernelName();
+    }
+
+    private static String kernelLabel(String kernel) {
+        return kernel == null || kernel.isBlank() ? "Choose Kernel…" : "Kernel: " + kernel;
     }
 
     private static final class CellEditor extends JPanel {

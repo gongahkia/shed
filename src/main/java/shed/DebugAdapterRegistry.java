@@ -29,7 +29,7 @@ final class DebugAdapterRegistry {
         }
     }
 
-    record Configuration(String name, String adapter, Request request, String scope, String program, String cwd, List<String> args,
+    record Configuration(String name, String adapter, Request request, String scope, String program, String module, String code, String cwd, List<String> args,
         String prelaunchTask, String host, int port, List<String> fileExtensions) {
         Configuration {
             name = name == null ? "" : name;
@@ -37,6 +37,8 @@ final class DebugAdapterRegistry {
             request = request == null ? Request.LAUNCH : request;
             scope = scope == null ? "" : scope;
             program = program == null ? "" : program;
+            module = module == null ? "" : module;
+            code = code == null ? "" : code;
             cwd = cwd == null ? "" : cwd;
             args = args == null ? List.of() : List.copyOf(args);
             prelaunchTask = prelaunchTask == null ? "" : prelaunchTask;
@@ -45,8 +47,13 @@ final class DebugAdapterRegistry {
         }
 
         Configuration(String name, String adapter, Request request, String scope, String program, String cwd, List<String> args,
+            String prelaunchTask, String host, int port, List<String> fileExtensions) {
+            this(name, adapter, request, scope, program, "", "", cwd, args, prelaunchTask, host, port, fileExtensions);
+        }
+
+        Configuration(String name, String adapter, Request request, String scope, String program, String cwd, List<String> args,
             String host, int port) {
-            this(name, adapter, request, scope, program, cwd, args, "", host, port, List.of());
+            this(name, adapter, request, scope, program, "", "", cwd, args, "", host, port, List.of());
         }
     }
 
@@ -75,12 +82,19 @@ final class DebugAdapterRegistry {
         }
     }
 
-    record Plan(Adapter adapter, Configuration configuration, Path workspace, Path cwd, Path program, List<String> args) {
+    record Plan(Adapter adapter, Configuration configuration, Path workspace, Path cwd, Path program, String module, String code, List<String> args) {
         Plan {
+            module = module == null ? "" : module;
+            code = code == null ? "" : code;
             args = args == null ? List.of() : List.copyOf(args);
         }
+        Plan(Adapter adapter, Configuration configuration, Path workspace, Path cwd, Path program, List<String> args) {
+            this(adapter, configuration, workspace, cwd, program, configuration == null ? "" : configuration.module(),
+                configuration == null ? "" : configuration.code(), args);
+        }
         Plan(Adapter adapter, Configuration configuration, Path workspace, Path cwd, Path program) {
-            this(adapter, configuration, workspace, cwd, program, configuration == null ? List.of() : configuration.args());
+            this(adapter, configuration, workspace, cwd, program, configuration == null ? "" : configuration.module(),
+                configuration == null ? "" : configuration.code(), configuration == null ? List.of() : configuration.args());
         }
     }
 
@@ -96,7 +110,7 @@ final class DebugAdapterRegistry {
         "debug.stacktrace.enabled", "debug.scopes.enabled", "debug.variables.enabled", "debug.evaluate.enabled", "debug.attach.enabled",
         "debug.open.source.on.stop");
     private static final Set<String> ADAPTER_FIELDS = Set.of("transport", "command", "args", "capabilities");
-    private static final Set<String> CONFIGURATION_FIELDS = Set.of("adapter", "request", "scope", "program", "cwd", "args", "prelaunch_task", "host", "port", "file_extensions");
+    private static final Set<String> CONFIGURATION_FIELDS = Set.of("adapter", "request", "scope", "program", "module", "code", "cwd", "args", "prelaunch_task", "host", "port", "file_extensions");
     private final Map<String, Adapter> adapters;
 
     private DebugAdapterRegistry(Map<String, Adapter> adapters) {
@@ -181,8 +195,9 @@ final class DebugAdapterRegistry {
         Path root = workspace.toAbsolutePath().normalize();
         LaunchContext launchContext = context == null ? new LaunchContext(null, "", null) : context;
         Path cwd = resolveWorkspacePath(root, configuration.cwd(), launchContext.activeFile());
-        Path program = configuration.request() == Request.LAUNCH ? resolveWorkspacePath(root, configuration.program(), launchContext.activeFile()) : null;
-        if (cwd == null || (configuration.request() == Request.LAUNCH && program == null)) {
+        Path program = configuration.request() == Request.LAUNCH && !configuration.program().isBlank()
+            ? resolveWorkspacePath(root, configuration.program(), launchContext.activeFile()) : null;
+        if (cwd == null || (configuration.request() == Request.LAUNCH && !configuration.program().isBlank() && program == null)) {
             return new PlanResult(null, "Debug configuration escapes the workspace scope; no process will be launched.");
         }
         List<String> args = resolveArguments(configuration.args(), root, launchContext);
@@ -190,7 +205,7 @@ final class DebugAdapterRegistry {
         if (configuration.request() == Request.LAUNCH && !matchesFileExtension(program, configuration.fileExtensions())) {
             return new PlanResult(null, "Debug configuration does not support this file type; no process will be launched.");
         }
-        return new PlanResult(new Plan(adapter, configuration, root, cwd, program, args), "");
+        return new PlanResult(new Plan(adapter, configuration, root, cwd, program, configuration.module(), configuration.code(), args), "");
     }
 
     private static void collect(String key, String value, String prefix, Set<String> fields, Map<String, Map<String, String>> grouped, List<Error> errors) {
@@ -233,8 +248,21 @@ final class DebugAdapterRegistry {
             String cwd = fields.getOrDefault("cwd", "${workspaceFolder}").trim();
             if (!workspaceScoped(cwd, false)) errors.add(new Error(prefix + ".cwd", prefix + ".cwd must remain within ${workspaceFolder}"));
             String program = fields.getOrDefault("program", "").trim();
-            if (request == Request.LAUNCH && !workspaceScoped(program, true)) {
-                errors.add(new Error(prefix + ".program", prefix + ".program is required and must remain within ${workspaceFolder} or ${file}"));
+            String module = fields.getOrDefault("module", "").trim();
+            String code = fields.getOrDefault("code", "");
+            int launchTargets = (program.isBlank() ? 0 : 1) + (module.isBlank() ? 0 : 1) + (code.isBlank() ? 0 : 1);
+            if (request == Request.LAUNCH) {
+                if (launchTargets != 1) {
+                    errors.add(new Error(prefix + ".program", prefix + " launch requires exactly one of program, module, or code"));
+                } else if (!program.isBlank() && !workspaceScoped(program, true)) {
+                    errors.add(new Error(prefix + ".program", prefix + ".program must remain within ${workspaceFolder} or ${file}"));
+                } else if (!module.isBlank() && !safeModule(module)) {
+                    errors.add(new Error(prefix + ".module", prefix + ".module must be a non-empty single-line identifier or dotted identifier"));
+                } else if (!code.isBlank() && !safeCode(code)) {
+                    errors.add(new Error(prefix + ".code", prefix + ".code must be non-empty, contain no NUL, and be at most 64 KiB"));
+                }
+            } else if (!module.isBlank() || !code.isBlank()) {
+                errors.add(new Error(prefix + ".module", prefix + ".module and .code are launch-only"));
             }
             List<String> args = tokens(fields.get("args"));
             if (fields.containsKey("args") && args == null) errors.add(new Error(prefix + ".args", prefix + ".args contains an invalid control character"));
@@ -243,6 +271,9 @@ final class DebugAdapterRegistry {
                 errors.add(new Error(prefix + ".prelaunch_task", prefix + ".prelaunch_task must be a task identifier"));
             }
             List<String> fileExtensions = fileExtensions(prefix + ".file_extensions", fields.get("file_extensions"), errors);
+            if (request == Request.LAUNCH && program.isBlank() && !fileExtensions.isEmpty()) {
+                errors.add(new Error(prefix + ".file_extensions", prefix + ".file_extensions requires a program launch target"));
+            }
             String host = fields.getOrDefault("host", "127.0.0.1").trim();
             int port = port(fieldKey(prefix, fields, "port"), prefix + ".port", fields.get("port"), request, errors);
             if (request == Request.ATTACH && !loopback(host)) errors.add(new Error(prefix + ".host", prefix + ".host must be loopback in M0"));
@@ -250,7 +281,7 @@ final class DebugAdapterRegistry {
             if (adapter == null) errors.add(new Error(fieldKey(prefix, fields, "adapter"), prefix + ".adapter is not registered"));
             else if (!adapter.supports(request)) errors.add(new Error(prefix + ".request", prefix + ".request is not supported by adapter " + adapterId));
             if (errorsFor(errors, prefix)) continue;
-            result.put(name, new Configuration(name, adapterId, request, scope, program, cwd, args, prelaunchTask, host, port, fileExtensions));
+            result.put(name, new Configuration(name, adapterId, request, scope, program, module, code, cwd, args, prelaunchTask, host, port, fileExtensions));
         }
         return result;
     }
@@ -316,6 +347,8 @@ final class DebugAdapterRegistry {
 
     private static boolean identifier(String value) { return value != null && value.matches("[A-Za-z0-9_-]+"); }
     private static boolean safeText(String value) { return value != null && !value.isBlank() && value.indexOf('\u0000') < 0 && value.indexOf('\n') < 0 && value.indexOf('\r') < 0; }
+    private static boolean safeModule(String value) { return value != null && value.matches("[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*"); }
+    private static boolean safeCode(String value) { return value != null && !value.isBlank() && value.length() <= 64 * 1024 && value.indexOf('\u0000') < 0; }
     private static boolean loopback(String host) { return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host) || "::1".equals(host); }
 
     private static List<String> tokens(String value) {

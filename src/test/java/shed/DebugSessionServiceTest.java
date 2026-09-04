@@ -118,6 +118,25 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void sendsValidatedModuleAndInlineCodeTargetsWithoutInventingAProgramPath() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-module-session").toAbsolutePath();
+        FakeConnection moduleConnection = new FakeConnection();
+
+        assertTrue(service.start(workspace, (Path) null, validationWithTarget("module", "package.main"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, listener) -> moduleConnection).succeeded());
+        assertEquals("package.main", moduleConnection.arguments.get(1).get("module"));
+        assertFalse(moduleConnection.arguments.get(1).containsKey("program"));
+        service.stop(workspace);
+
+        FakeConnection codeConnection = new FakeConnection();
+        assertTrue(service.start(workspace, (Path) null, validationWithTarget("code", "print('Shed')"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, listener) -> codeConnection).succeeded());
+        assertEquals("print('Shed')", codeConnection.arguments.get(1).get("code"));
+        assertFalse(codeConnection.arguments.get(1).containsKey("program"));
+    }
+
+    @Test
     void preservesAdapterFailureDiagnostics() {
         DebugSessionService service = new DebugSessionService();
         Path workspace = Path.of("build/debug-session").toAbsolutePath();
@@ -602,6 +621,18 @@ public class DebugSessionServiceTest {
         values.put("debug.configuration.main.program", "${file}");
         values.put("debug.configuration.main.cwd", "${workspaceFolder}");
         values.put("debug.configuration.main.prelaunch_task", task);
+        return DebugAdapterRegistry.validate(values);
+    }
+
+    private static DebugAdapterRegistry.Validation validationWithTarget(String target, String value) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("debug.adapter.java.command", "java-debug-adapter");
+        values.put("debug.adapter.java.capabilities", "launch");
+        values.put("debug.configuration.main.adapter", "java");
+        values.put("debug.configuration.main.request", "launch");
+        values.put("debug.configuration.main.scope", "workspace");
+        values.put("debug.configuration.main." + target, value);
+        values.put("debug.configuration.main.cwd", "${workspaceFolder}");
         return DebugAdapterRegistry.validate(values);
     }
 

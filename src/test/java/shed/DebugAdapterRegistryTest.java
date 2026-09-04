@@ -73,6 +73,64 @@ public class DebugAdapterRegistryTest {
     }
 
     @Test
+    void acceptsModuleOrInlineCodeAsExclusiveLaunchTargets() {
+        Map<String, Object> values = configuration("launch");
+        values.remove("debug.configuration.main.program");
+        values.put("debug.configuration.main.module", "package.main");
+        DebugAdapterRegistry.Validation moduleValidation = DebugAdapterRegistry.validate(values);
+
+        DebugAdapterRegistry.PlanResult modulePlan = DebugAdapterRegistry.plan(moduleValidation, "main", Path.of("build/debug-module-workspace"));
+        assertTrue(moduleValidation.valid());
+        assertTrue(modulePlan.launchable());
+        assertEquals("package.main", modulePlan.plan().module());
+        assertEquals("", modulePlan.plan().code());
+        assertEquals(null, modulePlan.plan().program());
+
+        values.remove("debug.configuration.main.module");
+        values.put("debug.configuration.main.code", "print('hello from Shed')");
+        DebugAdapterRegistry.Validation codeValidation = DebugAdapterRegistry.validate(values);
+        DebugAdapterRegistry.PlanResult codePlan = DebugAdapterRegistry.plan(codeValidation, "main", Path.of("build/debug-code-workspace"));
+        assertTrue(codeValidation.valid());
+        assertTrue(codePlan.launchable());
+        assertEquals("print('hello from Shed')", codePlan.plan().code());
+
+        values.put("debug.configuration.main.program", "${file}");
+        DebugAdapterRegistry.Validation ambiguous = DebugAdapterRegistry.validate(values);
+        assertFalse(ambiguous.valid());
+        assertTrue(ambiguous.errors().stream().anyMatch(error -> error.message().contains("exactly one")));
+    }
+
+    @Test
+    void rejectsFileExtensionsWithoutAProgramOrUnsafeModuleNames() {
+        Map<String, Object> values = configuration("launch");
+        values.remove("debug.configuration.main.program");
+        values.put("debug.configuration.main.module", "package.main");
+        values.put("debug.configuration.main.file_extensions", ".py");
+        DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.validate(values);
+
+        assertFalse(validation.valid());
+        assertTrue(validation.errors().stream().anyMatch(error -> error.key().endsWith(".file_extensions")));
+
+        values.remove("debug.configuration.main.file_extensions");
+        values.put("debug.configuration.main.module", "package;main");
+        validation = DebugAdapterRegistry.validate(values);
+        assertFalse(validation.valid());
+        assertTrue(validation.errors().stream().anyMatch(error -> error.key().endsWith(".module")));
+    }
+
+    @Test
+    void retainsLegacyProgramValuesOnAttachWithoutSendingThemAsLaunchTargets() {
+        Map<String, Object> values = configuration("attach");
+        values.put("debug.configuration.main.port", "5005");
+        DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.validate(values);
+
+        DebugAdapterRegistry.PlanResult plan = DebugAdapterRegistry.plan(validation, "main", Path.of("build/debug-attach-workspace"));
+        assertTrue(validation.valid());
+        assertTrue(plan.launchable());
+        assertEquals(null, plan.plan().program());
+    }
+
+    @Test
     void rejectsMalformedConfigurationFileExtensionLists() {
         Map<String, Object> values = configuration("launch");
         values.put("debug.configuration.main.file_extensions", "py,*.py");

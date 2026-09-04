@@ -76,14 +76,14 @@ public class NetworkConsentAuditTest {
         assertEquals(Set.of("DebugAdapterTransport.java"), sourcesContaining("new Socket("));
         assertEquals(Set.of("EditActionController.java", "MarkdownController.java", "TerminalController.java", "UpdateController.java"), sourcesContaining(".browse("));
         assertEquals(Set.of(
-            "BuiltInRemoteWorkspaceProviders.java", "BuiltInScmContributions.java", "DebugAdapterTransport.java", "DevContainerController.java", "ExternalFormatter.java",
+            "BuiltInRemoteWorkspaceProviders.java", "BuiltInScmContributions.java", "DebugAdapterTransport.java", "DevContainerController.java", "DevContainerRuntime.java", "ExternalFormatter.java",
             "JobQuickfixController.java", "LanguageServerDetector.java", "LspClient.java", "LuaEngine.java", "NotebookController.java",
             "NpmManagedLanguageInstaller.java", "PaletteController.java", "SyntaxUiController.java", "WorkspaceIndexService.java"
         ), sourcesContaining("new ProcessBuilder("));
         assertEquals(Set.of("PtyTerminalPane.java"), sourcesContaining("PtyProcessBuilder"));
 
         String audit = Files.readString(Path.of("docs/NETWORK_PRIVACY.md"));
-        for (String source : Set.of("PluginManager", "ExtensionManager", "DebugAdapterTransport", "DevContainerController", "GitHub", "UpdateMetadataTransport", "LandingPageRemoteTransport", "ManagedLanguageCatalog", "ManagedLanguageSupportService", "Notebook", "Remote workspace", "browser", "child processes")) {
+        for (String source : Set.of("PluginManager", "ExtensionManager", "DebugAdapterTransport", "DevContainerController", "DevContainerRuntime", "GitHub", "UpdateMetadataTransport", "LandingPageRemoteTransport", "ManagedLanguageCatalog", "ManagedLanguageSupportService", "Notebook", "Remote workspace", "browser", "child processes")) {
             assertTrue(audit.contains(source), "audit missing " + source);
         }
     }

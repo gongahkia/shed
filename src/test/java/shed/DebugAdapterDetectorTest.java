@@ -86,7 +86,7 @@ public class DebugAdapterDetectorTest {
         values.put("debug.configuration.main.adapter", "java");
         values.put("debug.configuration.main.request", request);
         values.put("debug.configuration.main.scope", "workspace");
-        values.put("debug.configuration.main.program", "${workspaceFolder}/Main.java");
+        if ("launch".equals(request)) values.put("debug.configuration.main.program", "${workspaceFolder}/Main.java");
         values.put("debug.configuration.main.cwd", "${workspaceFolder}");
         if ("attach".equals(request)) values.put("debug.configuration.main.port", "5005");
         return values;

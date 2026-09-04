@@ -24,7 +24,7 @@ final class NotebookController {
             pane.setCustomEditorComponent(new NotebookPanel(document,
                 updated -> save(pane, buffer, updated),
                 updated -> run(pane, buffer, updated),
-                (updated, cellCount) -> runThrough(pane, buffer, updated, cellCount)));
+                (updated, cellCount) -> runThrough(pane, buffer, updated, cellCount), buffer.getFile()));
             editor.renderWindowLayout();
             editor.showMessage("Opened Jupyter notebook");
             return true;

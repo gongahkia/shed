@@ -1,18 +1,32 @@
 package shed;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /** A lossless-enough in-memory representation of a Jupyter notebook document. */
 final class NotebookDocument {
+    private static final int MAX_IMAGES_PER_CELL = 16;
+    private static final int MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+    private static final int MAX_ENCODED_IMAGE_CHARACTERS = (MAX_IMAGE_BYTES * 4 / 3) + 8;
+
     record Cell(String type, String source, Map<String, Object> fields) {
         Cell {
             type = "markdown".equals(type) ? "markdown" : "code";
             source = source == null ? "" : source;
             fields = fields == null ? new LinkedHashMap<>() : new LinkedHashMap<>(fields);
         }
+    }
+
+    record ImageOutput(String mimeType, byte[] bytes) {
+        ImageOutput {
+            mimeType = mimeType == null ? "" : mimeType;
+            bytes = bytes == null ? new byte[0] : bytes.clone();
+        }
+
+        @Override public byte[] bytes() { return bytes.clone(); }
     }
 
     private final Map<String, Object> root;
@@ -120,6 +134,36 @@ final class NotebookDocument {
             }
         }
         return result.toString();
+    }
+
+    /** Returns bounded PNG/JPEG display data only; HTML, SVG, and scriptable MIME outputs stay inert. */
+    static List<ImageOutput> imageOutputs(Cell cell) {
+        if (cell == null || !"code".equals(cell.type())) return List.of();
+        List<Object> outputs = MiniJson.asArray(cell.fields().get("outputs"));
+        if (outputs == null || outputs.isEmpty()) return List.of();
+        List<ImageOutput> result = new ArrayList<>();
+        for (Object raw : outputs) {
+            if (result.size() >= MAX_IMAGES_PER_CELL) break;
+            Map<String, Object> output = MiniJson.asObject(raw);
+            if (output == null) continue;
+            Map<String, Object> data = MiniJson.asObject(output.get("data"));
+            if (data == null) continue;
+            addImage(result, "image/png", source(data.get("image/png")));
+            if (result.size() < MAX_IMAGES_PER_CELL) addImage(result, "image/jpeg", source(data.get("image/jpeg")));
+        }
+        return List.copyOf(result);
+    }
+
+    private static void addImage(List<ImageOutput> results, String mimeType, String encoded) {
+        if (encoded == null || encoded.isBlank() || encoded.length() > MAX_ENCODED_IMAGE_CHARACTERS) return;
+        String compact = encoded.replaceAll("\\s+", "");
+        if (compact.length() > MAX_ENCODED_IMAGE_CHARACTERS) return;
+        try {
+            byte[] bytes = Base64.getDecoder().decode(compact);
+            if (bytes.length > 0 && bytes.length <= MAX_IMAGE_BYTES) results.add(new ImageOutput(mimeType, bytes));
+        } catch (IllegalArgumentException ignored) {
+            // A malformed display payload remains an inert notebook value.
+        }
     }
 
     private static String source(Object value) {

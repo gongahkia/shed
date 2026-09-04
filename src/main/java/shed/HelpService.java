@@ -269,8 +269,22 @@ public class HelpService {
                     + ":task remove <name> removes a task.\n"
                     + ":task <name> or :task run <name> executes a task asynchronously.\n"
                     + ":task remote <connection-id> <name> explicitly runs a task in a matching connected workspace.\n"
+                    + ":task container <name> explicitly runs a task in the active project's running Dev Container.\n"
                     + "Output is parsed into quickfix when lines match file:line:col:message.\n"
                     + "Built-in fallback names are supported: :task test and :task build.\n";
+            case "compose":
+            case "docker-compose":
+                return "Help: Docker Compose\n\n"
+                    + ":compose status reads a local root Compose configuration without contacting Docker.\n"
+                    + ":compose up/build [service...], ps, services, and logs [service...] are explicit jobs.\n"
+                    + ":compose exec <service> <command...> runs direct argv; :compose terminal opens an interactive service shell.\n"
+                    + ":compose redeploy <service> builds and recreates that service; :compose down does not forward volume/image deletion flags.\n";
+            case "database":
+            case "db":
+                return "Help: PostgreSQL\n\n"
+                    + ":database status is local-only and opens no connection.\n"
+                    + ":database query <quoted-sql>, tables, and file <workspace-relative.sql> start explicit psql jobs.\n"
+                    + ":database terminal opens interactive psql. Shed stores no connection strings or credentials.\n";
             case "language":
             case "lang":
                 return "Help: language\n\n"
@@ -283,7 +297,7 @@ public class HelpService {
                     + ":git diff [args], :git log [count], :git branch show repository state.\n"
                     + ":git add|stage <paths...>, :git restore|unstage <paths...> modify staging.\n"
                     + ":git checkout <arg>, :git switch <branch> move HEAD.\n"
-                    + ":git permalink [line] shows an immutable link for the current GitHub/GitLab/Bitbucket file.\n"
+                    + ":git permalink [line|start-end] shows an immutable link for the current GitHub/GitLab/Bitbucket file; GitHub/GitLab support ranges.\n"
                     + ":git commit <message>, :git amend <message|--no-edit> create/update commits.\n";
             case "update":
             case "updates":

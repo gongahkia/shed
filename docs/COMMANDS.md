@@ -80,6 +80,8 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:task run <name>` | Explicitly run named task |
 | `:task remote <connection-id> <name>` | Explicitly run named task through a matching connected remote workspace |
 | `:task remote-dry-run <connection-id> <name>` | Resolve and show remote task plan without starting it |
+| `:task container <name>` | Explicitly run named task through the active project's running Dev Container |
+| `:task container-dry-run <name>` | Resolve and show the Dev Container task plan without starting it |
 | `:task cancel <id>` | Cancel a running task job |
 
 Notes:
@@ -310,7 +312,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:git amend <message>`, `:git amend --no-edit` | Amend latest commit |
 | `:git checkout <arg>`, `:git co <arg>` | Checkout branch/path |
 | `:git switch <branch>`, `:git sw <branch>` | Switch branch |
-| `:git permalink [line]`, `:git link [line]` | Show an immutable current-file permalink for supported GitHub, GitLab, or Bitbucket `origin` remotes |
+| `:git permalink [line\|start-end]`, `:git link [line\|start-end]` | Show an immutable current-file permalink for supported GitHub, GitLab, or Bitbucket `origin` remotes; GitHub/GitLab accept ranges |
 | `:git hunk stage [line]` | Stage hunk at current or explicit line |
 | `:git hunk unstage [line]` | Unstage hunk at current or explicit line |
 | `:git hunk revert [line]` | Revert hunk at current or explicit line |
@@ -445,6 +447,13 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:container up` | Explicitly run the local `devcontainer up` workflow as a cancellable job |
 | `:container exec <command...>`, `:container terminal [command...]` | Explicitly run/open a direct-argv command through the local Dev Container CLI |
 | `:container open <container> <absolute-path>` | Open an explicit Docker container mirror |
+| `:compose`, `:compose status` | Show the nearest workspace-root local Compose configuration without contacting Docker |
+| `:compose up [service...]`, `:compose build [service...]`, `:compose ps`, `:compose services`, `:compose logs [service...]` | Explicitly manage, inspect, or read bounded local Compose output |
+| `:compose exec <service> <command...>`, `:compose terminal <service> [command...]` | Explicitly run or open a PTY in a running Compose service |
+| `:compose redeploy <service>`, `:compose down` | Explicitly rebuild/recreate one service, or stop/remove the stack without volumes/images flags |
+| `:database`, `:database status` | Show the local PostgreSQL CLI boundary without opening a connection |
+| `:database query <quoted-sql>`, `:database tables`, `:database file <workspace-relative.sql>` | Explicitly execute a PostgreSQL query, bounded table listing, or workspace SQL file |
+| `:database terminal` | Open an explicit interactive `psql` terminal |
 | `:integration`, `:integration list` | List supporting database, deployment, collaboration, and container extension integrations |
 | `:integration <extension:id> help` | Show provider-declared actions |
 | `:integration <extension:id> <action> [arguments]` | Run an explicitly declared workspace-integration action |

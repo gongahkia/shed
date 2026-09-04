@@ -11,7 +11,7 @@ import java.nio.file.WatchService;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class FileWatcherService {
 
@@ -19,9 +19,16 @@ public class FileWatcherService {
         void onFileChanged(File file);
     }
 
+    @FunctionalInterface
+    public interface WatchRegistration extends AutoCloseable {
+        @Override void close();
+
+        static WatchRegistration noop() { return () -> { }; }
+    }
+
     private WatchService watchService;
     private final Map<WatchKey, Path> watchedDirs;
-    private final Map<String, FileChangeListener> listeners;
+    private final Map<String, CopyOnWriteArrayList<FileChangeListener>> listeners;
     private Thread watchThread;
     private volatile boolean running;
 
@@ -56,13 +63,14 @@ public class FileWatcherService {
         }
     }
 
-    public void watch(File file, FileChangeListener listener) {
-        if (file == null || listener == null || !running) return;
+    public WatchRegistration watch(File file, FileChangeListener listener) {
+        if (file == null || listener == null || !running) return WatchRegistration.noop();
         File parent = file.getParentFile();
-        if (parent == null || !parent.isDirectory()) return;
+        if (parent == null || !parent.isDirectory()) return WatchRegistration.noop();
 
         String absPath = file.getAbsolutePath();
-        listeners.put(absPath, listener);
+        CopyOnWriteArrayList<FileChangeListener> registrations = listeners.computeIfAbsent(absPath, ignored -> new CopyOnWriteArrayList<>());
+        registrations.add(listener);
 
         Path parentPath = parent.toPath();
         boolean alreadyWatched = false;
@@ -83,6 +91,10 @@ public class FileWatcherService {
                 System.err.println("FileWatcher: failed to watch " + parentPath + ": " + e.getMessage());
             }
         }
+        return () -> {
+            registrations.remove(listener);
+            if (registrations.isEmpty()) listeners.remove(absPath, registrations);
+        };
     }
 
     public void unwatch(File file) {
@@ -118,12 +130,14 @@ public class FileWatcherService {
                 Path changed = dir.resolve(ev.context());
                 String absPath = changed.toAbsolutePath().toString();
 
-                FileChangeListener listener = listeners.get(absPath);
-                if (listener != null) {
-                    try {
-                        listener.onFileChanged(changed.toFile());
-                    } catch (Exception e) {
-                        System.err.println("FileWatcher: listener error: " + e.getMessage());
+                CopyOnWriteArrayList<FileChangeListener> registrations = listeners.get(absPath);
+                if (registrations != null) {
+                    for (FileChangeListener listener : registrations) {
+                        try {
+                            listener.onFileChanged(changed.toFile());
+                        } catch (Exception e) {
+                            System.err.println("FileWatcher: listener error: " + e.getMessage());
+                        }
                     }
                 }
             }

@@ -92,6 +92,8 @@ public class Texteditor extends JFrame implements KeyListener {
     CustomEditorController customEditorController;
     NotebookController notebookController;
     DevContainerController devContainerController;
+    ComposeController composeController;
+    DatabaseController databaseController;
     WorkspaceToolController workspaceToolController;
     RemoteWorkspaceController remoteWorkspaceController;
     RemoteWorkspaceTaskTargets remoteWorkspaceTaskTargets;
@@ -247,6 +249,8 @@ public class Texteditor extends JFrame implements KeyListener {
         customEditorController = new CustomEditorController(this);
         notebookController = new NotebookController(this);
         devContainerController = new DevContainerController(this);
+        composeController = new ComposeController(this);
+        databaseController = new DatabaseController(this);
         workspaceToolController = new WorkspaceToolController(this, extensionRegistry);
         remoteWorkspaceTaskTargets = new RemoteWorkspaceTaskTargets();
         remoteWorkspaceController = new RemoteWorkspaceController(this);
@@ -1812,6 +1816,14 @@ public class Texteditor extends JFrame implements KeyListener {
 
     String handleContainerCommand(String argument) {
         return devContainerController.handle(argument);
+    }
+
+    String handleComposeCommand(String argument) {
+        return composeController.handle(argument);
+    }
+
+    String handleDatabaseCommand(String argument) {
+        return databaseController.handle(argument);
     }
 
     String handleWorkspaceIntegrationCommand(String argument) {

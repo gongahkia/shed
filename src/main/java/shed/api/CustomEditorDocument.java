@@ -59,11 +59,24 @@ public interface CustomEditorDocument {
         return Subscription.noop();
     }
 
+    /** Observes external file replacement, modification, or deletion while this document remains installed. */
+    default Subscription onDidExternalChange(ExternalChangeListener listener) {
+        Objects.requireNonNull(listener, "listener");
+        return Subscription.noop();
+    }
+
     record Change(long revision) { }
+
+    record ExternalChange(long revision, boolean exists) { }
 
     @FunctionalInterface
     interface ChangeListener {
         void changed(Change change);
+    }
+
+    @FunctionalInterface
+    interface ExternalChangeListener {
+        void changed(ExternalChange change);
     }
 
     @FunctionalInterface

@@ -53,6 +53,16 @@ public class MarkdownPreviewRendererTest {
     }
 
     @Test
+    void basicRendererAvoidsGeneratedAssetsAndKeepsImagePolicy() {
+        String html = MarkdownPreviewRenderer.renderBasic("# Cell\n\n![remote](https://example.com/image.png)", "Cell",
+            new Font(Font.DIALOG, Font.PLAIN, 13), Color.WHITE, Color.BLACK, null);
+
+        assertTrue(html.contains("<h1 id=\"cell\">Cell</h1>"));
+        assertTrue(html.contains("[image unavailable: remote]"));
+        assertFalse(html.contains("file:"));
+    }
+
+    @Test
     void rendersSupportedRawHtmlWithLocalImagesAndRemovesUnsafeMarkup() throws Exception {
         Path image = tempDir.resolve("logo.png");
         ImageIO.write(new BufferedImage(4, 4, BufferedImage.TYPE_INT_ARGB), "png", image.toFile());

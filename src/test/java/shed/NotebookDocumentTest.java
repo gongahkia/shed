@@ -1,10 +1,14 @@
 package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Map;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 
 class NotebookDocumentTest {
@@ -44,5 +48,27 @@ class NotebookDocumentTest {
         assertEquals(List.of("jupyter", "console"), NotebookController.consoleCommand(""));
         assertEquals(List.of("jupyter", "console", "--kernel", "python3"), NotebookController.consoleCommand("python3"));
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> NotebookController.consoleCommand("python3; bad"));
+    }
+
+    @Test
+    void extractsOnlyBoundedPngAndJpegDisplayData() {
+        NotebookDocument document = NotebookDocument.empty().withCells(List.of(new NotebookDocument.Cell("code", "", Map.of("outputs", List.of(
+            Map.of("data", Map.of("image/png", "aGVsbG8=", "image/svg+xml", "PHN2Zz4=")))))));
+
+        List<NotebookDocument.ImageOutput> images = NotebookDocument.imageOutputs(document.cells().getFirst());
+        assertEquals(1, images.size());
+        assertEquals("image/png", images.getFirst().mimeType());
+        assertFalse(new String(images.getFirst().bytes(), java.nio.charset.StandardCharsets.UTF_8).contains("svg"));
+    }
+
+    @Test
+    void decodesValidNotebookRasterOutputAfterHeaderChecks() throws Exception {
+        BufferedImage source = new BufferedImage(3, 2, BufferedImage.TYPE_INT_ARGB);
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        ImageIO.write(source, "png", bytes);
+
+        BufferedImage decoded = NotebookPanel.decodeImage(new NotebookDocument.ImageOutput("image/png", bytes.toByteArray()));
+        assertEquals(3, decoded.getWidth());
+        assertEquals(2, decoded.getHeight());
     }
 }

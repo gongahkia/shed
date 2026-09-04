@@ -1579,13 +1579,18 @@ final class TreeGitController {
         if (buffer == null || !buffer.hasFilePath()) return ":git permalink requires a file-backed buffer";
         String relativePath = relativizeAgainstGitRoot(gitRoot, new File(buffer.getFilePath()));
         if (relativePath == null || relativePath.isBlank()) return "Current file is outside git root";
-        int line = editor.getCurrentLineNumber();
+        int startLine = editor.getCurrentLineNumber();
+        int endLine = startLine;
         if (argument != null && !argument.isBlank()) {
             try {
-                line = Integer.parseInt(argument.strip());
-                if (line < 1) throw new NumberFormatException();
+                String value = argument.strip();
+                java.util.regex.Matcher range = java.util.regex.Pattern.compile("([1-9][0-9]*)(?:-([1-9][0-9]*))?").matcher(value);
+                if (!range.matches()) throw new NumberFormatException();
+                startLine = Integer.parseInt(range.group(1));
+                endLine = range.group(2) == null ? startLine : Integer.parseInt(range.group(2));
+                if (endLine < startLine) throw new NumberFormatException();
             } catch (NumberFormatException error) {
-                return "Usage: :git permalink [positive-line]";
+                return "Usage: :git permalink [positive-line|start-end]";
             }
         }
         CommandResult remote = runCommand(gitRoot, List.of("git", "remote", "get-url", "origin"));
@@ -1593,7 +1598,7 @@ final class TreeGitController {
         CommandResult revision = runCommand(gitRoot, List.of("git", "rev-parse", "--verify", "HEAD"));
         if (revision.exitCode != 0 || revision.stdout == null || revision.stdout.isBlank()) return "Git permalink requires a committed HEAD";
         try {
-            String link = GitPermalink.create(remote.stdout.strip(), revision.stdout.strip(), relativePath.replace(File.separatorChar, '/'), line);
+            String link = GitPermalink.create(remote.stdout.strip(), revision.stdout.strip(), relativePath.replace(File.separatorChar, '/'), startLine, endLine);
             editor.showScratchBuffer("[git permalink]", link + "\n");
             return "Showing immutable Git permalink";
         } catch (IllegalArgumentException error) {
@@ -1787,7 +1792,7 @@ final class TreeGitController {
                 + ":git amend <msg>      Amend last commit message/content\n"
                 + ":git checkout <arg>   Checkout branch/path\n"
                 + ":git switch <branch>  Switch branch\n"
-                + ":git permalink [line] Show an immutable GitHub/GitLab/Bitbucket source link\n");
+                + ":git permalink [line|start-end] Show an immutable GitHub/GitLab/Bitbucket source link\n");
         return "Showing git help";
     }
 

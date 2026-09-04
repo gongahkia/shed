@@ -20,13 +20,16 @@ class CustomEditorDocumentApiTest {
         };
         boolean[] changed = {false};
         boolean[] disposed = {false};
+        boolean[] external = {false};
 
         document.onDidChange(change -> changed[0] = true).close();
         document.onDidDispose(() -> disposed[0] = true).close();
+        document.onDidExternalChange(change -> external[0] = true).close();
 
         assertEquals(0L, document.revision());
         assertFalse(changed[0]);
         assertFalse(disposed[0]);
+        assertFalse(external[0]);
         assertFalse(document.canUndo());
         assertFalse(document.canRedo());
     }

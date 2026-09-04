@@ -481,7 +481,7 @@ final class JobQuickfixController {
         if (rootProbe.exitCode != 0) return rootProbe;
         String remoteRoot;
         try {
-            remoteRoot = remoteWorkingDirectory(rootProbe.stdout);
+            remoteRoot = DevContainerWorkspace.remoteWorkingDirectory(rootProbe.stdout);
         } catch (IllegalArgumentException error) {
             return new CommandResult(-1, "", "Dev Container workspace probe failed: " + error.getMessage());
         }
@@ -518,18 +518,6 @@ final class JobQuickfixController {
         command.add("-lc");
         command.add("cd -- " + posixQuote(directory) + " && exec " + posixCommand(request.command()));
         return List.copyOf(command);
-    }
-
-    static String remoteWorkingDirectory(String output) {
-        if (output == null) throw new IllegalArgumentException("devcontainer exec produced no workspace path");
-        String candidate = "";
-        for (String line : output.split("\\R")) {
-            if (line.startsWith("/")) candidate = line;
-        }
-        if (!candidate.startsWith("/") || candidate.indexOf('\u0000') >= 0 || candidate.indexOf('\n') >= 0 || candidate.indexOf('\r') >= 0) {
-            throw new IllegalArgumentException("devcontainer exec did not report an absolute POSIX workspace path");
-        }
-        return candidate;
     }
 
     private static String remoteDirectory(String root, String relative) throws IOException {

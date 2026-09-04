@@ -111,6 +111,53 @@ final class DevContainerController {
         return Files.isRegularFile(candidate) ? candidate : null;
     }
 
+    boolean hasConfiguration(Path workspace) {
+        if (workspace == null) return false;
+        return Files.isRegularFile(workspace.toAbsolutePath().normalize().resolve(".devcontainer").resolve("devcontainer.json"));
+    }
+
+    RemoteLspEndpoint languageServerEndpoint(Path workspace, List<String> serverCommand) throws IOException {
+        Path root = workspace == null ? null : workspace.toAbsolutePath().normalize();
+        if (root == null || !hasConfiguration(root)) throw new IOException("Dev Container language server requires .devcontainer/devcontainer.json");
+        String remoteRoot = DevContainerWorkspace.remoteWorkingDirectory(probeWorkspaceRoot(root));
+        return new RemoteLspEndpoint(root, remoteRoot, languageServerInvocation(root, serverCommand));
+    }
+
+    static List<String> languageServerInvocation(Path workspace, List<String> serverCommand) throws IOException {
+        if (workspace == null) throw new IOException("Dev Container workspace is required");
+        List<String> command = new ArrayList<>(List.of("devcontainer", "exec", "--workspace-folder", workspace.toAbsolutePath().normalize().toString()));
+        if (serverCommand == null || serverCommand.isEmpty() || serverCommand.getFirst() == null || serverCommand.getFirst().isBlank()) {
+            throw new IOException("Dev Container language server command is required");
+        }
+        for (String argument : serverCommand) {
+            if (argument == null || argument.indexOf('\0') >= 0 || argument.indexOf('\n') >= 0 || argument.indexOf('\r') >= 0) {
+                throw new IOException("Dev Container language server command is invalid");
+            }
+        }
+        command.addAll(serverCommand);
+        return List.copyOf(command);
+    }
+
+    private static String probeWorkspaceRoot(Path workspace) throws IOException {
+        Path output = Files.createTempFile("shed-devcontainer-lsp-", ".log");
+        try {
+            Process process = new ProcessBuilder("devcontainer", "exec", "--workspace-folder", workspace.toString(), "pwd")
+                .directory(workspace.toFile()).redirectErrorStream(true).redirectOutput(output.toFile()).start();
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new IOException("Dev Container workspace probe timed out after 5 seconds");
+            }
+            String text = readCapped(output);
+            if (process.exitValue() != 0) throw new IOException(text.isBlank() ? "devcontainer exited " + process.exitValue() : text.strip());
+            return text;
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Dev Container workspace probe interrupted", error);
+        } finally {
+            Files.deleteIfExists(output);
+        }
+    }
+
     private static String run(List<String> command, Path root, AsyncJobService.JobToken token) throws Exception {
         Path output = Files.createTempFile("shed-devcontainer-", ".log");
         try {

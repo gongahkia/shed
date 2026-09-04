@@ -1,9 +1,11 @@
 package shed;
 
 import javax.swing.SwingUtilities;
+import java.awt.Desktop;
 import java.awt.Dimension;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +51,7 @@ final class TerminalController {
         String title = nextTerminalTitle(label);
         PtyTerminalPane terminalPane;
         try {
-            terminalPane = PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont(), command);
+            terminalPane = PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont(), command, this::openTerminalLink);
         } catch (IOException e) {
             return "Terminal failed: " + e.getMessage();
         }
@@ -166,7 +168,8 @@ final class TerminalController {
 
 
     private void installRestoredTerminal(EditorPane pane, File workingDirectory) throws IOException {
-        PtyTerminalPane terminalPane = PtyTerminalPane.open(workingDirectory, editor.configManager, editor.resolveTerminalFont());
+        PtyTerminalPane terminalPane = PtyTerminalPane.open(workingDirectory, editor.configManager, editor.resolveTerminalFont(),
+            ShellCommand.interactiveCommand(), this::openTerminalLink);
         FileBuffer terminalBuffer = FileBuffer.createScratch(nextTerminalTitle("Terminal"), "");
         editor.buffers.add(terminalBuffer);
         pane.setBuffer(terminalBuffer);
@@ -250,6 +253,54 @@ final class TerminalController {
     private PtyTerminalPane currentTerminal() {
         FileBuffer buffer = editor.getCurrentBuffer();
         return buffer == null ? null : editor.ptyTerminalPanes.get(buffer);
+    }
+
+    private void openTerminalLink(TerminalLinkResolver.Link link) {
+        if (link instanceof TerminalLinkResolver.SourceLink source) {
+            openTerminalSource(source);
+        } else if (link instanceof TerminalLinkResolver.BrowserLink browser) {
+            openTerminalBrowserLink(browser);
+        }
+    }
+
+    private void openTerminalSource(TerminalLinkResolver.SourceLink source) {
+        if (!Files.isRegularFile(source.path())) {
+            editor.showMessage("Terminal source link is no longer available: " + source.path());
+            return;
+        }
+        try {
+            editor.recordJumpPosition();
+            editor.openFile(source.path().toFile());
+            String result = editor.gotoLine(source.line());
+            if (result.startsWith("Error") || result.startsWith("Invalid")) {
+                editor.showMessage(result);
+                return;
+            }
+            int line = Math.min(source.line() - 1, Math.max(0, editor.writingArea.getLineCount() - 1));
+            int lineStart = editor.writingArea.getLineStartOffset(line);
+            int target = Math.min(lineStart + source.column() - 1, editor.writingArea.getText().length());
+            editor.writingArea.setCaretPosition(target);
+            editor.showMessage("Opened terminal source link: " + source.path().getFileName());
+        } catch (Exception error) {
+            String detail = error.getMessage();
+            editor.showMessage("Could not open terminal source link: "
+                + (detail == null || detail.isBlank() ? error.getClass().getSimpleName() : detail));
+        }
+    }
+
+    private void openTerminalBrowserLink(TerminalLinkResolver.BrowserLink browser) {
+        if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            editor.showMessage("Browser links are unavailable on this desktop");
+            return;
+        }
+        try {
+            Desktop.getDesktop().browse(browser.uri());
+            editor.showMessage("Opened terminal URL: " + browser.uri());
+        } catch (IOException | SecurityException error) {
+            String detail = error.getMessage();
+            editor.showMessage("Could not open terminal URL: "
+                + (detail == null || detail.isBlank() ? error.getClass().getSimpleName() : detail));
+        }
     }
 
 

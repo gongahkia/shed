@@ -5,12 +5,22 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 /** Opens, saves, and explicitly executes local Jupyter notebooks. */
 final class NotebookController {
     private static final long OUTPUT_LIMIT_BYTES = 128 * 1024;
+    record KernelSpec(String name, String displayName, String language) {
+        KernelSpec {
+            name = kernelName(name);
+            displayName = displayName == null || displayName.isBlank() ? name : displayName.trim();
+            language = language == null ? "" : language.trim();
+        }
+    }
     private final Texteditor editor;
 
     NotebookController(Texteditor editor) {
@@ -45,13 +55,29 @@ final class NotebookController {
         return switch (operation) {
             case "", "open", "reopen" -> showIfAvailable(pane, buffer) ? "Notebook opened" : "Notebook view unavailable";
             case "runall", "run-all" -> runCurrent(pane, buffer, "");
+            case "kernels", "kernel", "kernelspecs" -> listKernels(buffer);
             case "raw", "text" -> {
                 pane.clearCustomEditorComponent();
                 editor.renderWindowLayout();
                 yield "Opened notebook JSON source";
             }
-            default -> "Usage: :notebook [open|run|console [kernel]|raw]";
+            default -> "Usage: :notebook [open|run [kernel]|kernels|console [kernel]|raw]";
         };
+    }
+
+    private String listKernels(FileBuffer buffer) {
+        if (!editor.ensureProjectTrustForFile(buffer.getFile())) return "Jupyter kernel discovery blocked: workspace is untrusted";
+        Path directory = buffer.getFile().toPath().toAbsolutePath().normalize().getParent();
+        int job = editor.asyncJobService.submit("Discover Jupyter kernels", token -> discoverKernels(directory, token),
+            (snapshot, kernels, error) -> {
+                if (error != null) {
+                    editor.showMessage("Jupyter kernel discovery failed: " + concise(error));
+                    return;
+                }
+                editor.showScratchBuffer("[jupyter kernels]", renderKernels(kernels));
+                editor.showMessage("Jupyter kernel discovery completed");
+            });
+        return "Jupyter kernel discovery started (job " + job + ").";
     }
 
     private String openConsole(FileBuffer buffer, String kernel) {
@@ -69,6 +95,27 @@ final class NotebookController {
         String name = kernel == null ? "" : kernel.trim();
         if (!name.isEmpty() && !name.matches("[A-Za-z0-9._-]+")) throw new IllegalArgumentException("kernel name is invalid");
         return name.isEmpty() ? List.of("jupyter", "console") : List.of("jupyter", "console", "--kernel", name);
+    }
+
+    static List<String> kernelListCommand() { return List.of("jupyter", "kernelspec", "list", "--json"); }
+
+    static List<KernelSpec> parseKernelSpecs(String output) throws IOException {
+        try {
+            Map<String, Object> root = MiniJson.asObject(MiniJson.parse(output == null ? "" : output));
+            Map<String, Object> values = MiniJson.asObject(root == null ? null : root.get("kernelspecs"));
+            if (values == null) throw new IllegalArgumentException("Jupyter output does not contain kernelspecs");
+            List<KernelSpec> result = new ArrayList<>();
+            for (Map.Entry<String, Object> entry : new TreeMap<>(values).entrySet()) {
+                Map<String, Object> kernel = MiniJson.asObject(entry.getValue());
+                Map<String, Object> spec = MiniJson.asObject(kernel == null ? null : kernel.get("spec"));
+                String displayName = MiniJson.asString(spec == null ? null : spec.get("display_name"));
+                String language = MiniJson.asString(spec == null ? null : spec.get("language"));
+                result.add(new KernelSpec(entry.getKey(), displayName, language));
+            }
+            return List.copyOf(result);
+        } catch (RuntimeException error) {
+            throw new IOException("Jupyter kernelspec output is invalid: " + error.getMessage(), error);
+        }
     }
 
     private void save(EditorPane pane, FileBuffer buffer, NotebookDocument document) {
@@ -185,6 +232,26 @@ final class NotebookController {
         }
     }
 
+    private static List<KernelSpec> discoverKernels(Path directory, AsyncJobService.JobToken token) throws Exception {
+        Path output = Files.createTempFile("shed-jupyter-kernels-", ".log");
+        try {
+            Process process = new ProcessBuilder(kernelListCommand()).directory(directory.toFile()).redirectErrorStream(true).redirectOutput(output.toFile()).start();
+            token.onCancel(process::destroyForcibly);
+            if (!process.waitFor(30, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                throw new IOException("Jupyter kernel discovery timed out after 30 seconds");
+            }
+            String text = readCapped(output);
+            if (process.exitValue() != 0) throw new IOException(text.isBlank() ? "Jupyter exited " + process.exitValue() : text.strip());
+            return parseKernelSpecs(text);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Jupyter kernel discovery interrupted", error);
+        } finally {
+            Files.deleteIfExists(output);
+        }
+    }
+
     private static NotebookDocument executeThrough(Path source, int cellCount, AsyncJobService.JobToken token) throws Exception {
         NotebookDocument document = NotebookDocument.parse(Files.readString(source, StandardCharsets.UTF_8));
         NotebookDocument prefix = document.through(cellCount);
@@ -216,6 +283,18 @@ final class NotebookController {
             String text = new String(bytes, 0, Math.min(bytes.length, (int) OUTPUT_LIMIT_BYTES), StandardCharsets.UTF_8);
             return bytes.length > OUTPUT_LIMIT_BYTES ? text + "\n[shed: output truncated]" : text;
         }
+    }
+
+    private static String renderKernels(List<KernelSpec> kernels) {
+        StringBuilder text = new StringBuilder("Jupyter Kernels\n\n");
+        if (kernels == null || kernels.isEmpty()) return text.append("(none)\n").toString();
+        for (KernelSpec kernel : kernels) {
+            text.append(kernel.name()).append("  ").append(kernel.displayName());
+            if (!kernel.language().isBlank()) text.append("  [").append(kernel.language()).append("]");
+            text.append('\n');
+        }
+        text.append("\nUse :notebook run <kernel> or :notebook console <kernel>. Selection remains one-shot.\n");
+        return text.toString();
     }
 
     private static String concise(Throwable error) {

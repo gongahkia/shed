@@ -63,6 +63,15 @@ class NotebookDocumentTest {
     }
 
     @Test
+    void listsOnlyStructuredJupyterKernelSpecs() throws Exception {
+        assertEquals(List.of("jupyter", "kernelspec", "list", "--json"), NotebookController.kernelListCommand());
+        assertEquals(List.of(new NotebookController.KernelSpec("python3", "Python 3", "python"),
+            new NotebookController.KernelSpec("typescript", "typescript", "typescript")),
+            NotebookController.parseKernelSpecs("{\"kernelspecs\":{\"typescript\":{\"spec\":{\"language\":\"typescript\"}},\"python3\":{\"spec\":{\"display_name\":\"Python 3\",\"language\":\"python\"}}}}"));
+        org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class, () -> NotebookController.parseKernelSpecs("{}"));
+    }
+
+    @Test
     void extractsOnlyBoundedPngAndJpegDisplayData() {
         NotebookDocument document = NotebookDocument.empty().withCells(List.of(new NotebookDocument.Cell("code", "", Map.of("outputs", List.of(
             Map.of("data", Map.of("image/png", "aGVsbG8=", "image/svg+xml", "PHN2Zz4=")))))));

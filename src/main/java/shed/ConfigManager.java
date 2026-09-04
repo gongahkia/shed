@@ -431,7 +431,7 @@ public class ConfigManager {
             case "lsp.command.execution.enabled" -> "Enable LSP execute-command requests";
             case "lsp.formatting.enabled" -> "Enable LSP document-formatting requests";
             case "lsp.format.on.save.enabled" -> "Format with LSP before saving; failed formatting leaves the buffer unsaved";
-            case "remote.lsp.enabled" -> "Run explicitly configured LSP servers through connected SSH, container, or WSL workspaces";
+            case "remote.lsp.enabled" -> "Run explicitly configured LSP servers through connected SSH/container/WSL workspaces or an already running Dev Container";
             case "ui.whichkey.hints" -> "Show prefix-key hint overlays";
             case "project.config.enabled" -> "Enable project-local configuration";
             case "project.config.allow.unsafe" -> "Allow unsafe project-local keys";

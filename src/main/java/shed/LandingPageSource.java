@@ -7,9 +7,19 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.regex.Pattern;
 
 final class LandingPageSource {
     private static final long MAX_LEGACY_DEFAULT_BYTES = 8 * 1024;
+    private static final Pattern LEGACY_DEFAULT_CONTENT = Pattern.compile(
+        "\\Ashed [^\\r\\n]+\\R"
+            + "swing modal editor\\R\\R"
+            + ":help        view help\\R"
+            + ":e <file>    open a file\\R"
+            + ":recent      show recent files\\R"
+            + ":ls          list open buffers\\R\\R"
+            + "edit and save this local landing file to customize it\\.\\R?\\z"
+    );
 
     record Resolved(File file, URI remoteUri) {
         boolean isRemote() {
@@ -89,7 +99,8 @@ final class LandingPageSource {
             if (size > MAX_LEGACY_DEFAULT_BYTES) {
                 return false;
             }
-            return legacyDefaultContent.equals(Files.readString(path, StandardCharsets.UTF_8));
+            String content = Files.readString(path, StandardCharsets.UTF_8);
+            return legacyDefaultContent.equals(content) || LEGACY_DEFAULT_CONTENT.matcher(content).matches();
         } catch (IOException | SecurityException error) {
             // Preserve a pre-existing or unreadable user file by using the legacy path.
             return false;

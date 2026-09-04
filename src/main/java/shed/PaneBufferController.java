@@ -85,6 +85,7 @@ final class PaneBufferController {
         } else if (editor.hasMarkdownPreviewForSource(pane)) {
             editor.closeMarkdownPreviewForSource(pane);
         }
+        boolean replacedCustomEditor = pane.getCustomEditorComponent() != null;
         editor.customEditorController.dispose(pane);
         pane.clearCustomEditorComponent();
 
@@ -118,10 +119,6 @@ final class PaneBufferController {
         withSuppressedDocumentEvents(() -> pane.getTextArea().setDocument(buffer.getDocument()));
         pane.getTextArea().setEditable(!buffer.isLargeFile() && editor.editorState.mode.isEditable());
         pane.getTextArea().setCaretPosition(Math.min(caretPosition, pane.getTextArea().getDocument().getLength()));
-        if (replacedTerminalPane) {
-            editor.renderWindowLayout();
-        }
-
         if (activePane) {
             editor.bindActivePane(pane);
             attachActiveDocumentListener();
@@ -141,6 +138,9 @@ final class PaneBufferController {
             editor.updateStatusBar();
         } else {
             pane.getLineNumberPanel().repaint();
+        }
+        if (replacedTerminalPane || replacedCustomEditor) {
+            editor.renderWindowLayout();
         }
     }
 

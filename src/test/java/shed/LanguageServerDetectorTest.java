@@ -65,4 +65,21 @@ public class LanguageServerDetectorTest {
         assertEquals("permission denied", failed.failure());
         assertEquals(Path.of("/tools/gopls").toString(), failed.executable());
     }
+
+    @Test
+    void validatesTheCsharpLsDotnetRequirementWithoutInstallingAnything() {
+        List<List<String>> commands = new ArrayList<>();
+        LanguageServerDetector detector = new LanguageServerDetector(command -> Path.of("/tools/csharp-ls"), command -> {
+            commands.add(command);
+            return command.get(0).equals("dotnet")
+                ? new LanguageServerDetector.CommandResult(0, "10.0.101\n", "")
+                : new LanguageServerDetector.CommandResult(0, "csharp-ls 1.0\n", "");
+        }, null);
+
+        LanguageServerDetector.Result result = detector.detect(ManagedLanguageCatalog.csharp(), ManagedLanguageSupportTrust.Platform.LINUX);
+
+        assertTrue(result.usable());
+        assertEquals("10.0.101", result.runtimeVersion());
+        assertEquals(List.of("dotnet", "--version"), commands.get(1));
+    }
 }

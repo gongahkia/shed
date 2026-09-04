@@ -121,18 +121,24 @@ final class JobQuickfixController {
         if (!loaded.isValid()) {
             return showTaskConfigurationDiagnostics(projectRoot, loaded.diagnostics());
         }
+        VsCodeTaskImporter.Report vsCodeTasks = vsCodeTaskReport(projectRoot, loaded.tasks());
+        Map<String, TaskService.WorkspaceTask> tasks = effectiveWorkspaceTasks(loaded.tasks(), vsCodeTasks);
         if (trimmed.isEmpty() || "list".equalsIgnoreCase(trimmed)) {
-            return showWorkspaceTasks(projectRoot, loaded.tasks());
+            return showWorkspaceTasks(projectRoot, tasks, vsCodeTasks);
         }
         List<String> args = editor.parseQuotedArguments(trimmed);
         if (args.isEmpty()) {
-            return showWorkspaceTasks(projectRoot, loaded.tasks());
+            return showWorkspaceTasks(projectRoot, tasks, vsCodeTasks);
         }
 
         String sub = args.get(0).toLowerCase(Locale.ROOT);
         switch (sub) {
             case "list":
-                return showWorkspaceTasks(projectRoot, loaded.tasks());
+                return showWorkspaceTasks(projectRoot, tasks, vsCodeTasks);
+            case "vscode":
+            case "tasks-json":
+            case "tasksjson":
+                return showVsCodeTasks(projectRoot, vsCodeTasks);
             case "add":
                 if (args.size() < 3) {
                     return "Usage: :task add <name> <command>";
@@ -156,36 +162,36 @@ final class JobQuickfixController {
                 if (args.size() < 2) {
                     return "Usage: :task run <name>";
                 }
-                return runLoadedTask(args.get(1), projectRoot, loaded.tasks(), false);
+                return runLoadedTask(args.get(1), projectRoot, tasks, false);
             case "dry-run":
             case "dryrun":
                 if (args.size() < 2) {
                     return "Usage: :task dry-run <name>";
                 }
-                return runLoadedTask(args.get(1), projectRoot, loaded.tasks(), true);
+                return runLoadedTask(args.get(1), projectRoot, tasks, true);
             case "remote":
             case "run-remote":
                 if (args.size() < 3) {
                     return "Usage: :task remote <connection-id> <name>";
                 }
-                return runRemoteTask(args.get(1), args.get(2), projectRoot, loaded.tasks(), false);
+                return runRemoteTask(args.get(1), args.get(2), projectRoot, tasks, false);
             case "remote-dry-run":
                 if (args.size() < 3) {
                     return "Usage: :task remote-dry-run <connection-id> <name>";
                 }
-                return runRemoteTask(args.get(1), args.get(2), projectRoot, loaded.tasks(), true);
+                return runRemoteTask(args.get(1), args.get(2), projectRoot, tasks, true);
             case "container":
             case "devcontainer":
                 if (args.size() < 2) {
                     return "Usage: :task container <name>";
                 }
-                return runContainerTask(args.get(1), projectRoot, loaded.tasks(), false);
+                return runContainerTask(args.get(1), projectRoot, tasks, false);
             case "container-dry-run":
             case "devcontainer-dry-run":
                 if (args.size() < 2) {
                     return "Usage: :task container-dry-run <name>";
                 }
-                return runContainerTask(args.get(1), projectRoot, loaded.tasks(), true);
+                return runContainerTask(args.get(1), projectRoot, tasks, true);
             case "cancel":
                 if (args.size() < 2) {
                     return "Usage: :task cancel <job-id>";
@@ -228,7 +234,7 @@ final class JobQuickfixController {
         }
         File fallback = cursor;
         while (cursor != null) {
-            if (new File(cursor, ".shedtasks").isFile()) {
+            if (new File(cursor, ".shedtasks").isFile() || new File(cursor, ".vscode/tasks.json").isFile()) {
                 return cursor;
             }
             if (new File(cursor, ".git").exists()) {
@@ -253,6 +259,10 @@ final class JobQuickfixController {
     }
 
     String showWorkspaceTasks(File projectRoot, Map<String, TaskService.WorkspaceTask> tasks) {
+        return showWorkspaceTasks(projectRoot, tasks, null);
+    }
+
+    String showWorkspaceTasks(File projectRoot, Map<String, TaskService.WorkspaceTask> tasks, VsCodeTaskImporter.Report vsCodeTasks) {
         StringBuilder sb = new StringBuilder();
         sb.append("Workspace tasks\n\n");
         sb.append("root: ").append(projectRoot.getAbsolutePath()).append("\n");
@@ -269,11 +279,62 @@ final class JobQuickfixController {
                 sb.append("  ").append(name).append(" = ").append(task.command())
                     .append("  [").append(task.shell().configValue())
                     .append(", ").append(task.problemMatcher().configValue())
-                    .append(", ").append(task.presentation().configValue()).append("]\n");
+                    .append(", ").append(task.presentation().configValue()).append("]")
+                    .append(task.hasDirectArguments() ? "  [VS Code session only]" : "").append("\n");
             }
         }
+        appendVsCodeTaskReport(sb, vsCodeTasks);
         editor.showScratchBuffer("[tasks]", sb.toString());
         return "Showing tasks";
+    }
+
+    Map<String, TaskService.WorkspaceTask> effectiveWorkspaceTasks(File projectRoot, TaskService.TaskLoadResult loaded) {
+        if (loaded == null || !loaded.isValid()) return Map.of();
+        VsCodeTaskImporter.Report imported = vsCodeTaskReport(projectRoot, loaded.tasks());
+        return effectiveWorkspaceTasks(loaded.tasks(), imported);
+    }
+
+    private Map<String, TaskService.WorkspaceTask> effectiveWorkspaceTasks(Map<String, TaskService.WorkspaceTask> local,
+                                                                            VsCodeTaskImporter.Report imported) {
+        Map<String, TaskService.WorkspaceTask> result = new LinkedHashMap<>(local == null ? Map.of() : local);
+        if (imported != null) result.putAll(imported.tasks());
+        return Map.copyOf(result);
+    }
+
+    private VsCodeTaskImporter.Report vsCodeTaskReport(File projectRoot, Map<String, TaskService.WorkspaceTask> localTasks) {
+        Path root = projectRoot == null ? null : projectRoot.toPath();
+        return VsCodeTaskImporter.read(root, localTasks == null ? Set.of() : localTasks.keySet());
+    }
+
+    private String showVsCodeTasks(File projectRoot, VsCodeTaskImporter.Report report) {
+        StringBuilder output = new StringBuilder("VS Code tasks.json compatibility\n\nWorkspace: ").append(projectRoot.getAbsolutePath()).append('\n');
+        appendVsCodeTaskReport(output, report);
+        editor.showScratchBuffer("[VS Code tasks.json]", output.toString());
+        return report != null && report.present() ? "Showing VS Code tasks.json compatibility" : "No .vscode/tasks.json was found for this workspace.";
+    }
+
+    private static void appendVsCodeTaskReport(StringBuilder output, VsCodeTaskImporter.Report report) {
+        if (report == null) return;
+        output.append("\nVS Code tasks.json:\n");
+        if (!report.present()) {
+            output.append("  (not found; no VS Code tasks were imported)\n");
+            return;
+        }
+        output.append("  ").append(report.source()).append("\n");
+        if (!report.failure().isEmpty()) {
+            output.append("  Import unavailable: ").append(report.failure()).append("\n");
+            return;
+        }
+        if (report.accepted().isEmpty()) output.append("  Accepted: (none)\n");
+        else {
+            output.append("  Accepted for this session only:\n");
+            for (String name : report.accepted()) output.append("    ").append(name).append("\n");
+            output.append("  Run with :task run <name>; start remains explicit.\n");
+        }
+        if (!report.skipped().isEmpty()) {
+            output.append("  Skipped:\n");
+            for (String detail : report.skipped()) output.append("    ").append(detail).append("\n");
+        }
     }
 
 

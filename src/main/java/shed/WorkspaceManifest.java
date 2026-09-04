@@ -23,13 +23,7 @@ final class WorkspaceManifest {
     static List<Path> read(Path source) throws IOException {
         Path manifest = regularManifest(source);
         if (Files.size(manifest) > MAX_BYTES) throw new IOException("Workspace manifest exceeds 1 MiB");
-        Map<String, Object> root;
-        try {
-            root = MiniJson.asObject(MiniJson.parse(Files.readString(manifest, StandardCharsets.UTF_8)));
-        } catch (RuntimeException error) {
-            throw new IOException("Workspace manifest is not valid JSON", error);
-        }
-        if (root == null) throw new IOException("Workspace manifest root must be an object");
+        Map<String, Object> root = Jsonc.parseObject(Files.readString(manifest, StandardCharsets.UTF_8));
         List<Object> folders = MiniJson.asArray(root.get("folders"));
         if (folders == null || folders.isEmpty()) throw new IOException("Workspace manifest requires at least one folder");
         if (folders.size() > MAX_FOLDERS) throw new IOException("Workspace manifest has too many folders");

@@ -74,6 +74,7 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:jobcancel <id>`, `:jobkill <id>` | Cancel running async job |
 | `:task`, `:task ui` | Open graphical Tasks/Jobs panel |
 | `:task text`, `:task text list` | Show legacy task scratch buffer |
+| `:task vscode` | Inspect the strict runtime-only `.vscode/tasks.json` compatibility report; accepted process tasks are session-only and still require explicit run |
 | `:task add <name> <command>` | Save task |
 | `:task remove <name>`, `:task rm <name>`, `:task delete <name>` | Remove task |
 | `:task dry-run <name>` | Resolve and show task execution plan without starting it |

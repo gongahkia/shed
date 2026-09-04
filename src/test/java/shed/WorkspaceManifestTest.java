@@ -37,6 +37,23 @@ class WorkspaceManifestTest {
     }
 
     @Test
+    void readsCodeWorkspaceJsoncFoldersWithoutApplyingSettingsTasksOrLaunch() throws IOException {
+        Path project = Files.createDirectory(tempDir.resolve("project-jsonc"));
+        Path manifest = tempDir.resolve("sample-jsonc.code-workspace");
+        Files.writeString(manifest, """
+            {
+              // VS Code workspace files are JSONC.
+              "folders": [{"path": "project-jsonc",},],
+              "settings": {"editor.tabSize": 2},
+              "tasks": {"version": "2.0.0", "tasks": []},
+              "launch": {"configurations": []},
+            }
+            """);
+
+        assertEquals(List.of(project.toRealPath()), WorkspaceManifest.read(manifest));
+    }
+
+    @Test
     void rejectsUnsupportedNamesAndMissingFolders() throws IOException {
         Path unsupported = tempDir.resolve("workspace.json");
         Path missing = tempDir.resolve("missing.shed-workspace");

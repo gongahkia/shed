@@ -34,6 +34,26 @@ public class ManagedLanguageCatalogTest {
     }
 
     @Test
+    void additionalBuiltInLanguageServersRemainUserManagedAndExposeEveryRecognizedExtension() {
+        assertEquals(ManagedLanguageCatalog.kotlin(), ManagedLanguageCatalog.forExtension("kts"));
+        assertEquals(ManagedLanguageCatalog.csharp(), ManagedLanguageCatalog.forExtension("csx"));
+        assertEquals(ManagedLanguageCatalog.php(), ManagedLanguageCatalog.forExtension("phtml"));
+        assertEquals(ManagedLanguageCatalog.ruby(), ManagedLanguageCatalog.forExtension("gemspec"));
+        assertEquals(ManagedLanguageCatalog.swift(), ManagedLanguageCatalog.forExtension("swift"));
+        assertEquals("kotlin-lsp", ManagedLanguageCatalog.kotlin().commandFor(ManagedLanguageSupportTrust.Platform.LINUX));
+        assertEquals("csharp-ls", ManagedLanguageCatalog.csharp().commandFor(ManagedLanguageSupportTrust.Platform.WINDOWS));
+        assertEquals("intelephense.cmd", ManagedLanguageCatalog.php().commandFor(ManagedLanguageSupportTrust.Platform.WINDOWS));
+        assertEquals("ruby-lsp", ManagedLanguageCatalog.ruby().commandFor(ManagedLanguageSupportTrust.Platform.MACOS));
+        assertEquals("sourcekit-lsp", ManagedLanguageCatalog.swift().commandFor(ManagedLanguageSupportTrust.Platform.LINUX));
+        assertEquals(ManagedLanguageCatalog.Availability.MANAGED_ARTIFACT_UNAVAILABLE,
+            ManagedLanguageCatalog.kotlin().assessManagedInstall(new ManagedLanguageSupportTrust(List.of(), Set.of()),
+                ManagedLanguageSupportTrust.Platform.LINUX, true).availability());
+        assertEquals(ManagedLanguageCatalog.Availability.AVAILABLE,
+            ManagedLanguageCatalog.ruby().assessUserManaged(ManagedLanguageSupportTrust.Platform.LINUX,
+                new ManagedLanguageCatalog.ToolDetection("ruby-lsp", "")).availability());
+    }
+
+    @Test
     void userManagedJavaStatesIdentifyExecutableAndRuntimeRemediation() {
         ManagedLanguageCatalog.Entry entry = ManagedLanguageCatalog.java();
 

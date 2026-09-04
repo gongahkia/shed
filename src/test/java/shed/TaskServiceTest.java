@@ -197,4 +197,23 @@ public class TaskServiceTest {
         assertEquals("nested-project", request.relativeWorkingDirectory());
         assertEquals("/srv/workspace/nested-project", request.environment().get("ROOT"));
     }
+
+    @Test
+    void directArgumentTasksPreserveArgumentsWithSpacesAndMapRemotePaths() throws IOException {
+        TaskService service = new TaskService();
+        Path workspace = tempDir.resolve("workspace with spaces");
+        Path source = workspace.resolve("file with spaces.py");
+        Files.createDirectories(workspace);
+        Files.writeString(source, "print('ok')\n");
+        TaskService.WorkspaceTask task = TaskService.directWorkspaceTask("vscode-run",
+            List.of("runner", "${file}", "two words"), "${workspaceFolder}", Map.of("ROOT", "${workspaceFolder}"),
+            TaskService.ProblemMatcher.NONE, TaskService.Presentation.NEVER);
+
+        TaskService.TaskExecutionPlan plan = service.buildExecutionPlan(task, workspace.toFile(), source.toFile());
+        RemoteCommandRequest remote = service.buildRemoteCommandRequest(plan, workspace, "/srv/project", source.toFile());
+
+        assertEquals(List.of("runner", source.toString(), "two words"), plan.processCommand());
+        assertEquals(List.of("runner", "/srv/project/file with spaces.py", "two words"), remote.command());
+        assertEquals("/srv/project", remote.environment().get("ROOT"));
+    }
 }

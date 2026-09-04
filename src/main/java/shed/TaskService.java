@@ -98,9 +98,16 @@ public class TaskService {
         private final ShellPolicy shell;
         private final ProblemMatcher problemMatcher;
         private final Presentation presentation;
+        private final List<String> directArguments;
 
         WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                       ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation) {
+            this(name, command, cwd, environment, shell, problemMatcher, presentation, null);
+        }
+
+        private WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
+                              ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation,
+                              List<String> directArguments) {
             this.name = name;
             this.command = command;
             this.cwd = cwd;
@@ -108,6 +115,7 @@ public class TaskService {
             this.shell = shell;
             this.problemMatcher = problemMatcher;
             this.presentation = presentation;
+            this.directArguments = directArguments == null ? null : Collections.unmodifiableList(new ArrayList<>(directArguments));
         }
 
         String name() { return name; }
@@ -117,6 +125,8 @@ public class TaskService {
         ShellPolicy shell() { return shell; }
         ProblemMatcher problemMatcher() { return problemMatcher; }
         Presentation presentation() { return presentation; }
+        boolean hasDirectArguments() { return directArguments != null; }
+        List<String> directArguments() { return directArguments == null ? List.of() : directArguments; }
     }
 
     static final class TaskLoadResult {
@@ -204,8 +214,8 @@ public class TaskService {
     TaskExecutionPlan buildExecutionPlan(WorkspaceTask task, File projectRoot, File activeFile) throws IOException {
         if (task == null) throw new IOException("task required");
         File workspace = canonicalDirectory(projectRoot, "workspace directory required");
-        String command = expandVariables(task.command(), workspace, activeFile);
-        validateCommand(command);
+        String command = task.hasDirectArguments() ? "" : expandVariables(task.command(), workspace, activeFile);
+        if (!task.hasDirectArguments()) validateCommand(command);
         String cwdValue = expandVariables(task.cwd(), workspace, activeFile);
         File cwd = resolveWorkspaceDirectory(workspace, cwdValue);
         Map<String, String> environment = new LinkedHashMap<>();
@@ -214,11 +224,14 @@ public class TaskService {
         }
         Map<String, String> shellEnvironment = new HashMap<>(System.getenv());
         shellEnvironment.putAll(environment);
-        List<String> processCommand = task.shell() == ShellPolicy.LOGIN
-            ? ShellCommand.forCommand(command, shellEnvironment, path -> new File(path).canExecute())
-            : ShellCommand.directCommand(command);
+        List<String> processCommand = task.hasDirectArguments()
+            ? expandDirectArguments(task.directArguments(), workspace, activeFile)
+            : task.shell() == ShellPolicy.LOGIN
+                ? ShellCommand.forCommand(command, shellEnvironment, path -> new File(path).canExecute())
+                : ShellCommand.directCommand(command);
         if (processCommand.isEmpty()) throw new IOException("task command required");
-        return new TaskExecutionPlan(task, workspace, command, processCommand, cwd, environment);
+        return new TaskExecutionPlan(task, workspace, task.hasDirectArguments() ? displayDirectCommand(processCommand) : command,
+            processCommand, cwd, environment);
     }
 
     RemoteCommandRequest buildRemoteCommandRequest(TaskExecutionPlan plan, Path connectionRoot, String executionRoot,
@@ -228,13 +241,14 @@ public class TaskService {
         Path workingDirectory = plan.workingDirectory().toPath().toAbsolutePath().normalize();
         if (!workingDirectory.startsWith(root)) throw new IOException("task directory is outside the connected workspace");
         String relativeDirectory = root.relativize(workingDirectory).toString().replace(File.separatorChar, '/');
-        String remoteCommand = expandRemoteVariables(plan.task().command(), plan.workspace(), activeFile, root, executionRoot);
+        String remoteCommand = plan.task().hasDirectArguments() ? "" : expandRemoteVariables(plan.task().command(), plan.workspace(), activeFile, root, executionRoot);
         Map<String, String> environment = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : plan.task().environment().entrySet()) {
             environment.put(entry.getKey(), expandRemoteVariables(entry.getValue(), plan.workspace(), activeFile, root, executionRoot));
         }
-        List<String> command = plan.task().shell() == ShellPolicy.LOGIN
-            ? List.of("sh", "-lc", remoteCommand) : ShellCommand.directCommand(remoteCommand);
+        List<String> command = plan.task().hasDirectArguments()
+            ? expandRemoteDirectArguments(plan.task().directArguments(), plan.workspace(), activeFile, root, executionRoot)
+            : plan.task().shell() == ShellPolicy.LOGIN ? List.of("sh", "-lc", remoteCommand) : ShellCommand.directCommand(remoteCommand);
         return new RemoteCommandRequest(command, relativeDirectory, environment);
     }
 
@@ -369,6 +383,29 @@ public class TaskService {
             ShellPolicy.LOGIN, ProblemMatcher.GENERIC, Presentation.ON_FAILURE);
     }
 
+    /** Creates an ephemeral direct-argv task without serializing its arguments into shell syntax. */
+    static WorkspaceTask directWorkspaceTask(String name, List<String> arguments, String cwd, Map<String, String> environment,
+                                             ProblemMatcher problemMatcher, Presentation presentation) {
+        if (!isValidTaskName(name)) throw new IllegalArgumentException("invalid task name: " + name);
+        if (arguments == null || arguments.isEmpty()) throw new IllegalArgumentException("direct task arguments required");
+        List<String> values = new ArrayList<>();
+        for (String argument : arguments) {
+            if (argument == null) throw new IllegalArgumentException("direct task argument required");
+            validateSingleLine(argument, "direct task argument");
+            values.add(argument);
+        }
+        if (cwd == null || cwd.isBlank()) throw new IllegalArgumentException("cwd must not be empty");
+        validateSingleLine(cwd, "cwd");
+        Map<String, String> valuesEnvironment = environment == null ? Map.of() : environment;
+        for (Map.Entry<String, String> entry : valuesEnvironment.entrySet()) {
+            if (!ENVIRONMENT_NAME.matcher(entry.getKey()).matches()) throw new IllegalArgumentException("invalid env name: " + entry.getKey());
+            if (entry.getValue() == null) throw new IllegalArgumentException("environment value required");
+            validateSingleLine(entry.getValue(), "environment value");
+        }
+        if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
+        return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.DIRECT, problemMatcher, presentation, values);
+    }
+
     private WorkspaceTask structuredTask(String name, TomlTable table) {
         rejectUnknownFields(table, name);
         Object command = table.get("command");
@@ -391,6 +428,7 @@ public class TaskService {
 
     private void validateTask(WorkspaceTask task) {
         if (!isValidTaskName(task.name())) throw new IllegalArgumentException("invalid task name: " + task.name());
+        if (task.hasDirectArguments()) throw new IllegalArgumentException("ephemeral direct-argument tasks cannot be written to .shedtasks");
         validateCommand(task.command());
         if (task.cwd() == null || task.cwd().isBlank()) throw new IllegalArgumentException("cwd must not be empty");
         validateSingleLine(task.cwd(), "cwd");
@@ -463,6 +501,29 @@ public class TaskService {
         }
         matcher.appendTail(expanded);
         return expanded.toString();
+    }
+
+    private List<String> expandDirectArguments(List<String> values, File workspace, File activeFile) throws IOException {
+        List<String> result = new ArrayList<>();
+        for (String value : values) {
+            String expanded = expandVariables(value, workspace, activeFile);
+            validateSingleLine(expanded, "direct task argument");
+            result.add(expanded);
+        }
+        if (result.isEmpty()) throw new IOException("task command required");
+        return List.copyOf(result);
+    }
+
+    private List<String> expandRemoteDirectArguments(List<String> values, File workspace, File activeFile, Path connectionRoot,
+                                                      String executionRoot) throws IOException {
+        List<String> result = new ArrayList<>();
+        for (String value : values) {
+            String expanded = expandRemoteVariables(value, workspace, activeFile, connectionRoot, executionRoot);
+            validateSingleLine(expanded, "direct task argument");
+            result.add(expanded);
+        }
+        if (result.isEmpty()) throw new IOException("task command required");
+        return List.copyOf(result);
     }
 
     private String expandRemoteVariables(String value, File workspace, File activeFile, Path connectionRoot,
@@ -547,6 +608,15 @@ public class TaskService {
 
     private String tomlString(String value) {
         return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\t", "\\t") + "\"";
+    }
+
+    private static String displayDirectCommand(List<String> command) {
+        List<String> displayed = new ArrayList<>();
+        for (String argument : command == null ? List.<String>of() : command) {
+            String value = argument == null ? "" : argument;
+            displayed.add('"' + value.replace("\\", "\\\\").replace("\"", "\\\"") + '"');
+        }
+        return String.join(" ", displayed);
     }
 
     private String location(org.tomlj.TomlPosition position) {

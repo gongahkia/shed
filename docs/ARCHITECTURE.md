@@ -37,7 +37,7 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | `EditorUiController` | UI assembly, painting, diagnostics | `QuickfixService`, `PerfService` |
 | `SyntaxUiController` | syntax and breadcrumb presentation | `SyntaxHighlightService`, `SymbolService`, `PerfService` |
 | `SearchReplaceController` | search and substitution UI effects | `SearchManager`, `SubstituteService` |
-| `JobQuickfixController` | tasks, shell jobs, quickfix navigation | `AsyncJobService`, `TaskService`, `QuickfixService`, explicit remote/Dev Container session services |
+| `JobQuickfixController` | tasks, shell jobs, quickfix navigation | `AsyncJobService`, `TaskService`, `VsCodeTaskImporter`, `QuickfixService`, explicit remote/Dev Container session services |
 | `ProblemsController` | live diagnostic and retained quickfix aggregation | `ProblemsService`, `LspClient`, tool-window host |
 | `TestController` | explicit test discovery/run session state and Problems projection | `TestService`, `TestAdapterRegistry`, `AsyncJobService` |
 | `TerminalController` | PTY terminal panes and lifecycle | `PtyTerminalPane`, pane/buffer state, explicit remote/Dev Container session services |
@@ -62,6 +62,8 @@ All current `*Controller` classes are package-private. Each is constructed with 
 `WorkspaceSymbolCoordinator` owns only explicit local fallback requests for `:workspace symbols`. Its `WorkspaceSymbolService` is controller-free and scans the existing ignore-filtered file index off the EDT, with per-file and result limits. `LspController` remains the preferred LSP-symbol path and cancels stale local work before each new request; neither component creates a background project-symbol index.
 
 `VsCodeLaunchConfigurationImporter` is deterministic, controller-free JSONC parsing and profile translation for `.vscode/launch.json`. It contributes only validated in-memory configuration objects to `DebugAdapterRegistry`; it neither reads adapter commands from the project file nor writes global or project configuration. `DebugSessionController` owns its presentation and makes every resulting launch remain explicit.
+
+`VsCodeTaskImporter` is the analogous controller-free reader for a strict `.vscode/tasks.json` process-task subset. It produces ephemeral `TaskService.WorkspaceTask` values with an exact direct argv vector, not an encoded shell command, and neither changes a project file nor makes execution automatic. `JobQuickfixController` owns merging those entries for the current workspace and still applies the normal plan, remote/Dev Container routing, and explicit-run gates.
 
 ## Explicit remote-session ownership
 

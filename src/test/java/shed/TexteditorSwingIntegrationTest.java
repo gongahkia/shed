@@ -227,6 +227,39 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void vscodeProcessTaskDryRunIsSessionOnlyAndUsesDirectArguments() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-vscode-task");
+        Path workspace = Files.createDirectories(tempDir.resolve("vscode-task-project"));
+        Path source = workspace.resolve("Main.java");
+        Files.createDirectories(home);
+        Files.writeString(source, "class Main {}\n", StandardCharsets.UTF_8);
+        Files.createDirectories(workspace.resolve(".vscode"));
+        Files.writeString(workspace.resolve(".vscode/tasks.json"), """
+            {
+              "version": "2.0.0",
+              "tasks": [
+                {"label":"Check source","type":"process","command":"printf","args":["%s", "${file}"],"problemMatcher":[]}
+              ]
+            }
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, source);
+        try {
+            String result = onEdt(() -> editor.handleTaskCommand("dry-run vscode-check-source"));
+
+            assertEquals("Task dry run shown (not started)", result);
+            String output = onEdt(() -> editor.getCurrentBuffer().getContent());
+            assertTrue(output.contains("Task dry run: vscode-check-source"));
+            assertTrue(output.contains("shell: direct"));
+            assertTrue(output.contains(source.toString()));
+            assertFalse(Files.exists(workspace.resolve(".shedtasks")));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void activeRemoteSessionRoutesNormalTaskDryRunsWithoutStartingAProcess() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-active-remote-task");

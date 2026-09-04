@@ -44,7 +44,8 @@ public class LspService {
 
     public java.util.List<String> getBuiltinExtensions() {
         return java.util.List.of("java", "rs", "py", "js", "jsx", "ts", "tsx", "go", "c", "cc", "cpp", "cxx", "h", "hpp", "hxx",
-            "json", "jsonc", "html", "htm", "xhtml", "css", "scss", "less", "md", "markdown");
+            "json", "jsonc", "html", "htm", "xhtml", "css", "scss", "less", "md", "markdown", "kt", "kts", "cs", "csx", "php", "phtml",
+            "php3", "php4", "php5", "phps", "rb", "rake", "gemspec", "swift");
     }
 
     public String[] builtinCommand(String extension) {
@@ -84,6 +85,25 @@ public class LspService {
             case "md":
             case "markdown":
                 return new String[] {ManagedLanguageCatalog.markdown().command(), "--stdio"};
+            case "kt":
+            case "kts":
+                return new String[] {ManagedLanguageCatalog.kotlin().command()};
+            case "cs":
+            case "csx":
+                return new String[] {ManagedLanguageCatalog.csharp().command()};
+            case "php":
+            case "phtml":
+            case "php3":
+            case "php4":
+            case "php5":
+            case "phps":
+                return new String[] {ManagedLanguageCatalog.php().command(), "--stdio"};
+            case "rb":
+            case "rake":
+            case "gemspec":
+                return new String[] {ManagedLanguageCatalog.ruby().command()};
+            case "swift":
+                return new String[] {ManagedLanguageCatalog.swift().command()};
             default:
                 return null;
         }

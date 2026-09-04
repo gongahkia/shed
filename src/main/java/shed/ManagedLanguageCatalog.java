@@ -376,7 +376,45 @@ final class ManagedLanguageCatalog {
             URI.create("https://github.com/remarkjs/remark-language-server/blob/main/license"), "MIT License", "Node.js", "16",
             RuntimeRequirementKind.MINIMUM_VERSION, RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
     );
-    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT, GO, RUST, C_CPP, JSON, HTML, CSS, MARKDOWN);
+    private static final Entry KOTLIN = new Entry(
+        "kotlin", Set.of("kt", "kts"), "Kotlin LSP",
+        "kotlin-lsp", "kotlin-lsp",
+        new InstallMetadata(new ManagedLanguageSupportTrust.ArtifactCoordinate("kotlin.kotlin-lsp", "user-managed"),
+            URI.create("https://github.com/Kotlin/kotlin-lsp"), URI.create("https://github.com/Kotlin/kotlin-lsp/blob/main/LICENSE.txt"),
+            "Kotlin LSP terms", "Kotlin / Java toolchain", "user-managed", RuntimeRequirementKind.NONE,
+            RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
+    );
+    private static final Entry CSHARP = new Entry(
+        "csharp", Set.of("cs", "csx"), "csharp-ls",
+        "csharp-ls", "csharp-ls",
+        new InstallMetadata(new ManagedLanguageSupportTrust.ArtifactCoordinate("csharp.csharp-ls", "user-managed"),
+            URI.create("https://github.com/razzmatazz/csharp-language-server"),
+            URI.create("https://github.com/razzmatazz/csharp-language-server/blob/master/LICENSE"), "MIT License", "dotnet SDK", "10",
+            RuntimeRequirementKind.MINIMUM_VERSION, RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
+    );
+    private static final Entry PHP = new Entry(
+        "php", Set.of("php", "phtml", "php3", "php4", "php5", "phps"), "Intelephense",
+        "intelephense", "intelephense.cmd",
+        new InstallMetadata(new ManagedLanguageSupportTrust.ArtifactCoordinate("php.intelephense", "user-managed"),
+            URI.create("https://intelephense.com/docs"), URI.create("https://intelephense.com/eula"), "Intelephense EULA", "Node.js", "current LTS",
+            RuntimeRequirementKind.NONE, RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
+    );
+    private static final Entry RUBY = new Entry(
+        "ruby", Set.of("rb", "rake", "gemspec"), "Ruby LSP",
+        "ruby-lsp", "ruby-lsp",
+        new InstallMetadata(new ManagedLanguageSupportTrust.ArtifactCoordinate("ruby.ruby-lsp", "user-managed"),
+            URI.create("https://github.com/Shopify/ruby-lsp"), URI.create("https://github.com/Shopify/ruby-lsp/blob/main/LICENSE.txt"), "MIT License",
+            "project Ruby and Bundler environment", "user-managed", RuntimeRequirementKind.NONE, RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
+    );
+    private static final Entry SWIFT = new Entry(
+        "swift", Set.of("swift"), "SourceKit-LSP",
+        "sourcekit-lsp", "sourcekit-lsp",
+        new InstallMetadata(new ManagedLanguageSupportTrust.ArtifactCoordinate("swift.sourcekit-lsp", "toolchain"),
+            URI.create("https://github.com/swiftlang/sourcekit-lsp"), URI.create("https://github.com/swiftlang/sourcekit-lsp/blob/main/LICENSE.txt"),
+            "Apache License 2.0", "Swift toolchain", "user-managed", RuntimeRequirementKind.NONE, RuntimeVersionScheme.STANDARD, DESKTOP_PLATFORMS)
+    );
+    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT, GO, RUST, C_CPP, JSON, HTML, CSS, MARKDOWN,
+        KOTLIN, CSHARP, PHP, RUBY, SWIFT);
 
     private ManagedLanguageCatalog() {
     }
@@ -420,6 +458,16 @@ final class ManagedLanguageCatalog {
     static Entry json() { return JSON; }
 
     static Entry markdown() { return MARKDOWN; }
+
+    static Entry kotlin() { return KOTLIN; }
+
+    static Entry csharp() { return CSHARP; }
+
+    static Entry php() { return PHP; }
+
+    static Entry ruby() { return RUBY; }
+
+    static Entry swift() { return SWIFT; }
 
     static Entry forExtension(String extension) {
         if (extension == null || extension.isBlank()) {

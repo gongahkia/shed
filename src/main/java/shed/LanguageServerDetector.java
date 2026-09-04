@@ -98,6 +98,7 @@ final class LanguageServerDetector {
         return switch (runtime) {
             case "java" -> List.of("java", "--version");
             case "node.js" -> List.of("node", "--version");
+            case "dotnet sdk" -> List.of("dotnet", "--version");
             case "go" -> List.of("go", "version");
             case "rust" -> List.of("rustc", "--version");
             default -> List.of(executable, "--version");

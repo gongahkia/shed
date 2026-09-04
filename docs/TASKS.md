@@ -1,6 +1,6 @@
 # Workspace Tasks
 
-Shed reads workspace developer commands from `<workspace>/.shedtasks`. Tasks are for build, test, run, lint, and debug commands. They do nothing until `:task run <name>` is entered. In a multi-root session, `<workspace>` is the deepest configured folder containing the active file; for a scratch or outside file it is the Explorer-selected folder.
+Shed reads its canonical workspace developer commands from `<workspace>/.shedtasks`. Tasks are for build, test, run, lint, and debug commands. They do nothing until `:task run <name>` is entered. In a multi-root session, `<workspace>` is the deepest configured folder containing the active file; for a scratch or outside file it is the Explorer-selected folder.
 
 A global, or explicitly trusted project, DAP configuration may name one of these tasks with `debug.configuration.<name>.prelaunch_task`. In that case an explicit `:debug start` runs the resolved local task before opening an adapter. A failed, cancelled, or timed-out task prevents the debug process from starting. This does not make tasks automatic at editor startup or file open.
 
@@ -30,12 +30,21 @@ CI = "true"
 
 Supported variables in `command`, `cwd`, and environment values are `${workspaceFolder}`, `${file}`, `${relativeFile}`, and `${fileBasename}`. File variables require a file-backed active buffer; `${relativeFile}` must remain inside the workspace. Quote `${file}` in a command when its path can contain spaces.
 
+## VS Code tasks.json compatibility
+
+When a workspace contains a regular, non-symlink `.vscode/tasks.json` no larger than 1 MiB, Shed reads a bounded JSONC subset in memory; comments and trailing commas are accepted. `:task list` includes compatible entries and `:task vscode` shows every accepted or skipped entry. Imported names use a `vscode-` prefix, such as `vscode-check-source`, and are available only for the current process. `:task run <name>` and `:task dry-run <name>` remain explicit. Shed never changes `tasks.json`, creates a `.shedtasks` file, starts a task at workspace open, or treats an imported entry as a debug pre-launch task.
+
+The accepted subset requires `"version": "2.0.0"` and an explicit `"type": "process"`. It accepts a string `label` and `command`, up to 256 string `args`, `options.cwd`, string `options.env`, an absent or empty-array `problemMatcher`, and `presentation.reveal` of `always` or `never`. The same four workspace/file placeholders above are supported. A process command and each argument remain separate argv values through local, remote, and Dev Container routing, so a path or argument with spaces is not converted into shell syntax.
+
+Shed rejects shell tasks, extension/provider task types, task dependencies, groups, automatic `runOn` behavior, custom problem matchers, task inputs, shell options, OS-specific overrides, and every unlisted field. Those constructs have execution, lifecycle, or output semantics that this compatibility reader does not reproduce. VS Code supports shell and process tasks, task providers, dependency graphs, auto-detected tasks, background tasks, and automatic-task policy; this is not `tasks.json` parity. [VS Code tasks](https://code.visualstudio.com/docs/debugtest/tasks), [tasks schema](https://code.visualstudio.com/docs/reference/tasks-appendix).
+
 ## Commands
 
 | Command | Action |
 | :--- | :--- |
 | `:task`, `:task ui` | Open the docked Tasks/Jobs panel |
 | `:task text`, `:task text list` | Show validated tasks in the legacy scratch buffer |
+| `:task vscode` | Show the runtime-only `.vscode/tasks.json` compatibility report |
 | `:task add <name> <command>` | Add a default login-shell task and write canonical TOML |
 | `:task remove <name>` | Remove a task while preserving other task settings |
 | `:task dry-run <name>` | Resolve variables and show the command, policy, cwd, and environment keys without starting a process |

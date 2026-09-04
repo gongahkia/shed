@@ -87,7 +87,7 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
         String selected = tasks.getSelectedValue();
         taskNames.clear(); taskByName.clear();
         if (loaded.isValid()) {
-            for (Map.Entry<String, TaskService.WorkspaceTask> entry : loaded.tasks().entrySet()) {
+            for (Map.Entry<String, TaskService.WorkspaceTask> entry : editor.jobQuickfixController.effectiveWorkspaceTasks(root, loaded).entrySet()) {
                 taskNames.addElement(entry.getKey()); taskByName.put(entry.getKey(), entry.getValue());
             }
         } else {
@@ -108,15 +108,19 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
         TaskService.WorkspaceTask task = taskByName.get(tasks.getSelectedValue());
         if (task == null) return;
         name.setText(task.name()); command.setText(task.command());
+        boolean editable = !task.hasDirectArguments();
+        name.setEditable(editable); command.setEditable(editable);
     }
 
     private void saveTask() {
+        if (selectedImportedTask()) { message("Imported VS Code tasks are session-only; edit tasks.json or create a separate Shed task."); return; }
         message(editor.saveProjectTask(editor.resolveTaskProjectRoot(), name.getText(), command.getText()));
     }
 
     private void removeTask() {
         String selected = tasks.getSelectedValue();
         if (selected == null) { message("Select a task."); return; }
+        if (selectedImportedTask()) { message("Imported VS Code tasks are session-only and were not removed."); return; }
         if (JOptionPane.showConfirmDialog(panel, "Remove task '" + selected + "'?", "Remove Task", JOptionPane.YES_NO_OPTION,
             JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION) message(editor.removeProjectTask(editor.resolveTaskProjectRoot(), selected));
     }
@@ -127,7 +131,8 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
         String selected = tasks.getSelectedValue();
         if (selected == null) { message("Select a task."); return; }
         TaskService.TaskLoadResult loaded = editor.taskService.loadWorkspaceTasks(editor.resolveTaskProjectRoot());
-        message(editor.jobQuickfixController.runLoadedTask(selected, editor.resolveTaskProjectRoot(), loaded.tasks(), dry));
+        message(editor.jobQuickfixController.runLoadedTask(selected, editor.resolveTaskProjectRoot(),
+            editor.jobQuickfixController.effectiveWorkspaceTasks(editor.resolveTaskProjectRoot(), loaded), dry));
     }
 
     private void cancelJob() {
@@ -146,5 +151,9 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     private void message(String result) { editor.showMessage(result); refresh(); }
+    private boolean selectedImportedTask() {
+        TaskService.WorkspaceTask task = taskByName.get(tasks.getSelectedValue());
+        return task != null && task.hasDirectArguments();
+    }
     private static JButton button(String text, Runnable action) { JButton button = new JButton(text); button.addActionListener(event -> action.run()); return button; }
 }

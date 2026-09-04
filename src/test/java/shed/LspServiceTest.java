@@ -261,11 +261,11 @@ public class LspServiceTest {
         assertArrayEquals(new String[] {"vscode-css-language-server", "--stdio"}, service.builtinCommand("scss"));
         assertArrayEquals(new String[] {"remark-language-server", "--stdio"}, service.builtinCommand("md"));
         assertArrayEquals(new String[] {"clangd"}, service.builtinCommand("cpp"));
-        assertNull(service.builtinCommand("kt"));
-        assertNull(service.builtinCommand("cs"));
-        assertNull(service.builtinCommand("php"));
-        assertNull(service.builtinCommand("rb"));
-        assertNull(service.builtinCommand("swift"));
+        assertArrayEquals(new String[] {"kotlin-lsp"}, service.builtinCommand("kt"));
+        assertArrayEquals(new String[] {"csharp-ls"}, service.builtinCommand("cs"));
+        assertArrayEquals(new String[] {"intelephense", "--stdio"}, service.builtinCommand("php"));
+        assertArrayEquals(new String[] {"ruby-lsp"}, service.builtinCommand("rb"));
+        assertArrayEquals(new String[] {"sourcekit-lsp"}, service.builtinCommand("swift"));
         assertNull(service.builtinCommand("lua"));
     }
 

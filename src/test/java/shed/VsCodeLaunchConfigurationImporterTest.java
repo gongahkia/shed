@@ -59,7 +59,8 @@ class VsCodeLaunchConfigurationImporterTest {
               "configurations": [
                 {"name":"Missing adapter","type":"node","request":"launch","program":"${file}"},
                 {"name":"External program","type":"python","request":"launch","program":"/tmp/run.py"},
-                {"name":"Environment omitted","type":"python","request":"launch","program":"${file}","env":{"TOKEN":"x"}}
+                {"name":"Environment omitted","type":"python","request":"launch","program":"${file}","env":{"TOKEN":"x"}},
+                {"name":"Unknown variable","type":"python","request":"launch","program":"${file}","args":["${env:SECRET}"]}
               ]
             }
             """);
@@ -70,10 +71,11 @@ class VsCodeLaunchConfigurationImporterTest {
 
         assertTrue(report.readable());
         assertTrue(report.configurations().isEmpty());
-        assertEquals(3, report.skipped().size());
+        assertEquals(4, report.skipped().size());
         assertTrue(report.skipped().stream().anyMatch(value -> value.contains("no matching configured Shed adapter")));
         assertTrue(report.skipped().stream().anyMatch(value -> value.contains("program must remain")));
         assertTrue(report.skipped().stream().anyMatch(value -> value.contains("unsupported field env")));
+        assertTrue(report.skipped().stream().anyMatch(value -> value.contains("variable other than")));
         assertFalse(effective.configurations().containsKey("vscode:Missing adapter"));
     }
 
@@ -90,5 +92,20 @@ class VsCodeLaunchConfigurationImporterTest {
         assertFalse(report.readable());
         assertTrue(report.configurations().isEmpty());
         assertTrue(report.failure().contains("duplicate object key"));
+    }
+
+    @Test
+    void rejectsALaunchDirectorySymlinkBeforeReadingExecutableMetadata() throws Exception {
+        Path root = Files.createDirectories(temporaryDirectory.resolve("workspace"));
+        Path external = Files.createDirectories(temporaryDirectory.resolve("external-vscode"));
+        Files.writeString(external.resolve("launch.json"), "{\"configurations\":[]}");
+        Files.createSymbolicLink(root.resolve(".vscode"), external);
+
+        VsCodeLaunchConfigurationImporter.Report report = VsCodeLaunchConfigurationImporter.read(root,
+            BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of())));
+
+        assertTrue(report.present());
+        assertFalse(report.readable());
+        assertTrue(report.failure().contains("not a regular directory"));
     }
 }

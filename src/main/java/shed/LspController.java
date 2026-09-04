@@ -2398,9 +2398,21 @@ final class LspController {
         }
         int dot = path.lastIndexOf('.');
         if (dot < 0 || dot >= path.length() - 1) {
-            return "";
+            return canonicalExtension(buffer.getFileType());
         }
         return path.substring(dot + 1).toLowerCase();
+    }
+
+    private static String canonicalExtension(FileType fileType) {
+        if (fileType == null) return "";
+        return switch (fileType) {
+            case KOTLIN -> "kt";
+            case CSHARP -> "cs";
+            case PHP -> "php";
+            case RUBY -> "rb";
+            case SWIFT -> "swift";
+            default -> "";
+        };
     }
 
 

@@ -7,7 +7,7 @@ Shed can exchange a folder-only multi-root workspace through an explicit manifes
 :workspace import /absolute/path/team.shed-workspace
 ```
 
-The import command also accepts a standard VS Code `.code-workspace` file. Shed reads only its `folders` entries, where each entry is either a path string or an object with a `path` string. Other fields, including `settings`, `tasks`, `launch`, `extensions`, and arbitrary extension data, are ignored. Shed does not run commands or apply configuration while importing a manifest.
+The import command also accepts a standard VS Code `.code-workspace` JSONC file; comments and trailing commas are accepted. Shed reads only its `folders` entries, where each entry is either a path string or an object with a `path` string. Other fields, including `settings`, `tasks`, `launch`, `extensions`, and arbitrary extension data, are ignored. Shed does not run commands or apply configuration while importing a manifest. VS Code documents workspace-level settings, tasks, and launch data inside the file; Shed deliberately does not apply them. [VS Code workspaces](https://code.visualstudio.com/docs/editing/workspaces/workspaces)
 
 Exports use JSON with `folders` objects and relative paths where possible. The target must end in `.shed-workspace` or `.code-workspace`; its parent must already exist. An import requires one to one hundred existing local directories, resolves their symbolic links, removes duplicate resolved roots, and replaces the current folder set only after the complete manifest has been validated.
 

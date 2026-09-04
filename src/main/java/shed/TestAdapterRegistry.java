@@ -21,6 +21,7 @@ final class TestAdapterRegistry {
         register(new VitestAdapter());
         register(new GoAdapter());
         register(new DotnetAdapter());
+        register(new CargoAdapter());
     }
 
     void register(TestAdapter adapter) {
@@ -234,6 +235,58 @@ final class TestAdapterRegistry {
 
         @Override public List<TestService.TestCase> parseRun(Path root, TestService.Command command, String output) {
             return TestService.parseTrx(root, id(), command.reports());
+        }
+    }
+
+    private static final class CargoAdapter extends BuiltInAdapter {
+        @Override public String id() { return "cargo"; }
+        @Override public boolean supports(Path root) { return Files.isRegularFile(root.resolve("Cargo.toml")); }
+        @Override public List<String> defaultCommand(Path root) { return List.of("cargo"); }
+        @Override public boolean supportsMultipleSelection() { return false; }
+
+        @Override public TestService.Command discovery(TestService.AdapterSpec spec) {
+            List<String> command = new ArrayList<>(base(spec));
+            command.addAll(List.of("test", "--", "--list"));
+            return new TestService.Command(command, List.of());
+        }
+
+        @Override public TestService.Command run(TestService.AdapterSpec spec, List<TestService.TestCase> selected, Path cache) {
+            List<String> command = new ArrayList<>(base(spec));
+            command.add("test");
+            if (selected != null && !selected.isEmpty()) {
+                command.add(selected.getFirst().id());
+                command.addAll(List.of("--", "--exact"));
+            }
+            return new TestService.Command(command, List.of());
+        }
+
+        @Override public List<TestService.TestCase> parseDiscovery(Path root, String output) {
+            List<TestService.TestCase> result = new ArrayList<>();
+            for (String line : output == null ? List.<String>of() : output.lines().toList()) {
+                String value = line.strip();
+                if (!value.endsWith(": test")) continue;
+                String id = value.substring(0, value.length() - ": test".length());
+                if (id.isBlank()) continue;
+                String name = id.substring(id.lastIndexOf("::") + 2);
+                result.add(new TestService.TestCase(id(), id, name, "rust", null, 1, TestService.Status.UNKNOWN, 0, ""));
+            }
+            return List.copyOf(result);
+        }
+
+        @Override public List<TestService.TestCase> parseRun(Path root, TestService.Command command, String output) {
+            java.util.regex.Pattern resultLine = java.util.regex.Pattern.compile("^test\\s+(.+?)\\s+\\.\\.\\.\\s+(ok|FAILED|ignored)$");
+            List<TestService.TestCase> result = new ArrayList<>();
+            for (String line : output == null ? List.<String>of() : output.lines().toList()) {
+                java.util.regex.Matcher match = resultLine.matcher(line.strip());
+                if (!match.matches()) continue;
+                String id = match.group(1);
+                String outcome = match.group(2);
+                TestService.Status status = "ok".equals(outcome) ? TestService.Status.PASSED
+                    : "ignored".equals(outcome) ? TestService.Status.SKIPPED : TestService.Status.FAILED;
+                String name = id.substring(id.lastIndexOf("::") + 2);
+                result.add(new TestService.TestCase(id(), id, name, "rust", null, 1, status, 0, ""));
+            }
+            return List.copyOf(result);
         }
     }
 }

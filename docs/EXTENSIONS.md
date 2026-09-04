@@ -60,7 +60,7 @@ Command ids are namespaced to their extension id and cannot overwrite a built-in
 
 Profiles intentionally use bounded literal tokens rather than arbitrary regular expressions. This keeps their typing-path cost predictable and avoids executing extension-supplied patterns in the editor. A profile may overlap a built-in file type; the extension profile then controls lexical display for its declared match, while the built-in type continues to supply any built-in editor behavior not represented by the profile.
 
-The API-v1 constructor ends at `keywords` and preserves the user's `tab.size` and `expand.tab` settings. The extended constructor accepts `Integer tabSize` (`1..16`) and `Boolean insertSpaces`; pass `null` for either setting to retain that user preference. These preferences are applied per editor pane as buffers change, rather than becoming a global setting.
+The API-v1 constructor ends at `keywords` and preserves the user's `tab.size` and `expand.tab` settings. The extended constructor accepts `Integer tabSize` (`1..16`) and `Boolean insertSpaces`; pass `null` for either setting to retain that user preference. These preferences are applied per editor pane as buffers change, rather than becoming a global setting. `:language <extension-id:language-id>` can select a profile for one open buffer when file-name/shebang detection is insufficient; `:language auto` clears only that buffer-local override.
 
 ```java
 context.registerLanguageProfile(new LanguageProfile(

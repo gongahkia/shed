@@ -86,6 +86,7 @@ public class Texteditor extends JFrame implements KeyListener {
     ProblemsService problemsService;
     PluginManager pluginManager;
     ExtensionRegistry extensionRegistry;
+    LanguageProfileSelection languageProfileSelection;
     ExtensionManager extensionManager;
     ScmController scmController;
     CustomEditorController customEditorController;
@@ -241,6 +242,7 @@ public class Texteditor extends JFrame implements KeyListener {
         // Initialize managers
         configManager = new ConfigManager();
         extensionRegistry = new ExtensionRegistry();
+        languageProfileSelection = new LanguageProfileSelection();
         scmController = new ScmController(this, extensionRegistry);
         customEditorController = new CustomEditorController(this);
         notebookController = new NotebookController(this);
@@ -2659,9 +2661,42 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     LanguageProfile languageProfileFor(FileBuffer buffer) {
-        if (buffer == null || buffer.getFile() == null || extensionRegistry == null) return null;
-        ExtensionRegistry.Owned<LanguageProfile> profile = extensionRegistry.languageProfileFor(buffer.getFile(), buffer.textSnapshot().text());
-        return profile == null ? null : profile.value();
+        return languageProfileSelection == null ? null : languageProfileSelection.profileFor(buffer, extensionRegistry);
+    }
+
+    String handleLanguageCommand(String argument) {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null) return "Current buffer is unavailable";
+        String value = argument == null ? "" : argument.trim();
+        if (value.isEmpty() || "list".equalsIgnoreCase(value)) {
+            StringBuilder output = new StringBuilder("Extension Language Profiles\n\n");
+            List<ExtensionRegistry.Owned<LanguageProfile>> profiles = languageProfileSelection.profiles(extensionRegistry);
+            if (profiles.isEmpty()) output.append("No extension language profiles are installed.\n");
+            for (ExtensionRegistry.Owned<LanguageProfile> profile : profiles) {
+                String id = LanguageProfileSelection.qualified(profile);
+                output.append(id).append("  ").append(profile.value().displayName()).append('\n');
+            }
+            LanguageProfile active = languageProfileFor(buffer);
+            output.append("\nActive: ").append(active == null ? "automatic built-in/text" : active.displayName())
+                .append(languageProfileSelection.isManual(buffer) ? " (manual)" : " (automatic)")
+                .append("\n\nUse :language <extension-id:language-id|language-id> or :language auto.\n");
+            showScratchBuffer("[language profiles]", output.toString());
+            return "Showing extension language profiles";
+        }
+        if ("auto".equalsIgnoreCase(value) || "automatic".equalsIgnoreCase(value)) {
+            languageProfileSelection.automatic(buffer);
+            applySyntaxHighlighting();
+            updateStatusBar();
+            return "Language profile detection restored";
+        }
+        try {
+            LanguageProfile profile = languageProfileSelection.select(buffer, extensionRegistry, value);
+            applySyntaxHighlighting();
+            updateStatusBar();
+            return "Language profile selected: " + profile.displayName();
+        } catch (IllegalArgumentException error) {
+            return "Language profile unavailable: " + error.getMessage();
+        }
     }
 
     int effectiveTabSize(FileBuffer buffer) {

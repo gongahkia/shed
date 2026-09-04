@@ -48,7 +48,7 @@ SSH necessarily passes a safely quoted command to the remote POSIX shell. For th
 - SSH mirroring deliberately omits `--delete`; a pull cannot silently delete an unrelated local mirror file.
 - Container remote-workspace support itself is file synchronization. It does not run an extension host inside a container; the separate local Dev Container CLI bridge below is explicit and does not alter that mirror model.
 - WSL support is Windows-only and uses the local WSL filesystem bridge rather than a remote server.
-- This is not VS Code or Zed remote-development parity: there is no remote extension host, remote LSP/task placement, SSH server bootstrap, port-forwarding UI, Codespaces service, browser editor, or automatic conflict resolver.
+- This is not VS Code or Zed remote-development parity: there is no remote extension host, remote LSP/debug/test placement, automatic task placement, SSH server bootstrap, port-forwarding UI, Codespaces service, browser editor, or automatic conflict resolver.
 
 Extensions can add URI schemes using `RemoteWorkspaceProvider`; they must disclose their own authentication, synchronization, and network behavior.
 

@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /** Opens, saves, and explicitly executes local Jupyter notebooks. */
@@ -34,10 +35,12 @@ final class NotebookController {
     }
 
     String handle(String argument) {
-        String operation = argument == null ? "" : argument.trim().toLowerCase(java.util.Locale.ROOT);
+        String raw = argument == null ? "" : argument.trim();
+        String operation = raw.toLowerCase(java.util.Locale.ROOT);
         EditorPane pane = editor.getActivePane();
         FileBuffer buffer = editor.getCurrentBuffer();
         if (!isNotebook(buffer)) return "The current buffer is not a .ipynb notebook";
+        if (operation.equals("console") || operation.startsWith("console ")) return openConsole(buffer, raw.substring("console".length()).trim());
         return switch (operation) {
             case "", "open", "reopen" -> showIfAvailable(pane, buffer) ? "Notebook opened" : "Notebook view unavailable";
             case "run", "runall", "run-all" -> runCurrent(pane, buffer);
@@ -46,8 +49,25 @@ final class NotebookController {
                 editor.renderWindowLayout();
                 yield "Opened notebook JSON source";
             }
-            default -> "Usage: :notebook [open|run|raw]";
+            default -> "Usage: :notebook [open|run|console [kernel]|raw]";
         };
+    }
+
+    private String openConsole(FileBuffer buffer, String kernel) {
+        if (!editor.ensureProjectTrustForFile(buffer.getFile())) return "Jupyter Console blocked: workspace is untrusted";
+        List<String> command;
+        try {
+            command = consoleCommand(kernel);
+        } catch (IllegalArgumentException error) {
+            return "Jupyter kernel name is invalid";
+        }
+        return editor.terminalController.openDirect("Jupyter Console", buffer.getFile().getParentFile(), command);
+    }
+
+    static List<String> consoleCommand(String kernel) {
+        String name = kernel == null ? "" : kernel.trim();
+        if (!name.isEmpty() && !name.matches("[A-Za-z0-9._-]+")) throw new IllegalArgumentException("kernel name is invalid");
+        return name.isEmpty() ? List.of("jupyter", "console") : List.of("jupyter", "console", "--kernel", name);
     }
 
     private void save(EditorPane pane, FileBuffer buffer, NotebookDocument document) {

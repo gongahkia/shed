@@ -5,6 +5,7 @@ Opening a local `.ipynb` file presents Shed's native notebook surface. It presen
 ```text
 :notebook open
 :notebook run
+:notebook console [kernel]
 :notebook raw
 ```
 
@@ -15,6 +16,8 @@ jupyter nbconvert --to notebook --execute --inplace <notebook>
 ```
 
 Each cell also has **Run to here**. It saves the notebook, creates a temporary prefix notebook in the project directory, runs that prefix with a fresh local kernel, and merges its outputs back into those cells. This is useful for a sequential checkpoint, not persistent per-cell kernel state.
+
+`:notebook console [kernel]` opens `jupyter console` in an explicit terminal at the notebook's directory. Passing a simple installed kernelspec name adds `--kernel <name>`; omitting it delegates selection to Jupyter. This gives an interactive local kernel session without embedding a terminal or kernel protocol in the notebook editor.
 
 The command is direct argv, runs as an asynchronous job, has a ten-minute limit, and requires the local `jupyter` CLI. Notebook execution is subject to the existing project-trust decision. Shed does not download Jupyter, create kernels, or execute a notebook automatically.
 

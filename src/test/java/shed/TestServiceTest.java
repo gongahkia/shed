@@ -90,4 +90,20 @@ class TestServiceTest {
         assertEquals(source, result.file());
         assertEquals(125, result.durationMillis());
     }
+
+    @Test
+    void detectsCargoAndBuildsExactSelectedTestCommands() throws Exception {
+        Files.writeString(root.resolve("Cargo.toml"), "[package]\nname = \"demo\"\nversion = \"0.1.0\"\n");
+        TestService service = new TestService();
+        TestService.AdapterSpec spec = service.load(root).specs().getFirst();
+        TestAdapter adapter = service.adapter("cargo");
+
+        assertEquals(List.of("cargo"), spec.command());
+        assertEquals(List.of("cargo", "test", "--", "--list"), adapter.discovery(spec).argv());
+        TestService.TestCase test = new TestService.TestCase("cargo", "module::works", "works", "rust", null, 1,
+            TestService.Status.UNKNOWN, 0, "");
+        assertEquals(List.of("cargo", "test", "module::works", "--", "--exact"), adapter.run(spec, List.of(test), root).argv());
+        assertEquals(TestService.Status.FAILED, adapter.parseRun(root, new TestService.Command(List.of(), List.of()),
+            "test module::works ... FAILED\n").getFirst().status());
+    }
 }

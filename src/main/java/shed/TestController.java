@@ -251,6 +251,11 @@ final class TestController {
         TestAdapter adapter = tests.adapter(raw.id());
         TestService.AdapterSpec spec = tests.resolvedSpec(state.root, raw);
         if (adapter == null || spec == null || spec.command().isEmpty()) return 0;
+        if (selection != null && selection.size() > 1 && !adapter.supportsMultipleSelection()) {
+            int started = 0;
+            for (TestService.TestCase test : selection) started += run(state, raw, List.of(test));
+            return started;
+        }
         try {
             Path cache = tests.reportCache(state.root, spec.id(), Path.of(editor.configManager.getShedDirectoryPath()));
             TestService.Command command = adapter.run(state.root, spec, selection == null ? List.of() : selection, cache);

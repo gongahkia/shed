@@ -439,6 +439,8 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:remote pull\|push\|close <id>` | Synchronize or disconnect a remote workspace |
 | `:remote exec <id> <command...>` | Explicitly run a direct-argv command in a connection when its provider supports execution |
 | `:remote terminal <id> [command...]` | Open an explicit interactive terminal at the connection root when its provider supports it |
+| `:language`, `:language list` | List installed extension language profiles and the active buffer's profile mode |
+| `:language <extension-id:language-id>`, `:language auto` | Override lexical profile detection for the current buffer, or restore automatic detection |
 | `:container status` | Show the active workspace's `.devcontainer/devcontainer.json` when present |
 | `:container up` | Explicitly run the local `devcontainer up` workflow as a cancellable job |
 | `:container exec <command...>`, `:container terminal [command...]` | Explicitly run/open a direct-argv command through the local Dev Container CLI |
@@ -446,7 +448,7 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:integration`, `:integration list` | List supporting database, deployment, collaboration, and container extension integrations |
 | `:integration <extension:id> help` | Show provider-declared actions |
 | `:integration <extension:id> <action> [arguments]` | Run an explicitly declared workspace-integration action |
-| `:notebook open`, `:notebook run`, `:notebook raw` | Open, explicitly execute, or show raw JSON for the current `.ipynb` file |
+| `:notebook open`, `:notebook run`, `:notebook console [kernel]`, `:notebook raw` | Open, explicitly execute, open an interactive local Jupyter Console, or show raw JSON for the current `.ipynb` file |
 | `:terminal list`, `:terminal profile <id>` | Show/open terminal profiles |
 | `:terminal commands`, `:terminal cwd` | Show in-memory Bash/Zsh/Fish shell-integration events or latest reported cwd |
 

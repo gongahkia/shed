@@ -286,20 +286,28 @@ final class TestController {
             for (TestService.TestCase test : selection) started += run(state, raw, List.of(test));
             return started;
         }
+        boolean devContainer = usesDevContainer(state.root);
+        Path cache = null;
         try {
-            Path cache;
             if (remoteExecutionTarget(state.root) != null) {
                 cache = Files.createTempDirectory(tests.reportCache(state.root, spec.id(), Path.of(editor.configManager.getShedDirectoryPath())), "remote-");
-            } else if (usesDevContainer(state.root)) {
+            } else if (devContainer) {
                 cache = DevContainerTestExecution.createReportCache(state.root);
             } else {
                 cache = tests.reportCache(state.root, spec.id(), Path.of(editor.configManager.getShedDirectoryPath()));
             }
             TestService.Command command = adapter.run(state.root, spec, selection == null ? List.of() : selection, cache);
-            if (!command.executable()) return 0;
-            return start(state, "run", spec, adapter, command, cache);
-        } catch (IOException error) {
-            state.output = "Test report cache failed: " + error.getMessage();
+            if (!command.executable()) {
+                reportDevContainerCleanupFailure(state, discardDevContainerReportCache(state, devContainer, cache));
+                return 0;
+            }
+            int started = start(state, "run", spec, adapter, command, cache);
+            if (started == 0) reportDevContainerCleanupFailure(state, discardDevContainerReportCache(state, devContainer, cache));
+            return started;
+        } catch (IOException | RuntimeException error) {
+            String message = error.getMessage();
+            state.output = "Test report cache failed: " + (message == null || message.isBlank() ? error.getClass().getSimpleName() : message);
+            reportDevContainerCleanupFailure(state, discardDevContainerReportCache(state, devContainer, cache));
             refreshPanel();
             return 0;
         }
@@ -463,6 +471,16 @@ final class TestController {
 
     private boolean usesDevContainer(Path root) {
         return DevContainerRuntime.hasConfiguration(root);
+    }
+
+    private static String discardDevContainerReportCache(State state, boolean devContainer, Path cache) {
+        return !devContainer || cache == null ? "" : DevContainerTestExecution.cleanupReportCache(state.root, cache);
+    }
+
+    private void reportDevContainerCleanupFailure(State state, String cleanup) {
+        if (cleanup == null || cleanup.isBlank()) return;
+        state.output = state.output.isBlank() ? cleanup : state.output + "\n" + cleanup;
+        refreshPanel();
     }
 
     private Path remoteDiscoveryCache(State state, TestService.AdapterSpec spec, TestService.Command command) throws IOException {

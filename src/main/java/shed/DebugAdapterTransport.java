@@ -484,7 +484,7 @@ final class DebugAdapterTransport implements AutoCloseable {
         Path workspace = plan.workspace().toAbsolutePath().normalize();
         Path cwd = plan.cwd().toAbsolutePath().normalize();
         if (!cwd.startsWith(workspace)) throw new IOException("Debug adapter cwd escapes the workspace");
-        if (plan.configuration().request() == DebugAdapterRegistry.Request.LAUNCH) {
+        if (plan.configuration().request() == DebugAdapterRegistry.Request.LAUNCH && !plan.configuration().program().isBlank()) {
             if (plan.program() == null || !plan.program().toAbsolutePath().normalize().startsWith(workspace)) {
                 throw new IOException("Debug adapter program escapes the workspace");
             }

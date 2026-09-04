@@ -1030,7 +1030,14 @@ final class DebugSessionService {
         if (configuration.request() == DebugAdapterRegistry.Request.ATTACH) {
             return Map.of("host", configuration.host(), "port", configuration.port(), "cwd", requireAdapterPath(connection, plan.cwd()), "args", plan.args());
         }
-        return Map.of("program", requireAdapterPath(connection, plan.program()), "cwd", requireAdapterPath(connection, plan.cwd()), "args", plan.args());
+        Map<String, Object> arguments = new LinkedHashMap<>();
+        if (!configuration.program().isBlank()) arguments.put("program", requireAdapterPath(connection, plan.program()));
+        else if (!plan.module().isBlank()) arguments.put("module", plan.module());
+        else if (!plan.code().isBlank()) arguments.put("code", plan.code());
+        else throw new IOException("Debug launch target is unavailable");
+        arguments.put("cwd", requireAdapterPath(connection, plan.cwd()));
+        arguments.put("args", plan.args());
+        return Map.copyOf(arguments);
     }
 
     private static String requireAdapterPath(Connection connection, Path localPath) throws IOException {

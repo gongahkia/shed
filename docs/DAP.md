@@ -9,7 +9,7 @@ Shed's debug architecture is adapter-capability driven. The Debug Adapter Protoc
 - Other adapters are user-managed and configured in global `~/.shed/config.toml` by default.
 - Project `.shed.toml` debug settings, adapters, and configuration declarations are unsafe and remain blocked until `project.config.allow.unsafe = true` and the project config is trusted. When enabled, Shed resolves the file at the selected workspace root, merges it with global declarations for that root only, captures its feature flags for the session, and never mutates the active editor configuration to do so.
 - Adapter commands are direct executable tokens plus whitespace-separated arguments; Shed does not invoke a shell.
-- Configuration scope is always `workspace`; `cwd` and launch `program` must remain under `${workspaceFolder}`, except `${file}` for the active workspace file.
+- Configuration scope is always `workspace`; `cwd` and a `program` launch target must remain under `${workspaceFolder}`, except `${file}` for the active workspace file. A launch may instead use one validated dotted `module` name or bounded inline `code`; neither accepts path placeholders.
 - Attach targets are loopback-only (`localhost`, `127.0.0.1`, or `::1`) in M0.
 
 ## TOML Schema
@@ -39,19 +39,23 @@ schema_version = 1
 "debug.configuration.main.cwd" = "${workspaceFolder}"
 "debug.configuration.main.args" = ""
 "debug.configuration.main.prelaunch_task" = "build"
+
+# Choose exactly one launch target. These replace `program` when used.
+# "debug.configuration.main.module" = "package.main"
+# "debug.configuration.main.code" = "print('hello from Shed')"
 ```
 
 For an explicit test-debug target, map an adapter in workspace `.shedtests` to one of these global or permitted root-local configurations with `debug_configuration = "main"`. During `:test debug <test-id>` or **Debug Selection**, the selected Tests root determines its DAP declaration set, and `${testId}` and `${testFile}` are available in `debug.configuration.<name>.args`; unknown placeholders and test files outside the selected workspace reject the launch before an adapter process starts.
 
 Adapter identifiers and configuration names are `[A-Za-z0-9_-]+`. `transport` is `stdio` (default) or `tcp`; `stdio` requires `command`, while `tcp` must not set one. Capabilities are comma-separated: `launch`, `attach`, `configuration_done`, `breakpoints`, `exception_breakpoints`, `conditional_breakpoints`, `hit_conditional_breakpoints`, `log_points`, `threads`, `stack_trace`, `scopes`, `variables`, `evaluate`, `continue`, `next`, `step_in`, `step_out`, `pause`, and `goto`.
 
-Each configuration requires `adapter` and `request` (`launch` or `attach`). A launch requires a workspace-scoped `program`. An attach requires a loopback `host` and `port` from `1..65535`. An optional `file_extensions` value is a comma-separated allowlist such as `.py,.pyw`; it rejects a launch whose resolved program has another extension. An optional `prelaunch_task` is a task identifier from the selected workspace’s `.shedtasks`. For an explicit debug start, Shed validates and runs that task in the local workspace or through the selected remote/Dev Container bridge before opening the adapter; a missing, invalid, cancelled, timed-out, or non-zero task stops the session before any adapter process starts. Invalid fields are reported with TOML line and column during config loading; Shed retains safe defaults and does not create a launch plan.
+Each configuration requires `adapter` and `request` (`launch` or `attach`). A launch requires exactly one target: workspace-scoped `program`, a dotted identifier `module`, or `code` up to 64 KiB without NUL. `module` and `code` are passed as DAP values rather than shell arguments; they cannot contain path placeholders. An attach requires a loopback `host` and `port` from `1..65535`; a legacy `program` value is accepted but is not sent to an attach request, while `module` and `code` are rejected. An optional `file_extensions` value is a comma-separated allowlist such as `.py,.pyw`; it is valid only for `program` and rejects a launch whose resolved program has another extension. An optional `prelaunch_task` is a task identifier from the selected workspace’s `.shedtasks`. For an explicit debug start, Shed validates and runs that task in the local workspace or through the selected remote/Dev Container bridge before opening the adapter; a missing, invalid, cancelled, timed-out, or non-zero task stops the session before any adapter process starts. Invalid fields are reported with TOML line and column during config loading; Shed retains safe defaults and does not create a launch plan.
 
 `python-debugpy` launches the current `.py` or `.pyw` file with the upstream `debugpy-adapter` DAP executable. Its request carries only `program`, `cwd`, and `args`, which debugpy accepts for program launch. This is not a bundled Python runtime, environment manager, or debugger marketplace.
 
 ## Future Session Boundary
 
-A debug session may only give the transport a validated `Plan`: selected adapter, locally declared capabilities, configuration, workspace root, resolved working directory, and resolved program. It performs DAP initialization before later adapter-specific launch or attach requests. `configurationDone` and rich source-breakpoint fields require both Shed's local adapter declaration and the matching capability advertised in the adapter's initialize response; a mismatch rejects the rich option with a diagnostic. Other adapter-specific request arguments remain deferred because DAP leaves them adapter-defined.
+A debug session may only give the transport a validated `Plan`: selected adapter, locally declared capabilities, configuration, workspace root, resolved working directory, and exactly one resolved launch target (`program`, `module`, or `code`) when launching. It performs DAP initialization before later adapter-specific launch or attach requests. `configurationDone` and rich source-breakpoint fields require both Shed's local adapter declaration and the matching capability advertised in the adapter's initialize response; a mismatch rejects the rich option with a diagnostic. Other adapter-specific request arguments remain deferred because DAP leaves them adapter-defined.
 
 ## Transport Boundary
 
@@ -84,7 +88,7 @@ For a connected SSH, Docker, or WSL workspace, or a workspace with a Dev Contain
 
 Use `:debug` to open the docked Debug panel, or `:debug configurations` to inspect configured adapters without starting one. The panel and `:debug select <name>` choose a configuration, while `:debug start [name]` explicitly begins a session. If no configuration is selected, an explicit start of the active `.py` or `.pyw` file chooses the built-in `python-debugpy` profile; no other language is inferred and opening a file never starts debugging. The editor starts the validated adapter, sends DAP `initialize`, then sends the configured `launch` or `attach` request. When the adapter emits `initialized`, Shed sends configuration requests before `configurationDone` only when both the declared adapter capability and the DAP initialize response support it. `:debug stop`, `:debug restart [name]`, and `:debug status` provide visible lifecycle state and retained diagnostics; prefix a command with `:debug text` for legacy scratch output.
 
-Shed never starts a debug adapter while inspecting configurations or selecting one. A rejected configuration, adapter start error, timeout, or failed DAP response leaves the session `FAILED` with diagnostics visible in `[debug status]`; normal editing remains available. The generic launch arguments are only `program`, `cwd`, and `args`; attach arguments are only `host`, `port`, `cwd`, and `args`, so adapters that require additional adapter-specific settings fail visibly rather than receiving inferred values. Test debugging never guesses a framework or adapter; it only starts the explicit mapping in `.shedtests`.
+Shed never starts a debug adapter while inspecting configurations or selecting one. A rejected configuration, adapter start error, timeout, or failed DAP response leaves the session `FAILED` with diagnostics visible in `[debug status]`; normal editing remains available. Generic launch arguments are exactly one of `program`, `module`, or `code`, plus `cwd` and `args`; attach arguments are only `host`, `port`, `cwd`, and `args`, so adapters that require additional adapter-specific settings fail visibly rather than receiving inferred values. Test debugging never guesses a framework or adapter; it only starts the explicit mapping in `.shedtests`.
 
 ## Execution controls
 

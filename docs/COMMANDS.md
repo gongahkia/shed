@@ -77,7 +77,7 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:task add <name> <command>` | Save task |
 | `:task remove <name>`, `:task rm <name>`, `:task delete <name>` | Remove task |
 | `:task dry-run <name>` | Resolve and show task execution plan without starting it |
-| `:task run <name>` | Explicitly run named task; routes through an explicitly connected Dev Container when the task root is inside that session |
+| `:task run <name>` | Explicitly run named task; routes through an explicitly activated remote workspace or connected Dev Container when the task root is inside that session |
 | `:task remote <connection-id> <name>` | Explicitly run named task through a matching connected remote workspace |
 | `:task remote-dry-run <connection-id> <name>` | Resolve and show remote task plan without starting it |
 | `:task container <name>` | Explicitly run named task through the active project's running Dev Container |
@@ -449,6 +449,7 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:remote pull\|push\|close <id>` | Synchronize or disconnect a remote workspace |
 | `:remote exec <id> <command...>` | Explicitly run a direct-argv command in a connection when its provider supports execution |
 | `:remote terminal <id> [command...]` | Open an explicit interactive terminal at the connection root when its provider supports it |
+| `:remote use <id>`, `:remote unuse <id>` | Start/stop in-memory routing of new ordinary terminals and `:task run` calls through an eligible connected remote workspace |
 | `:remote forward <id> <local-port> <remote-host> <remote-port>` | Explicitly start a loopback-only local SSH forward for a connected `ssh://` workspace |
 | `:remote forward list`, `:remote forward close <local-port>` | Show forward state or stop one explicit SSH forward |
 | `:language`, `:language list` | List installed extension language profiles and the active buffer's profile mode |

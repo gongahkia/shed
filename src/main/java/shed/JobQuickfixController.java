@@ -686,7 +686,8 @@ final class JobQuickfixController {
         output.append("shell: ").append(plan.task().shell().configValue()).append("\n");
         output.append("problem_matcher: ").append(plan.task().problemMatcher().configValue()).append("\n");
         output.append("presentation: ").append(plan.task().presentation().configValue()).append("\n");
-        output.append("env keys: ").append(request.environment().isEmpty() ? "(none)" : String.join(", ", request.environment().keySet())).append("\n");
+        output.append("env keys: ").append(request.environment().isEmpty() ? "(none)" : String.join(", ", request.environment().keySet())).append("\n\n");
+        output.append("This dry run starts nothing.\n");
         editor.showScratchBuffer("[remote task dry-run " + plan.task().name() + "]", output.toString());
         return "Remote task dry run shown (not started)";
     }

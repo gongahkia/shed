@@ -251,6 +251,7 @@ public class ConfigManager {
         defineDefault("terminal.session.restore", DEFAULT_TERMINAL_SESSION_RESTORE);
         defineDefault("terminal.shell.integration", DEFAULT_TERMINAL_SHELL_INTEGRATION);
         defineDefault("snippets.directory", defaultSnippetsDirectoryPath());
+        defineDefault("landing.welcome.enabled", true);
         defineDefault("landing.source", defaultLandingSourcePath());
         defineDefault("landing.remote.cache.path", defaultLandingRemoteCachePath());
         defineDefault("landing.remote.timeout.ms", DEFAULT_LANDING_REMOTE_TIMEOUT_MS);
@@ -379,6 +380,7 @@ public class ConfigManager {
             case "session.dir" -> "Directory for saved sessions";
             case "terminal.session.restore" -> "Persist terminal panel working directories and restore fresh shells";
             case "snippets.directory" -> "Directory containing VS Code-compatible JSON snippet files";
+            case "landing.welcome.enabled" -> "Show the native welcome screen for an untouched default landing source";
             case "landing.source" -> "Local path, file URI, or explicitly configured HTTPS landing-page source";
             case "landing.remote.cache.path" -> "Local file used to cache an HTTPS landing-page source";
             case "landing.remote.timeout.ms" -> "HTTPS landing-page connection and request timeout";
@@ -894,6 +896,10 @@ public class ConfigManager {
     public String getLandingSource() {
         String configured = getString("landing.source", defaultLandingSourcePath());
         return configured == null || configured.isBlank() ? defaultLandingSourcePath() : configured.trim();
+    }
+
+    public boolean getLandingWelcomeEnabled() {
+        return getBoolean("landing.welcome.enabled", true);
     }
 
     public String getLandingRemoteCachePath() {

@@ -9,11 +9,15 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
 final class LandingPageSource {
+    private static final long MAX_LEGACY_DEFAULT_BYTES = 8 * 1024;
+
     record Resolved(File file, URI remoteUri) {
         boolean isRemote() {
             return remoteUri != null;
         }
     }
+
+    record StartupTarget(Resolved source, boolean showNativeWelcome) { }
 
     private LandingPageSource() {
     }
@@ -47,6 +51,19 @@ final class LandingPageSource {
         return new Resolved(resolveLocalPath(source).toFile(), null);
     }
 
+    /**
+     * The native welcome surface deliberately owns only Shed's untouched default
+     * landing source. A configured file or remote URL remains an editable buffer.
+     */
+    static StartupTarget resolveStartupTarget(ConfigManager config, String legacyDefaultContent) throws IOException {
+        Resolved source = resolve(config);
+        boolean useWelcome = config.getLandingWelcomeEnabled()
+            && !source.isRemote()
+            && source.file().toPath().toAbsolutePath().normalize().equals(defaultLandingPath(config))
+            && isMissingOrLegacyDefault(source.file().toPath(), legacyDefaultContent);
+        return new StartupTarget(source, useWelcome);
+    }
+
     static File ensureLocalFile(Resolved source, String initialContent) throws IOException {
         Path path = source.file().toPath().toAbsolutePath().normalize();
         if (Files.exists(path)) {
@@ -58,6 +75,29 @@ final class LandingPageSource {
         Files.createDirectories(parent);
         Files.writeString(path, initialContent == null ? "" : initialContent, StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW);
         return path.toFile();
+    }
+
+    private static boolean isMissingOrLegacyDefault(Path path, String legacyDefaultContent) {
+        try {
+            if (Files.notExists(path)) {
+                return true;
+            }
+            if (!Files.isRegularFile(path) || legacyDefaultContent == null) {
+                return false;
+            }
+            long size = Files.size(path);
+            if (size > MAX_LEGACY_DEFAULT_BYTES) {
+                return false;
+            }
+            return legacyDefaultContent.equals(Files.readString(path, StandardCharsets.UTF_8));
+        } catch (IOException | SecurityException error) {
+            // Preserve a pre-existing or unreadable user file by using the legacy path.
+            return false;
+        }
+    }
+
+    private static Path defaultLandingPath(ConfigManager config) {
+        return Path.of(config.getShedDirectoryPath()).resolve("landing.md").toAbsolutePath().normalize();
     }
 
     private static Path resolveLocalPath(String configured) throws IOException {

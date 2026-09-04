@@ -33,7 +33,7 @@ All current `*Controller` classes are package-private. Each is constructed with 
 | --- | --- | --- |
 | `InputController` | key dispatch, modes, command/search input | `ModeEngine`, `SearchManager`, command routing |
 | `EditActionController` | editing and motion actions | editor state, buffers, text area |
-| `PaneBufferController` | panes, splits, buffers, layouts | `FileBuffer`, `EditorPane` |
+| `PaneBufferController` | panes, splits, buffers, default native welcome surface, landing sources, layouts | `FileBuffer`, `EditorPane`, `ShedWelcomePanel`, `LandingPageSource` |
 | `EditorUiController` | UI assembly, painting, diagnostics | `QuickfixService`, `PerfService` |
 | `SyntaxUiController` | syntax and breadcrumb presentation | `SyntaxHighlightService`, `SymbolService`, `PerfService` |
 | `SearchReplaceController` | search and substitution UI effects | `SearchManager`, `SubstituteService` |

@@ -60,6 +60,29 @@ public class LandingPageSourceTest {
     }
 
     @Test
+    void usesNativeWelcomeOnlyForMissingOrUntouchedDefaultLandingFile() throws Exception {
+        Path home = tempDir.resolve("home-welcome");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        String legacyContent = "shed 2.0\nwelcome\n";
+
+        assertTrue(LandingPageSource.resolveStartupTarget(config, legacyContent).showNativeWelcome());
+
+        Path defaultLanding = home.resolve(".shed/landing.md");
+        Files.createDirectories(defaultLanding.getParent());
+        Files.writeString(defaultLanding, legacyContent);
+        assertTrue(LandingPageSource.resolveStartupTarget(config, legacyContent).showNativeWelcome());
+
+        Files.writeString(defaultLanding, "my own start page\n");
+        assertFalse(LandingPageSource.resolveStartupTarget(config, legacyContent).showNativeWelcome());
+
+        config.set("landing.source", "pages/start.md");
+        assertFalse(LandingPageSource.resolveStartupTarget(config, legacyContent).showNativeWelcome());
+        config.set("landing.welcome.enabled", "false");
+        assertFalse(LandingPageSource.resolveStartupTarget(config, legacyContent).showNativeWelcome());
+    }
+
+    @Test
     void rejectsInsecureRemoteSource() {
         ConfigManager config = new ConfigManager();
         config.set("landing.source", "http://example.com/start.md");

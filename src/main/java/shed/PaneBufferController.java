@@ -367,7 +367,12 @@ final class PaneBufferController {
 
     void openLandingPage() {
         try {
-            LandingPageSource.Resolved source = LandingPageSource.resolve(editor.configManager);
+            LandingPageSource.StartupTarget target = LandingPageSource.resolveStartupTarget(editor.configManager, defaultLandingContent());
+            if (target.showNativeWelcome()) {
+                openNativeWelcomePage();
+                return;
+            }
+            LandingPageSource.Resolved source = target.source();
             File file = LandingPageSource.ensureLocalFile(source, source.isRemote() ? remoteLandingPlaceholder(source) : defaultLandingContent());
             landingFile = file.getAbsoluteFile();
             FileBuffer landing = findBufferByPath(landingFile);
@@ -393,6 +398,40 @@ final class PaneBufferController {
             loadBufferIntoEditor(fallback);
             editor.showMessage("Landing page unavailable: " + error.getMessage());
         }
+    }
+
+    private void openNativeWelcomePage() {
+        landingFile = null;
+        FileBuffer welcome = editor.buffers.stream()
+            .filter(this::isNativeWelcomeBuffer)
+            .findFirst()
+            .orElseGet(() -> FileBuffer.createScratch("[landing]", ""));
+        if (!editor.buffers.contains(welcome)) {
+            if (editor.buffers.isEmpty()) {
+                editor.buffers.add(welcome);
+            } else {
+                editor.buffers.set(0, welcome);
+            }
+        }
+        loadBufferIntoEditor(welcome);
+        EditorPane pane = editor.getActivePane();
+        if (pane == null) {
+            return;
+        }
+        ShedWelcomePanel panel = new ShedWelcomePanel(editor);
+        pane.setCustomEditorComponent(panel);
+        panel.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override public void focusGained(java.awt.event.FocusEvent event) {
+                editor.activateEditorPane(pane);
+            }
+        });
+        panel.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mousePressed(java.awt.event.MouseEvent event) {
+                editor.activateEditorPane(pane);
+            }
+        });
+        editor.renderWindowLayout();
+        SwingUtilities.invokeLater(panel::requestFocusInWindow);
     }
 
     private String defaultLandingContent() {
@@ -871,8 +910,12 @@ final class PaneBufferController {
             return false;
         }
         FileBuffer current = editor.buffers.get(0);
-        if (current.isScratch()) return "[landing]".equals(current.getDisplayName()) && !current.isModified();
+        if (current.isScratch()) return isNativeWelcomeBuffer(current) && !current.isModified();
         return landingFile != null && current.hasFilePath() && landingFile.equals(current.getFile().getAbsoluteFile()) && !current.isModified();
+    }
+
+    boolean isNativeWelcomeBuffer(FileBuffer buffer) {
+        return buffer != null && buffer.isScratch() && "[landing]".equals(buffer.getDisplayName());
     }
 
 }

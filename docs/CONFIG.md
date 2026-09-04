@@ -84,13 +84,16 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `multi.selection.enabled` | `false` | bool | Enable experimental multi-selection editing |
 | `multi.selection.max.cursors` | `16` | int | Maximum total cursors when enabled; `2..256` |
 | `markdown.preview.scroll.sync` | `true` | bool | Keep a Markdown preview aligned with its source cursor and source scrolling |
+| `landing.welcome.enabled` | `true` | bool | Show the native welcome screen for Shed's untouched default landing source |
 | `landing.source` | `~/.shed/landing.md` | string | Local path, `file:` URI, or explicitly configured HTTPS URL |
 | `landing.remote.cache.path` | `~/.shed/landing.remote.md` | path | Local editable cache for an HTTPS source |
 | `landing.remote.timeout.ms` | `5000` | int | HTTPS source timeout; `1000..30000` |
 
 ## Landing Page
 
-At startup without a file argument or restored session, Shed opens `landing.source` as a normal file buffer. The default `~/.shed/landing.md` is created with the startup text on its first use, then can be edited and saved like any other file. Relative paths resolve from the user home directory; `file:` URIs are local paths.
+At startup without a file argument or restored session, Shed shows a native, non-editable welcome screen by default. It uses the bundled Shed logo, the active theme, and working keyboard/click actions for the command palette, opening and finding files, buffer switching, and help. The welcome screen is an ephemeral `[landing]` buffer: opening a file replaces it instead of creating `~/.shed/landing.md`.
+
+`landing.welcome.enabled = false` restores the legacy editable landing buffer. Shed also preserves an existing default `~/.shed/landing.md` when its content differs from the old generated starter text, so a prior customization is not replaced. Any non-default `landing.source` remains an editable local buffer; relative paths resolve from the user home directory and `file:` URIs are local paths.
 
 An `https://` `landing.source` is an explicit global opt-in to fetch that URL when the landing page opens. Shed uses HTTPS only, never follows redirects, limits the response to 1 MiB, and caches it in `landing.remote.cache.path`; edits save to that local cache and are never uploaded. Project `.shed.toml` cannot override landing settings.
 
@@ -416,6 +419,7 @@ schema_version = 1
 "markdown.preview.scroll.sync" = true
 
 # Landing page
+"landing.welcome.enabled" = true
 "landing.source" = "~/.shed/landing.md"
 # "landing.source" = "https://example.com/start.md"
 # "landing.remote.cache.path" = "~/.shed/landing.remote.md"

@@ -328,7 +328,7 @@ When `project.config.allow.unsafe=false`, project-local config only applies:
 | `formatter.<ext>.args` | Quoted direct argv text; `${file}` allowed | `"formatter.py.args" = "format -"` |
 | `formatter.<ext>.format.on.save` | Per-extension format-on-save override | `"formatter.py.format.on.save" = true` |
 | `debug.adapter.<id>.<field>` | User-managed DAP adapter (`command`, `args`, `transport`, `capabilities`) | `"debug.adapter.java.command" = "java-debug-adapter"` |
-| `debug.configuration.<name>.<field>` | DAP launch/attach configuration (`file_extensions` can restrict a profile to file types) | `"debug.configuration.main.request" = "launch"` |
+| `debug.configuration.<name>.<field>` | DAP launch/attach configuration (`file_extensions` can restrict a profile to file types; `prelaunch_task` names a workspace `.shedtasks` task) | `"debug.configuration.main.request" = "launch"` |
 
 Supported keybind scopes: `normal`, `insert`, `visual`, `visual_line`, `replace`, `command`, `search`, `global`.
 

@@ -2,6 +2,8 @@
 
 Shed reads workspace developer commands from `<workspace>/.shedtasks`. Tasks are for build, test, run, lint, and debug commands. They do nothing until `:task run <name>` is entered. In a multi-root session, `<workspace>` is the deepest configured folder containing the active file; for a scratch or outside file it is the Explorer-selected folder.
 
+A global, or explicitly trusted project, DAP configuration may name one of these tasks with `debug.configuration.<name>.prelaunch_task`. In that case an explicit `:debug start` runs the resolved local task before opening an adapter. A failed, cancelled, or timed-out task prevents the debug process from starting. This does not make tasks automatic at editor startup or file open.
+
 ## Canonical TOML
 
 ```toml

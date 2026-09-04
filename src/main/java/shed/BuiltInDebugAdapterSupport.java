@@ -22,7 +22,7 @@ final class BuiltInDebugAdapterSupport {
                 DebugAdapterRegistry.Capability.CONTINUE, DebugAdapterRegistry.Capability.NEXT, DebugAdapterRegistry.Capability.STEP_IN,
                 DebugAdapterRegistry.Capability.STEP_OUT, DebugAdapterRegistry.Capability.PAUSE));
         DebugAdapterRegistry.Configuration python = new DebugAdapterRegistry.Configuration(PYTHON_DEBUGPY, PYTHON_DEBUGPY,
-            DebugAdapterRegistry.Request.LAUNCH, "workspace", "${file}", "${workspaceFolder}", List.of(), "127.0.0.1", 0, List.of(".py", ".pyw"));
+            DebugAdapterRegistry.Request.LAUNCH, "workspace", "${file}", "${workspaceFolder}", List.of(), "", "127.0.0.1", 0, List.of(".py", ".pyw"));
         return DebugAdapterRegistry.withAdapterDefaults(base, Map.of(PYTHON_DEBUGPY, debugpy), Map.of(PYTHON_DEBUGPY, python));
     }
 }

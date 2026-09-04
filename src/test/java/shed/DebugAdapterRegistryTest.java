@@ -83,6 +83,21 @@ public class DebugAdapterRegistryTest {
         assertTrue(validation.errors().stream().anyMatch(error -> error.key().equals("debug.configuration.main.file_extensions")));
     }
 
+    @Test
+    void validatesAnOptionalPreLaunchWorkspaceTaskIdentifier() {
+        Map<String, Object> values = configuration("launch");
+        values.put("debug.configuration.main.prelaunch_task", "compile_assets");
+        DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.validate(values);
+
+        assertTrue(validation.valid());
+        assertEquals("compile_assets", validation.configurations().get("main").prelaunchTask());
+
+        values.put("debug.configuration.main.prelaunch_task", "compile;assets");
+        validation = DebugAdapterRegistry.validate(values);
+        assertFalse(validation.valid());
+        assertTrue(validation.errors().stream().anyMatch(error -> error.key().equals("debug.configuration.main.prelaunch_task")));
+    }
+
     private static Map<String, Object> configuration(String request) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("debug.adapter.java.command", "java-debug-adapter");

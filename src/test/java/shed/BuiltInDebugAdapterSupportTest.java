@@ -18,6 +18,8 @@ class BuiltInDebugAdapterSupportTest {
         assertTrue(validation.valid());
         assertEquals("debugpy-adapter", validation.registry().adapter(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY).command());
         assertEquals(java.util.List.of(".py", ".pyw"), validation.configurations().get(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY).fileExtensions());
+        assertTrue(validation.registry().adapter(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY).capabilities()
+            .contains(DebugAdapterRegistry.Capability.EXCEPTION_BREAKPOINTS));
         assertTrue(DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.PYTHON_DEBUGPY, workspace, workspace.resolve("main.py")).launchable());
         assertFalse(DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.PYTHON_DEBUGPY, workspace, workspace.resolve("Main.java")).launchable());
     }

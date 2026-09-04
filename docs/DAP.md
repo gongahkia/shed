@@ -29,7 +29,7 @@ schema_version = 1
 "debug.adapter.java.command" = "java-debug-adapter"
 "debug.adapter.java.args" = "--stdio"
 "debug.adapter.java.transport" = "stdio"
-"debug.adapter.java.capabilities" = "launch,attach,configuration_done,breakpoints,conditional_breakpoints,hit_conditional_breakpoints,log_points,threads,stack_trace,scopes,variables,evaluate,continue,next,step_in,step_out,pause"
+"debug.adapter.java.capabilities" = "launch,attach,configuration_done,breakpoints,exception_breakpoints,conditional_breakpoints,hit_conditional_breakpoints,log_points,threads,stack_trace,scopes,variables,evaluate,continue,next,step_in,step_out,pause"
 
 "debug.configuration.main.adapter" = "java"
 "debug.configuration.main.request" = "launch"
@@ -37,13 +37,14 @@ schema_version = 1
 "debug.configuration.main.program" = "${file}"
 "debug.configuration.main.cwd" = "${workspaceFolder}"
 "debug.configuration.main.args" = ""
+"debug.configuration.main.prelaunch_task" = "build"
 ```
 
 For an explicit test-debug target, map an adapter in workspace `.shedtests` to one of these global configurations with `debug_configuration = "main"`. During `:test debug <test-id>` or **Debug Selection**, `${testId}` and `${testFile}` are available in `debug.configuration.<name>.args`; unknown placeholders and test files outside the selected workspace reject the launch before an adapter process starts.
 
 Adapter identifiers and configuration names are `[A-Za-z0-9_-]+`. `transport` is `stdio` (default) or `tcp`; `stdio` requires `command`, while `tcp` must not set one. Capabilities are comma-separated: `launch`, `attach`, `configuration_done`, `breakpoints`, `exception_breakpoints`, `conditional_breakpoints`, `hit_conditional_breakpoints`, `log_points`, `threads`, `stack_trace`, `scopes`, `variables`, `evaluate`, `continue`, `next`, `step_in`, `step_out`, and `pause`.
 
-Each configuration requires `adapter` and `request` (`launch` or `attach`). A launch requires a workspace-scoped `program`. An attach requires a loopback `host` and `port` from `1..65535`. An optional `file_extensions` value is a comma-separated allowlist such as `.py,.pyw`; it rejects a launch whose resolved program has another extension. Invalid fields are reported with TOML line and column during config loading; Shed retains safe defaults and does not create a launch plan.
+Each configuration requires `adapter` and `request` (`launch` or `attach`). A launch requires a workspace-scoped `program`. An attach requires a loopback `host` and `port` from `1..65535`. An optional `file_extensions` value is a comma-separated allowlist such as `.py,.pyw`; it rejects a launch whose resolved program has another extension. An optional `prelaunch_task` is a task identifier from the selected workspace’s `.shedtasks`. For an explicit debug start, Shed validates and runs that local task before opening the debug adapter; a missing, invalid, cancelled, timed-out, or non-zero task stops the session before any adapter process starts. Invalid fields are reported with TOML line and column during config loading; Shed retains safe defaults and does not create a launch plan.
 
 `python-debugpy` launches the current `.py` or `.pyw` file with the upstream `debugpy-adapter` DAP executable. Its request carries only `program`, `cwd`, and `args`, which debugpy accepts for program launch. This is local Python launch support, not a bundled Python runtime, environment manager, test-debugger integration, remote debugger, or general debugger marketplace.
 

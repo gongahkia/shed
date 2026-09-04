@@ -56,6 +56,33 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void defaultStartupShowsNativeWelcomeAndOpeningAFileReplacesIt() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-native-welcome");
+        Path file = tempDir.resolve("welcome-target.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "opened\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEmptyEditor(home);
+        try {
+            assertTrue(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
+            assertEquals("[landing]", onEdt(() -> editor.getCurrentBuffer().getDisplayName()));
+            assertFalse(Files.exists(home.resolve(".shed/landing.md")));
+
+            onEdt(() -> {
+                editor.openFile(file.toFile());
+                return null;
+            });
+
+            assertEquals(file.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
+            assertFalse(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
+            assertEquals(1, onEdt(() -> editor.buffers.size()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void vimLineMotionRetainsCaretAndCurrentLineHighlightAcrossLargeBuffer() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-motion");
@@ -1104,6 +1131,22 @@ public class TexteditorSwingIntegrationTest {
             System.setProperty("user.home", home.toString());
             try {
                 return new Texteditor(new String[] {file.toString()});
+            } finally {
+                if (previousHome == null) {
+                    System.clearProperty("user.home");
+                } else {
+                    System.setProperty("user.home", previousHome);
+                }
+            }
+        });
+    }
+
+    private static Texteditor createEmptyEditor(Path home) throws Exception {
+        String previousHome = System.getProperty("user.home");
+        return onEdt(() -> {
+            System.setProperty("user.home", home.toString());
+            try {
+                return new Texteditor(new String[0]);
             } finally {
                 if (previousHome == null) {
                     System.clearProperty("user.home");

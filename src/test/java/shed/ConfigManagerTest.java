@@ -63,6 +63,7 @@ public class ConfigManagerTest {
         assertFalse(config.getTerminalSessionRestoreEnabled());
         assertTrue(config.getMarkdownPreviewScrollSync());
         assertTrue(config.getDebugOpenSourceOnStop());
+        assertTrue(config.getLandingWelcomeEnabled());
         assertEquals(home.resolve(".shed/landing.md").toString(), config.getLandingSource());
         assertEquals(home.resolve(".shed/landing.remote.md").toString(), config.getLandingRemoteCachePath());
         assertEquals(5000, config.getLandingRemoteTimeoutMs());
@@ -152,15 +153,18 @@ public class ConfigManagerTest {
         ConfigManager config = new ConfigManager();
 
         config.set("landing.source", "notes/start.md");
+        config.set("landing.welcome.enabled", "false");
         config.set("landing.remote.cache.path", "cache/remote.md");
         config.set("landing.remote.timeout.ms", "6000");
 
         assertEquals("notes/start.md", config.getLandingSource());
+        assertFalse(config.getLandingWelcomeEnabled());
         assertEquals("cache/remote.md", config.getLandingRemoteCachePath());
         assertEquals(6000, config.getLandingRemoteTimeoutMs());
         assertEquals("landing.remote.timeout.ms must be between 1000 and 30000",
             config.validateSettingValue("landing.remote.timeout.ms", "999"));
         assertFalse(config.isProjectConfigKeyAllowed("landing.source"));
+        assertFalse(config.isProjectConfigKeyAllowed("landing.welcome.enabled"));
     }
 
     @Test

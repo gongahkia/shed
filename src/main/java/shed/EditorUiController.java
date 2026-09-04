@@ -611,8 +611,11 @@ final class EditorUiController {
         long started = System.nanoTime();
         FileBuffer buffer = editor.getCurrentBuffer();
         StringBuilder status = new StringBuilder();
+        boolean nativeWelcome = editor.paneBufferController != null && editor.paneBufferController.isNativeWelcomeBuffer(buffer);
 
-        if (buffer != null) {
+        if (nativeWelcome) {
+            status.append("Shed ").append(editor.VERSION).append("  Welcome");
+        } else if (buffer != null) {
             editor.pollLspNotifications(buffer);
             status.append(buffer.getDisplayName());
             if (buffer.isModified()) {
@@ -621,36 +624,38 @@ final class EditorUiController {
             status.append("  ");
         }
 
-        try {
-            int pos = editor.writingArea.getCaretPosition();
-            int line = editor.writingArea.getLineOfOffset(pos);
-            int col = pos - editor.writingArea.getLineStartOffset(line);
-            status.append((line + 1)).append(":").append((col + 1)).append("  ");
-        } catch (BadLocationException e) {
-            status.append("1:1  ");
-        }
+        if (!nativeWelcome) {
+            try {
+                int pos = editor.writingArea.getCaretPosition();
+                int line = editor.writingArea.getLineOfOffset(pos);
+                int col = pos - editor.writingArea.getLineStartOffset(line);
+                status.append((line + 1)).append(":").append((col + 1)).append("  ");
+            } catch (BadLocationException e) {
+                status.append("1:1  ");
+            }
 
-        String breadcrumb = editor.findCurrentBreadcrumb();
-        if (breadcrumb != null && !breadcrumb.isBlank()) {
-            status.append(breadcrumb).append("  ");
-        }
+            String breadcrumb = editor.findCurrentBreadcrumb();
+            if (breadcrumb != null && !breadcrumb.isBlank()) {
+                status.append(breadcrumb).append("  ");
+            }
 
-        EditorMode modeForStatus = editor.editorState.mode == null ? EditorMode.NORMAL : editor.editorState.mode;
-        status.append(modeForStatus.getDisplayName()).append("  ");
-        if (buffer != null) {
-            status.append(languageDisplayName(buffer)).append("  ");
-            status.append(buffer.getEncoding()).append("/").append(buffer.getLineEndingLabel()).append("  ");
-            appendLspStatus(status, buffer);
-        }
+            EditorMode modeForStatus = editor.editorState.mode == null ? EditorMode.NORMAL : editor.editorState.mode;
+            status.append(modeForStatus.getDisplayName()).append("  ");
+            if (buffer != null) {
+                status.append(languageDisplayName(buffer)).append("  ");
+                status.append(buffer.getEncoding()).append("/").append(buffer.getLineEndingLabel()).append("  ");
+                appendLspStatus(status, buffer);
+            }
 
-        if (editor.gitBranch != null && !editor.gitBranch.isEmpty()) {
-            status.append("git:").append(editor.gitBranch).append("  ");
-        }
+            if (editor.gitBranch != null && !editor.gitBranch.isEmpty()) {
+                status.append("git:").append(editor.gitBranch).append("  ");
+            }
 
-        int lineCount = editor.writingArea.getLineCount();
-        status.append(lineCount).append(" line").append(lineCount != 1 ? "s" : "");
-        if (buffer != null && buffer.isLargeFile() && buffer.isShowingPreviewOnly()) {
-            status.append("  preview");
+            int lineCount = editor.writingArea.getLineCount();
+            status.append(lineCount).append(" line").append(lineCount != 1 ? "s" : "");
+            if (buffer != null && buffer.isLargeFile() && buffer.isShowingPreviewOnly()) {
+                status.append("  preview");
+            }
         }
 
         String statusText = status.toString();

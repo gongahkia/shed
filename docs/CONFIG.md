@@ -274,7 +274,7 @@ Update checks require a global consent receipt, HTTPS metadata endpoint, and Bas
 | `debug.attach.enabled` | `true` | bool | Enables attach planning when adapter-supported |
 | `debug.open.source.on.stop` | `true` | bool | Opens the selected existing local source frame after a paused-frame inspection; disable to keep navigation manual |
 
-Shed includes a Python-only `python-debugpy` profile for a separately installed `debugpy-adapter` executable; it does not bundle or download that adapter. See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/attach schema, and capability declarations.
+Shed includes a Python-only `python-debugpy` profile for a separately installed `debugpy-adapter` executable; it does not bundle or download that adapter. A workspace `.vscode/launch.json` can contribute a strict, non-persistent compatibility subset only when it refers to an adapter already configured in Shed; use `:debug vscode` to inspect accepted and skipped profiles. See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/attach schema, compatibility boundary, and capability declarations.
 
 ## Undo History Policy
 

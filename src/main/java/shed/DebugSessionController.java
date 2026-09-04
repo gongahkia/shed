@@ -55,7 +55,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|goto [line]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|exception list|enable|disable|console [clear]|stack|variables|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|goto [line]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|exception list|enable|disable|console [clear]|stack|variables|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -63,6 +63,7 @@ final class DebugSessionController {
         return switch (command) {
             case "status" -> status();
             case "configurations", "configs", "list" -> configurations();
+            case "vscode", "launch-json", "launchjson" -> showVsCodeLaunchConfigurations();
             case "select", "configuration", "config" -> select(args);
             case "start", "launch", "attach" -> start(args);
             case "stop" -> stop();
@@ -216,6 +217,7 @@ final class DebugSessionController {
     private String configurations() {
         Path workspace = workspace();
         DebugAdapterRegistry.Validation validation = validation();
+        VsCodeLaunchConfigurationImporter.Report vsCode = vsCodeLaunchReport(workspace);
         java.util.Set<String> remote = new java.util.LinkedHashSet<>();
         if (validation != null) for (DebugAdapterRegistry.Adapter adapter : validation.registry().adapters().values()) {
             if (adapter.transport() != DebugAdapterRegistry.Transport.STDIO) continue;
@@ -242,8 +244,41 @@ final class DebugSessionController {
                 .append(configuration.availability()).append("\n    ").append(configuration.remediation()).append("\n");
         }
         if (!report.validationErrors().isEmpty()) output.append("\nValidation:\n  ").append(String.join("\n  ", report.validationErrors())).append("\n");
+        appendVsCodeLaunchReport(output, vsCode);
         editor.showScratchBuffer("[debug configurations]", output.toString());
         return "Showing debug configurations";
+    }
+
+    private String showVsCodeLaunchConfigurations() {
+        Path workspace = workspace();
+        VsCodeLaunchConfigurationImporter.Report report = vsCodeLaunchReport(workspace);
+        StringBuilder output = new StringBuilder("VS Code launch.json compatibility\n\nWorkspace: ").append(workspace).append('\n');
+        appendVsCodeLaunchReport(output, report);
+        editor.showScratchBuffer("[VS Code launch.json]", output.toString());
+        return report.present() ? "Showing VS Code launch.json compatibility" : "No .vscode/launch.json was found for this workspace.";
+    }
+
+    private static void appendVsCodeLaunchReport(StringBuilder output, VsCodeLaunchConfigurationImporter.Report report) {
+        output.append("\nVS Code launch.json:\n");
+        if (report == null || !report.present()) {
+            output.append("  (not found; no VS Code profiles were imported)\n");
+            return;
+        }
+        output.append("  ").append(report.source()).append("\n");
+        if (!report.failure().isEmpty()) {
+            output.append("  Import unavailable: ").append(report.failure()).append("\n");
+            return;
+        }
+        if (report.accepted().isEmpty()) output.append("  Accepted: (none)\n");
+        else {
+            output.append("  Accepted for this session only:\n");
+            for (String name : report.accepted()) output.append("    ").append(name).append("\n");
+            output.append("  Select with :debug select <name>; start remains explicit.\n");
+        }
+        if (!report.skipped().isEmpty()) {
+            output.append("  Skipped:\n");
+            for (String detail : report.skipped()) output.append("    ").append(detail).append("\n");
+        }
     }
 
     private String select(String requested) {
@@ -376,8 +411,18 @@ final class DebugSessionController {
     }
 
     private DebugAdapterRegistry.Validation validation(Path workspace) {
+        DebugAdapterRegistry.Validation base = baseValidation(workspace);
+        VsCodeLaunchConfigurationImporter.Report imported = VsCodeLaunchConfigurationImporter.read(workspace, base);
+        return DebugAdapterRegistry.withExternalConfigurations(base, imported.configurations());
+    }
+
+    private DebugAdapterRegistry.Validation baseValidation(Path workspace) {
         return ExtensionDebugAdapterSupport.effective(BuiltInDebugAdapterSupport.effective(editor.configManager.getDebugConfigurationForWorkspace(workspace)),
             editor.extensionRegistry);
+    }
+
+    private VsCodeLaunchConfigurationImporter.Report vsCodeLaunchReport(Path workspace) {
+        return VsCodeLaunchConfigurationImporter.read(workspace, baseValidation(workspace));
     }
 
     private boolean remoteDebugAdapterAvailable(Path workspace, List<String> command) throws IOException {

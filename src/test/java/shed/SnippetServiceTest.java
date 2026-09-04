@@ -108,6 +108,15 @@ class SnippetServiceTest {
     }
 
     @Test
+    void findsNativeStarterSnippetsForAdditionalBuiltInLexicalLanguages() {
+        assertTrue(service.findExact(FileType.KOTLIN, "fun").body.contains("fun"));
+        assertTrue(service.findExact(FileType.CSHARP, "prop").body.contains("get; set;"));
+        assertTrue(service.findExact(FileType.PHP, "foreach").body.contains("foreach"));
+        assertTrue(service.findExact(FileType.RUBY, "def").body.contains("end"));
+        assertTrue(service.findExact(FileType.SWIFT, "struct").body.contains("struct"));
+    }
+
+    @Test
     void loadsVsCodeCompatibleScopedAndGlobalSnippets() throws Exception {
         Files.writeString(temporaryDirectory.resolve("java.json"), """
             {"Log":{"prefix":["log","logger"],"body":["System.out.println(${1:value});","$0"],"description":"log"}}

@@ -63,6 +63,16 @@ final class DebugSessionService {
         Connection start(DebugAdapterRegistry.Plan plan, DebugFeatureSettings features, DebugAdapterTransport.Listener listener) throws IOException;
     }
 
+    interface PreLaunch {
+        PreLaunchResult run(DebugAdapterRegistry.Plan plan) throws IOException;
+    }
+
+    record PreLaunchResult(boolean succeeded, List<String> diagnostics) {
+        PreLaunchResult {
+            diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
+        }
+    }
+
     record Snapshot(Path workspace, String configuration, Lifecycle lifecycle, String detail, List<String> diagnostics) {
         Snapshot {
             workspace = workspace == null ? null : workspace.toAbsolutePath().normalize();
@@ -129,6 +139,12 @@ final class DebugSessionService {
 
     Result start(Path workspace, DebugAdapterRegistry.LaunchContext context, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
         String requestedConfiguration, Duration timeout, Starter starter, BreakpointStore breakpointStore, ExceptionBreakpointStore exceptionBreakpointStore) {
+        return start(workspace, context, validation, features, requestedConfiguration, timeout, starter, breakpointStore, exceptionBreakpointStore, null);
+    }
+
+    Result start(Path workspace, DebugAdapterRegistry.LaunchContext context, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
+        String requestedConfiguration, Duration timeout, Starter starter, BreakpointStore breakpointStore, ExceptionBreakpointStore exceptionBreakpointStore,
+        PreLaunch preLaunch) {
         Path root = root(workspace);
         DebugFeatureSettings settings = features == null ? DebugFeatureSettings.defaults() : features;
         String name;
@@ -159,6 +175,23 @@ final class DebugSessionService {
         CompletableFuture<Void> initialized = new CompletableFuture<>();
         Connection connection = null;
         try {
+            List<String> preLaunchDiagnostics = List.of();
+            if (!plan.configuration().prelaunchTask().isBlank()) {
+                if (preLaunch == null) {
+                    synchronized (this) {
+                        return fail(root, session, "Debug pre-launch task is unavailable", List.of("Debug configuration requires prelaunch task '"
+                            + plan.configuration().prelaunchTask() + "'."));
+                    }
+                }
+                PreLaunchResult result = preLaunch.run(plan);
+                if (result == null || !result.succeeded()) {
+                    List<String> diagnostics = result == null ? List.of("Debug pre-launch task returned no result.") : result.diagnostics();
+                    synchronized (this) {
+                        return fail(root, session, "Debug pre-launch task failed: " + plan.configuration().prelaunchTask(), diagnostics);
+                    }
+                }
+                preLaunchDiagnostics = result.diagnostics();
+            }
             Connection started = Objects.requireNonNull(starter, "starter").start(plan, settings, new DebugAdapterTransport.Listener() {
                 @Override public void onEvent(DebugAdapterTransport.Event event) {
                     if (event != null && "initialized".equals(event.event())) initialized.complete(null);
@@ -182,7 +215,7 @@ final class DebugSessionService {
                 }
             });
             boolean configurationReady = waitForInitializationOrStart(initialized, startRequest, timeout);
-            List<String> synchronizationDiagnostics = new ArrayList<>();
+            List<String> synchronizationDiagnostics = new ArrayList<>(preLaunchDiagnostics);
             if (configurationReady) {
                 synchronizationDiagnostics.addAll(synchronizeBreakpoints(plan, settings, runtimeCapabilities, connection, breakpointStore, timeout).diagnostics());
                 synchronizationDiagnostics.addAll(synchronizeExceptionBreakpoints(plan, settings, exceptionFilters, connection,

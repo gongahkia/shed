@@ -212,7 +212,8 @@ final class DebugSessionController {
         String name = requested == null ? "" : requested.trim();
         int jobId = editor.asyncJobService.submit("debug " + operation, token -> sessions.start(workspace, context,
             validation(), editor.configManager.getDebugFeatureSettings(), name,
-            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs())), this::startTransport, breakpoints, exceptionBreakpoints), (job, result, error) -> {
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs())), this::startTransport, breakpoints, exceptionBreakpoints,
+            plan -> editor.jobQuickfixController.runDebugPreLaunchTask(plan, token)), (job, result, error) -> {
                 if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
                     editor.showMessage("Debug " + operation + " cancelled.");
                     return;

@@ -50,6 +50,45 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void runsAConfiguredPreLaunchTaskBeforeOpeningTheDebugAdapter() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-prelaunch").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        AtomicReference<String> task = new AtomicReference<>();
+
+        DebugSessionService.Result result = service.start(workspace, new DebugAdapterRegistry.LaunchContext(file, "", null),
+            validationWithPreLaunch("build"), enabled(), "main", Duration.ofSeconds(1), (plan, features, listener) -> connection, null, null,
+            plan -> {
+                task.set(plan.configuration().prelaunchTask());
+                return new DebugSessionService.PreLaunchResult(true, List.of("Debug pre-launch task 'build' completed."));
+            });
+
+        assertTrue(result.succeeded());
+        assertEquals("build", task.get());
+        assertEquals(List.of("initialize", "launch"), connection.commands);
+        assertTrue(result.snapshot().diagnostics().contains("Debug pre-launch task 'build' completed."));
+    }
+
+    @Test
+    void doesNotOpenTheDebugAdapterWhenTheConfiguredPreLaunchTaskFails() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-prelaunch-fail").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        List<DebugAdapterRegistry.Plan> started = new ArrayList<>();
+
+        DebugSessionService.Result result = service.start(workspace, new DebugAdapterRegistry.LaunchContext(file, "", null),
+            validationWithPreLaunch("build"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, listener) -> { started.add(plan); return new FakeConnection(); }, null, null,
+            plan -> new DebugSessionService.PreLaunchResult(false, List.of("Task 'build' exited 1.")));
+
+        assertFalse(result.succeeded());
+        assertTrue(started.isEmpty());
+        assertTrue(result.snapshot().detail().contains("pre-launch task failed"));
+        assertTrue(result.snapshot().diagnostics().contains("Task 'build' exited 1."));
+    }
+
+    @Test
     void launchesOnlyWhenExplicitlyStartedThenStopsAndRestarts() {
         DebugSessionService service = new DebugSessionService();
         Path workspace = Path.of("build/debug-session").toAbsolutePath();
@@ -465,6 +504,19 @@ public class DebugSessionServiceTest {
         values.put("debug.configuration.main.scope", "workspace");
         values.put("debug.configuration.main.program", "${file}");
         values.put("debug.configuration.main.cwd", "${workspaceFolder}");
+        return DebugAdapterRegistry.validate(values);
+    }
+
+    private static DebugAdapterRegistry.Validation validationWithPreLaunch(String task) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("debug.adapter.java.command", "java-debug-adapter");
+        values.put("debug.adapter.java.capabilities", "launch");
+        values.put("debug.configuration.main.adapter", "java");
+        values.put("debug.configuration.main.request", "launch");
+        values.put("debug.configuration.main.scope", "workspace");
+        values.put("debug.configuration.main.program", "${file}");
+        values.put("debug.configuration.main.cwd", "${workspaceFolder}");
+        values.put("debug.configuration.main.prelaunch_task", task);
         return DebugAdapterRegistry.validate(values);
     }
 

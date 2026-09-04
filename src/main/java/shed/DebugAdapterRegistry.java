@@ -30,7 +30,7 @@ final class DebugAdapterRegistry {
     }
 
     record Configuration(String name, String adapter, Request request, String scope, String program, String cwd, List<String> args,
-        String host, int port, List<String> fileExtensions) {
+        String prelaunchTask, String host, int port, List<String> fileExtensions) {
         Configuration {
             name = name == null ? "" : name;
             adapter = adapter == null ? "" : adapter;
@@ -39,13 +39,14 @@ final class DebugAdapterRegistry {
             program = program == null ? "" : program;
             cwd = cwd == null ? "" : cwd;
             args = args == null ? List.of() : List.copyOf(args);
+            prelaunchTask = prelaunchTask == null ? "" : prelaunchTask;
             host = host == null ? "" : host;
             fileExtensions = fileExtensions == null ? List.of() : List.copyOf(fileExtensions);
         }
 
         Configuration(String name, String adapter, Request request, String scope, String program, String cwd, List<String> args,
             String host, int port) {
-            this(name, adapter, request, scope, program, cwd, args, host, port, List.of());
+            this(name, adapter, request, scope, program, cwd, args, "", host, port, List.of());
         }
     }
 
@@ -94,7 +95,7 @@ final class DebugAdapterRegistry {
     private static final Set<String> CORE_KEYS = Set.of("debug.enabled", "debug.breakpoints.enabled", "debug.threads.enabled",
         "debug.stacktrace.enabled", "debug.scopes.enabled", "debug.variables.enabled", "debug.evaluate.enabled", "debug.attach.enabled");
     private static final Set<String> ADAPTER_FIELDS = Set.of("transport", "command", "args", "capabilities");
-    private static final Set<String> CONFIGURATION_FIELDS = Set.of("adapter", "request", "scope", "program", "cwd", "args", "host", "port", "file_extensions");
+    private static final Set<String> CONFIGURATION_FIELDS = Set.of("adapter", "request", "scope", "program", "cwd", "args", "prelaunch_task", "host", "port", "file_extensions");
     private final Map<String, Adapter> adapters;
 
     private DebugAdapterRegistry(Map<String, Adapter> adapters) {
@@ -236,6 +237,10 @@ final class DebugAdapterRegistry {
             }
             List<String> args = tokens(fields.get("args"));
             if (fields.containsKey("args") && args == null) errors.add(new Error(prefix + ".args", prefix + ".args contains an invalid control character"));
+            String prelaunchTask = fields.getOrDefault("prelaunch_task", "").trim();
+            if (!prelaunchTask.isEmpty() && !identifier(prelaunchTask)) {
+                errors.add(new Error(prefix + ".prelaunch_task", prefix + ".prelaunch_task must be a task identifier"));
+            }
             List<String> fileExtensions = fileExtensions(prefix + ".file_extensions", fields.get("file_extensions"), errors);
             String host = fields.getOrDefault("host", "127.0.0.1").trim();
             int port = port(fieldKey(prefix, fields, "port"), prefix + ".port", fields.get("port"), request, errors);
@@ -244,7 +249,7 @@ final class DebugAdapterRegistry {
             if (adapter == null) errors.add(new Error(fieldKey(prefix, fields, "adapter"), prefix + ".adapter is not registered"));
             else if (!adapter.supports(request)) errors.add(new Error(prefix + ".request", prefix + ".request is not supported by adapter " + adapterId));
             if (errorsFor(errors, prefix)) continue;
-            result.put(name, new Configuration(name, adapterId, request, scope, program, cwd, args, host, port, fileExtensions));
+            result.put(name, new Configuration(name, adapterId, request, scope, program, cwd, args, prelaunchTask, host, port, fileExtensions));
         }
         return result;
     }

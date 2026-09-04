@@ -373,6 +373,38 @@ final class JobQuickfixController {
         return "Task job " + jobId + " started (" + normalizedName + ")";
     }
 
+    DebugSessionService.PreLaunchResult runDebugPreLaunchTask(DebugAdapterRegistry.Plan debugPlan, AsyncJobService.JobToken token) {
+        if (debugPlan == null || debugPlan.configuration() == null || debugPlan.configuration().prelaunchTask().isBlank()) {
+            return new DebugSessionService.PreLaunchResult(true, List.of());
+        }
+        String taskName = debugPlan.configuration().prelaunchTask();
+        File workspace = debugPlan.workspace().toFile();
+        TaskService.TaskLoadResult loaded = editor.taskService.loadWorkspaceTasks(workspace);
+        if (!loaded.isValid()) return new DebugSessionService.PreLaunchResult(false, loaded.diagnostics());
+        TaskService.WorkspaceTask task = loaded.tasks().get(taskName);
+        if (task == null) {
+            return new DebugSessionService.PreLaunchResult(false, List.of("Debug pre-launch task is not defined in "
+                + editor.taskService.taskFile(workspace).getAbsolutePath() + ": " + taskName));
+        }
+        TaskService.TaskExecutionPlan plan;
+        try {
+            File activeFile = debugPlan.program() == null ? null : debugPlan.program().toFile();
+            plan = editor.taskService.buildExecutionPlan(task, workspace, activeFile);
+        } catch (IOException | IllegalArgumentException error) {
+            return new DebugSessionService.PreLaunchResult(false, List.of("Debug pre-launch task validation failed: " + error.getMessage()));
+        }
+        String validationError = validateTaskPlan(plan);
+        if (validationError != null) return new DebugSessionService.PreLaunchResult(false, List.of(validationError));
+        CommandResult result = runExternalCommand(plan.processCommand(), plan.workingDirectory(), null, token,
+            editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true, plan.environment());
+        if (result.exitCode != 0) {
+            String detail = taskOutput(result);
+            return new DebugSessionService.PreLaunchResult(false, List.of("Debug pre-launch task '" + taskName + "' failed"
+                + (detail.isBlank() ? "." : ": " + detail)));
+        }
+        return new DebugSessionService.PreLaunchResult(true, List.of("Debug pre-launch task '" + taskName + "' completed."));
+    }
+
     private String runRemoteTask(String connectionId, String taskName, File projectRoot,
                                  Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun) {
         String normalizedName = taskName == null ? "" : taskName.trim();

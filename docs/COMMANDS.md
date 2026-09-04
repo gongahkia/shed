@@ -227,7 +227,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | :--- | :--- |
 | `:debug`, `:debug ui` | Open the docked Debug panel |
 | `:debug text [subcommand]` | Open legacy debug scratch output |
-| `:debug select <name>`, `:debug start [name]`, `:debug stop`, `:debug restart [name]` | Control an explicit DAP session, including the user-installed `python-debugpy` profile |
+| `:debug select <name>`, `:debug start [name]`, `:debug stop`, `:debug restart [name]` | Control an explicit DAP session, including the user-installed `python-debugpy` profile; a configured pre-launch workspace task must succeed before its adapter starts |
 | `:debug continue`, `:debug next`, `:debug stepin`, `:debug stepout`, `:debug pause` | Send a capability-declared DAP execution control; Continue/step require a paused thread |
 | `:debug breakpoint list` | Open persisted source breakpoints for the selected workspace |
 | `:debug breakpoint enable\|disable\|remove <line>` | Update the active file's source breakpoint |

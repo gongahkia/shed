@@ -51,6 +51,17 @@ class NotebookDocumentTest {
     }
 
     @Test
+    void buildsOnlyValidatedDirectArgvJupyterExecutionCommands() {
+        assertEquals(List.of("jupyter", "nbconvert", "--to", "notebook", "--execute", "--inplace", "/project/demo.ipynb"),
+            NotebookController.executeCommand(Path.of("/project/demo.ipynb"), ""));
+        assertEquals(List.of("jupyter", "nbconvert", "--to", "notebook", "--execute", "--inplace",
+            "--ExecutePreprocessor.kernel_name=python3", "/project/demo.ipynb"),
+            NotebookController.executeCommand(Path.of("/project/demo.ipynb"), "python3"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+            () -> NotebookController.executeCommand(Path.of("/project/demo.ipynb"), "python3; bad"));
+    }
+
+    @Test
     void extractsOnlyBoundedPngAndJpegDisplayData() {
         NotebookDocument document = NotebookDocument.empty().withCells(List.of(new NotebookDocument.Cell("code", "", Map.of("outputs", List.of(
             Map.of("data", Map.of("image/png", "aGVsbG8=", "image/svg+xml", "PHN2Zz4=")))))));

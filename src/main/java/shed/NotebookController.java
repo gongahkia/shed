@@ -41,9 +41,10 @@ final class NotebookController {
         FileBuffer buffer = editor.getCurrentBuffer();
         if (!isNotebook(buffer)) return "The current buffer is not a .ipynb notebook";
         if (operation.equals("console") || operation.startsWith("console ")) return openConsole(buffer, raw.substring("console".length()).trim());
+        if (operation.equals("run") || operation.startsWith("run ")) return runCurrent(pane, buffer, raw.substring("run".length()).trim());
         return switch (operation) {
             case "", "open", "reopen" -> showIfAvailable(pane, buffer) ? "Notebook opened" : "Notebook view unavailable";
-            case "run", "runall", "run-all" -> runCurrent(pane, buffer);
+            case "runall", "run-all" -> runCurrent(pane, buffer, "");
             case "raw", "text" -> {
                 pane.clearCustomEditorComponent();
                 editor.renderWindowLayout();
@@ -86,7 +87,7 @@ final class NotebookController {
             editor.showMessage("Notebook save failed: " + concise(error));
             return;
         }
-        runCurrent(pane, buffer);
+        runCurrent(pane, buffer, "");
     }
 
     private void runThrough(EditorPane pane, FileBuffer buffer, NotebookDocument document, int cellCount) {
@@ -118,10 +119,16 @@ final class NotebookController {
         editor.showMessage("Notebook cell execution started (job " + job + ", fresh kernel)");
     }
 
-    private String runCurrent(EditorPane pane, FileBuffer buffer) {
+    private String runCurrent(EditorPane pane, FileBuffer buffer, String kernel) {
         if (!editor.ensureProjectTrustForFile(buffer.getFile())) return "Notebook execution blocked: workspace is untrusted";
+        String selectedKernel;
+        try {
+            selectedKernel = kernelName(kernel);
+        } catch (IllegalArgumentException error) {
+            return "Jupyter kernel name is invalid";
+        }
         Path source = buffer.getFile().toPath().toAbsolutePath().normalize();
-        int job = editor.asyncJobService.submit("Execute notebook " + source.getFileName(), token -> execute(source, token),
+        int job = editor.asyncJobService.submit("Execute notebook " + source.getFileName(), token -> execute(source, selectedKernel, token),
             (snapshot, output, error) -> {
                 if (error != null) {
                     editor.showMessage("Notebook execution failed: " + concise(error));
@@ -137,14 +144,29 @@ final class NotebookController {
                     editor.showMessage("Notebook completed but could not reload: " + concise(loadError.getCause()));
                 }
             });
-        return "Notebook execution started (job " + job + ")";
+        return "Notebook execution started (job " + job + (selectedKernel.isBlank() ? "" : ", kernel " + selectedKernel) + ")";
     }
 
-    private static String execute(Path source, AsyncJobService.JobToken token) throws Exception {
+    static List<String> executeCommand(Path source, String kernel) {
+        if (source == null) throw new IllegalArgumentException("notebook path is required");
+        String selectedKernel = kernelName(kernel);
+        java.util.ArrayList<String> command = new java.util.ArrayList<>(List.of("jupyter", "nbconvert", "--to", "notebook", "--execute", "--inplace"));
+        if (!selectedKernel.isBlank()) command.add("--ExecutePreprocessor.kernel_name=" + selectedKernel);
+        command.add(source.toAbsolutePath().normalize().toString());
+        return List.copyOf(command);
+    }
+
+    private static String kernelName(String kernel) {
+        String name = kernel == null ? "" : kernel.trim();
+        if (!name.isEmpty() && !name.matches("[A-Za-z0-9._-]+")) throw new IllegalArgumentException("kernel name is invalid");
+        return name;
+    }
+
+    private static String execute(Path source, String kernel, AsyncJobService.JobToken token) throws Exception {
         Path output = Files.createTempFile("shed-notebook-", ".log");
         Process process = null;
         try {
-            process = new ProcessBuilder("jupyter", "nbconvert", "--to", "notebook", "--execute", "--inplace", source.toString())
+            process = new ProcessBuilder(executeCommand(source, kernel))
                 .directory(source.getParent().toFile()).redirectErrorStream(true).redirectOutput(output.toFile()).start();
             Process running = process;
             token.onCancel(() -> running.destroyForcibly());
@@ -169,7 +191,7 @@ final class NotebookController {
         Path temporary = Files.createTempFile(source.getParent(), ".shed-notebook-", ".ipynb");
         try {
             Files.writeString(temporary, prefix.serialize(), StandardCharsets.UTF_8);
-            execute(temporary, token);
+            execute(temporary, "", token);
             return document.withExecutedPrefix(NotebookDocument.parse(Files.readString(temporary, StandardCharsets.UTF_8)), cellCount);
         } finally {
             Files.deleteIfExists(temporary);

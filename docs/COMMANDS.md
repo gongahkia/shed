@@ -461,6 +461,7 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:database`, `:database status` | Show the local PostgreSQL CLI boundary without opening a connection |
 | `:database query <quoted-sql>`, `:database tables`, `:database file <workspace-relative.sql>` | Explicitly execute a PostgreSQL query, bounded table listing, or workspace SQL file |
 | `:database terminal` | Open an explicit interactive `psql` terminal |
+| `:database sqlite query <workspace-relative.db> <quoted-sql>`, `:database sqlite tables <workspace-relative.db>`, `:database sqlite terminal <workspace-relative.db>` | Query, list, or open an existing workspace-local SQLite database through `sqlite3` |
 | `:integration`, `:integration list` | List supporting database, deployment, collaboration, and container extension integrations |
 | `:integration <extension:id> help` | Show provider-declared actions |
 | `:integration <extension:id> <action> [arguments]` | Run an explicitly declared workspace-integration action |

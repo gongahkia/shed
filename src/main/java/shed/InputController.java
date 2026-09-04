@@ -2128,114 +2128,24 @@ final class InputController {
         }
 
         String withoutColon = input.substring(1);
-        if (withoutColon.startsWith("e ") || withoutColon.startsWith("w ")) {
-            return ":" + completePath(withoutColon.substring(0, 2), withoutColon.substring(2));
+        String lowered = withoutColon.toLowerCase(Locale.ROOT);
+        for (String prefix : List.of("e ", "edit ", "w ", "write ")) {
+            if (lowered.startsWith(prefix)) {
+                return ":" + completePath(withoutColon.substring(0, prefix.length()), withoutColon.substring(prefix.length()));
+            }
         }
-        String lowered = withoutColon.toLowerCase();
 
-        List<String> knownCommands = new ArrayList<>();
-        knownCommands.add("w");
-        knownCommands.add("write");
-        knownCommands.add("q");
-        knownCommands.add("quit");
-        knownCommands.add("q!");
-        knownCommands.add("wq");
-        knownCommands.add("x");
-        knownCommands.add("e");
-        knownCommands.add("edit");
-        knownCommands.add("bn");
-        knownCommands.add("bp");
-        knownCommands.add("ls");
-        knownCommands.add("buffers");
-        knownCommands.add("bd");
-        knownCommands.add("set");
-        knownCommands.add("settings");
-        knownCommands.add("config");
-        knownCommands.add("log");
-        knownCommands.add("commandlog");
-        knownCommands.add("session");
-        knownCommands.add("sessions");
-        knownCommands.add("workspace");
-        knownCommands.add("ws");
-        knownCommands.add("projectreplace");
-        knownCommands.add("largefile");
-        knownCommands.add("lf");
-        knownCommands.add("preplace");
-        knownCommands.add("jobs");
-        knownCommands.add("jobcancel");
-        knownCommands.add("jobkill");
-        knownCommands.add("drop");
-        knownCommands.add("task");
-        knownCommands.add("test");
-        knownCommands.add("coverage");
-        knownCommands.add("cov");
-        knownCommands.add("help");
-        knownCommands.add("wc");
-        knownCommands.add("recent");
-        knownCommands.add("d");
-        knownCommands.add("delete");
-        knownCommands.add("files");
-        knownCommands.add("folder");
-        knownCommands.add("folders");
-        knownCommands.add("tree");
-        knownCommands.add("git");
-        knownCommands.add("buf");
-        knownCommands.add("grep");
-        knownCommands.add("copen");
-        knownCommands.add("cclose");
-        knownCommands.add("cnext");
-        knownCommands.add("cprev");
-        knownCommands.add("cfirst");
-        knownCommands.add("clast");
-        knownCommands.add("cc");
-        knownCommands.add("lsp");
-        knownCommands.add("definition");
-        knownCommands.add("typedefinition");
-        knownCommands.add("typedef");
-        knownCommands.add("hover");
-        knownCommands.add("references");
-        knownCommands.add("diagnostics");
-        knownCommands.add("diag");
-        knownCommands.add("ldiag");
-        knownCommands.add("dnext");
-        knownCommands.add("dprev");
-        knownCommands.add("symbols");
-        knownCommands.add("sym");
-        knownCommands.add("registers");
-        knownCommands.add("marks");
-        knownCommands.add("yankring");
-        knownCommands.add("pastepicker");
-        knownCommands.add("yr");
-        knownCommands.add("zen");
-        knownCommands.add("goyo");
-        knownCommands.add("limelight");
-        knownCommands.add("normal");
-        knownCommands.add("reload");
-        knownCommands.add("source");
-        knownCommands.add("clean");
-        knownCommands.add("shedclean");
-        knownCommands.add("noh");
-        knownCommands.add("nohlsearch");
-        knownCommands.add("wa");
-        knownCommands.add("qa");
-        knownCommands.add("wqa");
-        knownCommands.add("split");
-        knownCommands.add("vsplit");
-        knownCommands.add("close");
-        knownCommands.add("themes");
-        // Markdown / orgmode commands
-        knownCommands.add("toc");
-        knownCommands.add("outline");
-        knownCommands.add("toggle");
-        knownCommands.add("table");
-        knownCommands.add("link");
-        knownCommands.add("img");
-        knownCommands.add("snippets");
-        knownCommands.add("bracketcolor");
-        knownCommands.add("term");
-        knownCommands.add("terminal");
-        knownCommands.add("conceal");
-        knownCommands.addAll(editor.configManager.getConfiguredCommandAliases());
+        java.util.Set<String> registered = new java.util.TreeSet<>();
+        if (editor.commandHandler != null) registered.addAll(editor.commandHandler.getCommandNames());
+        registered.addAll(editor.configManager.getConfiguredCommandAliases());
+        registered.addAll(editor.configManager.getUserCommands().keySet());
+        registered.add("q!");
+        List<String> knownCommands = registered.stream()
+            .filter(command -> command != null && !command.isBlank())
+            .map(command -> command.trim().toLowerCase(Locale.ROOT))
+            .distinct()
+            .sorted()
+            .toList();
 
         // Exact prefix match first
         for (String command : knownCommands) {

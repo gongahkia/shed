@@ -80,11 +80,11 @@ final class SshPortForwardService implements AutoCloseable {
 
     synchronized void closeForConnection(String connectionId) {
         String normalized = connectionId == null ? "" : connectionId.trim();
-        List<Integer> ports = forwards.values().stream()
+        List<Forward> matching = forwards.values().stream()
             .filter(forward -> forward.connectionId().equals(normalized))
-            .map(forward -> forward.spec().localPort())
             .toList();
-        for (Integer port : ports) close(port);
+        for (Forward forward : matching) forwards.remove(forward.spec().localPort());
+        for (Forward forward : matching) stopAsync(forward.process());
     }
 
     synchronized List<ForwardInfo> list() {
@@ -138,6 +138,12 @@ final class SshPortForwardService implements AutoCloseable {
             process.destroyForcibly();
             Thread.currentThread().interrupt();
         }
+    }
+
+    private static void stopAsync(Process process) {
+        if (process == null || !process.isAlive()) return;
+        process.destroy();
+        Thread.ofVirtual().name("shed-ssh-forward-stop").start(() -> stop(process));
     }
 
     private static int exitCode(Process process) {

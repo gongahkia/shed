@@ -275,6 +275,18 @@ final class TerminalController {
         }
         output.append("\nShell integration: ").append(editor.configManager.getTerminalShellIntegrationEnabled()
             ? "enabled for newly opened Bash, Zsh, and Fish terminals" : "disabled").append(".\n");
+        File startDirectory = resolveTerminalStartDirectory();
+        RemoteWorkspaceSessionService.Connection remote = editor.remoteWorkspaceSessions == null
+            ? null : editor.remoteWorkspaceSessions.connectionFor(startDirectory.toPath());
+        DevContainerSessionService.Connection container = editor.devContainerSessions == null
+            ? null : editor.devContainerSessions.connectionFor(startDirectory.toPath());
+        if (remote != null) {
+            output.append("New terminals for this file use remote session: ").append(remote.id()).append(".\n");
+        } else if (container != null) {
+            output.append("New terminals for this file use its connected Dev Container.\n");
+        } else {
+            output.append("New terminals for this file use the local host.\n");
+        }
         output.append("Use :terminal commands, :terminal cwd, or :terminal profile <extension:id>.\n");
         editor.showScratchBuffer("[terminal profiles]", output.toString());
         return "Showing terminal profiles";

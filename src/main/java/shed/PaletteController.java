@@ -38,6 +38,8 @@ final class PaletteController {
         action("Import Coverage Report", "coverage ui", "Open Tests, then use Import Coverage to choose a local coverage report."),
         action("Debug", "debug", "Open the Debug tool panel."),
         action("Tasks", "task", "Open the workspace Tasks panel."),
+        action("Remote Workspaces", "remote list", "Inspect explicit remote connections, active execution sessions, and loopback SSH forwards."),
+        action("Dev Container", "container status", "Inspect the active workspace's Dev Container configuration and session routing state."),
         action("Problems", "problems", "Open the unified diagnostics and quickfix Problems panel."),
         action("Project Replace", "projectreplace", "Open the reviewed project-wide replacement panel."),
         action("Show Completions", "lsp completion", "Request completion candidates at the caret."),
@@ -473,6 +475,10 @@ final class PaletteController {
                 return "Run async command against current file path.";
             case "task":
                 return "Run project tasks (:task test/build) with quickfix integration.";
+            case "remote":
+                return "Inspect or explicitly control remote workspace mirrors, session routing, and SSH forwards.";
+            case "container":
+                return "Inspect or explicitly control the local Dev Container CLI bridge.";
             case "test":
                 return "Open or control the explicit-refresh Test Explorer.";
             case "coverage":

@@ -59,6 +59,30 @@ public class DebugAdapterRegistryTest {
             new DebugAdapterRegistry.LaunchContext(test, "sample#works", test)).launchable());
     }
 
+    @Test
+    void acceptsOptionalConfigurationFileExtensionsAndRejectsUnsupportedPrograms() {
+        Map<String, Object> values = configuration("launch");
+        values.put("debug.configuration.main.file_extensions", ".py,.pyw");
+        DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.validate(values);
+        Path workspace = Path.of("build/debug-extension-workspace").toAbsolutePath();
+
+        assertTrue(validation.valid());
+        assertEquals(java.util.List.of(".py", ".pyw"), validation.configurations().get("main").fileExtensions());
+        assertFalse(DebugAdapterRegistry.plan(validation, "main", workspace, workspace.resolve("Main.java")).launchable());
+        assertTrue(DebugAdapterRegistry.plan(validation, "main", workspace, workspace.resolve("main.py")).launchable());
+    }
+
+    @Test
+    void rejectsMalformedConfigurationFileExtensionLists() {
+        Map<String, Object> values = configuration("launch");
+        values.put("debug.configuration.main.file_extensions", "py,*.py");
+
+        DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.validate(values);
+
+        assertFalse(validation.valid());
+        assertTrue(validation.errors().stream().anyMatch(error -> error.key().equals("debug.configuration.main.file_extensions")));
+    }
+
     private static Map<String, Object> configuration(String request) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("debug.adapter.java.command", "java-debug-adapter");

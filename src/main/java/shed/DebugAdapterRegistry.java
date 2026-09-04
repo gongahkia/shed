@@ -29,7 +29,7 @@ final class DebugAdapterRegistry {
     }
 
     record Configuration(String name, String adapter, Request request, String scope, String program, String cwd, List<String> args,
-        String host, int port) {
+        String host, int port, List<String> fileExtensions) {
         Configuration {
             name = name == null ? "" : name;
             adapter = adapter == null ? "" : adapter;
@@ -39,6 +39,12 @@ final class DebugAdapterRegistry {
             cwd = cwd == null ? "" : cwd;
             args = args == null ? List.of() : List.copyOf(args);
             host = host == null ? "" : host;
+            fileExtensions = fileExtensions == null ? List.of() : List.copyOf(fileExtensions);
+        }
+
+        Configuration(String name, String adapter, Request request, String scope, String program, String cwd, List<String> args,
+            String host, int port) {
+            this(name, adapter, request, scope, program, cwd, args, host, port, List.of());
         }
     }
 
@@ -87,7 +93,7 @@ final class DebugAdapterRegistry {
     private static final Set<String> CORE_KEYS = Set.of("debug.enabled", "debug.breakpoints.enabled", "debug.threads.enabled",
         "debug.stacktrace.enabled", "debug.scopes.enabled", "debug.variables.enabled", "debug.evaluate.enabled", "debug.attach.enabled");
     private static final Set<String> ADAPTER_FIELDS = Set.of("transport", "command", "args", "capabilities");
-    private static final Set<String> CONFIGURATION_FIELDS = Set.of("adapter", "request", "scope", "program", "cwd", "args", "host", "port");
+    private static final Set<String> CONFIGURATION_FIELDS = Set.of("adapter", "request", "scope", "program", "cwd", "args", "host", "port", "file_extensions");
     private final Map<String, Adapter> adapters;
 
     private DebugAdapterRegistry(Map<String, Adapter> adapters) {
@@ -119,18 +125,37 @@ final class DebugAdapterRegistry {
     }
 
     static Validation withContributedAdapters(Validation base, Map<String, Adapter> contributed) {
+        Map<String, Configuration> defaults = new LinkedHashMap<>();
+        if (contributed != null) {
+            for (Map.Entry<String, Adapter> entry : contributed.entrySet()) {
+                String id = entry.getKey();
+                Adapter adapter = entry.getValue();
+                if (id != null && adapter != null && adapter.supports(Request.LAUNCH)) {
+                    defaults.put(id, new Configuration(id, id, Request.LAUNCH, "workspace", "${file}", "${workspaceFolder}", List.of(), "127.0.0.1", 0));
+                }
+            }
+        }
+        return withAdapterDefaults(base, contributed, defaults);
+    }
+
+    static Validation withAdapterDefaults(Validation base, Map<String, Adapter> contributed, Map<String, Configuration> defaults) {
         Validation source = base == null ? validate(Map.of()) : base;
         if (!source.valid() || contributed == null || contributed.isEmpty()) return source;
         Map<String, Adapter> adapters = new LinkedHashMap<>(source.registry().adapters());
         Map<String, Configuration> configurations = new LinkedHashMap<>(source.configurations());
+        Set<String> added = new java.util.HashSet<>();
         for (Map.Entry<String, Adapter> entry : contributed.entrySet()) {
             String id = entry.getKey();
             Adapter adapter = entry.getValue();
             if (id == null || adapter == null || adapters.containsKey(id)) continue;
             adapters.put(id, adapter);
-            if (adapter.supports(Request.LAUNCH) && !configurations.containsKey(id)) {
-                configurations.put(id, new Configuration(id, id, Request.LAUNCH, "workspace", "${file}", "${workspaceFolder}", List.of(), "127.0.0.1", 0));
-            }
+            added.add(id);
+        }
+        if (defaults != null) for (Map.Entry<String, Configuration> entry : defaults.entrySet()) {
+            Configuration configuration = entry.getValue();
+            if (entry.getKey() == null || configuration == null || configurations.containsKey(entry.getKey())
+                || !added.contains(configuration.adapter())) continue;
+            configurations.put(entry.getKey(), configuration);
         }
         return new Validation(new DebugAdapterRegistry(adapters), configurations, source.errors());
     }
@@ -159,6 +184,9 @@ final class DebugAdapterRegistry {
         }
         List<String> args = resolveArguments(configuration.args(), root, launchContext);
         if (args == null) return new PlanResult(null, "Debug configuration has invalid launch placeholders; no process will be launched.");
+        if (configuration.request() == Request.LAUNCH && !matchesFileExtension(program, configuration.fileExtensions())) {
+            return new PlanResult(null, "Debug configuration does not support this file type; no process will be launched.");
+        }
         return new PlanResult(new Plan(adapter, configuration, root, cwd, program, args), "");
     }
 
@@ -207,6 +235,7 @@ final class DebugAdapterRegistry {
             }
             List<String> args = tokens(fields.get("args"));
             if (fields.containsKey("args") && args == null) errors.add(new Error(prefix + ".args", prefix + ".args contains an invalid control character"));
+            List<String> fileExtensions = fileExtensions(prefix + ".file_extensions", fields.get("file_extensions"), errors);
             String host = fields.getOrDefault("host", "127.0.0.1").trim();
             int port = port(fieldKey(prefix, fields, "port"), prefix + ".port", fields.get("port"), request, errors);
             if (request == Request.ATTACH && !loopback(host)) errors.add(new Error(prefix + ".host", prefix + ".host must be loopback in M0"));
@@ -214,7 +243,7 @@ final class DebugAdapterRegistry {
             if (adapter == null) errors.add(new Error(fieldKey(prefix, fields, "adapter"), prefix + ".adapter is not registered"));
             else if (!adapter.supports(request)) errors.add(new Error(prefix + ".request", prefix + ".request is not supported by adapter " + adapterId));
             if (errorsFor(errors, prefix)) continue;
-            result.put(name, new Configuration(name, adapterId, request, scope, program, cwd, args, host, port));
+            result.put(name, new Configuration(name, adapterId, request, scope, program, cwd, args, host, port, fileExtensions));
         }
         return result;
     }
@@ -239,6 +268,20 @@ final class DebugAdapterRegistry {
             catch (IllegalArgumentException error) { errors.add(new Error(key, key + " contains unsupported capability " + raw.trim())); }
         }
         return values;
+    }
+
+    private static List<String> fileExtensions(String key, String value, List<Error> errors) {
+        if (value == null || value.isBlank()) return List.of();
+        List<String> result = new ArrayList<>();
+        for (String raw : value.split(",")) {
+            String extension = raw.trim().toLowerCase(Locale.ROOT);
+            if (!extension.matches("\\.[a-z0-9][a-z0-9_-]*")) {
+                errors.add(new Error(key, key + " must be comma-separated file extensions such as .py,.pyw"));
+                return List.of();
+            }
+            if (!result.contains(extension)) result.add(extension);
+        }
+        return List.copyOf(result);
     }
 
     private static int port(String key, String field, String value, Request request, List<Error> errors) {

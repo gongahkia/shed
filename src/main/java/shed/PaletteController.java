@@ -12,7 +12,6 @@ import java.util.*;
 import java.util.List;
 
 final class PaletteController {
-    static final String LANGUAGE_SERVICES_ACTION = "Language Services";
     private record PaletteAction(String label, String command, String description) { }
 
     /*
@@ -20,7 +19,6 @@ final class PaletteController {
      * :git is searchable, but it cannot communicate or invoke its graphical sub-surfaces.
      */
     private static final List<PaletteAction> SURFACE_ACTIONS = List.of(
-        action(LANGUAGE_SERVICES_ACTION, "lsp manage", "Open Language Services. Installing or updating always needs a separate GUI approval."),
         action("Settings", "settings", "Open the Settings inspector, including font, landing-buffer, and Markdown-preview settings."),
         action("Open Settings TOML", "settings file", "Open the persisted settings.toml buffer."),
         action("Keymap Inspector", "keymap", "Inspect and edit validated keymap overlays."),
@@ -71,14 +69,7 @@ final class PaletteController {
     }
 
     public String showCommandPalette() {
-        List<String> commands = editor.commandHandler.getCommandNames();
-        List<String> candidates = new ArrayList<>();
-        for (PaletteAction action : SURFACE_ACTIONS) {
-            candidates.add(action.label());
-        }
-        for (String cmd : commands) {
-            candidates.add(":" + cmd);
-        }
+        List<String> candidates = commandPaletteCandidates();
         String selected = showPaletteDialog("Command Palette", candidates, this::describeCommandPaletteCandidate);
         if (selected == null || selected.isEmpty()) return "Command palette cancelled";
         PaletteAction action = surfaceAction(selected);
@@ -89,6 +80,10 @@ final class PaletteController {
 
     static List<String> surfaceActionNames() {
         return SURFACE_ACTIONS.stream().map(PaletteAction::label).toList();
+    }
+
+    static List<String> commandPaletteCandidates() {
+        return surfaceActionNames();
     }
 
     static String surfaceActionCommand(String label) {
@@ -595,10 +590,6 @@ final class PaletteController {
             case "problems":
             case "problem":
                 return "Open unified LSP and quickfix problems.";
-            case "languageservices":
-            case "language-services":
-            case "lspmanage":
-                return "Open Language Services. Installing or updating always needs a separate GUI approval.";
             case "dnext":
             case "dn":
                 return "Jump to next diagnostic.";

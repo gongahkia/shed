@@ -178,7 +178,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:projectreplace cancel` | Discard the current replacement preview |
 | `:projectreplace preview-required on\|off`, `:projectreplace confirm on\|off`, `:projectreplace backup on\|off` | Persist preview, confirmation, or backup controls |
 | `:projectreplace scope workspace\|current-file` | Persist replacement preview scope |
-| `:palette`, `:commands` | Command palette. Alongside raw `:command` entries, it exposes direct named actions for graphical and contextual surfaces such as Settings, Workspace Folders, Git Changes, Tests, Debug, Language Services, coverage import, formatter policy, code actions, peek, hierarchies, Markdown Preview, and snippets. |
+| `:palette`, `:commands` | Command palette. Lists only named graphical and contextual actions such as Settings, Workspace Folders, Git Changes, Tests, Debug, coverage import, formatter policy, code actions, peek, hierarchies, Markdown Preview, and snippets. Typed `:command` entries remain available in the command bar but are not duplicated in the palette. |
 | `:undolist`, `:undotree` | Show undo state summary |
 | `:themes` | Show built-in themes |
 | `:zen` | Toggle Goyo layout with Limelight; restores Limelight's prior state when disabled |
@@ -289,7 +289,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:lsp stop [ext]` | Stop LSP for extension |
 | `:lsp servers` | List configured + built-in server mappings |
 | `:lsp manage`, `:lsp manage ui` | Open the local Language Services panel; each install/update requires a fresh GUI confirmation |
-| `:languageservices`, `:language-services`, `:lspmanage` | Command-Palette-friendly alias that opens Language Services |
+| `:languageservices`, `:language-services`, `:lspmanage` | Direct-command aliases that open Language Services; typed commands are intentionally absent from the command palette |
 | `:lsp manage status` | Show managed-LSP status without probing or network access |
 | `:lsp log` | Show LSP error log |
 

@@ -256,6 +256,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:lsp <subcommand>` | Run explicit LSP subcommand |
 | `:definition` | LSP go-to-definition |
 | `:typedefinition`, `:typedef` | LSP go-to-type-definition |
+| `:implementation`, `:impl` | LSP go-to-implementation; multiple results open in quickfix |
 | `:hover` | LSP hover |
 | `:references` | LSP references to quickfix |
 
@@ -270,6 +271,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | Insert `(` or `,` | Shows capability-gated asynchronous signature help; the next edit or Escape cancels it |
 | `:lsp definition`, `:lsp def` | Go to definition |
 | `:lsp typedefinition`, `:lsp type`, `:lsp typedef` | Go to type definition |
+| `:lsp implementation`, `:lsp impl` | Go to implementation; multiple results open in quickfix |
 | `:lsp peek definition`, `:peek definition` | Asynchronously show a temporary read-only definition split; Enter opens and Escape restores the layout |
 | `:lsp peek type`, `:peek type` | Asynchronously show a temporary read-only type-definition split |
 | `:lsp calls incoming\|outgoing` | Open searchable lazy LSP call hierarchy |

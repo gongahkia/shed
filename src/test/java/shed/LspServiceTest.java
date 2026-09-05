@@ -19,7 +19,7 @@ public class LspServiceTest {
     @Test
     void negotiatesAdvertisedDisabledAndUnsupportedCapabilities() {
         Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
-            "{\"result\":{\"capabilities\":{\"completionProvider\":{},\"hoverProvider\":true,\"typeDefinitionProvider\":true,\"renameProvider\":{\"prepareProvider\":true}},\"serverInfo\":{\"name\":\"testls\",\"version\":\"1.2\"}}}"
+            "{\"result\":{\"capabilities\":{\"completionProvider\":{},\"hoverProvider\":true,\"typeDefinitionProvider\":true,\"implementationProvider\":true,\"renameProvider\":{\"prepareProvider\":true}},\"serverInfo\":{\"name\":\"testls\",\"version\":\"1.2\"}}}"
         ));
         Map<LspCapability, Boolean> clientEnabled = new EnumMap<>(LspCapability.class);
         clientEnabled.put(LspCapability.HOVER, Boolean.FALSE);
@@ -29,6 +29,7 @@ public class LspServiceTest {
         assertTrue(model.allows(LspCapability.COMPLETION));
         assertTrue(model.allows(LspCapability.RENAME));
         assertTrue(model.allows(LspCapability.TYPE_DEFINITION));
+        assertTrue(model.allows(LspCapability.IMPLEMENTATION));
         assertFalse(model.allows(LspCapability.HOVER));
         assertEquals(LspCapabilityModel.Availability.DISABLED, model.availability(LspCapability.HOVER));
         assertEquals("LSP hover is disabled by client policy; enable it in LSP settings",
@@ -80,6 +81,23 @@ public class LspServiceTest {
 
         assertTrue(model.allows(LspCapability.DOCUMENT_SYMBOLS));
         assertTrue(model.allows(LspCapability.WORKSPACE_SYMBOLS));
+    }
+
+    @Test
+    void parsesImplementationLocationsAndLocationLinksWithoutDuplicates() {
+        List<LspClient.Location> locations = LspClient.parseLocations(MiniJson.parse("["
+            + "{\"uri\":\"file:///project/App.java\",\"range\":{\"start\":{\"line\":3,\"character\":4}}},"
+            + "{\"targetUri\":\"file:///project/Child.java\",\"targetSelectionRange\":{\"start\":{\"line\":7,\"character\":2}}},"
+            + "{\"uri\":\"file:///project/App.java\",\"range\":{\"start\":{\"line\":3,\"character\":4}}}"
+            + "]"));
+
+        assertEquals(2, locations.size());
+        assertEquals("file:///project/App.java", locations.get(0).getUri());
+        assertEquals(3, locations.get(0).getLine());
+        assertEquals(4, locations.get(0).getCharacter());
+        assertEquals("file:///project/Child.java", locations.get(1).getUri());
+        assertEquals(7, locations.get(1).getLine());
+        assertEquals(2, locations.get(1).getCharacter());
     }
 
     @Test

@@ -1610,7 +1610,7 @@ final class LspController {
             return configured.toRealPath();
         }
         for (Path candidate = current; candidate != null; candidate = candidate.getParent()) {
-            if (Files.exists(candidate.resolve(".git"))
+            if (hasGitMetadata(candidate)
                 || Files.exists(candidate.resolve("pom.xml"))
                 || Files.exists(candidate.resolve("package.json"))
                 || Files.exists(candidate.resolve("Makefile"))) {
@@ -1618,6 +1618,22 @@ final class LspController {
             }
         }
         return Files.exists(current) ? current.toRealPath() : current;
+    }
+
+    private static boolean hasGitMetadata(Path directory) {
+        Path git = directory.resolve(".git");
+        if (Files.isDirectory(git)) {
+            return Files.isRegularFile(git.resolve("HEAD"));
+        }
+        try {
+            if (!Files.isRegularFile(git) || Files.size(git) > 4096L) {
+                return false;
+            }
+            String pointer = Files.readString(git, StandardCharsets.UTF_8).stripLeading();
+            return pointer.startsWith("gitdir:");
+        } catch (IOException | SecurityException ignored) {
+            return false;
+        }
     }
 
 

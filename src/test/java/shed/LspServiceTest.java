@@ -404,4 +404,29 @@ public class LspServiceTest {
         assertEquals(first.toRealPath(), controller.resolveWorkspaceRoot(first));
         assertEquals(second.toRealPath(), controller.resolveWorkspaceRoot(second));
     }
+
+    @Test
+    void resolveWorkspaceRootIgnoresAnInvalidGitDirectory() throws Exception {
+        Path parent = Files.createTempDirectory("shed-lsp-invalid-git-");
+        Files.createDirectories(parent.resolve(".git"));
+        Path standalone = Files.createDirectories(parent.resolve("standalone"));
+        LspController controller = new LspController(null);
+
+        assertEquals(standalone.toRealPath(), controller.resolveWorkspaceRoot(standalone));
+    }
+
+    @Test
+    void resolveWorkspaceRootRecognizesGitDirectoriesAndWorktreePointers() throws Exception {
+        Path repository = Files.createTempDirectory("shed-lsp-git-directory-");
+        Files.createDirectories(repository.resolve(".git"));
+        Files.writeString(repository.resolve(".git/HEAD"), "ref: refs/heads/main\n", StandardCharsets.UTF_8);
+        Path repositoryChild = Files.createDirectories(repository.resolve("src"));
+        Path worktree = Files.createTempDirectory("shed-lsp-git-worktree-");
+        Files.writeString(worktree.resolve(".git"), "gitdir: /tmp/shed-git-metadata\n", StandardCharsets.UTF_8);
+        Path worktreeChild = Files.createDirectories(worktree.resolve("src"));
+        LspController controller = new LspController(null);
+
+        assertEquals(repository.toRealPath(), controller.resolveWorkspaceRoot(repositoryChild));
+        assertEquals(worktree.toRealPath(), controller.resolveWorkspaceRoot(worktreeChild));
+    }
 }

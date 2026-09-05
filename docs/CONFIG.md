@@ -70,7 +70,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `line.numbers` | `absolute` | enum | `none`, `absolute`, `relative`, `relativeabsolute` (`hybrid` alias supported) |
 | `show.current.line` | `true` | bool | Highlight active line |
 | `expand.tab` | `true` | bool | Insert spaces for tab input |
-| `auto.indent` | `true` | bool | Auto-indent on newline |
+| `auto.indent` | `true` | bool | Continue leading indentation and apply bounded lexical block indentation on newline |
 | `highlight.search` | `true` | bool | Search result highlighting |
 | `list` | `false` | bool | Whitespace visualization |
 | `ruler.column` | `0` | int | Draw vertical ruler at column (`0` disables) |

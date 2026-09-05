@@ -1268,7 +1268,7 @@ final class EditActionController {
         try {
             int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
             int lineEnd = editor.writingArea.getLineEndOffset(line);
-            String indent = editor.configManager.getAutoIndent() ? currentLineIndentation() : "";
+            String indent = editor.configManager.getAutoIndent() ? editor.indentationForNewLine() : "";
             editor.writingArea.insert("\n" + indent, lineEnd - 1);
             editor.writingArea.setCaretPosition(lineEnd + indent.length());
             editor.markModified();

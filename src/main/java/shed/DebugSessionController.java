@@ -359,6 +359,10 @@ final class DebugSessionController {
         for (DebugAdapterDetector.ConfigurationReport configuration : report.configurations()) {
             output.append("  ").append(configuration.name()).append("  ").append(configuration.request()).append("  ")
                 .append(configuration.availability()).append("\n    ").append(configuration.remediation()).append("\n");
+            DebugAdapterRegistry.Configuration configured = validation.configurations().get(configuration.name());
+            if (configured != null && NativeDebugPresetDetector.isSuggestedConfiguration(configuration.name())) {
+                output.append("    Session-only native artifact preset: ").append(configured.program()).append("\n");
+            }
         }
         if (!report.validationErrors().isEmpty()) output.append("\nValidation:\n  ").append(String.join("\n  ", report.validationErrors())).append("\n");
         appendVsCodeLaunchReports(output, vsCode);
@@ -538,10 +542,11 @@ final class DebugSessionController {
 
     private DebugAdapterRegistry.Validation validation(Path workspace) {
         DebugAdapterRegistry.Validation base = baseValidation(workspace);
-        VsCodeLaunchReports imported = vsCodeLaunchReports(workspace, base);
+        DebugAdapterRegistry.Validation suggested = NativeDebugPresetDetector.effective(base, workspace);
+        VsCodeLaunchReports imported = vsCodeLaunchReports(workspace, suggested);
         Map<String, DebugAdapterRegistry.Configuration> configurations = new LinkedHashMap<>(imported.folder().configurations());
         configurations.putAll(imported.workspace().configurations());
-        return DebugAdapterRegistry.withExternalConfigurations(base, configurations);
+        return DebugAdapterRegistry.withExternalConfigurations(suggested, configurations);
     }
 
     private DebugAdapterRegistry.Validation baseValidation(Path workspace) {

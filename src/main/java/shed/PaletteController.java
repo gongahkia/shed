@@ -695,11 +695,19 @@ final class PaletteController {
 
 
     String showPaletteDialog(String title, List<String> candidates) {
-        return showPaletteDialog(title, candidates, null);
+        return showPaletteDialog(title, candidates, null, null);
     }
 
+    String showPaletteDialog(String title, List<String> candidates, ListCellRenderer<? super String> renderer) {
+        return showPaletteDialog(title, candidates, null, renderer);
+    }
 
     String showPaletteDialog(String title, List<String> candidates, PalettePreviewProvider previewProvider) {
+        return showPaletteDialog(title, candidates, previewProvider, null);
+    }
+
+    private String showPaletteDialog(String title, List<String> candidates, PalettePreviewProvider previewProvider,
+                                     ListCellRenderer<? super String> renderer) {
         // undecorated modal dialog styled as floating picker
         JDialog dialog = new JDialog(editor, title, true);
         dialog.setUndecorated(true);
@@ -726,6 +734,7 @@ final class PaletteController {
         list.setForeground(editor.configManager.getCommandBarForeground());
         list.setSelectionBackground(editor.configManager.getSelectionColor());
         list.setSelectionForeground(editor.configManager.getSelectionTextColor());
+        if (renderer != null) list.setCellRenderer(renderer);
         if (!model.isEmpty()) list.setSelectedIndex(0);
         JLabel titleLabel = new JLabel(" " + title);
         titleLabel.setForeground(editor.configManager.getCaretColor());

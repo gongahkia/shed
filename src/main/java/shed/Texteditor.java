@@ -2020,6 +2020,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return paletteController.showPaletteDialog(title, candidates);
     }
 
+    String showPaletteDialog(String title, List<String> candidates, ListCellRenderer<? super String> renderer) {
+        return paletteController.showPaletteDialog(title, candidates, renderer);
+    }
+
     String showPaletteDialog(String title, List<String> candidates, PalettePreviewProvider previewProvider) {
         return paletteController.showPaletteDialog(title, candidates, previewProvider);
     }

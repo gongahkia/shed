@@ -51,11 +51,16 @@ final class TreeGitController {
         if (files.isEmpty()) {
             return "No files found";
         }
-        String selected = editor.showPaletteDialog("Find File", files);
+        Map<String, String> filesByCandidate = new LinkedHashMap<>();
+        for (String file : files) filesByCandidate.put(file, file);
+        String selected = editor.showPaletteDialog("Find File", new ArrayList<>(filesByCandidate.keySet()),
+            FileFinderIcons.renderer(editor, filesByCandidate));
         if (selected == null) return "File finder cancelled";
         try {
-            editor.openFile(new File(projectRoot, selected));
-            return "Opened: " + selected;
+            String relativePath = filesByCandidate.get(selected);
+            if (relativePath == null) return "File finder selection is unavailable";
+            editor.openFile(new File(projectRoot, relativePath));
+            return "Opened: " + relativePath;
         } catch (IOException e) {
             return "Error opening file: " + e.getMessage();
         }

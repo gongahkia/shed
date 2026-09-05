@@ -163,7 +163,8 @@ final class DebugAdapterDetector {
             case SCOPES -> settings.scopes();
             case VARIABLES, SET_VARIABLE -> settings.variables();
             case EVALUATE -> settings.evaluate();
-            case LAUNCH, CONFIGURATION_DONE, CONTINUE, NEXT, STEP_IN, STEP_OUT, PAUSE, GOTO, REVERSE_CONTINUE, STEP_BACK, RESTART_FRAME -> true;
+            case LAUNCH, CONFIGURATION_DONE, CONTINUE, NEXT, STEP_IN, STEP_OUT, PAUSE, GOTO, REVERSE_CONTINUE, STEP_BACK, RESTART_FRAME,
+                EXCEPTION_DETAILS, MODULES, LOADED_SOURCES -> true;
         };
     }
 

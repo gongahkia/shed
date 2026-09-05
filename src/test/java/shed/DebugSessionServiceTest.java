@@ -295,6 +295,56 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void loadsStandardExceptionDetailsForThePausedThreadWhenAdvertised() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-exception-details").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsExceptionInfoRequest", true), ""));
+        connection.responses.put("exceptionInfo", response("exceptionInfo", true, Map.of("exceptionId", "java.lang.IllegalStateException",
+            "breakMode", "always", "description", "broken", "details", Map.of("typeName", "IllegalStateException",
+                "fullTypeName", "java.lang.IllegalStateException", "stackTrace", "at Main.main(Main.java:4)")), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,exception_details"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "exception", "threadId", 7)));
+
+        DebugSessionService.ExceptionDetailsResult result = service.exceptionDetails(workspace, Duration.ofSeconds(1));
+
+        assertTrue(result.succeeded());
+        assertEquals("java.lang.IllegalStateException", result.details().exceptionId());
+        assertEquals("always", result.details().breakMode());
+        assertEquals(Map.of("threadId", 7), connection.arguments.getLast());
+    }
+
+    @Test
+    void loadsModulesAndSourcesOnlyWhenTheAdapterAdvertisesStandardRequests() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-runtime-metadata").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true,
+            Map.of("supportsModulesRequest", true, "supportsLoadedSourcesRequest", true), ""));
+        connection.responses.put("modules", response("modules", true, Map.of("modules", List.of(Map.of("id", 4, "name", "app",
+            "path", "/tmp/app", "version", "1.0", "symbolStatus", "loaded"))), ""));
+        connection.responses.put("loadedSources", response("loadedSources", true, Map.of("sources", List.of(Map.of("name", "Main.java",
+            "path", file.toString(), "sourceReference", 0, "origin", "runtime", "presentationHint", "normal"))), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,modules,loaded_sources"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, listener) -> connection).succeeded());
+        DebugSessionService.ModulesResult modules = service.modules(workspace, 0, 25, Duration.ofSeconds(1));
+        DebugSessionService.LoadedSourcesResult sources = service.loadedSources(workspace, Duration.ofSeconds(1));
+
+        assertTrue(modules.succeeded());
+        assertEquals(new DebugSessionService.ModuleInfo("4", "app", "/tmp/app", "1.0", "loaded"), modules.modules().getFirst());
+        assertEquals(Map.of("startModule", 0, "moduleCount", 25), connection.arguments.get(2));
+        assertTrue(sources.succeeded());
+        assertEquals("Main.java", sources.sources().getFirst().name());
+        assertEquals("runtime", sources.sources().getFirst().origin());
+    }
+
+    @Test
     void sendsRunToCursorOnlyWhenDeclaredAndAdvertised() {
         DebugSessionService service = new DebugSessionService();
         Path workspace = Path.of("build/debug-goto").toAbsolutePath();

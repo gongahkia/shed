@@ -20,6 +20,7 @@ enum LspCapability {
     SELECTION_RANGES("selection ranges", "selectionRangeProvider"),
     DOCUMENT_LINKS("document links", "documentLinkProvider"),
     DOCUMENT_COLORS("document colors", "colorProvider"),
+    PULL_DIAGNOSTICS("pull diagnostics", "diagnosticProvider"),
     DOCUMENT_SYMBOLS("document symbols", "documentSymbolProvider"),
     WORKSPACE_SYMBOLS("workspace symbols", "workspaceSymbolProvider"),
     EXECUTE_COMMAND("command execution", "executeCommandProvider");

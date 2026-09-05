@@ -28,6 +28,7 @@ public final class ReferenceDocumentHighlightLanguageServer {
                         "selectionRangeProvider", Boolean.TRUE,
                         "documentLinkProvider", Map.of("resolveProvider", Boolean.TRUE),
                         "colorProvider", Boolean.TRUE,
+                        "diagnosticProvider", Map.of("interFileDependencies", Boolean.FALSE, "workspaceDiagnostics", Boolean.FALSE),
                         "executeCommandProvider", Map.of("commands", List.of("test.run")))
                 ));
                 case "textDocument/documentHighlight" -> respond(System.out, request.get("id"), highlights(request));
@@ -43,6 +44,7 @@ public final class ReferenceDocumentHighlightLanguageServer {
                 )));
                 case "documentLink/resolve" -> respond(System.out, request.get("id"), resolvedDocumentLink(request));
                 case "textDocument/documentColor" -> respond(System.out, request.get("id"), List.of(documentColor()));
+                case "textDocument/diagnostic" -> respond(System.out, request.get("id"), pullDiagnostics(request));
                 case "workspace/executeCommand" -> respond(System.out, request.get("id"), null);
                 case "shutdown" -> respond(System.out, request.get("id"), null);
                 case "exit" -> {
@@ -110,6 +112,17 @@ public final class ReferenceDocumentHighlightLanguageServer {
             "range", Map.of("start", Map.of("line", 8, "character", 4), "end", Map.of("line", 8, "character", 11)),
             "color", Map.of("red", 0.2, "green", 0.4, "blue", 0.6, "alpha", 1.0)
         );
+    }
+
+    private static Map<String, Object> pullDiagnostics(Map<String, Object> request) {
+        Map<String, Object> params = MiniJson.asObject(request.get("params"));
+        String previousResultId = MiniJson.asString(params == null ? null : params.get("previousResultId"));
+        if ("diagnostics-v1".equals(previousResultId)) return Map.of("kind", "unchanged", "resultId", "diagnostics-v1");
+        return Map.of("kind", "full", "resultId", "diagnostics-v1", "items", List.of(Map.of(
+            "range", Map.of("start", Map.of("line", 2, "character", 1), "end", Map.of("line", 2, "character", 4)),
+            "severity", 2,
+            "message", "pulled warning"
+        )));
     }
 
     private static void respond(OutputStream output, Object id, Object result) throws IOException {

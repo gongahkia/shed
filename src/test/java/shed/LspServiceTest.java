@@ -76,7 +76,7 @@ public class LspServiceTest {
     @Test
     void recognizesServerAdvertisedSymbolCapabilities() {
         Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
-            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true},\"selectionRangeProvider\":true,\"documentLinkProvider\":{\"resolveProvider\":true},\"colorProvider\":true}}}}"
+            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true},\"selectionRangeProvider\":true,\"documentLinkProvider\":{\"resolveProvider\":true},\"colorProvider\":true,\"diagnosticProvider\":{}}}}"
         ));
 
         LspCapabilityModel model = LspCapabilityModel.fromInitializeResult(response, LspFeatureSettings.defaults().capabilityEnablement());
@@ -87,6 +87,7 @@ public class LspServiceTest {
         assertTrue(model.allows(LspCapability.SELECTION_RANGES));
         assertTrue(model.allows(LspCapability.DOCUMENT_LINKS));
         assertTrue(model.allows(LspCapability.DOCUMENT_COLORS));
+        assertTrue(model.allows(LspCapability.PULL_DIAGNOSTICS));
         assertTrue(LspClient.parseCodeLensResolveSupport(response));
         assertTrue(LspClient.parseDocumentLinkResolveSupport(response));
     }
@@ -212,6 +213,26 @@ public class LspServiceTest {
             List<LspClient.DocumentColor> colors = client.documentColors(uri);
             assertEquals(List.of(new LspClient.DocumentColor(8, 4, 8, 11, 0.2, 0.4, 0.6, 1.0)), colors);
             assertEquals("#336699FF", colors.getFirst().hexValue());
+        } finally {
+            client.stop();
+        }
+    }
+
+    @Test
+    void pullsAndRetainsDiagnosticsFromAnAdvertisedLanguageServer() throws Exception {
+        Path workspace = Files.createTempDirectory("shed-lsp-pull-diagnostics-");
+        Path java = Path.of(System.getProperty("java.home"), "bin", javaExecutable());
+        Assumptions.assumeTrue(Files.isExecutable(java), "Java runtime executable is unavailable");
+        String uri = workspace.resolve("Main.java").toUri().toString();
+        LspClient client = new LspClient(List.of(java.toString(), "-cp", System.getProperty("java.class.path"),
+            ReferenceDocumentHighlightLanguageServer.class.getName()), workspace, workspace.toUri().toString(), LspFeatureSettings.defaults());
+        try {
+            assertTrue(client.supports(LspCapability.PULL_DIAGNOSTICS));
+            List<LspClient.Diagnostic> first = client.pullDiagnostics(uri);
+            assertEquals(1, first.size());
+            assertEquals("pulled warning", first.getFirst().getMessage());
+            assertEquals(first, client.pullDiagnostics(uri));
+            assertEquals(first, client.getDiagnostics(uri));
         } finally {
             client.stop();
         }
@@ -348,6 +369,17 @@ public class LspServiceTest {
 
         assertEquals(List.of(new LspClient.DocumentColor(2, 1, 2, 8, 0.1, 0.2, 0.3, 0.5)), colors);
         assertEquals("#1A334D80", colors.getFirst().hexValue());
+    }
+
+    @Test
+    void parsesPullDiagnosticsWithThePushDiagnosticShape() {
+        List<LspClient.Diagnostic> diagnostics = LspClient.parseDiagnostics(MiniJson.asArray(MiniJson.parse("["
+            + "{\"range\":{\"start\":{\"line\":1,\"character\":3},\"end\":{\"line\":1,\"character\":7}},\"severity\":1,\"message\":\"problem\"}]")));
+
+        assertEquals(1, diagnostics.size());
+        assertEquals(1, diagnostics.getFirst().getLine());
+        assertEquals(3, diagnostics.getFirst().getCharacter());
+        assertEquals("problem", diagnostics.getFirst().getMessage());
     }
 
     @Test

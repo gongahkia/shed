@@ -76,7 +76,7 @@ public class LspServiceTest {
     @Test
     void recognizesServerAdvertisedSymbolCapabilities() {
         Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
-            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true},\"selectionRangeProvider\":true,\"documentLinkProvider\":{\"resolveProvider\":true},\"colorProvider\":true,\"diagnosticProvider\":{\"workspaceDiagnostics\":true}}}}"
+            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true},\"selectionRangeProvider\":true,\"documentLinkProvider\":{\"resolveProvider\":true},\"colorProvider\":true,\"diagnosticProvider\":{\"workspaceDiagnostics\":true},\"foldingRangeProvider\":true}}}}"
         ));
 
         LspCapabilityModel model = LspCapabilityModel.fromInitializeResult(response, LspFeatureSettings.defaults().capabilityEnablement());
@@ -89,6 +89,7 @@ public class LspServiceTest {
         assertTrue(model.allows(LspCapability.DOCUMENT_COLORS));
         assertTrue(model.allows(LspCapability.PULL_DIAGNOSTICS));
         assertTrue(model.allows(LspCapability.WORKSPACE_DIAGNOSTICS));
+        assertTrue(model.allows(LspCapability.FOLDING_RANGES));
         assertTrue(LspClient.parseCodeLensResolveSupport(response));
         assertTrue(LspClient.parseDocumentLinkResolveSupport(response));
     }
@@ -259,6 +260,22 @@ public class LspServiceTest {
     }
 
     @Test
+    void requestsFoldingRangesFromAnAdvertisedLanguageServer() throws Exception {
+        Path workspace = Files.createTempDirectory("shed-lsp-folding-ranges-");
+        Path java = Path.of(System.getProperty("java.home"), "bin", javaExecutable());
+        Assumptions.assumeTrue(Files.isExecutable(java), "Java runtime executable is unavailable");
+        String uri = workspace.resolve("Main.java").toUri().toString();
+        LspClient client = new LspClient(List.of(java.toString(), "-cp", System.getProperty("java.class.path"),
+            ReferenceDocumentHighlightLanguageServer.class.getName()), workspace, workspace.toUri().toString(), LspFeatureSettings.defaults());
+        try {
+            assertTrue(client.supports(LspCapability.FOLDING_RANGES));
+            assertEquals(List.of(new LspClient.FoldingRange(10, 18, 2, 1, "region")), client.foldingRanges(uri));
+        } finally {
+            client.stop();
+        }
+    }
+
+    @Test
     void parsesCompletionDetailsAndMarkdownDocumentation() {
         List<LspClient.CompletionItem> items = LspClient.parseCompletionItems(MiniJson.parse(
             "{\"items\":[{\"label\":\"render\",\"detail\":\"void render()\",\"kind\":3,\"documentation\":{\"kind\":\"markdown\",\"value\":\"Renders a frame.\"}}]}"
@@ -400,6 +417,16 @@ public class LspServiceTest {
         assertEquals(1, diagnostics.getFirst().getLine());
         assertEquals(3, diagnostics.getFirst().getCharacter());
         assertEquals("problem", diagnostics.getFirst().getMessage());
+    }
+
+    @Test
+    void parsesLineAndCharacterFoldingRanges() {
+        List<LspClient.FoldingRange> ranges = LspClient.parseFoldingRanges(MiniJson.parse("["
+            + "{\"startLine\":1,\"startCharacter\":2,\"endLine\":4,\"endCharacter\":3,\"kind\":\"comment\"},"
+            + "{\"startLine\":8,\"endLine\":12},"
+            + "{\"startLine\":6,\"endLine\":5}]"));
+
+        assertEquals(List.of(new LspClient.FoldingRange(1, 4, 2, 3, "comment"), new LspClient.FoldingRange(8, 12, -1, -1, null)), ranges);
     }
 
     @Test

@@ -291,6 +291,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:lsp colors`, `:lsp documentcolors` | List current-document LSP colors as RGBA hex values without editing the buffer |
 | `:lsp pulldiagnostics`, `:lsp pulldiag` | Explicitly refresh a current-document pull-diagnostic provider and open its results in quickfix |
 | `:lsp workspacediagnostics`, `:lsp workspacediag` | Explicitly request bounded direct workspace diagnostics from active compatible servers and open local-file results in quickfix |
+| `:lsp folding`, `:lsp foldingranges` | List current-document LSP folding ranges without altering the Markdown-heading fold model |
 | `:lsp format` | Apply server formatting edits to the current document when supported |
 | `:format`, `:fmt` | Format with the current extension's selected formatter policy |
 | `:formatter`, `:formatpolicy` | Edit the current extension's formatter mode, direct command, args, and format-on-save policy |

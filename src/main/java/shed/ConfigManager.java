@@ -303,6 +303,7 @@ public class ConfigManager {
         defineDefault("lsp.document.colors.enabled", lspFeatures.documentColors());
         defineDefault("lsp.pull.diagnostics.enabled", lspFeatures.pullDiagnostics());
         defineDefault("lsp.workspace.diagnostics.enabled", lspFeatures.workspaceDiagnostics());
+        defineDefault("lsp.folding.ranges.enabled", lspFeatures.foldingRanges());
         defineDefault("lsp.semantic.tokens.inline", DEFAULT_LSP_SEMANTIC_TOKENS_INLINE);
         defineDefault("lsp.inlay.hints.inline", DEFAULT_LSP_INLAY_HINTS_INLINE);
         defineDefault("lsp.definition.enabled", lspFeatures.definition());
@@ -1046,6 +1047,7 @@ public class ConfigManager {
             getBoolean("lsp.document.colors.enabled", defaults.documentColors()),
             getBoolean("lsp.pull.diagnostics.enabled", defaults.pullDiagnostics()),
             getBoolean("lsp.workspace.diagnostics.enabled", defaults.workspaceDiagnostics()),
+            getBoolean("lsp.folding.ranges.enabled", defaults.foldingRanges()),
             getBoolean("lsp.definition.enabled", defaults.definition()),
             getBoolean("lsp.type.definition.enabled", defaults.typeDefinition()),
             getBoolean("lsp.implementation.enabled", defaults.implementation()),

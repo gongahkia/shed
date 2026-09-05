@@ -283,6 +283,7 @@ public class ConfigManagerTest {
         config.setAndPersist("lsp.inlay.hints.enabled", "false");
         config.setAndPersist("lsp.definition.enabled", "false");
         config.setAndPersist("lsp.type.definition.enabled", "false");
+        config.setAndPersist("lsp.implementation.enabled", "false");
         config.setAndPersist("lsp.call.hierarchy.enabled", "false");
         config.setAndPersist("lsp.type.hierarchy.enabled", "false");
         config.setAndPersist("lsp.references.enabled", "false");
@@ -294,12 +295,13 @@ public class ConfigManagerTest {
         assertTrue(config.getLspFormatOnSaveEnabled());
 
         LspFeatureSettings features = config.getLspFeatureSettings();
-        assertEquals(new LspFeatureSettings(false, true, false, false, false, false, false, false, false, false, false, false, false, false, false), features);
+        assertEquals(new LspFeatureSettings(false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false), features);
         assertFalse(features.capabilityEnablement().get(LspCapability.COMPLETION));
         assertFalse(features.capabilityEnablement().get(LspCapability.SIGNATURE_HELP));
         assertFalse(features.capabilityEnablement().get(LspCapability.HOVER));
         assertFalse(features.capabilityEnablement().get(LspCapability.DEFINITION));
         assertFalse(features.capabilityEnablement().get(LspCapability.TYPE_DEFINITION));
+        assertFalse(features.capabilityEnablement().get(LspCapability.IMPLEMENTATION));
         assertFalse(features.capabilityEnablement().get(LspCapability.CALL_HIERARCHY));
         assertFalse(features.capabilityEnablement().get(LspCapability.TYPE_HIERARCHY));
         assertFalse(features.capabilityEnablement().get(LspCapability.REFERENCES));

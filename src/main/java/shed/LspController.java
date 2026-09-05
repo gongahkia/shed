@@ -664,7 +664,7 @@ final class LspController {
             String path = filePathFromUri(location.getUri());
             if (path == null || path.isBlank()) continue;
             entries.add(new QuickfixService.Entry(path, location.getLine() + 1, location.getCharacter() + 1,
-                label.substring(0, label.length() - (label.endsWith("s") ? 1 : 0), "lsp"));
+                label.substring(0, label.length() - (label.endsWith("s") ? 1 : 0)), "lsp"));
         }
         if (entries.isEmpty()) {
             editor.problemsController.clearQuickfixSource("lsp");

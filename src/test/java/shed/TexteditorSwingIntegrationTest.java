@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.awt.Component;
 import java.awt.GraphicsEnvironment;
+import java.awt.Window;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.io.File;
@@ -19,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -98,6 +100,37 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(landing.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
             assertEquals("# My start page\n", onEdt(() -> editor.getCurrentBuffer().getContent()));
         } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void settingsDialogUsesTheActiveShedPalette() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-themed-settings");
+        Path file = tempDir.resolve("themed-settings.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "settings\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        SettingsEditorDialog dialog = null;
+        try {
+            dialog = onEdt(() -> {
+                SettingsEditorDialog.showFor(editor);
+                return Arrays.stream(Window.getWindows()).filter(SettingsEditorDialog.class::isInstance)
+                    .map(SettingsEditorDialog.class::cast).filter(Window::isDisplayable).findFirst().orElseThrow();
+            });
+            SettingsEditorDialog shown = dialog;
+
+            assertEquals(editor.configManager.getNormalColor(), onEdt(() -> shown.getContentPane().getBackground()));
+            List<javax.swing.JTextField> fields = onEdt(() -> descendants(shown, javax.swing.JTextField.class));
+            assertFalse(fields.isEmpty());
+            assertTrue(fields.stream().allMatch(field -> editor.configManager.getCommandBarBackground().equals(field.getBackground())));
+            List<javax.swing.JButton> buttons = onEdt(() -> descendants(shown, javax.swing.JButton.class));
+            assertFalse(buttons.isEmpty());
+            assertTrue(buttons.stream().allMatch(button -> editor.configManager.getEditorForeground().equals(button.getForeground())));
+        } finally {
+            if (dialog != null) onEdt(() -> { dialog.dispose(); return null; });
             disposeEditor(editor);
         }
     }
@@ -1337,6 +1370,16 @@ public class TexteditorSwingIntegrationTest {
         if (timer != null) {
             timer.stop();
         }
+    }
+
+    private static <T extends Component> List<T> descendants(Component root, Class<T> type) {
+        List<T> result = new ArrayList<>();
+        if (root == null) return result;
+        if (type.isInstance(root)) result.add(type.cast(root));
+        if (root instanceof java.awt.Container container) {
+            for (Component child : container.getComponents()) result.addAll(descendants(child, type));
+        }
+        return result;
     }
 
     private static <T> T onEdt(Callable<T> action) throws Exception {

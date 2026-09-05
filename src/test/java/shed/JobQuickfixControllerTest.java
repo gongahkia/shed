@@ -9,6 +9,8 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JobQuickfixControllerTest {
     @TempDir
@@ -50,6 +52,20 @@ class JobQuickfixControllerTest {
         assertEquals(List.of("cmake", "--build", build.toAbsolutePath().normalize().toString()), task.directArguments());
         assertFalse(task.hasShellArguments());
         assertEquals(TaskService.ShellPolicy.DIRECT, task.shell());
+    }
+
+    @Test
+    void buildsOnlyDirectArgumentsForExplicitCmakePresets() throws Exception {
+        assertEquals(List.of("cmake", "--preset", "debug local"), JobQuickfixController.cmakePresetArguments("configure", "debug local"));
+        assertEquals(List.of("cmake", "--build", "--preset", "debug"), JobQuickfixController.cmakePresetArguments("build", "debug"));
+        assertEquals(List.of("ctest", "--preset", "debug"), JobQuickfixController.cmakePresetArguments("test", "debug"));
+        assertThrows(IllegalArgumentException.class, () -> JobQuickfixController.cmakePresetArguments("package", "debug"));
+        assertThrows(IllegalArgumentException.class, () -> JobQuickfixController.cmakePresetArguments("build", "debug\nother"));
+
+        Path workspace = Files.createDirectories(temporaryDirectory.resolve("presets"));
+        assertFalse(JobQuickfixController.hasCmakePresetFile(workspace));
+        Files.writeString(workspace.resolve("CMakeUserPresets.json"), "{}\n");
+        assertTrue(JobQuickfixController.hasCmakePresetFile(workspace));
     }
 
     @Test

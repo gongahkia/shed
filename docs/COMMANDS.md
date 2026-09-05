@@ -83,10 +83,11 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:task remote-dry-run <connection-id> <name>` | Resolve and show remote task plan without starting it |
 | `:task container <name>` | Explicitly run named task through the active project's running Dev Container |
 | `:task container-dry-run <name>` | Resolve and show the Dev Container task plan without starting it |
+| `:task cmake [dry-run] <configure\|build\|test> <preset>` | Explicitly invoke a CMake Preset as direct argv; no preset is inferred or changed |
 | `:task cancel <id>` | Cancel a running task job |
 
 Notes:
-- `:task run test` and `:task run build` have built-in fallbacks for Maven, Gradle Wrapper, npm, Make, Cargo, Go modules, an unambiguous top-level .NET project/solution, and a sole conventional generated CMake tree if not explicitly defined. Gradle uses the project wrapper; no global Gradle fallback is inferred. .NET requires exactly one `.sln`, `.slnx`, `.csproj`, `.fsproj`, or `.vbproj` at the workspace root. CMake does not configure or choose a preset.
+- `:task run test` and `:task run build` have built-in fallbacks for Maven, Gradle Wrapper, npm, Make, Cargo, Go modules, an unambiguous top-level .NET project/solution, and a sole conventional generated CMake tree if not explicitly defined. Gradle uses the project wrapper; no global Gradle fallback is inferred. .NET requires exactly one `.sln`, `.slnx`, `.csproj`, `.fsproj`, or `.vbproj` at the workspace root. Use `:task cmake` with an explicit name to configure, build, or test a CMake Preset; ordinary fallback never chooses one.
 - Task schema, variable, shell, quickfix, and presentation policy: [Workspace Tasks](TASKS.md).
 
 ## Test Explorer

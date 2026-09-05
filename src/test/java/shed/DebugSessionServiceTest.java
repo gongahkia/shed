@@ -316,6 +316,34 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void retainsValidatedAdapterProcessAnnouncementsForTheActiveSession() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-process-events").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+
+        assertTrue(service.start(workspace, file, validation("launch"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "process", Map.of("name", "server", "systemProcessId", 41,
+            "isLocalProcess", true, "startMethod", "launch")));
+        listener.get().onEvent(new DebugAdapterTransport.Event(2, "process", Map.of("name", "worker", "systemProcessId", 42,
+            "isLocalProcess", false, "startMethod", "attach")));
+        listener.get().onEvent(new DebugAdapterTransport.Event(3, "process", Map.of("name", "server-renamed", "systemProcessId", 41,
+            "isLocalProcess", true, "startMethod", "launch")));
+        listener.get().onEvent(new DebugAdapterTransport.Event(4, "process", Map.of("name", "invalid\nname")));
+
+        List<DebugSessionService.ProcessInfo> processes = service.snapshot(workspace).processes();
+        assertEquals(2, processes.size());
+        assertEquals("server-renamed", processes.getFirst().name());
+        assertEquals(41, processes.getFirst().systemProcessId());
+        assertEquals(false, processes.get(1).local());
+        assertTrue(service.snapshot(workspace).diagnostics().contains("DAP process event is invalid."));
+        assertTrue(service.stop(workspace).snapshot().processes().isEmpty());
+    }
+
+    @Test
     void loadsStandardExceptionDetailsForThePausedThreadWhenAdvertised() {
         DebugSessionService service = new DebugSessionService();
         Path workspace = Path.of("build/debug-exception-details").toAbsolutePath();

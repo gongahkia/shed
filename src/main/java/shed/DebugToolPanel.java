@@ -232,7 +232,9 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
             DebugSessionService.Snapshot session = editor.debugSessionController.snapshotForPanel();
             if (!session.configuration().isBlank()) configurations.setSelectedItem(session.configuration());
             else configurations.setSelectedItem(selected);
-            state.setText(session.lifecycle().name().toLowerCase() + " — " + session.detail());
+            String processSummary = session.processes().isEmpty() ? "" : " — " + session.processes().size() + " announced process"
+                + (session.processes().size() == 1 ? "" : "es");
+            state.setText(session.lifecycle().name().toLowerCase() + " — " + session.detail() + processSummary);
             DebugInspection.Snapshot snapshot = editor.debugSessionController.inspectionForPanel();
             threads.removeAllItems();
             for (DebugInspection.ThreadInfo thread : snapshot.threads()) threads.addItem(thread);

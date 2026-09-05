@@ -1563,6 +1563,15 @@ final class DebugSessionController {
         StringBuilder output = new StringBuilder("Debug Lifecycle\n\nWorkspace: ").append(snapshot.workspace()).append("\nConfiguration: ")
             .append(snapshot.configuration().isBlank() ? "(none)" : snapshot.configuration()).append("\nState: ").append(snapshot.lifecycle())
             .append("\nDetail: ").append(snapshot.detail()).append("\n");
+        output.append("Processes:\n");
+        if (snapshot.processes().isEmpty()) output.append("  (none announced)\n");
+        for (DebugSessionService.ProcessInfo process : snapshot.processes()) {
+            output.append("  ").append(process.name());
+            if (process.systemProcessId() > 0) output.append("  pid ").append(process.systemProcessId());
+            if (process.local() != null) output.append(process.local() ? "  local" : "  remote");
+            if (!process.startMethod().isBlank()) output.append("  ").append(process.startMethod());
+            output.append("\n");
+        }
         DebugConsole.Snapshot console = sessions.console(workspace);
         output.append("Console: ").append(console.state()).append(" — ").append(console.detail()).append("\n");
         if (!snapshot.diagnostics().isEmpty()) output.append("\nDiagnostics:\n  ").append(String.join("\n  ", snapshot.diagnostics())).append("\n");

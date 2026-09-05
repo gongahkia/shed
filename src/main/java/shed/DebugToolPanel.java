@@ -118,6 +118,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         JButton start = button("Start", () -> message(editor.debugSessionController.startForPanel()));
         JButton stop = button("Stop", () -> message(editor.debugSessionController.stopForPanel()));
         JButton restart = button("Restart", () -> message(editor.debugSessionController.restartForPanel()));
+        JButton restartAdapter = button("Restart Adapter", () -> message(editor.debugSessionController.restartRequestForPanel()));
         JButton resume = button("Continue", () -> message(editor.debugSessionController.continueForPanel()));
         JButton next = button("Next", () -> message(editor.debugSessionController.nextForPanel()));
         JButton stepIn = button("Step In", () -> message(editor.debugSessionController.stepInForPanel()));
@@ -128,7 +129,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         JButton restartFrame = button("Restart Frame", () -> message(editor.debugSessionController.restartFrameForPanel()));
         JButton runToCursor = button("Run to Cursor", () -> message(editor.debugSessionController.runToCursorForPanel()));
         JButton inspect = button("Refresh", () -> message(editor.debugSessionController.refreshInspectionForPanel()));
-        controls.add(start); controls.add(stop); controls.add(restart); controls.add(resume); controls.add(next); controls.add(stepIn); controls.add(stepOut); controls.add(pause); controls.add(reverseContinue); controls.add(stepBack); controls.add(restartFrame); controls.add(runToCursor); controls.add(inspect);
+        controls.add(start); controls.add(stop); controls.add(restart); controls.add(restartAdapter); controls.add(resume); controls.add(next); controls.add(stepIn); controls.add(stepOut); controls.add(pause); controls.add(reverseContinue); controls.add(stepBack); controls.add(restartFrame); controls.add(runToCursor); controls.add(inspect);
         panel.add(controls, BorderLayout.WEST);
         panel.add(state, BorderLayout.CENTER);
         return panel;

@@ -810,6 +810,48 @@ final class DebugSessionService {
         }
     }
 
+    ControlResult restartRequest(Path workspace, Duration timeout) {
+        Path root = root(workspace);
+        Connection connection;
+        DebugAdapterRegistry.Plan plan;
+        synchronized (this) {
+            Session session = session(root);
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null) {
+                return controlFailure(root, session, "No running debug session is available.");
+            }
+            if (!session.plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.RESTART)) {
+                return controlFailure(root, session, "Debug adapter does not declare support for restart.");
+            }
+            if (!session.runtimeCapabilities.contains(DebugAdapterRegistry.Capability.RESTART)) {
+                return controlFailure(root, session, "Debug adapter did not advertise support for restart during initialization.");
+            }
+            connection = session.connection;
+            plan = session.plan;
+        }
+        try {
+            DebugAdapterTransport.Response response = connection.request("restart", Map.of(), timeout);
+            if (!response.success()) {
+                synchronized (this) { return controlFailure(root, session(root), responseFailure("restart", response)); }
+            }
+            synchronized (this) {
+                Session session = session(root);
+                if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING || session.plan != plan) {
+                    return new ControlResult(snapshot(root, session), false);
+                }
+                session.inspection.invalidated("Debug restart requested.");
+                session.detail = "Debug restart requested.";
+                return new ControlResult(snapshot(root, session), true);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) {
+                return controlFailure(root, session(root), "Debug restart failed: " + message(error));
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) { return controlFailure(root, session(root), "Debug restart interrupted."); }
+        }
+    }
+
     RunToCursorResult runToCursor(Path workspace, Path source, int line, int column, Duration timeout) {
         Path root = root(workspace);
         Path requestedSource = source == null ? null : source.toAbsolutePath().normalize();
@@ -1734,6 +1776,7 @@ final class DebugSessionService {
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.GOTO, "supportsGotoTargetsRequest");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.REVERSE_CONTINUE, "supportsReverseContinue");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.STEP_BACK, "supportsStepBack");
+        retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.RESTART, "supportsRestartRequest");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.RESTART_FRAME, "supportsRestartFrame");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.EXCEPTION_DETAILS, "supportsExceptionInfoRequest");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.MODULES, "supportsModulesRequest");

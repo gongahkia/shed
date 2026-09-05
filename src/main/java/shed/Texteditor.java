@@ -171,6 +171,7 @@ public class Texteditor extends JFrame implements KeyListener {
     List<SyntaxSpan> syntaxForegroundSpans;
     List<SyntaxSpan> lspSemanticSpans;
     List<LspInlayHintOverlay> lspInlayHintOverlays;
+    List<LspDocumentHighlightTag> lspDocumentHighlightTags;
     Color syntaxKeywordColor;
     Color syntaxStringColor;
     Color syntaxCommentColor;
@@ -318,6 +319,7 @@ public class Texteditor extends JFrame implements KeyListener {
         syntaxForegroundSpans = new ArrayList<>();
         lspSemanticSpans = new ArrayList<>();
         lspInlayHintOverlays = new ArrayList<>();
+        lspDocumentHighlightTags = new ArrayList<>();
         syntaxKeywordColor = configManager.getSyntaxKeywordColor();
         syntaxStringColor = configManager.getSyntaxStringColor();
         syntaxCommentColor = configManager.getSyntaxCommentColor();
@@ -1437,7 +1439,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("d"); commands.add("delete"); commands.add("files"); commands.add("folder"); commands.add("projectreplace");
         commands.add("tree"); commands.add("git"); commands.add("grep"); commands.add("copen");
         commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
-        commands.add("lsp"); commands.add("peek"); commands.add("format"); commands.add("formatter"); commands.add("debug"); commands.add("dap"); commands.add("definition"); commands.add("typedefinition"); commands.add("implementation"); commands.add("hover"); commands.add("references");
+        commands.add("lsp"); commands.add("peek"); commands.add("format"); commands.add("formatter"); commands.add("debug"); commands.add("dap"); commands.add("definition"); commands.add("typedefinition"); commands.add("implementation"); commands.add("highlights"); commands.add("hover"); commands.add("references");
         commands.add("diagnostics"); commands.add("diag"); commands.add("problems"); commands.add("dnext"); commands.add("dprev"); commands.add("symbols"); commands.add("sym");
         commands.add("registers"); commands.add("yankring"); commands.add("marks"); commands.add("zen"); commands.add("goyo"); commands.add("limelight"); commands.add("normal");
         commands.add("reload"); commands.add("source"); commands.add("clean"); commands.add("shedclean");
@@ -2177,6 +2179,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return lspController.lspGoToImplementation();
     }
 
+    public String lspDocumentHighlights(String argument) {
+        return lspController.lspDocumentHighlights(argument);
+    }
+
     public String lspHover() {
         return lspController.lspHover();
     }
@@ -2331,6 +2337,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void refreshLspDecorations() {
         lspController.refreshLspDecorations();
+    }
+
+    void clearLspDecorations() {
+        lspController.clearLspDecorations();
     }
 
     public void notifyCurrentBufferSaved() {

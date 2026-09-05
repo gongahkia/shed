@@ -228,6 +228,7 @@ public class HelpService {
                     + "  :lsp definition  go to definition\n"
                     + "  :lsp typedefinition  go to type definition\n"
                     + "  :lsp implementation  go to implementation; multiple results use quickfix\n"
+                    + "  :lsp highlights [clear]  highlight server-reported symbol occurrences\n"
                     + "  :lsp peek definition|type  temporary read-only peek; Enter opens, Escape closes\n"
                     + "  :lsp calls incoming|outgoing  searchable lazy call hierarchy\n"
                     + "  :lsp typehierarchy supertypes|subtypes  searchable lazy type hierarchy\n"

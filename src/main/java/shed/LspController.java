@@ -3,6 +3,8 @@ package shed;
 import javax.swing.*;
 import javax.swing.Timer;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.Highlighter;
 import java.awt.Color;
 import java.io.*;
 import java.net.URI;
@@ -30,6 +32,8 @@ final class LspController {
     private Timer lspDecorationTimer;
     private FileBuffer pendingLspDecoration;
     private int lspDecorationJobId = -1;
+    private int documentHighlightJobId = -1;
+    private long documentHighlightGeneration;
     private int workspaceSymbolQueryGeneration;
     private int codeActionJobId = -1;
     private long codeActionGeneration;
@@ -109,7 +113,7 @@ final class LspController {
         flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|typedefinition|implementation|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -131,6 +135,9 @@ final class LspController {
             case "implementations":
             case "impl":
                 return lspGoToImplementation();
+            case "highlights":
+            case "documenthighlights":
+                return lspDocumentHighlights(args);
             case "hover":
                 return lspHover();
             case "semantic":
@@ -436,6 +443,42 @@ final class LspController {
             return showLspLocationsInQuickfix("implementations", locations);
         } catch (BadLocationException error) {
             return "LSP implementation failed: " + error.getMessage();
+        }
+    }
+
+    public String lspDocumentHighlights(String argument) {
+        String action = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
+        if ("clear".equals(action)) {
+            boolean hadHighlights = !editor.lspDocumentHighlightTags.isEmpty();
+            clearDocumentHighlights();
+            return hadHighlights ? "Cleared document highlights" : "No document highlights";
+        }
+        if (!action.isEmpty()) return "Usage: :lsp highlights [clear]";
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP document highlights require a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        String unavailable = capabilityUnavailable(client, LspCapability.DOCUMENT_HIGHLIGHTS);
+        if (unavailable != null) return unavailable;
+        syncLspOpen(buffer);
+        flushPendingLspChange(buffer);
+        String uri = bufferUri(buffer);
+        Integer version = editor.lspDocumentVersions.get(uri);
+        if (version == null) return "LSP document highlights unavailable";
+        try {
+            int caret = editor.writingArea.getCaretPosition();
+            int line = editor.writingArea.getLineOfOffset(caret);
+            int column = caret - editor.writingArea.getLineStartOffset(line);
+            clearDocumentHighlights();
+            long generation = ++documentHighlightGeneration;
+            DocumentHighlightRequest request = new DocumentHighlightRequest(buffer, client, uri, version, buffer.textSnapshot(), generation, line, column);
+            documentHighlightJobId = editor.asyncJobService.submit("LSP document highlights", token -> {
+                List<LspClient.DocumentHighlight> highlights = request.client().documentHighlights(request.uri(), request.line(), request.column());
+                return token.isCancelled() ? null : new DocumentHighlightResult(request, highlights);
+            }, (snapshot, result, error) -> applyDocumentHighlights(snapshot, result, error));
+            return "Loading document highlights (job " + documentHighlightJobId + ")";
+        } catch (BadLocationException error) {
+            return "LSP document highlights failed: " + error.getMessage();
         }
     }
 
@@ -2187,6 +2230,7 @@ final class LspController {
             editor.asyncJobService.cancel(lspDecorationJobId);
             lspDecorationJobId = -1;
         }
+        clearDocumentHighlights();
         pendingLspChange = null;
         pendingLspDecoration = null;
     }
@@ -2331,11 +2375,57 @@ final class LspController {
         editor.writingArea.repaint();
     }
 
-    private void clearLspDecorations() {
-        if (editor.lspSemanticSpans.isEmpty() && editor.lspInlayHintOverlays.isEmpty()) return;
+    void clearLspDecorations() {
+        if (editor.lspSemanticSpans.isEmpty() && editor.lspInlayHintOverlays.isEmpty() && editor.lspDocumentHighlightTags.isEmpty()
+            && documentHighlightJobId < 0) return;
         editor.lspSemanticSpans.clear();
         editor.lspInlayHintOverlays.clear();
+        clearDocumentHighlights();
         if (editor.writingArea != null) editor.writingArea.repaint();
+    }
+
+    private void applyDocumentHighlights(AsyncJobService.JobSnapshot snapshot, DocumentHighlightResult result, Exception error) {
+        if (snapshot == null || snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED || result == null || error != null) return;
+        documentHighlightJobId = -1;
+        DocumentHighlightRequest request = result.request();
+        if (request.generation() != documentHighlightGeneration || request.buffer() != editor.getCurrentBuffer()
+            || request.text() != request.buffer().textSnapshot() || !Objects.equals(request.version(), editor.lspDocumentVersions.get(request.uri()))
+            || existingLspClient(request.buffer()) != request.client()) return;
+        removeDocumentHighlightTags();
+        Highlighter highlighter = editor.writingArea.getHighlighter();
+        Color selection = editor.configManager.getSelectionColor();
+        int rendered = 0;
+        for (LspClient.DocumentHighlight highlight : result.highlights()) {
+            int start = offsetForPosition(request.text(), highlight.startLine(), highlight.startCharacter());
+            int end = offsetForPosition(request.text(), highlight.endLine(), highlight.endCharacter());
+            if (end <= start || start < 0 || end > request.text().length()) continue;
+            int alpha = highlight.kind() == 3 ? 112 : highlight.kind() == 2 ? 88 : 96;
+            try {
+                Object tag = highlighter.addHighlight(start, end, new DefaultHighlighter.DefaultHighlightPainter(
+                    new Color(selection.getRed(), selection.getGreen(), selection.getBlue(), alpha)));
+                editor.lspDocumentHighlightTags.add(new LspDocumentHighlightTag(highlighter, tag));
+                rendered++;
+            } catch (BadLocationException ignored) {
+            }
+        }
+        editor.writingArea.repaint();
+        editor.showMessage(rendered == 0 ? "No document highlights" : "Highlighted " + rendered + " occurrence" + (rendered == 1 ? "" : "s"));
+    }
+
+    private void clearDocumentHighlights() {
+        if (documentHighlightJobId >= 0) {
+            editor.asyncJobService.cancel(documentHighlightJobId);
+            documentHighlightJobId = -1;
+        }
+        documentHighlightGeneration++;
+        removeDocumentHighlightTags();
+    }
+
+    private void removeDocumentHighlightTags() {
+        for (LspDocumentHighlightTag entry : editor.lspDocumentHighlightTags) {
+            if (entry.highlighter() != null && entry.tag() != null) entry.highlighter().removeHighlight(entry.tag());
+        }
+        editor.lspDocumentHighlightTags.clear();
     }
 
     private Color semanticTokenColor(String type) {
@@ -2362,6 +2452,10 @@ final class LspController {
 
     private record LspDecorationResult(LspDecorationRequest request, List<LspClient.SemanticToken> semanticTokens,
                                        List<LspClient.InlayHint> inlayHints) { }
+
+    private record DocumentHighlightRequest(FileBuffer buffer, LspClient client, String uri, Integer version, VersionedTextSnapshot text,
+                                            long generation, int line, int column) { }
+    private record DocumentHighlightResult(DocumentHighlightRequest request, List<LspClient.DocumentHighlight> highlights) { }
 
 
     public void notifyCurrentBufferSaved() {

@@ -425,6 +425,7 @@ final class EditorUiController {
             return;
         }
         editor.detachActiveDocumentListener();
+        editor.clearLspDecorations();
         editor.activePaneIndex = index;
         bindActivePane(pane);
         editor.writingArea.setTabSize(editor.effectiveTabSize(pane.getBuffer()));
@@ -432,6 +433,7 @@ final class EditorUiController {
         editor.currentBufferIndex = pane.getBuffer() == null ? -1 : editor.buffers.indexOf(pane.getBuffer());
         editor.updateCurrentLineHighlight();
         editor.refreshLineNumberPanel();
+        editor.refreshLspDecorations();
         updateStatusBar();
         editor.refreshLimelight();
     }

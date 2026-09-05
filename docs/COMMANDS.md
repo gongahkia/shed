@@ -257,6 +257,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:definition` | LSP go-to-definition |
 | `:typedefinition`, `:typedef` | LSP go-to-type-definition |
 | `:implementation`, `:impl` | LSP go-to-implementation; multiple results open in quickfix |
+| `:highlights`, `:documenthighlights` | Highlight LSP symbol occurrences in the current document; cleared on edits, pane changes, or `clear` |
 | `:hover` | LSP hover |
 | `:references` | LSP references to quickfix |
 
@@ -272,6 +273,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:lsp definition`, `:lsp def` | Go to definition |
 | `:lsp typedefinition`, `:lsp type`, `:lsp typedef` | Go to type definition |
 | `:lsp implementation`, `:lsp impl` | Go to implementation; multiple results open in quickfix |
+| `:lsp highlights` | Highlight server-reported occurrences for the caret symbol; `:lsp highlights clear` removes them |
 | `:lsp peek definition`, `:peek definition` | Asynchronously show a temporary read-only definition split; Enter opens and Escape restores the layout |
 | `:lsp peek type`, `:peek type` | Asynchronously show a temporary read-only type-definition split |
 | `:lsp calls incoming\|outgoing` | Open searchable lazy LSP call hierarchy |

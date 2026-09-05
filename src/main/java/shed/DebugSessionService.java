@@ -23,7 +23,9 @@ final class DebugSessionService {
         NEXT("next", DebugAdapterRegistry.Capability.NEXT, true),
         STEP_IN("stepIn", DebugAdapterRegistry.Capability.STEP_IN, true),
         STEP_OUT("stepOut", DebugAdapterRegistry.Capability.STEP_OUT, true),
-        PAUSE("pause", DebugAdapterRegistry.Capability.PAUSE, false);
+        PAUSE("pause", DebugAdapterRegistry.Capability.PAUSE, false),
+        REVERSE_CONTINUE("reverseContinue", DebugAdapterRegistry.Capability.REVERSE_CONTINUE, true),
+        STEP_BACK("stepBack", DebugAdapterRegistry.Capability.STEP_BACK, true);
 
         private final String dapCommand;
         private final DebugAdapterRegistry.Capability capability;
@@ -470,6 +472,10 @@ final class DebugSessionService {
             if (!session.plan.adapter().capabilities().contains(requested.capability)) {
                 return controlFailure(root, session, "Debug adapter does not declare support for " + requested.dapCommand + ".");
             }
+            if ((requested == Control.REVERSE_CONTINUE || requested == Control.STEP_BACK)
+                && !session.runtimeCapabilities.contains(requested.capability)) {
+                return controlFailure(root, session, "Debug adapter did not advertise support for " + requested.dapCommand + " during initialization.");
+            }
             inspection = session.inspection.snapshot();
             if (requested.requiresPause && (!inspection.paused() || inspection.threadId() < 1)) {
                 return controlFailure(root, session, "Debug " + requested.dapCommand + " requires a paused thread.");
@@ -514,6 +520,53 @@ final class DebugSessionService {
             synchronized (this) {
                 return controlFailure(root, session(root), "Debug " + requested.dapCommand + " interrupted.");
             }
+        }
+    }
+
+    ControlResult restartFrame(Path workspace, Duration timeout) {
+        Path root = root(workspace);
+        Connection connection;
+        DebugAdapterRegistry.Plan plan;
+        DebugInspection.Snapshot inspection;
+        synchronized (this) {
+            Session session = session(root);
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null) {
+                return controlFailure(root, session, "No running debug session is available.");
+            }
+            if (!session.plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.RESTART_FRAME)) {
+                return controlFailure(root, session, "Debug adapter does not declare support for restartFrame.");
+            }
+            if (!session.runtimeCapabilities.contains(DebugAdapterRegistry.Capability.RESTART_FRAME)) {
+                return controlFailure(root, session, "Debug adapter did not advertise support for restartFrame during initialization.");
+            }
+            inspection = session.inspection.snapshot();
+            if (!inspection.paused() || inspection.frameId() < 1) {
+                return controlFailure(root, session, "Debug restartFrame requires a selected paused frame.");
+            }
+            connection = session.connection;
+            plan = session.plan;
+        }
+        try {
+            DebugAdapterTransport.Response response = connection.request("restartFrame", Map.of("frameId", inspection.frameId()), timeout);
+            if (!response.success()) {
+                synchronized (this) { return controlFailure(root, session(root), responseFailure("restartFrame", response)); }
+            }
+            synchronized (this) {
+                Session session = session(root);
+                if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING || session.plan != plan) {
+                    return new ControlResult(snapshot(root, session), false);
+                }
+                session.inspection.invalidated("Debug restartFrame requested.");
+                session.detail = "Debug restartFrame requested.";
+                return new ControlResult(snapshot(root, session), true);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) {
+                return controlFailure(root, session(root), "Debug restartFrame failed: " + message(error));
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) { return controlFailure(root, session(root), "Debug restartFrame interrupted."); }
         }
     }
 
@@ -1376,6 +1429,9 @@ final class DebugSessionService {
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.LOG_POINTS, "supportsLogPoints");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.SET_VARIABLE, "supportsSetVariable");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.GOTO, "supportsGotoTargetsRequest");
+        retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.REVERSE_CONTINUE, "supportsReverseContinue");
+        retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.STEP_BACK, "supportsStepBack");
+        retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.RESTART_FRAME, "supportsRestartFrame");
         return Set.copyOf(result);
     }
 

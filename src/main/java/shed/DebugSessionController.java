@@ -90,7 +90,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|goto [line]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|exception list|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|exception list|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -108,6 +108,9 @@ final class DebugSessionController {
             case "stepin", "step-in" -> submitControl(DebugSessionService.Control.STEP_IN);
             case "stepout", "step-out" -> submitControl(DebugSessionService.Control.STEP_OUT);
             case "pause" -> submitControl(DebugSessionService.Control.PAUSE);
+            case "reverse-continue", "reversecontinue", "reverse" -> submitControl(DebugSessionService.Control.REVERSE_CONTINUE);
+            case "stepback", "step-back" -> submitControl(DebugSessionService.Control.STEP_BACK);
+            case "restart-frame", "restartframe" -> submitRestartFrame();
             case "goto", "run-to-cursor", "runtocursor" -> runToCursor(args);
             case "breakpoint", "breakpoints", "bp" -> breakpoint(args);
             case "function", "functions", "function-breakpoint", "function-breakpoints" -> functionBreakpoint(args);
@@ -163,6 +166,9 @@ final class DebugSessionController {
     String stepInForPanel() { return submitControl(DebugSessionService.Control.STEP_IN); }
     String stepOutForPanel() { return submitControl(DebugSessionService.Control.STEP_OUT); }
     String pauseForPanel() { return submitControl(DebugSessionService.Control.PAUSE); }
+    String reverseContinueForPanel() { return submitControl(DebugSessionService.Control.REVERSE_CONTINUE); }
+    String stepBackForPanel() { return submitControl(DebugSessionService.Control.STEP_BACK); }
+    String restartFrameForPanel() { return submitRestartFrame(); }
     String runToCursorForPanel() { return runToCursor(""); }
 
     List<BreakpointStore.Breakpoint> breakpointsForPanel() {
@@ -700,6 +706,17 @@ final class DebugSessionController {
                 } else editor.showMessage(result.snapshot().detail());
             });
         return "Debug " + operation + " requested (job " + jobId + ").";
+    }
+
+    private String submitRestartFrame() {
+        Path workspace = workspace();
+        int jobId = editor.asyncJobService.submit("debug restart frame", token -> sessions.restartFrame(workspace,
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                refreshDebugPanel();
+                if (error != null || result == null || !result.succeeded()) editor.showMessage("Debug restart frame failed; inspect :debug status.");
+                else editor.showMessage(result.snapshot().detail());
+            });
+        return "Debug restart frame requested (job " + jobId + ").";
     }
 
     private String runToCursor(String argument) {

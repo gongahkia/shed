@@ -1437,7 +1437,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("d"); commands.add("delete"); commands.add("files"); commands.add("folder"); commands.add("projectreplace");
         commands.add("tree"); commands.add("git"); commands.add("grep"); commands.add("copen");
         commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
-        commands.add("lsp"); commands.add("peek"); commands.add("format"); commands.add("formatter"); commands.add("debug"); commands.add("dap"); commands.add("definition"); commands.add("typedefinition"); commands.add("hover"); commands.add("references");
+        commands.add("lsp"); commands.add("peek"); commands.add("format"); commands.add("formatter"); commands.add("debug"); commands.add("dap"); commands.add("definition"); commands.add("typedefinition"); commands.add("implementation"); commands.add("hover"); commands.add("references");
         commands.add("diagnostics"); commands.add("diag"); commands.add("problems"); commands.add("dnext"); commands.add("dprev"); commands.add("symbols"); commands.add("sym");
         commands.add("registers"); commands.add("yankring"); commands.add("marks"); commands.add("zen"); commands.add("goyo"); commands.add("limelight"); commands.add("normal");
         commands.add("reload"); commands.add("source"); commands.add("clean"); commands.add("shedclean");
@@ -2171,6 +2171,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String lspGoToTypeDefinition() {
         return lspController.lspGoToTypeDefinition();
+    }
+
+    public String lspGoToImplementation() {
+        return lspController.lspGoToImplementation();
     }
 
     public String lspHover() {

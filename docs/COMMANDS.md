@@ -78,7 +78,7 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:task add <name> <command>` | Save task |
 | `:task remove <name>`, `:task rm <name>`, `:task delete <name>` | Remove task |
 | `:task dry-run <name>` | Resolve and show task execution plan without starting it |
-| `:task run <name>` | Explicitly run named task; routes through an explicitly activated remote workspace or connected Dev Container when the task root is inside that session |
+| `:task run <name>` | Explicitly run named task; an unambiguous explicitly-default imported VS Code `build` or `test` group can satisfy `build` or `test` when no same-named task exists; routes through an explicitly activated remote workspace or connected Dev Container when the task root is inside that session |
 | `:task remote <connection-id> <name>` | Explicitly run named task through a matching connected remote workspace |
 | `:task remote-dry-run <connection-id> <name>` | Resolve and show remote task plan without starting it |
 | `:task container <name>` | Explicitly run named task through the active project's running Dev Container |
@@ -87,7 +87,7 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:task cancel <id>` | Cancel a running task job |
 
 Notes:
-- `:task run test` and `:task run build` have built-in fallbacks for Maven, Gradle Wrapper, npm, Make, Cargo, Go modules, an unambiguous top-level .NET project/solution, and a sole conventional generated CMake tree if not explicitly defined. Gradle uses the project wrapper; no global Gradle fallback is inferred. .NET requires exactly one `.sln`, `.slnx`, `.csproj`, `.fsproj`, or `.vbproj` at the workspace root. Use `:task cmake` with an explicit name to configure, build, test, package, or run a workflow CMake Preset; ordinary fallback never chooses one. CPack package and workflow presets require CMake 3.25+ upstream.
+- `:task run test` and `:task run build` first honor a same-named task, then one explicit default imported VS Code group, then use built-in fallbacks for Maven, Gradle Wrapper, npm, Make, Cargo, Go modules, an unambiguous top-level .NET project/solution, and a sole conventional generated CMake tree. Gradle uses the project wrapper; no global Gradle fallback is inferred. .NET requires exactly one `.sln`, `.slnx`, `.csproj`, `.fsproj`, or `.vbproj` at the workspace root. Use `:task cmake` with an explicit name to configure, build, test, package, or run a workflow CMake Preset; ordinary fallback never chooses one. CPack package and workflow presets require CMake 3.25+ upstream.
 - Task schema, variable, shell, quickfix, and presentation policy: [Workspace Tasks](TASKS.md).
 
 ## Test Explorer

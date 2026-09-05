@@ -958,6 +958,11 @@ public class LspClient {
         return textDocumentLocation("textDocument/typeDefinition", uri, line, character);
     }
 
+    public List<Location> implementations(String uri, int line, int character) {
+        if (!supports(LspCapability.IMPLEMENTATION)) return List.of();
+        return textDocumentLocations("textDocument/implementation", uri, line, character, 2500L);
+    }
+
     public List<HierarchyItem> prepareCallHierarchy(String uri, int line, int character) {
         if (!supports(LspCapability.CALL_HIERARCHY)) return List.of();
         Map<String, Object> response = sendTextDocumentPositionRequest("textDocument/prepareCallHierarchy", uri, line, character, 2500L);
@@ -1007,23 +1012,16 @@ public class LspClient {
     }
 
     private Location textDocumentLocation(String method, String uri, int line, int character) {
-        Map<String, Object> response = sendTextDocumentPositionRequest(method, uri, line, character, 2000L);
+        List<Location> locations = textDocumentLocations(method, uri, line, character, 2000L);
+        return locations.isEmpty() ? null : locations.getFirst();
+    }
+
+    private List<Location> textDocumentLocations(String method, String uri, int line, int character, long timeoutMs) {
+        Map<String, Object> response = sendTextDocumentPositionRequest(method, uri, line, character, timeoutMs);
         if (response == null) {
-            return null;
+            return List.of();
         }
-        Object result = response.get("result");
-        Map<String, Object> location = MiniJson.asObject(result);
-        if (location == null) {
-            List<Object> locations = MiniJson.asArray(result);
-            if (locations == null || locations.isEmpty()) {
-                return null;
-            }
-            location = MiniJson.asObject(locations.get(0));
-        }
-        if (location == null) {
-            return null;
-        }
-        return parseLocation(location);
+        return parseLocations(response.get("result"));
     }
 
     public List<Location> references(String uri, int line, int character, boolean includeDeclaration) {
@@ -1046,22 +1044,7 @@ public class LspClient {
         if (response == null) {
             return List.of();
         }
-        List<Object> result = MiniJson.asArray(response.get("result"));
-        if (result == null) {
-            return List.of();
-        }
-        List<Location> locations = new ArrayList<>();
-        for (Object item : result) {
-            Map<String, Object> candidate = MiniJson.asObject(item);
-            if (candidate == null) {
-                continue;
-            }
-            Location parsed = parseLocation(candidate);
-            if (parsed != null) {
-                locations.add(parsed);
-            }
-        }
-        return locations;
+        return parseLocations(response.get("result"));
     }
 
     public List<TextEdit> rename(String uri, int line, int character, String newName) {
@@ -1312,6 +1295,7 @@ public class LspClient {
         textDocument.put("hover", hover);
         textDocument.put("definition", new LinkedHashMap<>());
         textDocument.put("typeDefinition", new LinkedHashMap<>());
+        textDocument.put("implementation", new LinkedHashMap<>());
         textDocument.put("callHierarchy", Map.of("dynamicRegistration", Boolean.FALSE));
         textDocument.put("typeHierarchy", Map.of("dynamicRegistration", Boolean.FALSE));
         textDocument.put("documentSymbol", Map.of("hierarchicalDocumentSymbolSupport", Boolean.TRUE));
@@ -1651,7 +1635,22 @@ public class LspClient {
         writeMessage(response);
     }
 
-    private Location parseLocation(Map<String, Object> location) {
+    static List<Location> parseLocations(Object value) {
+        Map<String, Object> single = MiniJson.asObject(value);
+        List<Object> candidates = single == null ? MiniJson.asArray(value) : List.of(single);
+        if (candidates == null || candidates.isEmpty()) return List.of();
+        Map<String, Location> unique = new LinkedHashMap<>();
+        for (Object candidate : candidates) {
+            Location location = parseLocation(MiniJson.asObject(candidate));
+            if (location != null) {
+                unique.putIfAbsent(location.getUri() + "\u0000" + location.getLine() + "\u0000" + location.getCharacter(), location);
+            }
+        }
+        return List.copyOf(unique.values());
+    }
+
+    private static Location parseLocation(Map<String, Object> location) {
+        if (location == null) return null;
         String uri = MiniJson.asString(location.get("uri"));
         Map<String, Object> range = MiniJson.asObject(location.get("range"));
         if (uri == null) {

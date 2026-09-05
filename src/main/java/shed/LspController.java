@@ -109,7 +109,7 @@ final class LspController {
         flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|typedefinition|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|typedefinition|implementation|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -127,6 +127,10 @@ final class LspController {
             case "type":
             case "typedef":
                 return lspGoToTypeDefinition();
+            case "implementation":
+            case "implementations":
+            case "impl":
+                return lspGoToImplementation();
             case "hover":
                 return lspHover();
             case "semantic":
@@ -411,6 +415,30 @@ final class LspController {
         }
     }
 
+    public String lspGoToImplementation() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP implementation requires a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        String unavailable = capabilityUnavailable(client, LspCapability.IMPLEMENTATION);
+        if (unavailable != null) return unavailable;
+        syncLspOpen(buffer);
+        String uri = bufferUri(buffer);
+        try {
+            int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
+            int column = editor.writingArea.getCaretPosition() - editor.writingArea.getLineStartOffset(line);
+            List<LspClient.Location> locations = client.implementations(uri, line, column);
+            if (locations.isEmpty()) {
+                editor.problemsController.clearQuickfixSource("lsp");
+                return "No implementations found";
+            }
+            if (locations.size() == 1) return openLspLocation(locations.getFirst(), "implementation");
+            return showLspLocationsInQuickfix("implementations", locations);
+        } catch (BadLocationException error) {
+            return "LSP implementation failed: " + error.getMessage();
+        }
+    }
+
     private String lspPeek(String argument) {
         String target = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
         if ("definition".equals(target) || "def".equals(target)) return requestPeek(false);
@@ -624,23 +652,26 @@ final class LspController {
                 editor.problemsController.clearQuickfixSource("lsp");
                 return "No references found";
             }
-            List<QuickfixService.Entry> entries = new ArrayList<>();
-            for (LspClient.Location location : locations) {
-                String path = filePathFromUri(location.getUri());
-                if (path == null || path.isBlank()) {
-                    continue;
-                }
-                entries.add(new QuickfixService.Entry(path, location.getLine() + 1, location.getCharacter() + 1, "reference", "lsp"));
-            }
-            if (entries.isEmpty()) {
-                editor.problemsController.clearQuickfixSource("lsp");
-                return "No file references found";
-            }
-            editor.updateQuickfixEntries("lsp references", entries);
-            return editor.openQuickfixList();
+            return showLspLocationsInQuickfix("references", locations);
         } catch (BadLocationException e) {
             return "LSP references failed: " + e.getMessage();
         }
+    }
+
+    private String showLspLocationsInQuickfix(String label, List<LspClient.Location> locations) {
+        List<QuickfixService.Entry> entries = new ArrayList<>();
+        for (LspClient.Location location : locations) {
+            String path = filePathFromUri(location.getUri());
+            if (path == null || path.isBlank()) continue;
+            entries.add(new QuickfixService.Entry(path, location.getLine() + 1, location.getCharacter() + 1,
+                label.substring(0, label.length() - (label.endsWith("s") ? 1 : 0), "lsp"));
+        }
+        if (entries.isEmpty()) {
+            editor.problemsController.clearQuickfixSource("lsp");
+            return "No file " + label + " found";
+        }
+        editor.updateQuickfixEntries("lsp " + label, entries);
+        return editor.openQuickfixList();
     }
 
     String showSymbols(String argument) {

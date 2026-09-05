@@ -100,6 +100,22 @@ public class TaskService {
         }
     }
 
+    /** The only VS Code task groups Shed can use as an explicit build/test entry point. */
+    enum TaskGroup {
+        NONE,
+        BUILD,
+        TEST;
+
+        static TaskGroup requestedBy(String taskName) {
+            if (taskName == null) return NONE;
+            return switch (taskName.trim().toLowerCase(Locale.ROOT)) {
+                case "build" -> BUILD;
+                case "test" -> TEST;
+                default -> NONE;
+            };
+        }
+    }
+
     static final class WorkspaceTask {
         private final String name;
         private final String command;
@@ -112,16 +128,18 @@ public class TaskService {
         private final List<String> shellArguments;
         private final boolean sessionOnly;
         private final List<String> dependencies;
+        private final TaskGroup group;
+        private final boolean defaultGroup;
 
         WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                       ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation) {
-            this(name, command, cwd, environment, shell, problemMatcher, presentation, null, null, false, List.of());
+            this(name, command, cwd, environment, shell, problemMatcher, presentation, null, null, false, List.of(), TaskGroup.NONE, false);
         }
 
         private WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                               ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation,
                               List<String> directArguments, List<String> shellArguments, boolean sessionOnly,
-                              List<String> dependencies) {
+                              List<String> dependencies, TaskGroup group, boolean defaultGroup) {
             this.name = name;
             this.command = command;
             this.cwd = cwd;
@@ -133,6 +151,8 @@ public class TaskService {
             this.shellArguments = shellArguments == null ? null : Collections.unmodifiableList(new ArrayList<>(shellArguments));
             this.sessionOnly = sessionOnly;
             this.dependencies = Collections.unmodifiableList(new ArrayList<>(dependencies == null ? List.of() : dependencies));
+            this.group = group == null ? TaskGroup.NONE : group;
+            this.defaultGroup = defaultGroup && this.group != TaskGroup.NONE;
         }
 
         String name() { return name; }
@@ -148,6 +168,8 @@ public class TaskService {
         List<String> shellArguments() { return shellArguments == null ? List.of() : shellArguments; }
         boolean sessionOnly() { return sessionOnly; }
         List<String> dependencies() { return dependencies; }
+        TaskGroup group() { return group; }
+        boolean defaultGroup() { return defaultGroup; }
     }
 
     static final class TaskLoadResult {
@@ -451,7 +473,7 @@ public class TaskService {
         }
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.DIRECT, problemMatcher, presentation,
-            values, null, true, List.of());
+            values, null, true, List.of(), TaskGroup.NONE, false);
     }
 
     /**
@@ -468,7 +490,7 @@ public class TaskService {
         Map<String, String> valuesEnvironment = validatedEnvironment(environment);
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.SHELL, problemMatcher, presentation,
-            null, values, true, List.of());
+            null, values, true, List.of(), TaskGroup.NONE, false);
     }
 
     /** Creates an ephemeral shell task whose sole command is intentionally raw shell syntax. */
@@ -481,14 +503,34 @@ public class TaskService {
         Map<String, String> valuesEnvironment = validatedEnvironment(environment);
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, command.trim(), cwd, valuesEnvironment, ShellPolicy.SHELL, problemMatcher, presentation,
-            null, null, true, List.of());
+            null, null, true, List.of(), TaskGroup.NONE, false);
     }
 
     static WorkspaceTask withDependencies(WorkspaceTask task, List<String> dependencies) {
         if (task == null) throw new IllegalArgumentException("task required");
         List<String> values = validatedDependencies(dependencies);
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
-            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), values);
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), values, task.group(), task.defaultGroup());
+    }
+
+    static WorkspaceTask withGroup(WorkspaceTask task, TaskGroup group, boolean defaultGroup) {
+        if (task == null) throw new IllegalArgumentException("task required");
+        if (group == null) throw new IllegalArgumentException("task group required");
+        return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), group, defaultGroup);
+    }
+
+    /** Returns an explicit imported default build/test task only when it is unambiguous. */
+    static WorkspaceTask defaultGroupTask(String taskName, Map<String, WorkspaceTask> tasks) {
+        TaskGroup requested = TaskGroup.requestedBy(taskName);
+        if (requested == TaskGroup.NONE || tasks == null || tasks.isEmpty()) return null;
+        WorkspaceTask selected = null;
+        for (WorkspaceTask task : tasks.values()) {
+            if (task == null || task.group() != requested || !task.defaultGroup()) continue;
+            if (selected != null) return null;
+            selected = task;
+        }
+        return selected;
     }
 
     private WorkspaceTask structuredTask(String name, TomlTable table) {

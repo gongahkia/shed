@@ -301,6 +301,7 @@ public class ConfigManager {
         defineDefault("lsp.inlay.hints.inline", DEFAULT_LSP_INLAY_HINTS_INLINE);
         defineDefault("lsp.definition.enabled", lspFeatures.definition());
         defineDefault("lsp.type.definition.enabled", lspFeatures.typeDefinition());
+        defineDefault("lsp.implementation.enabled", lspFeatures.implementation());
         defineDefault("lsp.call.hierarchy.enabled", lspFeatures.callHierarchy());
         defineDefault("lsp.type.hierarchy.enabled", lspFeatures.typeHierarchy());
         defineDefault("lsp.references.enabled", lspFeatures.references());
@@ -430,6 +431,7 @@ public class ConfigManager {
             case "lsp.inlay.hints.inline" -> "Render available LSP inlay hints in the editor";
             case "lsp.definition.enabled" -> "Enable LSP definition requests";
             case "lsp.type.definition.enabled" -> "Enable LSP type-definition requests";
+            case "lsp.implementation.enabled" -> "Enable LSP implementation requests";
             case "lsp.call.hierarchy.enabled" -> "Enable LSP call-hierarchy requests";
             case "lsp.type.hierarchy.enabled" -> "Enable LSP type-hierarchy requests";
             case "lsp.references.enabled" -> "Enable LSP reference requests";
@@ -1032,6 +1034,7 @@ public class ConfigManager {
             getBoolean("lsp.inlay.hints.enabled", defaults.inlayHints()),
             getBoolean("lsp.definition.enabled", defaults.definition()),
             getBoolean("lsp.type.definition.enabled", defaults.typeDefinition()),
+            getBoolean("lsp.implementation.enabled", defaults.implementation()),
             getBoolean("lsp.call.hierarchy.enabled", defaults.callHierarchy()),
             getBoolean("lsp.type.hierarchy.enabled", defaults.typeHierarchy()),
             getBoolean("lsp.references.enabled", defaults.references()),

@@ -88,6 +88,19 @@ class JobQuickfixControllerTest {
     }
 
     @Test
+    void explicitImportedDefaultBuildTaskPrecedesConventionalFallback() throws Exception {
+        Path workspace = Files.createDirectories(temporaryDirectory.resolve("explicit-default-build"));
+        Files.writeString(workspace.resolve("Makefile"), "build:\n\t@true\n");
+        TaskService.WorkspaceTask imported = TaskService.withGroup(TaskService.directWorkspaceTask("vscode-project-build", List.of("make", "project-build"),
+            "${workspaceFolder}", java.util.Map.of(), TaskService.ProblemMatcher.NONE, TaskService.Presentation.NEVER),
+            TaskService.TaskGroup.BUILD, true);
+
+        TaskService.WorkspaceTask selected = new JobQuickfixController(null).resolveTask("build", workspace.toFile(), java.util.Map.of(imported.name(), imported));
+
+        assertEquals(imported, selected);
+    }
+
+    @Test
     void dotnetFallbackRequiresExactlyOneTopLevelProjectOrSolution() throws Exception {
         Path workspace = Files.createDirectories(temporaryDirectory.resolve("dotnet workspace"));
         Files.writeString(workspace.resolve("app.slnx"), "<Solution/>\n");

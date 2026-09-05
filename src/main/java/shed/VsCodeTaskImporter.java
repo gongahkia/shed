@@ -28,7 +28,7 @@ final class VsCodeTaskImporter {
     private static final int MAX_TASKS = 100;
     private static final int MAX_ARGUMENTS = 256;
     private static final Set<String> SUPPORTED_TASK_FIELDS = Set.of("label", "type", "command", "args", "options", "problemMatcher", "presentation",
-        "dependsOn", "dependsOrder");
+        "dependsOn", "dependsOrder", "group");
     private static final Set<String> SUPPORTED_OPTIONS_FIELDS = Set.of("cwd", "env");
     private static final Set<String> SUPPORTED_PRESENTATION_FIELDS = Set.of("reveal");
     private static final Set<String> SUPPORTED_VARIABLES = Set.of("${workspaceFolder}", "${workspaceFolderBasename}",
@@ -211,6 +211,12 @@ final class VsCodeTaskImporter {
         } catch (IllegalArgumentException error) {
             return ImportResult.rejected(error.getMessage());
         }
+        Group group;
+        try {
+            group = group(entry.get("group"));
+        } catch (IllegalArgumentException error) {
+            return ImportResult.rejected(error.getMessage());
+        }
         String name = uniqueName(label, names);
         try {
             TaskService.WorkspaceTask task = process
@@ -218,7 +224,7 @@ final class VsCodeTaskImporter {
                 : arguments.isEmpty()
                     ? TaskService.rawShellWorkspaceTask(name, command, options.cwd(), options.environment(), matcher, presentation)
                     : TaskService.shellWorkspaceTask(name, commandArguments, options.cwd(), options.environment(), matcher, presentation);
-            return new ImportResult(task, label, dependencyLabels, null);
+            return new ImportResult(TaskService.withGroup(task, group.kind(), group.defaultGroup()), label, dependencyLabels, null);
         } catch (IllegalArgumentException error) {
             return ImportResult.rejected(oneLine(error.getMessage()));
         }
@@ -303,6 +309,35 @@ final class VsCodeTaskImporter {
         }
         if (new LinkedHashSet<>(labels).size() != labels.size()) throw new IllegalArgumentException("dependsOn must not repeat a task label.");
         return List.copyOf(labels);
+    }
+
+    private record Group(TaskService.TaskGroup kind, boolean defaultGroup) {
+        Group {
+            kind = kind == null ? TaskService.TaskGroup.NONE : kind;
+            defaultGroup = defaultGroup && kind != TaskService.TaskGroup.NONE;
+        }
+    }
+
+    private static Group group(Object value) {
+        if (value == null) return new Group(TaskService.TaskGroup.NONE, false);
+        if (value instanceof String text) return new Group(groupKind(text), false);
+        Map<String, Object> fields = MiniJson.asObject(value);
+        if (fields == null) throw new IllegalArgumentException("group must be build, test, or an object with kind and isDefault.");
+        Set<String> unsupported = new LinkedHashSet<>(fields.keySet());
+        unsupported.removeAll(Set.of("kind", "isDefault"));
+        if (!unsupported.isEmpty()) throw new IllegalArgumentException("group uses unsupported field" + (unsupported.size() == 1 ? " " : "s ")
+            + String.join(", ", unsupported.stream().sorted().toList()) + ".");
+        String kind = requiredText(fields, "kind");
+        if (kind == null) throw new IllegalArgumentException("group.kind must be build or test.");
+        Object rawDefault = fields.get("isDefault");
+        if (rawDefault != null && !(rawDefault instanceof Boolean)) throw new IllegalArgumentException("group.isDefault must be true or false when present.");
+        return new Group(groupKind(kind), Boolean.TRUE.equals(rawDefault));
+    }
+
+    private static TaskService.TaskGroup groupKind(String value) {
+        if ("build".equalsIgnoreCase(value)) return TaskService.TaskGroup.BUILD;
+        if ("test".equalsIgnoreCase(value)) return TaskService.TaskGroup.TEST;
+        throw new IllegalArgumentException("group must be build or test.");
     }
 
     private record Options(String cwd, Map<String, String> environment) {

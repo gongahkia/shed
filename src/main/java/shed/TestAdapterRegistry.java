@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -23,6 +24,7 @@ final class TestAdapterRegistry {
         register(new GoAdapter());
         register(new DotnetAdapter());
         register(new CargoAdapter());
+        register(new CtestAdapter());
     }
 
     void register(TestAdapter adapter) {
@@ -329,6 +331,86 @@ final class TestAdapterRegistry {
                 result.add(new TestService.TestCase(id(), id, name, "rust", null, 1, status, 0, ""));
             }
             return List.copyOf(result);
+        }
+    }
+
+    /** Runs an already-generated CTest tree; it never configures or builds a CMake project. */
+    private static final class CtestAdapter extends BuiltInAdapter {
+        private static final List<String> COMMON_BUILD_DIRECTORIES = List.of("", "build", "cmake-build-debug", "cmake-build-release", "out/build");
+
+        @Override public String id() { return "ctest"; }
+
+        @Override public boolean supports(Path root) { return testDirectory(root) != null; }
+
+        @Override public List<String> defaultCommand(Path root) {
+            Path directory = testDirectory(root);
+            return directory == null ? List.of("ctest") : List.of("ctest", "--test-dir", directory.toString());
+        }
+
+        @Override public TestService.Command discovery(TestService.AdapterSpec spec) {
+            List<String> command = new ArrayList<>(base(spec));
+            command.add("--show-only=json-v1");
+            return new TestService.Command(command, List.of());
+        }
+
+        @Override public TestService.Command run(TestService.AdapterSpec spec, List<TestService.TestCase> selected, Path cache) {
+            Path report = cache.resolve("ctest.xml");
+            List<String> command = new ArrayList<>(base(spec));
+            command.add("--output-on-failure");
+            command.add("--output-junit");
+            command.add(report.toString());
+            if (selected != null && !selected.isEmpty()) {
+                command.add("-R");
+                command.add(exactNameExpression(selected));
+            }
+            return command(command, report);
+        }
+
+        @Override public List<TestService.TestCase> parseDiscovery(Path root, String output) {
+            try {
+                int object = output == null ? -1 : output.indexOf('{');
+                Map<String, Object> payload = object < 0 ? null : MiniJson.asObject(MiniJson.parse(output.substring(object)));
+                if (payload == null || !"ctestInfo".equals(MiniJson.asString(payload.get("kind")))) return List.of();
+                List<Object> tests = MiniJson.asArray(payload.get("tests"));
+                if (tests == null) return List.of();
+                List<TestService.TestCase> result = new ArrayList<>();
+                for (Object raw : tests) {
+                    Map<String, Object> test = MiniJson.asObject(raw);
+                    String name = test == null ? "" : MiniJson.asString(test.get("name"));
+                    if (name == null || name.isBlank()) continue;
+                    result.add(new TestService.TestCase(id(), name, name, "ctest", null, 1, TestService.Status.UNKNOWN, 0, ""));
+                }
+                return List.copyOf(result);
+            } catch (RuntimeException error) {
+                return List.of();
+            }
+        }
+
+        @Override public List<TestService.TestCase> parseRun(Path root, TestService.Command command, String output) {
+            return TestService.parseJUnit(root, id(), command.reports());
+        }
+
+        private static Path testDirectory(Path root) {
+            if (root == null || !Files.isDirectory(root)) return null;
+            List<Path> candidates = COMMON_BUILD_DIRECTORIES.stream().map(root::resolve).map(path -> path.toAbsolutePath().normalize())
+                .filter(path -> Files.isRegularFile(path.resolve("CTestTestfile.cmake"))).sorted(Comparator.naturalOrder()).toList();
+            return candidates.size() == 1 ? candidates.getFirst() : null;
+        }
+
+        private static String exactNameExpression(List<TestService.TestCase> selected) {
+            List<String> names = selected.stream().map(TestService.TestCase::id).filter(name -> name != null && !name.isBlank())
+                .distinct().map(CtestAdapter::regexLiteral).toList();
+            return names.size() == 1 ? "^" + names.getFirst() + "$" : "^(" + String.join("|", names) + ")$";
+        }
+
+        private static String regexLiteral(String value) {
+            StringBuilder escaped = new StringBuilder(value.length());
+            for (int index = 0; index < value.length(); index++) {
+                char character = value.charAt(index);
+                if ("\\.^$|?*+()[]{}".indexOf(character) >= 0) escaped.append('\\');
+                escaped.append(character);
+            }
+            return escaped.toString();
         }
     }
 }

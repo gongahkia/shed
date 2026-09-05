@@ -23,14 +23,27 @@ final class ShellCommand {
     }
 
     static List<String> forCommand(String command, Map<String, String> env, Predicate<String> executable) {
-        String shell = resolveShell(env, executable);
+        return forCommand(command, env, executable, windowsHost());
+    }
+
+    static List<String> forCommand(String command, Map<String, String> env, Predicate<String> executable, boolean windows) {
+        String shell = resolveShell(env, executable, windows);
+        if (powerShell(shell)) return List.of(shell, "-NoProfile", "-Command", command);
+        if (commandPrompt(shell)) return List.of(shell, "/d", "/s", "/c", command);
         String flag = usesLoginFlag(shell) ? "-lc" : "-c";
         return List.of(shell, flag, command);
     }
 
     /** Starts the configured POSIX-like shell without loading its login startup files. */
     static List<String> nonLoginForCommand(String command, Map<String, String> env, Predicate<String> executable) {
-        return List.of(resolveShell(env, executable), "-c", command);
+        return nonLoginForCommand(command, env, executable, windowsHost());
+    }
+
+    static List<String> nonLoginForCommand(String command, Map<String, String> env, Predicate<String> executable, boolean windows) {
+        String shell = resolveShell(env, executable, windows);
+        if (powerShell(shell)) return List.of(shell, "-NoProfile", "-Command", command);
+        if (commandPrompt(shell)) return List.of(shell, "/d", "/s", "/c", command);
+        return List.of(shell, "-c", command);
     }
 
     /**
@@ -112,14 +125,34 @@ final class ShellCommand {
     }
 
     static List<String> interactiveCommand(Map<String, String> env, Predicate<String> executable) {
-        String shell = resolveShell(env, executable);
+        return interactiveCommand(env, executable, windowsHost());
+    }
+
+    static List<String> interactiveCommand(Map<String, String> env, Predicate<String> executable, boolean windows) {
+        String shell = resolveShell(env, executable, windows);
+        if (powerShell(shell)) return List.of(shell, "-NoLogo");
         return usesLoginFlag(shell) ? List.of(shell, "-l") : List.of(shell);
     }
 
     static String resolveShell(Map<String, String> env, Predicate<String> executable) {
+        return resolveShell(env, executable, windowsHost());
+    }
+
+    static String resolveShell(Map<String, String> env, Predicate<String> executable, boolean windows) {
         String shell = env == null ? null : env.get("SHELL");
         if (isUsableShell(shell, executable)) {
             return shell;
+        }
+        if (windows) {
+            String systemRoot = env == null ? null : firstPresent(env, "SystemRoot", "SYSTEMROOT");
+            if (systemRoot != null && !systemRoot.isBlank()) {
+                String separator = systemRoot.endsWith("\\") || systemRoot.endsWith("/") ? "" : "\\";
+                String powerShell = systemRoot + separator + "System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+                if (isUsableShell(powerShell, executable)) return powerShell;
+            }
+            String comSpec = env == null ? null : firstPresent(env, "ComSpec", "COMSPEC");
+            if (isUsableShell(comSpec, executable)) return comSpec;
+            return "cmd.exe";
         }
         for (String fallback : FALLBACK_SHELLS) {
             if (isUsableShell(fallback, executable)) {
@@ -127,6 +160,11 @@ final class ShellCommand {
             }
         }
         return "sh";
+    }
+
+    private static String firstPresent(Map<String, String> environment, String first, String second) {
+        String value = environment.get(first);
+        return value == null || value.isBlank() ? environment.get(second) : value;
     }
 
     private static boolean isUsableShell(String shell, Predicate<String> executable) {
@@ -144,6 +182,8 @@ final class ShellCommand {
         return "bash".equals(name)
             || "zsh".equals(name)
             || "fish".equals(name)
+            || powerShell(name)
+            || commandPrompt(name)
             || "sh".equals(name)
             || "dash".equals(name)
             || "ksh".equals(name)
@@ -153,6 +193,21 @@ final class ShellCommand {
     private static boolean usesLoginFlag(String shell) {
         String name = basename(shell).toLowerCase(Locale.ROOT);
         return "bash".equals(name) || "zsh".equals(name);
+    }
+
+    private static boolean powerShell(String shell) {
+        String name = basename(shell).toLowerCase(Locale.ROOT);
+        if (name.endsWith(".exe")) name = name.substring(0, name.length() - 4);
+        return "powershell".equals(name) || "pwsh".equals(name);
+    }
+
+    private static boolean commandPrompt(String shell) {
+        String name = basename(shell).toLowerCase(Locale.ROOT);
+        return "cmd".equals(name) || "cmd.exe".equals(name);
+    }
+
+    private static boolean windowsHost() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
     }
 
     private static String basename(String path) {

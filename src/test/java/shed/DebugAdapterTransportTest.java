@@ -10,6 +10,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -158,6 +159,49 @@ public class DebugAdapterTransportTest {
     }
 
     @Test
+    void acceptsOnlyAnAnnouncedIpv4LoopbackEndpointForSpawnedAdapters() throws Exception {
+        DebugAdapterRegistry.SpawnedTcpStartup startup = new DebugAdapterRegistry.SpawnedTcpStartup(List.of("--listen=127.0.0.1:0"),
+            "DAP server listening at:");
+
+        assertEquals(new DebugAdapterTransport.SpawnedTcpEndpoint("127.0.0.1", 43121),
+            DebugAdapterTransport.spawnedTcpEndpoint(startup, "DAP server listening at: 127.0.0.1:43121"));
+        assertNull(DebugAdapterTransport.spawnedTcpEndpoint(startup, "adapter starting"));
+        assertThrows(java.io.IOException.class, () -> DebugAdapterTransport.spawnedTcpEndpoint(startup,
+            "DAP server listening at: 192.0.2.50:43121"));
+        assertThrows(java.io.IOException.class, () -> DebugAdapterTransport.spawnedTcpEndpoint(startup,
+            "DAP server listening at: 127.0.0.1:0"));
+    }
+
+    @Test
+    void startsAChildAdapterAtItsAnnouncedLoopbackEndpointAndSpeaksDap() throws Exception {
+        Path workspace = java.nio.file.Files.createTempDirectory("shed-dap-tcp-");
+        String executable = Path.of(System.getProperty("java.home"), "bin", javaExecutable()).toString();
+        DebugAdapterRegistry.Adapter adapter = new DebugAdapterRegistry.Adapter("spawned", DebugAdapterRegistry.Transport.TCP, executable,
+            List.of("-cp", System.getProperty("java.class.path"), ReferenceTcpDebugAdapter.class.getName()),
+            java.util.Set.of(DebugAdapterRegistry.Capability.LAUNCH, DebugAdapterRegistry.Capability.CONFIGURATION_DONE),
+            new DebugAdapterRegistry.SpawnedTcpStartup(List.of("--shed-test"), "DAP server listening at:"), Map.of("mode", "debug"));
+        DebugAdapterRegistry.Configuration configuration = new DebugAdapterRegistry.Configuration("spawned", "spawned",
+            DebugAdapterRegistry.Request.LAUNCH, "workspace", "${file}", "${workspaceFolder}", List.of(), "", "127.0.0.1", 0, List.of(".go"));
+        DebugAdapterRegistry.Plan plan = new DebugAdapterRegistry.Plan(adapter, configuration, workspace, workspace, workspace.resolve("main.go"));
+        List<DebugAdapterTransport.Event> events = new CopyOnWriteArrayList<>();
+        DebugAdapterTransport transport = DebugAdapterTransport.start(plan, enabledDebugging(), new DebugAdapterTransport.Listener() {
+            @Override public void onEvent(DebugAdapterTransport.Event event) { events.add(event); }
+        });
+        try {
+            assertTrue(transport.request("initialize", Map.of("clientID", "shed"), Duration.ofSeconds(2)).success());
+            CompletableFuture<DebugAdapterTransport.Response> launch = CompletableFuture.supplyAsync(() -> {
+                try { return transport.request("launch", Map.of("program", workspace.resolve("main.go").toString()), Duration.ofSeconds(2)); }
+                catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
+            });
+            await(() -> events.stream().anyMatch(event -> "initialized".equals(event.event())));
+            assertTrue(transport.request("configurationDone", Map.of(), Duration.ofSeconds(2)).success());
+            assertTrue(launch.get(2, TimeUnit.SECONDS).success());
+        } finally {
+            transport.close();
+        }
+    }
+
+    @Test
     void closesWithDisconnectAndStopsTheAdapterProcess() throws Exception {
         java.io.PipedInputStream adapterOutput = new java.io.PipedInputStream();
         java.io.PipedOutputStream adapterWriter = new java.io.PipedOutputStream(adapterOutput);
@@ -181,6 +225,14 @@ public class DebugAdapterTransportTest {
             if (System.nanoTime() >= deadline) throw new AssertionError("condition was not met");
             Thread.sleep(10);
         }
+    }
+
+    private static DebugFeatureSettings enabledDebugging() {
+        return new DebugFeatureSettings(true, true, true, true, true, true, true, true);
+    }
+
+    private static String javaExecutable() {
+        return System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win") ? "java.exe" : "java";
     }
 
     private static final class FakeProcess extends Process {

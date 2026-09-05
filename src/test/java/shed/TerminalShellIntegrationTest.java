@@ -52,9 +52,25 @@ class TerminalShellIntegrationTest {
     }
 
     @Test
+    void preparesAnIsolatedPowerShellStartupWithoutModifyingUserProfiles() throws Exception {
+        Path directory = Files.createTempDirectory("shed-shell-");
+        TerminalShellIntegration.Launch launch = TerminalShellIntegration.prepare(List.of("pwsh", "-NoLogo"), true, directory);
+
+        assertTrue(launch.enabled());
+        assertEquals(List.of("pwsh", "-NoProfile", "-NoExit", "-File", directory.resolve("powershell-bootstrap.ps1").toString()), launch.command());
+        assertEquals("shed", launch.environment().get("TERM_PROGRAM"));
+        assertTrue(Files.readString(directory.resolve("powershell-bootstrap.ps1")).contains("$PROFILE.CurrentUserCurrentHost"));
+        String hook = Files.readString(directory.resolve("powershell.ps1"));
+        assertTrue(hook.contains("Set-PSReadLineKeyHandler -Chord Enter"));
+        assertTrue(hook.contains("Get-History -Count 1"));
+        assertTrue(hook.contains("1341;shed"));
+        assertTrue(TerminalShellIntegration.prepare(List.of("powershell.exe"), true, directory).enabled());
+    }
+
+    @Test
     void leavesNonInteractiveCommandsAndUnsupportedShellsUnmodified() throws Exception {
         Path directory = Files.createTempDirectory("shed-shell-");
         assertFalse(TerminalShellIntegration.prepare(List.of("bash", "-c", "echo hi"), true, directory).enabled());
-        assertFalse(TerminalShellIntegration.prepare(List.of("pwsh"), true, directory).enabled());
+        assertFalse(TerminalShellIntegration.prepare(List.of("cmd.exe"), true, directory).enabled());
     }
 }

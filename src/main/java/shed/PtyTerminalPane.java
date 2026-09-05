@@ -171,8 +171,9 @@ final class PtyTerminalPane implements AutoCloseable {
         String normalized = command == null ? "" : command.replace('\\', '/');
         int split = normalized.lastIndexOf('/');
         String name = (split < 0 ? normalized : normalized.substring(split + 1)).toLowerCase(java.util.Locale.ROOT);
+        if (name.endsWith(".exe")) name = name.substring(0, name.length() - 4);
         return switch (name) {
-            case "bash", "zsh", "sh", "dash", "ksh", "mksh", "fish", "pwsh", "powershell" -> true;
+            case "bash", "zsh", "sh", "dash", "ksh", "mksh", "fish", "pwsh", "powershell", "cmd" -> true;
             default -> false;
         };
     }

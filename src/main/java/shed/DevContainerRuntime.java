@@ -44,6 +44,10 @@ final class DevContainerRuntime {
         return processInvocation(workspace, command, "terminal");
     }
 
+    static List<String> defaultTerminalCommand() {
+        return List.of("/bin/sh");
+    }
+
     static String readCapped(Path path) throws IOException {
         try (InputStream input = Files.newInputStream(path); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];

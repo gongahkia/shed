@@ -124,6 +124,9 @@ public enum FileType {
                     case "bash":
                     case "zsh":
                     case "fish":
+                    case "ps1":
+                    case "psm1":
+                    case "psd1":
                         return SHELL;
                     case "txt":
                         return TEXT;
@@ -147,7 +150,8 @@ public enum FileType {
             if (firstLine.contains("php")) {
                 return PHP;
             }
-            if (firstLine.contains("sh") || firstLine.contains("bash") || firstLine.contains("zsh") || firstLine.contains("fish")) {
+            if (firstLine.contains("sh") || firstLine.contains("bash") || firstLine.contains("zsh") || firstLine.contains("fish")
+                || firstLine.contains("pwsh") || firstLine.contains("powershell")) {
                 return SHELL;
             }
         }

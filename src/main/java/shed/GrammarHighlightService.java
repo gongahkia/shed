@@ -374,7 +374,7 @@ final class GrammarHighlightService {
             case "yaml", "yml" -> FileType.YAML;
             case "toml" -> FileType.TOML;
             case "sql" -> FileType.SQL;
-            case "sh", "shell", "bash", "zsh", "fish" -> FileType.SHELL;
+            case "sh", "shell", "bash", "zsh", "fish", "powershell", "pwsh", "ps1" -> FileType.SHELL;
             default -> FileType.TEXT;
         };
     }

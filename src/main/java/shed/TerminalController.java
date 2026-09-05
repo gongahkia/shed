@@ -80,7 +80,8 @@ final class TerminalController {
             return openTerminal(label, startDirectory, command, message, null, orientation);
         }
         try {
-            List<String> invocation = DevContainerRuntime.terminalInvocation(connection.workspace(), command);
+            List<String> invocation = DevContainerRuntime.terminalInvocation(connection.workspace(), profile == null
+                ? DevContainerRuntime.defaultTerminalCommand() : command);
             String containerLabel = "Dev Container — " + label;
             String containerMessage = profile == null ? "Dev Container terminal opened" : "Dev Container terminal opened with "
                 + profile.extensionId() + ":" + profile.value().id();
@@ -274,7 +275,7 @@ final class TerminalController {
             }
         }
         output.append("\nShell integration: ").append(editor.configManager.getTerminalShellIntegrationEnabled()
-            ? "enabled for newly opened Bash, Zsh, and Fish terminals" : "disabled").append(".\n");
+            ? "enabled for newly opened Bash, Zsh, Fish, and PowerShell terminals" : "disabled").append(".\n");
         File startDirectory = resolveTerminalStartDirectory();
         RemoteWorkspaceSessionService.Connection remote = editor.remoteWorkspaceSessions == null
             ? null : editor.remoteWorkspaceSessions.connectionFor(startDirectory.toPath());

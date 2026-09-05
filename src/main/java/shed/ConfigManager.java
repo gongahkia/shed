@@ -1498,7 +1498,7 @@ public class ConfigManager {
         if (raw == null || raw.isBlank()) {
             return new String[0];
         }
-        return raw.trim().split("\\s+");
+        return ShellCommand.directCommand(raw).toArray(String[]::new);
     }
 
     public FormatterPolicy getFormatterPolicy(String extension) {
@@ -1554,8 +1554,13 @@ public class ConfigManager {
             if (key.startsWith(prefix) && key.endsWith(suffix) && key.length() > prefix.length() + suffix.length()) {
                 String ext = key.substring(prefix.length(), key.length() - suffix.length());
                 String cmd = config.get(key);
-                String[] args = getLspArgs(ext);
-                String full = cmd + (args.length > 0 ? " " + String.join(" ", args) : "");
+                String full;
+                try {
+                    String[] args = getLspArgs(ext);
+                    full = cmd + (args.length > 0 ? " " + String.join(" ", args) : "");
+                } catch (IllegalArgumentException error) {
+                    full = cmd + " <invalid arguments: " + error.getMessage() + ">";
+                }
                 servers.put(ext, full);
             }
         }

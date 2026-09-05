@@ -50,6 +50,23 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void explicitlyStartingAnActiveGoFileSelectsTheDelveProfileAndItsRequiredLaunchMode() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-go-context").toAbsolutePath();
+        Path file = workspace.resolve("main.go");
+        DebugAdapterRegistry.Validation validation = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
+        FakeConnection connection = new FakeConnection();
+
+        DebugSessionService.Result result = service.start(workspace, file, validation, enabled(), "", Duration.ofSeconds(1),
+            (plan, features, listener) -> connection);
+
+        assertTrue(result.succeeded());
+        assertEquals(BuiltInDebugAdapterSupport.GO_DELVE, result.snapshot().configuration());
+        assertEquals("debug", connection.arguments.get(1).get("mode"));
+        assertEquals(file.toString(), connection.arguments.get(1).get("program"));
+    }
+
+    @Test
     void runsAConfiguredPreLaunchTaskBeforeOpeningTheDebugAdapter() {
         DebugSessionService service = new DebugSessionService();
         Path workspace = Path.of("build/debug-prelaunch").toAbsolutePath();

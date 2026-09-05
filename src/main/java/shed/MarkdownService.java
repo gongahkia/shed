@@ -635,7 +635,7 @@ public class MarkdownService {
 
     private static final String[] COMMON_LANGUAGES = {
         "java", "javascript", "typescript", "python", "rust", "go", "c", "cpp",
-        "csharp", "ruby", "php", "swift", "kotlin", "scala", "bash", "shell",
+        "csharp", "ruby", "php", "swift", "kotlin", "scala", "bash", "shell", "powershell",
         "sql", "html", "css", "json", "yaml", "toml", "xml", "markdown",
         "lua", "haskell", "elixir", "clojure", "r", "dart", "zig", "nim"
     };

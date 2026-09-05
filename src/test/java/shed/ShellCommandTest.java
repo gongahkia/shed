@@ -68,6 +68,29 @@ public class ShellCommandTest {
     }
 
     @Test
+    void resolvesNativeWindowsPowerShellAndUsesItsDirectCommandConvention() {
+        Map<String, String> environment = Map.of("SystemRoot", "C:\\Windows", "ComSpec", "C:\\Windows\\System32\\cmd.exe");
+        java.util.function.Predicate<String> executable = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"::equals;
+
+        assertEquals("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+            ShellCommand.resolveShell(environment, executable, true));
+        assertEquals(java.util.List.of("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-NoLogo"),
+            ShellCommand.interactiveCommand(environment, executable, true));
+        assertEquals(java.util.List.of("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-NoProfile", "-Command", "Get-Date"),
+            ShellCommand.forCommand("Get-Date", environment, executable, true));
+    }
+
+    @Test
+    void fallsBackToCmdWhenWindowsPowerShellIsUnavailable() {
+        Map<String, String> environment = Map.of("ComSpec", "C:\\Windows\\System32\\cmd.exe");
+        java.util.function.Predicate<String> executable = "C:\\Windows\\System32\\cmd.exe"::equals;
+
+        assertEquals(java.util.List.of("C:\\Windows\\System32\\cmd.exe", "/d", "/s", "/c", "echo ok"),
+            ShellCommand.forCommand("echo ok", environment, executable, true));
+        assertEquals(java.util.List.of("C:\\Windows\\System32\\cmd.exe"), ShellCommand.interactiveCommand(environment, executable, true));
+    }
+
+    @Test
     void directCommandPreservesQuotedArgumentsWithoutStartingAShell() {
         assertEquals(
             java.util.List.of("tool", "two words", "plain value", ""),

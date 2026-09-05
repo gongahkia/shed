@@ -177,6 +177,9 @@ public class LspClient {
     public record InlayHint(int line, int character, String label) {
     }
 
+    public record DocumentHighlight(int startLine, int startCharacter, int endLine, int endCharacter, int kind) {
+    }
+
     public static class Location {
         private final String uri;
         private final int line;
@@ -963,6 +966,12 @@ public class LspClient {
         return textDocumentLocations("textDocument/implementation", uri, line, character, 2500L);
     }
 
+    public List<DocumentHighlight> documentHighlights(String uri, int line, int character) {
+        if (!supports(LspCapability.DOCUMENT_HIGHLIGHTS)) return List.of();
+        Map<String, Object> response = sendTextDocumentPositionRequest("textDocument/documentHighlight", uri, line, character, 2000L);
+        return response == null ? List.of() : parseDocumentHighlights(response.get("result"));
+    }
+
     public List<HierarchyItem> prepareCallHierarchy(String uri, int line, int character) {
         if (!supports(LspCapability.CALL_HIERARCHY)) return List.of();
         Map<String, Object> response = sendTextDocumentPositionRequest("textDocument/prepareCallHierarchy", uri, line, character, 2500L);
@@ -1296,6 +1305,7 @@ public class LspClient {
         textDocument.put("definition", new LinkedHashMap<>());
         textDocument.put("typeDefinition", new LinkedHashMap<>());
         textDocument.put("implementation", new LinkedHashMap<>());
+        textDocument.put("documentHighlight", new LinkedHashMap<>());
         textDocument.put("callHierarchy", Map.of("dynamicRegistration", Boolean.FALSE));
         textDocument.put("typeHierarchy", Map.of("dynamicRegistration", Boolean.FALSE));
         textDocument.put("documentSymbol", Map.of("hierarchicalDocumentSymbolSupport", Boolean.TRUE));
@@ -1645,6 +1655,32 @@ public class LspClient {
             if (location != null) {
                 unique.putIfAbsent(location.getUri() + "\u0000" + location.getLine() + "\u0000" + location.getCharacter(), location);
             }
+        }
+        return List.copyOf(unique.values());
+    }
+
+    static List<DocumentHighlight> parseDocumentHighlights(Object value) {
+        List<Object> values = MiniJson.asArray(value);
+        if (values == null || values.isEmpty()) return List.of();
+        Map<String, DocumentHighlight> unique = new LinkedHashMap<>();
+        for (Object valueItem : values) {
+            Map<String, Object> highlight = MiniJson.asObject(valueItem);
+            Map<String, Object> range = MiniJson.asObject(highlight == null ? null : highlight.get("range"));
+            Map<String, Object> start = MiniJson.asObject(range == null ? null : range.get("start"));
+            Map<String, Object> end = MiniJson.asObject(range == null ? null : range.get("end"));
+            Integer startLine = MiniJson.asInt(start == null ? null : start.get("line"));
+            Integer startCharacter = MiniJson.asInt(start == null ? null : start.get("character"));
+            Integer endLine = MiniJson.asInt(end == null ? null : end.get("line"));
+            Integer endCharacter = MiniJson.asInt(end == null ? null : end.get("character"));
+            if (startLine == null || startCharacter == null || endLine == null || endCharacter == null
+                || startLine < 0 || startCharacter < 0 || endLine < startLine
+                || endCharacter < 0 || endLine == startLine && endCharacter <= startCharacter) continue;
+            Integer parsedKind = MiniJson.asInt(highlight.get("kind"));
+            int kind = parsedKind == null || parsedKind < 1 || parsedKind > 3 ? 0 : parsedKind;
+            DocumentHighlight parsed = new DocumentHighlight(startLine, startCharacter, endLine, endCharacter, kind);
+            String key = startLine + "\u0000" + startCharacter + "\u0000" + endLine + "\u0000" + endCharacter + "\u0000" + kind;
+            unique.putIfAbsent(key, parsed);
+            if (unique.size() == 500) break;
         }
         return List.copyOf(unique.values());
     }

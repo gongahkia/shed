@@ -106,8 +106,8 @@ Notes:
 | `:test cancel` | Cancel running test jobs for the selected root |
 | `:test text` | Open a text summary of the session-local test state |
 | `:coverage import <report>` | Asynchronously import a local JaCoCo XML, Cobertura XML, LCOV, or Go `-coverprofile` report for the selected root |
-| `:coverage clear` | Clear imported session-local coverage for the selected root |
-| `:coverage text` | Open imported coverage totals and per-file line summaries |
+| `:coverage clear` | Clear manual and generated session-local coverage for the selected root |
+| `:coverage text` | Open manual and generated coverage totals and per-file line summaries |
 
 The Tests panel supports root selection, status/text filtering, Refresh, Run All, Run Selection, Debug Selection, Rerun Failed, Cancel, **Import Coverage**, **Clear Coverage**, output inspection, and source navigation. An SSH, Docker, or WSL root inside a connected workspace runs explicit discovery and tests remotely and retrieves only declared results into Shed's private cache. A selected root with an already-running Dev Container runs explicit dynamic discovery and tests through `devcontainer exec`, using a generated project-mounted report cache only for that run. Debug Selection can likewise use a configured already-installed remote or Dev Container stdio adapter. Imports are explicit and local; covered/uncovered lines render in the active editor gutter. Tests are discovered only after an explicit refresh. Failure locations are also published to Problems under `test:<adapter>` without replacing quickfix entries. Adapter declarations, direct argv overrides, debug mappings, report-cache policy, remote boundary, and supported built-ins are in [Testing](TESTS.md).
 

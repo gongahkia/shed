@@ -32,18 +32,20 @@ final class TestController {
         String output = "Refresh to discover tests.";
         String ctestPreset = "";
         final Map<Integer, String> jobs = new LinkedHashMap<>();
-        CoverageService.Report coverage = CoverageService.Report.empty();
+        CoverageService.Report importedCoverage = CoverageService.Report.empty();
+        CoverageService.Report generatedGoCoverage = CoverageService.Report.empty();
+        CoverageService.Report coverage() { return importedCoverage.merge(generatedGoCoverage); }
         State(Path root) { this.root = root; }
     }
 
     private record Execution(Path root, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command, CommandResult result,
-                             List<String> diagnostics, Path devContainerReportCache) {
+                             List<String> diagnostics, CoverageService.ImportResult generatedCoverage, Path devContainerReportCache) {
         Execution {
             diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
         }
         Execution(Path root, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command, CommandResult result,
                   List<String> diagnostics) {
-            this(root, spec, adapter, command, result, diagnostics, null);
+            this(root, spec, adapter, command, result, diagnostics, null, null);
         }
     }
     private record StaticDiscovery(Path root, TestService.AdapterSpec spec, List<TestService.TestCase> tests) { }
@@ -211,7 +213,7 @@ final class TestController {
 
     Snapshot snapshot(Path root) {
         State state = state(root == null ? selectedRoot() : root);
-        return new Snapshot(state.root, state.specs, state.tests, state.diagnostics, state.output, state.jobs.size(), state.coverage.summary(), state.ctestPreset);
+        return new Snapshot(state.root, state.specs, state.tests, state.diagnostics, state.output, state.jobs.size(), state.coverage().summary(), state.ctestPreset);
     }
 
     Result refresh(Path root) {
@@ -337,7 +339,8 @@ final class TestController {
 
     String clearCoverage(Path root) {
         State state = state(root);
-        state.coverage = CoverageService.Report.empty();
+        state.importedCoverage = CoverageService.Report.empty();
+        state.generatedGoCoverage = CoverageService.Report.empty();
         state.output = "Coverage cleared";
         updateCoverageGutter(editor.getCurrentBuffer());
         refreshPanel();
@@ -352,7 +355,7 @@ final class TestController {
         }
         Path file = buffer.getFile().toPath().toAbsolutePath().normalize();
         Path root = coverageRootFor(file, rootsForPanel(), selectedRoot());
-        editor.lineNumberPanel.updateCoverageMarkers(root == null ? Map.of() : state(root).coverage.hits(file));
+        editor.lineNumberPanel.updateCoverageMarkers(root == null ? Map.of() : state(root).coverage().hits(file));
     }
 
     /** Routes coverage to the workspace folder owning the file, not the Tests-panel selection. */
@@ -373,8 +376,8 @@ final class TestController {
         else if (error != null) state.output = "Coverage import failed: " + error.getMessage();
         else if (imported == null) state.output = "Coverage import failed";
         else {
-            state.coverage = state.coverage.merge(imported.imported().report());
-            state.output = "Imported " + imported.imported().format().name().toLowerCase(Locale.ROOT) + " coverage: " + state.coverage.summary().display();
+            state.importedCoverage = state.importedCoverage.merge(imported.imported().report());
+            state.output = "Imported " + imported.imported().format().name().toLowerCase(Locale.ROOT) + " coverage: " + state.coverage().summary().display();
             updateCoverageGutter(editor.getCurrentBuffer());
         }
         refreshPanel();
@@ -382,8 +385,9 @@ final class TestController {
 
     private String coverageText(Path root) {
         State state = state(root);
-        StringBuilder text = new StringBuilder("Coverage\n\n").append(state.coverage.summary().display()).append("\n\n");
-        for (Map.Entry<Path, Map<Integer, CoverageService.Line>> entry : state.coverage.files().entrySet()) {
+        CoverageService.Report report = state.coverage();
+        StringBuilder text = new StringBuilder("Coverage\n\n").append(report.summary().display()).append("\n\n");
+        for (Map.Entry<Path, Map<Integer, CoverageService.Line>> entry : report.files().entrySet()) {
             long covered = entry.getValue().values().stream().filter(CoverageService.Line::covered).count();
             text.append(entry.getKey()).append(": ").append(covered).append('/').append(entry.getValue().size()).append(" lines\n");
         }
@@ -437,7 +441,7 @@ final class TestController {
         int jobId = editor.asyncJobService.submit("test " + spec.id() + " " + operation, token -> {
             CommandResult result = editor.jobQuickfixController.runExternalCommand(command.argv(), state.root.toFile(), null, token,
                 editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true);
-            return new Execution(state.root, spec, adapter, command, result, List.of());
+            return execution(state.root, spec, adapter, command, result, List.of(), null);
         }, (job, execution, error) -> complete(state, job, execution, error));
         state.jobs.put(jobId, spec.id());
         state.output = operation + " " + spec.id() + " running (job " + jobId + ")";
@@ -458,12 +462,12 @@ final class TestController {
                 if (result.stdout != null && result.stdout.contains("[shed: output truncated]")) {
                     diagnostics.add("Dev Container test output was truncated; stdout-derived results may be incomplete.");
                 }
-                return new Execution(state.root, spec, adapter, safeCommand, result, diagnostics, reportCache);
+                return execution(state.root, spec, adapter, safeCommand, result, diagnostics, reportCache);
             } catch (Exception error) {
                 String message = error.getMessage();
                 CommandResult result = new CommandResult(-1, "", "Dev Container test unavailable: "
                     + (message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' ')));
-                return new Execution(state.root, spec, adapter, command, result, List.of(), reportCache);
+                return execution(state.root, spec, adapter, command, result, List.of(), reportCache);
             }
         }, (job, execution, error) -> complete(state, job, execution, error));
         state.jobs.put(jobId, spec.id());
@@ -484,7 +488,7 @@ final class TestController {
         }
         int jobId = editor.asyncJobService.submit("remote test " + spec.id() + " " + operation, token -> {
             RemoteTestExecution.Result result = RemoteTestExecution.execute(plan);
-            return new Execution(state.root, spec, adapter, result.command(), result.result(), result.diagnostics());
+            return execution(state.root, spec, adapter, result.command(), result.result(), result.diagnostics(), null);
         }, (job, execution, error) -> complete(state, job, execution, error));
         state.jobs.put(jobId, spec.id());
         state.output = operation + " " + spec.id() + " running remotely in " + remote.id() + " (job " + jobId + ")";
@@ -537,6 +541,11 @@ final class TestController {
             if (!parsed.isEmpty()) merge(state, parsed);
             state.output = output;
             if (state.output.isBlank()) state.output = execution.spec().id() + " exited " + execution.result().exitCode;
+            if (execution.generatedCoverage() != null) {
+                state.generatedGoCoverage = execution.generatedCoverage().report();
+                state.output += "\nGenerated Go coverage: " + state.coverage().summary().display();
+                updateCoverageGutter(editor.getCurrentBuffer());
+            }
             if (!execution.diagnostics().isEmpty()) state.output += "\n" + String.join("\n", execution.diagnostics());
             if (!"discover".equals(operation(job))) publishProblems(state, execution.spec().id());
         }
@@ -545,6 +554,21 @@ final class TestController {
             if (!cleanup.isBlank()) state.output = state.output.isBlank() ? cleanup : state.output + "\n" + cleanup;
         }
         refreshPanel();
+    }
+
+    /** Parses the profile on the worker after a successful Go run; the EDT only updates session state. */
+    private Execution execution(Path root, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command, CommandResult result,
+                                List<String> diagnostics, Path devContainerReportCache) {
+        List<String> messages = new ArrayList<>(diagnostics == null ? List.of() : diagnostics);
+        CoverageService.ImportResult generated = null;
+        if (result != null && result.exitCode == 0 && spec != null && "go".equals(spec.id()) && command != null && !command.reports().isEmpty()) {
+            try {
+                generated = coverage.importReport(root, command.reports().getFirst());
+            } catch (IOException error) {
+                messages.add("Generated Go coverage unavailable: " + concise(error));
+            }
+        }
+        return new Execution(root, spec, adapter, command, result, messages, generated, devContainerReportCache);
     }
 
     private static String operation(AsyncJobService.JobSnapshot job) {
@@ -613,5 +637,10 @@ final class TestController {
 
     private void refreshPanel() { if (editor.toolWindowHost != null) editor.toolWindowHost.refresh(ToolWindowHost.Tab.TESTS); }
     private static String firstLine(String value) { return value == null ? "" : value.lines().findFirst().orElse("").strip(); }
+    private static String concise(Exception error) {
+        String message = error == null ? "" : error.getMessage();
+        return message == null || message.isBlank() ? error == null ? "unknown error" : error.getClass().getSimpleName()
+            : message.replace('\n', ' ').replace('\r', ' ');
+    }
     record Result(String message) { }
 }

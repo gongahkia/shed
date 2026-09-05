@@ -911,6 +911,11 @@ final class DebugSessionService {
         return new InspectionResult(result.snapshot(), result.succeeded());
     }
 
+    synchronized InspectionResult selectThread(Path workspace, int threadId) {
+        DebugInspection.Result result = session(root(workspace)).inspection.selectThread(threadId);
+        return new InspectionResult(result.snapshot(), result.succeeded());
+    }
+
     InspectionResult expandVariables(Path workspace, int variablesReference, Duration timeout) {
         Path root = root(workspace);
         Connection connection;

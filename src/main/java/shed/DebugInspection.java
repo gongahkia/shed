@@ -11,6 +11,8 @@ final class DebugInspection {
 
     record ThreadInfo(int id, String name) {
         ThreadInfo { name = name == null ? "" : name; }
+
+        @Override public String toString() { return id + (name.isBlank() ? "" : "  " + name); }
     }
     record Frame(int id, String name, String source, int line, int column) {
         Frame { name = name == null ? "" : name; source = source == null ? "" : source; }
@@ -130,6 +132,20 @@ final class DebugInspection {
         expandedVariables.clear();
         state = State.IDLE;
         detail = "Selected frame " + id + ". Refresh inspection to load scopes and watches.";
+        resetWatches();
+        return new Result(snapshot(), true);
+    }
+
+    Result selectThread(int id) {
+        if (!paused || threads.stream().noneMatch(thread -> thread.id() == id)) return new Result(snapshot(), false);
+        generation++;
+        threadId = id;
+        frameId = 0;
+        frames = List.of();
+        scopes = List.of();
+        expandedVariables.clear();
+        state = State.IDLE;
+        detail = "Selected thread " + id + ". Refresh inspection to load frames, scopes, and watches.";
         resetWatches();
         return new Result(snapshot(), true);
     }

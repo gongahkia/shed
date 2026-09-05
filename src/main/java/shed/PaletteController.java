@@ -41,6 +41,7 @@ final class PaletteController {
         action("Problems", "problems", "Open the unified diagnostics and quickfix Problems panel."),
         action("Project Replace", "projectreplace", "Open the reviewed project-wide replacement panel."),
         action("Show Completions", "lsp completion", "Request completion candidates at the caret."),
+        action("Highlight Symbol Occurrences", "lsp highlights", "Highlight server-reported occurrences for the symbol at the caret."),
         action("Code Actions", "lsp codeaction", "Show diagnostic-anchored code actions at the caret."),
         action("Peek Definition", "peek definition", "Open a temporary read-only definition preview."),
         action("Peek Type Definition", "peek type", "Open a temporary read-only type-definition preview."),
@@ -577,6 +578,9 @@ final class PaletteController {
             case "typedefinition":
             case "typedef":
                 return "Jump to the type definition behind the symbol.";
+            case "highlights":
+            case "documenthighlights":
+                return "Highlight server-reported occurrences for the symbol at the caret.";
             case "hover":
                 return "Show hover docs in scratch buffer.";
             case "references":

@@ -92,6 +92,7 @@ final class PaneBufferController {
         boolean activePane = pane == editor.getActivePane();
         if (activePane) {
             detachActiveDocumentListener();
+            editor.clearLspDecorations();
             editor.clearExtraCursors();
             if (editor.searchManager != null) {
                 editor.searchManager.clearHighlights();

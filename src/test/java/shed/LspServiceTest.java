@@ -13,13 +13,14 @@ import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 public class LspServiceTest {
     @Test
     void negotiatesAdvertisedDisabledAndUnsupportedCapabilities() {
         Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
-            "{\"result\":{\"capabilities\":{\"completionProvider\":{},\"hoverProvider\":true,\"typeDefinitionProvider\":true,\"implementationProvider\":true,\"renameProvider\":{\"prepareProvider\":true}},\"serverInfo\":{\"name\":\"testls\",\"version\":\"1.2\"}}}"
+            "{\"result\":{\"capabilities\":{\"completionProvider\":{},\"hoverProvider\":true,\"typeDefinitionProvider\":true,\"implementationProvider\":true,\"documentHighlightProvider\":true,\"renameProvider\":{\"prepareProvider\":true}},\"serverInfo\":{\"name\":\"testls\",\"version\":\"1.2\"}}}"
         ));
         Map<LspCapability, Boolean> clientEnabled = new EnumMap<>(LspCapability.class);
         clientEnabled.put(LspCapability.HOVER, Boolean.FALSE);
@@ -30,6 +31,7 @@ public class LspServiceTest {
         assertTrue(model.allows(LspCapability.RENAME));
         assertTrue(model.allows(LspCapability.TYPE_DEFINITION));
         assertTrue(model.allows(LspCapability.IMPLEMENTATION));
+        assertTrue(model.allows(LspCapability.DOCUMENT_HIGHLIGHTS));
         assertFalse(model.allows(LspCapability.HOVER));
         assertEquals(LspCapabilityModel.Availability.DISABLED, model.availability(LspCapability.HOVER));
         assertEquals("LSP hover is disabled by client policy; enable it in LSP settings",
@@ -98,6 +100,41 @@ public class LspServiceTest {
         assertEquals("file:///project/Child.java", locations.get(1).getUri());
         assertEquals(7, locations.get(1).getLine());
         assertEquals(2, locations.get(1).getCharacter());
+    }
+
+    @Test
+    void parsesDocumentHighlightsWithKindsAndRejectsInvalidRanges() {
+        List<LspClient.DocumentHighlight> highlights = LspClient.parseDocumentHighlights(MiniJson.parse("["
+            + "{\"range\":{\"start\":{\"line\":1,\"character\":2},\"end\":{\"line\":1,\"character\":5}},\"kind\":2},"
+            + "{\"range\":{\"start\":{\"line\":3,\"character\":0},\"end\":{\"line\":4,\"character\":1}},\"kind\":3},"
+            + "{\"range\":{\"start\":{\"line\":1,\"character\":2},\"end\":{\"line\":1,\"character\":5}},\"kind\":2},"
+            + "{\"range\":{\"start\":{\"line\":2,\"character\":4},\"end\":{\"line\":2,\"character\":4}}}"
+            + "]"));
+
+        assertEquals(List.of(
+            new LspClient.DocumentHighlight(1, 2, 1, 5, 2),
+            new LspClient.DocumentHighlight(3, 0, 4, 1, 3)
+        ), highlights);
+    }
+
+    @Test
+    void requestsDocumentHighlightsFromAnAdvertisedLanguageServer() throws Exception {
+        Path workspace = Files.createTempDirectory("shed-lsp-highlights-");
+        Path java = Path.of(System.getProperty("java.home"), "bin", javaExecutable());
+        Assumptions.assumeTrue(Files.isExecutable(java), "Java runtime executable is unavailable");
+        String uri = workspace.resolve("Main.java").toUri().toString();
+        LspClient client = new LspClient(List.of(java.toString(), "-cp", System.getProperty("java.class.path"),
+            ReferenceDocumentHighlightLanguageServer.class.getName()), workspace, workspace.toUri().toString(), LspFeatureSettings.defaults());
+        try {
+            assertTrue(client.isAlive());
+            assertTrue(client.supports(LspCapability.DOCUMENT_HIGHLIGHTS));
+            assertEquals(List.of(
+                new LspClient.DocumentHighlight(2, 3, 2, 7, 2),
+                new LspClient.DocumentHighlight(3, 0, 3, 4, 3)
+            ), client.documentHighlights(uri, 2, 3));
+        } finally {
+            client.stop();
+        }
     }
 
     @Test
@@ -446,5 +483,9 @@ public class LspServiceTest {
 
         assertEquals(repository.toRealPath(), controller.resolveWorkspaceRoot(repositoryChild));
         assertEquals(worktree.toRealPath(), controller.resolveWorkspaceRoot(worktreeChild));
+    }
+
+    private static String javaExecutable() {
+        return System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win") ? "java.exe" : "java";
     }
 }

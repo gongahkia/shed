@@ -5,19 +5,33 @@ import java.util.Collections;
 import java.util.List;
 
 public class QuickfixService {
+    public enum Severity {
+        ERROR,
+        WARNING,
+        INFO,
+        HINT,
+        OTHER
+    }
+
     public static final class Entry {
         private final String filePath;
         private final int line;
         private final int column;
         private final String message;
         private final String source;
+        private final Severity severity;
 
         public Entry(String filePath, int line, int column, String message, String source) {
+            this(filePath, line, column, message, source, Severity.OTHER);
+        }
+
+        public Entry(String filePath, int line, int column, String message, String source, Severity severity) {
             this.filePath = filePath == null ? "" : filePath;
             this.line = Math.max(1, line);
             this.column = Math.max(1, column);
             this.message = message == null ? "" : message;
             this.source = source == null ? "" : source;
+            this.severity = severity == null ? Severity.OTHER : severity;
         }
 
         public String getFilePath() {
@@ -38,6 +52,10 @@ public class QuickfixService {
 
         public String getSource() {
             return source;
+        }
+
+        public Severity getSeverity() {
+            return severity;
         }
     }
 

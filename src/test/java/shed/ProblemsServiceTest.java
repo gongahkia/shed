@@ -50,6 +50,18 @@ class ProblemsServiceTest {
     }
 
     @Test
+    void retainsQuickfixSeverityForTheProblemsPanel() {
+        ProblemsService service = new ProblemsService();
+        service.recordQuickfixEntries(List.of(new QuickfixService.Entry("lint.js", 3, 2, "unused value", "task:lint",
+            QuickfixService.Severity.WARNING)));
+
+        List<ProblemsService.Problem> snapshot = service.snapshot(List.of());
+
+        assertEquals(1, snapshot.size());
+        assertEquals(ProblemsService.Severity.WARNING, snapshot.getFirst().severity());
+    }
+
+    @Test
     void capsOneLargeProducerWithoutDroppingItsEntireLatestResult() {
         ProblemsService service = new ProblemsService();
         java.util.ArrayList<QuickfixService.Entry> entries = new java.util.ArrayList<>();

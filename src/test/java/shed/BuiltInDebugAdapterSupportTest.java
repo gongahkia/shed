@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 class BuiltInDebugAdapterSupportTest {
     @Test
-    void contributesUserInstalledPythonAndGoProfilesForTheirMatchingFilesOnly() {
+    void contributesUserInstalledPythonGoCsharpAndNativeDebugSupport() {
         DebugAdapterRegistry.Validation validation = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
         Path workspace = Path.of("build/debugpy-profile").toAbsolutePath();
 
@@ -31,6 +31,15 @@ class BuiltInDebugAdapterSupportTest {
         assertEquals(java.util.List.of(".go"), validation.configurations().get(BuiltInDebugAdapterSupport.GO_DELVE).fileExtensions());
         assertTrue(DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.GO_DELVE, workspace, workspace.resolve("main.go")).launchable());
         assertFalse(DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.GO_DELVE, workspace, workspace.resolve("main.py")).launchable());
+        DebugAdapterRegistry.Adapter netcoredbg = validation.registry().adapter(BuiltInDebugAdapterSupport.CSHARP_NETCOREDBG);
+        assertEquals("netcoredbg", netcoredbg.command());
+        assertEquals(java.util.List.of("--interpreter=vscode"), netcoredbg.args());
+        assertTrue(netcoredbg.capabilities().contains(DebugAdapterRegistry.Capability.BREAKPOINTS));
+        assertFalse(validation.configurations().containsKey(BuiltInDebugAdapterSupport.CSHARP_NETCOREDBG));
+        DebugAdapterRegistry.Adapter lldb = validation.registry().adapter(BuiltInDebugAdapterSupport.NATIVE_LLDB);
+        assertEquals("lldb-dap", lldb.command());
+        assertTrue(lldb.capabilities().contains(DebugAdapterRegistry.Capability.BREAKPOINTS));
+        assertFalse(validation.configurations().containsKey(BuiltInDebugAdapterSupport.NATIVE_LLDB));
     }
 
     @Test

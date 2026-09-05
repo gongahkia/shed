@@ -52,6 +52,9 @@ public class TaskService {
 
     enum ProblemMatcher {
         GENERIC,
+        TYPESCRIPT,
+        ESLINT,
+        MSCOMPILE,
         NONE;
 
         static ProblemMatcher parse(Object value) {
@@ -59,8 +62,11 @@ public class TaskService {
             if (!(value instanceof String)) throw new IllegalArgumentException("problem_matcher must be TOML string");
             return switch (((String) value).trim().toLowerCase(Locale.ROOT)) {
                 case "generic" -> GENERIC;
+                case "typescript", "tsc" -> TYPESCRIPT;
+                case "eslint" -> ESLINT;
+                case "mscompile", "msvc" -> MSCOMPILE;
                 case "none" -> NONE;
-                default -> throw new IllegalArgumentException("problem_matcher must be generic or none");
+                default -> throw new IllegalArgumentException("problem_matcher must be generic, typescript, eslint, mscompile, or none");
             };
         }
 

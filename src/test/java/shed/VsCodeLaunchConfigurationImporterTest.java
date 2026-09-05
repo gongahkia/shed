@@ -28,6 +28,7 @@ class VsCodeLaunchConfigurationImporterTest {
                   "program": "${file}",
                   "cwd": "${workspaceFolder}/src",
                   "args": ["--label", "two words"],
+                  "env": {"APP_MODE": "development", "PORT": "3000"},
                   "preLaunchTask": "build",
                 },
               ],
@@ -46,6 +47,7 @@ class VsCodeLaunchConfigurationImporterTest {
         assertTrue(plan.launchable());
         assertEquals(root.resolve("src"), plan.plan().cwd());
         assertEquals(java.util.List.of("--label", "two words"), plan.plan().args());
+        assertEquals(Map.of("APP_MODE", "development", "PORT", "3000"), plan.plan().configuration().environment());
         assertEquals("build", plan.plan().configuration().prelaunchTask());
         assertFalse(base.configurations().containsKey("vscode:Run app"));
     }
@@ -66,6 +68,44 @@ class VsCodeLaunchConfigurationImporterTest {
         assertTrue(report.readable());
         assertEquals(java.util.List.of("vscode:Debug Go"), report.accepted());
         assertEquals(BuiltInDebugAdapterSupport.GO_DELVE, plan.plan().adapter().id());
+        assertTrue(plan.launchable());
+    }
+
+    @Test
+    void importsCoreClrLaunchConfigurationAgainstTheExplicitNetcoredbgAdapter() throws Exception {
+        Path root = Files.createDirectories(temporaryDirectory.resolve("coreclr"));
+        Path launch = Files.createDirectories(root.resolve(".vscode")).resolve("launch.json");
+        Files.writeString(launch, """
+            {"configurations":[{"name":"Debug .NET","type":"coreclr","request":"launch","program":"${workspaceFolder}/bin/Debug/net9.0/app.dll"}]}
+            """);
+        DebugAdapterRegistry.Validation base = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
+
+        VsCodeLaunchConfigurationImporter.Report report = VsCodeLaunchConfigurationImporter.read(root, base);
+        DebugAdapterRegistry.Validation effective = DebugAdapterRegistry.withExternalConfigurations(base, report.configurations());
+        DebugAdapterRegistry.PlanResult plan = DebugAdapterRegistry.plan(effective, "vscode:Debug .NET", root, root.resolve("Program.cs"));
+
+        assertTrue(report.readable());
+        assertEquals(java.util.List.of("vscode:Debug .NET"), report.accepted());
+        assertEquals(BuiltInDebugAdapterSupport.CSHARP_NETCOREDBG, plan.plan().adapter().id());
+        assertTrue(plan.launchable());
+    }
+
+    @Test
+    void importsLldbDapLaunchConfigurationAgainstTheExplicitNativeAdapter() throws Exception {
+        Path root = Files.createDirectories(temporaryDirectory.resolve("native"));
+        Path launch = Files.createDirectories(root.resolve(".vscode")).resolve("launch.json");
+        Files.writeString(launch, """
+            {"configurations":[{"name":"Debug native","type":"lldb-dap","request":"launch","program":"${workspaceFolder}/build/app"}]}
+            """);
+        DebugAdapterRegistry.Validation base = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
+
+        VsCodeLaunchConfigurationImporter.Report report = VsCodeLaunchConfigurationImporter.read(root, base);
+        DebugAdapterRegistry.Validation effective = DebugAdapterRegistry.withExternalConfigurations(base, report.configurations());
+        DebugAdapterRegistry.PlanResult plan = DebugAdapterRegistry.plan(effective, "vscode:Debug native", root, root.resolve("main.cpp"));
+
+        assertTrue(report.readable());
+        assertEquals(java.util.List.of("vscode:Debug native"), report.accepted());
+        assertEquals(BuiltInDebugAdapterSupport.NATIVE_LLDB, plan.plan().adapter().id());
         assertTrue(plan.launchable());
     }
 
@@ -125,7 +165,7 @@ class VsCodeLaunchConfigurationImporterTest {
               "configurations": [
                 {"name":"Missing adapter","type":"node","request":"launch","program":"${file}"},
                 {"name":"External program","type":"python","request":"launch","program":"/tmp/run.py"},
-                {"name":"Environment omitted","type":"python","request":"launch","program":"${file}","env":{"TOKEN":"x"}},
+                {"name":"Invalid environment","type":"python","request":"launch","program":"${file}","env":{"NOT-PORTABLE":"x"}},
                 {"name":"Unknown variable","type":"python","request":"launch","program":"${file}","args":["${env:SECRET}"]}
               ]
             }
@@ -140,9 +180,31 @@ class VsCodeLaunchConfigurationImporterTest {
         assertEquals(4, report.skipped().size());
         assertTrue(report.skipped().stream().anyMatch(value -> value.contains("no matching configured Shed adapter")));
         assertTrue(report.skipped().stream().anyMatch(value -> value.contains("program must remain")));
-        assertTrue(report.skipped().stream().anyMatch(value -> value.contains("unsupported field env")));
+        assertTrue(report.skipped().stream().anyMatch(value -> value.contains("env must be an object")));
         assertTrue(report.skipped().stream().anyMatch(value -> value.contains("unsupported VS Code variable")));
         assertFalse(effective.configurations().containsKey("vscode:Missing adapter"));
+    }
+
+    @Test
+    void rejectsEnvironmentUnsetsVariablesAndAttachEnvironments() throws Exception {
+        Path root = Files.createDirectories(temporaryDirectory.resolve("environment-boundary"));
+        Path launch = Files.createDirectories(root.resolve(".vscode")).resolve("launch.json");
+        Files.writeString(launch, """
+            {"configurations":[
+              {"name":"Unset","type":"python","request":"launch","program":"${file}","env":{"APP_MODE":null}},
+              {"name":"Variable","type":"python","request":"launch","program":"${file}","env":{"APP_MODE":"${env:MODE}"}},
+              {"name":"Attach","type":"python","request":"attach","host":"127.0.0.1","port":5678,"env":{"APP_MODE":"development"}}
+            ]}
+            """);
+        DebugAdapterRegistry.Validation base = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
+
+        VsCodeLaunchConfigurationImporter.Report report = VsCodeLaunchConfigurationImporter.read(root, base);
+
+        assertTrue(report.configurations().isEmpty());
+        assertEquals(3, report.skipped().size());
+        assertTrue(report.skipped().stream().anyMatch(value -> value.contains("env must be an object")));
+        assertTrue(report.skipped().stream().anyMatch(value -> value.contains("env values may not use VS Code variables")));
+        assertTrue(report.skipped().stream().anyMatch(value -> value.contains("env is launch-only")));
     }
 
     @Test

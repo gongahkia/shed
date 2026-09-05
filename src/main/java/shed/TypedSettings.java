@@ -281,6 +281,7 @@ final class TypedSettings {
             case "tab.size" -> "integer 1..16";
             case "keymap.profile" -> "vim | plain | emacs";
             case "font.size", "terminal.font.size" -> "integer >= 1";
+            case "terminal.default.profile" -> "system | builtin:<id> | <extension-id>:<id>";
             case "ui.font.size" -> "integer >= 0";
             case "line.numbers" -> "none | absolute | relative | relativeabsolute | hybrid";
             case "multi.selection.max.cursors" -> "integer " + MultiSelectionPolicy.MIN_MAX_CURSORS + ".." + MultiSelectionPolicy.MAX_MAX_CURSORS;
@@ -321,6 +322,9 @@ final class TypedSettings {
         }
         if (key.equals("terminal.shell.integration")) {
             return "Live: applies to newly opened Bash, Zsh, Fish, and PowerShell terminals";
+        }
+        if (key.equals("terminal.default.profile")) {
+            return "Live: used when the next default terminal opens";
         }
         if (key.startsWith("terminal.font.")) {
             return "Live: used by newly opened terminals";
@@ -487,6 +491,15 @@ final class TypedSettings {
             && !"vim".equalsIgnoreCase(((String) value).trim()) && !"plain".equalsIgnoreCase(((String) value).trim())
             && !"emacs".equalsIgnoreCase(((String) value).trim())) {
             return key + " must be vim, plain, or emacs";
+        }
+        if ("terminal.default.profile".equals(key) && value instanceof String) {
+            String profile = ((String) value).trim();
+            if (!"system".equalsIgnoreCase(profile)
+                && !(profile.regionMatches(true, 0, "builtin:", 0, "builtin:".length())
+                    && profile.substring("builtin:".length()).matches("[A-Za-z0-9._-]+"))
+                && !profile.matches("[A-Za-z0-9._-]+:[A-Za-z0-9._-]+")) {
+                return key + " must be system, builtin:<id>, or an extension profile id";
+            }
         }
         if (("backup.directory".equals(key) || "project.replace.backup.directory".equals(key)
             || "landing.source".equals(key) || "landing.remote.cache.path".equals(key))

@@ -25,4 +25,16 @@ class DatabaseControllerTest {
         assertEquals(List.of("sqlite3", "-batch", "-bail", "/project/app.db", "select name from sqlite_master"),
             DatabaseController.sqliteQueryCommand(Path.of("/project/app.db"), "select name from sqlite_master"));
     }
+
+    @Test
+    void buildsDirectMysqlBatchQueryWithNoShellOrCredentialArguments() {
+        assertEquals(List.of("mysql", "--batch", "--skip-column-names", "--execute=select 1"),
+            DatabaseController.mysqlQueryCommand("select 1"));
+    }
+
+    @Test
+    void rejectsUnsafeOrEmptyMysqlSqlCommandText() {
+        assertThrows(IllegalArgumentException.class, () -> DatabaseController.mysqlQueryCommand(""));
+        assertThrows(IllegalArgumentException.class, () -> DatabaseController.mysqlQueryCommand("select 1\nselect 2"));
+    }
 }

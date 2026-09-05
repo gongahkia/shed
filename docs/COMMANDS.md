@@ -86,7 +86,7 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:task cancel <id>` | Cancel a running task job |
 
 Notes:
-- `:task run test` and `:task run build` have built-in fallbacks for Maven/npm/Make projects if not explicitly defined.
+- `:task run test` and `:task run build` have built-in fallbacks for Maven, Gradle Wrapper, npm, Make, Cargo, Go modules, an unambiguous top-level .NET project/solution, and a sole conventional generated CMake tree if not explicitly defined. Gradle uses the project wrapper; no global Gradle fallback is inferred. .NET requires exactly one `.sln`, `.slnx`, `.csproj`, `.fsproj`, or `.vbproj` at the workspace root. CMake does not configure or choose a preset.
 - Task schema, variable, shell, quickfix, and presentation policy: [Workspace Tasks](TASKS.md).
 
 ## Test Explorer
@@ -184,7 +184,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:goyo` | Toggle the distraction-free layout without changing Limelight; hides status/line numbers/minimap/tree/tool windows while retaining every pane and split |
 | `:limelight` | Toggle paragraph focus dimming; the current paragraph or selected text stays bright |
 | `:minimap` | Toggle minimap panel |
-| `:term`, `:terminal` | Open an integrated terminal in a bottom split; terminal input owns focus, uses the system clipboard (`Cmd-C`/`Cmd-V` on macOS, `Ctrl-Shift-C`/`Ctrl-Shift-V` elsewhere), recognizes existing local `path:line[:column]` and HTTP(S) output links, and ignores zero-size resize events |
+| `:term`, `:terminal` | Open the configured default integrated terminal in a bottom split; terminal input owns focus, uses the system clipboard (`Cmd-C`/`Cmd-V` on macOS, `Ctrl-Shift-C`/`Ctrl-Shift-V` elsewhere), recognizes existing local `path:line[:column]` and HTTP(S) output links, and ignores zero-size resize events |
 
 ## Workspace Index Commands
 
@@ -229,7 +229,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:debug`, `:debug ui` | Open the docked Debug panel |
 | `:debug text [subcommand]` | Open legacy debug scratch output |
 | `:debug vscode` | Inspect strict runtime-only `.vscode/launch.json` and imported `.code-workspace` launch compatibility; accepted profiles are named `vscode:<name>` and still require explicit selection/start |
-| `:debug select <name>`, `:debug start [name]`, `:debug stop`, `:debug restart [name]` | Control an explicit DAP session, including the user-installed `python-debugpy` profile; a configured pre-launch workspace task, or a label mapped from an accepted VS Code process or POSIX-shell task, must succeed before its adapter starts |
+| `:debug select <name>`, `:debug start [name]`, `:debug stop`, `:debug restart [name]` | Control an explicit DAP session, including user-installed Python/Go profiles plus explicit compiled-artifact C#/.NET and native LLDB adapters; a configured pre-launch workspace task, or a label mapped from an accepted VS Code process or POSIX-shell task, must succeed before its adapter starts |
 | `:debug continue`, `:debug next`, `:debug stepin`, `:debug stepout`, `:debug pause` | Send a capability-declared DAP execution control; Continue/step require a paused thread |
 | `:debug goto [line]` | Run the paused thread to the active file's caret or one-based line when the adapter declares and advertises standard DAP `gotoTargets` support |
 | `:debug breakpoint list` | Open persisted source breakpoints for the selected workspace |
@@ -442,8 +442,8 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:extension enable\|disable\|remove <id>`, `:extension reload` | Change local extension activation |
 | `:view`, `:view list` | List extension tool views |
 | `:view <extension:id>` | Open a contributed docked tool view |
-| `:customeditor`, `:customeditor list` | List contributed custom text/binary editors |
-| `:customeditor reopen` | Reopen the current file with its matching contributed editor |
+| `:customeditor`, `:customeditor list` | List the built-in bounded binary Hex Editor and contributed custom text/binary editors |
+| `:customeditor reopen` | Reopen the current file with its matching extension editor or the built-in Hex Editor fallback |
 | `:scm`, `:scm list` | List SCM providers that support the active workspace |
 | `:scm status [provider]` | Show SCM status from one/all supported providers |
 | `:scm <provider> <declared-action> [args]` | Run an explicitly declared provider action |
@@ -467,16 +467,17 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:compose up [service...]`, `:compose build [service...]`, `:compose ps`, `:compose services`, `:compose logs [service...]` | Explicitly manage, inspect, or read bounded local Compose output |
 | `:compose exec <service> <command...>`, `:compose terminal <service> [command...]` | Explicitly run or open a PTY in a running Compose service |
 | `:compose redeploy <service>`, `:compose down` | Explicitly rebuild/recreate one service, or stop/remove the stack without volumes/images flags |
-| `:database`, `:database status` | Show the local PostgreSQL CLI boundary without opening a connection |
+| `:database`, `:database status` | Show the local database CLI boundaries without opening a connection |
 | `:database query <quoted-sql>`, `:database tables`, `:database file <workspace-relative.sql>` | Explicitly execute a PostgreSQL query, bounded table listing, or workspace SQL file |
 | `:database terminal` | Open an explicit interactive `psql` terminal |
 | `:database sqlite query <workspace-relative.db> <quoted-sql>`, `:database sqlite tables <workspace-relative.db>`, `:database sqlite terminal <workspace-relative.db>` | Query, list, or open an existing workspace-local SQLite database through `sqlite3` |
+| `:database mysql query <quoted-sql>`, `:database mysql tables`, `:database mysql terminal` | Query, list the selected database's tables, or open the installed `mysql` client using its user-managed option/login configuration |
 | `:integration`, `:integration list` | List supporting database, deployment, collaboration, and container extension integrations |
 | `:integration <extension:id> help` | Show provider-declared actions |
 | `:integration <extension:id> <action> [arguments]` | Run an explicitly declared workspace-integration action |
 | `:notebook open`, `:notebook run [kernel]`, `:notebook kernels`, `:notebook select`, `:notebook kernel [name]`, `:notebook console [kernel]`, `:notebook raw` | Open, execute with the persisted or one-shot local kernelspec, discover or select installed local kernels, persist a known kernel name, open a local Jupyter Console, or show raw JSON for the current `.ipynb` file |
-| `:terminal list`, `:terminal profile <id>` | Show/open terminal profiles |
-| `:terminal split <side|bottom>` | Open the default shell beside the active pane or below it |
+| `:terminal list`, `:terminal profile <builtin:id\|extension:id\|id>` | Show the configured default plus detected built-in and extension profiles; open one profile explicitly |
+| `:terminal split <side|bottom>` | Open the configured default terminal beside the active pane or below it |
 | `:terminal commands`, `:terminal cwd` | Show in-memory Bash/Zsh/Fish shell-integration events or latest reported cwd |
 
 See [Java Extensions](EXTENSIONS.md), [Workspace Integrations](WORKSPACE_INTEGRATIONS.md), [Remote Workspaces](REMOTE_WORKSPACES.md), [Jupyter Notebooks](NOTEBOOKS.md), and [Terminal](TERMINAL.md).

@@ -26,14 +26,16 @@ final class CustomEditorController {
     }
 
     boolean showIfAvailable(EditorPane pane, FileBuffer buffer) {
-        if (pane == null || buffer == null || !buffer.hasFilePath() || editor.extensionManager == null) return false;
+        if (pane == null || buffer == null || !buffer.hasFilePath()) return false;
         Path file;
         try {
             file = Path.of(buffer.getFilePath()).toAbsolutePath().normalize();
         } catch (RuntimeException error) {
             return false;
         }
-        for (ExtensionRegistry.Owned<CustomEditorContribution> owned : editor.extensionManager.customEditors()) {
+        List<ExtensionRegistry.Owned<CustomEditorContribution>> extensions = editor.extensionManager == null
+            ? List.of() : editor.extensionManager.customEditors();
+        for (ExtensionRegistry.Owned<CustomEditorContribution> owned : extensions) {
             try {
                 if (!owned.value().supports(file)) continue;
                 Document document = new Document(file, pane, buffer);
@@ -51,24 +53,25 @@ final class CustomEditorController {
                 return false;
             }
         }
-        return false;
+        return showBuiltInHexEditor(pane, buffer, file);
     }
 
     String handle(String argument) {
         String value = argument == null ? "" : argument.trim();
         if (value.isEmpty() || "list".equalsIgnoreCase(value)) {
             StringBuilder output = new StringBuilder("Custom Editors\n\n");
+            output.append("Built in:\n  shed:hex  Hex editor for binary files up to 8 MiB\n\n");
             List<ExtensionRegistry.Owned<CustomEditorContribution>> editors = editor.extensionManager == null ? List.of() : editor.extensionManager.customEditors();
-            if (editors.isEmpty()) output.append("No custom editors installed.\n");
+            if (editors.isEmpty()) output.append("No extension custom editors installed.\n");
             else for (ExtensionRegistry.Owned<CustomEditorContribution> candidate : editors) {
                 output.append("  ").append(name(candidate)).append("  ").append(candidate.value().displayName()).append("\n");
             }
-            output.append("\nCustom editors are selected when a file is opened. They receive a byte-backed resource model and may explicitly save that one resource atomically.\n");
+            output.append("\nMatching extension editors take priority. Otherwise, eligible binary files open in the built-in hex editor. Custom editors receive a byte-backed resource model and may explicitly save that one resource atomically.\n");
             editor.showScratchBuffer("[custom editors]", output.toString());
             return "Showing custom editors";
         }
         if ("reopen".equalsIgnoreCase(value)) {
-            return showIfAvailable(editor.getActivePane(), editor.getCurrentBuffer()) ? "Custom editor reopened" : "No installed custom editor supports the current file";
+            return showIfAvailable(editor.getActivePane(), editor.getCurrentBuffer()) ? "Custom editor reopened" : "No custom editor supports the current file";
         }
         return "Usage: :customeditor [list|reopen]";
     }
@@ -94,6 +97,20 @@ final class CustomEditorController {
         component.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override public void mousePressed(java.awt.event.MouseEvent event) { editor.activateEditorPane(pane); }
         });
+    }
+
+    private boolean showBuiltInHexEditor(EditorPane pane, FileBuffer buffer, Path file) {
+        try {
+            if (!HexEditorPanel.supports(file)) return false;
+            Document document = new Document(file, pane, buffer);
+            install(pane, new HexEditorPanel(document), document);
+            editor.renderWindowLayout();
+            editor.showMessage("Opened with built-in Hex Editor");
+            return true;
+        } catch (IOException | SecurityException error) {
+            editor.showMessage("Built-in Hex Editor failed: " + concise(error));
+            return false;
+        }
     }
 
     private static String name(ExtensionRegistry.Owned<CustomEditorContribution> value) { return value.extensionId() + ":" + value.value().id(); }

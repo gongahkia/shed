@@ -57,6 +57,7 @@ public class ConfigManagerTest {
         assertEquals(0, config.getUiFontSize());
         assertEquals("Monospaced", config.getTerminalFontFamily());
         assertEquals(14, config.getTerminalFontSize());
+        assertEquals("system", config.getTerminalDefaultProfile());
         assertEquals(KeymapProfile.VIM, config.getKeymapProfile());
         assertEquals(LineNumberMode.ABSOLUTE, config.getLineNumberMode());
         assertTrue(config.getHighlightSearch());
@@ -72,6 +73,10 @@ public class ConfigManagerTest {
             .filter(setting -> setting.key().equals("terminal.session.restore")).findFirst().orElseThrow();
         assertEquals("Terminal", terminalRestore.category());
         assertEquals("Live: checked when saving or loading a session", terminalRestore.applyBehavior());
+        TypedSettings.Descriptor terminalProfile = config.typedSettingDescriptors().stream()
+            .filter(setting -> setting.key().equals("terminal.default.profile")).findFirst().orElseThrow();
+        assertEquals("system | builtin:<id> | <extension-id>:<id>", terminalProfile.allowedValues());
+        assertEquals("Live: used when the next default terminal opens", terminalProfile.applyBehavior());
         assertFalse(config.getWorkspaceIndexEnabled());
         assertTrue(config.getGitAutoRefreshEnabled());
         assertEquals(1500, config.getGitAutoRefreshIntervalMs());
@@ -180,6 +185,7 @@ public class ConfigManagerTest {
         config.set("ui.font.size", "13");
         config.set("terminal.font.family", "JetBrains Mono");
         config.set("terminal.font.size", "12");
+        config.set("terminal.default.profile", "builtin:bash");
 
         assertEquals("Fira Code", config.getFontFamily());
         assertEquals(15, config.getFontSize());
@@ -187,8 +193,13 @@ public class ConfigManagerTest {
         assertEquals(13, config.getUiFontSize());
         assertEquals("JetBrains Mono", config.getTerminalFontFamily());
         assertEquals(12, config.getTerminalFontSize());
+        assertEquals("builtin:bash", config.getTerminalDefaultProfile());
         assertEquals("ui.font.size must be non-negative", config.validateSettingValue("ui.font.size", "-1"));
         assertEquals("terminal.font.size must be at least 1", config.validateSettingValue("terminal.font.size", "0"));
+        assertEquals("terminal.default.profile must be system, builtin:<id>, or an extension profile id",
+            config.validateSettingValue("terminal.default.profile", "/bin/bash"));
+        assertEquals("terminal.default.profile must be system, builtin:<id>, or an extension profile id",
+            config.validateSettingValue("terminal.default.profile", "builtin:"));
     }
 
     @Test

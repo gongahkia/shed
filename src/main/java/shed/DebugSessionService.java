@@ -1039,6 +1039,7 @@ final class DebugSessionService {
         else throw new IOException("Debug launch target is unavailable");
         arguments.put("cwd", requireAdapterPath(connection, plan.cwd()));
         arguments.put("args", plan.args());
+        if (!configuration.environment().isEmpty()) arguments.put("env", configuration.environment());
         for (Map.Entry<String, String> entry : plan.adapter().launchDefaults().entrySet()) {
             arguments.putIfAbsent(entry.getKey(), entry.getValue());
         }

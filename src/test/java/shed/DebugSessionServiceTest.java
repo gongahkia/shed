@@ -67,6 +67,25 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void sendsAValidatedImportedLaunchEnvironmentToTheAdapter() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-environment-context").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        DebugAdapterRegistry.Configuration imported = new DebugAdapterRegistry.Configuration("vscode:With environment", "java",
+            DebugAdapterRegistry.Request.LAUNCH, "workspace", "${file}", "", "", "${workspaceFolder}", List.of(), "", "127.0.0.1", 0,
+            List.of(), Map.of("APP_MODE", "development", "PORT", "3000"));
+        DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.withExternalConfigurations(validation(),
+            Map.of(imported.name(), imported));
+        FakeConnection connection = new FakeConnection();
+
+        DebugSessionService.Result result = service.start(workspace, file, validation, enabled(), imported.name(), Duration.ofSeconds(1),
+            (plan, features, listener) -> connection);
+
+        assertTrue(result.succeeded());
+        assertEquals(Map.of("APP_MODE", "development", "PORT", "3000"), connection.arguments.get(1).get("env"));
+    }
+
+    @Test
     void runsAConfiguredPreLaunchTaskBeforeOpeningTheDebugAdapter() {
         DebugSessionService service = new DebugSessionService();
         Path workspace = Path.of("build/debug-prelaunch").toAbsolutePath();

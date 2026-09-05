@@ -766,8 +766,36 @@ final class JobQuickfixController {
     private TaskService.WorkspaceTask resolveTask(String name, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks) {
         TaskService.WorkspaceTask task = tasks.get(name);
         if (task != null) return task;
-        String command = inferBuiltInTaskCommand(name, projectRoot);
-        return command == null || command.isBlank() ? null : TaskService.defaultWorkspaceTask(name, command);
+        return inferBuiltInTask(name, projectRoot);
+    }
+
+    TaskService.WorkspaceTask inferBuiltInTask(String taskName, File projectRoot) {
+        String command = inferBuiltInTaskCommand(taskName, projectRoot);
+        if (command != null && !command.isBlank()) return TaskService.defaultWorkspaceTask(taskName, command);
+        if (projectRoot == null) return null;
+        String normalized = taskName == null ? "" : taskName.trim().toLowerCase(Locale.ROOT);
+        if ("test".equals(normalized)) {
+            if (hasSoleDotnetTarget(projectRoot)) return directDotnetTask(taskName, "test");
+            Path testDirectory = TestAdapterRegistry.ctestTestDirectory(projectRoot.toPath());
+            return testDirectory == null ? null : directCmakeTask(taskName,
+                List.of("ctest", "--test-dir", testDirectory.toString(), "--output-on-failure"));
+        }
+        if ("build".equals(normalized)) {
+            if (hasSoleDotnetTarget(projectRoot)) return directDotnetTask(taskName, "build");
+            Path buildDirectory = TestAdapterRegistry.cmakeBuildDirectory(projectRoot.toPath());
+            return buildDirectory == null ? null : directCmakeTask(taskName, List.of("cmake", "--build", buildDirectory.toString()));
+        }
+        return null;
+    }
+
+    private TaskService.WorkspaceTask directCmakeTask(String name, List<String> arguments) {
+        return TaskService.directWorkspaceTask(name, arguments, "${workspaceFolder}", Map.of(),
+            TaskService.ProblemMatcher.GENERIC, TaskService.Presentation.ON_FAILURE);
+    }
+
+    private TaskService.WorkspaceTask directDotnetTask(String name, String operation) {
+        return TaskService.directWorkspaceTask(name, List.of("dotnet", operation), "${workspaceFolder}", Map.of(),
+            TaskService.ProblemMatcher.GENERIC, TaskService.Presentation.ON_FAILURE);
     }
 
     private CommandResult remoteCommandResult(RemoteCommandResult result) {
@@ -1058,25 +1086,60 @@ final class JobQuickfixController {
             if (new File(projectRoot, "pom.xml").isFile()) {
                 return "mvn -q test";
             }
+            String gradle = gradleWrapperCommand(projectRoot, "test");
+            if (gradle != null) return gradle;
             if (new File(projectRoot, "package.json").isFile()) {
                 return "npm test";
             }
             if (new File(projectRoot, "Makefile").isFile()) {
                 return "make test";
             }
+            if (new File(projectRoot, "Cargo.toml").isFile()) {
+                return "cargo test";
+            }
+            if (new File(projectRoot, "go.mod").isFile()) {
+                return "go test ./...";
+            }
         }
         if ("build".equals(normalized)) {
             if (new File(projectRoot, "pom.xml").isFile()) {
                 return "mvn -q -DskipTests package";
             }
+            String gradle = gradleWrapperCommand(projectRoot, "build");
+            if (gradle != null) return gradle;
             if (new File(projectRoot, "package.json").isFile()) {
                 return "npm run build";
             }
             if (new File(projectRoot, "Makefile").isFile()) {
                 return "make build";
             }
+            if (new File(projectRoot, "Cargo.toml").isFile()) {
+                return "cargo build";
+            }
+            if (new File(projectRoot, "go.mod").isFile()) {
+                return "go build ./...";
+            }
         }
         return null;
+    }
+
+    private static String gradleWrapperCommand(File projectRoot, String task) {
+        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")
+            && new File(projectRoot, "gradlew.bat").isFile()) return "gradlew.bat " + task;
+        if (new File(projectRoot, "gradlew").isFile()) return "./gradlew " + task;
+        return null;
+    }
+
+    private static boolean hasSoleDotnetTarget(File projectRoot) {
+        if (projectRoot == null) return false;
+        File[] entries = projectRoot.listFiles(file -> file.isFile() && isDotnetTargetName(file.getName()));
+        return entries != null && entries.length == 1;
+    }
+
+    private static boolean isDotnetTargetName(String name) {
+        String normalized = name == null ? "" : name.toLowerCase(Locale.ROOT);
+        return normalized.endsWith(".sln") || normalized.endsWith(".slnx") || normalized.endsWith(".csproj")
+            || normalized.endsWith(".fsproj") || normalized.endsWith(".vbproj");
     }
 
 
@@ -1109,7 +1172,7 @@ final class JobQuickfixController {
         }
         List<QuickfixService.Entry> parsedEntries = plan.task().problemMatcher() == TaskService.ProblemMatcher.NONE
             ? List.of()
-            : parseTaskQuickfixEntries(output, "task:" + taskName, plan.workingDirectory());
+            : parseTaskQuickfixEntries(output, "task:" + taskName, plan.workingDirectory(), plan.task().problemMatcher());
         if (parsedEntries.isEmpty()) editor.problemsController.clearQuickfixSource("task:" + taskName);
         if (!parsedEntries.isEmpty()) {
             updateQuickfixEntries("task " + taskName + " #" + jobId, parsedEntries);
@@ -1155,7 +1218,12 @@ final class JobQuickfixController {
 
 
     List<QuickfixService.Entry> parseTaskQuickfixEntries(String output, String source, File workingDirectory) {
-        return TaskProblemParser.parseGeneric(output, source, workingDirectory);
+        return parseTaskQuickfixEntries(output, source, workingDirectory, TaskService.ProblemMatcher.GENERIC);
+    }
+
+    List<QuickfixService.Entry> parseTaskQuickfixEntries(String output, String source, File workingDirectory,
+                                                          TaskService.ProblemMatcher matcher) {
+        return TaskProblemParser.parse(output, source, workingDirectory, matcher);
     }
 
 

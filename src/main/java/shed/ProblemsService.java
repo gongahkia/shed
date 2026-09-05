@@ -67,7 +67,7 @@ final class ProblemsService {
             if (entry == null || isLiveLspDiagnostic(entry.getSource())) continue;
             String source = normalizedSource(entry.getSource());
             grouped.computeIfAbsent(source, ignored -> new ArrayList<>()).add(new Problem(
-                entry.getFilePath(), entry.getLine(), entry.getColumn(), entry.getMessage(), source, Severity.OTHER
+                entry.getFilePath(), entry.getLine(), entry.getColumn(), entry.getMessage(), source, fromQuickfixSeverity(entry.getSeverity())
             ));
         }
         for (Map.Entry<String, List<Problem>> entry : grouped.entrySet()) {
@@ -119,6 +119,17 @@ final class ProblemsService {
 
     private static boolean isLiveLspDiagnostic(String source) {
         return source != null && source.toLowerCase(Locale.ROOT).startsWith("diag-");
+    }
+
+    private static Severity fromQuickfixSeverity(QuickfixService.Severity severity) {
+        if (severity == null) return Severity.OTHER;
+        return switch (severity) {
+            case ERROR -> Severity.ERROR;
+            case WARNING -> Severity.WARNING;
+            case INFO -> Severity.INFO;
+            case HINT -> Severity.HINT;
+            case OTHER -> Severity.OTHER;
+        };
     }
 
     private static String normalizedSource(String source) {

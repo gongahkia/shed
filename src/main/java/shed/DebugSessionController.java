@@ -90,7 +90,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|memory <reference> [offset [count]]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -114,6 +114,7 @@ final class DebugSessionController {
             case "goto", "run-to-cursor", "runtocursor" -> runToCursor(args);
             case "modules", "module" -> modules(args);
             case "sources", "loaded-sources", "loadedsources" -> loadedSources();
+            case "memory", "read-memory", "readmemory" -> memory(args);
             case "breakpoint", "breakpoints", "bp" -> breakpoint(args);
             case "function", "functions", "function-breakpoint", "function-breakpoints" -> functionBreakpoint(args);
             case "data", "data-breakpoint", "data-breakpoints" -> dataBreakpoint(args);
@@ -884,6 +885,55 @@ final class DebugSessionController {
                 editor.showMessage(result.snapshot().detail());
             });
         return "Loaded-source inspection requested (job " + jobId + ").";
+    }
+
+    private String memory(String argument) {
+        String[] values = argument == null || argument.isBlank() ? new String[0] : argument.trim().split("\\s+");
+        if (values.length < 1 || values.length > 3) return "Usage: :debug memory <reference> [offset [count]]";
+        int offset = 0;
+        int count = 256;
+        try {
+            if (values.length > 1) offset = Integer.parseInt(values[1]);
+            if (values.length > 2) count = Integer.parseInt(values[2]);
+        } catch (NumberFormatException error) {
+            return "Usage: :debug memory <reference> [offset [count]]";
+        }
+        Path workspace = workspace();
+        int requestedOffset = offset;
+        int requestedCount = count;
+        int jobId = editor.asyncJobService.submit("debug memory", token -> sessions.readMemory(workspace, values[0], requestedOffset,
+            requestedCount, Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                refreshDebugPanel();
+                if (error != null || result == null || !result.succeeded()) {
+                    editor.showMessage("Memory inspection failed; inspect :debug status.");
+                    return;
+                }
+                editor.showScratchBuffer("[debug memory]", formatMemory(result.memory()));
+                editor.showMessage(result.snapshot().detail());
+            });
+        return "Memory inspection requested (job " + jobId + ").";
+    }
+
+    private static String formatMemory(DebugSessionService.MemoryRead memory) {
+        StringBuilder output = new StringBuilder("Debug Memory\n\naddress: ").append(memory.address());
+        if (memory.unreadableBytes() > 0) output.append("\nunreadable bytes: ").append(memory.unreadableBytes());
+        output.append("\n\n");
+        byte[] bytes = memory.data();
+        if (bytes.length == 0) return output.append("(no readable bytes)\n").toString();
+        for (int start = 0; start < bytes.length; start += 16) {
+            output.append(String.format("+%04x  ", start));
+            for (int index = 0; index < 16; index++) {
+                if (start + index < bytes.length) output.append(String.format("%02x ", Byte.toUnsignedInt(bytes[start + index])));
+                else output.append("   ");
+            }
+            output.append(' ');
+            for (int index = start; index < Math.min(start + 16, bytes.length); index++) {
+                int value = Byte.toUnsignedInt(bytes[index]);
+                output.append(value >= 32 && value <= 126 ? (char) value : '.');
+            }
+            output.append('\n');
+        }
+        return output.toString();
     }
 
     private String functionBreakpoint(String argument) {

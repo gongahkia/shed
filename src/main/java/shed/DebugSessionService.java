@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -108,6 +109,16 @@ final class DebugSessionService {
     record ExceptionDetailsResult(Snapshot snapshot, ExceptionDetails details, boolean succeeded) { }
     record ModulesResult(Snapshot snapshot, List<ModuleInfo> modules, boolean succeeded) { }
     record LoadedSourcesResult(Snapshot snapshot, List<LoadedSource> sources, boolean succeeded) { }
+    record MemoryRead(String address, int unreadableBytes, byte[] data) {
+        MemoryRead {
+            address = address == null ? "" : address;
+            if (unreadableBytes < 0) throw new IllegalArgumentException("unreadable byte count is invalid");
+            data = data == null ? new byte[0] : data.clone();
+        }
+
+        @Override public byte[] data() { return data.clone(); }
+    }
+    record MemoryReadResult(Snapshot snapshot, MemoryRead memory, boolean succeeded) { }
     private record InspectionPayload(List<DebugInspection.ThreadInfo> threads, List<DebugInspection.Frame> frames, int frameId,
         List<DebugInspection.Scope> scopes, List<DebugInspection.Watch> watches, String detail, DebugInspection.State state) { }
 
@@ -581,6 +592,42 @@ final class DebugSessionService {
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             synchronized (this) { return loadedSourcesFailure(root, session(root), "Loaded-source inspection interrupted."); }
+        }
+    }
+
+    MemoryReadResult readMemory(Path workspace, String memoryReference, int offset, int count, Duration timeout) {
+        Path root = root(workspace);
+        String reference = memoryReference == null ? "" : memoryReference.trim();
+        Connection connection;
+        synchronized (this) {
+            Session session = session(root);
+            if (!validMemoryReference(reference) || offset < -1_048_576 || offset > 1_048_576 || count < 1 || count > 4_096) {
+                return memoryReadFailure(root, session, "Memory inspection arguments are invalid.");
+            }
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null
+                || !session.plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.READ_MEMORY)
+                || !session.runtimeCapabilities.contains(DebugAdapterRegistry.Capability.READ_MEMORY)) {
+                return memoryReadFailure(root, session, "Memory inspection is unavailable for the active adapter.");
+            }
+            connection = session.connection;
+        }
+        try {
+            Map<String, Object> body = body(connection.request("readMemory", Map.of("memoryReference", reference, "offset", offset, "count", count), timeout),
+                "readMemory");
+            MemoryRead memory = memoryRead(body, count);
+            synchronized (this) {
+                Session session = session(root);
+                if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING) {
+                    return new MemoryReadResult(snapshot(root, session), memory, false);
+                }
+                session.detail = "Read " + memory.data().length + " byte" + (memory.data().length == 1 ? "" : "s") + " from debug memory.";
+                return new MemoryReadResult(snapshot(root, session), memory, true);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) { return memoryReadFailure(root, session(root), "Memory inspection failed: " + message(error)); }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) { return memoryReadFailure(root, session(root), "Memory inspection interrupted."); }
         }
     }
 
@@ -1562,6 +1609,7 @@ final class DebugSessionService {
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.EXCEPTION_DETAILS, "supportsExceptionInfoRequest");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.MODULES, "supportsModulesRequest");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.LOADED_SOURCES, "supportsLoadedSourcesRequest");
+        retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.READ_MEMORY, "supportsReadMemoryRequest");
         return Set.copyOf(result);
     }
 
@@ -1664,10 +1712,43 @@ final class DebugSessionService {
         return List.copyOf(result);
     }
 
+    private static MemoryRead memoryRead(Map<String, Object> body, int requestedCount) throws IOException {
+        String address = MiniJson.asString(body == null ? null : body.get("address"));
+        String encoded = MiniJson.asString(body == null ? null : body.get("data"));
+        Object unreadableValue = body == null ? null : body.get("unreadableBytes");
+        int unreadable = integer(unreadableValue);
+        int maximumEncodedLength = ((requestedCount + 2) / 3) * 4;
+        if (!validMemoryReference(address) || (unreadableValue != null && !validNonNegativeInteger(unreadableValue))
+            || unreadable > requestedCount || (encoded != null && encoded.length() > maximumEncodedLength)) {
+            throw new IOException("DAP readMemory response is invalid");
+        }
+        byte[] bytes;
+        try {
+            bytes = encoded == null || encoded.isBlank() ? new byte[0] : Base64.getDecoder().decode(encoded);
+        } catch (IllegalArgumentException error) {
+            throw new IOException("DAP readMemory response data is not base64", error);
+        }
+        if (bytes.length > requestedCount || bytes.length + unreadable > requestedCount) {
+            throw new IOException("DAP readMemory response exceeds the requested byte count");
+        }
+        return new MemoryRead(display(address, 512), unreadable, bytes);
+    }
+
     private static String display(Object value, int maximum) {
         String text = value instanceof String string ? string : value instanceof Number || value instanceof Boolean ? String.valueOf(value) : "";
         if (text.length() > maximum) return text.substring(0, maximum) + "…";
         return text;
+    }
+
+    private static boolean validMemoryReference(String value) {
+        if (value == null || value.isBlank() || value.length() > 1024) return false;
+        for (int index = 0; index < value.length(); index++) if (Character.isISOControl(value.charAt(index))) return false;
+        return true;
+    }
+
+    private static boolean validNonNegativeInteger(Object value) {
+        return value instanceof Number number && number.doubleValue() == number.longValue() && number.longValue() >= 0
+            && number.longValue() <= Integer.MAX_VALUE;
     }
 
     private Result fail(Path root, Session session, String detail, List<String> diagnostics) {
@@ -1727,6 +1808,12 @@ final class DebugSessionService {
         session.detail = message;
         session.diagnostics.add(message);
         return new LoadedSourcesResult(snapshot(root, session), List.of(), false);
+    }
+    private static MemoryReadResult memoryReadFailure(Path root, Session session, String detail) {
+        String message = detail == null || detail.isBlank() ? "Memory inspection failed." : detail;
+        session.detail = message;
+        session.diagnostics.add(message);
+        return new MemoryReadResult(snapshot(root, session), null, false);
     }
     private static RunToCursorResult runToCursorFailure(Path root, Session session, String detail) {
         String message = detail == null || detail.isBlank() ? "Debug run to cursor failed." : detail;

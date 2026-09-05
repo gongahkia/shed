@@ -1,6 +1,7 @@
 package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -8,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -344,6 +346,44 @@ public class DebugSessionServiceTest {
         assertTrue(sources.succeeded());
         assertEquals("Main.java", sources.sources().getFirst().name());
         assertEquals("runtime", sources.sources().getFirst().origin());
+    }
+
+    @Test
+    void readsBoundedMemoryOnlyWhenTheAdapterAdvertisesTheStandardRequest() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-memory").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsReadMemoryRequest", true), ""));
+        connection.responses.put("readMemory", response("readMemory", true, Map.of("address", "0x1004",
+            "data", Base64.getEncoder().encodeToString(new byte[] {0x41, 0x00, 0x42}), "unreadableBytes", 1), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,read_memory"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, listener) -> connection).succeeded());
+        DebugSessionService.MemoryReadResult result = service.readMemory(workspace, "0x1000", 4, 4, Duration.ofSeconds(1));
+
+        assertTrue(result.succeeded());
+        assertEquals("0x1004", result.memory().address());
+        assertEquals(1, result.memory().unreadableBytes());
+        assertArrayEquals(new byte[] {0x41, 0x00, 0x42}, result.memory().data());
+        assertEquals(Map.of("memoryReference", "0x1000", "offset", 4, "count", 4), connection.arguments.getLast());
+    }
+
+    @Test
+    void refusesMemoryReadsWhenTheAdapterDoesNotAdvertiseTheStandardRequest() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-memory-unavailable").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true, Map.of(), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,read_memory"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, listener) -> connection).succeeded());
+        DebugSessionService.MemoryReadResult result = service.readMemory(workspace, "0x1000", 0, 16, Duration.ofSeconds(1));
+
+        assertFalse(result.succeeded());
+        assertEquals(List.of("initialize", "launch"), connection.commands);
+        assertTrue(result.snapshot().detail().contains("unavailable"));
     }
 
     @Test

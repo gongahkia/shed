@@ -166,12 +166,30 @@ final class DebugSessionController {
     String startForPanel() { return start(""); }
 
     String startTest(Path root, TestService.TestCase test, String configuration) {
-        if (root == null || test == null || configuration == null || configuration.isBlank()) return "Test debug configuration is required";
-        if (test.file() == null) return "Test source location is unavailable";
+        if (root == null || test == null) return "Test debug target is required";
         Path workspace = root.toAbsolutePath().normalize();
-        Path file = test.file().toAbsolutePath().normalize();
-        if (!file.startsWith(workspace)) return "Test source escapes the selected workspace";
-        return submitStart(workspace, new DebugAdapterRegistry.LaunchContext(file, test.id(), file), configuration, false, "test debug");
+        Path file = test.file() == null ? null : test.file().toAbsolutePath().normalize();
+        if (file != null && !file.startsWith(workspace)) return "Test source escapes the selected workspace";
+        DebugAdapterRegistry.Validation validation = validation(workspace);
+        String requested = configuration == null ? "" : configuration.trim();
+        if (requested.isBlank()) requested = inferredTestConfiguration(validation, test);
+        if (requested.isBlank()) return "No safe built-in test debug configuration is available for " + test.adapterId() + ".";
+        return submitStart(workspace, new DebugAdapterRegistry.LaunchContext(file, test.id(), file), requested, false, "test debug");
+    }
+
+    static String inferredTestConfiguration(DebugAdapterRegistry.Validation validation, TestService.TestCase test) {
+        if (validation == null || !validation.valid() || test == null) return "";
+        String candidate = switch (test.adapterId()) {
+            case "pytest" -> BuiltInDebugAdapterSupport.PYTHON_DEBUGPY_PYTEST;
+            case "unittest" -> BuiltInDebugAdapterSupport.PYTHON_DEBUGPY_UNITTEST;
+            case "go" -> safeGoTestId(test) ? BuiltInDebugAdapterSupport.GO_DELVE_TEST : "";
+            default -> "";
+        };
+        return candidate.isBlank() || !validation.configurations().containsKey(candidate) ? "" : candidate;
+    }
+
+    private static boolean safeGoTestId(TestService.TestCase test) {
+        return test != null && test.id().equals(test.name()) && test.id().matches("(?:Test|Benchmark|Example)[A-Za-z0-9_]+");
     }
 
     String stopForPanel() { return stop(); }

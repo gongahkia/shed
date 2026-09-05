@@ -7,7 +7,10 @@ import java.util.Set;
 /** Declares local debug profiles whose adapters remain separately installed by the user. */
 final class BuiltInDebugAdapterSupport {
     static final String PYTHON_DEBUGPY = "python-debugpy";
+    static final String PYTHON_DEBUGPY_PYTEST = "python-debugpy-pytest";
+    static final String PYTHON_DEBUGPY_UNITTEST = "python-debugpy-unittest";
     static final String GO_DELVE = "go-delve";
+    static final String GO_DELVE_TEST = "go-delve-test";
     static final String CSHARP_NETCOREDBG = "csharp-netcoredbg";
     static final String NATIVE_LLDB = "native-lldb";
 
@@ -55,8 +58,17 @@ final class BuiltInDebugAdapterSupport {
             DebugAdapterRegistry.Request.LAUNCH, "workspace", "${file}", "${workspaceFolder}", List.of(), "", "127.0.0.1", 0, List.of(".py", ".pyw"));
         DebugAdapterRegistry.Configuration go = new DebugAdapterRegistry.Configuration(GO_DELVE, GO_DELVE,
             DebugAdapterRegistry.Request.LAUNCH, "workspace", "${file}", "${workspaceFolder}", List.of(), "", "127.0.0.1", 0, List.of(".go"));
+        DebugAdapterRegistry.Configuration pytest = new DebugAdapterRegistry.Configuration(PYTHON_DEBUGPY_PYTEST, PYTHON_DEBUGPY,
+            DebugAdapterRegistry.Request.LAUNCH, "workspace", "", "pytest", "", "${workspaceFolder}", List.of("${testId}"), "",
+            "127.0.0.1", 0, List.of(), Map.of(), Map.of());
+        DebugAdapterRegistry.Configuration unittest = new DebugAdapterRegistry.Configuration(PYTHON_DEBUGPY_UNITTEST, PYTHON_DEBUGPY,
+            DebugAdapterRegistry.Request.LAUNCH, "workspace", "", "unittest", "", "${workspaceFolder}", List.of("${testId}"), "",
+            "127.0.0.1", 0, List.of(), Map.of(), Map.of());
+        DebugAdapterRegistry.Configuration goTest = new DebugAdapterRegistry.Configuration(GO_DELVE_TEST, GO_DELVE,
+            DebugAdapterRegistry.Request.LAUNCH, "workspace", "${workspaceFolder}", "", "", "${workspaceFolder}",
+            List.of("-test.run", "^${testId}$"), "", "127.0.0.1", 0, List.of(), Map.of(), Map.of("mode", "test"));
         return DebugAdapterRegistry.withAdapterDefaults(base, Map.of(PYTHON_DEBUGPY, debugpy, GO_DELVE, delve, CSHARP_NETCOREDBG, netcoredbg,
             NATIVE_LLDB, lldb),
-            Map.of(PYTHON_DEBUGPY, python, GO_DELVE, go));
+            Map.of(PYTHON_DEBUGPY, python, PYTHON_DEBUGPY_PYTEST, pytest, PYTHON_DEBUGPY_UNITTEST, unittest, GO_DELVE, go, GO_DELVE_TEST, goTest));
     }
 }

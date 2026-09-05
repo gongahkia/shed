@@ -32,6 +32,16 @@ class BuiltInDebugAdapterSupportTest {
         assertEquals(java.util.List.of(".go"), validation.configurations().get(BuiltInDebugAdapterSupport.GO_DELVE).fileExtensions());
         assertTrue(DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.GO_DELVE, workspace, workspace.resolve("main.go")).launchable());
         assertFalse(DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.GO_DELVE, workspace, workspace.resolve("main.py")).launchable());
+        DebugAdapterRegistry.PlanResult pytest = DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.PYTHON_DEBUGPY_PYTEST, workspace,
+            new DebugAdapterRegistry.LaunchContext(null, "tests/test_main.py::works", null));
+        assertTrue(pytest.launchable());
+        assertEquals("pytest", pytest.plan().module());
+        assertEquals(java.util.List.of("tests/test_main.py::works"), pytest.plan().args());
+        DebugAdapterRegistry.PlanResult goTest = DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.GO_DELVE_TEST, workspace,
+            new DebugAdapterRegistry.LaunchContext(null, "TestWorks", null));
+        assertTrue(goTest.launchable());
+        assertEquals(workspace, goTest.plan().program());
+        assertEquals("test", goTest.plan().configuration().adapterOptions().get("mode"));
         DebugAdapterRegistry.Adapter netcoredbg = validation.registry().adapter(BuiltInDebugAdapterSupport.CSHARP_NETCOREDBG);
         assertEquals("netcoredbg", netcoredbg.command());
         assertEquals(java.util.List.of("--interpreter=vscode"), netcoredbg.args());
@@ -53,5 +63,21 @@ class BuiltInDebugAdapterSupportTest {
 
         assertEquals("custom-debug-adapter", validation.registry().adapter(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY).command());
         assertFalse(validation.configurations().containsKey(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY));
+    }
+
+    @Test
+    void infersOnlyUnambiguousBuiltInTestDebugProfiles() {
+        DebugAdapterRegistry.Validation validation = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
+
+        assertEquals(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY_PYTEST, DebugSessionController.inferredTestConfiguration(validation,
+            new TestService.TestCase("pytest", "tests/test_main.py::works", "works", "tests/test_main.py", null, 1, TestService.Status.UNKNOWN, 0, "")));
+        assertEquals(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY_UNITTEST, DebugSessionController.inferredTestConfiguration(validation,
+            new TestService.TestCase("unittest", "tests.MainTest.works", "works", "tests.MainTest", null, 1, TestService.Status.UNKNOWN, 0, "")));
+        assertEquals(BuiltInDebugAdapterSupport.GO_DELVE_TEST, DebugSessionController.inferredTestConfiguration(validation,
+            new TestService.TestCase("go", "TestWorks", "TestWorks", "go", null, 1, TestService.Status.UNKNOWN, 0, "")));
+        assertEquals("", DebugSessionController.inferredTestConfiguration(validation,
+            new TestService.TestCase("go", "example::TestWorks", "TestWorks", "example", null, 1, TestService.Status.UNKNOWN, 0, "")));
+        assertEquals("", DebugSessionController.inferredTestConfiguration(validation,
+            new TestService.TestCase("maven", "example.Works#test", "test", "example.Works", null, 1, TestService.Status.UNKNOWN, 0, "")));
     }
 }

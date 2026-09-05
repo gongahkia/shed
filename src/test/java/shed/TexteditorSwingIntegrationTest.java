@@ -344,6 +344,31 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void cmakePresetDryRunUsesDirectArgumentsWithoutReadingWorkspaceTasks() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-cmake-preset-task");
+        Path workspace = Files.createDirectories(tempDir.resolve("cmake-preset-project"));
+        Path source = workspace.resolve("main.cpp");
+        Files.createDirectories(home);
+        Files.writeString(source, "int main() {}\n", StandardCharsets.UTF_8);
+        Files.writeString(workspace.resolve("CMakeUserPresets.json"), "{}\n", StandardCharsets.UTF_8);
+        Files.writeString(workspace.resolve(".shedtasks"), "[task.bad\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, source);
+        try {
+            String result = onEdt(() -> editor.handleTaskCommand("cmake dry-run build \"debug local\""));
+
+            assertEquals("Task dry run shown (not started)", result);
+            String output = onEdt(() -> editor.getCurrentBuffer().getContent());
+            assertTrue(output.contains("Task dry run: cmake-preset-build"));
+            assertTrue(output.contains("command: \"cmake\" \"--build\" \"--preset\" \"debug local\""));
+            assertTrue(output.contains("shell: direct"));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void localTaskDependenciesRunInDeclaredOrderAsOneJob() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-task-dependencies");

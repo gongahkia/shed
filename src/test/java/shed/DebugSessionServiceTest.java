@@ -471,6 +471,50 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void resolvesAndSynchronizesDataBreakpointsOnlyAfterTheAdapterAdvertisesSupport(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        DataBreakpointStore store = new DataBreakpointStore(tempDir.resolve("state"));
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsDataBreakpoints", true), ""));
+        connection.responses.put("dataBreakpointInfo", response("dataBreakpointInfo", true, Map.of("dataId", "variable:counter",
+            "description", "counter", "accessTypes", List.of("read", "write")), ""));
+        connection.responses.put("setDataBreakpoints", response("setDataBreakpoints", true,
+            Map.of("breakpoints", List.of(Map.of("verified", true))), ""));
+
+        DebugSessionService.Result started = service.start(workspace, new DebugAdapterRegistry.LaunchContext(file, "", null),
+            validation("launch,data_breakpoints"), enabled(), "main", Duration.ofSeconds(1), (plan, features, listener) -> connection,
+            null, null, null, store, null);
+        DebugSessionService.DataBreakpointResult added = service.addDataBreakpoint(workspace, 55, "counter", DataBreakpointStore.AccessType.WRITE,
+            store, Duration.ofSeconds(1));
+
+        assertTrue(started.succeeded());
+        assertTrue(added.succeeded());
+        assertEquals(List.of("initialize", "launch", "setDataBreakpoints", "dataBreakpointInfo", "setDataBreakpoints"), connection.commands);
+        assertEquals(List.of(Map.of("dataId", "variable:counter", "accessType", "write")), connection.arguments.getLast().get("breakpoints"));
+        assertEquals(DataBreakpointStore.State.VERIFIED, store.breakpoints(workspace).getFirst().state());
+    }
+
+    @Test
+    void refusesDataBreakpointLookupWhenInitializeDoesNotAdvertiseSupport(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        DataBreakpointStore store = new DataBreakpointStore(tempDir.resolve("state"));
+        FakeConnection connection = new FakeConnection();
+
+        assertTrue(service.start(workspace, new DebugAdapterRegistry.LaunchContext(file, "", null), validation("launch,data_breakpoints"), enabled(),
+            "main", Duration.ofSeconds(1), (plan, features, listener) -> connection, null, null, null, store, null).succeeded());
+        DebugSessionService.DataBreakpointResult result = service.addDataBreakpoint(workspace, 55, "counter", DataBreakpointStore.AccessType.WRITE,
+            store, Duration.ofSeconds(1));
+
+        assertFalse(result.succeeded());
+        assertTrue(result.snapshot().detail().contains("Data breakpoints are unavailable"));
+        assertFalse(connection.commands.contains("dataBreakpointInfo"));
+    }
+
+    @Test
     void doesNotSynchronizeFunctionBreakpointsWithoutInitializeSupport(@TempDir Path tempDir) throws Exception {
         DebugSessionService service = new DebugSessionService();
         Path workspace = tempDir.resolve("workspace");

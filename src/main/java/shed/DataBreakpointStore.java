@@ -105,6 +105,17 @@ final class DataBreakpointStore {
         return true;
     }
 
+    synchronized void reject(Path workspace, Breakpoint requested, String message) throws IOException {
+        if (requested == null) return;
+        Path root = root(workspace);
+        Map<String, Breakpoint> values = loaded(root);
+        Breakpoint current = values.get(requested.dataId());
+        if (current == null || !current.equals(requested)) return;
+        values.put(current.dataId(), new Breakpoint(current.dataId(), current.description(), current.accessType(), State.REJECTED,
+            message, current.enabled(), current.condition(), current.hitCondition()));
+        save(root, values);
+    }
+
     synchronized SyncResult apply(Path workspace, List<Breakpoint> requested, Object responseBody) throws IOException {
         Path root = root(workspace);
         List<Breakpoint> original = requested == null ? List.of() : List.copyOf(requested);

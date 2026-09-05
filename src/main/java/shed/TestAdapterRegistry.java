@@ -233,12 +233,13 @@ final class TestAdapterRegistry {
         @Override public List<String> defaultCommand(Path root) { return List.of("go"); }
         @Override public TestService.Command discovery(TestService.AdapterSpec spec) { List<String> command = new ArrayList<>(base(spec)); command.addAll(List.of("test", "-list", ".", "./...")); return new TestService.Command(command, List.of()); }
         @Override public TestService.Command run(TestService.AdapterSpec spec, List<TestService.TestCase> selected, Path cache) {
-            List<String> command = new ArrayList<>(base(spec)); command.addAll(List.of("test", "-json", "./..."));
+            Path profile = cache.resolve("go.coverprofile");
+            List<String> command = new ArrayList<>(base(spec)); command.addAll(List.of("test", "-json", "-coverprofile=" + profile, "./..."));
             if (!selected.isEmpty()) {
                 command.add("-run");
                 command.add("^(?:" + selected.stream().map(TestService.TestCase::name).map(java.util.regex.Pattern::quote).collect(java.util.stream.Collectors.joining("|")) + ")$");
             }
-            return new TestService.Command(command, List.of());
+            return command(command, profile);
         }
         @Override public List<TestService.TestCase> parseDiscovery(Path root, String output) {
             List<TestService.TestCase> result = new ArrayList<>();

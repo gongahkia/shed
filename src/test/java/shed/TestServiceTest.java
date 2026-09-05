@@ -91,6 +91,19 @@ class TestServiceTest {
     }
 
     @Test
+    void runsGoTestsWithADeclaredCoverageProfile() throws Exception {
+        Files.writeString(root.resolve("go.mod"), "module example.com/demo\n");
+        TestService service = new TestService();
+        TestService.AdapterSpec spec = service.load(root).specs().getFirst();
+        Path cache = root.resolve("test-cache");
+
+        TestService.Command command = service.adapter("go").run(spec, List.of(), cache);
+
+        assertEquals(List.of("go", "test", "-json", "-coverprofile=" + cache.resolve("go.coverprofile"), "./..."), command.argv());
+        assertEquals(List.of(cache.resolve("go.coverprofile")), command.reports());
+    }
+
+    @Test
     void detectsDotnetAndParsesTrxResults() throws Exception {
         Files.writeString(root.resolve("demo.sln"), "");
         Path source = root.resolve("Demo.Tests/WidgetTests.cs");

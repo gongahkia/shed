@@ -64,6 +64,7 @@ final class CoverageService {
     private static final Pattern LCOV_DA = Pattern.compile("DA:(\\d+),(\\d+)");
     private static final Pattern LCOV_BRDA = Pattern.compile("BRDA:(\\d+),[^,]*,[^,]*,(-|\\d+)");
     private static final Pattern GO_BLOCK = Pattern.compile("(.+?):(\\d+)\\.\\d+,(\\d+)\\.\\d+\\s+\\d+\\s+(\\d+)");
+    private static final Pattern GO_MODULE = Pattern.compile("(?m)^\\s*module\\s+([^\\s]+)");
     private static final Pattern COBERTURA_BRANCH = Pattern.compile(".*?\\((\\d+)/(\\d+)\\).*?");
 
     ImportResult importReport(Path root, Path report) throws IOException {
@@ -158,7 +159,7 @@ final class CoverageService {
         for (String row : text.lines().toList()) {
             Matcher matcher = GO_BLOCK.matcher(row.trim());
             if (!matcher.matches()) continue;
-            Path path = resolve(root, matcher.group(1));
+            Path path = resolveGo(root, matcher.group(1));
             if (path == null) continue;
             int start = Integer.parseInt(matcher.group(2));
             int end = Integer.parseInt(matcher.group(3));
@@ -185,6 +186,18 @@ final class CoverageService {
             candidate = candidate.normalize().toAbsolutePath();
             return candidate.startsWith(root) && Files.isRegularFile(candidate) ? candidate : null;
         } catch (RuntimeException ignored) { return null; }
+    }
+
+    /** Go profiles may use a module import path instead of a workspace-relative source path. */
+    private static Path resolveGo(Path root, String raw) {
+        Path direct = resolve(root, raw);
+        if (direct != null) return direct;
+        try {
+            Matcher module = GO_MODULE.matcher(Files.readString(root.resolve("go.mod"), StandardCharsets.UTF_8));
+            if (!module.find()) return null;
+            String prefix = module.group(1) + "/";
+            return raw != null && raw.startsWith(prefix) ? resolve(root, raw.substring(prefix.length())) : null;
+        } catch (IOException | RuntimeException ignored) { return null; }
     }
 
     private static DocumentBuilderFactory secureFactory() throws Exception {

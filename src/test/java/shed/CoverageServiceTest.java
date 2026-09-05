@@ -61,4 +61,18 @@ class CoverageServiceTest {
         Files.writeString(root.resolve("outside.info"), "SF:/tmp/not-shed.js\nDA:1,1\nend_of_record\n");
         assertThrows(java.io.IOException.class, () -> new CoverageService().importReport(root, root.resolve("outside.info")));
     }
+
+    @Test
+    void resolvesGoModulePathsInCoverprofiles() throws Exception {
+        Files.writeString(root.resolve("go.mod"), "module example.com/demo\n");
+        Path source = root.resolve("pkg/feature.go");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, "package pkg\n");
+        Path profile = root.resolve("cover.out");
+        Files.writeString(profile, "mode: set\nexample.com/demo/pkg/feature.go:1.1,1.12 1 1\n");
+
+        CoverageService.ImportResult imported = new CoverageService().importReport(root, profile);
+
+        assertEquals(1, imported.report().hits(source).get(0));
+    }
 }

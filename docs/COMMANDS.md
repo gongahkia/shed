@@ -246,6 +246,9 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:debug function clear-condition\|clear-hit <name>` | Clear one function-breakpoint option |
 | `:debug exception list` | Show exception filters returned by the current compatible adapter and their effective workspace settings |
 | `:debug exception enable\|disable <filter>` | Persist an explicit override and synchronize it with the running compatible adapter |
+| `:debug variables [reference]` | Refresh paused-frame inspection, or lazily load one nested variable reference shown by the Debug panel/inspector |
+| `:debug eval <expression>` | Evaluate one bounded single-line expression in the selected paused frame with standard DAP `repl` context |
+| `:debug console [clear]` | Show retained adapter output and REPL evaluations, or clear the retained console text |
 
 ## LSP and Symbol Commands
 

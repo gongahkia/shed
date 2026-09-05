@@ -65,6 +65,30 @@ public class DebugAdapterIntegrationTest {
     }
 
     @Test
+    void referenceAdapterExpandsStructuredVariablesAndEvaluatesInTheSelectedFrame(@TempDir Path tempDir) throws Exception {
+        Path workspace = tempDir.resolve("workspace");
+        Path source = workspace.resolve("Main.java");
+        DebugSessionService service = new DebugSessionService();
+        try (ReferenceDebugAdapter adapter = new ReferenceDebugAdapter(ReferenceDebugAdapter.Mode.NORMAL)) {
+            assertTrue(service.start(workspace, source, validation(), enabled(), "main", Duration.ofSeconds(1), starter(adapter)).succeeded());
+            await(() -> service.inspection(workspace).paused());
+            assertTrue(service.refreshInspection(workspace, Duration.ofSeconds(1)).succeeded());
+
+            DebugInspection.Variable count = service.inspection(workspace).scopes().getFirst().variables().getFirst();
+            assertEquals(56, count.variablesReference());
+            assertTrue(service.expandVariables(workspace, count.variablesReference(), Duration.ofSeconds(1)).succeeded());
+            assertEquals("bits", service.inspection(workspace).expandedVariables().get(56).getFirst().name());
+
+            DebugSessionService.EvaluationResult evaluation = service.evaluate(workspace, "count + 1", Duration.ofSeconds(1));
+            assertTrue(evaluation.succeeded());
+            assertEquals("3", evaluation.evaluation().result());
+            assertEquals("int", evaluation.evaluation().type());
+            assertTrue(service.console(workspace).output().contains("[repl] > count + 1"));
+            assertTrue(adapter.commands().containsAll(List.of("variables", "evaluate")));
+        }
+    }
+
+    @Test
     void timeoutSendsCancellationAndTheReferenceAdapterRecovers() throws Exception {
         try (ReferenceDebugAdapter adapter = new ReferenceDebugAdapter(ReferenceDebugAdapter.Mode.TIMEOUT_THREADS)) {
             DebugAdapterTransport transport = DebugAdapterTransport.forStreams(adapter.clientInput(), adapter.clientOutput(), adapter.process(), null);

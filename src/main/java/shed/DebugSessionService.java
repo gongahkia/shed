@@ -48,6 +48,15 @@ final class DebugSessionService {
     }
     record InspectionResult(DebugInspection.Snapshot snapshot, boolean succeeded) { }
     record ConsoleResult(DebugConsole.Snapshot snapshot, boolean succeeded) { }
+    record Evaluation(String expression, String result, String type, int variablesReference, String message) {
+        Evaluation {
+            expression = expression == null ? "" : expression;
+            result = result == null ? "" : result;
+            type = type == null ? "" : type;
+            message = message == null ? "" : message;
+        }
+    }
+    record EvaluationResult(DebugConsole.Snapshot console, Evaluation evaluation, boolean succeeded) { }
     record ControlResult(Snapshot snapshot, boolean succeeded) { }
     record RunToCursorResult(Snapshot snapshot, boolean succeeded) { }
     private record InspectionPayload(List<DebugInspection.ThreadInfo> threads, List<DebugInspection.Frame> frames, int frameId,
@@ -522,6 +531,109 @@ final class DebugSessionService {
         return new InspectionResult(result.snapshot(), result.succeeded());
     }
 
+    InspectionResult expandVariables(Path workspace, int variablesReference, Duration timeout) {
+        Path root = root(workspace);
+        Connection connection;
+        DebugInspection.VariableLoad load;
+        synchronized (this) {
+            Session session = session(root);
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null
+                || !supports(session.plan, session.features, DebugAdapterRegistry.Capability.VARIABLES)) {
+                return new InspectionResult(session.inspection.snapshot(), false);
+            }
+            load = session.inspection.beginVariableLoad(variablesReference);
+            if (load == null) return new InspectionResult(session.inspection.snapshot(), false);
+            connection = session.connection;
+        }
+        try {
+            List<DebugInspection.Variable> variables = variables(connection, load.variablesReference(), timeout,
+                () -> variableLoadActive(root, connection, load.generation()));
+            synchronized (this) {
+                Session session = session(root);
+                boolean applied = session.connection == connection && session.inspection.completeVariableLoad(load.generation(), load.variablesReference(), variables);
+                return new InspectionResult(session.inspection.snapshot(), applied);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) {
+                Session session = session(root);
+                session.diagnostics.add("Nested variable inspection failed: " + message(error));
+                return new InspectionResult(session.inspection.snapshot(), false);
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) {
+                Session session = session(root);
+                session.diagnostics.add("Nested variable inspection interrupted.");
+                return new InspectionResult(session.inspection.snapshot(), false);
+            }
+        }
+    }
+
+    EvaluationResult evaluate(Path workspace, String expression, Duration timeout) {
+        Path root = root(workspace);
+        String source = expression == null ? "" : expression.trim();
+        if (!validExpression(source)) {
+            synchronized (this) {
+                Session session = session(root);
+                return new EvaluationResult(session.console.snapshot(), new Evaluation(source, "", "", 0,
+                    "Debug expression is empty, too long, or contains a control character."), false);
+            }
+        }
+        Connection connection;
+        DebugInspection.EvaluationLoad load;
+        synchronized (this) {
+            Session session = session(root);
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null
+                || !supports(session.plan, session.features, DebugAdapterRegistry.Capability.EVALUATE)) {
+                return new EvaluationResult(session.console.snapshot(), new Evaluation(source, "", "", 0,
+                    "Debug expression evaluation is unavailable for the active adapter."), false);
+            }
+            load = session.inspection.beginEvaluation();
+            if (load == null) {
+                return new EvaluationResult(session.console.snapshot(), new Evaluation(source, "", "", 0,
+                    "Debug expression evaluation requires a selected paused frame."), false);
+            }
+            connection = session.connection;
+        }
+        try {
+            Map<String, Object> arguments = new LinkedHashMap<>();
+            arguments.put("expression", source);
+            arguments.put("context", "repl");
+            arguments.put("frameId", load.frameId());
+            DebugAdapterTransport.Response response = connection.request("evaluate", arguments, timeout);
+            if (!response.success()) throw new IOException(responseFailure("evaluate", response));
+            Map<String, Object> body = MiniJson.asObject(response.body());
+            String result = body == null ? null : MiniJson.asString(body.get("result"));
+            if (result == null) throw new IOException("DAP evaluate response is missing result");
+            Evaluation evaluation = new Evaluation(source, result, string(body.get("type")), integer(body.get("variablesReference")), "");
+            synchronized (this) {
+                Session session = session(root);
+                if (session.connection != connection || !session.inspection.current(load.generation(), load.frameId())) {
+                    return new EvaluationResult(session.console.snapshot(), new Evaluation(source, "", "", 0,
+                        "Debug state changed before evaluation completed."), false);
+                }
+                session.console.appendEvaluation(evaluation);
+                session.detail = "Evaluated debug expression.";
+                return new EvaluationResult(session.console.snapshot(), evaluation, true);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) {
+                Session session = session(root);
+                String detail = "Debug expression evaluation failed: " + message(error);
+                session.diagnostics.add(detail);
+                return new EvaluationResult(session.console.snapshot(), new Evaluation(source, "", "", 0, detail), false);
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) {
+                Session session = session(root);
+                String detail = "Debug expression evaluation interrupted.";
+                session.diagnostics.add(detail);
+                return new EvaluationResult(session.console.snapshot(), new Evaluation(source, "", "", 0, detail), false);
+            }
+        }
+    }
+
     InspectionResult refreshInspection(Path workspace, Duration timeout) {
         Path root = root(workspace);
         Connection connection;
@@ -606,6 +718,11 @@ final class DebugSessionService {
     private synchronized boolean inspectionLoading(Path workspace, Connection connection, long generation) {
         Session session = session(root(workspace));
         return session.connection == connection && session.inspection.loading(generation);
+    }
+
+    private synchronized boolean variableLoadActive(Path workspace, Connection connection, long generation) {
+        Session session = session(root(workspace));
+        return session.connection == connection && session.inspection.current(generation);
     }
 
     private static InspectionPayload loadInspection(DebugAdapterRegistry.Plan plan, DebugFeatureSettings settings, Connection connection,
@@ -772,6 +889,12 @@ final class DebugSessionService {
     private static String string(Object value) {
         String string = MiniJson.asString(value);
         return string == null ? "" : string;
+    }
+
+    private static boolean validExpression(String expression) {
+        if (expression == null || expression.isEmpty() || expression.length() > 1024) return false;
+        for (int index = 0; index < expression.length(); index++) if (Character.isISOControl(expression.charAt(index))) return false;
+        return true;
     }
 
     private static BreakpointSynchronization synchronizeBreakpoints(DebugAdapterRegistry.Plan plan, DebugFeatureSettings settings,

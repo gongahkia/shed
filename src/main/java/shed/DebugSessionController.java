@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 final class DebugSessionController {
@@ -76,7 +77,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|goto [line]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|exception list|enable|disable|console [clear]|stack|variables|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|goto [line]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|exception list|enable|disable|console [clear]|eval <expression>|stack|variables [reference]|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -99,9 +100,11 @@ final class DebugSessionController {
             case "function", "functions", "function-breakpoint", "function-breakpoints" -> functionBreakpoint(args);
             case "exception", "exceptions" -> exceptionBreakpoint(args);
             case "console", "output" -> console(args);
-            case "stack", "frames", "variables", "inspect", "refresh" -> submitInspection();
+            case "stack", "frames", "inspect", "refresh" -> submitInspection();
+            case "variables", "variable" -> variables(args);
             case "frame" -> selectFrame(args);
             case "watch", "watches" -> watch(args);
+            case "eval", "evaluate", "repl" -> evaluate(args);
             default -> "Unknown :debug subcommand: " + command;
         };
     }
@@ -229,6 +232,10 @@ final class DebugSessionController {
             });
         return "Debug inspection requested (job " + jobId + ").";
     }
+
+    String expandVariablesForPanel(int variablesReference) { return submitVariableExpansion(variablesReference); }
+
+    String evaluateForPanel(String expression) { return evaluate(expression); }
 
     String addWatchForPanel(String expression) {
         DebugSessionService.InspectionResult result = sessions.addWatch(workspace(), expression);
@@ -561,6 +568,29 @@ final class DebugSessionController {
         return submitInspection();
     }
 
+    private String variables(String argument) {
+        String value = argument == null ? "" : argument.trim();
+        if (value.isEmpty()) return submitInspection();
+        int reference;
+        try { reference = Integer.parseInt(value); }
+        catch (NumberFormatException error) { return "Usage: :debug variables [positive-reference]"; }
+        return reference < 1 ? "Usage: :debug variables [positive-reference]" : submitVariableExpansion(reference);
+    }
+
+    private String evaluate(String expression) {
+        Path workspace = workspace();
+        String value = expression == null ? "" : expression.trim();
+        if (!validDebugExpression(value)) return "Usage: :debug eval <non-empty single-line expression>";
+        int jobId = editor.asyncJobService.submit("debug evaluate", token -> sessions.evaluate(workspace, value,
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                refreshDebugPanel();
+                if (error != null || result == null || !result.succeeded()) {
+                    editor.showMessage(result == null ? "Debug evaluation failed; inspect :debug status." : result.evaluation().message());
+                } else editor.showMessage("Debug expression evaluated.");
+            });
+        return "Debug evaluation requested (job " + jobId + ").";
+    }
+
     private String watch(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "list".equalsIgnoreCase(trimmed)) {
@@ -592,6 +622,17 @@ final class DebugSessionController {
             });
         showInspection(workspace);
         return "Debug inspection requested (job " + jobId + ").";
+    }
+
+    private String submitVariableExpansion(int variablesReference) {
+        Path workspace = workspace();
+        int jobId = editor.asyncJobService.submit("debug variables", token -> sessions.expandVariables(workspace, variablesReference,
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                refreshDebugPanel();
+                if (error != null || result == null || !result.succeeded()) editor.showMessage("Nested variables are unavailable; inspect :debug status.");
+                else editor.showMessage("Nested variables loaded.");
+            });
+        return "Nested variable inspection requested (job " + jobId + ").";
     }
 
     private String submitControl(DebugSessionService.Control control) {
@@ -920,11 +961,7 @@ final class DebugSessionController {
         for (DebugInspection.Scope scope : snapshot.scopes()) {
             output.append("  ").append(scope.name()).append(scope.expensive() ? " (expensive)" : "").append("\n");
             if (scope.variables().isEmpty()) output.append("    (none or unavailable)\n");
-            for (DebugInspection.Variable variable : scope.variables()) {
-                output.append("    ").append(variable.name()).append(" = ").append(variable.value());
-                if (!variable.type().isBlank()) output.append("  : ").append(variable.type());
-                output.append("\n");
-            }
+            for (DebugInspection.Variable variable : scope.variables()) appendVariable(output, variable, snapshot.expandedVariables(), "    ", Set.of(), 0);
         }
         output.append("\nWatches:\n");
         if (snapshot.watches().isEmpty()) output.append("  (none)\n");
@@ -935,8 +972,30 @@ final class DebugSessionController {
             if (!watch.message().isBlank()) output.append("  ").append(watch.message());
             output.append("\n");
         }
-        output.append("\nActions: :debug stack | :debug variables | :debug frame <id> | :debug watch add <expression> | :debug watch remove <expression>\n");
+        output.append("\nActions: :debug stack | :debug variables [reference] | :debug frame <id> | :debug eval <expression> | :debug watch add <expression> | :debug watch remove <expression>\n");
         editor.showScratchBuffer("[debug inspector]", output.toString());
+    }
+
+    private static void appendVariable(StringBuilder output, DebugInspection.Variable variable, Map<Integer, List<DebugInspection.Variable>> expanded,
+                                       String indent, Set<Integer> ancestors, int depth) {
+        if (variable == null) return;
+        output.append(indent).append(variable.name()).append(" = ").append(variable.value());
+        if (!variable.type().isBlank()) output.append("  : ").append(variable.type());
+        int reference = variable.variablesReference();
+        if (reference > 0 && !expanded.containsKey(reference)) output.append("  [reference ").append(reference).append("]");
+        output.append("\n");
+        if (reference < 1 || depth >= 12 || ancestors.contains(reference)) return;
+        List<DebugInspection.Variable> children = expanded.get(reference);
+        if (children == null) return;
+        java.util.LinkedHashSet<Integer> childAncestors = new java.util.LinkedHashSet<>(ancestors);
+        childAncestors.add(reference);
+        for (DebugInspection.Variable child : children) appendVariable(output, child, expanded, indent + "  ", Set.copyOf(childAncestors), depth + 1);
+    }
+
+    private static boolean validDebugExpression(String value) {
+        if (value == null || value.isEmpty() || value.length() > 1024) return false;
+        for (int index = 0; index < value.length(); index++) if (Character.isISOControl(value.charAt(index))) return false;
+        return true;
     }
 
     private void showConsole(Path workspace) {
@@ -948,7 +1007,7 @@ final class DebugSessionController {
         if (snapshot.output().isEmpty()) output.append("  (none)\n");
         else output.append(snapshot.output());
         if (!snapshot.output().isEmpty() && !snapshot.output().endsWith("\n")) output.append("\n");
-        output.append("\nActions: :debug console clear\n");
+        output.append("\nActions: :debug eval <expression> | :debug console clear\n");
         editor.showScratchBuffer("[debug console]", output.toString());
     }
 

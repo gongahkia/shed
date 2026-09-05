@@ -36,4 +36,21 @@ public class DebugInspectionTest {
         assertEquals(45, inspection.snapshot().frameId());
         assertTrue(inspection.snapshot().scopes().isEmpty());
     }
+
+    @Test
+    void discardsNestedVariablesWhenThePausedStateChanges() {
+        DebugInspection inspection = new DebugInspection();
+        inspection.stopped(7, "breakpoint", "");
+        DebugInspection.Load load = inspection.beginLoad();
+        assertTrue(inspection.complete(load.generation(), List.of(), List.of(new DebugInspection.Frame(44, "main", "Main.java", 8, 1)), 44,
+            List.of(new DebugInspection.Scope("Locals", 55, false, List.of(new DebugInspection.Variable("object", "{}", "Map", 56)))), List.of(), "ready",
+            DebugInspection.State.READY));
+        DebugInspection.VariableLoad variableLoad = inspection.beginVariableLoad(56);
+        assertTrue(variableLoad != null);
+        inspection.invalidated("Debug execution continued.");
+
+        assertFalse(inspection.completeVariableLoad(variableLoad.generation(), variableLoad.variablesReference(),
+            List.of(new DebugInspection.Variable("field", "1", "int", 0))));
+        assertTrue(inspection.snapshot().expandedVariables().isEmpty());
+    }
 }

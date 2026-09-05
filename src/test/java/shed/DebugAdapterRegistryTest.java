@@ -179,6 +179,22 @@ public class DebugAdapterRegistryTest {
         assertTrue(DebugAdapterRegistry.validate(values).valid());
     }
 
+    @Test
+    void acceptsBoundedTypedAdapterSpecificLaunchOptionsButReservesCoreFields() {
+        Map<String, Object> values = configuration("launch");
+        values.put("debug.configuration.main.adapter_options", "{\"type\":\"pwa-node\",\"sourceMaps\":true,\"outFiles\":[\"dist/**/*.js\"]}");
+
+        DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.validate(values);
+
+        assertTrue(validation.valid());
+        assertEquals(Map.of("type", "pwa-node", "sourceMaps", true, "outFiles", java.util.List.of("dist/**/*.js")),
+            validation.configurations().get("main").adapterOptions());
+        values.put("debug.configuration.main.adapter_options", "{\"program\":\"outside.java\"}");
+        assertFalse(DebugAdapterRegistry.validate(values).valid());
+        values.put("debug.configuration.main.adapter_options", "{not-json}");
+        assertFalse(DebugAdapterRegistry.validate(values).valid());
+    }
+
     private static Map<String, Object> configuration(String request) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("debug.adapter.java.command", "java-debug-adapter");

@@ -72,6 +72,26 @@ class VsCodeLaunchConfigurationImporterTest {
     }
 
     @Test
+    void retainsBoundedAdapterSpecificVsCodeFieldsWithoutLettingThemReplaceCoreFields() throws Exception {
+        Path root = Files.createDirectories(temporaryDirectory.resolve("adapter-options"));
+        Path launch = Files.createDirectories(root.resolve(".vscode")).resolve("launch.json");
+        Files.writeString(launch, """
+            {"configurations":[{"name":"Run app","type":"python","request":"launch","program":"${file}",
+            "justMyCode":true,"pathMappings":[{"localRoot":"src","remoteRoot":"/srv/app"}]}]}
+            """);
+        DebugAdapterRegistry.Validation base = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
+
+        VsCodeLaunchConfigurationImporter.Report report = VsCodeLaunchConfigurationImporter.read(root, base);
+        DebugAdapterRegistry.Configuration configuration = report.configurations().get("vscode:Run app");
+
+        assertTrue(report.readable());
+        assertEquals(true, configuration.adapterOptions().get("justMyCode"));
+        assertEquals("python", configuration.adapterOptions().get("type"));
+        assertEquals(java.util.List.of(Map.of("localRoot", "src", "remoteRoot", "/srv/app")), configuration.adapterOptions().get("pathMappings"));
+        assertFalse(configuration.adapterOptions().containsKey("program"));
+    }
+
+    @Test
     void importsCoreClrLaunchConfigurationAgainstTheExplicitNetcoredbgAdapter() throws Exception {
         Path root = Files.createDirectories(temporaryDirectory.resolve("coreclr"));
         Path launch = Files.createDirectories(root.resolve(".vscode")).resolve("launch.json");

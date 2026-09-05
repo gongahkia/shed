@@ -26,7 +26,7 @@ final class VsCodeLaunchConfigurationImporter {
     static final String NAME_PREFIX = "vscode:";
     private static final long MAX_BYTES = 1024L * 1024L;
     private static final int MAX_CONFIGURATIONS = 100;
-    private static final Set<String> SUPPORTED_FIELDS = Set.of("name", "type", "request", "program", "module", "code", "cwd", "args",
+    private static final Set<String> CORE_FIELDS = Set.of("name", "type", "request", "program", "module", "code", "cwd", "args",
         "preLaunchTask", "host", "port", "env");
     private static final Set<String> SUPPORTED_ARGUMENT_VARIABLES = Set.of("${workspaceFolder}", "${workspaceFolderBasename}",
         "${file}", "${fileWorkspaceFolder}", "${relativeFile}", "${relativeFileDirname}", "${fileBasename}",
@@ -128,10 +128,6 @@ final class VsCodeLaunchConfigurationImporter {
 
     private static ImportResult importEntry(Map<String, Object> entry, DebugAdapterRegistry.Validation validation, Set<String> names,
                                             Map<String, String> taskNamesByLabel) {
-        Set<String> unsupported = new LinkedHashSet<>(entry.keySet());
-        unsupported.removeAll(SUPPORTED_FIELDS);
-        if (!unsupported.isEmpty()) return ImportResult.rejected("uses unsupported field" + (unsupported.size() == 1 ? " " : "s ")
-            + String.join(", ", unsupported.stream().sorted().toList()) + "; it was not altered or started.");
         String label = requiredText(entry, "name");
         if (label == null) return ImportResult.rejected("name must be a non-empty, single-line string of at most 120 characters.");
         String type = requiredText(entry, "type");
@@ -178,11 +174,17 @@ final class VsCodeLaunchConfigurationImporter {
         }
         Integer port = integer(entry.get("port"));
         if (port == null && entry.containsKey("port")) return ImportResult.rejected("port must be an integer when present.");
+        Map<String, Object> adapterOptions = new LinkedHashMap<>(entry);
+        adapterOptions.keySet().removeAll(CORE_FIELDS);
+        adapterOptions.put("type", type);
+        if (!DebugAdapterRegistry.safeAdapterOptions(adapterOptions)) {
+            return ImportResult.rejected("adapter-specific fields must be bounded JSON values with non-core property names.");
+        }
         String name = uniqueName(label, names);
         DebugAdapterRegistry.Configuration configuration = new DebugAdapterRegistry.Configuration(name, adapter, request, "workspace",
             program == null ? "" : program, module == null ? "" : module, code == null ? "" : code,
             cwd == null || cwd.isBlank() ? "${workspaceFolder}" : cwd, args, mappedPreLaunchTask == null ? preLaunchTask : mappedPreLaunchTask,
-            host == null || host.isBlank() ? "127.0.0.1" : host, port == null ? 0 : port, List.of(), environment);
+            host == null || host.isBlank() ? "127.0.0.1" : host, port == null ? 0 : port, List.of(), environment, adapterOptions);
         String error = DebugAdapterRegistry.externalConfigurationError(configuration,
             validation == null ? Map.of() : validation.registry().adapters());
         return error == null ? new ImportResult(configuration, null) : ImportResult.rejected(error + ".");

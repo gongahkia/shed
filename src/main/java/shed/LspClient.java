@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 public class LspClient {
     private static final int MAX_CODE_LENSES = 500;
+    private static final int MAX_SELECTION_RANGE_DEPTH = 100;
     private static final List<String> STANDARD_SEMANTIC_TOKEN_TYPES = List.of(
         "namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter", "variable",
         "property", "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment",
@@ -204,6 +205,9 @@ public class LspClient {
         public Object getCommandArguments() { return commandArguments; }
         public boolean hasCommand() { return !commandId.isBlank(); }
         Map<String, Object> getResolvePayload() { return resolvePayload; }
+    }
+
+    public record SelectionRange(int startLine, int startCharacter, int endLine, int endCharacter) {
     }
 
     public record DocumentHighlight(int startLine, int startCharacter, int endLine, int endCharacter, int kind) {
@@ -1031,6 +1035,57 @@ public class LspClient {
         return new CodeLens(line, character, title, commandId, command == null ? null : command.get("arguments"), lens);
     }
 
+    public List<SelectionRange> selectionRanges(String uri, int line, int character) {
+        if (!supports(LspCapability.SELECTION_RANGES) || uri == null || uri.isBlank() || line < 0 || character < 0) return List.of();
+        Map<String, Object> position = Map.of("line", line, "character", character);
+        Map<String, Object> params = Map.of("textDocument", Map.of("uri", uri), "positions", List.of(position));
+        Map<String, Object> response = sendRequest("textDocument/selectionRange", params, 2500L);
+        return parseSelectionRanges(response == null ? null : response.get("result"));
+    }
+
+    static List<SelectionRange> parseSelectionRanges(Object value) {
+        List<Object> values = MiniJson.asArray(value);
+        if (values == null || values.isEmpty()) return List.of();
+        return parseSelectionRangeChain(MiniJson.asObject(values.getFirst()));
+    }
+
+    private static List<SelectionRange> parseSelectionRangeChain(Map<String, Object> value) {
+        List<SelectionRange> ranges = new ArrayList<>();
+        Map<String, Object> current = value;
+        SelectionRange child = null;
+        while (current != null && ranges.size() < MAX_SELECTION_RANGE_DEPTH) {
+            SelectionRange range = parseSelectionRange(current);
+            if (range == null || (child != null && !contains(range, child))) break;
+            ranges.add(range);
+            child = range;
+            current = MiniJson.asObject(current.get("parent"));
+        }
+        return List.copyOf(ranges);
+    }
+
+    private static SelectionRange parseSelectionRange(Map<String, Object> value) {
+        Map<String, Object> range = MiniJson.asObject(value == null ? null : value.get("range"));
+        Map<String, Object> start = MiniJson.asObject(range == null ? null : range.get("start"));
+        Map<String, Object> end = MiniJson.asObject(range == null ? null : range.get("end"));
+        Integer startLine = MiniJson.asInt(start == null ? null : start.get("line"));
+        Integer startCharacter = MiniJson.asInt(start == null ? null : start.get("character"));
+        Integer endLine = MiniJson.asInt(end == null ? null : end.get("line"));
+        Integer endCharacter = MiniJson.asInt(end == null ? null : end.get("character"));
+        if (startLine == null || startCharacter == null || endLine == null || endCharacter == null || startLine < 0 || startCharacter < 0
+            || endLine < 0 || endCharacter < 0 || endLine < startLine || (endLine.equals(startLine) && endCharacter < startCharacter)) return null;
+        return new SelectionRange(startLine, startCharacter, endLine, endCharacter);
+    }
+
+    private static boolean contains(SelectionRange outer, SelectionRange inner) {
+        return comparePosition(outer.startLine(), outer.startCharacter(), inner.startLine(), inner.startCharacter()) <= 0
+            && comparePosition(outer.endLine(), outer.endCharacter(), inner.endLine(), inner.endCharacter()) >= 0;
+    }
+
+    private static int comparePosition(int leftLine, int leftCharacter, int rightLine, int rightCharacter) {
+        int line = Integer.compare(leftLine, rightLine);
+        return line == 0 ? Integer.compare(leftCharacter, rightCharacter) : line;
+    }
+
     public Location definition(String uri, int line, int character) {
         if (!supports(LspCapability.DEFINITION)) {
             return null;
@@ -1370,6 +1425,8 @@ public class LspClient {
         inlayHint.put("dynamicRegistration", Boolean.FALSE);
         Map<String, Object> codeLens = new LinkedHashMap<>();
         codeLens.put("dynamicRegistration", Boolean.FALSE);
+        Map<String, Object> selectionRange = new LinkedHashMap<>();
+        selectionRange.put("dynamicRegistration", Boolean.FALSE);
         Map<String, Object> diagnosticsCapability = new LinkedHashMap<>();
         diagnosticsCapability.put("relatedInformation", Boolean.FALSE);
         Map<String, Object> changeAnnotationSupport = new LinkedHashMap<>();
@@ -1397,6 +1454,7 @@ public class LspClient {
         textDocument.put("semanticTokens", semanticTokens);
         textDocument.put("inlayHint", inlayHint);
         textDocument.put("codeLens", codeLens);
+        textDocument.put("selectionRange", selectionRange);
         capabilities.put("textDocument", textDocument);
         capabilities.put("workspace", workspace);
 

@@ -119,6 +119,17 @@ final class DebugSessionService {
         @Override public byte[] data() { return data.clone(); }
     }
     record MemoryReadResult(Snapshot snapshot, MemoryRead memory, boolean succeeded) { }
+    record DisassembledInstruction(String address, String instructionBytes, String instruction, String symbol) {
+        DisassembledInstruction {
+            address = address == null ? "" : address;
+            instructionBytes = instructionBytes == null ? "" : instructionBytes;
+            instruction = instruction == null ? "" : instruction;
+            symbol = symbol == null ? "" : symbol;
+        }
+    }
+    record DisassemblyResult(Snapshot snapshot, List<DisassembledInstruction> instructions, boolean succeeded) {
+        DisassemblyResult { instructions = instructions == null ? List.of() : List.copyOf(instructions); }
+    }
     private record InspectionPayload(List<DebugInspection.ThreadInfo> threads, List<DebugInspection.Frame> frames, int frameId,
         List<DebugInspection.Scope> scopes, List<DebugInspection.Watch> watches, String detail, DebugInspection.State state) { }
 
@@ -647,6 +658,42 @@ final class DebugSessionService {
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             synchronized (this) { return memoryReadFailure(root, session(root), "Memory inspection interrupted."); }
+        }
+    }
+
+    DisassemblyResult disassemble(Path workspace, String memoryReference, int offset, int count, Duration timeout) {
+        Path root = root(workspace);
+        String reference = memoryReference == null ? "" : memoryReference.trim();
+        Connection connection;
+        synchronized (this) {
+            Session session = session(root);
+            if (!validMemoryReference(reference) || offset < -1_048_576 || offset > 1_048_576 || count < 1 || count > 1_024) {
+                return disassemblyFailure(root, session, "Disassembly arguments are invalid.");
+            }
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null
+                || !session.plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.DISASSEMBLE)
+                || !session.runtimeCapabilities.contains(DebugAdapterRegistry.Capability.DISASSEMBLE)) {
+                return disassemblyFailure(root, session, "Disassembly is unavailable for the active adapter.");
+            }
+            connection = session.connection;
+        }
+        try {
+            Map<String, Object> body = body(connection.request("disassemble", Map.of("memoryReference", reference, "offset", offset,
+                "instructionCount", count), timeout), "disassemble");
+            List<DisassembledInstruction> instructions = disassembly(body, count);
+            synchronized (this) {
+                Session session = session(root);
+                if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING) {
+                    return new DisassemblyResult(snapshot(root, session), instructions, false);
+                }
+                session.detail = "Loaded " + instructions.size() + " disassembled instruction" + (instructions.size() == 1 ? "." : "s.");
+                return new DisassemblyResult(snapshot(root, session), instructions, true);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) { return disassemblyFailure(root, session(root), "Disassembly failed: " + message(error)); }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) { return disassemblyFailure(root, session(root), "Disassembly interrupted."); }
         }
     }
 
@@ -1688,6 +1735,7 @@ final class DebugSessionService {
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.LOADED_SOURCES, "supportsLoadedSourcesRequest");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.READ_MEMORY, "supportsReadMemoryRequest");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.INSTRUCTION_BREAKPOINTS, "supportsInstructionBreakpoints");
+        retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.DISASSEMBLE, "supportsDisassembleRequest");
         return Set.copyOf(result);
     }
 
@@ -1812,6 +1860,26 @@ final class DebugSessionService {
         return new MemoryRead(display(address, 512), unreadable, bytes);
     }
 
+    private static List<DisassembledInstruction> disassembly(Map<String, Object> body, int requestedCount) throws IOException {
+        List<Object> values = MiniJson.asArray(body == null ? null : body.get("instructions"));
+        if (values == null || values.size() > requestedCount) throw new IOException("DAP disassemble response is invalid or exceeds the requested count");
+        List<DisassembledInstruction> result = new ArrayList<>();
+        for (Object value : values) {
+            Map<String, Object> instruction = MiniJson.asObject(value);
+            if (instruction == null) throw new IOException("DAP disassemble response contains an invalid instruction");
+            String address = MiniJson.asString(instruction.get("address"));
+            String text = MiniJson.asString(instruction.get("instruction"));
+            String bytes = MiniJson.asString(instruction.get("instructionBytes"));
+            String symbol = MiniJson.asString(instruction.get("symbol"));
+            if (!validMemoryReference(address) || !validDisassemblyText(text, 4 * 1024)
+                || (bytes != null && !validDisassemblyText(bytes, 1024)) || (symbol != null && !validDisassemblyText(symbol, 1024))) {
+                throw new IOException("DAP disassemble response contains unsafe instruction text");
+            }
+            result.add(new DisassembledInstruction(display(address, 512), display(bytes, 1024), display(text, 4 * 1024), display(symbol, 1024)));
+        }
+        return List.copyOf(result);
+    }
+
     private static String display(Object value, int maximum) {
         String text = value instanceof String string ? string : value instanceof Number || value instanceof Boolean ? String.valueOf(value) : "";
         if (text.length() > maximum) return text.substring(0, maximum) + "…";
@@ -1827,6 +1895,12 @@ final class DebugSessionService {
     private static boolean validNonNegativeInteger(Object value) {
         return value instanceof Number number && number.doubleValue() == number.longValue() && number.longValue() >= 0
             && number.longValue() <= Integer.MAX_VALUE;
+    }
+
+    private static boolean validDisassemblyText(String value, int maximum) {
+        if (value == null || value.length() > maximum) return false;
+        for (int index = 0; index < value.length(); index++) if (Character.isISOControl(value.charAt(index))) return false;
+        return true;
     }
 
     private Result fail(Path root, Session session, String detail, List<String> diagnostics) {
@@ -1892,6 +1966,12 @@ final class DebugSessionService {
         session.detail = message;
         session.diagnostics.add(message);
         return new MemoryReadResult(snapshot(root, session), null, false);
+    }
+    private static DisassemblyResult disassemblyFailure(Path root, Session session, String detail) {
+        String message = detail == null || detail.isBlank() ? "Disassembly failed." : detail;
+        session.detail = message;
+        session.diagnostics.add(message);
+        return new DisassemblyResult(snapshot(root, session), List.of(), false);
     }
     private static RunToCursorResult runToCursorFailure(Path root, Session session, String detail) {
         String message = detail == null || detail.isBlank() ? "Debug run to cursor failed." : detail;

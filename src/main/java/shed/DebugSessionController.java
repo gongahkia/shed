@@ -101,7 +101,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|memory <reference> [offset [count]]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|instruction list|add|enable|disable|remove|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|memory <reference> [offset [count]]|disassemble <reference> [offset [count]]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|instruction list|add|enable|disable|remove|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -126,6 +126,7 @@ final class DebugSessionController {
             case "modules", "module" -> modules(args);
             case "sources", "loaded-sources", "loadedsources" -> loadedSources();
             case "memory", "read-memory", "readmemory" -> memory(args);
+            case "disassemble", "disassembly" -> disassemble(args);
             case "breakpoint", "breakpoints", "bp" -> breakpoint(args);
             case "function", "functions", "function-breakpoint", "function-breakpoints" -> functionBreakpoint(args);
             case "data", "data-breakpoint", "data-breakpoints" -> dataBreakpoint(args);
@@ -946,6 +947,42 @@ final class DebugSessionController {
             output.append('\n');
         }
         return output.toString();
+    }
+
+    private String disassemble(String argument) {
+        String[] values = argument == null || argument.isBlank() ? new String[0] : argument.trim().split("\\s+");
+        if (values.length < 1 || values.length > 3) return "Usage: :debug disassemble <reference> [offset [count]]";
+        int offset = 0;
+        int count = 64;
+        try {
+            if (values.length > 1) offset = Integer.parseInt(values[1]);
+            if (values.length > 2) count = Integer.parseInt(values[2]);
+        } catch (NumberFormatException error) {
+            return "Usage: :debug disassemble <reference> [offset [count]]";
+        }
+        Path workspace = workspace();
+        int requestedOffset = offset;
+        int requestedCount = count;
+        int jobId = editor.asyncJobService.submit("debug disassemble", token -> sessions.disassemble(workspace, values[0], requestedOffset,
+            requestedCount, Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                refreshDebugPanel();
+                if (error != null || result == null || !result.succeeded()) {
+                    editor.showMessage("Disassembly failed; inspect :debug status.");
+                    return;
+                }
+                StringBuilder output = new StringBuilder("Debug Disassembly\n\n");
+                if (result.instructions().isEmpty()) output.append("(none)\n");
+                for (DebugSessionService.DisassembledInstruction instruction : result.instructions()) {
+                    output.append(instruction.address()).append("  ");
+                    if (!instruction.instructionBytes().isBlank()) output.append(instruction.instructionBytes()).append("  ");
+                    output.append(instruction.instruction());
+                    if (!instruction.symbol().isBlank()) output.append("  ; ").append(instruction.symbol());
+                    output.append('\n');
+                }
+                editor.showScratchBuffer("[debug disassembly]", output.toString());
+                editor.showMessage(result.snapshot().detail());
+            });
+        return "Disassembly requested (job " + jobId + ").";
     }
 
     private String functionBreakpoint(String argument) {

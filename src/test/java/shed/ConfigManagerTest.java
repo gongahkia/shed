@@ -283,6 +283,7 @@ public class ConfigManagerTest {
         config.setAndPersist("lsp.inlay.hints.enabled", "false");
         config.setAndPersist("lsp.code.lens.enabled", "false");
         config.setAndPersist("lsp.selection.ranges.enabled", "false");
+        config.setAndPersist("lsp.document.links.enabled", "false");
         config.setAndPersist("lsp.definition.enabled", "false");
         config.setAndPersist("lsp.type.definition.enabled", "false");
         config.setAndPersist("lsp.implementation.enabled", "false");
@@ -298,7 +299,7 @@ public class ConfigManagerTest {
         assertTrue(config.getLspFormatOnSaveEnabled());
 
         LspFeatureSettings features = config.getLspFeatureSettings();
-        assertEquals(new LspFeatureSettings(false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false), features);
+        assertEquals(new LspFeatureSettings(false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false), features);
         assertFalse(features.capabilityEnablement().get(LspCapability.COMPLETION));
         assertFalse(features.capabilityEnablement().get(LspCapability.SIGNATURE_HELP));
         assertFalse(features.capabilityEnablement().get(LspCapability.HOVER));
@@ -317,6 +318,7 @@ public class ConfigManagerTest {
         assertFalse(features.capabilityEnablement().get(LspCapability.INLAY_HINTS));
         assertFalse(features.capabilityEnablement().get(LspCapability.CODE_LENS));
         assertFalse(features.capabilityEnablement().get(LspCapability.SELECTION_RANGES));
+        assertFalse(features.capabilityEnablement().get(LspCapability.DOCUMENT_LINKS));
         TypedSettings.Descriptor descriptor = config.typedSettingDescriptors().stream()
             .filter(setting -> setting.key().equals("lsp.command.execution.enabled"))
             .findFirst()

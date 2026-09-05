@@ -113,7 +113,7 @@ final class LspController {
         flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|links [index]|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -154,6 +154,10 @@ final class LspController {
             case "selectionrange":
             case "selection-ranges":
                 return lspSelectionRange(args);
+            case "links":
+            case "documentlinks":
+            case "document-links":
+                return lspDocumentLinks(args);
             case "format":
                 return lspFormat();
             case "peek":
@@ -749,6 +753,70 @@ final class LspController {
         int start = text.lineStartOffset(line);
         int end = text.lineEndOffset(line);
         return character > end - start ? -1 : start + character;
+    }
+
+    public String lspDocumentLinks(String selectionArgument) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP document links require a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        String unavailable = capabilityUnavailable(client, LspCapability.DOCUMENT_LINKS);
+        if (unavailable != null) return unavailable;
+        int requestedIndex = parseOneBasedIndex(selectionArgument);
+        if (selectionArgument != null && !selectionArgument.isBlank() && requestedIndex < 1) return "Usage: :lsp links [index]";
+        syncLspOpen(buffer);
+        flushPendingLspChange(buffer);
+        String uri = bufferUri(buffer);
+        Integer version = editor.lspDocumentVersions.get(uri);
+        List<LspClient.DocumentLink> links = client.documentLinks(uri);
+        if (!Objects.equals(version, editor.lspDocumentVersions.get(uri))) return "Document links became stale; refresh again";
+        if (links.isEmpty()) return "No document links";
+        if (requestedIndex < 1) {
+            StringBuilder text = new StringBuilder("LSP Document Links\n\n");
+            for (int i = 0; i < links.size(); i++) {
+                LspClient.DocumentLink link = links.get(i);
+                String target = link.hasTarget() ? editor.safePreviewText(link.getTarget(), 180) : "(unresolved link)";
+                text.append(i + 1).append(". ").append(link.getStartLine() + 1).append(":").append(link.getStartCharacter() + 1)
+                    .append("–").append(link.getEndLine() + 1).append(":").append(link.getEndCharacter() + 1).append("  ").append(target);
+                if (!link.getTooltip().isBlank()) text.append("  — ").append(editor.safePreviewText(link.getTooltip(), 120));
+                text.append('\n');
+            }
+            text.append("\nRun :lsp links <index> to open a resolved link.\n");
+            editor.showScratchBuffer("[lsp document links]", text.toString());
+            return "Showing " + links.size() + " document link" + (links.size() == 1 ? "" : "s");
+        }
+        if (requestedIndex > links.size()) return "Document link index out of range: " + requestedIndex;
+        return openLspDocumentLink(buffer, links.get(requestedIndex - 1));
+    }
+
+    private String openLspDocumentLink(FileBuffer source, LspClient.DocumentLink link) {
+        if (link == null || !link.hasTarget()) return "Document link has no target";
+        try {
+            URI uri = new URI(link.getTarget());
+            String scheme = uri.getScheme();
+            if (scheme == null) {
+                File parent = source == null || source.getFile() == null ? null : source.getFile().getAbsoluteFile().getParentFile();
+                if (parent == null) return "Document link source has no parent folder";
+                File target = new File(parent, uri.getPath() == null ? link.getTarget() : uri.getPath());
+                if (!target.isFile()) return "Linked file not found: " + target.getPath();
+                editor.openFile(target);
+                return "Opened document link: " + target.getName();
+            }
+            if ("file".equalsIgnoreCase(scheme)) {
+                File target = Path.of(uri).toFile();
+                if (!target.isFile()) return "Linked file not found: " + target.getPath();
+                editor.openFile(target);
+                return "Opened document link: " + target.getName();
+            }
+            if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme) && !"mailto".equalsIgnoreCase(scheme)) {
+                return "Unsupported document-link scheme: " + scheme;
+            }
+            if (!java.awt.Desktop.isDesktopSupported()) return "Desktop links are unavailable";
+            java.awt.Desktop.getDesktop().browse(uri);
+            return "Opened document link";
+        } catch (IOException | URISyntaxException | IllegalArgumentException error) {
+            return "Document link failed: " + error.getMessage();
+        }
     }
 
     public String lspFormat() {

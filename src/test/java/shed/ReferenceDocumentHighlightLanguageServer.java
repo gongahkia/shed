@@ -26,6 +26,7 @@ public final class ReferenceDocumentHighlightLanguageServer {
                     "capabilities", Map.of("documentHighlightProvider", Boolean.TRUE,
                         "codeLensProvider", Map.of("resolveProvider", Boolean.TRUE),
                         "selectionRangeProvider", Boolean.TRUE,
+                        "documentLinkProvider", Map.of("resolveProvider", Boolean.TRUE),
                         "executeCommandProvider", Map.of("commands", List.of("test.run")))
                 ));
                 case "textDocument/documentHighlight" -> respond(System.out, request.get("id"), highlights(request));
@@ -35,6 +36,11 @@ public final class ReferenceDocumentHighlightLanguageServer {
                 )));
                 case "codeLens/resolve" -> respond(System.out, request.get("id"), resolvedCodeLens(request));
                 case "textDocument/selectionRange" -> respond(System.out, request.get("id"), List.of(selectionRange()));
+                case "textDocument/documentLink" -> respond(System.out, request.get("id"), List.of(Map.of(
+                    "range", Map.of("start", Map.of("line", 6, "character", 1), "end", Map.of("line", 6, "character", 9)),
+                    "data", Map.of("id", "guide")
+                )));
+                case "documentLink/resolve" -> respond(System.out, request.get("id"), resolvedDocumentLink(request));
                 case "workspace/executeCommand" -> respond(System.out, request.get("id"), null);
                 case "shutdown" -> respond(System.out, request.get("id"), null);
                 case "exit" -> {
@@ -85,6 +91,16 @@ public final class ReferenceDocumentHighlightLanguageServer {
             "start", Map.of("line", 4, "character", 0),
             "end", Map.of("line", 4, "character", 12)
         )));
+    }
+
+    private static Map<String, Object> resolvedDocumentLink(Map<String, Object> request) {
+        Map<String, Object> params = MiniJson.asObject(request.get("params"));
+        Map<String, Object> range = MiniJson.asObject(params == null ? null : params.get("range"));
+        return Map.of(
+            "range", range == null ? Map.of("start", Map.of("line", 0, "character", 0), "end", Map.of("line", 0, "character", 0)) : range,
+            "target", "https://example.test/guide",
+            "tooltip", "Open guide"
+        );
     }
 
     private static void respond(OutputStream output, Object id, Object result) throws IOException {

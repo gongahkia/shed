@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 public class LspClient {
     private static final int MAX_CODE_LENSES = 500;
     private static final int MAX_SELECTION_RANGE_DEPTH = 100;
+    private static final int MAX_DOCUMENT_LINKS = 500;
     private static final List<String> STANDARD_SEMANTIC_TOKEN_TYPES = List.of(
         "namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter", "variable",
         "property", "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment",
@@ -208,6 +209,37 @@ public class LspClient {
     }
 
     public record SelectionRange(int startLine, int startCharacter, int endLine, int endCharacter) {
+    }
+
+    public static class DocumentLink {
+        private final int startLine;
+        private final int startCharacter;
+        private final int endLine;
+        private final int endCharacter;
+        private final String target;
+        private final String tooltip;
+        private final Map<String, Object> resolvePayload;
+
+        private DocumentLink(int startLine, int startCharacter, int endLine, int endCharacter, String target, String tooltip,
+                             Map<String, Object> resolvePayload) {
+            this.startLine = startLine;
+            this.startCharacter = startCharacter;
+            this.endLine = endLine;
+            this.endCharacter = endCharacter;
+            this.target = target == null ? "" : target;
+            this.tooltip = tooltip == null ? "" : tooltip;
+            this.resolvePayload = resolvePayload == null || resolvePayload.isEmpty() ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(resolvePayload));
+        }
+
+        public int getStartLine() { return startLine; }
+        public int getStartCharacter() { return startCharacter; }
+        public int getEndLine() { return endLine; }
+        public int getEndCharacter() { return endCharacter; }
+        public String getTarget() { return target; }
+        public String getTooltip() { return tooltip; }
+        public boolean hasTarget() { return !target.isBlank(); }
+        Map<String, Object> getResolvePayload() { return resolvePayload; }
     }
 
     public record DocumentHighlight(int startLine, int startCharacter, int endLine, int endCharacter, int kind) {
@@ -564,6 +596,7 @@ public class LspClient {
     private Set<String> completionTriggerCharacters;
     private boolean completionResolveSupported;
     private boolean codeLensResolveSupported;
+    private boolean documentLinkResolveSupported;
 
     public LspClient(String command, String[] args, Path rootPath) throws IOException {
         this(command, args, rootPath, LspFeatureSettings.defaults());
@@ -600,6 +633,7 @@ public class LspClient {
         this.completionTriggerCharacters = Set.of();
         this.completionResolveSupported = false;
         this.codeLensResolveSupported = false;
+        this.documentLinkResolveSupported = false;
         startReaderThread();
         initialize(rootUri);
     }
@@ -1086,6 +1120,55 @@ public class LspClient {
         return line == 0 ? Integer.compare(leftCharacter, rightCharacter) : line;
     }
 
+    public List<DocumentLink> documentLinks(String uri) {
+        if (!supports(LspCapability.DOCUMENT_LINKS) || uri == null || uri.isBlank()) return List.of();
+        Map<String, Object> response = sendRequest("textDocument/documentLink", Map.of("textDocument", Map.of("uri", uri)), 2500L);
+        List<DocumentLink> links = parseDocumentLinks(response == null ? null : response.get("result"));
+        if (!documentLinkResolveSupported || links.isEmpty()) return links;
+        List<DocumentLink> resolved = new ArrayList<>(links.size());
+        for (DocumentLink link : links) {
+            resolved.add(link.hasTarget() ? link : resolveDocumentLink(link));
+        }
+        return List.copyOf(resolved);
+    }
+
+    static List<DocumentLink> parseDocumentLinks(Object value) {
+        List<Object> values = MiniJson.asArray(value);
+        if (values == null || values.isEmpty()) return List.of();
+        List<DocumentLink> links = new ArrayList<>();
+        for (Object valueItem : values) {
+            if (links.size() >= MAX_DOCUMENT_LINKS) break;
+            DocumentLink link = parseDocumentLink(MiniJson.asObject(valueItem));
+            if (link != null) links.add(link);
+        }
+        return List.copyOf(links);
+    }
+
+    private DocumentLink resolveDocumentLink(DocumentLink link) {
+        if (link == null || link.hasTarget() || link.getResolvePayload().isEmpty()) return link;
+        Map<String, Object> response = sendRequest("documentLink/resolve", link.getResolvePayload(), 2500L);
+        Map<String, Object> result = MiniJson.asObject(response == null ? null : response.get("result"));
+        if (result == null) return link;
+        Map<String, Object> merged = new LinkedHashMap<>(link.getResolvePayload());
+        merged.putAll(result);
+        DocumentLink resolved = parseDocumentLink(merged);
+        return resolved == null ? link : resolved;
+    }
+
+    private static DocumentLink parseDocumentLink(Map<String, Object> link) {
+        Map<String, Object> range = MiniJson.asObject(link == null ? null : link.get("range"));
+        Map<String, Object> start = MiniJson.asObject(range == null ? null : range.get("start"));
+        Map<String, Object> end = MiniJson.asObject(range == null ? null : range.get("end"));
+        Integer startLine = MiniJson.asInt(start == null ? null : start.get("line"));
+        Integer startCharacter = MiniJson.asInt(start == null ? null : start.get("character"));
+        Integer endLine = MiniJson.asInt(end == null ? null : end.get("line"));
+        Integer endCharacter = MiniJson.asInt(end == null ? null : end.get("character"));
+        if (startLine == null || startCharacter == null || endLine == null || endCharacter == null || startLine < 0 || startCharacter < 0
+            || endLine < 0 || endCharacter < 0 || endLine < startLine || (endLine.equals(startLine) && endCharacter < startCharacter)) return null;
+        return new DocumentLink(startLine, startCharacter, endLine, endCharacter, MiniJson.asString(link.get("target")),
+            MiniJson.asString(link.get("tooltip")), link);
+    }
+
     public Location definition(String uri, int line, int character) {
         if (!supports(LspCapability.DEFINITION)) {
             return null;
@@ -1427,6 +1510,9 @@ public class LspClient {
         codeLens.put("dynamicRegistration", Boolean.FALSE);
         Map<String, Object> selectionRange = new LinkedHashMap<>();
         selectionRange.put("dynamicRegistration", Boolean.FALSE);
+        Map<String, Object> documentLink = new LinkedHashMap<>();
+        documentLink.put("dynamicRegistration", Boolean.FALSE);
+        documentLink.put("tooltipSupport", Boolean.TRUE);
         Map<String, Object> diagnosticsCapability = new LinkedHashMap<>();
         diagnosticsCapability.put("relatedInformation", Boolean.FALSE);
         Map<String, Object> changeAnnotationSupport = new LinkedHashMap<>();
@@ -1455,6 +1541,7 @@ public class LspClient {
         textDocument.put("inlayHint", inlayHint);
         textDocument.put("codeLens", codeLens);
         textDocument.put("selectionRange", selectionRange);
+        textDocument.put("documentLink", documentLink);
         capabilities.put("textDocument", textDocument);
         capabilities.put("workspace", workspace);
 
@@ -1473,6 +1560,7 @@ public class LspClient {
         completionTriggerCharacters = parseCompletionTriggerCharacters(response);
         completionResolveSupported = parseCompletionResolveSupport(response);
         codeLensResolveSupported = parseCodeLensResolveSupport(response);
+        documentLinkResolveSupported = parseDocumentLinkResolveSupport(response);
         sendNotification("initialized", new LinkedHashMap<>());
         initialized = true;
     }
@@ -1526,6 +1614,13 @@ public class LspClient {
         Map<String, Object> result = MiniJson.asObject(response == null ? null : response.get("result"));
         Map<String, Object> capabilities = MiniJson.asObject(result == null ? null : result.get("capabilities"));
         Map<String, Object> provider = MiniJson.asObject(capabilities == null ? null : capabilities.get("codeLensProvider"));
+        return Boolean.TRUE.equals(provider == null ? null : provider.get("resolveProvider"));
+    }
+
+    static boolean parseDocumentLinkResolveSupport(Map<String, Object> response) {
+        Map<String, Object> result = MiniJson.asObject(response == null ? null : response.get("result"));
+        Map<String, Object> capabilities = MiniJson.asObject(result == null ? null : result.get("capabilities"));
+        Map<String, Object> provider = MiniJson.asObject(capabilities == null ? null : capabilities.get("documentLinkProvider"));
         return Boolean.TRUE.equals(provider == null ? null : provider.get("resolveProvider"));
     }
 

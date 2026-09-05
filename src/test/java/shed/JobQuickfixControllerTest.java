@@ -117,4 +117,16 @@ class JobQuickfixControllerTest {
         assertNull(controller.inferBuiltInTask("test", workspace.toFile()));
         assertNull(controller.inferBuiltInTask("build", workspace.toFile()));
     }
+
+    @Test
+    void permitsAnUnboundedLocalProcessWhenTheTaskTimeoutIsZero() {
+        long startedAt = System.nanoTime();
+        CommandResult result = new JobQuickfixController(null).runExternalCommand(List.of("sh", "-c", "sleep 0.7; printf watcher-ready"),
+            temporaryDirectory.toFile(), null, null, 0, 4096, true);
+        long elapsedMillis = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
+
+        assertEquals(0, result.exitCode);
+        assertEquals("watcher-ready", result.stdout);
+        assertTrue(elapsedMillis >= 650, "an unbounded process must not use the normal 500 ms minimum timeout");
+    }
 }

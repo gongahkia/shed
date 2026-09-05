@@ -147,6 +147,7 @@ public class AsyncJobService {
     }
 
     private final ExecutorService executor;
+    private final ExecutorService longRunningExecutor;
     private final AtomicInteger nextId;
     private final Map<Integer, JobRecord> jobs;
     private final int maxHistoryEntries;
@@ -170,6 +171,7 @@ public class AsyncJobService {
 
     AsyncJobService(ExecutorService executor, int maxHistoryEntries, ApplicationErrorReporter errorReporter) {
         this.executor = executor == null ? Executors.newFixedThreadPool(workerCount()) : executor;
+        this.longRunningExecutor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("shed-long-running-", 0).factory());
         this.nextId = new AtomicInteger(1);
         this.jobs = new ConcurrentHashMap<>();
         this.maxHistoryEntries = Math.max(10, maxHistoryEntries);
@@ -181,6 +183,15 @@ public class AsyncJobService {
     }
 
     public <T> int submit(String description, JobTask<T> task, JobCompletion<T> completion) {
+        return submit(executor, description, task, completion);
+    }
+
+    /** Runs an explicitly user-started long-lived process without occupying the bounded worker pool. */
+    public <T> int submitLongRunning(String description, JobTask<T> task, JobCompletion<T> completion) {
+        return submit(longRunningExecutor, description, task, completion);
+    }
+
+    private <T> int submit(ExecutorService targetExecutor, String description, JobTask<T> task, JobCompletion<T> completion) {
         if (task == null) {
             throw new IllegalArgumentException("task must not be null");
         }
@@ -199,7 +210,7 @@ public class AsyncJobService {
 
         Future<?> future;
         try {
-            future = executor.submit(() -> {
+            future = targetExecutor.submit(() -> {
             record.started = true;
             T result = null;
             Exception error = null;
@@ -300,6 +311,7 @@ public class AsyncJobService {
             }
         }
         executor.shutdownNow();
+        longRunningExecutor.shutdownNow();
     }
 
     private void trimHistoryIfNeeded() {

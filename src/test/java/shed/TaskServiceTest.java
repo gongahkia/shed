@@ -294,6 +294,35 @@ public class TaskServiceTest {
     }
 
     @Test
+    void persistsLocalBackgroundWatchTasksAndRejectsThemAsDependencies() throws IOException {
+        TaskService service = new TaskService();
+        Path project = tempDir.resolve("background-task");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve(".shedtasks"), """
+            schema_version = 1
+
+            [task.watch]
+            command = "tool --watch"
+            background = true
+
+            [task.check]
+            command = "tool check"
+            depends_on = ["watch"]
+            """);
+
+        TaskService.TaskLoadResult loaded = service.loadWorkspaceTasks(project.toFile());
+        List<TaskService.TaskExecutionPlan> watch = service.buildExecutionPlans("watch", loaded.tasks(), project.toFile(), null);
+        List<TaskService.TaskExecutionPlan> check = service.buildExecutionPlans("check", loaded.tasks(), project.toFile(), null);
+
+        assertTrue(loaded.isValid());
+        assertTrue(loaded.tasks().get("watch").background());
+        assertNull(TaskService.backgroundPlanError(watch));
+        assertEquals("background task 'watch' cannot be a dependency", TaskService.backgroundPlanError(check));
+        service.saveWorkspaceTasks(project.toFile(), loaded.tasks());
+        assertTrue(Files.readString(project.resolve(".shedtasks")).contains("background = true"));
+    }
+
+    @Test
     void rejectsUnresolvedAndCyclicDependenciesBeforeBuildingAnyPlan() throws IOException {
         TaskService service = new TaskService();
         Path project = tempDir.resolve("dependency-invalid");

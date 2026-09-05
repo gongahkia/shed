@@ -284,7 +284,6 @@ final class TestController {
         State state = state(root);
         for (TestService.AdapterSpec spec : state.specs) {
             if (!spec.id().equals(test.adapterId())) continue;
-            if (spec.debugConfiguration().isBlank()) return "Adapter " + spec.id() + " has no debug_configuration in .shedtests";
             return editor.debugSessionController.startTest(state.root, test, spec.debugConfiguration());
         }
         return "Selected test adapter is unavailable";

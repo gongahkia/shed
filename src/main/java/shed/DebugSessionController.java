@@ -77,7 +77,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|goto [line]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|exception list|enable|disable|console [clear]|eval <expression>|stack|variables [reference]|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|goto [line]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|exception list|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -105,6 +105,7 @@ final class DebugSessionController {
             case "frame" -> selectFrame(args);
             case "watch", "watches" -> watch(args);
             case "eval", "evaluate", "repl" -> evaluate(args);
+            case "set", "setvariable" -> setVariable(args);
             default -> "Unknown :debug subcommand: " + command;
         };
     }
@@ -236,6 +237,8 @@ final class DebugSessionController {
     String expandVariablesForPanel(int variablesReference) { return submitVariableExpansion(variablesReference); }
 
     String evaluateForPanel(String expression) { return evaluate(expression); }
+
+    String setVariableForPanel(int variablesReference, String name, String value) { return submitVariableMutation(variablesReference, name, value); }
 
     String addWatchForPanel(String expression) {
         DebugSessionService.InspectionResult result = sessions.addWatch(workspace(), expression);
@@ -591,6 +594,22 @@ final class DebugSessionController {
         return "Debug evaluation requested (job " + jobId + ").";
     }
 
+    private String setVariable(String argument) {
+        String value = argument == null ? "" : argument.trim();
+        int separator = value.indexOf(" -- ");
+        if (separator < 0) return "Usage: :debug set <reference> <name> -- <value>";
+        String target = value.substring(0, separator).trim();
+        String replacement = value.substring(separator + 4).trim();
+        int split = target.indexOf(' ');
+        if (split < 1) return "Usage: :debug set <reference> <name> -- <value>";
+        int reference;
+        try { reference = Integer.parseInt(target.substring(0, split)); }
+        catch (NumberFormatException error) { return "Usage: :debug set <reference> <name> -- <value>"; }
+        String name = target.substring(split + 1).trim();
+        return reference < 1 || !validVariableText(name, 1024) || !validVariableText(replacement, 4096)
+            ? "Usage: :debug set <reference> <name> -- <value>" : submitVariableMutation(reference, name, replacement);
+    }
+
     private String watch(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "list".equalsIgnoreCase(trimmed)) {
@@ -633,6 +652,23 @@ final class DebugSessionController {
                 else editor.showMessage("Nested variables loaded.");
             });
         return "Nested variable inspection requested (job " + jobId + ").";
+    }
+
+    private String submitVariableMutation(int variablesReference, String name, String value) {
+        if (variablesReference < 1 || !validVariableText(name, 1024) || !validVariableText(value, 4096)) {
+            return "Variable name or value is empty, too long, or contains a control character.";
+        }
+        Path workspace = workspace();
+        int jobId = editor.asyncJobService.submit("debug set variable", token -> {
+            return sessions.setVariable(workspace, variablesReference, name, value,
+                Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs())));
+        }, (job, result, error) -> {
+            refreshDebugPanel();
+            if (error != null || result == null || !result.succeeded()) {
+                editor.showMessage(result == null ? "Changing the debug variable failed; inspect :debug status." : result.mutation().message());
+            } else editor.showMessage("Debug variable changed.");
+        });
+        return "Debug variable update requested (job " + jobId + ").";
     }
 
     private String submitControl(DebugSessionService.Control control) {
@@ -994,6 +1030,12 @@ final class DebugSessionController {
 
     private static boolean validDebugExpression(String value) {
         if (value == null || value.isEmpty() || value.length() > 1024) return false;
+        for (int index = 0; index < value.length(); index++) if (Character.isISOControl(value.charAt(index))) return false;
+        return true;
+    }
+
+    private static boolean validVariableText(String value, int maximum) {
+        if (value == null || value.isEmpty() || value.length() > maximum) return false;
         for (int index = 0; index < value.length(); index++) if (Character.isISOControl(value.charAt(index))) return false;
         return true;
     }

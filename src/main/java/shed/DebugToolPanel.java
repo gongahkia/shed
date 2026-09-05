@@ -56,10 +56,11 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
     private final JTextArea console = textArea();
     private final JTextField watchInput = new JTextField();
     private final JTextField evaluationInput = new JTextField();
+    private final JTextField variableValue = new JTextField();
     private final Set<Integer> loadingVariableReferences = new HashSet<>();
     private boolean refreshing;
 
-    private record VariableNode(DebugInspection.Variable variable) {
+    private record VariableNode(int variablesReference, DebugInspection.Variable variable) {
         @Override public String toString() {
             if (variable == null) return "";
             StringBuilder text = new StringBuilder(variable.name()).append(" = ").append(variable.value());
@@ -93,6 +94,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
             @Override public void treeWillExpand(TreeExpansionEvent event) { requestVariableExpansion(event); }
             @Override public void treeWillCollapse(TreeExpansionEvent event) { }
         });
+        variableTree.addTreeSelectionListener(event -> loadVariableValue());
     }
 
     @Override public JPanel component() { return panel; }
@@ -189,6 +191,10 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         JPanel variablesPanel = new JPanel(new BorderLayout());
         variablesPanel.setBorder(BorderFactory.createTitledBorder("Variables and Scopes"));
         variablesPanel.add(new JScrollPane(variableTree), BorderLayout.CENTER);
+        JPanel variableActions = new JPanel(new BorderLayout(3, 0));
+        variableActions.add(variableValue, BorderLayout.CENTER);
+        variableActions.add(button("Set", this::setVariable), BorderLayout.EAST);
+        variablesPanel.add(variableActions, BorderLayout.SOUTH);
         JPanel consolePanel = new JPanel(new BorderLayout(3, 3));
         consolePanel.setBorder(BorderFactory.createTitledBorder("Debug Console"));
         consolePanel.add(new JScrollPane(console), BorderLayout.CENTER);
@@ -282,6 +288,11 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
 
     private void addWatch() { message(editor.debugSessionController.addWatchForPanel(watchInput.getText())); watchInput.setText(""); }
     private void evaluate() { message(editor.debugSessionController.evaluateForPanel(evaluationInput.getText())); evaluationInput.setText(""); }
+    private void setVariable() {
+        VariableNode variable = selectedVariable();
+        message(variable == null ? "Select a displayed variable." : editor.debugSessionController.setVariableForPanel(variable.variablesReference(),
+            variable.variable().name(), variableValue.getText()));
+    }
     private void removeWatch() {
         DebugInspection.Watch watch = watchList.getSelectedValue();
         message(watch == null ? "Select a watch." : editor.debugSessionController.removeWatchForPanel(watch.expression()));
@@ -318,6 +329,17 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         exceptionBreakpointEnabled.setSelected(breakpoint == null || breakpoint.enabled());
     }
 
+    private void loadVariableValue() {
+        VariableNode variable = selectedVariable();
+        variableValue.setText(variable == null ? "" : variable.variable().value());
+    }
+
+    private VariableNode selectedVariable() {
+        Object selected = variableTree.getLastSelectedPathComponent();
+        if (!(selected instanceof DefaultMutableTreeNode node) || !(node.getUserObject() instanceof VariableNode variable)) return null;
+        return variable.variablesReference() < 1 ? null : variable;
+    }
+
     private void requestVariableExpansion(TreeExpansionEvent event) {
         Object candidate = event == null || event.getPath() == null ? null : event.getPath().getLastPathComponent();
         if (!(candidate instanceof DefaultMutableTreeNode node) || !(node.getUserObject() instanceof VariableNode variable)) return;
@@ -339,7 +361,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
                 DefaultMutableTreeNode scopeNode = new DefaultMutableTreeNode(scope.name() + (scope.expensive() ? " (expensive)" : ""));
                 variableRoot.add(scopeNode);
                 for (DebugInspection.Variable variable : scope.variables()) {
-                    appendVariable(scopeNode, variable, snapshot.expandedVariables(), Set.of(), 0);
+                    appendVariable(scopeNode, scope.variablesReference(), variable, snapshot.expandedVariables(), Set.of(), 0);
                 }
             }
         }
@@ -360,9 +382,10 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         }
     }
 
-    private static void appendVariable(DefaultMutableTreeNode parent, DebugInspection.Variable variable, Map<Integer, List<DebugInspection.Variable>> expanded,
+    private static void appendVariable(DefaultMutableTreeNode parent, int variablesReference, DebugInspection.Variable variable,
+                                       Map<Integer, List<DebugInspection.Variable>> expanded,
                                        Set<Integer> ancestors, int depth) {
-        DefaultMutableTreeNode node = new DefaultMutableTreeNode(new VariableNode(variable));
+        DefaultMutableTreeNode node = new DefaultMutableTreeNode(new VariableNode(variablesReference, variable));
         parent.add(node);
         int reference = variable == null ? 0 : variable.variablesReference();
         if (reference < 1 || depth >= 12) return;
@@ -377,7 +400,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         }
         Set<Integer> childAncestors = new HashSet<>(ancestors);
         childAncestors.add(reference);
-        for (DebugInspection.Variable child : children) appendVariable(node, child, expanded, Set.copyOf(childAncestors), depth + 1);
+        for (DebugInspection.Variable child : children) appendVariable(node, reference, child, expanded, Set.copyOf(childAncestors), depth + 1);
     }
 
     private void message(String text) { editor.showMessage(text); refresh(); }

@@ -58,6 +58,7 @@ final class DebugInspection {
     }
     record VariableLoad(long generation, int variablesReference) { }
     record EvaluationLoad(long generation, int frameId) { }
+    record VariableMutationLoad(long generation, int frameId, int variablesReference) { }
     record Result(Snapshot snapshot, boolean succeeded) { }
 
     private long generation;
@@ -181,6 +182,34 @@ final class DebugInspection {
         return paused && frameId > 0 ? new EvaluationLoad(generation, frameId) : null;
     }
 
+    VariableMutationLoad beginVariableMutation(int variablesReference, String name) {
+        if (!paused || frameId < 1 || variablesReference < 1 || !hasVariableContainerReference(variablesReference)
+            || !hasDisplayedVariable(variablesReference, name)) return null;
+        return new VariableMutationLoad(generation, frameId, variablesReference);
+    }
+
+    boolean updateVariable(long generation, int frameId, int variablesReference, String name, String value, String type, int childReference) {
+        if (!current(generation, frameId)) return false;
+        for (int index = 0; index < scopes.size(); index++) {
+            Scope scope = scopes.get(index);
+            if (scope.variablesReference() != variablesReference) continue;
+            List<Variable> updated = replaceVariable(scope.variables(), name, value, type, childReference);
+            if (updated == scope.variables()) return false;
+            List<Scope> copies = new ArrayList<>(scopes);
+            copies.set(index, new Scope(scope.name(), scope.variablesReference(), scope.expensive(), updated));
+            scopes = List.copyOf(copies);
+            detail = "Changed debug variable '" + name + "'.";
+            return true;
+        }
+        List<Variable> values = expandedVariables.get(variablesReference);
+        if (values == null) return false;
+        List<Variable> updated = replaceVariable(values, name, value, type, childReference);
+        if (updated == values) return false;
+        expandedVariables.put(variablesReference, updated);
+        detail = "Changed debug variable '" + name + "'.";
+        return true;
+    }
+
     boolean current(long generation, int frameId) {
         return paused && this.generation == generation && this.frameId == frameId;
     }
@@ -199,9 +228,40 @@ final class DebugInspection {
         return false;
     }
 
+    private boolean hasVariableContainerReference(int reference) {
+        for (Scope scope : scopes) if (scope.variablesReference() == reference) return true;
+        return hasVariableReference(reference);
+    }
+
+    private boolean hasDisplayedVariable(int reference, String name) {
+        String requested = name == null ? "" : name;
+        for (Scope scope : scopes) if (scope.variablesReference() == reference && hasVariable(scope.variables(), requested)) return true;
+        List<Variable> values = expandedVariables.get(reference);
+        return hasVariable(values, requested);
+    }
+
     private static boolean hasVariableReference(List<Variable> variables, int reference) {
         if (variables == null) return false;
         return variables.stream().anyMatch(variable -> variable != null && variable.variablesReference() == reference);
+    }
+
+    private static boolean hasVariable(List<Variable> variables, String name) {
+        if (variables == null) return false;
+        return variables.stream().anyMatch(variable -> variable != null && variable.name().equals(name));
+    }
+
+    private static List<Variable> replaceVariable(List<Variable> values, String name, String value, String type, int childReference) {
+        if (values == null) return List.of();
+        List<Variable> result = new ArrayList<>(values.size());
+        boolean replaced = false;
+        for (Variable variable : values) {
+            if (!replaced && variable != null && variable.name().equals(name)) {
+                result.add(new Variable(variable.name(), value, type == null || type.isBlank() ? variable.type() : type,
+                    childReference > 0 ? childReference : variable.variablesReference()));
+                replaced = true;
+            } else result.add(variable);
+        }
+        return replaced ? List.copyOf(result) : values;
     }
 
     private void resetWatches() {

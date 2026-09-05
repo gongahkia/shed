@@ -57,6 +57,15 @@ final class DebugSessionService {
         }
     }
     record EvaluationResult(DebugConsole.Snapshot console, Evaluation evaluation, boolean succeeded) { }
+    record VariableMutation(String name, String value, String type, int variablesReference, String message) {
+        VariableMutation {
+            name = name == null ? "" : name;
+            value = value == null ? "" : value;
+            type = type == null ? "" : type;
+            message = message == null ? "" : message;
+        }
+    }
+    record VariableMutationResult(DebugConsole.Snapshot console, VariableMutation mutation, boolean succeeded) { }
     record ControlResult(Snapshot snapshot, boolean succeeded) { }
     record RunToCursorResult(Snapshot snapshot, boolean succeeded) { }
     private record InspectionPayload(List<DebugInspection.ThreadInfo> threads, List<DebugInspection.Frame> frames, int frameId,
@@ -634,6 +643,74 @@ final class DebugSessionService {
         }
     }
 
+    VariableMutationResult setVariable(Path workspace, int variablesReference, String name, String value, Duration timeout) {
+        Path root = root(workspace);
+        String variableName = name == null ? "" : name.trim();
+        String variableValue = value == null ? "" : value.trim();
+        if (!validVariableText(variableName, 1024) || !validVariableText(variableValue, 4096)) {
+            synchronized (this) {
+                Session session = session(root);
+                return new VariableMutationResult(session.console.snapshot(), new VariableMutation(variableName, "", "", 0,
+                    "Variable name or value is empty, too long, or contains a control character."), false);
+            }
+        }
+        Connection connection;
+        DebugInspection.VariableMutationLoad load;
+        synchronized (this) {
+            Session session = session(root);
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null
+                || !supports(session.plan, session.features, DebugAdapterRegistry.Capability.SET_VARIABLE)) {
+                return new VariableMutationResult(session.console.snapshot(), new VariableMutation(variableName, "", "", 0,
+                    "Changing variables is unavailable for the active adapter."), false);
+            }
+            if (!session.runtimeCapabilities.contains(DebugAdapterRegistry.Capability.SET_VARIABLE)) {
+                return new VariableMutationResult(session.console.snapshot(), new VariableMutation(variableName, "", "", 0,
+                    "The active adapter did not advertise DAP setVariable support."), false);
+            }
+            load = session.inspection.beginVariableMutation(variablesReference, variableName);
+            if (load == null) {
+                return new VariableMutationResult(session.console.snapshot(), new VariableMutation(variableName, "", "", 0,
+                    "Changing a variable requires a currently displayed paused variable scope."), false);
+            }
+            connection = session.connection;
+        }
+        try {
+            DebugAdapterTransport.Response response = connection.request("setVariable", Map.of("variablesReference", load.variablesReference(),
+                "name", variableName, "value", variableValue), timeout);
+            if (!response.success()) throw new IOException(responseFailure("setVariable", response));
+            Map<String, Object> body = MiniJson.asObject(response.body());
+            String appliedValue = body == null ? null : MiniJson.asString(body.get("value"));
+            if (appliedValue == null) throw new IOException("DAP setVariable response is missing value");
+            VariableMutation mutation = new VariableMutation(variableName, appliedValue, string(body.get("type")), integer(body.get("variablesReference")), "");
+            synchronized (this) {
+                Session session = session(root);
+                if (session.connection != connection || !session.inspection.updateVariable(load.generation(), load.frameId(), load.variablesReference(),
+                    variableName, mutation.value(), mutation.type(), mutation.variablesReference())) {
+                    return new VariableMutationResult(session.console.snapshot(), new VariableMutation(variableName, "", "", 0,
+                        "Debug state changed or no longer displays that variable."), false);
+                }
+                session.console.append("repl", "set " + variableName + " = " + appliedValue + "\n");
+                session.detail = "Changed debug variable '" + variableName + "'.";
+                return new VariableMutationResult(session.console.snapshot(), mutation, true);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) {
+                Session session = session(root);
+                String detail = "Changing debug variable failed: " + message(error);
+                session.diagnostics.add(detail);
+                return new VariableMutationResult(session.console.snapshot(), new VariableMutation(variableName, "", "", 0, detail), false);
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) {
+                Session session = session(root);
+                String detail = "Changing debug variable interrupted.";
+                session.diagnostics.add(detail);
+                return new VariableMutationResult(session.console.snapshot(), new VariableMutation(variableName, "", "", 0, detail), false);
+            }
+        }
+    }
+
     InspectionResult refreshInspection(Path workspace, Duration timeout) {
         Path root = root(workspace);
         Connection connection;
@@ -897,6 +974,12 @@ final class DebugSessionService {
         return true;
     }
 
+    private static boolean validVariableText(String value, int maximum) {
+        if (value == null || value.isEmpty() || value.length() > maximum) return false;
+        for (int index = 0; index < value.length(); index++) if (Character.isISOControl(value.charAt(index))) return false;
+        return true;
+    }
+
     private static BreakpointSynchronization synchronizeBreakpoints(DebugAdapterRegistry.Plan plan, DebugFeatureSettings settings,
         Set<DebugAdapterRegistry.Capability> runtimeCapabilities, Connection connection, BreakpointStore breakpointStore, Duration timeout) {
         if (breakpointStore == null || settings == null || !settings.breakpoints() || plan == null || connection == null
@@ -1154,6 +1237,7 @@ final class DebugSessionService {
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.CONDITIONAL_BREAKPOINTS, "supportsConditionalBreakpoints");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.HIT_CONDITIONAL_BREAKPOINTS, "supportsHitConditionalBreakpoints");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.LOG_POINTS, "supportsLogPoints");
+        retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.SET_VARIABLE, "supportsSetVariable");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.GOTO, "supportsGotoTargetsRequest");
         return Set.copyOf(result);
     }

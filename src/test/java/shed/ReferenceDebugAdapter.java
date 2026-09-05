@@ -79,7 +79,8 @@ final class ReferenceDebugAdapter implements AutoCloseable {
     private void handle(String command, int requestSeq, Map<String, Object> request) throws IOException {
         switch (command) {
             case "initialize" -> response(requestSeq, command, true,
-                Map.of("supportsCancelRequest", true, "supportsConfigurationDoneRequest", true, "supportsFunctionBreakpoints", true), "");
+                Map.of("supportsCancelRequest", true, "supportsConfigurationDoneRequest", true, "supportsFunctionBreakpoints", true,
+                    "supportsSetVariable", true), "");
             case "launch", "attach" -> {
                 launchRequest = requestSeq;
                 event("initialized", Map.of());
@@ -99,6 +100,7 @@ final class ReferenceDebugAdapter implements AutoCloseable {
             case "scopes" -> response(requestSeq, command, true, Map.of("scopes", List.of(Map.of("name", "Locals", "variablesReference", 55))), "");
             case "variables" -> response(requestSeq, command, true, Map.of("variables", variables(request)), "");
             case "evaluate" -> response(requestSeq, command, true, evaluation(request), "");
+            case "setVariable" -> response(requestSeq, command, true, variableMutation(request), "");
             case "cancel", "disconnect" -> response(requestSeq, command, true, Map.of(), "");
             default -> response(requestSeq, command, false, Map.of(), "unsupported test command");
         }
@@ -129,8 +131,20 @@ final class ReferenceDebugAdapter implements AutoCloseable {
         Map<String, Object> arguments = MiniJson.asObject(request.get("arguments"));
         String expression = MiniJson.asString(arguments == null ? null : arguments.get("expression"));
         String context = MiniJson.asString(arguments == null ? null : arguments.get("context"));
-        if ("count + 1".equals(expression) && "repl".equals(context)) return Map.of("result", "3", "type", "int");
+        if ("count + 1".equals(expression) && "repl".equals(context) && number(arguments == null ? null : arguments.get("frameId")) == 44) {
+            return Map.of("result", "3", "type", "int");
+        }
         return Map.of("result", "2", "type", "int");
+    }
+
+    private Map<String, Object> variableMutation(Map<String, Object> request) {
+        Map<String, Object> arguments = MiniJson.asObject(request.get("arguments"));
+        if (number(arguments == null ? null : arguments.get("variablesReference")) != 55
+            || !"count".equals(MiniJson.asString(arguments == null ? null : arguments.get("name")))) {
+            return Map.of("value", "unexpected", "type", "invalid");
+        }
+        String value = MiniJson.asString(arguments == null ? null : arguments.get("value"));
+        return Map.of("value", value == null ? "" : value, "type", "int");
     }
 
     private void response(int requestSeq, String command, boolean success, Object body, String message) throws IOException {

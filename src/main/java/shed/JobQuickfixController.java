@@ -767,9 +767,11 @@ final class JobQuickfixController {
         return "'" + value.replace("'", "'\"'\"'") + "'";
     }
 
-    private TaskService.WorkspaceTask resolveTask(String name, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks) {
+    TaskService.WorkspaceTask resolveTask(String name, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks) {
         TaskService.WorkspaceTask task = tasks.get(name);
         if (task != null) return task;
+        TaskService.WorkspaceTask grouped = TaskService.defaultGroupTask(name, tasks);
+        if (grouped != null) return grouped;
         return inferBuiltInTask(name, projectRoot);
     }
 

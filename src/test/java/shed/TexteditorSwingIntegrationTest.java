@@ -965,6 +965,38 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void explicitVscodeDefaultBuildTaskRunsWhenNoNamedBuildTaskExists() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-vscode-default-build");
+        Path workspace = Files.createDirectories(tempDir.resolve("vscode-default-build-project"));
+        Path source = workspace.resolve("Main.java");
+        Path marker = workspace.resolve("default-build.marker");
+        Files.createDirectories(home);
+        Files.writeString(source, "class Main {}\n", StandardCharsets.UTF_8);
+        Files.createDirectories(workspace.resolve(".vscode"));
+        Files.writeString(workspace.resolve(".vscode/tasks.json"), """
+            {"version":"2.0.0","tasks":[
+              {"label":"Project build","type":"process","command":"sh",
+               "args":["-c","printf built > default-build.marker"],"problemMatcher":[],
+               "group":{"kind":"build","isDefault":true}}
+            ]}
+            """, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, source);
+        try {
+            String requested = onEdt(() -> editor.handleTaskCommand("run build"));
+            int jobId = Integer.parseInt(requested.replaceAll("Task job ([0-9]+) started.*", "$1"));
+
+            assertTrue(awaitJobCompletion(editor, jobId));
+            assertEquals("built", Files.readString(marker, StandardCharsets.UTF_8));
+            assertTrue(onEdt(() -> editor.jobQuickfixController.taskOutputForPanel(jobId).contains("==> task vscode-project-build")));
+            assertFalse(Files.exists(workspace.resolve(".shedtasks")));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void importedCodeWorkspaceCanRunItsAcceptedTaskBeforeItsAcceptedLaunchProfile() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-workspace-launch-prelaunch");

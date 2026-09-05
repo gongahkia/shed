@@ -2,6 +2,7 @@ package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -107,6 +108,46 @@ class VsCodeTaskImporterTest {
         assertEquals(5, report.tasks().size());
         assertTrue(report.skipped().stream().anyMatch(value -> value.contains("background-task lifecycle")));
         assertTrue(report.skipped().stream().anyMatch(value -> value.contains("problemMatcher")));
+    }
+
+    @Test
+    void importsExplicitDefaultBuildAndTestGroupsWithoutStartingThem() throws Exception {
+        Path root = Files.createDirectories(temporaryDirectory.resolve("default-groups"));
+        Path tasks = Files.createDirectories(root.resolve(".vscode")).resolve("tasks.json");
+        Files.writeString(tasks, """
+            {"version":"2.0.0","tasks":[
+              {"label":"Build all","type":"process","command":"make","args":["all"],
+               "group":{"kind":"build","isDefault":true}},
+              {"label":"Unit tests","type":"process","command":"make","args":["test"],
+               "group":{"kind":"test","isDefault":true}},
+              {"label":"Other test","type":"process","command":"make","args":["check"],"group":"test"},
+              {"label":"Invalid group","type":"process","command":"make","group":{"kind":"build","isDefault":"yes"}}
+            ]}
+            """);
+
+        VsCodeTaskImporter.Report report = VsCodeTaskImporter.read(root, Set.of());
+
+        TaskService.WorkspaceTask build = report.tasks().get("vscode-build-all");
+        TaskService.WorkspaceTask test = report.tasks().get("vscode-unit-tests");
+        assertEquals(TaskService.TaskGroup.BUILD, build.group());
+        assertTrue(build.defaultGroup());
+        assertEquals(TaskService.TaskGroup.TEST, test.group());
+        assertTrue(test.defaultGroup());
+        assertEquals(TaskService.TaskGroup.TEST, report.tasks().get("vscode-other-test").group());
+        assertFalse(report.tasks().get("vscode-other-test").defaultGroup());
+        assertEquals(build, TaskService.defaultGroupTask("build", report.tasks()));
+        assertEquals(test, TaskService.defaultGroupTask("test", report.tasks()));
+        assertTrue(report.skipped().stream().anyMatch(value -> value.contains("group.isDefault")));
+    }
+
+    @Test
+    void declinesAnAmbiguousDefaultTaskGroup() {
+        TaskService.WorkspaceTask first = TaskService.withGroup(TaskService.directWorkspaceTask("one", List.of("make", "one"),
+            "${workspaceFolder}", Map.of(), TaskService.ProblemMatcher.NONE, TaskService.Presentation.NEVER), TaskService.TaskGroup.BUILD, true);
+        TaskService.WorkspaceTask second = TaskService.withGroup(TaskService.directWorkspaceTask("two", List.of("make", "two"),
+            "${workspaceFolder}", Map.of(), TaskService.ProblemMatcher.NONE, TaskService.Presentation.NEVER), TaskService.TaskGroup.BUILD, true);
+
+        assertNull(TaskService.defaultGroupTask("build", Map.of(first.name(), first, second.name(), second)));
     }
 
     @Test

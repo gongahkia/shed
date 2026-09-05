@@ -181,6 +181,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleDebugCommand(args), "debug", "dap");
         registerCommand((args, range, force) -> editor.lspGoToDefinition(), "definition");
         registerCommand((args, range, force) -> editor.lspGoToTypeDefinition(), "typedefinition", "typedef");
+        registerCommand((args, range, force) -> editor.lspGoToImplementation(), "implementation", "impl");
         registerCommand((args, range, force) -> editor.lspHover(), "hover");
         registerCommand((args, range, force) -> editor.lspReferences(), "references");
         registerCommand((args, range, force) -> editor.showDiagnostics(), "diagnostics", "diag", "ldiag");

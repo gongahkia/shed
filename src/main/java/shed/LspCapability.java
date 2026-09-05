@@ -6,6 +6,7 @@ enum LspCapability {
     HOVER("hover", "hoverProvider"),
     DEFINITION("definition", "definitionProvider"),
     TYPE_DEFINITION("type definition", "typeDefinitionProvider"),
+    IMPLEMENTATION("implementation", "implementationProvider"),
     CALL_HIERARCHY("call hierarchy", "callHierarchyProvider"),
     TYPE_HIERARCHY("type hierarchy", "typeHierarchyProvider"),
     REFERENCES("references", "referencesProvider"),

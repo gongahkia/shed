@@ -76,7 +76,7 @@ public class LspServiceTest {
     @Test
     void recognizesServerAdvertisedSymbolCapabilities() {
         Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
-            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true},\"selectionRangeProvider\":true,\"documentLinkProvider\":{\"resolveProvider\":true},\"colorProvider\":true,\"diagnosticProvider\":{}}}}"
+            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true},\"selectionRangeProvider\":true,\"documentLinkProvider\":{\"resolveProvider\":true},\"colorProvider\":true,\"diagnosticProvider\":{\"workspaceDiagnostics\":true}}}}"
         ));
 
         LspCapabilityModel model = LspCapabilityModel.fromInitializeResult(response, LspFeatureSettings.defaults().capabilityEnablement());
@@ -88,6 +88,7 @@ public class LspServiceTest {
         assertTrue(model.allows(LspCapability.DOCUMENT_LINKS));
         assertTrue(model.allows(LspCapability.DOCUMENT_COLORS));
         assertTrue(model.allows(LspCapability.PULL_DIAGNOSTICS));
+        assertTrue(model.allows(LspCapability.WORKSPACE_DIAGNOSTICS));
         assertTrue(LspClient.parseCodeLensResolveSupport(response));
         assertTrue(LspClient.parseDocumentLinkResolveSupport(response));
     }
@@ -233,6 +234,25 @@ public class LspServiceTest {
             assertEquals("pulled warning", first.getFirst().getMessage());
             assertEquals(first, client.pullDiagnostics(uri));
             assertEquals(first, client.getDiagnostics(uri));
+        } finally {
+            client.stop();
+        }
+    }
+
+    @Test
+    void pullsWorkspaceDiagnosticsFromAnAdvertisedLanguageServer() throws Exception {
+        Path workspace = Files.createTempDirectory("shed-lsp-workspace-diagnostics-");
+        Path java = Path.of(System.getProperty("java.home"), "bin", javaExecutable());
+        Assumptions.assumeTrue(Files.isExecutable(java), "Java runtime executable is unavailable");
+        LspClient client = new LspClient(List.of(java.toString(), "-cp", System.getProperty("java.class.path"),
+            ReferenceDocumentHighlightLanguageServer.class.getName()), workspace, workspace.toUri().toString(), LspFeatureSettings.defaults());
+        try {
+            assertTrue(client.supports(LspCapability.WORKSPACE_DIAGNOSTICS));
+            Map<String, List<LspClient.Diagnostic>> reports = client.workspaceDiagnostics();
+            assertEquals(1, reports.size());
+            List<LspClient.Diagnostic> diagnostics = reports.get("file:///workspace/Workspace.java");
+            assertNotNull(diagnostics);
+            assertEquals("workspace error", diagnostics.getFirst().getMessage());
         } finally {
             client.stop();
         }

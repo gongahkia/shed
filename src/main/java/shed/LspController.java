@@ -113,7 +113,7 @@ final class LspController {
         flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|links [index]|colors|pulldiagnostics|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|links [index]|colors|pulldiagnostics|workspacediagnostics|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -166,6 +166,10 @@ final class LspController {
             case "pull-diagnostics":
             case "pulldiag":
                 return lspPullDiagnostics();
+            case "workspacediagnostics":
+            case "workspace-diagnostics":
+            case "workspacediag":
+                return lspWorkspaceDiagnostics();
             case "format":
                 return lspFormat();
             case "peek":
@@ -871,6 +875,31 @@ final class LspController {
         List<QuickfixService.Entry> entries = diagnosticsToQuickfixEntries(buffer.getFilePath(), diagnostics);
         if (entries.isEmpty()) return "No pull diagnostics";
         editor.updateQuickfixEntries("pull diagnostics", entries);
+        return editor.openQuickfixList();
+    }
+
+    public String lspWorkspaceDiagnostics() {
+        FileBuffer active = editor.getCurrentBuffer();
+        if (active != null && active.hasFilePath() && !active.isLargeFile()) {
+            syncLspOpen(active);
+            flushPendingLspChange(active);
+        }
+        List<LspClient> clients = new ArrayList<>(new LinkedHashSet<>(editor.lspClients.values()));
+        clients.removeIf(client -> client == null || !client.isAlive() || !client.supports(LspCapability.WORKSPACE_DIAGNOSTICS));
+        if (clients.isEmpty()) return "No LSP workspace diagnostic provider is active";
+        List<QuickfixService.Entry> entries = new ArrayList<>();
+        for (LspClient client : clients) {
+            for (Map.Entry<String, List<LspClient.Diagnostic>> report : client.workspaceDiagnostics().entrySet()) {
+                String path = filePathFromUri(report.getKey());
+                if (path == null || path.isBlank()) continue;
+                entries.addAll(diagnosticsToQuickfixEntries(path, report.getValue()));
+            }
+        }
+        if (entries.isEmpty()) {
+            editor.problemsController.clearQuickfixSource("workspace diagnostics");
+            return "No workspace diagnostics";
+        }
+        editor.updateQuickfixEntries("workspace diagnostics", entries);
         return editor.openQuickfixList();
     }
 

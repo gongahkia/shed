@@ -290,6 +290,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:lsp links [index]`, `:lsp documentlinks [index]` | List current-document links; an explicit index opens a resolved local-file, HTTP(S), or mail link |
 | `:lsp colors`, `:lsp documentcolors` | List current-document LSP colors as RGBA hex values without editing the buffer |
 | `:lsp pulldiagnostics`, `:lsp pulldiag` | Explicitly refresh a current-document pull-diagnostic provider and open its results in quickfix |
+| `:lsp workspacediagnostics`, `:lsp workspacediag` | Explicitly request bounded direct workspace diagnostics from active compatible servers and open local-file results in quickfix |
 | `:lsp format` | Apply server formatting edits to the current document when supported |
 | `:format`, `:fmt` | Format with the current extension's selected formatter policy |
 | `:formatter`, `:formatpolicy` | Edit the current extension's formatter mode, direct command, args, and format-on-save policy |

@@ -68,6 +68,14 @@ final class DebugSessionService {
     record VariableMutationResult(DebugConsole.Snapshot console, VariableMutation mutation, boolean succeeded) { }
     record ControlResult(Snapshot snapshot, boolean succeeded) { }
     record RunToCursorResult(Snapshot snapshot, boolean succeeded) { }
+    record DataBreakpointInfo(String dataId, String description, List<DataBreakpointStore.AccessType> accessTypes) {
+        DataBreakpointInfo {
+            dataId = dataId == null ? "" : dataId;
+            description = description == null ? "" : description;
+            accessTypes = accessTypes == null ? List.of() : List.copyOf(accessTypes);
+        }
+    }
+    record DataBreakpointResult(Snapshot snapshot, DataBreakpointInfo info, boolean succeeded) { }
     private record InspectionPayload(List<DebugInspection.ThreadInfo> threads, List<DebugInspection.Frame> frames, int frameId,
         List<DebugInspection.Scope> scopes, List<DebugInspection.Watch> watches, String detail, DebugInspection.State state) { }
 
@@ -180,6 +188,13 @@ final class DebugSessionService {
     Result start(Path workspace, DebugAdapterRegistry.LaunchContext context, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
         String requestedConfiguration, Duration timeout, Starter starter, BreakpointStore breakpointStore, ExceptionBreakpointStore exceptionBreakpointStore,
         FunctionBreakpointStore functionBreakpointStore, PreLaunch preLaunch) {
+        return start(workspace, context, validation, features, requestedConfiguration, timeout, starter, breakpointStore, exceptionBreakpointStore,
+            functionBreakpointStore, null, preLaunch);
+    }
+
+    Result start(Path workspace, DebugAdapterRegistry.LaunchContext context, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
+        String requestedConfiguration, Duration timeout, Starter starter, BreakpointStore breakpointStore, ExceptionBreakpointStore exceptionBreakpointStore,
+        FunctionBreakpointStore functionBreakpointStore, DataBreakpointStore dataBreakpointStore, PreLaunch preLaunch) {
         Path root = root(workspace);
         DebugFeatureSettings settings = features == null ? DebugFeatureSettings.defaults() : features;
         String name;
@@ -256,6 +271,8 @@ final class DebugSessionService {
                 synchronizationDiagnostics.addAll(synchronizeBreakpoints(plan, settings, runtimeCapabilities, connection, breakpointStore, timeout).diagnostics());
                 synchronizationDiagnostics.addAll(synchronizeFunctionBreakpoints(plan, settings, runtimeCapabilities, connection,
                     functionBreakpointStore, timeout).diagnostics());
+                synchronizationDiagnostics.addAll(synchronizeDataBreakpoints(plan, settings, runtimeCapabilities, connection,
+                    dataBreakpointStore, timeout).diagnostics());
                 synchronizationDiagnostics.addAll(synchronizeExceptionBreakpoints(plan, settings, exceptionFilters, connection,
                     exceptionBreakpointStore, timeout).diagnostics());
                 if (supportsConfigurationDone(plan, initialize)) {
@@ -273,6 +290,8 @@ final class DebugSessionService {
                 synchronizationDiagnostics.addAll(synchronization.diagnostics());
                 synchronizationDiagnostics.addAll(synchronizeFunctionBreakpoints(plan, settings, runtimeCapabilities, connection,
                     functionBreakpointStore, timeout).diagnostics());
+                synchronizationDiagnostics.addAll(synchronizeDataBreakpoints(plan, settings, runtimeCapabilities, connection,
+                    dataBreakpointStore, timeout).diagnostics());
                 synchronizationDiagnostics.addAll(synchronizeExceptionBreakpoints(plan, settings, exceptionFilters, connection,
                     exceptionBreakpointStore, timeout).diagnostics());
             }
@@ -349,6 +368,11 @@ final class DebugSessionService {
 
     Result synchronizeBreakpoints(Path workspace, BreakpointStore breakpointStore, ExceptionBreakpointStore exceptionBreakpointStore,
         FunctionBreakpointStore functionBreakpointStore, Duration timeout) {
+        return synchronizeBreakpoints(workspace, breakpointStore, exceptionBreakpointStore, functionBreakpointStore, null, timeout);
+    }
+
+    Result synchronizeBreakpoints(Path workspace, BreakpointStore breakpointStore, ExceptionBreakpointStore exceptionBreakpointStore,
+        FunctionBreakpointStore functionBreakpointStore, DataBreakpointStore dataBreakpointStore, Duration timeout) {
         Path root = root(workspace);
         Connection connection;
         DebugAdapterRegistry.Plan plan;
@@ -368,12 +392,66 @@ final class DebugSessionService {
         }
         List<String> diagnostics = new ArrayList<>(synchronizeBreakpoints(plan, settings, runtimeCapabilities, connection, breakpointStore, timeout).diagnostics());
         diagnostics.addAll(synchronizeFunctionBreakpoints(plan, settings, runtimeCapabilities, connection, functionBreakpointStore, timeout).diagnostics());
+        diagnostics.addAll(synchronizeDataBreakpoints(plan, settings, runtimeCapabilities, connection, dataBreakpointStore, timeout).diagnostics());
         diagnostics.addAll(synchronizeExceptionBreakpoints(plan, settings, exceptionFilters, connection, exceptionBreakpointStore, timeout).diagnostics());
         synchronized (this) {
             Session session = session(root);
             if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING) return new Result(snapshot(root, session), false);
             session.diagnostics.addAll(diagnostics);
             return new Result(snapshot(root, session), true);
+        }
+    }
+
+    DataBreakpointResult addDataBreakpoint(Path workspace, int variablesReference, String name, DataBreakpointStore.AccessType preferredAccess,
+        DataBreakpointStore dataBreakpointStore, Duration timeout) {
+        Path root = root(workspace);
+        Connection connection;
+        DebugAdapterRegistry.Plan plan;
+        DebugFeatureSettings settings;
+        Set<DebugAdapterRegistry.Capability> runtimeCapabilities;
+        String requestedName = name == null ? "" : name.trim();
+        synchronized (this) {
+            Session session = session(root);
+            if (variablesReference < 1 || !validVariableText(requestedName, 512)) {
+                return dataBreakpointFailure(root, session, "Data breakpoints require a displayed variable reference and name.");
+            }
+            if (dataBreakpointStore == null || session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null
+                || !supports(session.plan, session.features, DebugAdapterRegistry.Capability.DATA_BREAKPOINTS)
+                || !session.runtimeCapabilities.contains(DebugAdapterRegistry.Capability.DATA_BREAKPOINTS)) {
+                return dataBreakpointFailure(root, session, "Data breakpoints are unavailable for the active adapter.");
+            }
+            connection = session.connection;
+            plan = session.plan;
+            settings = session.features;
+            runtimeCapabilities = session.runtimeCapabilities;
+        }
+        try {
+            Map<String, Object> arguments = new LinkedHashMap<>();
+            arguments.put("variablesReference", variablesReference);
+            arguments.put("name", requestedName);
+            DebugAdapterTransport.Response response = connection.request("dataBreakpointInfo", Map.copyOf(arguments), timeout);
+            if (!response.success()) {
+                synchronized (this) { return dataBreakpointFailure(root, session(root), responseFailure("dataBreakpointInfo", response)); }
+            }
+            DataBreakpointInfo info = dataBreakpointInfo(response.body(), requestedName, preferredAccess);
+            dataBreakpointStore.add(root, info.dataId(), info.description(), selectDataBreakpointAccess(info.accessTypes(), preferredAccess));
+            BreakpointSynchronization synchronization = synchronizeDataBreakpoints(plan, settings, runtimeCapabilities, connection, dataBreakpointStore, timeout);
+            synchronized (this) {
+                Session session = session(root);
+                if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING || session.plan != plan) {
+                    return new DataBreakpointResult(snapshot(root, session), info, false);
+                }
+                session.diagnostics.addAll(synchronization.diagnostics());
+                session.detail = "Data breakpoint '" + info.description() + "' added.";
+                return new DataBreakpointResult(snapshot(root, session), info, true);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) { return dataBreakpointFailure(root, session(root), "Data breakpoint lookup failed: " + message(error)); }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) { return dataBreakpointFailure(root, session(root), "Data breakpoint lookup interrupted."); }
+        } catch (IllegalArgumentException error) {
+            synchronized (this) { return dataBreakpointFailure(root, session(root), "Data breakpoint lookup returned invalid metadata: " + message(error)); }
         }
     }
 
@@ -1080,6 +1158,50 @@ final class DebugSessionService {
         return new BreakpointSynchronization(true, diagnostics);
     }
 
+    private static BreakpointSynchronization synchronizeDataBreakpoints(DebugAdapterRegistry.Plan plan, DebugFeatureSettings settings,
+        Set<DebugAdapterRegistry.Capability> runtimeCapabilities, Connection connection, DataBreakpointStore dataBreakpointStore,
+        Duration timeout) {
+        if (dataBreakpointStore == null || settings == null || !settings.breakpoints() || plan == null || connection == null
+            || !plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.DATA_BREAKPOINTS)
+            || runtimeCapabilities == null || !runtimeCapabilities.contains(DebugAdapterRegistry.Capability.DATA_BREAKPOINTS)) {
+            return new BreakpointSynchronization(false, List.of());
+        }
+        try {
+            List<String> diagnostics = new ArrayList<>();
+            List<DataBreakpointStore.Breakpoint> requested = new ArrayList<>();
+            List<Map<String, Object>> arguments = new ArrayList<>();
+            for (DataBreakpointStore.Breakpoint breakpoint : dataBreakpointStore.breakpoints(plan.workspace())) {
+                if (!breakpoint.enabled()) continue;
+                String unsupported = unsupportedDataBreakpointOption(plan.adapter(), runtimeCapabilities, breakpoint);
+                if (unsupported != null) {
+                    String detail = "Data breakpoint option is unsupported by adapter " + plan.adapter().id() + ": " + unsupported + ".";
+                    dataBreakpointStore.reject(plan.workspace(), breakpoint, detail);
+                    diagnostics.add("Data breakpoint '" + breakpoint.description() + "' " + detail);
+                    continue;
+                }
+                Map<String, Object> value = new LinkedHashMap<>();
+                value.put("dataId", breakpoint.dataId());
+                value.put("accessType", breakpoint.accessType().dapValue());
+                if (!breakpoint.condition().isBlank()) value.put("condition", breakpoint.condition());
+                if (!breakpoint.hitCondition().isBlank()) value.put("hitCondition", breakpoint.hitCondition());
+                requested.add(breakpoint);
+                arguments.add(Map.copyOf(value));
+            }
+            DebugAdapterTransport.Response response = connection.request("setDataBreakpoints", Map.of("breakpoints", List.copyOf(arguments)), timeout);
+            if (!response.success()) {
+                return new BreakpointSynchronization(true, List.of("DAP setDataBreakpoints failed"
+                    + (response.message().isBlank() ? "." : ": " + response.message())));
+            }
+            diagnostics.addAll(dataBreakpointStore.apply(plan.workspace(), requested, response.body()).diagnostics());
+            return new BreakpointSynchronization(true, diagnostics);
+        } catch (IOException | TimeoutException error) {
+            return new BreakpointSynchronization(true, List.of("Data breakpoint synchronization failed: " + message(error)));
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            return new BreakpointSynchronization(true, List.of("Data breakpoint synchronization interrupted."));
+        }
+    }
+
     private static List<String> exceptionBreakpointDiagnostics(Object responseBody, List<String> requested) {
         Map<String, Object> body = MiniJson.asObject(responseBody);
         List<Object> returned = MiniJson.asArray(body == null ? null : body.get("breakpoints"));
@@ -1139,6 +1261,20 @@ final class DebugSessionService {
     private static String unsupportedFunctionBreakpointOption(DebugAdapterRegistry.Adapter adapter,
         Set<DebugAdapterRegistry.Capability> runtimeCapabilities, FunctionBreakpointStore.Breakpoint breakpoint) {
         if (adapter == null || breakpoint == null) return "function breakpoint";
+        if (!breakpoint.condition().isBlank()) {
+            String unsupported = unsupportedCapability(adapter, runtimeCapabilities, DebugAdapterRegistry.Capability.CONDITIONAL_BREAKPOINTS, "condition");
+            if (unsupported != null) return unsupported;
+        }
+        if (!breakpoint.hitCondition().isBlank()) {
+            String unsupported = unsupportedCapability(adapter, runtimeCapabilities, DebugAdapterRegistry.Capability.HIT_CONDITIONAL_BREAKPOINTS, "hit condition");
+            if (unsupported != null) return unsupported;
+        }
+        return null;
+    }
+
+    private static String unsupportedDataBreakpointOption(DebugAdapterRegistry.Adapter adapter,
+        Set<DebugAdapterRegistry.Capability> runtimeCapabilities, DataBreakpointStore.Breakpoint breakpoint) {
+        if (adapter == null || breakpoint == null) return "data breakpoint";
         if (!breakpoint.condition().isBlank()) {
             String unsupported = unsupportedCapability(adapter, runtimeCapabilities, DebugAdapterRegistry.Capability.CONDITIONAL_BREAKPOINTS, "condition");
             if (unsupported != null) return unsupported;
@@ -1234,6 +1370,7 @@ final class DebugSessionService {
         result.addAll(plan.adapter().capabilities());
         Map<String, Object> capabilities = initialize == null ? null : MiniJson.asObject(initialize.body());
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.FUNCTION_BREAKPOINTS, "supportsFunctionBreakpoints");
+        retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.DATA_BREAKPOINTS, "supportsDataBreakpoints");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.CONDITIONAL_BREAKPOINTS, "supportsConditionalBreakpoints");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.HIT_CONDITIONAL_BREAKPOINTS, "supportsHitConditionalBreakpoints");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.LOG_POINTS, "supportsLogPoints");
@@ -1245,6 +1382,49 @@ final class DebugSessionService {
     private static void retainAdvertised(EnumSet<DebugAdapterRegistry.Capability> capabilities, Map<String, Object> initialize,
         DebugAdapterRegistry.Capability capability, String key) {
         if (capabilities.contains(capability) && !Boolean.TRUE.equals(initialize == null ? null : initialize.get(key))) capabilities.remove(capability);
+    }
+
+    private static DataBreakpointInfo dataBreakpointInfo(Object responseBody, String fallbackDescription, DataBreakpointStore.AccessType preferred)
+        throws IOException {
+        Map<String, Object> body = MiniJson.asObject(responseBody);
+        String dataId = body == null ? null : MiniJson.asString(body.get("dataId"));
+        if (dataId == null || dataId.isBlank()) throw new IOException("DAP dataBreakpointInfo response is missing dataId");
+        String description = MiniJson.asString(body.get("description"));
+        if (description == null || description.isBlank()) description = MiniJson.asString(body.get("text"));
+        if (description == null || description.isBlank()) description = fallbackDescription;
+        List<DataBreakpointStore.AccessType> accessTypes = new ArrayList<>();
+        List<Object> supplied = MiniJson.asArray(body.get("accessTypes"));
+        if (supplied == null) {
+            accessTypes.add(DataBreakpointStore.AccessType.READ);
+            accessTypes.add(DataBreakpointStore.AccessType.WRITE);
+            accessTypes.add(DataBreakpointStore.AccessType.READ_WRITE);
+        } else {
+            for (Object value : supplied) {
+                String access = MiniJson.asString(value);
+                if (access == null) throw new IOException("DAP dataBreakpointInfo response contains an invalid access type");
+                try {
+                    DataBreakpointStore.AccessType type = DataBreakpointStore.AccessType.parse(access);
+                    if (!accessTypes.contains(type)) accessTypes.add(type);
+                } catch (IllegalArgumentException error) {
+                    throw new IOException("DAP dataBreakpointInfo response contains an invalid access type", error);
+                }
+            }
+            if (accessTypes.isEmpty()) throw new IOException("DAP dataBreakpointInfo response has no supported access types");
+        }
+        try {
+            return new DataBreakpointInfo(new DataBreakpointStore.Breakpoint(dataId, description,
+                selectDataBreakpointAccess(accessTypes, preferred)).dataId(), description, accessTypes);
+        } catch (IllegalArgumentException error) {
+            throw new IOException("DAP dataBreakpointInfo response is invalid", error);
+        }
+    }
+
+    private static DataBreakpointStore.AccessType selectDataBreakpointAccess(List<DataBreakpointStore.AccessType> accessTypes,
+        DataBreakpointStore.AccessType preferred) {
+        List<DataBreakpointStore.AccessType> available = accessTypes == null ? List.of() : accessTypes;
+        if (preferred != null && available.contains(preferred)) return preferred;
+        if (available.contains(DataBreakpointStore.AccessType.WRITE)) return DataBreakpointStore.AccessType.WRITE;
+        return available.isEmpty() ? DataBreakpointStore.AccessType.WRITE : available.getFirst();
     }
 
     private Result fail(Path root, Session session, String detail, List<String> diagnostics) {
@@ -1280,6 +1460,12 @@ final class DebugSessionService {
         String message = detail == null || detail.isBlank() ? "Debug control failed." : detail;
         session.diagnostics.add(message);
         return new ControlResult(snapshot(root, session), false);
+    }
+    private static DataBreakpointResult dataBreakpointFailure(Path root, Session session, String detail) {
+        String message = detail == null || detail.isBlank() ? "Data breakpoint failed." : detail;
+        session.detail = message;
+        session.diagnostics.add(message);
+        return new DataBreakpointResult(snapshot(root, session), null, false);
     }
     private static RunToCursorResult runToCursorFailure(Path root, Session session, String detail) {
         String message = detail == null || detail.isBlank() ? "Debug run to cursor failed." : detail;

@@ -84,7 +84,11 @@ public class DebugAdapterIntegrationTest {
             assertEquals("3", evaluation.evaluation().result());
             assertEquals("int", evaluation.evaluation().type());
             assertTrue(service.console(workspace).output().contains("[repl] > count + 1"));
-            assertTrue(adapter.commands().containsAll(List.of("variables", "evaluate")));
+            DebugSessionService.VariableMutationResult mutation = service.setVariable(workspace, 55, "count", "9", Duration.ofSeconds(1));
+            assertTrue(mutation.succeeded());
+            assertEquals("9", mutation.mutation().value());
+            assertTrue(service.console(workspace).output().contains("[repl] set count = 9"));
+            assertTrue(adapter.commands().containsAll(List.of("variables", "evaluate", "setVariable")));
         }
     }
 
@@ -141,7 +145,7 @@ public class DebugAdapterIntegrationTest {
     private static DebugAdapterRegistry.Validation validation() {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("debug.adapter.reference.command", "reference-adapter");
-        values.put("debug.adapter.reference.capabilities", "launch,breakpoints,function_breakpoints,configuration_done,threads,stack_trace,scopes,variables,evaluate");
+        values.put("debug.adapter.reference.capabilities", "launch,breakpoints,function_breakpoints,configuration_done,threads,stack_trace,scopes,variables,set_variable,evaluate");
         values.put("debug.configuration.main.adapter", "reference");
         values.put("debug.configuration.main.request", "launch");
         values.put("debug.configuration.main.scope", "workspace");

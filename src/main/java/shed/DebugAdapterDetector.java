@@ -161,7 +161,7 @@ final class DebugAdapterDetector {
             case THREADS -> settings.threads();
             case STACK_TRACE -> settings.stackTrace();
             case SCOPES -> settings.scopes();
-            case VARIABLES -> settings.variables();
+            case VARIABLES, SET_VARIABLE -> settings.variables();
             case EVALUATE -> settings.evaluate();
             case LAUNCH, CONFIGURATION_DONE, CONTINUE, NEXT, STEP_IN, STEP_OUT, PAUSE, GOTO -> true;
         };

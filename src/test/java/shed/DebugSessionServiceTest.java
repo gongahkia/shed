@@ -617,6 +617,31 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void rejectsVariableMutationWhenTheAdapterDoesNotAdvertiseItAtInitialization(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("threads", response("threads", true, Map.of("threads", List.of(Map.of("id", 7, "name", "main"))), ""));
+        connection.responses.put("stackTrace", response("stackTrace", true, Map.of("stackFrames", List.of(Map.of("id", 44, "name", "main"))), ""));
+        connection.responses.put("scopes", response("scopes", true, Map.of("scopes", List.of(Map.of("name", "Locals", "variablesReference", 55))), ""));
+        connection.responses.put("variables", response("variables", true,
+            Map.of("variables", List.of(Map.of("name", "count", "value", "2", "type", "int"))), ""));
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+
+        assertTrue(service.start(workspace, file, validation("launch,threads,stack_trace,scopes,variables,set_variable"), enabled(), "main",
+            Duration.ofSeconds(1), (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+        assertTrue(service.refreshInspection(workspace, Duration.ofSeconds(1)).succeeded());
+
+        DebugSessionService.VariableMutationResult result = service.setVariable(workspace, 55, "count", "9", Duration.ofSeconds(1));
+
+        assertFalse(result.succeeded());
+        assertTrue(result.mutation().message().contains("did not advertise"));
+        assertFalse(connection.commands.contains("setVariable"));
+    }
+
+    @Test
     void leavesPausedInspectionUnavailableWithoutUndeclaredRequests(@TempDir Path tempDir) throws Exception {
         DebugSessionService service = new DebugSessionService();
         Path workspace = tempDir.resolve("workspace");

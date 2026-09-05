@@ -59,7 +59,8 @@ class JobQuickfixControllerTest {
         assertEquals(List.of("cmake", "--preset", "debug local"), JobQuickfixController.cmakePresetArguments("configure", "debug local"));
         assertEquals(List.of("cmake", "--build", "--preset", "debug"), JobQuickfixController.cmakePresetArguments("build", "debug"));
         assertEquals(List.of("ctest", "--preset", "debug"), JobQuickfixController.cmakePresetArguments("test", "debug"));
-        assertThrows(IllegalArgumentException.class, () -> JobQuickfixController.cmakePresetArguments("package", "debug"));
+        assertEquals(List.of("cpack", "--preset", "release package"), JobQuickfixController.cmakePresetArguments("package", "release package"));
+        assertEquals(List.of("cmake", "--workflow", "--preset", "ci"), JobQuickfixController.cmakePresetArguments("workflow", "ci"));
         assertThrows(IllegalArgumentException.class, () -> JobQuickfixController.cmakePresetArguments("build", "debug\nother"));
 
         Path workspace = Files.createDirectories(temporaryDirectory.resolve("presets"));

@@ -2,6 +2,7 @@ package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -147,6 +148,14 @@ class TestServiceTest {
         assertEquals(List.of("ctest", "--test-dir", build.toAbsolutePath().normalize().toString(), "--output-on-failure", "--output-junit",
             root.resolve("cache/ctest.xml").toString(), "-R", "^(unit\\.alpha|unit\\+beta)$"), selected.argv());
         assertEquals(root.resolve("cache/ctest.xml"), selected.reports().getFirst());
+        Files.createDirectories(root.resolve("cache"));
+        Files.writeString(root.resolve("cache/ctest.xml"), """
+            <testsuite><testcase classname="cmake.generated" name="unit.alpha" time="0.02"/></testsuite>
+            """);
+        TestService.TestCase completed = adapter.parseRun(root, selected, "").getFirst();
+        assertEquals("unit.alpha", completed.id());
+        assertEquals(TestService.Status.PASSED, completed.status());
+        assertEquals(20, completed.durationMillis());
     }
 
     @Test
@@ -162,6 +171,24 @@ class TestServiceTest {
 
         assertTrue(loaded.valid());
         assertTrue(loaded.specs().isEmpty());
+    }
+
+    @Test
+    void usesAnExplicitCtestPresetWithoutGuessingOrParsingThePresetFile() throws Exception {
+        Files.writeString(root.resolve("CMakePresets.json"), "{\"version\": 2, \"testPresets\": []}\n");
+        TestService service = new TestService();
+        TestService.LoadResult loaded = service.load(root);
+
+        List<TestService.AdapterSpec> specs = TestService.withCtestPreset(loaded, root, "linux debug");
+        TestAdapter adapter = service.adapter("ctest");
+
+        assertEquals(List.of("ctest"), specs.stream().map(TestService.AdapterSpec::id).toList());
+        assertEquals(List.of("ctest", "--preset", "linux debug"), specs.getFirst().command());
+        assertEquals(List.of("ctest", "--preset", "linux debug", "--show-only=json-v1"), adapter.discovery(specs.getFirst()).argv());
+        assertThrows(IllegalArgumentException.class, () -> TestService.withCtestPreset(loaded, root, "bad\npreset"));
+
+        Files.writeString(root.resolve(TestService.CONFIG_FILE), "schema_version = 1\n\n[[adapter]]\nid = \"ctest\"\n");
+        assertThrows(IllegalArgumentException.class, () -> TestService.withCtestPreset(service.load(root), root, "linux debug"));
     }
 
     @Test

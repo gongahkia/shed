@@ -219,7 +219,8 @@ final class JobQuickfixController {
         if (buffer != null && buffer.hasFilePath()) {
             start = new File(buffer.getFilePath());
         } else {
-            start = new File(".");
+            Path activeWorkspace = editor.workspaceController == null ? null : editor.workspaceController.activeRoot();
+            start = activeWorkspace == null ? new File(".") : activeWorkspace.toFile();
         }
         File root = detectTaskProjectRoot(start);
         if (root == null) {
@@ -801,7 +802,7 @@ final class JobQuickfixController {
         int operationIndex = dryRun ? 2 : 1;
         int presetIndex = dryRun ? 3 : 2;
         if (arguments.size() != presetIndex + 1) {
-            return "Usage: :task cmake [dry-run] <configure|build|test> <preset>";
+            return "Usage: :task cmake [dry-run] <configure|build|test|package|workflow> <preset>";
         }
         if (!hasCmakePresetFile(projectRoot == null ? null : projectRoot.toPath())) {
             return "CMake preset command requires CMakePresets.json or CMakeUserPresets.json at the workspace root";
@@ -823,27 +824,27 @@ final class JobQuickfixController {
 
     static List<String> cmakePresetArguments(String operation, String preset) {
         String normalizedOperation = operation == null ? "" : operation.trim().toLowerCase(Locale.ROOT);
-        if (!"configure".equals(normalizedOperation) && !"build".equals(normalizedOperation) && !"test".equals(normalizedOperation)) {
-            throw new IllegalArgumentException("operation must be configure, build, or test");
+        if (!"configure".equals(normalizedOperation) && !"build".equals(normalizedOperation) && !"test".equals(normalizedOperation)
+            && !"package".equals(normalizedOperation) && !"workflow".equals(normalizedOperation)) {
+            throw new IllegalArgumentException("operation must be configure, build, test, package, or workflow");
         }
-        if (!isSafeCmakePresetName(preset)) throw new IllegalArgumentException("preset name is invalid");
+        if (!CmakePresetSupport.isSafeName(preset)) throw new IllegalArgumentException("preset name is invalid");
         return switch (normalizedOperation) {
             case "configure" -> List.of("cmake", "--preset", preset.trim());
             case "build" -> List.of("cmake", "--build", "--preset", preset.trim());
             case "test" -> List.of("ctest", "--preset", preset.trim());
+            case "package" -> List.of("cpack", "--preset", preset.trim());
+            case "workflow" -> List.of("cmake", "--workflow", "--preset", preset.trim());
             default -> throw new IllegalStateException("unreachable CMake preset operation");
         };
     }
 
     static boolean hasCmakePresetFile(Path root) {
-        if (root == null || !java.nio.file.Files.isDirectory(root)) return false;
-        return java.nio.file.Files.isRegularFile(root.resolve("CMakePresets.json"))
-            || java.nio.file.Files.isRegularFile(root.resolve("CMakeUserPresets.json"));
+        return CmakePresetSupport.hasPresetFile(root);
     }
 
-    private static boolean isSafeCmakePresetName(String name) {
-        if (name == null || name.isBlank() || name.length() > 256) return false;
-        return name.indexOf('\u0000') < 0 && name.indexOf('\n') < 0 && name.indexOf('\r') < 0;
+    static boolean isSafeCmakePresetName(String name) {
+        return CmakePresetSupport.isSafeName(name);
     }
 
     private TaskService.WorkspaceTask directDotnetTask(String name, String operation) {

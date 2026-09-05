@@ -42,6 +42,13 @@ public class LspService {
         }
     }
 
+    public String languageId(String extension, FileType fileType) {
+        if ("ps1".equals(extension) || "psm1".equals(extension) || "psd1".equals(extension)) {
+            return "powershell";
+        }
+        return languageId(fileType);
+    }
+
     public java.util.List<String> getBuiltinExtensions() {
         return java.util.List.of("java", "rs", "py", "js", "jsx", "ts", "tsx", "go", "c", "cc", "cpp", "cxx", "h", "hpp", "hxx",
             "json", "jsonc", "html", "htm", "xhtml", "css", "scss", "less", "md", "markdown", "kt", "kts", "cs", "csx", "php", "phtml",

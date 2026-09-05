@@ -320,7 +320,7 @@ final class TypedSettings {
             return "Live: checked when saving or loading a session";
         }
         if (key.equals("terminal.shell.integration")) {
-            return "Live: applies to newly opened Bash and Zsh terminals";
+            return "Live: applies to newly opened Bash, Zsh, Fish, and PowerShell terminals";
         }
         if (key.startsWith("terminal.font.")) {
             return "Live: used by newly opened terminals";

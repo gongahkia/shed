@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 class BuiltInDebugAdapterSupportTest {
     @Test
-    void contributesAUserInstalledDebugpyProfileForPythonFilesOnly() {
+    void contributesUserInstalledPythonAndGoProfilesForTheirMatchingFilesOnly() {
         DebugAdapterRegistry.Validation validation = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
         Path workspace = Path.of("build/debugpy-profile").toAbsolutePath();
 
@@ -22,6 +22,15 @@ class BuiltInDebugAdapterSupportTest {
             .contains(DebugAdapterRegistry.Capability.EXCEPTION_BREAKPOINTS));
         assertTrue(DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.PYTHON_DEBUGPY, workspace, workspace.resolve("main.py")).launchable());
         assertFalse(DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.PYTHON_DEBUGPY, workspace, workspace.resolve("Main.java")).launchable());
+        DebugAdapterRegistry.Adapter delve = validation.registry().adapter(BuiltInDebugAdapterSupport.GO_DELVE);
+        assertEquals("dlv", delve.command());
+        assertEquals(DebugAdapterRegistry.Transport.TCP, delve.transport());
+        assertEquals(java.util.List.of("dap"), delve.args());
+        assertEquals(java.util.List.of("--listen=127.0.0.1:0"), delve.spawnedTcpStartup().arguments());
+        assertEquals("debug", delve.launchDefaults().get("mode"));
+        assertEquals(java.util.List.of(".go"), validation.configurations().get(BuiltInDebugAdapterSupport.GO_DELVE).fileExtensions());
+        assertTrue(DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.GO_DELVE, workspace, workspace.resolve("main.go")).launchable());
+        assertFalse(DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.GO_DELVE, workspace, workspace.resolve("main.py")).launchable());
     }
 
     @Test

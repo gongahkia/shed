@@ -2007,24 +2007,23 @@ final class LspController {
         }
 
         String command = editor.configManager.getLspCommand(extension);
-        String[] args = editor.configManager.getLspArgs(extension);
         boolean userConfigured = command != null && !command.isBlank();
-        if (command == null || command.isBlank()) {
-            String[] contributed = contributedLspCommand(extension);
-            if (contributed != null && contributed.length == 0) {
-                editor.lspErrors.put(key, "extension language for ." + extension + " does not provide an LSP command");
-                return null;
-            }
-            String[] builtin = contributed == null ? builtinLspCommand(extension) : contributed;
-            if (builtin == null || builtin.length == 0) {
-                editor.lspErrors.put(key, "no server configured for ." + extension);
-                return null;
-            }
-            command = builtin[0];
-            args = java.util.Arrays.copyOfRange(builtin, 1, builtin.length);
-        }
-
         try {
+            String[] args = editor.configManager.getLspArgs(extension);
+            if (command == null || command.isBlank()) {
+                String[] contributed = contributedLspCommand(extension);
+                if (contributed != null && contributed.length == 0) {
+                    editor.lspErrors.put(key, "extension language for ." + extension + " does not provide an LSP command");
+                    return null;
+                }
+                String[] builtin = contributed == null ? builtinLspCommand(extension) : contributed;
+                if (builtin == null || builtin.length == 0) {
+                    editor.lspErrors.put(key, "no server configured for ." + extension);
+                    return null;
+                }
+                command = builtin[0];
+                args = java.util.Arrays.copyOfRange(builtin, 1, builtin.length);
+            }
             List<String> invocation = new ArrayList<>();
             invocation.add(command);
             if (args != null) java.util.Collections.addAll(invocation, args);
@@ -2057,7 +2056,7 @@ final class LspController {
             else remoteLspEndpoints.put(key, remote);
             editor.lspErrors.remove(key);
             return client;
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             remoteLspEndpoints.remove(key);
             editor.lspErrors.put(key, e.getMessage());
             return null;
@@ -2379,9 +2378,10 @@ final class LspController {
 
 
     String languageId(FileBuffer buffer) {
-        ExtensionRegistry.Owned<shed.api.LanguageContribution> contribution = extensionLanguage(bufferExtension(buffer));
+        String extension = bufferExtension(buffer);
+        ExtensionRegistry.Owned<shed.api.LanguageContribution> contribution = extensionLanguage(extension);
         if (contribution != null) return contribution.value().id();
-        return editor.lspService.languageId(buffer.getFileType());
+        return editor.lspService.languageId(extension, buffer.getFileType());
     }
 
 

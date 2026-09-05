@@ -1,6 +1,7 @@
 package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -812,6 +813,26 @@ public class ConfigManagerTest {
         assertTrue(servers.get("py").contains("pyright-langserver"));
         assertTrue(servers.get("py").contains("--stdio"));
         assertEquals("rust-analyzer", servers.get("rs"));
+    }
+
+    @Test
+    void lspArgumentsPreserveQuotedValuesAndExposeMalformedValues() throws IOException {
+        Path home = tempDir.resolve("home-lsp-arguments");
+        Path shedDir = home.resolve(".shed");
+        Files.createDirectories(shedDir);
+        Files.writeString(shedDir.resolve("config.toml"),
+            "schema_version = 1\n"
+            + "\"lsp.ps1.command\" = \"pwsh\"\n"
+            + "\"lsp.ps1.args\" = \"-NoProfile -Command \\\"& '/opt/PowerShell Editor Services/Start-EditorServices.ps1' -Stdio\\\"\"\n");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        assertArrayEquals(new String[] {"-NoProfile", "-Command",
+            "& '/opt/PowerShell Editor Services/Start-EditorServices.ps1' -Stdio"}, config.getLspArgs("ps1"));
+
+        config.set("lsp.ps1.args", "'unterminated");
+        assertThrows(IllegalArgumentException.class, () -> config.getLspArgs("ps1"));
+        assertTrue(config.getConfiguredLspServers().get("ps1").contains("invalid arguments"));
     }
 
     @Test

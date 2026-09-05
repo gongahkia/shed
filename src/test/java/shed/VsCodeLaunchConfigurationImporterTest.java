@@ -51,6 +51,25 @@ class VsCodeLaunchConfigurationImporterTest {
     }
 
     @Test
+    void importsTheBasicVsCodeGoLaunchSubsetIntoTheBuiltInDelveProfile() throws Exception {
+        Path root = Files.createDirectories(temporaryDirectory.resolve("go-workspace"));
+        Path launch = Files.createDirectories(root.resolve(".vscode")).resolve("launch.json");
+        Files.writeString(launch, """
+            {"configurations":[{"name":"Debug Go","type":"go","request":"launch","program":"${file}"}]}
+            """);
+        DebugAdapterRegistry.Validation base = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
+
+        VsCodeLaunchConfigurationImporter.Report report = VsCodeLaunchConfigurationImporter.read(root, base);
+        DebugAdapterRegistry.Validation effective = DebugAdapterRegistry.withExternalConfigurations(base, report.configurations());
+        DebugAdapterRegistry.PlanResult plan = DebugAdapterRegistry.plan(effective, "vscode:Debug Go", root, root.resolve("main.go"));
+
+        assertTrue(report.readable());
+        assertEquals(java.util.List.of("vscode:Debug Go"), report.accepted());
+        assertEquals(BuiltInDebugAdapterSupport.GO_DELVE, plan.plan().adapter().id());
+        assertTrue(plan.launchable());
+    }
+
+    @Test
     void translatesPreLaunchTaskLabelsOnlyWhenTheyResolveToAcceptedProcessTasks() throws Exception {
         Path root = Files.createDirectories(temporaryDirectory.resolve("workspace"));
         Path launch = Files.createDirectories(root.resolve(".vscode")).resolve("launch.json");

@@ -160,7 +160,8 @@ final class DebugSessionService {
             if (name.isBlank()) name = contextualConfiguration(validation, context);
             if (!settings.enabled()) return fail(root, session, "Debugging is disabled by settings", List.of("Set debug.enabled=true before launch."));
             if (validation == null || !validation.valid()) return fail(root, session, "Debug configuration is invalid", validationErrors(validation));
-            if (name.isBlank()) return fail(root, session, "Select a debug configuration before launch", List.of("Use :debug select <name>, or open a .py/.pyw file for the built-in Python profile."));
+            if (name.isBlank()) return fail(root, session, "Select a debug configuration before launch", List.of(
+                "Use :debug select <name>, or open a matching file for an available built-in profile."));
             DebugAdapterRegistry.PlanResult planned = DebugAdapterRegistry.plan(validation, name, root, context);
             if (!planned.launchable()) return fail(root, session, planned.error(), List.of(planned.error()));
             if (session.lifecycle == Lifecycle.RUNNING || session.lifecycle == Lifecycle.STARTING) {
@@ -905,12 +906,13 @@ final class DebugSessionService {
 
     private static String contextualConfiguration(DebugAdapterRegistry.Validation validation, DebugAdapterRegistry.LaunchContext context) {
         if (validation == null || !validation.valid() || context == null || context.activeFile() == null) return "";
-        DebugAdapterRegistry.Configuration python = validation.configurations().get(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY);
-        if (python == null || python.request() != DebugAdapterRegistry.Request.LAUNCH
-            || !BuiltInDebugAdapterSupport.PYTHON_DEBUGPY.equals(python.adapter())) return "";
         String fileName = context.activeFile().getFileName() == null ? "" : context.activeFile().getFileName().toString().toLowerCase(java.util.Locale.ROOT);
-        for (String extension : python.fileExtensions()) {
-            if (extension != null && !extension.isBlank() && fileName.endsWith(extension.toLowerCase(java.util.Locale.ROOT))) return python.name();
+        for (String id : BuiltInDebugAdapterSupport.contextualProfileIds()) {
+            DebugAdapterRegistry.Configuration profile = validation.configurations().get(id);
+            if (profile == null || profile.request() != DebugAdapterRegistry.Request.LAUNCH || !id.equals(profile.adapter())) continue;
+            for (String extension : profile.fileExtensions()) {
+                if (extension != null && !extension.isBlank() && fileName.endsWith(extension.toLowerCase(java.util.Locale.ROOT))) return profile.name();
+            }
         }
         return "";
     }
@@ -1037,6 +1039,9 @@ final class DebugSessionService {
         else throw new IOException("Debug launch target is unavailable");
         arguments.put("cwd", requireAdapterPath(connection, plan.cwd()));
         arguments.put("args", plan.args());
+        for (Map.Entry<String, String> entry : plan.adapter().launchDefaults().entrySet()) {
+            arguments.putIfAbsent(entry.getKey(), entry.getValue());
+        }
         return Map.copyOf(arguments);
     }
 

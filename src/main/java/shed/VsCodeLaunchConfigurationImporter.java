@@ -191,6 +191,9 @@ final class VsCodeLaunchConfigurationImporter {
         if ("python".equalsIgnoreCase(type) || "debugpy".equalsIgnoreCase(type)) {
             if (adapters.containsKey(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY)) return BuiltInDebugAdapterSupport.PYTHON_DEBUGPY;
         }
+        if ("go".equalsIgnoreCase(type) || "delve".equalsIgnoreCase(type)) {
+            if (adapters.containsKey(BuiltInDebugAdapterSupport.GO_DELVE)) return BuiltInDebugAdapterSupport.GO_DELVE;
+        }
         for (String id : adapters.keySet()) if (id.equalsIgnoreCase(type)) return id;
         return null;
     }

@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 final class DebugAdapterTransport implements AutoCloseable {
     enum State { RUNNING, FAILED, CLOSED }
@@ -50,6 +51,8 @@ final class DebugAdapterTransport implements AutoCloseable {
     private static final int MAX_HEADER_BYTES = 16 * 1024;
     private static final int MAX_CONTENT_BYTES = 8 * 1024 * 1024;
     private static final int CONNECT_TIMEOUT_MS = 2_000;
+    private static final int STARTUP_TIMEOUT_MS = 5_000;
+    private static final int MAX_STARTUP_OUTPUT_BYTES = 16 * 1024;
     private static final Duration STOP_TIMEOUT = Duration.ofMillis(250);
     private final InputStream input;
     private final OutputStream output;
@@ -101,6 +104,9 @@ final class DebugAdapterTransport implements AutoCloseable {
         DebugAdapterRegistry.Adapter adapter = plan.adapter();
         boolean terminateDebuggee = plan.configuration().request() == DebugAdapterRegistry.Request.LAUNCH;
         if (adapter.transport() == DebugAdapterRegistry.Transport.TCP) {
+            if (adapter.spawnedTcpStartup() != null) {
+                return startSpawnedTcpAdapter(plan, adapter, listener, diagnosticLog, terminateDebuggee);
+            }
             String host = plan.configuration().host();
             if (!loopback(host) || plan.configuration().port() < 1 || plan.configuration().port() > 65535) {
                 throw new IOException("Debug adapter TCP targets must be loopback with a valid port");
@@ -127,6 +133,100 @@ final class DebugAdapterTransport implements AutoCloseable {
         }
         Process process = new ProcessBuilder(command).directory(plan.cwd().toFile()).start();
         return new DebugAdapterTransport(process.getInputStream(), process.getOutputStream(), process, null, listener, diagnosticLog, terminateDebuggee);
+    }
+
+    private static DebugAdapterTransport startSpawnedTcpAdapter(DebugAdapterRegistry.Plan plan, DebugAdapterRegistry.Adapter adapter,
+        Listener listener, DiagnosticLog diagnosticLog, boolean terminateDebuggee) throws IOException {
+        if (adapter.command().isBlank() || containsControl(adapter.command())) throw new IOException("Debug adapter command is invalid");
+        java.util.List<String> command = new java.util.ArrayList<>();
+        command.add(adapter.command());
+        for (String argument : adapter.args()) {
+            if (argument == null || argument.isBlank() || containsControl(argument)) throw new IOException("Debug adapter argument is invalid");
+            command.add(argument);
+        }
+        command.addAll(adapter.spawnedTcpStartup().arguments());
+        Process process = new ProcessBuilder(command).directory(plan.cwd().toFile()).start();
+        try {
+            SpawnedTcpEndpoint endpoint = awaitSpawnedTcpEndpoint(process, adapter.spawnedTcpStartup());
+            Socket socket = new Socket();
+            try {
+                socket.connect(new InetSocketAddress(InetAddress.getByName(endpoint.host()), endpoint.port()), CONNECT_TIMEOUT_MS);
+                drain(process.getInputStream(), "shed-dap-spawned-stdout");
+                return new DebugAdapterTransport(socket.getInputStream(), socket.getOutputStream(), process, socket, listener, diagnosticLog,
+                    terminateDebuggee);
+            } catch (IOException error) {
+                try { socket.close(); } catch (IOException ignored) { }
+                throw error;
+            }
+        } catch (IOException error) {
+            stop(process);
+            throw error;
+        }
+    }
+
+    record SpawnedTcpEndpoint(String host, int port) { }
+
+    static SpawnedTcpEndpoint spawnedTcpEndpoint(DebugAdapterRegistry.SpawnedTcpStartup startup, String line) throws IOException {
+        if (startup == null || line == null) return null;
+        String candidate = line.strip();
+        if (!candidate.startsWith(startup.readinessPrefix())) return null;
+        String address = candidate.substring(startup.readinessPrefix().length()).trim();
+        int separator = address.lastIndexOf(':');
+        if (separator <= 0 || separator == address.length() - 1) throw new IOException("Spawned debug adapter announced an invalid TCP endpoint");
+        String host = address.substring(0, separator);
+        String rawPort = address.substring(separator + 1);
+        if (!"127.0.0.1".equals(host)) throw new IOException("Spawned debug adapter must listen on 127.0.0.1");
+        try {
+            int port = Integer.parseInt(rawPort);
+            if (port < 1 || port > 65535) throw new NumberFormatException();
+            return new SpawnedTcpEndpoint(host, port);
+        } catch (NumberFormatException error) {
+            throw new IOException("Spawned debug adapter announced an invalid TCP port", error);
+        }
+    }
+
+    private static SpawnedTcpEndpoint awaitSpawnedTcpEndpoint(Process process, DebugAdapterRegistry.SpawnedTcpStartup startup) throws IOException {
+        AtomicReference<SpawnedTcpEndpoint> endpoint = new AtomicReference<>();
+        AtomicReference<IOException> failure = new AtomicReference<>();
+        Thread reader = new Thread(() -> {
+            try {
+                InputStream output = process.getInputStream();
+                StringBuilder line = new StringBuilder();
+                int consumed = 0;
+                while (consumed < MAX_STARTUP_OUTPUT_BYTES) {
+                    int next = output.read();
+                    if (next < 0) throw new IOException("Spawned debug adapter exited before announcing a TCP endpoint");
+                    consumed++;
+                    if (next == '\n') {
+                        SpawnedTcpEndpoint candidate = spawnedTcpEndpoint(startup, line.toString());
+                        if (candidate != null) {
+                            endpoint.set(candidate);
+                            return;
+                        }
+                        line.setLength(0);
+                    } else if (next != '\r') {
+                        if (line.length() >= 1024) throw new IOException("Spawned debug adapter startup output contains an oversized line");
+                        line.append((char) next);
+                    }
+                }
+                throw new IOException("Spawned debug adapter did not announce a TCP endpoint");
+            } catch (IOException error) {
+                failure.set(error);
+            }
+        }, "shed-dap-startup");
+        reader.setDaemon(true);
+        reader.start();
+        try {
+            reader.join(STARTUP_TIMEOUT_MS);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for debug adapter startup", error);
+        }
+        if (reader.isAlive()) throw new IOException("Timed out waiting for debug adapter TCP startup");
+        if (failure.get() != null) throw failure.get();
+        SpawnedTcpEndpoint result = endpoint.get();
+        if (result == null) throw new IOException("Spawned debug adapter did not announce a TCP endpoint");
+        return result;
     }
 
     static DebugAdapterTransport startRemote(DebugAdapterRegistry.Plan plan, List<String> command, DebugFeatureSettings features, Listener listener,
@@ -317,14 +417,18 @@ final class DebugAdapterTransport implements AutoCloseable {
 
     private void startStderrDrain() {
         if (process == null) return;
-        Thread stderr = new Thread(() -> {
-            try (InputStream errors = process.getErrorStream()) {
+        drain(process.getErrorStream(), "shed-dap-stderr");
+    }
+
+    private static void drain(InputStream stream, String threadName) {
+        Thread drain = new Thread(() -> {
+            try (InputStream source = stream) {
                 byte[] buffer = new byte[4_096];
-                while (errors.read(buffer) >= 0) { }
+                while (source.read(buffer) >= 0) { }
             } catch (IOException ignored) { }
-        }, "shed-dap-stderr");
-        stderr.setDaemon(true);
-        stderr.start();
+        }, threadName);
+        drain.setDaemon(true);
+        drain.start();
     }
 
     private void dispatch(Map<String, Object> message) throws IOException {
@@ -397,14 +501,17 @@ final class DebugAdapterTransport implements AutoCloseable {
         if (endpoint != null) {
             try { endpoint.close(); } catch (IOException ignored) { }
         }
-        if (process != null) {
-            process.destroy();
-            try {
-                if (!process.waitFor(STOP_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) process.destroyForcibly();
-            } catch (InterruptedException error) {
-                Thread.currentThread().interrupt();
-                process.destroyForcibly();
-            }
+        stop(process);
+    }
+
+    private static void stop(Process process) {
+        if (process == null) return;
+        process.destroy();
+        try {
+            if (!process.waitFor(STOP_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) process.destroyForcibly();
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            process.destroyForcibly();
         }
     }
 

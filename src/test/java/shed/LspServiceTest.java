@@ -232,6 +232,9 @@ public class LspServiceTest {
         assertEquals("php", service.languageId(FileType.PHP));
         assertEquals("ruby", service.languageId(FileType.RUBY));
         assertEquals("swift", service.languageId(FileType.SWIFT));
+        assertEquals("powershell", service.languageId("ps1", FileType.SHELL));
+        assertEquals("powershell", service.languageId("psm1", FileType.SHELL));
+        assertEquals("text", service.languageId("sh", FileType.SHELL));
         assertEquals(FileType.JAVASCRIPT, FileType.detect(new java.io.File("component.jsx"), ""));
         assertEquals(FileType.TYPESCRIPT, FileType.detect(new java.io.File("component.tsx"), ""));
         assertEquals(FileType.JSON, FileType.detect(new java.io.File("settings.jsonc"), ""));
@@ -239,6 +242,8 @@ public class LspServiceTest {
         assertEquals(FileType.TOML, FileType.detect(new java.io.File("Cargo.toml"), ""));
         assertEquals(FileType.SQL, FileType.detect(new java.io.File("schema.sql"), ""));
         assertEquals(FileType.SHELL, FileType.detect(new java.io.File("deploy"), "#!/usr/bin/env bash"));
+        assertEquals(FileType.SHELL, FileType.detect(new java.io.File("setup.ps1"), ""));
+        assertEquals(FileType.SHELL, FileType.detect(new java.io.File("profile"), "#!/usr/bin/env pwsh"));
         assertEquals(FileType.KOTLIN, FileType.detect(new java.io.File("build.gradle.kts"), ""));
         assertEquals(FileType.CSHARP, FileType.detect(new java.io.File("Program.csx"), ""));
         assertEquals(FileType.PHP, FileType.detect(new java.io.File("index.phtml"), ""));

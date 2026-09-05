@@ -54,6 +54,7 @@ class DevContainerControllerTest {
     void buildsOnlyValidatedDirectArgvTerminalCommands() throws Exception {
         Path workspace = Files.createDirectory(tempDir.resolve("terminal-project"));
 
+        assertEquals(List.of("/bin/sh"), DevContainerRuntime.defaultTerminalCommand());
         assertEquals(List.of("devcontainer", "exec", "--workspace-folder", workspace.toAbsolutePath().normalize().toString(), "zsh", "-l"),
             DevContainerRuntime.terminalInvocation(workspace, List.of("zsh", "-l")));
         assertThrows(java.io.IOException.class, () -> DevContainerRuntime.terminalInvocation(workspace, List.of("zsh\nbad")));

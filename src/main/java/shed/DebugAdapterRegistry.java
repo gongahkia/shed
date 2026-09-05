@@ -15,13 +15,49 @@ final class DebugAdapterRegistry {
         THREADS, STACK_TRACE, SCOPES, VARIABLES, EVALUATE, CONTINUE, NEXT, STEP_IN, STEP_OUT, PAUSE, GOTO }
     enum Request { LAUNCH, ATTACH }
 
-    record Adapter(String id, Transport transport, String command, List<String> args, Set<Capability> capabilities) {
+    /**
+     * Metadata for a built-in adapter that opens its own local loopback TCP
+     * endpoint. User TOML adapters remain connect-only when using TCP.
+     */
+    record SpawnedTcpStartup(List<String> arguments, String readinessPrefix) {
+        SpawnedTcpStartup {
+            List<String> suppliedArguments = arguments == null ? List.of() : arguments;
+            readinessPrefix = readinessPrefix == null ? "" : readinessPrefix.trim();
+            if (suppliedArguments.isEmpty() || readinessPrefix.isEmpty()) throw new IllegalArgumentException("TCP startup metadata is incomplete");
+            for (String argument : suppliedArguments) {
+                if (argument == null || argument.isBlank() || argument.indexOf('\0') >= 0 || argument.indexOf('\n') >= 0 || argument.indexOf('\r') >= 0) {
+                    throw new IllegalArgumentException("TCP startup argument is invalid");
+                }
+            }
+            arguments = List.copyOf(suppliedArguments);
+        }
+    }
+
+    record Adapter(String id, Transport transport, String command, List<String> args, Set<Capability> capabilities,
+        SpawnedTcpStartup spawnedTcpStartup, Map<String, String> launchDefaults) {
         Adapter {
             id = id == null ? "" : id;
             transport = transport == null ? Transport.STDIO : transport;
             command = command == null ? "" : command;
             args = args == null ? List.of() : List.copyOf(args);
             capabilities = capabilities == null ? Set.of() : Set.copyOf(capabilities);
+            Map<String, String> suppliedLaunchDefaults = launchDefaults == null ? Map.of() : launchDefaults;
+            if (spawnedTcpStartup != null && transport != Transport.TCP) {
+                throw new IllegalArgumentException("spawned TCP adapters must use TCP transport");
+            }
+            for (Map.Entry<String, String> entry : suppliedLaunchDefaults.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+                if (key == null || !key.matches("[A-Za-z][A-Za-z0-9_]*") || value == null || value.indexOf('\0') >= 0
+                    || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
+                    throw new IllegalArgumentException("adapter launch default is invalid");
+                }
+            }
+            launchDefaults = Map.copyOf(suppliedLaunchDefaults);
+        }
+
+        Adapter(String id, Transport transport, String command, List<String> args, Set<Capability> capabilities) {
+            this(id, transport, command, args, capabilities, null, Map.of());
         }
 
         boolean supports(Request request) {

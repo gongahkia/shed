@@ -156,13 +156,26 @@ final class DebugSessionService {
         }
     }
 
-    record Snapshot(Path workspace, String configuration, Lifecycle lifecycle, String detail, List<String> diagnostics) {
+    record ProcessInfo(String name, int systemProcessId, Boolean local, String startMethod) {
+        ProcessInfo {
+            name = name == null ? "" : name;
+            if (systemProcessId < 0) systemProcessId = 0;
+            startMethod = startMethod == null ? "" : startMethod;
+        }
+    }
+
+    record Snapshot(Path workspace, String configuration, Lifecycle lifecycle, String detail, List<String> diagnostics, List<ProcessInfo> processes) {
         Snapshot {
             workspace = workspace == null ? null : workspace.toAbsolutePath().normalize();
             configuration = configuration == null ? "" : configuration;
             lifecycle = lifecycle == null ? Lifecycle.IDLE : lifecycle;
             detail = detail == null ? "" : detail;
             diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
+            processes = processes == null ? List.of() : List.copyOf(processes);
+        }
+
+        Snapshot(Path workspace, String configuration, Lifecycle lifecycle, String detail, List<String> diagnostics) {
+            this(workspace, configuration, lifecycle, detail, diagnostics, List.of());
         }
     }
 
@@ -178,6 +191,7 @@ final class DebugSessionService {
         private DebugFeatureSettings features;
         private Set<DebugAdapterRegistry.Capability> runtimeCapabilities = Set.of();
         private List<ExceptionFilter> exceptionFilters = List.of();
+        private final List<ProcessInfo> processes = new ArrayList<>();
         private final DebugInspection inspection = new DebugInspection();
         private final DebugConsole console = new DebugConsole();
         private long generation;
@@ -282,6 +296,7 @@ final class DebugSessionService {
             session.diagnostics.clear();
             session.console.start();
             session.runtimeCapabilities = Set.of();
+            session.processes.clear();
             generation = ++session.generation;
             plan = planned.plan();
         }
@@ -397,6 +412,7 @@ final class DebugSessionService {
         session.plan = null;
         session.features = null;
         session.runtimeCapabilities = Set.of();
+        session.processes.clear();
         session.inspection.invalidated("Debug session stopped.");
         session.console.stopped();
         session.generation++;
@@ -1204,6 +1220,10 @@ final class DebugSessionService {
             String output = body == null ? null : MiniJson.asString(body.get("output"));
             if (output == null) session.diagnostics.add("DAP output event is missing text.");
             else session.console.append(string(body.get("category")), output);
+        } else if ("process".equals(event.event())) {
+            ProcessInfo process = processInfo(MiniJson.asObject(event.body()));
+            if (process == null) session.diagnostics.add("DAP process event is invalid.");
+            else recordProcess(session.processes, process);
         } else if ("continued".equals(event.event()) || "terminated".equals(event.event()) || "exited".equals(event.event())) {
             session.inspection.invalidated("Debug execution " + event.event() + ".");
             if ("terminated".equals(event.event()) || "exited".equals(event.event())) session.console.disconnected("Debug adapter " + event.event() + ".");
@@ -1396,6 +1416,40 @@ final class DebugSessionService {
         if (value == null || value.isEmpty() || value.length() > maximum) return false;
         for (int index = 0; index < value.length(); index++) if (Character.isISOControl(value.charAt(index))) return false;
         return true;
+    }
+
+    private static ProcessInfo processInfo(Map<String, Object> body) {
+        if (body == null) return null;
+        String name = string(body.get("name"));
+        if (!validVariableText(name, 4096)) return null;
+        Object systemProcessIdValue = body.get("systemProcessId");
+        if (systemProcessIdValue != null && !validNonNegativeInteger(systemProcessIdValue)) return null;
+        int systemProcessId = integer(systemProcessIdValue);
+        Object localValue = body.get("isLocalProcess");
+        if (localValue != null && !(localValue instanceof Boolean)) return null;
+        Boolean local = localValue instanceof Boolean value ? value : null;
+        Object startMethodValue = body.get("startMethod");
+        if (startMethodValue != null && !(startMethodValue instanceof String)) return null;
+        String startMethod = string(startMethodValue);
+        if (!startMethod.isBlank() && !Set.of("launch", "attach", "attachForSuspendedLaunch").contains(startMethod)) return null;
+        return new ProcessInfo(name, systemProcessId, local, startMethod);
+    }
+
+    private static void recordProcess(List<ProcessInfo> processes, ProcessInfo process) {
+        for (int index = 0; index < processes.size(); index++) {
+            ProcessInfo existing = processes.get(index);
+            if (process.systemProcessId() > 0 && process.systemProcessId() == existing.systemProcessId()) {
+                processes.set(index, process);
+                return;
+            }
+            if (process.systemProcessId() == 0 && existing.systemProcessId() == 0 && process.name().equals(existing.name())
+                && Objects.equals(process.local(), existing.local()) && process.startMethod().equals(existing.startMethod())) {
+                processes.set(index, process);
+                return;
+            }
+        }
+        if (processes.size() == 32) processes.removeFirst();
+        processes.add(process);
     }
 
     private static BreakpointSynchronization synchronizeBreakpoints(DebugAdapterRegistry.Plan plan, DebugFeatureSettings settings,
@@ -1954,6 +2008,7 @@ final class DebugSessionService {
     private Result fail(Path root, Session session, String detail, List<String> diagnostics) {
         session.connection = null;
         session.runtimeCapabilities = Set.of();
+        session.processes.clear();
         session.lifecycle = Lifecycle.FAILED;
         session.detail = detail == null ? "Debug session failed." : detail;
         if (session.console.snapshot().state() == DebugConsole.State.CONNECTED) session.console.failed(session.detail);
@@ -1963,7 +2018,9 @@ final class DebugSessionService {
 
     private Session session(Path workspace) { return sessions.computeIfAbsent(workspace, ignored -> new Session()); }
     private static Path root(Path workspace) { return (workspace == null ? Path.of(".") : workspace).toAbsolutePath().normalize(); }
-    private static Snapshot snapshot(Path workspace, Session session) { return new Snapshot(workspace, session.configuration, session.lifecycle, session.detail, session.diagnostics); }
+    private static Snapshot snapshot(Path workspace, Session session) {
+        return new Snapshot(workspace, session.configuration, session.lifecycle, session.detail, session.diagnostics, session.processes);
+    }
     private static List<String> validationErrors(DebugAdapterRegistry.Validation validation) {
         return validation == null ? List.of("Debug configuration has not been loaded.") : validation.errors().stream().map(DebugAdapterRegistry.Error::message).toList();
     }

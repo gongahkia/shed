@@ -13,6 +13,7 @@ record LspFeatureSettings(
     boolean codeLens,
     boolean selectionRanges,
     boolean documentLinks,
+    boolean documentColors,
     boolean definition,
     boolean typeDefinition,
     boolean implementation,
@@ -26,7 +27,7 @@ record LspFeatureSettings(
     boolean formatting
 ) {
     static LspFeatureSettings defaults() {
-        return new LspFeatureSettings(true, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true);
+        return new LspFeatureSettings(true, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true);
     }
 
     Map<LspCapability, Boolean> capabilityEnablement() {
@@ -50,6 +51,7 @@ record LspFeatureSettings(
         enabled.put(LspCapability.CODE_LENS, codeLens);
         enabled.put(LspCapability.SELECTION_RANGES, selectionRanges);
         enabled.put(LspCapability.DOCUMENT_LINKS, documentLinks);
+        enabled.put(LspCapability.DOCUMENT_COLORS, documentColors);
         return enabled;
     }
 }

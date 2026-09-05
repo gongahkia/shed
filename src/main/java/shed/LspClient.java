@@ -22,6 +22,7 @@ public class LspClient {
     private static final int MAX_CODE_LENSES = 500;
     private static final int MAX_SELECTION_RANGE_DEPTH = 100;
     private static final int MAX_DOCUMENT_LINKS = 500;
+    private static final int MAX_DOCUMENT_COLORS = 500;
     private static final List<String> STANDARD_SEMANTIC_TOKEN_TYPES = List.of(
         "namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter", "variable",
         "property", "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment",
@@ -240,6 +241,17 @@ public class LspClient {
         public String getTooltip() { return tooltip; }
         public boolean hasTarget() { return !target.isBlank(); }
         Map<String, Object> getResolvePayload() { return resolvePayload; }
+    }
+
+    public record DocumentColor(int startLine, int startCharacter, int endLine, int endCharacter,
+                                double red, double green, double blue, double alpha) {
+        public String hexValue() {
+            return String.format("#%02X%02X%02X%02X", component(red), component(green), component(blue), component(alpha));
+        }
+
+        private static int component(double value) {
+            return (int) Math.round(Math.max(0.0, Math.min(1.0, value)) * 255.0);
+        }
     }
 
     public record DocumentHighlight(int startLine, int startCharacter, int endLine, int endCharacter, int kind) {
@@ -1169,6 +1181,49 @@ public class LspClient {
             MiniJson.asString(link.get("tooltip")), link);
     }
 
+    public List<DocumentColor> documentColors(String uri) {
+        if (!supports(LspCapability.DOCUMENT_COLORS) || uri == null || uri.isBlank()) return List.of();
+        Map<String, Object> response = sendRequest("textDocument/documentColor", Map.of("textDocument", Map.of("uri", uri)), 2500L);
+        return parseDocumentColors(response == null ? null : response.get("result"));
+    }
+
+    static List<DocumentColor> parseDocumentColors(Object value) {
+        List<Object> values = MiniJson.asArray(value);
+        if (values == null || values.isEmpty()) return List.of();
+        List<DocumentColor> colors = new ArrayList<>();
+        for (Object valueItem : values) {
+            if (colors.size() >= MAX_DOCUMENT_COLORS) break;
+            DocumentColor color = parseDocumentColor(MiniJson.asObject(valueItem));
+            if (color != null) colors.add(color);
+        }
+        return List.copyOf(colors);
+    }
+
+    private static DocumentColor parseDocumentColor(Map<String, Object> value) {
+        Map<String, Object> range = MiniJson.asObject(value == null ? null : value.get("range"));
+        Map<String, Object> start = MiniJson.asObject(range == null ? null : range.get("start"));
+        Map<String, Object> end = MiniJson.asObject(range == null ? null : range.get("end"));
+        Map<String, Object> color = MiniJson.asObject(value == null ? null : value.get("color"));
+        Integer startLine = MiniJson.asInt(start == null ? null : start.get("line"));
+        Integer startCharacter = MiniJson.asInt(start == null ? null : start.get("character"));
+        Integer endLine = MiniJson.asInt(end == null ? null : end.get("line"));
+        Integer endCharacter = MiniJson.asInt(end == null ? null : end.get("character"));
+        Double red = normalizedColorComponent(color == null ? null : color.get("red"));
+        Double green = normalizedColorComponent(color == null ? null : color.get("green"));
+        Double blue = normalizedColorComponent(color == null ? null : color.get("blue"));
+        Double alpha = normalizedColorComponent(color == null ? null : color.get("alpha"));
+        if (startLine == null || startCharacter == null || endLine == null || endCharacter == null || startLine < 0 || startCharacter < 0
+            || endLine < 0 || endCharacter < 0 || endLine < startLine || (endLine.equals(startLine) && endCharacter < startCharacter)
+            || red == null || green == null || blue == null || alpha == null) return null;
+        return new DocumentColor(startLine, startCharacter, endLine, endCharacter, red, green, blue, alpha);
+    }
+
+    private static Double normalizedColorComponent(Object value) {
+        if (!(value instanceof Number number)) return null;
+        double component = number.doubleValue();
+        return Double.isFinite(component) && component >= 0.0 && component <= 1.0 ? component : null;
+    }
+
     public Location definition(String uri, int line, int character) {
         if (!supports(LspCapability.DEFINITION)) {
             return null;
@@ -1513,6 +1568,8 @@ public class LspClient {
         Map<String, Object> documentLink = new LinkedHashMap<>();
         documentLink.put("dynamicRegistration", Boolean.FALSE);
         documentLink.put("tooltipSupport", Boolean.TRUE);
+        Map<String, Object> colorProvider = new LinkedHashMap<>();
+        colorProvider.put("dynamicRegistration", Boolean.FALSE);
         Map<String, Object> diagnosticsCapability = new LinkedHashMap<>();
         diagnosticsCapability.put("relatedInformation", Boolean.FALSE);
         Map<String, Object> changeAnnotationSupport = new LinkedHashMap<>();
@@ -1542,6 +1599,7 @@ public class LspClient {
         textDocument.put("codeLens", codeLens);
         textDocument.put("selectionRange", selectionRange);
         textDocument.put("documentLink", documentLink);
+        textDocument.put("colorProvider", colorProvider);
         capabilities.put("textDocument", textDocument);
         capabilities.put("workspace", workspace);
 

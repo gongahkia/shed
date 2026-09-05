@@ -7,6 +7,7 @@ enum LspCapability {
     DEFINITION("definition", "definitionProvider"),
     TYPE_DEFINITION("type definition", "typeDefinitionProvider"),
     IMPLEMENTATION("implementation", "implementationProvider"),
+    DOCUMENT_HIGHLIGHTS("document highlights", "documentHighlightProvider"),
     CALL_HIERARCHY("call hierarchy", "callHierarchyProvider"),
     TYPE_HIERARCHY("type hierarchy", "typeHierarchyProvider"),
     REFERENCES("references", "referencesProvider"),

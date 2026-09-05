@@ -90,7 +90,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|exception list|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -112,6 +112,8 @@ final class DebugSessionController {
             case "stepback", "step-back" -> submitControl(DebugSessionService.Control.STEP_BACK);
             case "restart-frame", "restartframe" -> submitRestartFrame();
             case "goto", "run-to-cursor", "runtocursor" -> runToCursor(args);
+            case "modules", "module" -> modules(args);
+            case "sources", "loaded-sources", "loadedsources" -> loadedSources();
             case "breakpoint", "breakpoints", "bp" -> breakpoint(args);
             case "function", "functions", "function-breakpoint", "function-breakpoints" -> functionBreakpoint(args);
             case "data", "data-breakpoint", "data-breakpoints" -> dataBreakpoint(args);
@@ -793,11 +795,95 @@ final class DebugSessionController {
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase(java.util.Locale.ROOT);
         String filterId = split < 0 ? "" : trimmed.substring(split + 1).trim();
-        if (!"enable".equals(command) && !"disable".equals(command)) return "Usage: :debug exception list|enable <filter>|disable <filter>";
+        if ("details".equals(command) && filterId.isEmpty()) return exceptionDetails();
+        if (!"enable".equals(command) && !"disable".equals(command)) return "Usage: :debug exception list|details|enable <filter>|disable <filter>";
         DebugSessionService.ExceptionFilter filter = sessions.exceptionFilters(workspace()).stream()
             .filter(value -> value.id().equals(filterId)).findFirst().orElse(null);
         if (filter == null) return "Exception breakpoint filter is unavailable; start a compatible debug session and use :debug exception list.";
         return configureExceptionBreakpoint(filter, "enable".equals(command));
+    }
+
+    private String exceptionDetails() {
+        Path workspace = workspace();
+        int jobId = editor.asyncJobService.submit("debug exception details", token -> sessions.exceptionDetails(workspace,
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                refreshDebugPanel();
+                if (error != null || result == null || !result.succeeded()) {
+                    editor.showMessage("Exception details are unavailable; inspect :debug status.");
+                    return;
+                }
+                DebugSessionService.ExceptionDetails details = result.details();
+                StringBuilder output = new StringBuilder("Exception Details\n\nId: ").append(details.exceptionId())
+                    .append("\nBreak mode: ").append(details.breakMode());
+                if (!details.description().isBlank()) output.append("\nDescription: ").append(details.description());
+                if (!details.typeName().isBlank()) output.append("\nType: ").append(details.typeName());
+                if (!details.fullTypeName().isBlank()) output.append("\nFull type: ").append(details.fullTypeName());
+                if (!details.stackTrace().isBlank()) output.append("\n\nStack trace:\n").append(details.stackTrace());
+                editor.showScratchBuffer("[debug exception details]", output.toString());
+                editor.showMessage(result.snapshot().detail());
+            });
+        return "Exception details requested (job " + jobId + ").";
+    }
+
+    private String modules(String argument) {
+        String[] values = argument == null || argument.isBlank() ? new String[0] : argument.trim().split("\\s+");
+        if (values.length > 2) return "Usage: :debug modules [start [count]]";
+        int start = 0;
+        int count = 50;
+        try {
+            if (values.length > 0) start = Integer.parseInt(values[0]);
+            if (values.length > 1) count = Integer.parseInt(values[1]);
+        } catch (NumberFormatException error) {
+            return "Usage: :debug modules [start [count]]";
+        }
+        Path workspace = workspace();
+        int requestedStart = start;
+        int requestedCount = count;
+        int jobId = editor.asyncJobService.submit("debug modules", token -> sessions.modules(workspace, requestedStart, requestedCount,
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                refreshDebugPanel();
+                if (error != null || result == null || !result.succeeded()) {
+                    editor.showMessage("Module inspection failed; inspect :debug status.");
+                    return;
+                }
+                StringBuilder output = new StringBuilder("Loaded Modules\n\n");
+                if (result.modules().isEmpty()) output.append("(none)\n");
+                for (DebugSessionService.ModuleInfo module : result.modules()) {
+                    output.append(module.id()).append("  ").append(module.name());
+                    if (!module.version().isBlank()) output.append("  version=").append(module.version());
+                    if (!module.symbolStatus().isBlank()) output.append("  symbols=").append(module.symbolStatus());
+                    output.append("\n");
+                    if (!module.path().isBlank()) output.append("  ").append(module.path()).append("\n");
+                }
+                editor.showScratchBuffer("[debug modules]", output.toString());
+                editor.showMessage(result.snapshot().detail());
+            });
+        return "Module inspection requested (job " + jobId + ").";
+    }
+
+    private String loadedSources() {
+        Path workspace = workspace();
+        int jobId = editor.asyncJobService.submit("debug loaded sources", token -> sessions.loadedSources(workspace,
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                refreshDebugPanel();
+                if (error != null || result == null || !result.succeeded()) {
+                    editor.showMessage("Loaded-source inspection failed; inspect :debug status.");
+                    return;
+                }
+                StringBuilder output = new StringBuilder("Loaded Sources\n\n");
+                if (result.sources().isEmpty()) output.append("(none)\n");
+                for (DebugSessionService.LoadedSource source : result.sources()) {
+                    output.append(source.name().isBlank() ? "(unnamed)" : source.name());
+                    if (source.sourceReference() > 0) output.append("  reference=").append(source.sourceReference());
+                    if (!source.origin().isBlank()) output.append("  origin=").append(source.origin());
+                    if (!source.presentationHint().isBlank()) output.append("  hint=").append(source.presentationHint());
+                    output.append("\n");
+                    if (!source.path().isBlank()) output.append("  ").append(source.path()).append("\n");
+                }
+                editor.showScratchBuffer("[debug loaded sources]", output.toString());
+                editor.showMessage(result.snapshot().detail());
+            });
+        return "Loaded-source inspection requested (job " + jobId + ").";
     }
 
     private String functionBreakpoint(String argument) {

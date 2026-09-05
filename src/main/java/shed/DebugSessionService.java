@@ -78,6 +78,36 @@ final class DebugSessionService {
         }
     }
     record DataBreakpointResult(Snapshot snapshot, DataBreakpointInfo info, boolean succeeded) { }
+    record ExceptionDetails(String exceptionId, String description, String breakMode, String typeName, String fullTypeName, String stackTrace) {
+        ExceptionDetails {
+            exceptionId = exceptionId == null ? "" : exceptionId;
+            description = description == null ? "" : description;
+            breakMode = breakMode == null ? "" : breakMode;
+            typeName = typeName == null ? "" : typeName;
+            fullTypeName = fullTypeName == null ? "" : fullTypeName;
+            stackTrace = stackTrace == null ? "" : stackTrace;
+        }
+    }
+    record ModuleInfo(String id, String name, String path, String version, String symbolStatus) {
+        ModuleInfo {
+            id = id == null ? "" : id;
+            name = name == null ? "" : name;
+            path = path == null ? "" : path;
+            version = version == null ? "" : version;
+            symbolStatus = symbolStatus == null ? "" : symbolStatus;
+        }
+    }
+    record LoadedSource(String name, String path, int sourceReference, String origin, String presentationHint) {
+        LoadedSource {
+            name = name == null ? "" : name;
+            path = path == null ? "" : path;
+            origin = origin == null ? "" : origin;
+            presentationHint = presentationHint == null ? "" : presentationHint;
+        }
+    }
+    record ExceptionDetailsResult(Snapshot snapshot, ExceptionDetails details, boolean succeeded) { }
+    record ModulesResult(Snapshot snapshot, List<ModuleInfo> modules, boolean succeeded) { }
+    record LoadedSourcesResult(Snapshot snapshot, List<LoadedSource> sources, boolean succeeded) { }
     private record InspectionPayload(List<DebugInspection.ThreadInfo> threads, List<DebugInspection.Frame> frames, int frameId,
         List<DebugInspection.Scope> scopes, List<DebugInspection.Watch> watches, String detail, DebugInspection.State state) { }
 
@@ -454,6 +484,103 @@ final class DebugSessionService {
             synchronized (this) { return dataBreakpointFailure(root, session(root), "Data breakpoint lookup interrupted."); }
         } catch (IllegalArgumentException error) {
             synchronized (this) { return dataBreakpointFailure(root, session(root), "Data breakpoint lookup returned invalid metadata: " + message(error)); }
+        }
+    }
+
+    ExceptionDetailsResult exceptionDetails(Path workspace, Duration timeout) {
+        Path root = root(workspace);
+        Connection connection;
+        DebugInspection.Snapshot inspection;
+        synchronized (this) {
+            Session session = session(root);
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null
+                || !session.plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.EXCEPTION_DETAILS)
+                || !session.runtimeCapabilities.contains(DebugAdapterRegistry.Capability.EXCEPTION_DETAILS)) {
+                return exceptionDetailsFailure(root, session, "Exception details are unavailable for the active adapter.");
+            }
+            inspection = session.inspection.snapshot();
+            if (!inspection.paused() || inspection.threadId() < 1) {
+                return exceptionDetailsFailure(root, session, "Exception details require a paused thread.");
+            }
+            connection = session.connection;
+        }
+        try {
+            Map<String, Object> body = body(connection.request("exceptionInfo", Map.of("threadId", inspection.threadId()), timeout), "exceptionInfo");
+            ExceptionDetails details = exceptionDetails(body);
+            synchronized (this) {
+                Session session = session(root);
+                if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING) {
+                    return new ExceptionDetailsResult(snapshot(root, session), details, false);
+                }
+                session.detail = "Loaded exception details.";
+                return new ExceptionDetailsResult(snapshot(root, session), details, true);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) { return exceptionDetailsFailure(root, session(root), "Exception details failed: " + message(error)); }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) { return exceptionDetailsFailure(root, session(root), "Exception details interrupted."); }
+        }
+    }
+
+    ModulesResult modules(Path workspace, int startModule, int count, Duration timeout) {
+        Path root = root(workspace);
+        Connection connection;
+        synchronized (this) {
+            Session session = session(root);
+            if (startModule < 0 || count < 1 || count > 100) return modulesFailure(root, session, "Module inspection arguments are invalid.");
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null
+                || !session.plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.MODULES)
+                || !session.runtimeCapabilities.contains(DebugAdapterRegistry.Capability.MODULES)) {
+                return modulesFailure(root, session, "Module inspection is unavailable for the active adapter.");
+            }
+            connection = session.connection;
+        }
+        try {
+            Map<String, Object> body = body(connection.request("modules", Map.of("startModule", startModule, "moduleCount", count), timeout), "modules");
+            List<ModuleInfo> modules = modules(body, connection, count);
+            synchronized (this) {
+                Session session = session(root);
+                if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING) return new ModulesResult(snapshot(root, session), modules, false);
+                session.detail = "Loaded " + modules.size() + " module" + (modules.size() == 1 ? "." : "s.");
+                return new ModulesResult(snapshot(root, session), modules, true);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) { return modulesFailure(root, session(root), "Module inspection failed: " + message(error)); }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) { return modulesFailure(root, session(root), "Module inspection interrupted."); }
+        }
+    }
+
+    LoadedSourcesResult loadedSources(Path workspace, Duration timeout) {
+        Path root = root(workspace);
+        Connection connection;
+        synchronized (this) {
+            Session session = session(root);
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null
+                || !session.plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.LOADED_SOURCES)
+                || !session.runtimeCapabilities.contains(DebugAdapterRegistry.Capability.LOADED_SOURCES)) {
+                return loadedSourcesFailure(root, session, "Loaded-source inspection is unavailable for the active adapter.");
+            }
+            connection = session.connection;
+        }
+        try {
+            Map<String, Object> body = body(connection.request("loadedSources", Map.of(), timeout), "loadedSources");
+            List<LoadedSource> sources = loadedSources(body, connection);
+            synchronized (this) {
+                Session session = session(root);
+                if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING) {
+                    return new LoadedSourcesResult(snapshot(root, session), sources, false);
+                }
+                session.detail = "Loaded " + sources.size() + " source" + (sources.size() == 1 ? "." : "s.");
+                return new LoadedSourcesResult(snapshot(root, session), sources, true);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) { return loadedSourcesFailure(root, session(root), "Loaded-source inspection failed: " + message(error)); }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) { return loadedSourcesFailure(root, session(root), "Loaded-source inspection interrupted."); }
         }
     }
 
@@ -1432,6 +1559,9 @@ final class DebugSessionService {
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.REVERSE_CONTINUE, "supportsReverseContinue");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.STEP_BACK, "supportsStepBack");
         retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.RESTART_FRAME, "supportsRestartFrame");
+        retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.EXCEPTION_DETAILS, "supportsExceptionInfoRequest");
+        retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.MODULES, "supportsModulesRequest");
+        retainAdvertised(result, capabilities, DebugAdapterRegistry.Capability.LOADED_SOURCES, "supportsLoadedSourcesRequest");
         return Set.copyOf(result);
     }
 
@@ -1483,6 +1613,63 @@ final class DebugSessionService {
         return available.isEmpty() ? DataBreakpointStore.AccessType.WRITE : available.getFirst();
     }
 
+    private static ExceptionDetails exceptionDetails(Map<String, Object> body) throws IOException {
+        String exceptionId = MiniJson.asString(body == null ? null : body.get("exceptionId"));
+        String breakMode = MiniJson.asString(body == null ? null : body.get("breakMode"));
+        if (exceptionId == null || exceptionId.isBlank() || breakMode == null || breakMode.isBlank()) {
+            throw new IOException("DAP exceptionInfo response is missing exceptionId or breakMode");
+        }
+        Map<String, Object> details = MiniJson.asObject(body.get("details"));
+        return new ExceptionDetails(display(exceptionId, 512), display(MiniJson.asString(body.get("description")), 8 * 1024),
+            display(breakMode, 64), display(MiniJson.asString(details == null ? null : details.get("typeName")), 512),
+            display(MiniJson.asString(details == null ? null : details.get("fullTypeName")), 1024),
+            display(MiniJson.asString(details == null ? null : details.get("stackTrace")), 32 * 1024));
+    }
+
+    private static List<ModuleInfo> modules(Map<String, Object> body, Connection connection, int maximum) throws IOException {
+        List<Object> values = MiniJson.asArray(body == null ? null : body.get("modules"));
+        if (values == null || values.size() > maximum) throw new IOException("DAP modules response is invalid or exceeds the requested count");
+        List<ModuleInfo> result = new ArrayList<>();
+        for (Object value : values) {
+            Map<String, Object> module = MiniJson.asObject(value);
+            if (module == null) throw new IOException("DAP modules response contains an invalid module");
+            String id = display(module.get("id"), 512);
+            String name = display(MiniJson.asString(module.get("name")), 1024);
+            if (id.isBlank() || name.isBlank()) throw new IOException("DAP modules response contains a module without id or name");
+            String path = display(MiniJson.asString(module.get("path")), 8 * 1024);
+            Path local = connection == null ? null : connection.localPath(path);
+            if (local != null) path = local.toString();
+            result.add(new ModuleInfo(id, name, path, display(MiniJson.asString(module.get("version")), 512),
+                display(MiniJson.asString(module.get("symbolStatus")), 512)));
+        }
+        return List.copyOf(result);
+    }
+
+    private static List<LoadedSource> loadedSources(Map<String, Object> body, Connection connection) throws IOException {
+        List<Object> values = MiniJson.asArray(body == null ? null : body.get("sources"));
+        if (values == null || values.size() > 100) throw new IOException("DAP loadedSources response is invalid or too large");
+        List<LoadedSource> result = new ArrayList<>();
+        for (Object value : values) {
+            Map<String, Object> source = MiniJson.asObject(value);
+            if (source == null) throw new IOException("DAP loadedSources response contains an invalid source");
+            String name = display(MiniJson.asString(source.get("name")), 1024);
+            String path = display(MiniJson.asString(source.get("path")), 8 * 1024);
+            int sourceReference = integer(source.get("sourceReference"));
+            if (name.isBlank() && path.isBlank() && sourceReference < 1) throw new IOException("DAP loadedSources response contains an empty source");
+            Path local = connection == null ? null : connection.localPath(path);
+            if (local != null) path = local.toString();
+            result.add(new LoadedSource(name, path, sourceReference, display(MiniJson.asString(source.get("origin")), 512),
+                display(MiniJson.asString(source.get("presentationHint")), 512)));
+        }
+        return List.copyOf(result);
+    }
+
+    private static String display(Object value, int maximum) {
+        String text = value instanceof String string ? string : value instanceof Number || value instanceof Boolean ? String.valueOf(value) : "";
+        if (text.length() > maximum) return text.substring(0, maximum) + "…";
+        return text;
+    }
+
     private Result fail(Path root, Session session, String detail, List<String> diagnostics) {
         session.connection = null;
         session.runtimeCapabilities = Set.of();
@@ -1522,6 +1709,24 @@ final class DebugSessionService {
         session.detail = message;
         session.diagnostics.add(message);
         return new DataBreakpointResult(snapshot(root, session), null, false);
+    }
+    private static ExceptionDetailsResult exceptionDetailsFailure(Path root, Session session, String detail) {
+        String message = detail == null || detail.isBlank() ? "Exception details failed." : detail;
+        session.detail = message;
+        session.diagnostics.add(message);
+        return new ExceptionDetailsResult(snapshot(root, session), null, false);
+    }
+    private static ModulesResult modulesFailure(Path root, Session session, String detail) {
+        String message = detail == null || detail.isBlank() ? "Module inspection failed." : detail;
+        session.detail = message;
+        session.diagnostics.add(message);
+        return new ModulesResult(snapshot(root, session), List.of(), false);
+    }
+    private static LoadedSourcesResult loadedSourcesFailure(Path root, Session session, String detail) {
+        String message = detail == null || detail.isBlank() ? "Loaded-source inspection failed." : detail;
+        session.detail = message;
+        session.diagnostics.add(message);
+        return new LoadedSourcesResult(snapshot(root, session), List.of(), false);
     }
     private static RunToCursorResult runToCursorFailure(Path root, Session session, String detail) {
         String message = detail == null || detail.isBlank() ? "Debug run to cursor failed." : detail;

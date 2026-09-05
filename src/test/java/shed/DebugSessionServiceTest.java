@@ -650,6 +650,46 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void synchronizesInstructionBreakpointsOnlyWhenInitializeAdvertisesSupport(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.cpp");
+        InstructionBreakpointStore store = new InstructionBreakpointStore(tempDir.resolve("state"));
+        store.add(workspace, "module!0x100", 4);
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsInstructionBreakpoints", true), ""));
+        connection.responses.put("setInstructionBreakpoints", response("setInstructionBreakpoints", true,
+            Map.of("breakpoints", List.of(Map.of("verified", true))), ""));
+
+        DebugSessionService.Result result = service.start(workspace, new DebugAdapterRegistry.LaunchContext(file, "", null),
+            validation("launch,instruction_breakpoints"), enabled(), "main", Duration.ofSeconds(1), (plan, features, listener) -> connection,
+            null, null, null, null, store, null);
+
+        assertTrue(result.succeeded());
+        assertEquals(List.of("initialize", "launch", "setInstructionBreakpoints"), connection.commands);
+        assertEquals(List.of(Map.of("instructionReference", "module!0x100", "offset", 4)), connection.arguments.getLast().get("breakpoints"));
+        assertEquals(InstructionBreakpointStore.State.VERIFIED, store.breakpoints(workspace).getFirst().state());
+    }
+
+    @Test
+    void doesNotSynchronizeInstructionBreakpointsWithoutInitializeSupport(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.cpp");
+        InstructionBreakpointStore store = new InstructionBreakpointStore(tempDir.resolve("state"));
+        store.add(workspace, "module!0x100", 0);
+        FakeConnection connection = new FakeConnection();
+
+        DebugSessionService.Result result = service.start(workspace, new DebugAdapterRegistry.LaunchContext(file, "", null),
+            validation("launch,instruction_breakpoints"), enabled(), "main", Duration.ofSeconds(1), (plan, features, listener) -> connection,
+            null, null, null, null, store, null);
+
+        assertTrue(result.succeeded());
+        assertEquals(List.of("initialize", "launch"), connection.commands);
+        assertEquals(InstructionBreakpointStore.State.REQUESTED, store.breakpoints(workspace).getFirst().state());
+    }
+
+    @Test
     void doesNotSynchronizeFunctionBreakpointsWithoutInitializeSupport(@TempDir Path tempDir) throws Exception {
         DebugSessionService service = new DebugSessionService();
         Path workspace = tempDir.resolve("workspace");

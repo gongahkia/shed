@@ -9,7 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Small child-process fixture for the LSP document-highlight integration test. */
+/** Small child-process fixture for LSP request integration tests. */
 public final class ReferenceDocumentHighlightLanguageServer {
     private ReferenceDocumentHighlightLanguageServer() {
     }
@@ -23,9 +23,17 @@ public final class ReferenceDocumentHighlightLanguageServer {
             if (method == null) continue;
             switch (method) {
                 case "initialize" -> respond(System.out, request.get("id"), Map.of(
-                    "capabilities", Map.of("documentHighlightProvider", Boolean.TRUE)
+                    "capabilities", Map.of("documentHighlightProvider", Boolean.TRUE,
+                        "codeLensProvider", Map.of("resolveProvider", Boolean.TRUE),
+                        "executeCommandProvider", Map.of("commands", List.of("test.run")))
                 ));
                 case "textDocument/documentHighlight" -> respond(System.out, request.get("id"), highlights(request));
+                case "textDocument/codeLens" -> respond(System.out, request.get("id"), List.of(Map.of(
+                    "range", Map.of("start", Map.of("line", 4, "character", 2), "end", Map.of("line", 4, "character", 8)),
+                    "data", Map.of("id", "run-test")
+                )));
+                case "codeLens/resolve" -> respond(System.out, request.get("id"), resolvedCodeLens(request));
+                case "workspace/executeCommand" -> respond(System.out, request.get("id"), null);
                 case "shutdown" -> respond(System.out, request.get("id"), null);
                 case "exit" -> {
                     return;
@@ -55,6 +63,15 @@ public final class ReferenceDocumentHighlightLanguageServer {
                 "end", Map.of("line", endLine, "character", endCharacter)
             ),
             "kind", kind
+        );
+    }
+
+    private static Map<String, Object> resolvedCodeLens(Map<String, Object> request) {
+        Map<String, Object> params = MiniJson.asObject(request.get("params"));
+        Map<String, Object> range = MiniJson.asObject(params == null ? null : params.get("range"));
+        return Map.of(
+            "range", range == null ? Map.of("start", Map.of("line", 0, "character", 0), "end", Map.of("line", 0, "character", 0)) : range,
+            "command", Map.of("title", "Run test", "command", "test.run", "arguments", List.of("AppTest"))
         );
     }
 

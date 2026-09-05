@@ -10,6 +10,7 @@ record LspFeatureSettings(
     boolean hover,
     boolean semanticTokens,
     boolean inlayHints,
+    boolean codeLens,
     boolean definition,
     boolean typeDefinition,
     boolean implementation,
@@ -23,7 +24,7 @@ record LspFeatureSettings(
     boolean formatting
 ) {
     static LspFeatureSettings defaults() {
-        return new LspFeatureSettings(true, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true);
+        return new LspFeatureSettings(true, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true);
     }
 
     Map<LspCapability, Boolean> capabilityEnablement() {
@@ -44,6 +45,7 @@ record LspFeatureSettings(
         enabled.put(LspCapability.FORMATTING, formatting);
         enabled.put(LspCapability.SEMANTIC_TOKENS, semanticTokens);
         enabled.put(LspCapability.INLAY_HINTS, inlayHints);
+        enabled.put(LspCapability.CODE_LENS, codeLens);
         return enabled;
     }
 }

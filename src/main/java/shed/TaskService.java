@@ -25,9 +25,13 @@ import java.util.regex.Pattern;
 public class TaskService {
     private static final String TASKS_FILE_NAME = ".shedtasks";
     private static final Pattern TASK_NAME = Pattern.compile("[A-Za-z0-9_-]+");
+    private static final Pattern TASK_INPUT_NAME = Pattern.compile("[A-Za-z][A-Za-z0-9_-]{0,63}");
     private static final Pattern ENVIRONMENT_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final Pattern VARIABLE = Pattern.compile("\\$\\{([^}]+)}");
     private static final int MAX_DEPENDENCIES = 100;
+    private static final int MAX_TASK_INPUTS = 32;
+    private static final int MAX_INPUT_OPTIONS = 100;
+    private static final int MAX_INPUT_VALUE_LENGTH = 256;
 
     enum ShellPolicy {
         LOGIN,
@@ -102,6 +106,23 @@ public class TaskService {
         }
     }
 
+    /** A bounded, task-local value selected explicitly on the command line. */
+    static final class TaskInput {
+        private final String name;
+        private final String defaultValue;
+        private final List<String> options;
+
+        TaskInput(String name, String defaultValue, List<String> options) {
+            this.name = name;
+            this.defaultValue = defaultValue;
+            this.options = Collections.unmodifiableList(new ArrayList<>(options == null ? List.of() : options));
+        }
+
+        String name() { return name; }
+        String defaultValue() { return defaultValue; }
+        List<String> options() { return options; }
+    }
+
     /** The only VS Code task groups Shed can use as an explicit build/test entry point. */
     enum TaskGroup {
         NONE,
@@ -134,18 +155,19 @@ public class TaskService {
         private final boolean defaultGroup;
         private final boolean background;
         private final String readyWhen;
+        private final Map<String, TaskInput> inputs;
         private final TaskDiagnosticTemplate customProblemMatcher;
 
         WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                       ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation) {
-            this(name, command, cwd, environment, shell, problemMatcher, presentation, null, null, false, List.of(), TaskGroup.NONE, false, false, "", null);
+            this(name, command, cwd, environment, shell, problemMatcher, presentation, null, null, false, List.of(), TaskGroup.NONE, false, false, "", Map.of(), null);
         }
 
         private WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                               ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation,
                               List<String> directArguments, List<String> shellArguments, boolean sessionOnly,
                               List<String> dependencies, TaskGroup group, boolean defaultGroup, boolean background, String readyWhen,
-                              TaskDiagnosticTemplate customProblemMatcher) {
+                              Map<String, TaskInput> inputs, TaskDiagnosticTemplate customProblemMatcher) {
             this.name = name;
             this.command = command;
             this.cwd = cwd;
@@ -161,6 +183,7 @@ public class TaskService {
             this.defaultGroup = defaultGroup && this.group != TaskGroup.NONE;
             this.background = background;
             this.readyWhen = readyWhen == null ? "" : readyWhen;
+            this.inputs = Collections.unmodifiableMap(new LinkedHashMap<>(inputs == null ? Map.of() : inputs));
             this.customProblemMatcher = customProblemMatcher;
         }
 
@@ -181,6 +204,7 @@ public class TaskService {
         boolean defaultGroup() { return defaultGroup; }
         boolean background() { return background; }
         String readyWhen() { return readyWhen; }
+        Map<String, TaskInput> inputs() { return inputs; }
         TaskDiagnosticTemplate customProblemMatcher() { return customProblemMatcher; }
     }
 
@@ -205,15 +229,17 @@ public class TaskService {
         private final List<String> processCommand;
         private final File workingDirectory;
         private final Map<String, String> environment;
+        private final Map<String, String> inputValues;
 
         TaskExecutionPlan(WorkspaceTask task, File workspace, String expandedCommand, List<String> processCommand,
-                          File workingDirectory, Map<String, String> environment) {
+                          File workingDirectory, Map<String, String> environment, Map<String, String> inputValues) {
             this.task = task;
             this.workspace = workspace;
             this.expandedCommand = expandedCommand;
             this.processCommand = Collections.unmodifiableList(new ArrayList<>(processCommand));
             this.workingDirectory = workingDirectory;
             this.environment = Collections.unmodifiableMap(new LinkedHashMap<>(environment));
+            this.inputValues = Collections.unmodifiableMap(new LinkedHashMap<>(inputValues));
         }
 
         WorkspaceTask task() { return task; }
@@ -222,19 +248,37 @@ public class TaskService {
         List<String> processCommand() { return processCommand; }
         File workingDirectory() { return workingDirectory; }
         Map<String, String> environment() { return environment; }
+        Map<String, String> inputValues() { return inputValues; }
     }
 
     /** Builds a dependency-first, sequential execution plan without starting any task. */
     List<TaskExecutionPlan> buildExecutionPlans(String taskName, Map<String, WorkspaceTask> tasks,
                                                 File projectRoot, File activeFile) throws IOException {
+        return buildExecutionPlans(taskName, tasks, projectRoot, activeFile, Map.of());
+    }
+
+    List<TaskExecutionPlan> buildExecutionPlans(String taskName, Map<String, WorkspaceTask> tasks,
+                                                File projectRoot, File activeFile, Map<String, String> suppliedInputs) throws IOException {
         if (taskName == null || taskName.isBlank()) throw new IOException("task name required");
         Map<String, WorkspaceTask> available = tasks == null ? Map.of() : tasks;
         List<WorkspaceTask> ordered = new ArrayList<>();
         List<String> path = new ArrayList<>();
         java.util.HashSet<String> completed = new java.util.HashSet<>();
         resolveTaskDependencies(taskName, available, path, completed, ordered);
+        Map<String, String> inputs = validatedInputAssignments(suppliedInputs);
+        java.util.Set<String> declared = new java.util.HashSet<>();
+        for (WorkspaceTask task : ordered) declared.addAll(task.inputs().keySet());
+        for (String name : inputs.keySet()) {
+            if (!declared.contains(name)) throw new IOException("task input is not declared in this task plan: " + name);
+        }
         List<TaskExecutionPlan> plans = new ArrayList<>(ordered.size());
-        for (WorkspaceTask task : ordered) plans.add(buildExecutionPlan(task, projectRoot, activeFile));
+        for (WorkspaceTask task : ordered) {
+            Map<String, String> taskInputs = new LinkedHashMap<>();
+            for (String name : task.inputs().keySet()) {
+                if (inputs.containsKey(name)) taskInputs.put(name, inputs.get(name));
+            }
+            plans.add(buildExecutionPlan(task, projectRoot, activeFile, taskInputs));
+        }
         return List.copyOf(plans);
     }
 
@@ -281,22 +325,28 @@ public class TaskService {
     }
 
     TaskExecutionPlan buildExecutionPlan(WorkspaceTask task, File projectRoot, File activeFile) throws IOException {
+        return buildExecutionPlan(task, projectRoot, activeFile, Map.of());
+    }
+
+    TaskExecutionPlan buildExecutionPlan(WorkspaceTask task, File projectRoot, File activeFile,
+                                         Map<String, String> suppliedInputs) throws IOException {
         if (task == null) throw new IOException("task required");
+        Map<String, String> inputs = resolvedInputValues(task, suppliedInputs);
         File workspace = canonicalDirectory(projectRoot, "workspace directory required");
         String command = task.hasDirectArguments() ? "" : task.hasShellArguments()
-            ? ShellCommand.posixQuotedCommand(expandShellArguments(task.shellArguments(), workspace, activeFile))
-            : expandVariables(task.command(), workspace, activeFile);
+            ? ShellCommand.posixQuotedCommand(expandShellArguments(task.shellArguments(), workspace, activeFile, inputs))
+            : expandVariables(task.command(), workspace, activeFile, inputs);
         if (!task.hasDirectArguments() && !task.hasShellArguments()) validateCommand(command);
-        String cwdValue = expandVariables(task.cwd(), workspace, activeFile);
+        String cwdValue = expandVariables(task.cwd(), workspace, activeFile, inputs);
         File cwd = resolveWorkspaceDirectory(workspace, cwdValue);
         Map<String, String> environment = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : task.environment().entrySet()) {
-            environment.put(entry.getKey(), expandVariables(entry.getValue(), workspace, activeFile));
+            environment.put(entry.getKey(), expandVariables(entry.getValue(), workspace, activeFile, inputs));
         }
         Map<String, String> shellEnvironment = new HashMap<>(System.getenv());
         shellEnvironment.putAll(environment);
         List<String> processCommand = task.hasDirectArguments()
-            ? expandDirectArguments(task.directArguments(), workspace, activeFile)
+            ? expandDirectArguments(task.directArguments(), workspace, activeFile, inputs)
             : task.shell() == ShellPolicy.LOGIN
                 ? ShellCommand.forCommand(command, shellEnvironment, path -> new File(path).canExecute())
                 : task.shell() == ShellPolicy.SHELL
@@ -304,7 +354,7 @@ public class TaskService {
                 : ShellCommand.directCommand(command);
         if (processCommand.isEmpty()) throw new IOException("task command required");
         return new TaskExecutionPlan(task, workspace, task.hasDirectArguments() ? displayDirectCommand(processCommand) : command,
-            processCommand, cwd, environment);
+            processCommand, cwd, environment, inputs);
     }
 
     RemoteCommandRequest buildRemoteCommandRequest(TaskExecutionPlan plan, Path connectionRoot, String executionRoot,
@@ -315,14 +365,15 @@ public class TaskService {
         if (!workingDirectory.startsWith(root)) throw new IOException("task directory is outside the connected workspace");
         String relativeDirectory = root.relativize(workingDirectory).toString().replace(File.separatorChar, '/');
         String remoteCommand = plan.task().hasDirectArguments() ? "" : plan.task().hasShellArguments()
-            ? ShellCommand.posixQuotedCommand(expandRemoteShellArguments(plan.task().shellArguments(), plan.workspace(), activeFile, root, executionRoot))
-            : expandRemoteVariables(plan.task().command(), plan.workspace(), activeFile, root, executionRoot);
+            ? ShellCommand.posixQuotedCommand(expandRemoteShellArguments(plan.task().shellArguments(), plan.workspace(), activeFile, root, executionRoot,
+                plan.inputValues()))
+            : expandRemoteVariables(plan.task().command(), plan.workspace(), activeFile, root, executionRoot, plan.inputValues());
         Map<String, String> environment = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : plan.task().environment().entrySet()) {
-            environment.put(entry.getKey(), expandRemoteVariables(entry.getValue(), plan.workspace(), activeFile, root, executionRoot));
+            environment.put(entry.getKey(), expandRemoteVariables(entry.getValue(), plan.workspace(), activeFile, root, executionRoot, plan.inputValues()));
         }
         List<String> command = plan.task().hasDirectArguments()
-            ? expandRemoteDirectArguments(plan.task().directArguments(), plan.workspace(), activeFile, root, executionRoot)
+            ? expandRemoteDirectArguments(plan.task().directArguments(), plan.workspace(), activeFile, root, executionRoot, plan.inputValues())
             : plan.task().shell() == ShellPolicy.LOGIN ? List.of("sh", "-lc", remoteCommand)
                 : plan.task().shell() == ShellPolicy.SHELL ? List.of("sh", "-c", remoteCommand)
                     : ShellCommand.directCommand(remoteCommand);
@@ -378,6 +429,20 @@ public class TaskService {
                 List<String> keys = new ArrayList<>(task.environment().keySet());
                 Collections.sort(keys);
                 for (String key : keys) lines.add(key + " = " + tomlString(task.environment().get(key)));
+            }
+            if (!task.inputs().isEmpty()) {
+                List<String> inputNames = new ArrayList<>(task.inputs().keySet());
+                Collections.sort(inputNames);
+                for (String inputName : inputNames) {
+                    TaskInput input = task.inputs().get(inputName);
+                    lines.add("");
+                    lines.add("[task." + name + ".input." + inputName + "]");
+                    if (input.defaultValue() != null) lines.add("default = " + tomlString(input.defaultValue()));
+                    if (!input.options().isEmpty()) {
+                        lines.add("options = [" + input.options().stream().map(this::tomlString)
+                            .collect(java.util.stream.Collectors.joining(", ")) + "]");
+                    }
+                }
             }
         }
         Files.write(taskFile.toPath(), lines, StandardCharsets.UTF_8,
@@ -488,7 +553,7 @@ public class TaskService {
         }
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.DIRECT, problemMatcher, presentation,
-            values, null, true, List.of(), TaskGroup.NONE, false, false, "", null);
+            values, null, true, List.of(), TaskGroup.NONE, false, false, "", Map.of(), null);
     }
 
     /**
@@ -505,7 +570,7 @@ public class TaskService {
         Map<String, String> valuesEnvironment = validatedEnvironment(environment);
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.SHELL, problemMatcher, presentation,
-            null, values, true, List.of(), TaskGroup.NONE, false, false, "", null);
+            null, values, true, List.of(), TaskGroup.NONE, false, false, "", Map.of(), null);
     }
 
     /** Creates an ephemeral shell task whose sole command is intentionally raw shell syntax. */
@@ -518,7 +583,7 @@ public class TaskService {
         Map<String, String> valuesEnvironment = validatedEnvironment(environment);
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, command.trim(), cwd, valuesEnvironment, ShellPolicy.SHELL, problemMatcher, presentation,
-            null, null, true, List.of(), TaskGroup.NONE, false, false, "", null);
+            null, null, true, List.of(), TaskGroup.NONE, false, false, "", Map.of(), null);
     }
 
     static WorkspaceTask withDependencies(WorkspaceTask task, List<String> dependencies) {
@@ -526,7 +591,7 @@ public class TaskService {
         List<String> values = validatedDependencies(dependencies);
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
             task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), values, task.group(), task.defaultGroup(), task.background(),
-            task.readyWhen(), task.customProblemMatcher());
+            task.readyWhen(), task.inputs(), task.customProblemMatcher());
     }
 
     static WorkspaceTask withGroup(WorkspaceTask task, TaskGroup group, boolean defaultGroup) {
@@ -534,14 +599,14 @@ public class TaskService {
         if (group == null) throw new IllegalArgumentException("task group required");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
             task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), group, defaultGroup, task.background(),
-            task.readyWhen(), task.customProblemMatcher());
+            task.readyWhen(), task.inputs(), task.customProblemMatcher());
     }
 
     static WorkspaceTask withBackground(WorkspaceTask task, boolean background) {
         if (task == null) throw new IllegalArgumentException("task required");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
             task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(), background,
-            background ? task.readyWhen() : "", task.customProblemMatcher());
+            background ? task.readyWhen() : "", task.inputs(), task.customProblemMatcher());
     }
 
     static WorkspaceTask withReadinessMarker(WorkspaceTask task, String readyWhen) {
@@ -550,7 +615,15 @@ public class TaskService {
         if (!marker.isEmpty() && !task.background()) throw new IllegalArgumentException("ready_when requires background = true");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
             task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(),
-            task.background(), marker, task.customProblemMatcher());
+            task.background(), marker, task.inputs(), task.customProblemMatcher());
+    }
+
+    static WorkspaceTask withInputs(WorkspaceTask task, Map<String, TaskInput> inputs) {
+        if (task == null) throw new IllegalArgumentException("task required");
+        Map<String, TaskInput> values = validatedTaskInputs(inputs);
+        return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(),
+            task.background(), task.readyWhen(), values, task.customProblemMatcher());
     }
 
     static WorkspaceTask withCustomProblemMatcher(WorkspaceTask task, TaskDiagnosticTemplate matcher) {
@@ -558,7 +631,7 @@ public class TaskService {
         if (task.problemMatcher() != ProblemMatcher.CUSTOM) throw new IllegalArgumentException("custom matcher requires problem_matcher = custom");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
             task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(),
-            task.background(), task.readyWhen(), matcher);
+            task.background(), task.readyWhen(), task.inputs(), matcher);
     }
 
     /** A watcher may only be the final plan because it does not complete until explicitly stopped. */
@@ -611,10 +684,12 @@ public class TaskService {
         Map<String, String> environment = environment((TomlTable) environmentValue);
         ProblemMatcher matcher = ProblemMatcher.parse(table.get("problem_matcher"));
         TaskDiagnosticTemplate customMatcher = customProblemMatcher(table, matcher);
+        Map<String, TaskInput> inputs = taskInputs(table);
         WorkspaceTask task = new WorkspaceTask(name, ((String) command).trim(), cwdValue, environment,
             ShellPolicy.parse(table.get("shell")), matcher,
             Presentation.parse(table.get("presentation")));
         task = withReadinessMarker(withBackground(withDependencies(task, dependencies(table)), background(table)), readinessMarker(table));
+        task = withInputs(task, inputs);
         return customMatcher == null ? task : withCustomProblemMatcher(task, customMatcher);
     }
 
@@ -650,6 +725,53 @@ public class TaskService {
         return TaskDiagnosticTemplate.parse((String) value);
     }
 
+    private static Map<String, TaskInput> taskInputs(TomlTable table) {
+        Object value = table.get("input");
+        if (value == null) return Map.of();
+        if (!(value instanceof TomlTable inputs)) throw new IllegalArgumentException("input must be a TOML table");
+        if (inputs.size() > MAX_TASK_INPUTS) throw new IllegalArgumentException("input has more than " + MAX_TASK_INPUTS + " entries");
+        Map<String, TaskInput> result = new LinkedHashMap<>();
+        for (String name : inputs.keySet()) {
+            if (!isValidTaskInputName(name)) throw new IllegalArgumentException("invalid task input name: " + name);
+            Object raw = inputs.get(name);
+            if (!(raw instanceof TomlTable input)) throw new IllegalArgumentException("input." + name + " must be a TOML table");
+            result.put(name, taskInput(name, input));
+        }
+        return validatedTaskInputs(result);
+    }
+
+    private static TaskInput taskInput(String name, TomlTable table) {
+        for (String field : table.keySet()) {
+            if (!"default".equals(field) && !"options".equals(field)) {
+                throw new IllegalArgumentException("unknown field input." + name + "." + field);
+            }
+        }
+        Object defaultValue = table.get("default");
+        if (defaultValue != null && !(defaultValue instanceof String)) throw new IllegalArgumentException("input." + name + ".default must be TOML string");
+        String fallback = defaultValue == null ? null : (String) defaultValue;
+        if (fallback != null) validateTaskInputValue(fallback, "input." + name + ".default");
+        Object optionsValue = table.get("options");
+        List<String> options = new ArrayList<>();
+        if (optionsValue != null) {
+            if (!(optionsValue instanceof TomlArray array)) throw new IllegalArgumentException("input." + name + ".options must be a TOML string array");
+            if (array.size() == 0 || array.size() > MAX_INPUT_OPTIONS) {
+                throw new IllegalArgumentException("input." + name + ".options must contain one to " + MAX_INPUT_OPTIONS + " values");
+            }
+            for (int index = 0; index < array.size(); index++) {
+                Object entry = array.get(index);
+                if (!(entry instanceof String)) throw new IllegalArgumentException("input." + name + ".options must be a TOML string array");
+                String option = (String) entry;
+                validateTaskInputValue(option, "input." + name + ".options");
+                if (options.contains(option)) throw new IllegalArgumentException("input." + name + ".options has duplicate value");
+                options.add(option);
+            }
+        }
+        if (fallback != null && !options.isEmpty() && !options.contains(fallback)) {
+            throw new IllegalArgumentException("input." + name + ".default must be one of its options");
+        }
+        return new TaskInput(name, fallback, options);
+    }
+
     private void validateTask(WorkspaceTask task) {
         if (!isValidTaskName(task.name())) throw new IllegalArgumentException("invalid task name: " + task.name());
         if (task.sessionOnly()) {
@@ -667,6 +789,7 @@ public class TaskService {
         if (task.problemMatcher() != ProblemMatcher.CUSTOM && task.customProblemMatcher() != null) {
             throw new IllegalArgumentException("problem_pattern requires problem_matcher = custom");
         }
+        validatedTaskInputs(task.inputs());
         for (Map.Entry<String, String> entry : task.environment().entrySet()) {
             if (!ENVIRONMENT_NAME.matcher(entry.getKey()).matches()) throw new IllegalArgumentException("invalid env name: " + entry.getKey());
             validateEnvironmentValue(entry.getValue());
@@ -679,10 +802,77 @@ public class TaskService {
             if (!"command".equals(field) && !"cwd".equals(field) && !"env".equals(field)
                 && !"shell".equals(field) && !"problem_matcher".equals(field) && !"presentation".equals(field)
                 && !"depends_on".equals(field) && !"background".equals(field) && !"ready_when".equals(field)
-                && !"problem_pattern".equals(field)) {
+                && !"problem_pattern".equals(field) && !"input".equals(field)) {
                 throw new IllegalArgumentException("unknown field " + field);
             }
         }
+    }
+
+    static Map<String, String> parseInputAssignments(List<String> values, int firstIndex) {
+        if (values == null || firstIndex < 0 || firstIndex > values.size()) throw new IllegalArgumentException("task input assignments required");
+        Map<String, String> result = new LinkedHashMap<>();
+        for (int index = firstIndex; index < values.size(); index++) {
+            String assignment = values.get(index);
+            int separator = assignment == null ? -1 : assignment.indexOf('=');
+            if (separator <= 0) throw new IllegalArgumentException("task input must use name=value: " + assignment);
+            String name = assignment.substring(0, separator);
+            String value = assignment.substring(separator + 1);
+            if (!isValidTaskInputName(name)) throw new IllegalArgumentException("invalid task input name: " + name);
+            validateTaskInputValue(value, "task input " + name);
+            if (result.put(name, value) != null) throw new IllegalArgumentException("duplicate task input: " + name);
+        }
+        return Map.copyOf(result);
+    }
+
+    private static Map<String, String> validatedInputAssignments(Map<String, String> values) throws IOException {
+        Map<String, String> result = new LinkedHashMap<>();
+        if (values == null) return result;
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            String name = entry.getKey();
+            if (!isValidTaskInputName(name)) throw new IOException("invalid task input name: " + name);
+            try {
+                validateTaskInputValue(entry.getValue(), "task input " + name);
+            } catch (IllegalArgumentException error) {
+                throw new IOException(error.getMessage(), error);
+            }
+            if (result.put(name, entry.getValue()) != null) throw new IOException("duplicate task input: " + name);
+        }
+        return result;
+    }
+
+    private static Map<String, TaskInput> validatedTaskInputs(Map<String, TaskInput> values) {
+        Map<String, TaskInput> result = new LinkedHashMap<>();
+        if (values == null) return result;
+        if (values.size() > MAX_TASK_INPUTS) throw new IllegalArgumentException("input has more than " + MAX_TASK_INPUTS + " entries");
+        for (Map.Entry<String, TaskInput> entry : values.entrySet()) {
+            String name = entry.getKey();
+            TaskInput input = entry.getValue();
+            if (!isValidTaskInputName(name) || input == null || !name.equals(input.name())) {
+                throw new IllegalArgumentException("invalid task input: " + name);
+            }
+            if (input.defaultValue() != null) validateTaskInputValue(input.defaultValue(), "input." + name + ".default");
+            if (input.options().size() > MAX_INPUT_OPTIONS) throw new IllegalArgumentException("input." + name + ".options has too many values");
+            for (String option : input.options()) validateTaskInputValue(option, "input." + name + ".options");
+            if (new java.util.HashSet<>(input.options()).size() != input.options().size()) {
+                throw new IllegalArgumentException("input." + name + ".options has duplicate value");
+            }
+            if (input.defaultValue() != null && !input.options().isEmpty() && !input.options().contains(input.defaultValue())) {
+                throw new IllegalArgumentException("input." + name + ".default must be one of its options");
+            }
+            result.put(name, input);
+        }
+        return result;
+    }
+
+    private static boolean isValidTaskInputName(String value) {
+        return value != null && TASK_INPUT_NAME.matcher(value).matches();
+    }
+
+    private static void validateTaskInputValue(String value, String label) {
+        if (value == null || value.isEmpty() || value.length() > MAX_INPUT_VALUE_LENGTH) {
+            throw new IllegalArgumentException(label + " must be a non-empty single-line value of at most " + MAX_INPUT_VALUE_LENGTH + " characters");
+        }
+        validateSingleLine(value, label);
     }
 
     private Map<String, String> environment(TomlTable table) {
@@ -774,7 +964,7 @@ public class TaskService {
         }
     }
 
-    private String expandVariables(String value, File workspace, File activeFile) throws IOException {
+    private String expandVariables(String value, File workspace, File activeFile, Map<String, String> inputValues) throws IOException {
         if (value == null) throw new IOException("task value required");
         java.util.regex.Matcher matcher = VARIABLE.matcher(value);
         StringBuffer expanded = new StringBuffer();
@@ -791,7 +981,7 @@ public class TaskService {
                 case "fileExtname" -> activeFileExtension(activeFile);
                 case "fileDirname" -> activeFileDirectory(activeFile);
                 case "fileDirnameBasename" -> activeFileDirectoryBasename(activeFile);
-                default -> throw new IOException("unsupported task variable: ${" + matcher.group(1) + "}");
+                default -> taskInputVariable(matcher.group(1), inputValues);
             };
             matcher.appendReplacement(expanded, java.util.regex.Matcher.quoteReplacement(replacement));
         }
@@ -799,18 +989,21 @@ public class TaskService {
         return expanded.toString();
     }
 
-    private List<String> expandDirectArguments(List<String> values, File workspace, File activeFile) throws IOException {
-        return expandArguments(values, workspace, activeFile, "direct task argument");
+    private List<String> expandDirectArguments(List<String> values, File workspace, File activeFile,
+                                               Map<String, String> inputValues) throws IOException {
+        return expandArguments(values, workspace, activeFile, inputValues, "direct task argument");
     }
 
-    private List<String> expandShellArguments(List<String> values, File workspace, File activeFile) throws IOException {
-        return expandArguments(values, workspace, activeFile, "shell task argument");
+    private List<String> expandShellArguments(List<String> values, File workspace, File activeFile,
+                                              Map<String, String> inputValues) throws IOException {
+        return expandArguments(values, workspace, activeFile, inputValues, "shell task argument");
     }
 
-    private List<String> expandArguments(List<String> values, File workspace, File activeFile, String label) throws IOException {
+    private List<String> expandArguments(List<String> values, File workspace, File activeFile, Map<String, String> inputValues,
+                                         String label) throws IOException {
         List<String> result = new ArrayList<>();
         for (String value : values) {
-            String expanded = expandVariables(value, workspace, activeFile);
+            String expanded = expandVariables(value, workspace, activeFile, inputValues);
             validateSingleLine(expanded, label);
             result.add(expanded);
         }
@@ -819,20 +1012,20 @@ public class TaskService {
     }
 
     private List<String> expandRemoteDirectArguments(List<String> values, File workspace, File activeFile, Path connectionRoot,
-                                                      String executionRoot) throws IOException {
-        return expandRemoteArguments(values, workspace, activeFile, connectionRoot, executionRoot, "direct task argument");
+                                                      String executionRoot, Map<String, String> inputValues) throws IOException {
+        return expandRemoteArguments(values, workspace, activeFile, connectionRoot, executionRoot, inputValues, "direct task argument");
     }
 
     private List<String> expandRemoteShellArguments(List<String> values, File workspace, File activeFile, Path connectionRoot,
-                                                     String executionRoot) throws IOException {
-        return expandRemoteArguments(values, workspace, activeFile, connectionRoot, executionRoot, "shell task argument");
+                                                     String executionRoot, Map<String, String> inputValues) throws IOException {
+        return expandRemoteArguments(values, workspace, activeFile, connectionRoot, executionRoot, inputValues, "shell task argument");
     }
 
     private List<String> expandRemoteArguments(List<String> values, File workspace, File activeFile, Path connectionRoot,
-                                               String executionRoot, String label) throws IOException {
+                                               String executionRoot, Map<String, String> inputValues, String label) throws IOException {
         List<String> result = new ArrayList<>();
         for (String value : values) {
-            String expanded = expandRemoteVariables(value, workspace, activeFile, connectionRoot, executionRoot);
+            String expanded = expandRemoteVariables(value, workspace, activeFile, connectionRoot, executionRoot, inputValues);
             validateSingleLine(expanded, label);
             result.add(expanded);
         }
@@ -841,7 +1034,7 @@ public class TaskService {
     }
 
     private String expandRemoteVariables(String value, File workspace, File activeFile, Path connectionRoot,
-                                         String executionRoot) throws IOException {
+                                         String executionRoot, Map<String, String> inputValues) throws IOException {
         if (value == null) throw new IOException("task value required");
         Path workspacePath = workspace.toPath().toAbsolutePath().normalize();
         if (!workspacePath.startsWith(connectionRoot)) {
@@ -865,12 +1058,38 @@ public class TaskService {
                 case "fileExtname" -> activeFileExtension(activeFile);
                 case "fileDirname" -> remoteFileDirectory(activeFile, connectionRoot, executionRoot);
                 case "fileDirnameBasename" -> activeFileDirectoryBasename(activeFile);
-                default -> throw new IOException("unsupported task variable: ${" + matcher.group(1) + "}");
+                default -> taskInputVariable(matcher.group(1), inputValues);
             };
             matcher.appendReplacement(expanded, java.util.regex.Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(expanded);
         return expanded.toString();
+    }
+
+    private String taskInputVariable(String variable, Map<String, String> inputValues) throws IOException {
+        if (variable == null || !variable.startsWith("input:")) throw new IOException("unsupported task variable: ${" + variable + "}");
+        String name = variable.substring("input:".length());
+        if (!isValidTaskInputName(name) || inputValues == null || !inputValues.containsKey(name)) {
+            throw new IOException("task input is not declared: " + name);
+        }
+        return inputValues.get(name);
+    }
+
+    private Map<String, String> resolvedInputValues(WorkspaceTask task, Map<String, String> suppliedInputs) throws IOException {
+        Map<String, String> supplied = validatedInputAssignments(suppliedInputs);
+        for (String name : supplied.keySet()) {
+            if (!task.inputs().containsKey(name)) throw new IOException("task input is not declared: " + name);
+        }
+        Map<String, String> result = new LinkedHashMap<>();
+        for (TaskInput input : task.inputs().values()) {
+            String value = supplied.containsKey(input.name()) ? supplied.get(input.name()) : input.defaultValue();
+            if (value == null) throw new IOException("task input is required: " + input.name() + " (use " + input.name() + "=<value>)");
+            if (!input.options().isEmpty() && !input.options().contains(value)) {
+                throw new IOException("task input " + input.name() + " must be one of: " + String.join(", ", input.options()));
+            }
+            result.put(input.name(), value);
+        }
+        return result;
     }
 
     private String remoteFilePath(File activeFile, Path connectionRoot, String executionRoot) throws IOException {

@@ -32,10 +32,29 @@ CI = "true"
 | `background` | `false` | `true` keeps a local watch process running without the normal process timeout until it exits or `:task cancel <job-id>` stops it. It is not available for remote/Dev Container routing; debug prelaunch additionally requires `ready_when`. |
 | `ready_when` | none | A non-empty literal output fragment up to 256 characters; valid only with `background = true`. It marks a local watcher ready for an explicit debug prelaunch after its ordinary prerequisites complete. |
 | `depends_on` | none | one to 100 distinct task names from the same `.shedtasks` file; they are validated, planned, and run once each in declared dependency-first order |
+| `input.<name>` | none | A task-local input table. `name` matches `[A-Za-z][A-Za-z0-9_-]{0,63}`. `default` is an optional non-empty single-line value up to 256 characters; `options` is an optional one-to-100-value string list and constrains both the default and supplied value. |
 
 Before a task process starts, Shed resolves its complete dependency graph. An unknown task, duplicate dependency, cycle, unsafe command, invalid cwd, or background task used as a dependency stops the request before any stage starts. A background task may have ordinary completed prerequisites, but it must be the final stage. `:task dry-run` shows the complete order. Ordinary dependency stages run sequentially. A local background task can serve as a DAP `prelaunch_task` only when `ready_when` is present; Shed waits for that literal marker within the configured process timeout, then leaves the watcher as a separately cancellable task job.
 
-Supported variables in `command`, `cwd`, and environment values are `${workspaceFolder}`, `${workspaceFolderBasename}`, `${file}`, `${fileWorkspaceFolder}`, `${relativeFile}`, `${relativeFileDirname}`, `${fileBasename}`, `${fileBasenameNoExtension}`, `${fileExtname}`, `${fileDirname}`, and `${fileDirnameBasename}`. File variables require a file-backed active buffer and, where relevant, must remain inside the workspace. `${relativeFileDirname}` is `.` when the active file is at the workspace root. Quote `${file}` in a shell command when its path can contain spaces.
+Supported variables in `command`, `cwd`, and environment values are `${workspaceFolder}`, `${workspaceFolderBasename}`, `${file}`, `${fileWorkspaceFolder}`, `${relativeFile}`, `${relativeFileDirname}`, `${fileBasename}`, `${fileBasenameNoExtension}`, `${fileExtname}`, `${fileDirname}`, `${fileDirnameBasename}`, and task-declared `${input:name}` values. File variables require a file-backed active buffer and, where relevant, must remain inside the workspace. `${relativeFileDirname}` is `.` when the active file is at the workspace root. Quote `${file}` in a shell command when its path can contain spaces.
+
+Define a task input as a nested TOML table and supply it explicitly after the task name:
+
+```toml
+[task.deploy]
+command = "./deploy ${input:target}"
+
+[task.deploy.input.target]
+default = "staging"
+options = ["staging", "production"]
+```
+
+```text
+:task run deploy target=production
+:task remote <connection-id> deploy target=production
+```
+
+The same assignments apply to `dry-run` and Dev Container task commands. Defaults are used when an assignment is absent; a task with no default stops before execution and reports the missing input. Debug prelaunch does not prompt, so it likewise requires defaults for all selected task inputs. Input values are resolved before local, remote, or Dev Container process construction and remain bounded single-line data.
 
 ## VS Code task compatibility
 
@@ -43,7 +62,7 @@ Shed reads the same bounded JSONC subset either from a regular, non-symlink `.vs
 
 The accepted subset requires `"version": "2.0.0"` and an explicit `"type": "process"` or, on a POSIX host, `"type": "shell"`. It accepts a string `label` and `command`, up to 256 string `args`, `options.cwd`, string `options.env`, `presentation.reveal` of `always` or `never`, and an absent/empty `problemMatcher` or exactly one `$tsc`, `$eslint-compact`, `$eslint-stylish`, `$msCompile`, `$go`, or `$gcc` built-in matcher (as a string or one-element array). `$go` and `$gcc` use the generic location form. The other accepted names preserve their documented TypeScript, ESLint, or parenthesized Microsoft compiler location forms and carry error/warning severity into Shed's Problems view. It accepts `group` only as `"build"`, `"test"`, or an object with exactly `kind` (`build` or `test`) and optional boolean `isDefault`; only `isDefault: true` participates in the explicit `build`/`test` lookup above. It additionally accepts `dependsOn` as one string or an array of one to 100 distinct labels only when `dependsOrder` is exactly `"sequence"`. Each label must resolve to exactly one accepted task in the same imported source; a missing or ambiguous label rejects the dependent task. The same bounded workspace/file placeholders above are supported. A process command and each argument remain separate argv values through local, remote, and Dev Container routing. For a shell task with arguments, Shed expands each bounded value first, then POSIX-strong-quotes each value into a non-login shell command; spaces, apostrophes, and shell metacharacters therefore remain data. A shell task with no `args` preserves its single `command` as raw shell syntax, matching VS Code's single-command behavior. Shell tasks with `options.shell`, Windows shell semantics, argument quoting objects, or anything outside this subset are rejected rather than guessed.
 
-Shed rejects extension/provider task types, `dependsOn` object forms and default/parallel dependency execution, `isBackground`, automatic `runOn` behavior, VS Code custom/modified/multiple problem matchers, task inputs, terminal grouping/presentation behavior, shell options, OS-specific overrides, and every unlisted field. `$tsc-watch` is rejected because its readiness patterns are not implemented. Native `.shedtasks` custom matching uses only the literal-delimited `problem_pattern` format above; it does not import VS Code regular expressions. Those constructs have execution, lifecycle, platform, or output semantics that this compatibility reader does not reproduce. VS Code supports task providers, parallel dependency graphs, auto-detected tasks, background tasks, and automatic-task policy; this is not `tasks.json` parity. [VS Code tasks](https://code.visualstudio.com/docs/debugtest/tasks), [tasks schema](https://code.visualstudio.com/docs/reference/tasks-appendix).
+Shed rejects extension/provider task types, `dependsOn` object forms and default/parallel dependency execution, `isBackground`, automatic `runOn` behavior, VS Code custom/modified/multiple problem matchers, VS Code task inputs, terminal grouping/presentation behavior, shell options, OS-specific overrides, and every unlisted field. `$tsc-watch` is rejected because its readiness patterns are not implemented. Native `.shedtasks` custom matching uses only the literal-delimited `problem_pattern` format above, and native task inputs use the bounded command-line assignments above; neither imports VS Code regular expressions or interactive-input protocol. Those constructs have execution, lifecycle, platform, or output semantics that this compatibility reader does not reproduce. VS Code supports task providers, parallel dependency graphs, auto-detected tasks, background tasks, and automatic-task policy; this is not `tasks.json` parity. [VS Code tasks](https://code.visualstudio.com/docs/debugtest/tasks), [tasks schema](https://code.visualstudio.com/docs/reference/tasks-appendix).
 
 ## Commands
 
@@ -54,12 +73,12 @@ Shed rejects extension/provider task types, `dependsOn` object forms and default
 | `:task vscode` | Show the runtime-only `.vscode/tasks.json` and imported `.code-workspace` task compatibility report |
 | `:task add <name> <command>` | Add a default login-shell task and write canonical TOML |
 | `:task remove <name>` | Remove a task while preserving other task settings |
-| `:task dry-run <name>` | Resolve every dependency, variable, policy, cwd, and environment key without starting a process |
-| `:task run <name>` | Explicitly start a dependency-first task sequence; uses an active remote execution session or connected Dev Container only when the task root is inside one |
-| `:task remote <connection-id> <name>` | Explicitly run a task through a connected remote workspace that contains this task's project root |
-| `:task remote-dry-run <connection-id> <name>` | Resolve and show the remote command request without starting it |
-| `:task container <name>` | Explicitly run a task through the project Dev Container after it has been started |
-| `:task container-dry-run <name>` | Resolve and show the Dev Container task request without starting it |
+| `:task dry-run <name> [input=value ...]` | Resolve every dependency, variable, policy, cwd, environment key, and declared input without starting a process |
+| `:task run <name> [input=value ...]` | Explicitly start a dependency-first task sequence; uses an active remote execution session or connected Dev Container only when the task root is inside one |
+| `:task remote <connection-id> <name> [input=value ...]` | Explicitly run a task through a connected remote workspace that contains this task's project root |
+| `:task remote-dry-run <connection-id> <name> [input=value ...]` | Resolve and show the remote command request without starting it |
+| `:task container <name> [input=value ...]` | Explicitly run a task through the project Dev Container after it has been started |
+| `:task container-dry-run <name> [input=value ...]` | Resolve and show the Dev Container task request without starting it |
 | `:task cmake [dry-run] <configure\|build\|test\|package\|workflow> <preset>` | Explicitly run one CMake configure, build, test, package, or workflow preset as direct argv |
 | `:task cancel <job-id>` | Cancel a running task; `:jobcancel <job-id>` also works |
 

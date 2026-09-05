@@ -101,7 +101,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|memory <reference> [offset [count]]|disassemble <reference> [offset [count]]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|instruction list|add|enable|disable|remove|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|thread <id>|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|restart-request|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|memory <reference> [offset [count]]|disassemble <reference> [offset [count]]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|instruction list|add|enable|disable|remove|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|thread <id>|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -114,6 +114,7 @@ final class DebugSessionController {
             case "start", "launch", "attach" -> start(args);
             case "stop" -> stop();
             case "restart" -> restart(args);
+            case "restart-request", "adapter-restart" -> submitRestartRequest();
             case "continue", "cont", "c" -> submitControl(DebugSessionService.Control.CONTINUE);
             case "next", "stepover", "step-over" -> submitControl(DebugSessionService.Control.NEXT);
             case "stepin", "step-in" -> submitControl(DebugSessionService.Control.STEP_IN);
@@ -195,6 +196,8 @@ final class DebugSessionController {
     String stopForPanel() { return stop(); }
 
     String restartForPanel() { return restart(""); }
+
+    String restartRequestForPanel() { return submitRestartRequest(); }
 
     String continueForPanel() { return submitControl(DebugSessionService.Control.CONTINUE); }
     String nextForPanel() { return submitControl(DebugSessionService.Control.NEXT); }
@@ -772,6 +775,17 @@ final class DebugSessionController {
                 else editor.showMessage(result.snapshot().detail());
             });
         return "Debug restart frame requested (job " + jobId + ").";
+    }
+
+    private String submitRestartRequest() {
+        Path workspace = workspace();
+        int jobId = editor.asyncJobService.submit("debug restart request", token -> sessions.restartRequest(workspace,
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                refreshDebugPanel();
+                if (error != null || result == null || !result.succeeded()) editor.showMessage("Debug adapter restart failed; inspect :debug status.");
+                else editor.showMessage(result.snapshot().detail());
+            });
+        return "Debug adapter restart requested (job " + jobId + ").";
     }
 
     private String runToCursor(String argument) {

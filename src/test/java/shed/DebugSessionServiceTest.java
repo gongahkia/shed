@@ -299,6 +299,23 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void restartsTheLiveAdapterOnlyWhenItAdvertisesTheStandardRequest() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-restart-request").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsRestartRequest", true), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,restart"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> connection).succeeded());
+
+        assertTrue(service.restartRequest(workspace, Duration.ofSeconds(1)).succeeded());
+        assertEquals("restart", connection.commands.getLast());
+        assertEquals(Map.of(), connection.arguments.getLast());
+        assertTrue(service.snapshot(workspace).detail().contains("restart requested"));
+    }
+
+    @Test
     void loadsStandardExceptionDetailsForThePausedThreadWhenAdvertised() {
         DebugSessionService service = new DebugSessionService();
         Path workspace = Path.of("build/debug-exception-details").toAbsolutePath();

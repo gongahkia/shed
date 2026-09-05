@@ -3,6 +3,8 @@ package shed;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -128,5 +130,40 @@ class JobQuickfixControllerTest {
         assertEquals(0, result.exitCode);
         assertEquals("watcher-ready", result.stdout);
         assertTrue(elapsedMillis >= 650, "an unbounded process must not use the normal 500 ms minimum timeout");
+    }
+
+    @Test
+    void runsIndependentLocalDependencyStagesInParallelWithDeterministicOutput() throws Exception {
+        TaskService.WorkspaceTask first = TaskService.defaultWorkspaceTask("first", "true");
+        TaskService.WorkspaceTask second = TaskService.defaultWorkspaceTask("second", "true");
+        TaskService.WorkspaceTask root = TaskService.withDependencyOrder(
+            TaskService.withDependencies(TaskService.defaultWorkspaceTask("verify", "true"), List.of("first", "second")),
+            TaskService.DependencyOrder.PARALLEL);
+        List<TaskService.TaskExecutionPlan> plans = List.of(
+            taskPlan(first), taskPlan(second), taskPlan(root)
+        );
+        AtomicInteger active = new AtomicInteger();
+        AtomicInteger maximumActive = new AtomicInteger();
+
+        assertTrue(JobQuickfixController.usesParallelDependencyStages(plans));
+        CommandResult result = JobQuickfixController.executeTaskPlans(plans, null, 4096, true, plan -> {
+            int count = active.incrementAndGet();
+            maximumActive.accumulateAndGet(count, Math::max);
+            try {
+                if (!"verify".equals(plan.task().name())) Thread.sleep(150);
+                return new CommandResult(0, plan.task().name(), "");
+            } finally {
+                active.decrementAndGet();
+            }
+        });
+
+        assertEquals(0, result.exitCode);
+        assertEquals(2, maximumActive.get());
+        assertTrue(result.stdout.indexOf("==> task first") < result.stdout.indexOf("==> task second"));
+        assertTrue(result.stdout.indexOf("==> task second") < result.stdout.indexOf("==> task verify"));
+    }
+
+    private TaskService.TaskExecutionPlan taskPlan(TaskService.WorkspaceTask task) {
+        return new TaskService.TaskExecutionPlan(task, temporaryDirectory.toFile(), "true", List.of("true"), temporaryDirectory.toFile(), Map.of(), Map.of());
     }
 }

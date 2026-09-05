@@ -428,6 +428,34 @@ public class TaskServiceTest {
     }
 
     @Test
+    void persistsAnExplicitParallelDependencyOrder() throws IOException {
+        TaskService service = new TaskService();
+        Path project = tempDir.resolve("parallel-task-order");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve(".shedtasks"), """
+            schema_version = 1
+
+            [task.verify]
+            command = "verify"
+            depends_on = ["compile", "lint"]
+            depends_order = "parallel"
+
+            [task.compile]
+            command = "compile"
+
+            [task.lint]
+            command = "lint"
+            """);
+
+        TaskService.TaskLoadResult loaded = service.loadWorkspaceTasks(project.toFile());
+
+        assertTrue(loaded.isValid());
+        assertEquals(TaskService.DependencyOrder.PARALLEL, loaded.tasks().get("verify").dependencyOrder());
+        service.saveWorkspaceTasks(project.toFile(), loaded.tasks());
+        assertTrue(Files.readString(project.resolve(".shedtasks")).contains("depends_order = \"parallel\""));
+    }
+
+    @Test
     void rejectsUnresolvedAndCyclicDependenciesBeforeBuildingAnyPlan() throws IOException {
         TaskService service = new TaskService();
         Path project = tempDir.resolve("dependency-invalid");

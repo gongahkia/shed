@@ -106,6 +106,26 @@ public class TaskService {
         }
     }
 
+    /** Controls whether a requested task's independent dependency stages may run concurrently. */
+    enum DependencyOrder {
+        SEQUENTIAL,
+        PARALLEL;
+
+        static DependencyOrder parse(Object value) {
+            if (value == null) return SEQUENTIAL;
+            if (!(value instanceof String)) throw new IllegalArgumentException("depends_order must be TOML string");
+            return switch (((String) value).trim().toLowerCase(Locale.ROOT)) {
+                case "sequential" -> SEQUENTIAL;
+                case "parallel" -> PARALLEL;
+                default -> throw new IllegalArgumentException("depends_order must be sequential or parallel");
+            };
+        }
+
+        String configValue() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
     /** A bounded, task-local value selected explicitly on the command line. */
     static final class TaskInput {
         private final String name;
@@ -151,6 +171,7 @@ public class TaskService {
         private final List<String> shellArguments;
         private final boolean sessionOnly;
         private final List<String> dependencies;
+        private final DependencyOrder dependencyOrder;
         private final TaskGroup group;
         private final boolean defaultGroup;
         private final boolean background;
@@ -160,13 +181,14 @@ public class TaskService {
 
         WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                       ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation) {
-            this(name, command, cwd, environment, shell, problemMatcher, presentation, null, null, false, List.of(), TaskGroup.NONE, false, false, "", Map.of(), null);
+            this(name, command, cwd, environment, shell, problemMatcher, presentation, null, null, false, List.of(), DependencyOrder.SEQUENTIAL,
+                TaskGroup.NONE, false, false, "", Map.of(), null);
         }
 
         private WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                               ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation,
                               List<String> directArguments, List<String> shellArguments, boolean sessionOnly,
-                              List<String> dependencies, TaskGroup group, boolean defaultGroup, boolean background, String readyWhen,
+                              List<String> dependencies, DependencyOrder dependencyOrder, TaskGroup group, boolean defaultGroup, boolean background, String readyWhen,
                               Map<String, TaskInput> inputs, TaskDiagnosticTemplate customProblemMatcher) {
             this.name = name;
             this.command = command;
@@ -179,6 +201,7 @@ public class TaskService {
             this.shellArguments = shellArguments == null ? null : Collections.unmodifiableList(new ArrayList<>(shellArguments));
             this.sessionOnly = sessionOnly;
             this.dependencies = Collections.unmodifiableList(new ArrayList<>(dependencies == null ? List.of() : dependencies));
+            this.dependencyOrder = dependencyOrder == null ? DependencyOrder.SEQUENTIAL : dependencyOrder;
             this.group = group == null ? TaskGroup.NONE : group;
             this.defaultGroup = defaultGroup && this.group != TaskGroup.NONE;
             this.background = background;
@@ -200,6 +223,7 @@ public class TaskService {
         List<String> shellArguments() { return shellArguments == null ? List.of() : shellArguments; }
         boolean sessionOnly() { return sessionOnly; }
         List<String> dependencies() { return dependencies; }
+        DependencyOrder dependencyOrder() { return dependencyOrder; }
         TaskGroup group() { return group; }
         boolean defaultGroup() { return defaultGroup; }
         boolean background() { return background; }
@@ -423,6 +447,9 @@ public class TaskService {
                 lines.add("depends_on = [" + task.dependencies().stream().map(this::tomlString)
                     .collect(java.util.stream.Collectors.joining(", ")) + "]");
             }
+            if (task.dependencyOrder() != DependencyOrder.SEQUENTIAL) {
+                lines.add("depends_order = " + tomlString(task.dependencyOrder().configValue()));
+            }
             if (!task.environment().isEmpty()) {
                 lines.add("");
                 lines.add("[task." + name + ".env]");
@@ -553,7 +580,7 @@ public class TaskService {
         }
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.DIRECT, problemMatcher, presentation,
-            values, null, true, List.of(), TaskGroup.NONE, false, false, "", Map.of(), null);
+            values, null, true, List.of(), DependencyOrder.SEQUENTIAL, TaskGroup.NONE, false, false, "", Map.of(), null);
     }
 
     /**
@@ -570,7 +597,7 @@ public class TaskService {
         Map<String, String> valuesEnvironment = validatedEnvironment(environment);
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.SHELL, problemMatcher, presentation,
-            null, values, true, List.of(), TaskGroup.NONE, false, false, "", Map.of(), null);
+            null, values, true, List.of(), DependencyOrder.SEQUENTIAL, TaskGroup.NONE, false, false, "", Map.of(), null);
     }
 
     /** Creates an ephemeral shell task whose sole command is intentionally raw shell syntax. */
@@ -583,29 +610,36 @@ public class TaskService {
         Map<String, String> valuesEnvironment = validatedEnvironment(environment);
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, command.trim(), cwd, valuesEnvironment, ShellPolicy.SHELL, problemMatcher, presentation,
-            null, null, true, List.of(), TaskGroup.NONE, false, false, "", Map.of(), null);
+            null, null, true, List.of(), DependencyOrder.SEQUENTIAL, TaskGroup.NONE, false, false, "", Map.of(), null);
     }
 
     static WorkspaceTask withDependencies(WorkspaceTask task, List<String> dependencies) {
         if (task == null) throw new IllegalArgumentException("task required");
         List<String> values = validatedDependencies(dependencies);
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
-            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), values, task.group(), task.defaultGroup(), task.background(),
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), values, task.dependencyOrder(), task.group(), task.defaultGroup(), task.background(),
             task.readyWhen(), task.inputs(), task.customProblemMatcher());
+    }
+
+    static WorkspaceTask withDependencyOrder(WorkspaceTask task, DependencyOrder order) {
+        if (task == null || order == null) throw new IllegalArgumentException("task dependency order is required");
+        return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), order, task.group(), task.defaultGroup(),
+            task.background(), task.readyWhen(), task.inputs(), task.customProblemMatcher());
     }
 
     static WorkspaceTask withGroup(WorkspaceTask task, TaskGroup group, boolean defaultGroup) {
         if (task == null) throw new IllegalArgumentException("task required");
         if (group == null) throw new IllegalArgumentException("task group required");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
-            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), group, defaultGroup, task.background(),
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.dependencyOrder(), group, defaultGroup, task.background(),
             task.readyWhen(), task.inputs(), task.customProblemMatcher());
     }
 
     static WorkspaceTask withBackground(WorkspaceTask task, boolean background) {
         if (task == null) throw new IllegalArgumentException("task required");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
-            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(), background,
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.dependencyOrder(), task.group(), task.defaultGroup(), background,
             background ? task.readyWhen() : "", task.inputs(), task.customProblemMatcher());
     }
 
@@ -614,7 +648,7 @@ public class TaskService {
         String marker = readyWhen == null || readyWhen.isEmpty() ? "" : validatedReadinessMarker(readyWhen);
         if (!marker.isEmpty() && !task.background()) throw new IllegalArgumentException("ready_when requires background = true");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
-            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(),
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.dependencyOrder(), task.group(), task.defaultGroup(),
             task.background(), marker, task.inputs(), task.customProblemMatcher());
     }
 
@@ -622,7 +656,7 @@ public class TaskService {
         if (task == null) throw new IllegalArgumentException("task required");
         Map<String, TaskInput> values = validatedTaskInputs(inputs);
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
-            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(),
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.dependencyOrder(), task.group(), task.defaultGroup(),
             task.background(), task.readyWhen(), values, task.customProblemMatcher());
     }
 
@@ -630,7 +664,7 @@ public class TaskService {
         if (task == null || matcher == null) throw new IllegalArgumentException("custom problem matcher is required");
         if (task.problemMatcher() != ProblemMatcher.CUSTOM) throw new IllegalArgumentException("custom matcher requires problem_matcher = custom");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
-            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(),
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.dependencyOrder(), task.group(), task.defaultGroup(),
             task.background(), task.readyWhen(), task.inputs(), matcher);
     }
 
@@ -685,10 +719,14 @@ public class TaskService {
         ProblemMatcher matcher = ProblemMatcher.parse(table.get("problem_matcher"));
         TaskDiagnosticTemplate customMatcher = customProblemMatcher(table, matcher);
         Map<String, TaskInput> inputs = taskInputs(table);
+        DependencyOrder dependencyOrder = DependencyOrder.parse(table.get("depends_order"));
         WorkspaceTask task = new WorkspaceTask(name, ((String) command).trim(), cwdValue, environment,
             ShellPolicy.parse(table.get("shell")), matcher,
             Presentation.parse(table.get("presentation")));
-        task = withReadinessMarker(withBackground(withDependencies(task, dependencies(table)), background(table)), readinessMarker(table));
+        task = withDependencies(task, dependencies(table));
+        task = withDependencyOrder(task, dependencyOrder);
+        task = withBackground(task, background(table));
+        task = withReadinessMarker(task, readinessMarker(table));
         task = withInputs(task, inputs);
         return customMatcher == null ? task : withCustomProblemMatcher(task, customMatcher);
     }
@@ -780,7 +818,7 @@ public class TaskService {
         validateCommand(task.command());
         if (task.cwd() == null || task.cwd().isBlank()) throw new IllegalArgumentException("cwd must not be empty");
         validateSingleLine(task.cwd(), "cwd");
-        if (task.shell() == null || task.problemMatcher() == null || task.presentation() == null) {
+        if (task.shell() == null || task.problemMatcher() == null || task.presentation() == null || task.dependencyOrder() == null) {
             throw new IllegalArgumentException("task settings required");
         }
         if (task.problemMatcher() == ProblemMatcher.CUSTOM && task.customProblemMatcher() == null) {
@@ -802,7 +840,7 @@ public class TaskService {
             if (!"command".equals(field) && !"cwd".equals(field) && !"env".equals(field)
                 && !"shell".equals(field) && !"problem_matcher".equals(field) && !"presentation".equals(field)
                 && !"depends_on".equals(field) && !"background".equals(field) && !"ready_when".equals(field)
-                && !"problem_pattern".equals(field) && !"input".equals(field)) {
+                && !"problem_pattern".equals(field) && !"input".equals(field) && !"depends_order".equals(field)) {
                 throw new IllegalArgumentException("unknown field " + field);
             }
         }

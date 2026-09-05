@@ -537,7 +537,8 @@ final class JobQuickfixController {
             }
             try {
                 if (plans.size() > 1) {
-                    CommandResult prerequisites = runLocalTaskPlans(plans.subList(0, plans.size() - 1), token);
+                    CommandResult prerequisites = runLocalTaskPlans(plans.subList(0, plans.size() - 1), token,
+                        task.dependencyOrder() == TaskService.DependencyOrder.PARALLEL);
                     if (prerequisites.exitCode != 0) {
                         String detail = taskOutput(prerequisites);
                         return new DebugSessionService.PreLaunchResult(false, List.of("Debug pre-launch prerequisite failed"
@@ -985,36 +986,94 @@ final class JobQuickfixController {
     }
 
     private CommandResult runLocalTaskPlans(List<TaskService.TaskExecutionPlan> plans, AsyncJobService.JobToken token) throws Exception {
-        return runTaskPlans(plans, token, plan -> runExternalCommand(plan.processCommand(), plan.workingDirectory(), null, token,
+        return runLocalTaskPlans(plans, token, usesParallelDependencyStages(plans));
+    }
+
+    private CommandResult runLocalTaskPlans(List<TaskService.TaskExecutionPlan> plans, AsyncJobService.JobToken token,
+                                            boolean parallelDependencies) throws Exception {
+        return runTaskPlans(plans, token, parallelDependencies, plan -> runExternalCommand(plan.processCommand(), plan.workingDirectory(), null, token,
             plan.task().background() ? 0 : editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true,
             plan.environment()));
     }
 
     private CommandResult runTaskPlans(List<TaskService.TaskExecutionPlan> plans, AsyncJobService.JobToken token,
                                        TaskPlanRunner runner) throws Exception {
+        return runTaskPlans(plans, token, false, runner);
+    }
+
+    private CommandResult runTaskPlans(List<TaskService.TaskExecutionPlan> plans, AsyncJobService.JobToken token,
+                                       boolean parallelDependencies, TaskPlanRunner runner) throws Exception {
+        return executeTaskPlans(plans, token, editor.configManager.getProcessOutputMaxBytes(), parallelDependencies, runner);
+    }
+
+    static CommandResult executeTaskPlans(List<TaskService.TaskExecutionPlan> plans, AsyncJobService.JobToken token, int outputLimit,
+                                          boolean parallelDependencies, TaskPlanRunner runner) throws Exception {
         if (plans == null || plans.isEmpty()) return new CommandResult(-1, "", "Task execution plan is empty");
-        int limit = Math.max(1024, editor.configManager.getProcessOutputMaxBytes());
+        if (runner == null) return new CommandResult(-1, "", "Task execution runner is unavailable");
+        int limit = Math.max(1024, outputLimit);
         byte[] truncationMarker = "[shed: task sequence output truncated]\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         int contentLimit = Math.max(0, limit - truncationMarker.length);
         java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
         boolean[] truncated = new boolean[] {false};
-        for (TaskService.TaskExecutionPlan plan : plans) {
+        List<TaskService.TaskExecutionPlan> remaining = new ArrayList<>(plans);
+        Set<String> completed = new HashSet<>();
+        while (!remaining.isEmpty()) {
             if (token != null && token.isCancelled()) return new CommandResult(-1, output.toString(java.nio.charset.StandardCharsets.UTF_8), "Task cancelled");
-            appendTaskOutput(output, "==> task " + plan.task().name() + "\n", contentLimit, truncated);
-            CommandResult result = runner.run(plan);
-            String stageOutput = taskOutput(result);
-            if (!stageOutput.isBlank()) appendTaskOutput(output, stageOutput + "\n", contentLimit, truncated);
-            if (result.exitCode != 0) {
-                String detail = result.stderr == null || result.stderr.isBlank() ? "Task '" + plan.task().name() + "' failed" : result.stderr;
-                if (truncated[0]) output.writeBytes(truncationMarker);
-                return new CommandResult(result.exitCode, output.toString(java.nio.charset.StandardCharsets.UTF_8), detail);
+            List<TaskService.TaskExecutionPlan> stage = new ArrayList<>();
+            for (TaskService.TaskExecutionPlan plan : remaining) {
+                if (completed.containsAll(plan.task().dependencies())) {
+                    stage.add(plan);
+                    if (!parallelDependencies) break;
+                }
+            }
+            if (stage.isEmpty()) return new CommandResult(-1, output.toString(java.nio.charset.StandardCharsets.UTF_8), "Task dependency plan is invalid");
+            List<CommandResult> results = runTaskStage(stage, runner);
+            for (int index = 0; index < stage.size(); index++) {
+                TaskService.TaskExecutionPlan plan = stage.get(index);
+                CommandResult result = results.get(index);
+                appendTaskOutput(output, "==> task " + plan.task().name() + "\n", contentLimit, truncated);
+                String stageOutput = taskOutput(result);
+                if (!stageOutput.isBlank()) appendTaskOutput(output, stageOutput + "\n", contentLimit, truncated);
+                if (result.exitCode != 0) {
+                    String detail = result.stderr == null || result.stderr.isBlank() ? "Task '" + plan.task().name() + "' failed" : result.stderr;
+                    if (truncated[0]) output.writeBytes(truncationMarker);
+                    return new CommandResult(result.exitCode, output.toString(java.nio.charset.StandardCharsets.UTF_8), detail);
+                }
+            }
+            for (TaskService.TaskExecutionPlan plan : stage) {
+                completed.add(plan.task().name());
+                remaining.remove(plan);
             }
         }
         if (truncated[0]) output.writeBytes(truncationMarker);
         return new CommandResult(0, output.toString(java.nio.charset.StandardCharsets.UTF_8), "");
     }
 
-    private void appendTaskOutput(java.io.ByteArrayOutputStream output, String value, int limit, boolean[] truncated) {
+    static boolean usesParallelDependencyStages(List<TaskService.TaskExecutionPlan> plans) {
+        return plans != null && plans.size() > 1
+            && plans.getLast().task().dependencyOrder() == TaskService.DependencyOrder.PARALLEL;
+    }
+
+    private static List<CommandResult> runTaskStage(List<TaskService.TaskExecutionPlan> stage, TaskPlanRunner runner) throws Exception {
+        if (stage.size() == 1) return List.of(runner.run(stage.getFirst()));
+        try (java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            List<java.util.concurrent.Future<CommandResult>> futures = new ArrayList<>();
+            for (TaskService.TaskExecutionPlan plan : stage) futures.add(executor.submit(() -> runner.run(plan)));
+            List<CommandResult> results = new ArrayList<>();
+            for (java.util.concurrent.Future<CommandResult> future : futures) {
+                try {
+                    results.add(future.get());
+                } catch (java.util.concurrent.ExecutionException error) {
+                    Throwable cause = error.getCause();
+                    if (cause instanceof Exception exception) throw exception;
+                    throw new Exception(cause);
+                }
+            }
+            return List.copyOf(results);
+        }
+    }
+
+    private static void appendTaskOutput(java.io.ByteArrayOutputStream output, String value, int limit, boolean[] truncated) {
         if (output == null || value == null || value.isEmpty() || truncated == null || truncated.length == 0 || truncated[0]) return;
         byte[] bytes = value.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         int remaining = limit - output.size();
@@ -1028,7 +1087,7 @@ final class JobQuickfixController {
     }
 
     @FunctionalInterface
-    private interface TaskPlanRunner {
+    interface TaskPlanRunner {
         CommandResult run(TaskService.TaskExecutionPlan plan) throws Exception;
     }
 
@@ -1056,7 +1115,10 @@ final class JobQuickfixController {
             output.append("   shell: ").append(plan.task().shell().configValue()).append("\n");
             output.append("   cwd: ").append(plan.workingDirectory().getAbsolutePath()).append("\n");
         }
-        output.append("\nTasks run in this exact order; this dry run starts nothing.\n");
+        boolean parallel = plans.getLast().task().dependencyOrder() == TaskService.DependencyOrder.PARALLEL;
+        output.append(parallel
+            ? "\nIndependent local dependency stages run concurrently; this dry run starts nothing.\n"
+            : "\nTasks run in this exact order; this dry run starts nothing.\n");
         editor.showScratchBuffer("[task dry-run " + plans.get(plans.size() - 1).task().name() + "]", output.toString());
         return "Task dependency dry run shown (not started)";
     }
@@ -1339,7 +1401,7 @@ final class JobQuickfixController {
     }
 
 
-    String taskOutput(CommandResult result) {
+    static String taskOutput(CommandResult result) {
         String stdout = result.stdout == null ? "" : result.stdout.stripTrailing();
         String stderr = result.stderr == null ? "" : result.stderr.stripTrailing();
         if (stderr.isEmpty() || stderr.equals(stdout)) return stdout;

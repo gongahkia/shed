@@ -1,5 +1,8 @@
 package shed;
 
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -83,5 +86,31 @@ final class BuiltInDebugAdapterSupport {
         return DebugAdapterRegistry.withAdapterDefaults(base, Map.of(PYTHON_DEBUGPY, debugpy, GO_DELVE, delve, CSHARP_NETCOREDBG, netcoredbg,
             NATIVE_LLDB, lldb, NATIVE_GDB, gdb),
             Map.of(PYTHON_DEBUGPY, python, PYTHON_DEBUGPY_PYTEST, pytest, PYTHON_DEBUGPY_UNITTEST, unittest, GO_DELVE, go, GO_DELVE_TEST, goTest));
+    }
+
+    /** Uses a conventional project debugpy installation only for Shed's own default adapter. */
+    static DebugAdapterRegistry.Validation effective(DebugAdapterRegistry.Validation base, Path workspace) {
+        boolean contributedPythonAdapter = base == null || base.registry().adapter(PYTHON_DEBUGPY) == null;
+        DebugAdapterRegistry.Validation result = effective(base);
+        if (!contributedPythonAdapter) return result;
+        Path launcher = localDebugpyAdapter(workspace);
+        if (launcher == null) return result;
+        DebugAdapterRegistry.Adapter defaultAdapter = result.registry().adapter(PYTHON_DEBUGPY);
+        DebugAdapterRegistry.Adapter localAdapter = new DebugAdapterRegistry.Adapter(defaultAdapter.id(), defaultAdapter.transport(), launcher.toString(),
+            defaultAdapter.args(), defaultAdapter.capabilities(), defaultAdapter.spawnedTcpStartup(), defaultAdapter.launchDefaults());
+        return DebugAdapterRegistry.withAdapterReplacement(result, localAdapter);
+    }
+
+    private static Path localDebugpyAdapter(Path workspace) {
+        if (workspace == null) return null;
+        Path root = workspace.toAbsolutePath().normalize();
+        Path unix = root.resolve(".venv/bin/debugpy-adapter");
+        if (localExecutable(unix)) return unix;
+        Path windows = root.resolve(".venv/Scripts/debugpy-adapter.exe");
+        return localExecutable(windows) ? windows : null;
+    }
+
+    private static boolean localExecutable(Path path) {
+        return Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) && Files.isExecutable(path);
     }
 }

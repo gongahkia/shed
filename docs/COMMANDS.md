@@ -288,6 +288,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:lsp codelens [index]`, `:lsp code-lens [index]` | List current-document CodeLens commands; an explicit index executes one resolved lens only when the server advertises command execution |
 | `:lsp selection`, `:lsp selection expand` | Expand the active selection to the next larger LSP selection range at the caret |
 | `:lsp links [index]`, `:lsp documentlinks [index]` | List current-document links; an explicit index opens a resolved local-file, HTTP(S), or mail link |
+| `:lsp colors`, `:lsp documentcolors` | List current-document LSP colors as RGBA hex values without editing the buffer |
 | `:lsp format` | Apply server formatting edits to the current document when supported |
 | `:format`, `:fmt` | Format with the current extension's selected formatter policy |
 | `:formatter`, `:formatpolicy` | Edit the current extension's formatter mode, direct command, args, and format-on-save policy |

@@ -76,7 +76,7 @@ public class LspServiceTest {
     @Test
     void recognizesServerAdvertisedSymbolCapabilities() {
         Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
-            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true},\"selectionRangeProvider\":true,\"documentLinkProvider\":{\"resolveProvider\":true}}}}"
+            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true},\"selectionRangeProvider\":true,\"documentLinkProvider\":{\"resolveProvider\":true},\"colorProvider\":true}}}}"
         ));
 
         LspCapabilityModel model = LspCapabilityModel.fromInitializeResult(response, LspFeatureSettings.defaults().capabilityEnablement());
@@ -86,6 +86,7 @@ public class LspServiceTest {
         assertTrue(model.allows(LspCapability.CODE_LENS));
         assertTrue(model.allows(LspCapability.SELECTION_RANGES));
         assertTrue(model.allows(LspCapability.DOCUMENT_LINKS));
+        assertTrue(model.allows(LspCapability.DOCUMENT_COLORS));
         assertTrue(LspClient.parseCodeLensResolveSupport(response));
         assertTrue(LspClient.parseDocumentLinkResolveSupport(response));
     }
@@ -193,6 +194,24 @@ public class LspServiceTest {
             assertEquals(1, links.size());
             assertEquals("https://example.test/guide", links.getFirst().getTarget());
             assertEquals("Open guide", links.getFirst().getTooltip());
+        } finally {
+            client.stop();
+        }
+    }
+
+    @Test
+    void requestsDocumentColorsFromAnAdvertisedLanguageServer() throws Exception {
+        Path workspace = Files.createTempDirectory("shed-lsp-document-color-");
+        Path java = Path.of(System.getProperty("java.home"), "bin", javaExecutable());
+        Assumptions.assumeTrue(Files.isExecutable(java), "Java runtime executable is unavailable");
+        String uri = workspace.resolve("Main.java").toUri().toString();
+        LspClient client = new LspClient(List.of(java.toString(), "-cp", System.getProperty("java.class.path"),
+            ReferenceDocumentHighlightLanguageServer.class.getName()), workspace, workspace.toUri().toString(), LspFeatureSettings.defaults());
+        try {
+            assertTrue(client.supports(LspCapability.DOCUMENT_COLORS));
+            List<LspClient.DocumentColor> colors = client.documentColors(uri);
+            assertEquals(List.of(new LspClient.DocumentColor(8, 4, 8, 11, 0.2, 0.4, 0.6, 1.0)), colors);
+            assertEquals("#336699FF", colors.getFirst().hexValue());
         } finally {
             client.stop();
         }
@@ -317,6 +336,18 @@ public class LspServiceTest {
         assertEquals(1, links.getFirst().getStartLine());
         assertEquals("file:///project/README.md", links.getFirst().getTarget());
         assertEquals("Open README", links.getFirst().getTooltip());
+    }
+
+    @Test
+    void parsesNormalizedDocumentColorsOnly() {
+        List<LspClient.DocumentColor> colors = LspClient.parseDocumentColors(MiniJson.parse("["
+            + "{\"range\":{\"start\":{\"line\":2,\"character\":1},\"end\":{\"line\":2,\"character\":8}},"
+            + "\"color\":{\"red\":0.1,\"green\":0.2,\"blue\":0.3,\"alpha\":0.5}},"
+            + "{\"range\":{\"start\":{\"line\":4,\"character\":0},\"end\":{\"line\":4,\"character\":1}},"
+            + "\"color\":{\"red\":1.1,\"green\":0,\"blue\":0,\"alpha\":1}}]"));
+
+        assertEquals(List.of(new LspClient.DocumentColor(2, 1, 2, 8, 0.1, 0.2, 0.3, 0.5)), colors);
+        assertEquals("#1A334D80", colors.getFirst().hexValue());
     }
 
     @Test

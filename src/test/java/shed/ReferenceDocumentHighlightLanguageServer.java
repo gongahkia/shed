@@ -27,6 +27,7 @@ public final class ReferenceDocumentHighlightLanguageServer {
                         "codeLensProvider", Map.of("resolveProvider", Boolean.TRUE),
                         "selectionRangeProvider", Boolean.TRUE,
                         "documentLinkProvider", Map.of("resolveProvider", Boolean.TRUE),
+                        "colorProvider", Boolean.TRUE,
                         "executeCommandProvider", Map.of("commands", List.of("test.run")))
                 ));
                 case "textDocument/documentHighlight" -> respond(System.out, request.get("id"), highlights(request));
@@ -41,6 +42,7 @@ public final class ReferenceDocumentHighlightLanguageServer {
                     "data", Map.of("id", "guide")
                 )));
                 case "documentLink/resolve" -> respond(System.out, request.get("id"), resolvedDocumentLink(request));
+                case "textDocument/documentColor" -> respond(System.out, request.get("id"), List.of(documentColor()));
                 case "workspace/executeCommand" -> respond(System.out, request.get("id"), null);
                 case "shutdown" -> respond(System.out, request.get("id"), null);
                 case "exit" -> {
@@ -100,6 +102,13 @@ public final class ReferenceDocumentHighlightLanguageServer {
             "range", range == null ? Map.of("start", Map.of("line", 0, "character", 0), "end", Map.of("line", 0, "character", 0)) : range,
             "target", "https://example.test/guide",
             "tooltip", "Open guide"
+        );
+    }
+
+    private static Map<String, Object> documentColor() {
+        return Map.of(
+            "range", Map.of("start", Map.of("line", 8, "character", 4), "end", Map.of("line", 8, "character", 11)),
+            "color", Map.of("red", 0.2, "green", 0.4, "blue", 0.6, "alpha", 1.0)
         );
     }
 

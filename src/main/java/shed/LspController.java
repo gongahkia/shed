@@ -113,7 +113,7 @@ final class LspController {
         flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|links [index]|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|links [index]|colors|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -158,6 +158,10 @@ final class LspController {
             case "documentlinks":
             case "document-links":
                 return lspDocumentLinks(args);
+            case "colors":
+            case "documentcolors":
+            case "document-colors":
+                return lspDocumentColors();
             case "format":
                 return lspFormat();
             case "peek":
@@ -817,6 +821,30 @@ final class LspController {
         } catch (IOException | URISyntaxException | IllegalArgumentException error) {
             return "Document link failed: " + error.getMessage();
         }
+    }
+
+    public String lspDocumentColors() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP document colors require a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        String unavailable = capabilityUnavailable(client, LspCapability.DOCUMENT_COLORS);
+        if (unavailable != null) return unavailable;
+        syncLspOpen(buffer);
+        flushPendingLspChange(buffer);
+        String uri = bufferUri(buffer);
+        Integer version = editor.lspDocumentVersions.get(uri);
+        List<LspClient.DocumentColor> colors = client.documentColors(uri);
+        if (!Objects.equals(version, editor.lspDocumentVersions.get(uri))) return "Document colors became stale; refresh again";
+        StringBuilder text = new StringBuilder("LSP Document Colors\n\n");
+        for (LspClient.DocumentColor color : colors) {
+            text.append(color.startLine() + 1).append(":").append(color.startCharacter() + 1)
+                .append("–").append(color.endLine() + 1).append(":").append(color.endCharacter() + 1)
+                .append("  ").append(color.hexValue()).append('\n');
+        }
+        if (colors.isEmpty()) text.append("No document colors\n");
+        editor.showScratchBuffer("[lsp document colors]", text.toString());
+        return "Showing " + colors.size() + " document color" + (colors.size() == 1 ? "" : "s");
     }
 
     public String lspFormat() {

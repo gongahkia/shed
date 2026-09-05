@@ -19,6 +19,7 @@ enum LspCapability {
     CODE_LENS("code lenses", "codeLensProvider"),
     SELECTION_RANGES("selection ranges", "selectionRangeProvider"),
     DOCUMENT_LINKS("document links", "documentLinkProvider"),
+    DOCUMENT_COLORS("document colors", "colorProvider"),
     DOCUMENT_SYMBOLS("document symbols", "documentSymbolProvider"),
     WORKSPACE_SYMBOLS("workspace symbols", "workspaceSymbolProvider"),
     EXECUTE_COMMAND("command execution", "executeCommandProvider");

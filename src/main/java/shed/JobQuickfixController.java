@@ -170,45 +170,54 @@ final class JobQuickfixController {
                 return removeProjectTask(projectRoot, args.get(1));
             case "run":
                 if (args.size() < 2) {
-                    return "Usage: :task run <name>";
+                    return "Usage: :task run <name> [input=value ...]";
                 }
-                return runLoadedTask(args.get(1), projectRoot, tasks, false);
+                return runTaskWithInputs(args, 2, inputs -> runLoadedTask(args.get(1), projectRoot, tasks, false, inputs));
             case "dry-run":
             case "dryrun":
                 if (args.size() < 2) {
-                    return "Usage: :task dry-run <name>";
+                    return "Usage: :task dry-run <name> [input=value ...]";
                 }
-                return runLoadedTask(args.get(1), projectRoot, tasks, true);
+                return runTaskWithInputs(args, 2, inputs -> runLoadedTask(args.get(1), projectRoot, tasks, true, inputs));
             case "remote":
             case "run-remote":
                 if (args.size() < 3) {
-                    return "Usage: :task remote <connection-id> <name>";
+                    return "Usage: :task remote <connection-id> <name> [input=value ...]";
                 }
-                return runRemoteTask(args.get(1), args.get(2), projectRoot, tasks, false);
+                return runTaskWithInputs(args, 3, inputs -> runRemoteTask(args.get(1), args.get(2), projectRoot, tasks, false, inputs));
             case "remote-dry-run":
                 if (args.size() < 3) {
-                    return "Usage: :task remote-dry-run <connection-id> <name>";
+                    return "Usage: :task remote-dry-run <connection-id> <name> [input=value ...]";
                 }
-                return runRemoteTask(args.get(1), args.get(2), projectRoot, tasks, true);
+                return runTaskWithInputs(args, 3, inputs -> runRemoteTask(args.get(1), args.get(2), projectRoot, tasks, true, inputs));
             case "container":
             case "devcontainer":
                 if (args.size() < 2) {
-                    return "Usage: :task container <name>";
+                    return "Usage: :task container <name> [input=value ...]";
                 }
-                return runContainerTask(args.get(1), projectRoot, tasks, false);
+                return runTaskWithInputs(args, 2, inputs -> runContainerTask(args.get(1), projectRoot, tasks, false, inputs));
             case "container-dry-run":
             case "devcontainer-dry-run":
                 if (args.size() < 2) {
-                    return "Usage: :task container-dry-run <name>";
+                    return "Usage: :task container-dry-run <name> [input=value ...]";
                 }
-                return runContainerTask(args.get(1), projectRoot, tasks, true);
+                return runTaskWithInputs(args, 2, inputs -> runContainerTask(args.get(1), projectRoot, tasks, true, inputs));
             case "cancel":
                 if (args.size() < 2) {
                     return "Usage: :task cancel <job-id>";
                 }
                 return cancelTaskJob(args.get(1));
             default:
-                return "Usage: :task run <name> (use :task list)";
+                return "Usage: :task run <name> [input=value ...] (use :task list)";
+        }
+    }
+
+    private String runTaskWithInputs(List<String> arguments, int firstInput,
+                                     java.util.function.Function<Map<String, String>, String> runner) {
+        try {
+            return runner.apply(TaskService.parseInputAssignments(arguments, firstInput));
+        } catch (IllegalArgumentException error) {
+            return "Task input invalid: " + error.getMessage();
         }
     }
 
@@ -441,6 +450,11 @@ final class JobQuickfixController {
 
 
     String runLoadedTask(String taskName, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun) {
+        return runLoadedTask(taskName, projectRoot, tasks, dryRun, Map.of());
+    }
+
+    String runLoadedTask(String taskName, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun,
+                         Map<String, String> inputValues) {
         String normalizedName = taskName == null ? "" : taskName.trim();
         if (normalizedName.isEmpty()) return "Task name required";
         TaskService.WorkspaceTask task = resolveTask(normalizedName, projectRoot, tasks);
@@ -450,7 +464,7 @@ final class JobQuickfixController {
         File activeFile = activeTaskFile();
         List<TaskService.TaskExecutionPlan> plans;
         try {
-            plans = taskExecutionPlans(normalizedName, task, tasks, projectRoot, activeFile);
+            plans = taskExecutionPlans(normalizedName, task, tasks, projectRoot, activeFile, inputValues);
         } catch (IOException | IllegalArgumentException error) {
             return "Task validation failed: " + error.getMessage();
         }
@@ -606,7 +620,7 @@ final class JobQuickfixController {
     }
 
     private String runRemoteTask(String connectionId, String taskName, File projectRoot,
-                                 Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun) {
+                                 Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun, Map<String, String> inputValues) {
         String normalizedName = taskName == null ? "" : taskName.trim();
         if (normalizedName.isEmpty()) return "Task name required";
         TaskService.WorkspaceTask task = resolveTask(normalizedName, projectRoot, tasks);
@@ -614,7 +628,7 @@ final class JobQuickfixController {
         File activeFile = activeTaskFile();
         List<TaskService.TaskExecutionPlan> plans;
         try {
-            plans = taskExecutionPlans(normalizedName, task, tasks, projectRoot, activeFile);
+            plans = taskExecutionPlans(normalizedName, task, tasks, projectRoot, activeFile, inputValues);
         } catch (IOException | IllegalArgumentException error) {
             return "Task validation failed: " + error.getMessage();
         }
@@ -656,7 +670,7 @@ final class JobQuickfixController {
     }
 
     private String runContainerTask(String taskName, File projectRoot,
-                                    Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun) {
+                                    Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun, Map<String, String> inputValues) {
         String normalizedName = taskName == null ? "" : taskName.trim();
         if (normalizedName.isEmpty()) return "Task name required";
         if (!new File(projectRoot, ".devcontainer/devcontainer.json").isFile()) {
@@ -667,7 +681,7 @@ final class JobQuickfixController {
         File activeFile = activeTaskFile();
         List<TaskService.TaskExecutionPlan> plans;
         try {
-            plans = taskExecutionPlans(normalizedName, task, tasks, projectRoot, activeFile);
+            plans = taskExecutionPlans(normalizedName, task, tasks, projectRoot, activeFile, inputValues);
         } catch (IOException | IllegalArgumentException error) {
             return "Task validation failed: " + error.getMessage();
         }
@@ -917,9 +931,16 @@ final class JobQuickfixController {
     private List<TaskService.TaskExecutionPlan> taskExecutionPlans(String taskName, TaskService.WorkspaceTask task,
                                                                     Map<String, TaskService.WorkspaceTask> tasks,
                                                                     File projectRoot, File activeFile) throws IOException {
+        return taskExecutionPlans(taskName, task, tasks, projectRoot, activeFile, Map.of());
+    }
+
+    private List<TaskService.TaskExecutionPlan> taskExecutionPlans(String taskName, TaskService.WorkspaceTask task,
+                                                                    Map<String, TaskService.WorkspaceTask> tasks,
+                                                                    File projectRoot, File activeFile,
+                                                                    Map<String, String> inputValues) throws IOException {
         Map<String, TaskService.WorkspaceTask> available = new LinkedHashMap<>(tasks == null ? Map.of() : tasks);
         available.putIfAbsent(taskName, task);
-        return editor.taskService.buildExecutionPlans(taskName, available, projectRoot, activeFile);
+        return editor.taskService.buildExecutionPlans(taskName, available, projectRoot, activeFile, inputValues);
     }
 
     private String validateRemoteTaskPlans(List<TaskService.TaskExecutionPlan> plans, Path localRoot, String executionRoot,
@@ -1253,7 +1274,7 @@ final class JobQuickfixController {
 
     void handleTaskJobCompletion(String taskName, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
         TaskService.WorkspaceTask task = TaskService.defaultWorkspaceTask(taskName, "true");
-        TaskService.TaskExecutionPlan plan = new TaskService.TaskExecutionPlan(task, new File("."), "true", List.of("true"), new File("."), Map.of());
+        TaskService.TaskExecutionPlan plan = new TaskService.TaskExecutionPlan(task, new File("."), "true", List.of("true"), new File("."), Map.of(), Map.of());
         handleTaskJobCompletion(taskName, plan, snapshot, result, error);
     }
 

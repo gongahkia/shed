@@ -369,6 +369,65 @@ public class TaskServiceTest {
     }
 
     @Test
+    void resolvesValidatedTaskInputsThroughLocalExecutionPlans() throws IOException {
+        TaskService service = new TaskService();
+        Path project = tempDir.resolve("task-inputs");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve(".shedtasks"), """
+            schema_version = 1
+
+            [task.deploy]
+            command = "echo ${input:target}"
+            shell = "direct"
+            depends_on = ["prepare"]
+
+            [task.deploy.input.target]
+            default = "staging"
+            options = ["staging", "production"]
+
+            [task.prepare]
+            command = "echo ${input:mode}"
+            shell = "direct"
+
+            [task.prepare.input.mode]
+            default = "quick"
+
+            [task.publish]
+            command = "echo ${input:release}"
+            shell = "direct"
+
+            [task.publish.input.release]
+            options = ["candidate", "stable"]
+            """);
+
+        TaskService.TaskLoadResult loaded = service.loadWorkspaceTasks(project.toFile());
+        TaskService.WorkspaceTask deploy = loaded.tasks().get("deploy");
+        TaskService.TaskExecutionPlan fallback = service.buildExecutionPlan(deploy, project.toFile(), null);
+        TaskService.TaskExecutionPlan supplied = service.buildExecutionPlan(deploy, project.toFile(), null, Map.of("target", "production"));
+
+        assertTrue(loaded.isValid());
+        assertEquals("staging", deploy.inputs().get("target").defaultValue());
+        assertEquals(List.of("echo", "staging"), fallback.processCommand());
+        assertEquals(List.of("echo", "production"), supplied.processCommand());
+        assertEquals(Map.of("target", "production"), supplied.inputValues());
+        List<TaskService.TaskExecutionPlan> dependencyPlans = service.buildExecutionPlans("deploy", loaded.tasks(), project.toFile(), null,
+            Map.of("target", "production"));
+        assertEquals(Map.of("mode", "quick"), dependencyPlans.getFirst().inputValues());
+        assertEquals(Map.of("target", "production"), dependencyPlans.get(1).inputValues());
+        RemoteCommandRequest remote = service.buildRemoteCommandRequest(supplied, project, "/srv/task-inputs", null);
+        assertEquals(List.of("echo", "production"), remote.command());
+        assertEquals(Map.of("target", "production"), TaskService.parseInputAssignments(List.of("deploy", "target=production"), 1));
+        IOException invalid = assertThrows(IOException.class,
+            () -> service.buildExecutionPlan(deploy, project.toFile(), null, Map.of("target", "preview")));
+        assertTrue(invalid.getMessage().contains("must be one of"));
+        IOException missing = assertThrows(IOException.class,
+            () -> service.buildExecutionPlan(loaded.tasks().get("publish"), project.toFile(), null));
+        assertTrue(missing.getMessage().contains("task input is required: release"));
+        service.saveWorkspaceTasks(project.toFile(), loaded.tasks());
+        assertTrue(Files.readString(project.resolve(".shedtasks")).contains("[task.deploy.input.target]"));
+    }
+
+    @Test
     void rejectsUnresolvedAndCyclicDependenciesBeforeBuildingAnyPlan() throws IOException {
         TaskService service = new TaskService();
         Path project = tempDir.resolve("dependency-invalid");

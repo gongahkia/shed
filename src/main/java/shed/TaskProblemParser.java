@@ -27,12 +27,18 @@ final class TaskProblemParser {
     }
 
     static List<QuickfixService.Entry> parse(String output, String source, File workingDirectory, TaskService.ProblemMatcher matcher) {
+        return parse(output, source, workingDirectory, matcher, null);
+    }
+
+    static List<QuickfixService.Entry> parse(String output, String source, File workingDirectory, TaskService.ProblemMatcher matcher,
+                                             TaskDiagnosticTemplate customMatcher) {
         TaskService.ProblemMatcher selected = matcher == null ? TaskService.ProblemMatcher.GENERIC : matcher;
         return switch (selected) {
             case GENERIC -> parseGeneric(output, source, workingDirectory);
             case TYPESCRIPT -> parseTypescript(output, source, workingDirectory);
             case ESLINT -> parseEslint(output, source, workingDirectory);
             case MSCOMPILE -> parseMsCompile(output, source, workingDirectory);
+            case CUSTOM -> parseCustom(output, source, workingDirectory, customMatcher);
             case NONE -> List.of();
         };
     }
@@ -94,6 +100,25 @@ final class TaskProblemParser {
             }
             String candidate = line == null ? "" : line.strip();
             currentFile = isEslintFileHeader(candidate) ? candidate : null;
+        }
+        return entries;
+    }
+
+    private static List<QuickfixService.Entry> parseCustom(String output, String source, File workingDirectory,
+                                                            TaskDiagnosticTemplate template) {
+        List<QuickfixService.Entry> entries = new ArrayList<>();
+        if (output == null || output.isBlank() || workingDirectory == null || template == null) return entries;
+        for (String line : output.split("\\R")) {
+            java.util.Map<TaskDiagnosticTemplate.Field, String> match = template.match(line);
+            if (match.isEmpty()) continue;
+            String path = match.get(TaskDiagnosticTemplate.Field.FILE);
+            String lineNumber = match.get(TaskDiagnosticTemplate.Field.LINE);
+            String column = match.get(TaskDiagnosticTemplate.Field.COLUMN);
+            String message = match.get(TaskDiagnosticTemplate.Field.MESSAGE);
+            if (path == null || path.isBlank() || lineNumber == null || lineNumber.isBlank() || message == null || message.isBlank()) continue;
+            String severity = match.get(TaskDiagnosticTemplate.Field.SEVERITY);
+            add(entries, path, lineNumber, column, message, source, workingDirectory,
+                severity == null || severity.isBlank() ? severityFromMessage(message) : severity(severity));
         }
         return entries;
     }

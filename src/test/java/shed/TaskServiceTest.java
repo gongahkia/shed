@@ -345,6 +345,30 @@ public class TaskServiceTest {
     }
 
     @Test
+    void persistsAValidatedCustomProblemMatcherWithItsTask() throws IOException {
+        TaskService service = new TaskService();
+        Path project = tempDir.resolve("custom-problem-matcher");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve(".shedtasks"), """
+            schema_version = 1
+
+            [task.lint]
+            command = "lint"
+            problem_matcher = "custom"
+            problem_pattern = "diagnostic {{file}}:{{line}}:{{severity}}: {{message}}"
+            """);
+
+        TaskService.TaskLoadResult loaded = service.loadWorkspaceTasks(project.toFile());
+        TaskService.WorkspaceTask lint = loaded.tasks().get("lint");
+
+        assertTrue(loaded.isValid());
+        assertEquals(TaskService.ProblemMatcher.CUSTOM, lint.problemMatcher());
+        assertEquals("diagnostic {{file}}:{{line}}:{{severity}}: {{message}}", lint.customProblemMatcher().source());
+        service.saveWorkspaceTasks(project.toFile(), loaded.tasks());
+        assertTrue(Files.readString(project.resolve(".shedtasks")).contains("problem_pattern = \"diagnostic {{file}}:{{line}}:{{severity}}: {{message}}\""));
+    }
+
+    @Test
     void rejectsUnresolvedAndCyclicDependenciesBeforeBuildingAnyPlan() throws IOException {
         TaskService service = new TaskService();
         Path project = tempDir.resolve("dependency-invalid");

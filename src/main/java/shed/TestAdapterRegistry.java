@@ -27,6 +27,23 @@ final class TestAdapterRegistry {
         register(new CtestAdapter());
     }
 
+    /** Returns the sole conventional generated CTest tree, never guessing between multiple builds. */
+    static Path ctestTestDirectory(Path root) {
+        return conventionalCmakeDirectory(root, "CTestTestfile.cmake");
+    }
+
+    /** Returns the sole conventional CMake binary tree, never guessing between multiple builds. */
+    static Path cmakeBuildDirectory(Path root) {
+        return conventionalCmakeDirectory(root, "CMakeCache.txt");
+    }
+
+    private static Path conventionalCmakeDirectory(Path root, String marker) {
+        if (root == null || !Files.isDirectory(root)) return null;
+        List<Path> candidates = CtestAdapter.COMMON_BUILD_DIRECTORIES.stream().map(root::resolve).map(path -> path.toAbsolutePath().normalize())
+            .filter(path -> Files.isRegularFile(path.resolve(marker))).sorted(Comparator.naturalOrder()).toList();
+        return candidates.size() == 1 ? candidates.getFirst() : null;
+    }
+
     void register(TestAdapter adapter) {
         if (adapter == null || adapter.id() == null || adapter.id().isBlank()) throw new IllegalArgumentException("test adapter id required");
         String id = adapter.id().trim().toLowerCase(Locale.ROOT);
@@ -340,10 +357,10 @@ final class TestAdapterRegistry {
 
         @Override public String id() { return "ctest"; }
 
-        @Override public boolean supports(Path root) { return testDirectory(root) != null; }
+        @Override public boolean supports(Path root) { return ctestTestDirectory(root) != null; }
 
         @Override public List<String> defaultCommand(Path root) {
-            Path directory = testDirectory(root);
+            Path directory = ctestTestDirectory(root);
             return directory == null ? List.of("ctest") : List.of("ctest", "--test-dir", directory.toString());
         }
 
@@ -388,13 +405,6 @@ final class TestAdapterRegistry {
 
         @Override public List<TestService.TestCase> parseRun(Path root, TestService.Command command, String output) {
             return TestService.parseJUnit(root, id(), command.reports());
-        }
-
-        private static Path testDirectory(Path root) {
-            if (root == null || !Files.isDirectory(root)) return null;
-            List<Path> candidates = COMMON_BUILD_DIRECTORIES.stream().map(root::resolve).map(path -> path.toAbsolutePath().normalize())
-                .filter(path -> Files.isRegularFile(path.resolve("CTestTestfile.cmake"))).sorted(Comparator.naturalOrder()).toList();
-            return candidates.size() == 1 ? candidates.getFirst() : null;
         }
 
         private static String exactNameExpression(List<TestService.TestCase> selected) {

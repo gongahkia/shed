@@ -27,7 +27,7 @@ final class VsCodeLaunchConfigurationImporter {
     private static final long MAX_BYTES = 1024L * 1024L;
     private static final int MAX_CONFIGURATIONS = 100;
     private static final Set<String> SUPPORTED_FIELDS = Set.of("name", "type", "request", "program", "module", "code", "cwd", "args",
-        "preLaunchTask", "host", "port");
+        "preLaunchTask", "host", "port", "env");
     private static final Set<String> SUPPORTED_ARGUMENT_VARIABLES = Set.of("${workspaceFolder}", "${workspaceFolderBasename}",
         "${file}", "${fileWorkspaceFolder}", "${relativeFile}", "${relativeFileDirname}", "${fileBasename}",
         "${fileBasenameNoExtension}", "${fileExtname}", "${fileDirname}", "${fileDirnameBasename}", "${testFile}", "${testId}");
@@ -166,13 +166,23 @@ final class VsCodeLaunchConfigurationImporter {
         if (!supportedArgumentVariables(args)) {
             return ImportResult.rejected("args use an unsupported VS Code variable.");
         }
+        Map<String, String> environment = environment(entry.get("env"));
+        if (environment == null || entry.containsKey("env") && MiniJson.asObject(entry.get("env")) == null) {
+            return ImportResult.rejected("env must be an object of at most 100 portable environment names and single-line string values.");
+        }
+        if (!supportedEnvironmentValues(environment)) {
+            return ImportResult.rejected("env values may not use VS Code variables.");
+        }
+        if (request == DebugAdapterRegistry.Request.ATTACH && !environment.isEmpty()) {
+            return ImportResult.rejected("env is launch-only.");
+        }
         Integer port = integer(entry.get("port"));
         if (port == null && entry.containsKey("port")) return ImportResult.rejected("port must be an integer when present.");
         String name = uniqueName(label, names);
         DebugAdapterRegistry.Configuration configuration = new DebugAdapterRegistry.Configuration(name, adapter, request, "workspace",
             program == null ? "" : program, module == null ? "" : module, code == null ? "" : code,
             cwd == null || cwd.isBlank() ? "${workspaceFolder}" : cwd, args, mappedPreLaunchTask == null ? preLaunchTask : mappedPreLaunchTask,
-            host == null || host.isBlank() ? "127.0.0.1" : host, port == null ? 0 : port, List.of());
+            host == null || host.isBlank() ? "127.0.0.1" : host, port == null ? 0 : port, List.of(), environment);
         String error = DebugAdapterRegistry.externalConfigurationError(configuration,
             validation == null ? Map.of() : validation.registry().adapters());
         return error == null ? new ImportResult(configuration, null) : ImportResult.rejected(error + ".");
@@ -193,6 +203,12 @@ final class VsCodeLaunchConfigurationImporter {
         }
         if ("go".equalsIgnoreCase(type) || "delve".equalsIgnoreCase(type)) {
             if (adapters.containsKey(BuiltInDebugAdapterSupport.GO_DELVE)) return BuiltInDebugAdapterSupport.GO_DELVE;
+        }
+        if ("coreclr".equalsIgnoreCase(type) || "netcoredbg".equalsIgnoreCase(type)) {
+            if (adapters.containsKey(BuiltInDebugAdapterSupport.CSHARP_NETCOREDBG)) return BuiltInDebugAdapterSupport.CSHARP_NETCOREDBG;
+        }
+        if ("lldb-dap".equalsIgnoreCase(type)) {
+            if (adapters.containsKey(BuiltInDebugAdapterSupport.NATIVE_LLDB)) return BuiltInDebugAdapterSupport.NATIVE_LLDB;
         }
         for (String id : adapters.keySet()) if (id.equalsIgnoreCase(type)) return id;
         return null;
@@ -235,6 +251,27 @@ final class VsCodeLaunchConfigurationImporter {
     private static Integer integer(Object value) {
         if (!(value instanceof Long number) || number < Integer.MIN_VALUE || number > Integer.MAX_VALUE) return null;
         return number.intValue();
+    }
+
+    private static Map<String, String> environment(Object value) {
+        if (value == null) return Map.of();
+        Map<String, Object> values = MiniJson.asObject(value);
+        if (values == null || values.size() > 100) return null;
+        Map<String, String> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            String name = entry.getKey();
+            String supplied = MiniJson.asString(entry.getValue());
+            if (name == null || supplied == null) return null;
+            result.put(name, supplied);
+        }
+        return DebugAdapterRegistry.safeEnvironment(result) ? Map.copyOf(result) : null;
+    }
+
+    private static boolean supportedEnvironmentValues(Map<String, String> environment) {
+        for (String value : environment == null ? List.<String>of() : environment.values()) {
+            if (value != null && value.contains("${")) return false;
+        }
+        return true;
     }
 
     private static boolean supportedArgumentVariables(List<String> arguments) {

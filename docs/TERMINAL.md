@@ -1,8 +1,18 @@
 # Terminal
 
-Shed opens an interactive shell in a PTY-backed bottom split. `:terminal split side` places a new default-shell terminal beside the active pane, while `:terminal split bottom` makes the default placement explicit. `:terminal list` shows the default shell, extension-provided direct-argv profiles, and the resolved execution target for the current file; `:terminal profile <extension:id>` opens one. After an explicit `:remote use <id>`, new ordinary terminals for files in that connected SSH/Docker/WSL workspace run through that provider; after an explicit `:container connect`, they run through `devcontainer exec`. A selected remote execution session takes precedence when both apply. Terminal session restoration, when enabled, records only a pane's host working directory and starts a fresh local shell. It never restores commands, arguments, scrollback, process state, remote/container connections, or credentials.
+Shed opens an interactive shell in a PTY-backed bottom split. `:terminal split side` places a configured-default terminal beside the active pane, while `:terminal split bottom` makes the default placement explicit. `:terminal list` shows that default, detected standard shell profiles, extension-provided direct-argv profiles, and the resolved execution target for the current file; `:terminal profile <builtin:id>` or `:terminal profile <extension:id>` opens one. After an explicit `:remote use <id>`, new ordinary terminals for files in that connected SSH/Docker/WSL workspace run through that provider; after an explicit `:container connect`, they run through `devcontainer exec`. A selected remote execution session takes precedence when both apply. Terminal session restoration, when enabled, records only a pane's host working directory and starts a fresh local shell. It never restores commands, arguments, scrollback, process state, remote/container connections, or credentials.
 
 On a native Windows host, a local default terminal resolves to the system Windows PowerShell executable when available, then `ComSpec`/`cmd.exe`. Shell-backed local task and command execution use PowerShell's `-NoProfile -Command` or `cmd.exe /d /s /c` direct argument form. SSH, Docker, WSL, and Dev Container defaults remain selected by their remote provider rather than inheriting the host shell.
+
+## Shell profiles
+
+`terminal.default.profile` defaults to `system`, preserving the host's existing default-shell behavior. `:terminal list` detects locally executable standard profiles without launching them: Bash, Zsh, Fish, and PowerShell 7 on POSIX; PowerShell 7, Windows PowerShell, and Command Prompt on Windows. Select one for future ordinary terminals with a qualified profile id:
+
+```toml
+"terminal.default.profile" = "builtin:bash"
+```
+
+An installed extension profile uses its full `<extension-id>:<id>` id. The setting does not accept arbitrary executable paths or arguments. If its selected built-in or extension profile is unavailable, Shed opens the system shell and reports that fallback. Detection checks only the configured shell and executable paths; it does not start a shell, probe versions, or edit shell configuration.
 
 ## Shell integration
 

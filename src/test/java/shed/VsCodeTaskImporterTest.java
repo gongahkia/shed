@@ -82,6 +82,34 @@ class VsCodeTaskImporterTest {
     }
 
     @Test
+    void importsAConservativeSubsetOfBuiltInProblemMatchers() throws Exception {
+        Path root = Files.createDirectories(temporaryDirectory.resolve("matchers"));
+        Path tasks = Files.createDirectories(root.resolve(".vscode")).resolve("tasks.json");
+        Files.writeString(tasks, """
+            {"version":"2.0.0","tasks":[
+              {"label":"TypeScript","type":"process","command":"tsc","problemMatcher":["$tsc"]},
+              {"label":"Lint","type":"process","command":"eslint","problemMatcher":"$eslint-stylish"},
+              {"label":"CSharp","type":"process","command":"dotnet","problemMatcher":"$msCompile"},
+              {"label":"Go","type":"process","command":"go","problemMatcher":"$go"},
+              {"label":"Gcc","type":"process","command":"gcc","problemMatcher":"$gcc"},
+              {"label":"Watch","type":"process","command":"tsc","problemMatcher":"$tsc-watch"},
+              {"label":"Custom","type":"process","command":"tool","problemMatcher":{"pattern":"anything"}}
+            ]}
+            """);
+
+        VsCodeTaskImporter.Report report = VsCodeTaskImporter.read(root, Set.of());
+
+        assertEquals(TaskService.ProblemMatcher.TYPESCRIPT, report.tasks().get("vscode-typescript").problemMatcher());
+        assertEquals(TaskService.ProblemMatcher.ESLINT, report.tasks().get("vscode-lint").problemMatcher());
+        assertEquals(TaskService.ProblemMatcher.MSCOMPILE, report.tasks().get("vscode-csharp").problemMatcher());
+        assertEquals(TaskService.ProblemMatcher.GENERIC, report.tasks().get("vscode-go").problemMatcher());
+        assertEquals(TaskService.ProblemMatcher.GENERIC, report.tasks().get("vscode-gcc").problemMatcher());
+        assertEquals(5, report.tasks().size());
+        assertTrue(report.skipped().stream().anyMatch(value -> value.contains("background-task lifecycle")));
+        assertTrue(report.skipped().stream().anyMatch(value -> value.contains("problemMatcher")));
+    }
+
+    @Test
     void importsShellArgumentsWithExpansionBeforeStrongPosixQuotingLocallyAndRemotely() throws Exception {
         Path root = Files.createDirectories(temporaryDirectory.resolve("workspace's name"));
         Path source = Files.writeString(root.resolve("file's value.py"), "print('ok')\n");

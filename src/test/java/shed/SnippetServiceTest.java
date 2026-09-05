@@ -108,6 +108,23 @@ class SnippetServiceTest {
     }
 
     @Test
+    void findsNativeStarterSnippetsForCmake() {
+        assertTrue(service.findExact(FileType.CMAKE, "cmake").body.contains("cmake_minimum_required"));
+        assertTrue(service.findExact(FileType.CMAKE, "exe").body.contains("add_executable"));
+        assertTrue(service.findExact(FileType.CMAKE, "test").body.contains("add_test"));
+    }
+
+    @Test
+    void findsNativeStarterSnippetsForRemainingLexicalLanguages() {
+        assertTrue(service.findExact(FileType.CSS, "rule").body.contains("{"));
+        assertTrue(service.findExact(FileType.JSON, "obj").body.contains("\""));
+        assertTrue(service.findExact(FileType.YAML, "map").body.contains(":"));
+        assertTrue(service.findExact(FileType.TOML, "table").body.startsWith("["));
+        assertTrue(service.findExact(FileType.SQL, "select").body.contains("SELECT"));
+        assertTrue(service.findExact(FileType.SHELL, "echo").body.startsWith("echo"));
+    }
+
+    @Test
     void findsNativeStarterSnippetsForAdditionalBuiltInLexicalLanguages() {
         assertTrue(service.findExact(FileType.KOTLIN, "fun").body.contains("fun"));
         assertTrue(service.findExact(FileType.CSHARP, "prop").body.contains("get; set;"));

@@ -64,6 +64,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `ui.font.size` | `0` | int | UI font size; `0` retains each system UI default size |
 | `terminal.font.family` | `Monospaced` | string | Terminal font family |
 | `terminal.font.size` | `14` | int | Terminal font size |
+| `terminal.default.profile` | `system` | string | Default terminal: `system`, a detected `builtin:<id>`, or an installed `<extension-id>:<id>` profile |
 | `snippets.directory` | `~/.shed/snippets` | path | User snippet directory; applies immediately |
 | `tab.size` | `4` | int | Tab width (`:set ts=` command clamps to `1..16`) |
 | `line.numbers` | `absolute` | enum | `none`, `absolute`, `relative`, `relativeabsolute` (`hybrid` alias supported) |
@@ -286,7 +287,29 @@ Update checks require a global consent receipt, HTTPS metadata endpoint, and Bas
 | `debug.attach.enabled` | `true` | bool | Enables attach planning when adapter-supported |
 | `debug.open.source.on.stop` | `true` | bool | Opens the selected existing local source frame after a paused-frame inspection; disable to keep navigation manual |
 
-Shed includes `python-debugpy` for a separately installed `debugpy-adapter` executable and `go-delve` for a separately installed `dlv` executable; it does not bundle or download either debugger. `go-delve` starts local `dlv dap` only after an explicit debug request and accepts only its announced `127.0.0.1` endpoint. A workspace `.vscode/launch.json`, or the `launch` object of an explicitly imported standard `.code-workspace`, can contribute a strict, non-persistent compatibility subset only when it refers to an adapter already configured in Shed; use `:debug vscode` to inspect accepted and skipped profiles. See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/attach schema, compatibility boundary, and capability declarations.
+Shed includes `python-debugpy` for a separately installed `debugpy-adapter` executable and `go-delve` for a separately installed `dlv` executable; it also recognizes separately installed `netcoredbg --interpreter=vscode` and `lldb-dap` adapters for explicit compiled C#/.NET and native programs. Shed does not bundle or download these debuggers. `go-delve` starts local `dlv dap` only after an explicit debug request and accepts only its announced `127.0.0.1` endpoint. A workspace `.vscode/launch.json`, or the `launch` object of an explicitly imported standard `.code-workspace`, can contribute a strict, non-persistent compatibility subset only when it refers to an adapter already configured in Shed; use `:debug vscode` to inspect accepted and skipped profiles. See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/attach schema, compatibility boundary, and capability declarations.
+
+To launch a compiled .NET artifact without a `launch.json`, add an explicit configuration whose `program` is the project-relative output selected by your build:
+
+```toml
+"debug.configuration.dotnet-app.adapter" = "csharp-netcoredbg"
+"debug.configuration.dotnet-app.request" = "launch"
+"debug.configuration.dotnet-app.program" = "${workspaceFolder}/bin/Debug/net9.0/app.dll"
+"debug.configuration.dotnet-app.cwd" = "${workspaceFolder}"
+```
+
+Run `:debug start dotnet-app` only after the artifact exists. Shed does not infer a framework, assembly name, build output, or `launchSettings.json` profile.
+
+To launch a compiled C, C++, Rust, or other LLDB-supported native artifact, configure its exact executable explicitly:
+
+```toml
+"debug.configuration.native-app.adapter" = "native-lldb"
+"debug.configuration.native-app.request" = "launch"
+"debug.configuration.native-app.program" = "${workspaceFolder}/build/app"
+"debug.configuration.native-app.cwd" = "${workspaceFolder}"
+```
+
+`native-lldb` starts the user-installed `lldb-dap` over stdio. It does not choose an executable, infer compiler output, or translate CodeLLDB/`cppdbg` configurations.
 
 ## Undo History Policy
 
@@ -415,6 +438,7 @@ schema_version = 1
 "ui.font.size" = 0
 "terminal.font.family" = "Monospaced"
 "terminal.font.size" = 14
+"terminal.default.profile" = "system"
 "snippets.directory" = "~/.shed/snippets"
 "tab.size" = 4
 "line.numbers" = "relative"

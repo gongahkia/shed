@@ -325,9 +325,28 @@ final class VsCodeTaskImporter {
 
     private static TaskService.ProblemMatcher problemMatcher(Object value) {
         if (value == null) return TaskService.ProblemMatcher.NONE;
+        if (value instanceof String) return namedProblemMatcher((String) value);
         List<Object> entries = MiniJson.asArray(value);
         if (entries != null && entries.isEmpty()) return TaskService.ProblemMatcher.NONE;
-        throw new IllegalArgumentException("problemMatcher is only supported when absent or an empty array.");
+        if (entries == null || entries.size() != 1) {
+            throw new IllegalArgumentException("problemMatcher must be absent, an empty array, or one supported built-in matcher.");
+        }
+        String name = MiniJson.asString(entries.getFirst());
+        if (name == null) throw new IllegalArgumentException("problemMatcher entries must be built-in matcher names.");
+        return namedProblemMatcher(name);
+    }
+
+    private static TaskService.ProblemMatcher namedProblemMatcher(String value) {
+        String name = value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
+        return switch (name) {
+            case "$go", "$gcc" -> TaskService.ProblemMatcher.GENERIC;
+            case "$tsc" -> TaskService.ProblemMatcher.TYPESCRIPT;
+            case "$eslint-compact", "$eslint-stylish" -> TaskService.ProblemMatcher.ESLINT;
+            case "$mscompile" -> TaskService.ProblemMatcher.MSCOMPILE;
+            case "$tsc-watch" -> throw new IllegalArgumentException("problemMatcher $tsc-watch requires unsupported background-task lifecycle.");
+            default -> throw new IllegalArgumentException("problemMatcher is not in Shed's supported built-in subset: "
+                + (value == null || value.isBlank() ? "(empty)" : value) + ".");
+        };
     }
 
     private static TaskService.Presentation presentation(Object value) {

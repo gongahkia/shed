@@ -61,6 +61,7 @@ public class HelpService {
                    "  :jobcancel id  Cancel async job\n" +
                    "  :drop cmd      Run async command with current file path\n" +
                    "  :task ...      Run/save project tasks with quickfix integration\n" +
+                   "  :customeditor  List/reopen extension editors and the built-in binary Hex Editor\n" +
                    "  :files         File finder\n" +
                    "  :folder        Folder finder\n" +
                    "  :tree [path]   Toggle/open file tree pane\n" +
@@ -291,6 +292,13 @@ public class HelpService {
                     + ":language lists installed extension language profiles.\n"
                     + ":language <extension-id:language-id> selects lexical metadata for the current buffer.\n"
                     + ":language auto restores filename/shebang detection.\n";
+            case "customeditor":
+            case "customeditors":
+            case "custom-editor":
+                return "Help: custom editors\n\n"
+                    + ":customeditor list shows extension editors and Shed's bounded binary Hex Editor.\n"
+                    + ":customeditor reopen selects a matching extension editor first, then the Hex Editor for an eligible binary file.\n"
+                    + "The Hex Editor displays 4 KiB pages and can atomically change one byte at a time; it accepts regular binary files up to 8 MiB.\n";
             case "git":
                 return "Help: git\n\n"
                     + ":git shows status.\n"

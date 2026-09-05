@@ -8,13 +8,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Explicit PostgreSQL CLI bridge; connection details remain entirely with libpq and the user's environment. */
+/** Explicit local database CLI bridges; connection details remain with their clients and the user's environment. */
 final class DatabaseController {
     private static final String TABLES_QUERY = "select table_schema, table_name from information_schema.tables "
         + "where table_type = 'BASE TABLE' and table_schema not in ('pg_catalog', 'information_schema') "
         + "order by table_schema, table_name";
     private static final String SQLITE_TABLES_QUERY = "select name from sqlite_master where type in ('table', 'view') "
         + "and name not like 'sqlite_%' order by name";
+    private static final String MYSQL_TABLES_QUERY = "select table_schema, table_name from information_schema.tables "
+        + "where table_type = 'BASE TABLE' and table_schema = database() order by table_schema, table_name";
     private final Texteditor editor;
 
     DatabaseController(Texteditor editor) {
@@ -37,7 +39,8 @@ final class DatabaseController {
             case "file" -> executeFile(tokens.subList(1, tokens.size()));
             case "terminal", "console" -> editor.terminalController.openDirect("PostgreSQL", workspace().toFile(), baseCommand());
             case "sqlite", "sqlite3" -> sqlite(tokens.subList(1, tokens.size()));
-            default -> "Usage: :database [status|query <quoted-sql>|tables|file <workspace-relative.sql>|terminal|sqlite query <workspace-relative.db> <quoted-sql>|sqlite tables <workspace-relative.db>|sqlite terminal <workspace-relative.db>]";
+            case "mysql" -> mysql(tokens.subList(1, tokens.size()));
+            default -> "Usage: :database [status|query <quoted-sql>|tables|file <workspace-relative.sql>|terminal|sqlite query <workspace-relative.db> <quoted-sql>|sqlite tables <workspace-relative.db>|sqlite terminal <workspace-relative.db>|mysql query <quoted-sql>|mysql tables|mysql terminal]";
         };
     }
 
@@ -59,6 +62,11 @@ final class DatabaseController {
             throw new IllegalArgumentException("SQL must be a non-empty single line");
         }
         return List.of("sqlite3", "-batch", "-bail", database.toAbsolutePath().normalize().toString(), sql);
+    }
+
+    static List<String> mysqlQueryCommand(String sql) {
+        validateSingleLineSql(sql);
+        return List.of("mysql", "--batch", "--skip-column-names", "--execute=" + sql);
     }
 
     private static List<String> baseCommand() {
@@ -126,6 +134,28 @@ final class DatabaseController {
         return "Usage: :database sqlite query <workspace-relative.db> <quoted-sql>|tables <workspace-relative.db>|terminal <workspace-relative.db>";
     }
 
+    private String mysql(List<String> arguments) {
+        if (arguments.isEmpty()) return "Usage: :database mysql query <quoted-sql>|tables|terminal";
+        String operation = arguments.getFirst().toLowerCase(Locale.ROOT);
+        if ("query".equals(operation)) {
+            if (arguments.size() < 2) return "Usage: :database mysql query <quoted-sql>";
+            try {
+                return submitMysql("query", mysqlQueryCommand(String.join(" ", arguments.subList(1, arguments.size()))));
+            } catch (IllegalArgumentException error) {
+                return "MySQL query invalid: " + error.getMessage();
+            }
+        }
+        if ("tables".equals(operation)) {
+            return arguments.size() == 1 ? submitMysql("tables", mysqlQueryCommand(MYSQL_TABLES_QUERY))
+                : "Usage: :database mysql tables";
+        }
+        if ("terminal".equals(operation) || "console".equals(operation)) {
+            return arguments.size() == 1 ? editor.terminalController.openDirect("MySQL", workspace().toFile(), List.of("mysql"))
+                : "Usage: :database mysql terminal";
+        }
+        return "Usage: :database mysql query <quoted-sql>|tables|terminal";
+    }
+
     private String submit(String operation, List<String> command) {
         Path root = workspace();
         int job = editor.asyncJobService.submit("database " + operation, token -> editor.runExternalCommand(command, root.toFile(), null, token,
@@ -142,8 +172,16 @@ final class DatabaseController {
         return "SQLite " + operation + " requested (job " + job + ").";
     }
 
+    private String submitMysql(String operation, List<String> command) {
+        Path root = workspace();
+        int job = editor.asyncJobService.submit("mysql " + operation, token -> editor.runExternalCommand(command, root.toFile(), null, token,
+            editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true),
+            (snapshot, result, error) -> completeMysql(operation, snapshot, result, error));
+        return "MySQL " + operation + " requested (job " + job + ").";
+    }
+
     private String showStatus() {
-        StringBuilder output = new StringBuilder("PostgreSQL CLI\n\n");
+        StringBuilder output = new StringBuilder("Database CLIs\n\n");
         output.append("Workspace: ").append(workspace()).append("\n");
         output.append("Connection: user-managed libpq/psql configuration; no connection is opened for this view.\n");
         output.append("Detected connection selectors: ");
@@ -154,9 +192,11 @@ final class DatabaseController {
         output.append(selectors.isEmpty() ? "(none)" : String.join(", ", selectors)).append("\n\n");
         output.append(":database query \"select 1\"\n:database tables\n:database file migrations/check.sql\n:database terminal\n\n");
         output.append(":database sqlite query app.db \"select 1\"\n:database sqlite tables app.db\n:database sqlite terminal app.db\n\n");
+        output.append(":database mysql query \"select 1\"\n:database mysql tables\n:database mysql terminal\n\n");
+        output.append("MySQL uses the installed mysql client's option/login configuration, which Shed does not inspect.\n");
         output.append("Shed does not store credentials or connection strings. Prefer a libpq password/service file over PGPASSWORD.\n");
         editor.showScratchBuffer("[database]", output.toString());
-        return "Showing PostgreSQL CLI status";
+        return "Showing database CLI status";
     }
 
     private void complete(String operation, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
@@ -188,6 +228,22 @@ final class DatabaseController {
             editor.showMessage("SQLite " + operation + " failed: " + detail);
         } else {
             editor.showMessage("SQLite " + operation + " completed");
+        }
+    }
+
+    private void completeMysql(String operation, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
+        if (editor.closingDown) return;
+        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
+            editor.showMessage("MySQL " + operation + " cancelled");
+            return;
+        }
+        String output = output(result);
+        if (!output.isBlank()) editor.showScratchBuffer("[mysql " + operation + "]", output + "\n");
+        if (error != null || result == null || result.exitCode != 0) {
+            String detail = error != null ? concise(error) : result == null ? "unknown error" : output.isBlank() ? "exit " + result.exitCode : output.strip();
+            editor.showMessage("MySQL " + operation + " failed: " + detail);
+        } else {
+            editor.showMessage("MySQL " + operation + " completed");
         }
     }
 
@@ -229,5 +285,11 @@ final class DatabaseController {
         String message = error == null ? null : error.getMessage();
         return message == null || message.isBlank() ? error == null ? "unknown error" : error.getClass().getSimpleName()
             : message.replace('\n', ' ').replace('\r', ' ');
+    }
+
+    private static void validateSingleLineSql(String sql) {
+        if (sql == null || sql.isBlank() || sql.indexOf('\u0000') >= 0 || sql.indexOf('\n') >= 0 || sql.indexOf('\r') >= 0) {
+            throw new IllegalArgumentException("SQL must be a non-empty single line");
+        }
     }
 }

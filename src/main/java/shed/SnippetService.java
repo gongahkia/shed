@@ -140,6 +140,35 @@ public class SnippetService {
         add("main", "int main(int argc, char *argv[]) {\n    $0\n    return 0;\n}", "main function", FileType.CPP);
         add("class", "class $1 {\npublic:\n    $1();\n    ~$1();\nprivate:\n    $0\n};", "class", FileType.CPP);
 
+        // CSS snippets
+        add("rule", "$1 {\n    $0\n}", "CSS rule", FileType.CSS);
+        add("media", "@media ($1: $2) {\n    $0\n}", "media query", FileType.CSS);
+
+        // JSON snippets
+        add("obj", "{\n    \"$1\": $0\n}", "object", FileType.JSON);
+        add("arr", "[\n    $0\n]", "array", FileType.JSON);
+
+        // YAML snippets
+        add("map", "$1: $0", "mapping entry", FileType.YAML);
+        add("list", "- $0", "list entry", FileType.YAML);
+
+        // TOML snippets
+        add("table", "[$1]\n$0", "table", FileType.TOML);
+        add("key", "$1 = $0", "key/value", FileType.TOML);
+
+        // CMake snippets
+        add("cmake", "cmake_minimum_required(VERSION $1)\nproject($2 LANGUAGES CXX)\n\n$0", "CMake project", FileType.CMAKE);
+        add("exe", "add_executable($1\n    $0\n)", "executable target", FileType.CMAKE);
+        add("lib", "add_library($1\n    $0\n)", "library target", FileType.CMAKE);
+        add("test", "add_test(NAME $1 COMMAND $0)", "CTest test", FileType.CMAKE);
+
+        // SQL snippets
+        add("select", "SELECT $1\nFROM $2\nWHERE $0;", "SELECT query", FileType.SQL);
+        add("create", "CREATE TABLE $1 (\n    $0\n);", "CREATE TABLE", FileType.SQL);
+
+        // Portable shell snippet: echo is also an alias of Write-Output in PowerShell.
+        add("echo", "echo \"$0\"", "echo value", FileType.SHELL);
+
         // Markdown snippets
         add("link", "[$1]($2)", "link", FileType.MARKDOWN);
         add("img", "![$1]($2)", "image", FileType.MARKDOWN);

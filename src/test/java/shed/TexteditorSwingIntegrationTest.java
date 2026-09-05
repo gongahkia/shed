@@ -125,6 +125,51 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void openingAnEligibleBinaryFileUsesTheBuiltInHexEditor() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-native-hex");
+        Path file = tempDir.resolve("asset.bin");
+        Files.createDirectories(home);
+        Files.write(file, new byte[] {'S', 0, 'H', 'E', 'D'});
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertTrue(onEdt(() -> editor.getActivePane().getComponent() instanceof HexEditorPanel));
+            assertSame(onEdt(() -> editor.getActivePane().getComponent()), onEdt(() -> editor.renderedLayoutComponent));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void matchingExtensionCustomEditorTakesPriorityOverBuiltInHexEditor() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-extension-hex-priority");
+        Path file = tempDir.resolve("extension-asset.bin");
+        Files.createDirectories(home);
+        Files.write(file, new byte[] {'S', 0, 'H', 'E', 'D'});
+        javax.swing.JPanel contributed = new javax.swing.JPanel();
+
+        Texteditor editor = createEmptyEditor(home);
+        try {
+            onEdt(() -> {
+                editor.extensionRegistry.registerCustomEditor("test", new shed.api.CustomEditorContribution() {
+                    @Override public String id() { return "binary"; }
+                    @Override public String displayName() { return "Test binary editor"; }
+                    @Override public boolean supports(Path candidate) { return file.toAbsolutePath().equals(candidate); }
+                    @Override public javax.swing.JComponent createComponent(Path candidate, String content) { return contributed; }
+                });
+                editor.openFile(file.toFile());
+                return null;
+            });
+
+            assertSame(contributed, onEdt(() -> editor.getActivePane().getComponent()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void vimLineMotionRetainsCaretAndCurrentLineHighlightAcrossLargeBuffer() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-motion");

@@ -12,6 +12,15 @@ import java.util.Map;
 import shed.api.TerminalProfile;
 
 final class TerminalController {
+    private record ProfileChoice(String id, String displayName, List<String> command) {
+        ProfileChoice {
+            command = List.copyOf(command == null ? List.of() : command);
+        }
+    }
+
+    private record DefaultProfile(ProfileChoice profile, String warning) {
+    }
+
     private final Texteditor editor;
 
     TerminalController(Texteditor editor) {
@@ -19,7 +28,7 @@ final class TerminalController {
     }
 
     public String openTerminal() {
-        return openTerminal(null);
+        return openDefaultTerminal(WindowLayoutNode.Orientation.VERTICAL, null);
     }
 
     String openDirect(String label, File workingDirectory, List<String> command) {
@@ -41,10 +50,13 @@ final class TerminalController {
             WindowLayoutNode.Orientation orientation = splitOrientation(value.length() == 5 ? "" : value.substring(6));
             if (orientation == null) return "Usage: :terminal split <side|bottom>";
             String placement = orientation == WindowLayoutNode.Orientation.HORIZONTAL ? "side" : "bottom";
-            return openTerminal(null, orientation, "Terminal opened in " + placement + " split");
+            return openDefaultTerminal(orientation, "Terminal opened in " + placement + " split");
         }
         String profile = value.regionMatches(true, 0, "profile ", 0, 8) ? value.substring(8).trim() : value;
-        if (profile.isBlank()) return "Usage: :terminal [list|commands|cwd|split <side|bottom>|profile <extension:id|id>]";
+        if (profile.isBlank()) return "Usage: :terminal [list|commands|cwd|split <side|bottom>|profile <builtin:id|extension:id|id>]";
+        if ("system".equalsIgnoreCase(profile)) return openSelectedTerminal(null, WindowLayoutNode.Orientation.VERTICAL, null);
+        BuiltInTerminalProfiles.Profile builtIn = BuiltInTerminalProfiles.resolve(profile, BuiltInTerminalProfiles.detect());
+        if (builtIn != null) return openTerminal(builtIn);
         ExtensionRegistry.Owned<TerminalProfile> selected = resolveProfile(profile);
         if (selected == null) return "Terminal profile not found: " + profile;
         return openTerminal(selected);
@@ -55,10 +67,26 @@ final class TerminalController {
     }
 
     private String openTerminal(ExtensionRegistry.Owned<TerminalProfile> profile, WindowLayoutNode.Orientation orientation, String defaultMessage) {
-        String label = profile == null ? "Terminal" : profile.value().displayName();
-        List<String> command = profile == null ? ShellCommand.interactiveCommand() : profile.value().command();
+        return openSelectedTerminal(profile == null ? null : new ProfileChoice(profile.extensionId() + ":" + profile.value().id(),
+            profile.value().displayName(), profile.value().command()), orientation, defaultMessage);
+    }
+
+    private String openTerminal(BuiltInTerminalProfiles.Profile profile) {
+        return openSelectedTerminal(new ProfileChoice("builtin:" + profile.id(), profile.displayName(), profile.command()),
+            WindowLayoutNode.Orientation.VERTICAL, null);
+    }
+
+    private String openDefaultTerminal(WindowLayoutNode.Orientation orientation, String defaultMessage) {
+        DefaultProfile selected = resolveDefaultProfile();
+        String result = openSelectedTerminal(selected.profile(), orientation, defaultMessage);
+        return selected.warning().isBlank() ? result : result + "; " + selected.warning();
+    }
+
+    private String openSelectedTerminal(ProfileChoice profile, WindowLayoutNode.Orientation orientation, String defaultMessage) {
+        String label = profile == null ? "Terminal" : profile.displayName();
+        List<String> command = profile == null ? ShellCommand.interactiveCommand() : profile.command();
         String message = profile == null ? (defaultMessage == null ? "Terminal opened" : defaultMessage)
-            : "Terminal opened with " + profile.extensionId() + ":" + profile.value().id();
+            : "Terminal opened with " + profile.id();
         File startDirectory = resolveTerminalStartDirectory();
         RemoteWorkspaceSessionService.Connection remoteConnection = editor.remoteWorkspaceSessions == null
             ? null : editor.remoteWorkspaceSessions.connectionFor(startDirectory.toPath());
@@ -67,7 +95,7 @@ final class TerminalController {
                 List<String> invocation = remoteConnection.terminalInvocation(startDirectory.toPath(), profile == null ? List.of() : command);
                 String remoteLabel = "Remote " + remoteConnection.id() + " — " + label;
                 String remoteMessage = profile == null ? "Remote terminal opened: " + remoteConnection.id()
-                    : "Remote terminal opened with " + profile.extensionId() + ":" + profile.value().id();
+                    : "Remote terminal opened with " + profile.id();
                 return openTerminal(remoteLabel, remoteConnection.localRoot().toFile(), invocation, remoteMessage,
                     remoteConnection.sourcePathMapper(startDirectory.toPath()), orientation);
             } catch (Exception error) {
@@ -84,7 +112,7 @@ final class TerminalController {
                 ? DevContainerRuntime.defaultTerminalCommand() : command);
             String containerLabel = "Dev Container — " + label;
             String containerMessage = profile == null ? "Dev Container terminal opened" : "Dev Container terminal opened with "
-                + profile.extensionId() + ":" + profile.value().id();
+                + profile.id();
             return openTerminal(containerLabel, connection.workspace().toFile(), invocation, containerMessage,
                 connection.sourcePathMapper(), orientation);
         } catch (IOException error) {
@@ -262,8 +290,22 @@ final class TerminalController {
     }
 
     private String showProfiles() {
-        StringBuilder output = new StringBuilder("Terminal Profiles\n\nDefault: ")
-            .append(String.join(" ", ShellCommand.interactiveCommand())).append("\n");
+        DefaultProfile defaultProfile = resolveDefaultProfile();
+        String configuredDefault = editor.configManager.getTerminalDefaultProfile();
+        StringBuilder output = new StringBuilder("Terminal Profiles\n\nConfigured default: ").append(configuredDefault).append("\nResolved default: ")
+            .append(defaultProfile.profile() == null ? String.join(" ", ShellCommand.interactiveCommand())
+                : defaultProfile.profile().id() + " -> " + String.join(" ", defaultProfile.profile().command())).append("\n");
+        if (!defaultProfile.warning().isBlank()) output.append("Warning: ").append(defaultProfile.warning()).append("\n");
+        List<BuiltInTerminalProfiles.Profile> builtIns = BuiltInTerminalProfiles.detect();
+        if (builtIns.isEmpty()) {
+            output.append("\nNo standard shell profiles were detected.\n");
+        } else {
+            output.append("\nBuilt in:\n");
+            for (BuiltInTerminalProfiles.Profile profile : builtIns) {
+                output.append("  builtin:").append(profile.id()).append("  ").append(profile.displayName())
+                    .append(" -> ").append(String.join(" ", profile.command())).append("\n");
+            }
+        }
         List<ExtensionRegistry.Owned<TerminalProfile>> profiles = editor.extensionManager == null ? List.of() : editor.extensionManager.terminalProfiles();
         if (profiles.isEmpty()) {
             output.append("\nNo extension terminal profiles installed.\n");
@@ -288,9 +330,20 @@ final class TerminalController {
         } else {
             output.append("New terminals for this file use the local host.\n");
         }
-        output.append("Use :terminal commands, :terminal cwd, or :terminal profile <extension:id>.\n");
+        output.append("Use :terminal commands, :terminal cwd, or :terminal profile <builtin:id|extension:id>.\n");
         editor.showScratchBuffer("[terminal profiles]", output.toString());
         return "Showing terminal profiles";
+    }
+
+    private DefaultProfile resolveDefaultProfile() {
+        String configured = editor.configManager.getTerminalDefaultProfile();
+        if ("system".equalsIgnoreCase(configured)) return new DefaultProfile(null, "");
+        BuiltInTerminalProfiles.Profile builtIn = BuiltInTerminalProfiles.resolve(configured, BuiltInTerminalProfiles.detect());
+        if (builtIn != null) return new DefaultProfile(new ProfileChoice("builtin:" + builtIn.id(), builtIn.displayName(), builtIn.command()), "");
+        ExtensionRegistry.Owned<TerminalProfile> extension = resolveProfile(configured);
+        if (extension != null) return new DefaultProfile(new ProfileChoice(extension.extensionId() + ":" + extension.value().id(),
+            extension.value().displayName(), extension.value().command()), "");
+        return new DefaultProfile(null, "Configured terminal.default.profile '" + configured + "' is unavailable; used system shell");
     }
 
     private ExtensionRegistry.Owned<TerminalProfile> resolveProfile(String requested) {

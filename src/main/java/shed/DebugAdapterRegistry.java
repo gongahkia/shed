@@ -66,7 +66,7 @@ final class DebugAdapterRegistry {
     }
 
     record Configuration(String name, String adapter, Request request, String scope, String program, String module, String code, String cwd, List<String> args,
-        String prelaunchTask, String host, int port, List<String> fileExtensions) {
+        String prelaunchTask, String host, int port, List<String> fileExtensions, Map<String, String> environment) {
         Configuration {
             name = name == null ? "" : name;
             adapter = adapter == null ? "" : adapter;
@@ -80,6 +80,16 @@ final class DebugAdapterRegistry {
             prelaunchTask = prelaunchTask == null ? "" : prelaunchTask;
             host = host == null ? "" : host;
             fileExtensions = fileExtensions == null ? List.of() : List.copyOf(fileExtensions);
+            Map<String, String> suppliedEnvironment = environment == null ? Map.of() : environment;
+            if (!DebugAdapterRegistry.safeEnvironment(suppliedEnvironment)) {
+                throw new IllegalArgumentException("debug configuration environment is invalid");
+            }
+            environment = Map.copyOf(new LinkedHashMap<>(suppliedEnvironment));
+        }
+
+        Configuration(String name, String adapter, Request request, String scope, String program, String module, String code, String cwd, List<String> args,
+            String prelaunchTask, String host, int port, List<String> fileExtensions) {
+            this(name, adapter, request, scope, program, module, code, cwd, args, prelaunchTask, host, port, fileExtensions, Map.of());
         }
 
         Configuration(String name, String adapter, Request request, String scope, String program, String cwd, List<String> args,
@@ -262,6 +272,10 @@ final class DebugAdapterRegistry {
             return "module and code are launch-only";
         }
         if (!safeArguments(configuration.args())) return "args contain an invalid control character or exceed 64 KiB";
+        if (!safeEnvironment(configuration.environment())) return "environment contains an invalid name/value or exceeds 64 KiB";
+        if (configuration.request() == Request.ATTACH && !configuration.environment().isEmpty()) {
+            return "environment is launch-only";
+        }
         if (!configuration.prelaunchTask().isEmpty() && !identifier(configuration.prelaunchTask())) {
             return "preLaunchTask must name a Shed task identifier";
         }
@@ -453,6 +467,19 @@ final class DebugAdapterRegistry {
         for (String value : values == null ? List.<String>of() : values) {
             if (value == null || value.indexOf('\u0000') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0 || value.length() > 8 * 1024) return false;
             length += value.length();
+            if (length > 64 * 1024) return false;
+        }
+        return true;
+    }
+    static boolean safeEnvironment(Map<String, String> values) {
+        if (values == null || values.size() > 100) return false;
+        int length = 0;
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            if (key == null || !key.matches("[A-Za-z_][A-Za-z0-9_]*") || value == null || value.indexOf('\u0000') >= 0
+                || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0 || value.length() > 8 * 1024) return false;
+            length += key.length() + value.length();
             if (length > 64 * 1024) return false;
         }
         return true;

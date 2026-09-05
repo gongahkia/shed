@@ -54,6 +54,7 @@ public class ConfigManager {
     private static final int DEFAULT_UI_FONT_SIZE = 0;
     private static final String DEFAULT_TERMINAL_FONT_FAMILY = "Monospaced";
     private static final int DEFAULT_TERMINAL_FONT_SIZE = 14;
+    private static final String DEFAULT_TERMINAL_DEFAULT_PROFILE = "system";
     private static final int DEFAULT_TAB_SIZE = 4;
     private static final KeymapProfile DEFAULT_KEYMAP_PROFILE = KeymapProfile.VIM;
     private static final LineNumberMode DEFAULT_LINE_NUMBER_MODE = LineNumberMode.ABSOLUTE;
@@ -235,6 +236,7 @@ public class ConfigManager {
         defineDefault("ui.font.size", DEFAULT_UI_FONT_SIZE);
         defineDefault("terminal.font.family", DEFAULT_TERMINAL_FONT_FAMILY);
         defineDefault("terminal.font.size", DEFAULT_TERMINAL_FONT_SIZE);
+        defineDefault("terminal.default.profile", DEFAULT_TERMINAL_DEFAULT_PROFILE);
         defineDefault("tab.size", DEFAULT_TAB_SIZE);
         defineDefault(KeymapProfile.CONFIG_KEY, DEFAULT_KEYMAP_PROFILE.configValue());
         defineDefault("line.numbers", DEFAULT_LINE_NUMBER_MODE.toConfigValue());
@@ -365,6 +367,7 @@ public class ConfigManager {
             case "ui.font.size" -> "Application UI font size; zero uses each system UI default size";
             case "terminal.font.family" -> "Terminal font family";
             case "terminal.font.size" -> "Terminal font size";
+            case "terminal.default.profile" -> "Default profile for newly opened terminals";
             case "tab.size" -> "Tab width in spaces";
             case "keymap.profile" -> "Input keymap profile";
             case "line.numbers" -> "Line number display mode";
@@ -818,6 +821,11 @@ public class ConfigManager {
 
     public int getTerminalFontSize() {
         return getInt("terminal.font.size", DEFAULT_TERMINAL_FONT_SIZE);
+    }
+
+    public String getTerminalDefaultProfile() {
+        String configured = getString("terminal.default.profile", DEFAULT_TERMINAL_DEFAULT_PROFILE);
+        return configured == null || configured.isBlank() ? DEFAULT_TERMINAL_DEFAULT_PROFILE : configured.trim();
     }
 
     public String getSnippetsDirectory() {

@@ -8,6 +8,8 @@ import java.util.Set;
 final class BuiltInDebugAdapterSupport {
     static final String PYTHON_DEBUGPY = "python-debugpy";
     static final String GO_DELVE = "go-delve";
+    static final String CSHARP_NETCOREDBG = "csharp-netcoredbg";
+    static final String NATIVE_LLDB = "native-lldb";
 
     private BuiltInDebugAdapterSupport() {
     }
@@ -34,11 +36,26 @@ final class BuiltInDebugAdapterSupport {
                 DebugAdapterRegistry.Capability.EVALUATE, DebugAdapterRegistry.Capability.CONTINUE, DebugAdapterRegistry.Capability.NEXT,
                 DebugAdapterRegistry.Capability.STEP_IN, DebugAdapterRegistry.Capability.STEP_OUT, DebugAdapterRegistry.Capability.PAUSE),
             new DebugAdapterRegistry.SpawnedTcpStartup(List.of("--listen=127.0.0.1:0"), "DAP server listening at:"), Map.of("mode", "debug"));
+        DebugAdapterRegistry.Adapter netcoredbg = new DebugAdapterRegistry.Adapter(CSHARP_NETCOREDBG, DebugAdapterRegistry.Transport.STDIO,
+            "netcoredbg", List.of("--interpreter=vscode"), Set.of(DebugAdapterRegistry.Capability.LAUNCH,
+                DebugAdapterRegistry.Capability.CONFIGURATION_DONE, DebugAdapterRegistry.Capability.BREAKPOINTS,
+                DebugAdapterRegistry.Capability.THREADS, DebugAdapterRegistry.Capability.STACK_TRACE,
+                DebugAdapterRegistry.Capability.SCOPES, DebugAdapterRegistry.Capability.VARIABLES, DebugAdapterRegistry.Capability.EVALUATE,
+                DebugAdapterRegistry.Capability.CONTINUE, DebugAdapterRegistry.Capability.NEXT, DebugAdapterRegistry.Capability.STEP_IN,
+                DebugAdapterRegistry.Capability.STEP_OUT, DebugAdapterRegistry.Capability.PAUSE));
+        DebugAdapterRegistry.Adapter lldb = new DebugAdapterRegistry.Adapter(NATIVE_LLDB, DebugAdapterRegistry.Transport.STDIO,
+            "lldb-dap", List.of(), Set.of(DebugAdapterRegistry.Capability.LAUNCH, DebugAdapterRegistry.Capability.CONFIGURATION_DONE,
+                DebugAdapterRegistry.Capability.BREAKPOINTS, DebugAdapterRegistry.Capability.THREADS,
+                DebugAdapterRegistry.Capability.STACK_TRACE, DebugAdapterRegistry.Capability.SCOPES,
+                DebugAdapterRegistry.Capability.VARIABLES, DebugAdapterRegistry.Capability.EVALUATE,
+                DebugAdapterRegistry.Capability.CONTINUE, DebugAdapterRegistry.Capability.NEXT, DebugAdapterRegistry.Capability.STEP_IN,
+                DebugAdapterRegistry.Capability.STEP_OUT, DebugAdapterRegistry.Capability.PAUSE));
         DebugAdapterRegistry.Configuration python = new DebugAdapterRegistry.Configuration(PYTHON_DEBUGPY, PYTHON_DEBUGPY,
             DebugAdapterRegistry.Request.LAUNCH, "workspace", "${file}", "${workspaceFolder}", List.of(), "", "127.0.0.1", 0, List.of(".py", ".pyw"));
         DebugAdapterRegistry.Configuration go = new DebugAdapterRegistry.Configuration(GO_DELVE, GO_DELVE,
             DebugAdapterRegistry.Request.LAUNCH, "workspace", "${file}", "${workspaceFolder}", List.of(), "", "127.0.0.1", 0, List.of(".go"));
-        return DebugAdapterRegistry.withAdapterDefaults(base, Map.of(PYTHON_DEBUGPY, debugpy, GO_DELVE, delve),
+        return DebugAdapterRegistry.withAdapterDefaults(base, Map.of(PYTHON_DEBUGPY, debugpy, GO_DELVE, delve, CSHARP_NETCOREDBG, netcoredbg,
+            NATIVE_LLDB, lldb),
             Map.of(PYTHON_DEBUGPY, python, GO_DELVE, go));
     }
 }

@@ -28,7 +28,7 @@ public final class ReferenceDocumentHighlightLanguageServer {
                         "selectionRangeProvider", Boolean.TRUE,
                         "documentLinkProvider", Map.of("resolveProvider", Boolean.TRUE),
                         "colorProvider", Boolean.TRUE,
-                        "diagnosticProvider", Map.of("interFileDependencies", Boolean.FALSE, "workspaceDiagnostics", Boolean.FALSE),
+                        "diagnosticProvider", Map.of("interFileDependencies", Boolean.FALSE, "workspaceDiagnostics", Boolean.TRUE),
                         "executeCommandProvider", Map.of("commands", List.of("test.run")))
                 ));
                 case "textDocument/documentHighlight" -> respond(System.out, request.get("id"), highlights(request));
@@ -45,6 +45,7 @@ public final class ReferenceDocumentHighlightLanguageServer {
                 case "documentLink/resolve" -> respond(System.out, request.get("id"), resolvedDocumentLink(request));
                 case "textDocument/documentColor" -> respond(System.out, request.get("id"), List.of(documentColor()));
                 case "textDocument/diagnostic" -> respond(System.out, request.get("id"), pullDiagnostics(request));
+                case "workspace/diagnostic" -> respond(System.out, request.get("id"), workspaceDiagnostics());
                 case "workspace/executeCommand" -> respond(System.out, request.get("id"), null);
                 case "shutdown" -> respond(System.out, request.get("id"), null);
                 case "exit" -> {
@@ -122,6 +123,19 @@ public final class ReferenceDocumentHighlightLanguageServer {
             "range", Map.of("start", Map.of("line", 2, "character", 1), "end", Map.of("line", 2, "character", 4)),
             "severity", 2,
             "message", "pulled warning"
+        )));
+    }
+
+    private static Map<String, Object> workspaceDiagnostics() {
+        return Map.of("items", List.of(Map.of(
+            "uri", "file:///workspace/Workspace.java",
+            "kind", "full",
+            "resultId", "workspace-v1",
+            "items", List.of(Map.of(
+                "range", Map.of("start", Map.of("line", 4, "character", 2), "end", Map.of("line", 4, "character", 6)),
+                "severity", 1,
+                "message", "workspace error"
+            ))
         )));
     }
 

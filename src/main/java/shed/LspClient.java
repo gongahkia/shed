@@ -23,6 +23,7 @@ public class LspClient {
     private static final int MAX_SELECTION_RANGE_DEPTH = 100;
     private static final int MAX_DOCUMENT_LINKS = 500;
     private static final int MAX_DOCUMENT_COLORS = 500;
+    private static final int MAX_WORKSPACE_DIAGNOSTIC_REPORTS = 500;
     private static final List<String> STANDARD_SEMANTIC_TOKEN_TYPES = List.of(
         "namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter", "variable",
         "property", "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment",
@@ -1248,6 +1249,46 @@ public class LspClient {
         Runnable handler = diagnosticsChangedHandler;
         if (handler != null) handler.run();
         return List.copyOf(parsed);
+    }
+
+    public Map<String, List<Diagnostic>> workspaceDiagnostics() {
+        if (!supports(LspCapability.WORKSPACE_DIAGNOSTICS)) return Map.of();
+        List<Map<String, Object>> previousResultIds = new ArrayList<>();
+        for (Map.Entry<String, String> entry : pullDiagnosticResultIds.entrySet()) {
+            if (previousResultIds.size() >= MAX_WORKSPACE_DIAGNOSTIC_REPORTS) break;
+            if (entry.getKey() != null && !entry.getKey().isBlank() && entry.getValue() != null && !entry.getValue().isBlank()) {
+                previousResultIds.add(Map.of("uri", entry.getKey(), "value", entry.getValue()));
+            }
+        }
+        Map<String, Object> response = sendRequest("workspace/diagnostic", Map.of("previousResultIds", previousResultIds), 5000L);
+        Map<String, Object> result = MiniJson.asObject(response == null ? null : response.get("result"));
+        List<Object> reports = MiniJson.asArray(result == null ? null : result.get("items"));
+        if (reports == null) return Map.of();
+        Map<String, List<Diagnostic>> changed = new LinkedHashMap<>();
+        boolean diagnosticsChanged = false;
+        for (Object reportValue : reports) {
+            if (changed.size() >= MAX_WORKSPACE_DIAGNOSTIC_REPORTS) break;
+            Map<String, Object> report = MiniJson.asObject(reportValue);
+            String uri = MiniJson.asString(report == null ? null : report.get("uri"));
+            String kind = MiniJson.asString(report == null ? null : report.get("kind"));
+            if (uri == null || uri.isBlank() || kind == null) continue;
+            if ("unchanged".equals(kind)) {
+                changed.put(uri, getDiagnostics(uri));
+                continue;
+            }
+            if (!"full".equals(kind)) continue;
+            List<Object> values = MiniJson.asArray(report.get("items"));
+            if (values == null) continue;
+            List<Diagnostic> parsed = parseDiagnostics(values);
+            diagnostics.put(uri, parsed);
+            String resultId = MiniJson.asString(report.get("resultId"));
+            if (resultId == null || resultId.isBlank()) pullDiagnosticResultIds.remove(uri);
+            else pullDiagnosticResultIds.put(uri, resultId);
+            changed.put(uri, parsed);
+            diagnosticsChanged = true;
+        }
+        if (diagnosticsChanged && diagnosticsChangedHandler != null) diagnosticsChangedHandler.run();
+        return Map.copyOf(changed);
     }
 
     public Location definition(String uri, int line, int character) {

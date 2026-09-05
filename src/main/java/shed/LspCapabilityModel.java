@@ -38,7 +38,7 @@ final class LspCapabilityModel {
             boolean enabled = clientEnabled == null || !Boolean.FALSE.equals(clientEnabled.get(capability));
             Object advertised = serverCapabilities == null ? null : serverCapabilities.get(capability.serverField());
             availability.put(capability, !enabled ? Availability.DISABLED
-                : advertises(advertised) ? Availability.AVAILABLE : Availability.UNSUPPORTED);
+                : advertises(capability, advertised) ? Availability.AVAILABLE : Availability.UNSUPPORTED);
         }
         String serverName = MiniJson.asString(serverInfo == null ? null : serverInfo.get("name"));
         String serverVersion = MiniJson.asString(serverInfo == null ? null : serverInfo.get("version"));
@@ -70,7 +70,11 @@ final class LspCapabilityModel {
         return serverVersion.isBlank() ? " (" + serverName + ")" : " (" + serverName + " " + serverVersion + ")";
     }
 
-    private static boolean advertises(Object value) {
+    private static boolean advertises(LspCapability capability, Object value) {
+        if (capability == LspCapability.WORKSPACE_DIAGNOSTICS) {
+            Map<String, Object> diagnosticProvider = MiniJson.asObject(value);
+            return Boolean.TRUE.equals(diagnosticProvider == null ? null : diagnosticProvider.get("workspaceDiagnostics"));
+        }
         return Boolean.TRUE.equals(value) || value instanceof Map<?, ?>;
     }
 }

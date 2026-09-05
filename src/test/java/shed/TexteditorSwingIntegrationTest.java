@@ -780,6 +780,33 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void debugFunctionBreakpointCommandsPersistNamedBreakpointOptions() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-debug-function-breakpoints");
+        Path file = tempDir.resolve("debug-function-breakpoints.go");
+        Files.createDirectories(home);
+        Files.writeString(file, "package main\nfunc main() {}\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertEquals("Function breakpoint 'main.main' added.", onEdt(() -> editor.commandHandler.execute("debug function add main.main")));
+            assertEquals("Function breakpoint 'main.main' updated.",
+                onEdt(() -> editor.commandHandler.execute("debug function condition main.main -- count > 0")));
+            assertEquals("Function breakpoint 'main.main' updated.", onEdt(() -> editor.commandHandler.execute("debug function hit main.main -- 3")));
+            assertEquals("Function breakpoint 'main.main' updated.", onEdt(() -> editor.commandHandler.execute("debug function disable main.main")));
+
+            FunctionBreakpointStore.Breakpoint breakpoint = onEdt(() -> editor.debugSessionController.functionBreakpointsForPanel().getFirst());
+            assertFalse(breakpoint.enabled());
+            assertEquals("count > 0", breakpoint.condition());
+            assertEquals("3", breakpoint.hitCondition());
+            assertEquals("Showing function breakpoints.", onEdt(() -> editor.commandHandler.execute("debug function list")));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("main.main"));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void debugPreLaunchTaskRunsBeforeAnAdapterProcessIsOpened() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-debug-prelaunch");

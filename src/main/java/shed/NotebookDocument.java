@@ -11,6 +11,9 @@ final class NotebookDocument {
     private static final int MAX_IMAGES_PER_CELL = 16;
     private static final int MAX_IMAGE_BYTES = 4 * 1024 * 1024;
     private static final int MAX_ENCODED_IMAGE_CHARACTERS = (MAX_IMAGE_BYTES * 4 / 3) + 8;
+    private static final int MAX_MARKDOWN_OUTPUTS_PER_CELL = 16;
+    private static final int MAX_MARKDOWN_OUTPUT_CHARACTERS = 128 * 1024;
+    private static final int MAX_JSON_OUTPUT_CHARACTERS = 128 * 1024;
 
     record Cell(String type, String source, Map<String, Object> fields) {
         Cell {
@@ -27,6 +30,10 @@ final class NotebookDocument {
         }
 
         @Override public byte[] bytes() { return bytes.clone(); }
+    }
+
+    record MarkdownOutput(String markdown) {
+        MarkdownOutput { markdown = markdown == null ? "" : markdown; }
     }
 
     private final Map<String, Object> root;
@@ -143,7 +150,10 @@ final class NotebookDocument {
             String text = source(output.get("text"));
             if (text.isBlank()) {
                 Map<String, Object> data = MiniJson.asObject(output.get("data"));
-                if (data != null) text = source(data.get("text/plain"));
+                if (data != null) {
+                    text = source(data.get("text/plain"));
+                    if (text.isBlank() && data.containsKey("application/json")) text = jsonText(data.get("application/json"));
+                }
             }
             if (text.isBlank()) {
                 String name = MiniJson.asString(output.get("ename"));
@@ -156,6 +166,15 @@ final class NotebookDocument {
             }
         }
         return result.toString();
+    }
+
+    private static String jsonText(Object value) {
+        try {
+            String serialized = MiniJson.stringify(value);
+            return serialized.length() > MAX_JSON_OUTPUT_CHARACTERS ? "" : serialized;
+        } catch (RuntimeException ignored) {
+            return "";
+        }
     }
 
     /** Returns bounded PNG/JPEG display data only; HTML, SVG, and scriptable MIME outputs stay inert. */
@@ -172,6 +191,23 @@ final class NotebookDocument {
             if (data == null) continue;
             addImage(result, "image/png", source(data.get("image/png")));
             if (result.size() < MAX_IMAGES_PER_CELL) addImage(result, "image/jpeg", source(data.get("image/jpeg")));
+        }
+        return List.copyOf(result);
+    }
+
+    /** Returns bounded text/markdown display data; raw HTML remains sanitised by the view renderer. */
+    static List<MarkdownOutput> markdownOutputs(Cell cell) {
+        if (cell == null || !"code".equals(cell.type())) return List.of();
+        List<Object> outputs = MiniJson.asArray(cell.fields().get("outputs"));
+        if (outputs == null || outputs.isEmpty()) return List.of();
+        List<MarkdownOutput> result = new ArrayList<>();
+        for (Object raw : outputs) {
+            if (result.size() >= MAX_MARKDOWN_OUTPUTS_PER_CELL) break;
+            Map<String, Object> output = MiniJson.asObject(raw);
+            Map<String, Object> data = MiniJson.asObject(output == null ? null : output.get("data"));
+            String markdown = source(data == null ? null : data.get("text/markdown"));
+            if (markdown.isBlank() || markdown.length() > MAX_MARKDOWN_OUTPUT_CHARACTERS) continue;
+            result.add(new MarkdownOutput(markdown));
         }
         return List.copyOf(result);
     }

@@ -236,6 +236,10 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:debug breakpoint enable\|disable\|remove <line>` | Update the active file's source breakpoint |
 | `:debug breakpoint condition\|hit\|log <line> <value>` | Set a bounded condition, hit condition, or log message on the active-file breakpoint |
 | `:debug breakpoint clear-condition\|clear-hit\|clear-log <line>` | Clear one active-file breakpoint option |
+| `:debug function list` | Open persisted function breakpoints for the selected workspace |
+| `:debug function add\|enable\|disable\|remove <name>` | Add or update a named function breakpoint; it is synchronized only with a declared and runtime-advertised DAP function-breakpoint adapter |
+| `:debug function condition\|hit <name> -- <value>` | Set a bounded function-breakpoint condition or hit condition; `--` separates a name that may contain spaces from its value |
+| `:debug function clear-condition\|clear-hit <name>` | Clear one function-breakpoint option |
 | `:debug exception list` | Show exception filters returned by the current compatible adapter and their effective workspace settings |
 | `:debug exception enable\|disable <filter>` | Persist an explicit override and synchronize it with the running compatible adapter |
 

@@ -28,6 +28,7 @@ class BuiltInDebugAdapterSupportTest {
         assertEquals(java.util.List.of("dap"), delve.args());
         assertEquals(java.util.List.of("--listen=127.0.0.1:0"), delve.spawnedTcpStartup().arguments());
         assertEquals("debug", delve.launchDefaults().get("mode"));
+        assertTrue(delve.capabilities().contains(DebugAdapterRegistry.Capability.FUNCTION_BREAKPOINTS));
         assertEquals(java.util.List.of(".go"), validation.configurations().get(BuiltInDebugAdapterSupport.GO_DELVE).fileExtensions());
         assertTrue(DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.GO_DELVE, workspace, workspace.resolve("main.go")).launchable());
         assertFalse(DebugAdapterRegistry.plan(validation, BuiltInDebugAdapterSupport.GO_DELVE, workspace, workspace.resolve("main.py")).launchable());
@@ -39,6 +40,7 @@ class BuiltInDebugAdapterSupportTest {
         DebugAdapterRegistry.Adapter lldb = validation.registry().adapter(BuiltInDebugAdapterSupport.NATIVE_LLDB);
         assertEquals("lldb-dap", lldb.command());
         assertTrue(lldb.capabilities().contains(DebugAdapterRegistry.Capability.BREAKPOINTS));
+        assertTrue(lldb.capabilities().contains(DebugAdapterRegistry.Capability.FUNCTION_BREAKPOINTS));
         assertFalse(validation.configurations().containsKey(BuiltInDebugAdapterSupport.NATIVE_LLDB));
     }
 

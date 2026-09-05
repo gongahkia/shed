@@ -448,6 +448,90 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void synchronizesPersistedFunctionBreakpointsOnlyAfterTheAdapterAdvertisesSupport(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        FunctionBreakpointStore store = new FunctionBreakpointStore(tempDir.resolve("state"));
+        store.add(workspace, "main");
+        store.configure(workspace, "main", true, "count > 2", "5");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsFunctionBreakpoints", true,
+            "supportsConditionalBreakpoints", true, "supportsHitConditionalBreakpoints", true), ""));
+        connection.responses.put("setFunctionBreakpoints", response("setFunctionBreakpoints", true, Map.of("breakpoints", List.of(Map.of("verified", true))), ""));
+
+        DebugSessionService.Result result = service.start(workspace, file,
+            validation("launch,function_breakpoints,conditional_breakpoints,hit_conditional_breakpoints"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, listener) -> connection, null, null, store);
+
+        assertTrue(result.succeeded());
+        assertEquals(List.of("initialize", "launch", "setFunctionBreakpoints"), connection.commands);
+        assertEquals(List.of(Map.of("name", "main", "condition", "count > 2", "hitCondition", "5")), connection.arguments.get(2).get("breakpoints"));
+        assertEquals(FunctionBreakpointStore.State.VERIFIED, store.breakpoints(workspace).getFirst().state());
+    }
+
+    @Test
+    void doesNotSynchronizeFunctionBreakpointsWithoutInitializeSupport(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        FunctionBreakpointStore store = new FunctionBreakpointStore(tempDir.resolve("state"));
+        store.add(workspace, "main");
+        FakeConnection connection = new FakeConnection();
+
+        DebugSessionService.Result result = service.start(workspace, file, validation("launch,function_breakpoints"), enabled(), "main",
+            Duration.ofSeconds(1), (plan, features, listener) -> connection, null, null, store);
+
+        assertTrue(result.succeeded());
+        assertEquals(List.of("initialize", "launch"), connection.commands);
+        assertEquals(FunctionBreakpointStore.State.REQUESTED, store.breakpoints(workspace).getFirst().state());
+    }
+
+    @Test
+    void sendsFunctionBreakpointsBeforeConfigurationDoneAfterInitialized(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.go");
+        FunctionBreakpointStore store = new FunctionBreakpointStore(tempDir.resolve("state"));
+        store.add(workspace, "main.main");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsFunctionBreakpoints", true,
+            "supportsConfigurationDoneRequest", true), ""));
+        connection.responses.put("setFunctionBreakpoints", response("setFunctionBreakpoints", true,
+            Map.of("breakpoints", List.of(Map.of("verified", true))), ""));
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+        connection.requestHook = command -> {
+            if ("launch".equals(command)) listener.get().onEvent(new DebugAdapterTransport.Event(1, "initialized", Map.of()));
+        };
+
+        DebugSessionService.Result result = service.start(workspace, file, validation("launch,function_breakpoints,configuration_done"), enabled(),
+            "main", Duration.ofSeconds(1), (plan, features, value) -> { listener.set(value); return connection; }, null, null, store);
+
+        assertTrue(result.succeeded());
+        assertEquals(List.of("initialize", "launch", "setFunctionBreakpoints", "configurationDone"), connection.commands);
+    }
+
+    @Test
+    void clearsFunctionBreakpointsAtTheAdapterWhenEveryPersistedEntryIsDisabled(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.go");
+        FunctionBreakpointStore store = new FunctionBreakpointStore(tempDir.resolve("state"));
+        store.add(workspace, "main.main");
+        store.configure(workspace, "main.main", false, "", "");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsFunctionBreakpoints", true), ""));
+        connection.responses.put("setFunctionBreakpoints", response("setFunctionBreakpoints", true, Map.of("breakpoints", List.of()), ""));
+
+        DebugSessionService.Result result = service.start(workspace, file, validation("launch,function_breakpoints"), enabled(), "main",
+            Duration.ofSeconds(1), (plan, features, listener) -> connection, null, null, store);
+
+        assertTrue(result.succeeded());
+        assertEquals(List.of(), connection.arguments.get(2).get("breakpoints"));
+        assertFalse(store.breakpoints(workspace).getFirst().enabled());
+    }
+
+    @Test
     void doesNotSendExceptionBreakpointConfigurationWithoutAdapterFilters(@TempDir Path tempDir) throws Exception {
         DebugSessionService service = new DebugSessionService();
         Path workspace = tempDir.resolve("workspace");

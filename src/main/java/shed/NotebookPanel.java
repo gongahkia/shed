@@ -167,8 +167,9 @@ final class NotebookPanel extends JPanel {
                 add(new JScrollPane(source), BorderLayout.CENTER);
             }
             String output = NotebookDocument.outputText(cell);
+            List<NotebookDocument.MarkdownOutput> markdown = NotebookDocument.markdownOutputs(cell);
             List<NotebookDocument.ImageOutput> images = NotebookDocument.imageOutputs(cell);
-            if (!output.isBlank() || !images.isEmpty()) {
+            if (!output.isBlank() || !markdown.isEmpty() || !images.isEmpty()) {
                 JPanel outputPanel = new JPanel(new BorderLayout(0, 3));
                 outputPanel.add(new JLabel("Output"), BorderLayout.NORTH);
                 JPanel contents = new JPanel();
@@ -179,6 +180,20 @@ final class NotebookPanel extends JPanel {
                     outputs.setLineWrap(true);
                     outputs.setWrapStyleWord(true);
                     contents.add(new JScrollPane(outputs));
+                }
+                for (NotebookDocument.MarkdownOutput value : markdown) {
+                    JEditorPane preview = new JEditorPane();
+                    preview.setContentType("text/html");
+                    preview.setEditable(false);
+                    preview.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE);
+                    preview.getAccessibleContext().setAccessibleName("Notebook Markdown Output");
+                    preview.setText(markdownPreview(value.markdown(), sourceFile));
+                    JScrollPane rendered = new JScrollPane(preview);
+                    rendered.setAlignmentX(Component.LEFT_ALIGNMENT);
+                    rendered.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, 360));
+                    rendered.setPreferredSize(new java.awt.Dimension(700, 220));
+                    contents.add(Box.createVerticalStrut(5));
+                    contents.add(rendered);
                 }
                 for (NotebookDocument.ImageOutput image : images) {
                     try {

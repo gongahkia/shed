@@ -105,6 +105,42 @@ class NotebookDocumentTest {
     }
 
     @Test
+    void extractsBoundedMarkdownDisplayDataForTheSanitizedNotebookView() {
+        NotebookDocument document = NotebookDocument.empty().withCells(List.of(new NotebookDocument.Cell("code", "", Map.of("outputs", List.of(
+            Map.of("data", Map.of("text/markdown", List.of("# Result\n", "<script>bad()</script>"), "text/html", "<b>ignored</b>")))))));
+
+        List<NotebookDocument.MarkdownOutput> outputs = NotebookDocument.markdownOutputs(document.cells().getFirst());
+
+        assertEquals(List.of("# Result\n<script>bad()</script>"), outputs.stream().map(NotebookDocument.MarkdownOutput::markdown).toList());
+        assertFalse(MarkdownPreviewRenderer.renderBasic(outputs.getFirst().markdown(), "Notebook", null, null, null, null).contains("<script>"));
+    }
+
+    @Test
+    void skipsOversizedMarkdownDisplayData() {
+        NotebookDocument document = NotebookDocument.empty().withCells(List.of(new NotebookDocument.Cell("code", "", Map.of("outputs", List.of(
+            Map.of("data", Map.of("text/markdown", "x".repeat(128 * 1024 + 1))))))));
+
+        assertEquals(List.of(), NotebookDocument.markdownOutputs(document.cells().getFirst()));
+    }
+
+    @Test
+    void rendersBoundedApplicationJsonAsInertTextWhenPlainTextIsUnavailable() {
+        NotebookDocument document = NotebookDocument.empty().withCells(List.of(new NotebookDocument.Cell("code", "", Map.of("outputs", List.of(
+            Map.of("data", Map.of("application/json", Map.of("count", 2L, "items", List.of("a", "b")))))))));
+
+        assertEquals(Map.of("count", 2L, "items", List.of("a", "b")),
+            MiniJson.asObject(MiniJson.parse(NotebookDocument.outputText(document.cells().getFirst()))));
+    }
+
+    @Test
+    void skipsOversizedApplicationJsonDisplayData() {
+        NotebookDocument document = NotebookDocument.empty().withCells(List.of(new NotebookDocument.Cell("code", "", Map.of("outputs", List.of(
+            Map.of("data", Map.of("application/json", "x".repeat(128 * 1024))))))));
+
+        assertEquals("", NotebookDocument.outputText(document.cells().getFirst()));
+    }
+
+    @Test
     void decodesValidNotebookRasterOutputAfterHeaderChecks() throws Exception {
         BufferedImage source = new BufferedImage(3, 2, BufferedImage.TYPE_INT_ARGB);
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();

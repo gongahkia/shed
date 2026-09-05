@@ -113,7 +113,7 @@ final class LspController {
         flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|links [index]|colors|pulldiagnostics|workspacediagnostics|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|links [index]|colors|folding|pulldiagnostics|workspacediagnostics|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -170,6 +170,10 @@ final class LspController {
             case "workspace-diagnostics":
             case "workspacediag":
                 return lspWorkspaceDiagnostics();
+            case "folding":
+            case "foldingranges":
+            case "folding-ranges":
+                return lspFoldingRanges();
             case "format":
                 return lspFormat();
             case "peek":
@@ -901,6 +905,32 @@ final class LspController {
         }
         editor.updateQuickfixEntries("workspace diagnostics", entries);
         return editor.openQuickfixList();
+    }
+
+    public String lspFoldingRanges() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP folding ranges require a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        String unavailable = capabilityUnavailable(client, LspCapability.FOLDING_RANGES);
+        if (unavailable != null) return unavailable;
+        syncLspOpen(buffer);
+        flushPendingLspChange(buffer);
+        String uri = bufferUri(buffer);
+        Integer version = editor.lspDocumentVersions.get(uri);
+        List<LspClient.FoldingRange> ranges = client.foldingRanges(uri);
+        if (!Objects.equals(version, editor.lspDocumentVersions.get(uri))) return "Folding ranges became stale; refresh again";
+        StringBuilder text = new StringBuilder("LSP Folding Ranges\n\n");
+        for (LspClient.FoldingRange range : ranges) {
+            text.append(range.startLine() + 1).append(":").append(range.startCharacter() < 0 ? 1 : range.startCharacter() + 1)
+                .append("–").append(range.endLine() + 1).append(":").append(range.endCharacter() < 0 ? "end" : range.endCharacter() + 1);
+            if (range.kind() != null && !range.kind().isBlank()) text.append("  ").append(editor.safePreviewText(range.kind(), 80));
+            text.append('\n');
+        }
+        if (ranges.isEmpty()) text.append("No folding ranges\n");
+        text.append("\nThese ranges are informational; the current editor fold model remains Markdown-heading-only.\n");
+        editor.showScratchBuffer("[lsp folding ranges]", text.toString());
+        return "Showing " + ranges.size() + " folding range" + (ranges.size() == 1 ? "" : "s");
     }
 
     public String lspFormat() {

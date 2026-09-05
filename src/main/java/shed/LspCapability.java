@@ -22,6 +22,7 @@ enum LspCapability {
     DOCUMENT_COLORS("document colors", "colorProvider"),
     PULL_DIAGNOSTICS("pull diagnostics", "diagnosticProvider"),
     WORKSPACE_DIAGNOSTICS("workspace diagnostics", "diagnosticProvider"),
+    FOLDING_RANGES("folding ranges", "foldingRangeProvider"),
     DOCUMENT_SYMBOLS("document symbols", "documentSymbolProvider"),
     WORKSPACE_SYMBOLS("workspace symbols", "workspaceSymbolProvider"),
     EXECUTE_COMMAND("command execution", "executeCommandProvider");

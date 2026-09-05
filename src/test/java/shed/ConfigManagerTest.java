@@ -287,6 +287,7 @@ public class ConfigManagerTest {
         config.setAndPersist("lsp.document.colors.enabled", "false");
         config.setAndPersist("lsp.pull.diagnostics.enabled", "false");
         config.setAndPersist("lsp.workspace.diagnostics.enabled", "false");
+        config.setAndPersist("lsp.folding.ranges.enabled", "false");
         config.setAndPersist("lsp.definition.enabled", "false");
         config.setAndPersist("lsp.type.definition.enabled", "false");
         config.setAndPersist("lsp.implementation.enabled", "false");
@@ -302,7 +303,7 @@ public class ConfigManagerTest {
         assertTrue(config.getLspFormatOnSaveEnabled());
 
         LspFeatureSettings features = config.getLspFeatureSettings();
-        assertEquals(new LspFeatureSettings(false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false), features);
+        assertEquals(new LspFeatureSettings(false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false), features);
         assertFalse(features.capabilityEnablement().get(LspCapability.COMPLETION));
         assertFalse(features.capabilityEnablement().get(LspCapability.SIGNATURE_HELP));
         assertFalse(features.capabilityEnablement().get(LspCapability.HOVER));
@@ -325,6 +326,7 @@ public class ConfigManagerTest {
         assertFalse(features.capabilityEnablement().get(LspCapability.DOCUMENT_COLORS));
         assertFalse(features.capabilityEnablement().get(LspCapability.PULL_DIAGNOSTICS));
         assertFalse(features.capabilityEnablement().get(LspCapability.WORKSPACE_DIAGNOSTICS));
+        assertFalse(features.capabilityEnablement().get(LspCapability.FOLDING_RANGES));
         TypedSettings.Descriptor descriptor = config.typedSettingDescriptors().stream()
             .filter(setting -> setting.key().equals("lsp.command.execution.enabled"))
             .findFirst()

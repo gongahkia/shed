@@ -24,6 +24,7 @@ public class LspClient {
     private static final int MAX_DOCUMENT_LINKS = 500;
     private static final int MAX_DOCUMENT_COLORS = 500;
     private static final int MAX_WORKSPACE_DIAGNOSTIC_REPORTS = 500;
+    private static final int MAX_FOLDING_RANGES = 500;
     private static final List<String> STANDARD_SEMANTIC_TOKEN_TYPES = List.of(
         "namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter", "variable",
         "property", "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment",
@@ -253,6 +254,9 @@ public class LspClient {
         private static int component(double value) {
             return (int) Math.round(Math.max(0.0, Math.min(1.0, value)) * 255.0);
         }
+    }
+
+    public record FoldingRange(int startLine, int endLine, int startCharacter, int endCharacter, String kind) {
     }
 
     public record DocumentHighlight(int startLine, int startCharacter, int endLine, int endCharacter, int kind) {
@@ -1291,6 +1295,31 @@ public class LspClient {
         return Map.copyOf(changed);
     }
 
+    public List<FoldingRange> foldingRanges(String uri) {
+        if (!supports(LspCapability.FOLDING_RANGES) || uri == null || uri.isBlank()) return List.of();
+        Map<String, Object> response = sendRequest("textDocument/foldingRange", Map.of("textDocument", Map.of("uri", uri)), 2500L);
+        return parseFoldingRanges(response == null ? null : response.get("result"));
+    }
+
+    static List<FoldingRange> parseFoldingRanges(Object value) {
+        List<Object> values = MiniJson.asArray(value);
+        if (values == null || values.isEmpty()) return List.of();
+        List<FoldingRange> ranges = new ArrayList<>();
+        for (Object valueItem : values) {
+            if (ranges.size() >= MAX_FOLDING_RANGES) break;
+            Map<String, Object> range = MiniJson.asObject(valueItem);
+            Integer startLine = MiniJson.asInt(range == null ? null : range.get("startLine"));
+            Integer endLine = MiniJson.asInt(range == null ? null : range.get("endLine"));
+            Integer startCharacter = MiniJson.asInt(range == null ? null : range.get("startCharacter"));
+            Integer endCharacter = MiniJson.asInt(range == null ? null : range.get("endCharacter"));
+            if (startLine == null || endLine == null || startLine < 0 || endLine < startLine
+                || (startCharacter != null && startCharacter < 0) || (endCharacter != null && endCharacter < 0)) continue;
+            ranges.add(new FoldingRange(startLine, endLine, startCharacter == null ? -1 : startCharacter,
+                endCharacter == null ? -1 : endCharacter, MiniJson.asString(range.get("kind"))));
+        }
+        return List.copyOf(ranges);
+    }
+
     public Location definition(String uri, int line, int character) {
         if (!supports(LspCapability.DEFINITION)) {
             return null;
@@ -1640,6 +1669,9 @@ public class LspClient {
         Map<String, Object> diagnostic = new LinkedHashMap<>();
         diagnostic.put("dynamicRegistration", Boolean.FALSE);
         diagnostic.put("relatedDocumentSupport", Boolean.FALSE);
+        Map<String, Object> foldingRange = new LinkedHashMap<>();
+        foldingRange.put("dynamicRegistration", Boolean.FALSE);
+        foldingRange.put("lineFoldingOnly", Boolean.FALSE);
         Map<String, Object> diagnosticsCapability = new LinkedHashMap<>();
         diagnosticsCapability.put("relatedInformation", Boolean.FALSE);
         Map<String, Object> changeAnnotationSupport = new LinkedHashMap<>();
@@ -1671,6 +1703,7 @@ public class LspClient {
         textDocument.put("documentLink", documentLink);
         textDocument.put("colorProvider", colorProvider);
         textDocument.put("diagnostic", diagnostic);
+        textDocument.put("foldingRange", foldingRange);
         capabilities.put("textDocument", textDocument);
         capabilities.put("workspace", workspace);
 

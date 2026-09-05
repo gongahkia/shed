@@ -29,6 +29,7 @@ public final class ReferenceDocumentHighlightLanguageServer {
                         "documentLinkProvider", Map.of("resolveProvider", Boolean.TRUE),
                         "colorProvider", Boolean.TRUE,
                         "diagnosticProvider", Map.of("interFileDependencies", Boolean.FALSE, "workspaceDiagnostics", Boolean.TRUE),
+                        "foldingRangeProvider", Boolean.TRUE,
                         "executeCommandProvider", Map.of("commands", List.of("test.run")))
                 ));
                 case "textDocument/documentHighlight" -> respond(System.out, request.get("id"), highlights(request));
@@ -46,6 +47,9 @@ public final class ReferenceDocumentHighlightLanguageServer {
                 case "textDocument/documentColor" -> respond(System.out, request.get("id"), List.of(documentColor()));
                 case "textDocument/diagnostic" -> respond(System.out, request.get("id"), pullDiagnostics(request));
                 case "workspace/diagnostic" -> respond(System.out, request.get("id"), workspaceDiagnostics());
+                case "textDocument/foldingRange" -> respond(System.out, request.get("id"), List.of(Map.of(
+                    "startLine", 10, "startCharacter", 2, "endLine", 18, "endCharacter", 1, "kind", "region"
+                )));
                 case "workspace/executeCommand" -> respond(System.out, request.get("id"), null);
                 case "shutdown" -> respond(System.out, request.get("id"), null);
                 case "exit" -> {

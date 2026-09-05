@@ -16,6 +16,7 @@ record LspFeatureSettings(
     boolean documentColors,
     boolean pullDiagnostics,
     boolean workspaceDiagnostics,
+    boolean foldingRanges,
     boolean definition,
     boolean typeDefinition,
     boolean implementation,
@@ -29,7 +30,7 @@ record LspFeatureSettings(
     boolean formatting
 ) {
     static LspFeatureSettings defaults() {
-        return new LspFeatureSettings(true, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true);
+        return new LspFeatureSettings(true, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true);
     }
 
     Map<LspCapability, Boolean> capabilityEnablement() {
@@ -56,6 +57,7 @@ record LspFeatureSettings(
         enabled.put(LspCapability.DOCUMENT_COLORS, documentColors);
         enabled.put(LspCapability.PULL_DIAGNOSTICS, pullDiagnostics);
         enabled.put(LspCapability.WORKSPACE_DIAGNOSTICS, workspaceDiagnostics);
+        enabled.put(LspCapability.FOLDING_RANGES, foldingRanges);
         return enabled;
     }
 }

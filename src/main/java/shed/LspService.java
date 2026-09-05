@@ -46,6 +46,7 @@ public class LspService {
         if ("ps1".equals(extension) || "psm1".equals(extension) || "psd1".equals(extension)) {
             return "powershell";
         }
+        if ("cmake".equals(extension) || "cmakelists".equals(extension)) return "cmake";
         return languageId(fileType);
     }
 

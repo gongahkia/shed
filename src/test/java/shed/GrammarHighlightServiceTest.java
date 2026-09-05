@@ -80,6 +80,10 @@ class GrammarHighlightServiceTest {
         String shell = "if true; then # local comment";
         assertTrue(has(highlight("deploy.sh", shell), shell, "if", GrammarHighlightService.Scope.KEYWORD));
         assertTrue(has(highlight("deploy.sh", shell), shell, "# local comment", GrammarHighlightService.Scope.COMMENT));
+
+        String cmake = "CMAKE_MINIMUM_REQUIRED(VERSION 3.21) # local comment";
+        assertTrue(has(highlight("CMakeLists.txt", cmake), cmake, "CMAKE_MINIMUM_REQUIRED", GrammarHighlightService.Scope.KEYWORD));
+        assertTrue(has(highlight("CMakeLists.txt", cmake), cmake, "# local comment", GrammarHighlightService.Scope.COMMENT));
     }
 
     @Test

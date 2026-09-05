@@ -27,6 +27,7 @@ public enum FileType {
     MARKDOWN("markdown"),
     YAML("yaml"),
     TOML("toml"),
+    CMAKE("cmake"),
     SQL("sql"),
     SHELL("shell"),
     TEXT("text"),
@@ -45,6 +46,9 @@ public enum FileType {
     public static FileType detect(File file, String content) {
         if (file != null) {
             String name = file.getName().toLowerCase();
+            if (name.equals("cmakelists.txt") || name.endsWith(".cmake.in")) {
+                return CMAKE;
+            }
             if (name.equals("rakefile") || name.equals("gemfile") || name.equals("guardfile") || name.equals("capfile")) {
                 return RUBY;
             }
@@ -118,6 +122,8 @@ public enum FileType {
                         return YAML;
                     case "toml":
                         return TOML;
+                    case "cmake":
+                        return CMAKE;
                     case "sql":
                         return SQL;
                     case "sh":

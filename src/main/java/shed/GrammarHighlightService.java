@@ -373,6 +373,7 @@ final class GrammarHighlightService {
             case "json" -> FileType.JSON;
             case "yaml", "yml" -> FileType.YAML;
             case "toml" -> FileType.TOML;
+            case "cmake", "cmakelists" -> FileType.CMAKE;
             case "sql" -> FileType.SQL;
             case "sh", "shell", "bash", "zsh", "fish", "powershell", "pwsh", "ps1" -> FileType.SHELL;
             default -> FileType.TEXT;
@@ -517,7 +518,8 @@ final class GrammarHighlightService {
                 index = end;
                 continue;
             }
-            if ((type == FileType.PYTHON || type == FileType.PHP || type == FileType.RUBY || type == FileType.YAML || type == FileType.TOML || type == FileType.SHELL) && current == '#') {
+            if ((type == FileType.PYTHON || type == FileType.PHP || type == FileType.RUBY || type == FileType.YAML || type == FileType.TOML
+                || type == FileType.CMAKE || type == FileType.SHELL) && current == '#') {
                 add(tokens, index, to, Scope.COMMENT);
                 break;
             }
@@ -573,7 +575,7 @@ final class GrammarHighlightService {
     private boolean isKeyword(String text, int start, int end, FileType type) {
         int length = end - start;
         for (String keyword : keywords.getOrDefault(type, Set.of())) {
-            if (keyword.length() == length && text.regionMatches(type == FileType.SQL, start, keyword, 0, length)) return true;
+            if (keyword.length() == length && text.regionMatches(type == FileType.SQL || type == FileType.CMAKE, start, keyword, 0, length)) return true;
         }
         return false;
     }

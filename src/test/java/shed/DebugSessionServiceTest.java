@@ -387,6 +387,42 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void disassemblesBoundedInstructionsOnlyWhenTheAdapterAdvertisesTheStandardRequest() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-disassemble").toAbsolutePath();
+        Path file = workspace.resolve("Main.cpp");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsDisassembleRequest", true), ""));
+        connection.responses.put("disassemble", response("disassemble", true, Map.of("instructions", List.of(
+            Map.of("address", "0x1004", "instructionBytes", "90", "instruction", "nop", "symbol", "main"))), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,disassemble"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, listener) -> connection).succeeded());
+        DebugSessionService.DisassemblyResult result = service.disassemble(workspace, "0x1000", 4, 16, Duration.ofSeconds(1));
+
+        assertTrue(result.succeeded());
+        assertEquals(new DebugSessionService.DisassembledInstruction("0x1004", "90", "nop", "main"), result.instructions().getFirst());
+        assertEquals(Map.of("memoryReference", "0x1000", "offset", 4, "instructionCount", 16), connection.arguments.getLast());
+    }
+
+    @Test
+    void refusesDisassemblyWhenTheAdapterDoesNotAdvertiseTheStandardRequest() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-disassemble-unavailable").toAbsolutePath();
+        Path file = workspace.resolve("Main.cpp");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("initialize", response("initialize", true, Map.of(), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,disassemble"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, listener) -> connection).succeeded());
+        DebugSessionService.DisassemblyResult result = service.disassemble(workspace, "0x1000", 0, 16, Duration.ofSeconds(1));
+
+        assertFalse(result.succeeded());
+        assertEquals(List.of("initialize", "launch"), connection.commands);
+        assertTrue(result.snapshot().detail().contains("unavailable"));
+    }
+
+    @Test
     void sendsRunToCursorOnlyWhenDeclaredAndAdvertised() {
         DebugSessionService service = new DebugSessionService();
         Path workspace = Path.of("build/debug-goto").toAbsolutePath();

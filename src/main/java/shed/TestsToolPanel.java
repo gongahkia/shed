@@ -13,6 +13,7 @@ import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -67,6 +68,8 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
         controls.add(button("Debug Selection", () -> message(editor.testController.debugSelection(editor.testController.selectedRoot(), selectedTest()))));
         controls.add(button("Rerun Failed", () -> message(editor.testController.rerunFailed(editor.testController.selectedRoot()))));
         controls.add(button("Cancel", () -> message(editor.testController.cancel(editor.testController.selectedRoot()))));
+        controls.add(button("List CTest Presets", () -> message(editor.testController.handle("ctest list"))));
+        controls.add(button("CTest Preset…", this::selectCtestPreset));
         controls.add(button("Import Coverage…", this::importCoverage));
         controls.add(button("Clear Coverage", () -> message(editor.testController.clearCoverage(editor.testController.selectedRoot()))));
         controls.add(new JLabel("Show")); controls.add(status); controls.add(filter);
@@ -145,6 +148,13 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
     private static String summary(TestController.Snapshot value) {
         long failed = value.tests().stream().filter(test -> test.status().failed()).count();
         String coverage = value.coverage().lines() == 0 ? "" : " — coverage " + value.coverage().display();
-        return (value.tests().isEmpty() ? "Refresh to discover tests." : value.tests().size() + " tests" + (failed == 0 ? "" : ", " + failed + " failing")) + coverage;
+        String preset = value.ctestPreset().isBlank() ? "" : " — CTest preset " + value.ctestPreset();
+        return (value.tests().isEmpty() ? "Refresh to discover tests." : value.tests().size() + " tests" + (failed == 0 ? "" : ", " + failed + " failing")) + coverage + preset;
+    }
+
+    private void selectCtestPreset() {
+        String preset = JOptionPane.showInputDialog(panel, "CTest test preset name:", "Use CTest Preset", JOptionPane.PLAIN_MESSAGE);
+        if (preset == null) return;
+        message(editor.testController.handle("ctest use " + preset));
     }
 }

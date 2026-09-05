@@ -13,13 +13,14 @@ import java.util.Map;
 
 final class TestController {
     record Snapshot(Path root, List<TestService.AdapterSpec> adapters, List<TestService.TestCase> tests, List<String> diagnostics, String output, int runningJobs,
-                    CoverageService.Summary coverage) {
+                    CoverageService.Summary coverage, String ctestPreset) {
         Snapshot {
             adapters = adapters == null ? List.of() : List.copyOf(adapters);
             tests = tests == null ? List.of() : List.copyOf(tests);
             diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
             output = output == null ? "" : output;
             coverage = coverage == null ? CoverageService.Report.empty().summary() : coverage;
+            ctestPreset = ctestPreset == null ? "" : ctestPreset;
         }
     }
 
@@ -29,6 +30,7 @@ final class TestController {
         List<TestService.TestCase> tests = List.of();
         List<String> diagnostics = List.of();
         String output = "Refresh to discover tests.";
+        String ctestPreset = "";
         final Map<Integer, String> jobs = new LinkedHashMap<>();
         CoverageService.Report coverage = CoverageService.Report.empty();
         State(Path root) { this.root = root; }
@@ -46,6 +48,11 @@ final class TestController {
     }
     private record StaticDiscovery(Path root, TestService.AdapterSpec spec, List<TestService.TestCase> tests) { }
     private record CoverageImport(Path root, CoverageService.ImportResult imported) { }
+    private record CtestPresetListing(Path root, CommandResult result, List<String> diagnostics) {
+        CtestPresetListing {
+            diagnostics = diagnostics == null ? List.of() : List.copyOf(diagnostics);
+        }
+    }
 
     private final Texteditor editor;
     private final TestService tests;
@@ -69,9 +76,104 @@ final class TestController {
         if ("failed".equalsIgnoreCase(value) || "rerun-failed".equalsIgnoreCase(value)) return rerunFailed(selectedRoot());
         if ("cancel".equalsIgnoreCase(value)) return cancel(selectedRoot());
         if ("text".equalsIgnoreCase(value)) return showText(selectedRoot());
+        if (value.equalsIgnoreCase("ctest") || value.regionMatches(true, 0, "ctest ", 0, 6)) return handleCtest(selectedRoot(), value.substring(5).trim());
         if (value.regionMatches(true, 0, "run ", 0, 4)) return runId(selectedRoot(), value.substring(4).trim());
         if (value.regionMatches(true, 0, "debug ", 0, 6)) return debugId(selectedRoot(), value.substring(6).trim());
-        return "Usage: :test [ui|refresh|run [test-id]|debug <test-id>|failed|cancel|text]";
+        return "Usage: :test [ui|refresh|run [test-id]|debug <test-id>|failed|cancel|text|ctest [use <preset>|clear]]";
+    }
+
+    private String handleCtest(Path root, String argument) {
+        String value = argument == null ? "" : argument.trim();
+        if (value.equalsIgnoreCase("list")) return listCtestPresets(root);
+        State state = state(root);
+        if (value.equalsIgnoreCase("clear")) {
+            if (state.ctestPreset.isBlank()) return "No CTest preset is selected";
+            state.ctestPreset = "";
+            return refresh(root).message();
+        }
+        if (!value.regionMatches(true, 0, "use ", 0, 4)) return "Usage: :test ctest [list|use <preset>|clear]";
+        String preset = value.substring(4).trim();
+        try {
+            TestService.withCtestPreset(tests.load(root), root, preset);
+        } catch (IllegalArgumentException error) {
+            return "CTest preset not selected: " + error.getMessage();
+        }
+        state.ctestPreset = preset;
+        return refresh(root).message();
+    }
+
+    private String listCtestPresets(Path root) {
+        if (!CmakePresetSupport.hasPresetFile(root)) {
+            return "CTest preset listing requires CMakePresets.json or CMakeUserPresets.json at the workspace root";
+        }
+        State state = state(root);
+        TestService.Command command = new TestService.Command(List.of("ctest", "--list-presets"), List.of());
+        RemoteWorkspaceTaskTargets.Target remote = remoteExecutionTarget(root);
+        if (remote != null) return startRemoteCtestPresetListing(state, command, remote);
+        if (usesDevContainer(root)) return startDevContainerCtestPresetListing(state, command);
+        int jobId = editor.asyncJobService.submit("ctest preset list", token -> new CtestPresetListing(root,
+            editor.jobQuickfixController.runExternalCommand(command.argv(), root.toFile(), null, token,
+                editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true), List.of()),
+            (job, listed, error) -> completeCtestPresetListing(job, state, listed, error));
+        state.jobs.put(jobId, "ctest preset list");
+        state.output = "CTest preset listing running (job " + jobId + ")";
+        refreshPanel();
+        return "CTest preset listing requested (job " + jobId + ")";
+    }
+
+    private String startRemoteCtestPresetListing(State state, TestService.Command command, RemoteWorkspaceTaskTargets.Target remote) {
+        RemoteTestExecution.Plan plan;
+        try {
+            plan = RemoteTestExecution.prepare(remote, state.root, command, null);
+        } catch (IOException error) {
+            return "Remote CTest preset listing unavailable: " + error.getMessage();
+        }
+        int jobId = editor.asyncJobService.submit("remote ctest preset list", token -> {
+            RemoteTestExecution.Result result = RemoteTestExecution.execute(plan);
+            return new CtestPresetListing(state.root, result.result(), result.diagnostics());
+        }, (job, listed, error) -> completeCtestPresetListing(job, state, listed, error));
+        state.jobs.put(jobId, "ctest preset list");
+        state.output = "CTest preset listing running remotely in " + remote.id() + " (job " + jobId + ")";
+        refreshPanel();
+        return "CTest preset listing requested (job " + jobId + ")";
+    }
+
+    private String startDevContainerCtestPresetListing(State state, TestService.Command command) {
+        int jobId = editor.asyncJobService.submit("dev container ctest preset list", token -> {
+            try {
+                String remoteRoot = DevContainerRuntime.remoteWorkingDirectory(state.root);
+                DevContainerTestExecution.Plan plan = DevContainerTestExecution.prepare(state.root, remoteRoot, command);
+                CommandResult result = editor.jobQuickfixController.runExternalCommand(plan.invocation(), state.root.toFile(), null, token,
+                    editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true);
+                return new CtestPresetListing(state.root, result, List.of());
+            } catch (Exception error) {
+                String message = error.getMessage();
+                return new CtestPresetListing(state.root, new CommandResult(-1, "", "Dev Container CTest preset listing unavailable: "
+                    + (message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' '))), List.of());
+            }
+        }, (job, listed, error) -> completeCtestPresetListing(job, state, listed, error));
+        state.jobs.put(jobId, "ctest preset list");
+        state.output = "CTest preset listing running in the Dev Container (job " + jobId + ")";
+        refreshPanel();
+        return "CTest preset listing requested (job " + jobId + ")";
+    }
+
+    private void completeCtestPresetListing(AsyncJobService.JobSnapshot job, State expected, CtestPresetListing listed, Exception error) {
+        State state = listed == null ? expected : state(listed.root());
+        state.jobs.remove(job.getId());
+        if (job.getStatus() == AsyncJobService.Status.CANCELLED) state.output = "CTest preset listing cancelled";
+        else if (listed == null || error != null || listed.result() == null) {
+            state.output = "CTest preset listing failed: " + (error == null ? job.getErrorMessage() : error.getMessage());
+        } else {
+            CommandResult result = listed.result();
+            String stdout = result.stdout == null ? "" : result.stdout;
+            String stderr = result.stderr == null ? "" : result.stderr;
+            String output = stdout.isBlank() ? stderr : stderr.isBlank() ? stdout : stdout + "\n" + stderr;
+            state.output = output.isBlank() ? "ctest exited " + result.exitCode : output;
+            if (!listed.diagnostics().isEmpty()) state.output += "\n" + String.join("\n", listed.diagnostics());
+            editor.showScratchBuffer("[CTest test presets]", state.output);
+        }
+        refreshPanel();
     }
 
     String handleCoverage(String argument) {
@@ -109,21 +211,31 @@ final class TestController {
 
     Snapshot snapshot(Path root) {
         State state = state(root == null ? selectedRoot() : root);
-        return new Snapshot(state.root, state.specs, state.tests, state.diagnostics, state.output, state.jobs.size(), state.coverage.summary());
+        return new Snapshot(state.root, state.specs, state.tests, state.diagnostics, state.output, state.jobs.size(), state.coverage.summary(), state.ctestPreset);
     }
 
     Result refresh(Path root) {
         State state = state(root);
         for (TestService.AdapterSpec spec : state.specs) editor.problemsController.clearQuickfixSource("test:" + spec.id());
         TestService.LoadResult loaded = tests.load(state.root);
-        state.specs = loaded.specs();
+        try {
+            state.specs = state.ctestPreset.isBlank() ? loaded.specs() : TestService.withCtestPreset(loaded, state.root, state.ctestPreset);
+        } catch (IllegalArgumentException error) {
+            state.specs = List.of();
+            state.diagnostics = List.of(error.getMessage());
+            state.tests = List.of();
+            state.output = error.getMessage();
+            refreshPanel();
+            return new Result("Test configuration invalid");
+        }
         state.diagnostics = loaded.diagnostics();
         state.tests = List.of();
-        state.output = loaded.valid() ? loaded.specs().isEmpty() ? "No supported test runner detected. Add .shedtests to declare one." : "Discovery requested." : String.join("\n", loaded.diagnostics());
+        state.output = loaded.valid() ? state.specs.isEmpty() ? "No supported test runner detected. Add .shedtests to declare one." :
+            (state.ctestPreset.isBlank() ? "Discovery requested." : "CTest preset " + state.ctestPreset + " selected. Discovery requested.") : String.join("\n", loaded.diagnostics());
         refreshPanel();
         if (!loaded.valid()) return new Result("Test configuration invalid");
         int started = 0;
-        for (TestService.AdapterSpec raw : loaded.specs()) {
+        for (TestService.AdapterSpec raw : state.specs) {
             TestAdapter adapter = tests.adapter(raw.id());
             TestService.AdapterSpec spec = tests.resolvedSpec(state.root, raw);
             if (adapter == null || spec == null) continue;

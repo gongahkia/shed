@@ -130,7 +130,8 @@ public class TexteditorSwingIntegrationTest {
             assertFalse(buttons.isEmpty());
             assertTrue(buttons.stream().allMatch(button -> editor.configManager.getEditorForeground().equals(button.getForeground())));
         } finally {
-            if (dialog != null) onEdt(() -> { dialog.dispose(); return null; });
+            SettingsEditorDialog currentDialog = dialog;
+            if (currentDialog != null) onEdt(() -> { currentDialog.dispose(); return null; });
             disposeEditor(editor);
         }
     }
@@ -377,7 +378,7 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
-    void cmakePresetDryRunUsesDirectArgumentsWithoutReadingWorkspaceTasks() throws Exception {
+    void cmakePresetDryRunsUseDirectArgumentsWithoutReadingWorkspaceTasks() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-cmake-preset-task");
         Path workspace = Files.createDirectories(tempDir.resolve("cmake-preset-project"));
@@ -389,6 +390,7 @@ public class TexteditorSwingIntegrationTest {
 
         Texteditor editor = createEditor(home, source);
         try {
+            onEdt(() -> { editor.workspaceController.addDirectory(workspace.toFile(), true); return null; });
             String result = onEdt(() -> editor.handleTaskCommand("cmake dry-run build \"debug local\""));
 
             assertEquals("Task dry run shown (not started)", result);
@@ -396,6 +398,11 @@ public class TexteditorSwingIntegrationTest {
             assertTrue(output.contains("Task dry run: cmake-preset-build"));
             assertTrue(output.contains("command: \"cmake\" \"--build\" \"--preset\" \"debug local\""));
             assertTrue(output.contains("shell: direct"));
+
+            assertEquals("Task dry run shown (not started)", onEdt(() -> editor.handleTaskCommand("cmake dry-run package release")));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("command: \"cpack\" \"--preset\" \"release\""));
+            assertEquals("Task dry run shown (not started)", onEdt(() -> editor.handleTaskCommand("cmake dry-run workflow ci")));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("command: \"cmake\" \"--workflow\" \"--preset\" \"ci\""));
         } finally {
             disposeEditor(editor);
         }
@@ -1132,6 +1139,87 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree() throws Exception {
+        assumeSwingAvailable();
+        Path cmake = Files.isExecutable(Path.of("/usr/bin/cmake")) ? Path.of("/usr/bin/cmake") : Path.of("/bin/cmake");
+        Path ctest = Files.isExecutable(Path.of("/usr/bin/ctest")) ? Path.of("/usr/bin/ctest") : Path.of("/bin/ctest");
+        Path cpack = Files.isExecutable(Path.of("/usr/bin/cpack")) ? Path.of("/usr/bin/cpack") : Path.of("/bin/cpack");
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.isExecutable(cmake) && Files.isExecutable(ctest) && Files.isExecutable(cpack),
+            "CMake, CTest, and CPack are unavailable");
+        Path home = tempDir.resolve("home-ctest-preset");
+        Path workspace = tempDir.resolve("ctest-preset-workspace");
+        Path source = workspace.resolve("CMakeLists.txt");
+        Files.createDirectories(home.resolve(".shed"));
+        Files.createDirectories(workspace);
+        Files.writeString(source, """
+            cmake_minimum_required(VERSION 3.21)
+            project(shed_ctest_preset VERSION 1.0 LANGUAGES NONE)
+            enable_testing()
+            add_test(NAME preset-smoke COMMAND "${CMAKE_COMMAND}" -E true)
+            include(CPack)
+            """, StandardCharsets.UTF_8);
+        Files.writeString(workspace.resolve("CMakePresets.json"), """
+            {
+              "version": 6,
+              "configurePresets": [{"name": "shed-test", "generator": "Unix Makefiles", "binaryDir": "${sourceDir}/out/shed-test"}],
+              "testPresets": [{"name": "shed-test", "configurePreset": "shed-test"}],
+              "packagePresets": [{"name": "shed-package", "configurePreset": "shed-test", "generators": ["TGZ"]}],
+              "workflowPresets": [{"name": "shed-workflow", "steps": [
+                {"type": "configure", "name": "shed-test"},
+                {"type": "test", "name": "shed-test"},
+                {"type": "package", "name": "shed-package"}
+              ]}]
+            }
+            """, StandardCharsets.UTF_8);
+        Process configure = new ProcessBuilder(cmake.toString(), "--preset", "shed-test").directory(workspace.toFile()).start();
+        assertTrue(configure.waitFor(20, TimeUnit.SECONDS));
+        String configureOutput = new String(configure.getInputStream().readAllBytes(), StandardCharsets.UTF_8)
+            + new String(configure.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, configure.exitValue(), configureOutput);
+        Process packagePreset = new ProcessBuilder(cpack.toString(), "--preset", "shed-package").directory(workspace.toFile()).start();
+        assertTrue(packagePreset.waitFor(20, TimeUnit.SECONDS));
+        String packageOutput = new String(packagePreset.getInputStream().readAllBytes(), StandardCharsets.UTF_8)
+            + new String(packagePreset.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, packagePreset.exitValue(), packageOutput);
+        Process workflow = new ProcessBuilder(cmake.toString(), "--workflow", "--preset", "shed-workflow").directory(workspace.toFile()).start();
+        assertTrue(workflow.waitFor(20, TimeUnit.SECONDS));
+        String workflowOutput = new String(workflow.getInputStream().readAllBytes(), StandardCharsets.UTF_8)
+            + new String(workflow.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, workflow.exitValue(), workflowOutput);
+
+        Texteditor editor = createEditor(home, source);
+        try {
+            String listing = onEdt(() -> {
+                editor.testController.selectRoot(workspace);
+                return editor.handleTestCommand("ctest list");
+            });
+            int listingJob = Integer.parseInt(listing.replaceAll(".*\\(job ([0-9]+)\\).*", "$1"));
+            assertTrue(awaitJobCompletion(editor, listingJob));
+            String listedPresets = onEdt(() -> editor.getCurrentBuffer().getContent());
+            assertTrue(listedPresets.contains("Available test presets"));
+            assertTrue(listedPresets.contains("shed-test"));
+
+            String selected = onEdt(() -> {
+                editor.testController.selectRoot(workspace);
+                return editor.handleTestCommand("ctest use shed-test");
+            });
+            assertTrue(selected.startsWith("Test discovery requested"), selected);
+            assertTrue(awaitTestDiscovery(editor, workspace, "preset-smoke"));
+            assertEquals("shed-test", onEdt(() -> editor.testController.snapshot(workspace).ctestPreset()));
+            TestService.TestCase smoke = onEdt(() -> editor.testController.snapshot(workspace).tests().stream()
+                .filter(test -> "preset-smoke".equals(test.id())).findFirst().orElseThrow());
+            assertEquals("Test run requested", onEdt(() -> editor.testController.runSelection(workspace, smoke)));
+            boolean passed = awaitTestStatus(editor, workspace, "preset-smoke", TestService.Status.PASSED);
+            assertTrue(passed, onEdt(() -> editor.testController.snapshot(workspace).output()));
+
+            assertEquals("Test discovery complete", onEdt(() -> editor.handleTestCommand("ctest clear")));
+            assertTrue(onEdt(() -> editor.testController.snapshot(workspace).ctestPreset()).isBlank());
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void managedLspCommandsExposeInertStatusAndManualRemediation() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-managed-lsp");
@@ -1266,6 +1354,17 @@ public class TexteditorSwingIntegrationTest {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (System.nanoTime() < deadline) {
             boolean found = onEdt(() -> editor.testController.snapshot(root).tests().stream().anyMatch(test -> testId.equals(test.id())));
+            if (found) return true;
+            Thread.sleep(20);
+        }
+        return false;
+    }
+
+    private static boolean awaitTestStatus(Texteditor editor, Path root, String testId, TestService.Status expected) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            boolean found = onEdt(() -> editor.testController.snapshot(root).tests().stream()
+                .anyMatch(test -> testId.equals(test.id()) && expected == test.status()));
             if (found) return true;
             Thread.sleep(20);
         }

@@ -404,7 +404,15 @@ final class TestAdapterRegistry {
         }
 
         @Override public List<TestService.TestCase> parseRun(Path root, TestService.Command command, String output) {
-            return TestService.parseJUnit(root, id(), command.reports());
+            List<TestService.TestCase> parsed = TestService.parseJUnit(root, id(), command.reports());
+            List<TestService.TestCase> result = new ArrayList<>();
+            for (TestService.TestCase test : parsed) {
+                String name = test.name();
+                if (name == null || name.isBlank()) continue;
+                // CTest JSON discovery identifies a test by name, while its JUnit classname is implementation-defined.
+                result.add(new TestService.TestCase(id(), name, name, "ctest", null, 1, test.status(), test.durationMillis(), test.output()));
+            }
+            return List.copyOf(result);
         }
 
         private static String exactNameExpression(List<TestService.TestCase> selected) {

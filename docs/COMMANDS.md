@@ -83,11 +83,11 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:task remote-dry-run <connection-id> <name>` | Resolve and show remote task plan without starting it |
 | `:task container <name>` | Explicitly run named task through the active project's running Dev Container |
 | `:task container-dry-run <name>` | Resolve and show the Dev Container task plan without starting it |
-| `:task cmake [dry-run] <configure\|build\|test> <preset>` | Explicitly invoke a CMake Preset as direct argv; no preset is inferred or changed |
+| `:task cmake [dry-run] <configure\|build\|test\|package\|workflow> <preset>` | Explicitly invoke a CMake/CTest/CPack/Workflow Preset as direct argv; no preset is inferred or changed |
 | `:task cancel <id>` | Cancel a running task job |
 
 Notes:
-- `:task run test` and `:task run build` have built-in fallbacks for Maven, Gradle Wrapper, npm, Make, Cargo, Go modules, an unambiguous top-level .NET project/solution, and a sole conventional generated CMake tree if not explicitly defined. Gradle uses the project wrapper; no global Gradle fallback is inferred. .NET requires exactly one `.sln`, `.slnx`, `.csproj`, `.fsproj`, or `.vbproj` at the workspace root. Use `:task cmake` with an explicit name to configure, build, or test a CMake Preset; ordinary fallback never chooses one.
+- `:task run test` and `:task run build` have built-in fallbacks for Maven, Gradle Wrapper, npm, Make, Cargo, Go modules, an unambiguous top-level .NET project/solution, and a sole conventional generated CMake tree if not explicitly defined. Gradle uses the project wrapper; no global Gradle fallback is inferred. .NET requires exactly one `.sln`, `.slnx`, `.csproj`, `.fsproj`, or `.vbproj` at the workspace root. Use `:task cmake` with an explicit name to configure, build, test, package, or run a workflow CMake Preset; ordinary fallback never chooses one. CPack package and workflow presets require CMake 3.25+ upstream.
 - Task schema, variable, shell, quickfix, and presentation policy: [Workspace Tasks](TASKS.md).
 
 ## Test Explorer
@@ -99,6 +99,9 @@ Notes:
 | `:test run` | Run every detected/configured adapter in the selected workspace root; a selected SSH, Docker, WSL, or already-running Dev Container root runs them in that environment |
 | `:test run <test-id>` | Run one discovered test by its exact id |
 | `:test debug <test-id>` | Start the adapter explicitly mapped by that test adapter's `.shedtests` `debug_configuration`, including an accepted runtime-only `vscode:<name>` profile; connected SSH, Docker, WSL, and an already-running Dev Container workspace may use an already-installed configured stdio adapter |
+| `:test ctest list` | Explicitly run `ctest --list-presets` in the selected local, remote, or connected Dev Container root and show CTest's output |
+| `:test ctest use <preset>` | Explicitly select a CMake test preset for this root's Test Explorer session; `ctest` resolves the preset |
+| `:test ctest clear` | Clear the session-only CMake test-preset selection and refresh normal Test Explorer detection |
 | `:test failed`, `:test rerun-failed` | Run the failed tests retained for this session |
 | `:test cancel` | Cancel running test jobs for the selected root |
 | `:test text` | Open a text summary of the session-local test state |

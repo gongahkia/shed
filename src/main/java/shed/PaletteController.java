@@ -70,12 +70,10 @@ final class PaletteController {
 
     public String showCommandPalette() {
         List<String> candidates = commandPaletteCandidates();
-        String selected = showPaletteDialog("Command Palette", candidates, this::describeCommandPaletteCandidate);
+        String selected = showPaletteDialog("Command Palette", candidates);
         if (selected == null || selected.isEmpty()) return "Command palette cancelled";
         PaletteAction action = surfaceAction(selected);
-        if (action != null) return editor.commandHandler.execute(action.command());
-        String cmd = selected.startsWith(":") ? selected.substring(1) : selected;
-        return editor.commandHandler.execute(cmd);
+        return action == null ? "Command palette selection unavailable" : editor.commandHandler.execute(action.command());
     }
 
     static List<String> surfaceActionNames() {
@@ -801,7 +799,7 @@ final class PaletteController {
         sp.setPreferredSize(new Dimension(600, 320));
         sp.setBorder(null);
         dialog.add(sp, BorderLayout.SOUTH);
-        dialog.add(previewArea, BorderLayout.EAST);
+        if (previewProvider != null) dialog.add(previewArea, BorderLayout.EAST);
         syncPreview.run();
         Dimension targetSize = previewProvider == null ? new Dimension(620, 400) : new Dimension(720, 420);
         dialog.setSize(targetSize);

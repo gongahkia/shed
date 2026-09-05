@@ -159,6 +159,20 @@ final class TestService {
         return spec.command().isEmpty() ? new AdapterSpec(spec.id(), adapter.defaultCommand(root), spec.debugConfiguration()) : spec;
     }
 
+    /** Replaces automatic CTest-tree detection with one explicit, session-selected test preset. */
+    static List<AdapterSpec> withCtestPreset(LoadResult loaded, Path root, String preset) {
+        if (loaded == null || !loaded.valid()) throw new IllegalArgumentException("test configuration is invalid");
+        if (loaded.configured()) throw new IllegalArgumentException(".shedtests controls test adapters; declare the CTest command there instead");
+        if (!CmakePresetSupport.hasPresetFile(root)) {
+            throw new IllegalArgumentException("CMakePresets.json or CMakeUserPresets.json is required at the workspace root");
+        }
+        if (!CmakePresetSupport.isSafeName(preset)) throw new IllegalArgumentException("preset name is invalid");
+        List<AdapterSpec> result = new ArrayList<>();
+        for (AdapterSpec spec : loaded.specs()) if (!"ctest".equals(spec.id())) result.add(spec);
+        result.add(new AdapterSpec("ctest", List.of("ctest", "--preset", preset.trim())));
+        return List.copyOf(result);
+    }
+
     List<TestCase> staticDiscovery(Path root, AdapterSpec spec) {
         if (spec == null) return List.of();
         if ("unittest".equals(spec.id())) return discoverUnittestTests(root);

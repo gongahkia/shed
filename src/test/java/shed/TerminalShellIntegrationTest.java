@@ -52,6 +52,25 @@ class TerminalShellIntegrationTest {
     }
 
     @Test
+    void zshPromptHookDoesNotAssignItsReadOnlyStatusParameter() throws Exception {
+        Path directory = Files.createTempDirectory("shed-shell-");
+        TerminalShellIntegration.Launch launch = TerminalShellIntegration.prepare(List.of("zsh"), true, directory);
+
+        assertTrue(launch.enabled());
+        assertEquals(List.of("zsh", "-i"), launch.command());
+        String hook = Files.readString(directory.resolve("zsh.sh"));
+        assertTrue(hook.contains("local exit_code=$?"));
+        assertFalse(hook.contains("local status=$?"));
+
+        Path zsh = Files.isExecutable(Path.of("/usr/bin/zsh")) ? Path.of("/usr/bin/zsh") : Path.of("/bin/zsh");
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.isExecutable(zsh), "Zsh is unavailable");
+        Process invocation = new ProcessBuilder(zsh.toString(), "-df", "-c", "source \"$1\"; _shed_precmd", "zsh",
+            directory.resolve("zsh.sh").toString()).start();
+        assertTrue(invocation.waitFor(10, java.util.concurrent.TimeUnit.SECONDS));
+        assertEquals(0, invocation.exitValue());
+    }
+
+    @Test
     void preparesAnIsolatedPowerShellStartupWithoutModifyingUserProfiles() throws Exception {
         Path directory = Files.createTempDirectory("shed-shell-");
         TerminalShellIntegration.Launch launch = TerminalShellIntegration.prepare(List.of("pwsh", "-NoLogo"), true, directory);

@@ -52,6 +52,13 @@ class BuiltInDebugAdapterSupportTest {
         assertTrue(lldb.capabilities().contains(DebugAdapterRegistry.Capability.BREAKPOINTS));
         assertTrue(lldb.capabilities().contains(DebugAdapterRegistry.Capability.FUNCTION_BREAKPOINTS));
         assertFalse(validation.configurations().containsKey(BuiltInDebugAdapterSupport.NATIVE_LLDB));
+        DebugAdapterRegistry.Adapter gdb = validation.registry().adapter(BuiltInDebugAdapterSupport.NATIVE_GDB);
+        assertEquals("gdb", gdb.command());
+        assertEquals(java.util.List.of("--interpreter=dap"), gdb.args());
+        assertTrue(gdb.capabilities().contains(DebugAdapterRegistry.Capability.INSTRUCTION_BREAKPOINTS));
+        assertTrue(gdb.capabilities().contains(DebugAdapterRegistry.Capability.READ_MEMORY));
+        assertTrue(gdb.capabilities().contains(DebugAdapterRegistry.Capability.DISASSEMBLE));
+        assertFalse(validation.configurations().containsKey(BuiltInDebugAdapterSupport.NATIVE_GDB));
     }
 
     @Test

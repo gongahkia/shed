@@ -296,7 +296,7 @@ Update checks require a global consent receipt, HTTPS metadata endpoint, and Bas
 | `debug.attach.enabled` | `true` | bool | Enables attach planning when adapter-supported |
 | `debug.open.source.on.stop` | `true` | bool | Opens the selected existing local source frame after a paused-frame inspection; disable to keep navigation manual |
 
-Shed includes `python-debugpy` for a separately installed `debugpy-adapter` executable and `go-delve` for a separately installed `dlv` executable; it also recognizes separately installed `netcoredbg --interpreter=vscode` and `lldb-dap` adapters for explicit compiled C#/.NET and native programs. Shed does not bundle or download these debuggers. `go-delve` starts local `dlv dap` only after an explicit debug request and accepts only its announced `127.0.0.1` endpoint. A workspace `.vscode/launch.json`, or the `launch` object of an explicitly imported standard `.code-workspace`, can contribute a strict, non-persistent compatibility subset only when it refers to an adapter already configured in Shed; use `:debug vscode` to inspect accepted and skipped profiles. See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/attach schema, compatibility boundary, and capability declarations.
+Shed includes `python-debugpy` for a separately installed `debugpy-adapter` executable and `go-delve` for a separately installed `dlv` executable; it also recognizes separately installed `netcoredbg --interpreter=vscode`, `lldb-dap`, and `gdb --interpreter=dap` adapters for explicit compiled C#/.NET and native programs. Shed does not bundle or download these debuggers. `go-delve` starts local `dlv dap` only after an explicit debug request and accepts only its announced `127.0.0.1` endpoint. A workspace `.vscode/launch.json`, or the `launch` object of an explicitly imported standard `.code-workspace`, can contribute a strict, non-persistent compatibility subset only when it refers to an adapter already configured in Shed; use `:debug vscode` to inspect accepted and skipped profiles. See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/attach schema, compatibility boundary, and capability declarations.
 
 To launch a compiled .NET artifact without a `launch.json`, add an explicit configuration whose `program` is the project-relative output selected by your build:
 
@@ -319,6 +319,17 @@ To launch a compiled C, C++, Rust, or other LLDB-supported native artifact, conf
 ```
 
 `native-lldb` starts the user-installed `lldb-dap` over stdio. It does not choose an executable, infer compiler output, or translate CodeLLDB/`cppdbg` configurations.
+
+For a compiled GDB-supported artifact, configure its exact executable explicitly:
+
+```toml
+"debug.configuration.native-gdb.adapter" = "native-gdb"
+"debug.configuration.native-gdb.request" = "launch"
+"debug.configuration.native-gdb.program" = "${workspaceFolder}/build/app"
+"debug.configuration.native-gdb.cwd" = "${workspaceFolder}"
+```
+
+`native-gdb` starts the user-installed `gdb --interpreter=dap` over stdio. GDB’s DAP interpreter requires a build with Python support. It does not choose an executable, infer compiler output, or translate `cppdbg` MI settings.
 
 ## Undo History Policy
 

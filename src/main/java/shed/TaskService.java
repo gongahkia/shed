@@ -55,6 +55,7 @@ public class TaskService {
         TYPESCRIPT,
         ESLINT,
         MSCOMPILE,
+        CUSTOM,
         NONE;
 
         static ProblemMatcher parse(Object value) {
@@ -65,8 +66,9 @@ public class TaskService {
                 case "typescript", "tsc" -> TYPESCRIPT;
                 case "eslint" -> ESLINT;
                 case "mscompile", "msvc" -> MSCOMPILE;
+                case "custom" -> CUSTOM;
                 case "none" -> NONE;
-                default -> throw new IllegalArgumentException("problem_matcher must be generic, typescript, eslint, mscompile, or none");
+                default -> throw new IllegalArgumentException("problem_matcher must be generic, typescript, eslint, mscompile, custom, or none");
             };
         }
 
@@ -132,16 +134,18 @@ public class TaskService {
         private final boolean defaultGroup;
         private final boolean background;
         private final String readyWhen;
+        private final TaskDiagnosticTemplate customProblemMatcher;
 
         WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                       ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation) {
-            this(name, command, cwd, environment, shell, problemMatcher, presentation, null, null, false, List.of(), TaskGroup.NONE, false, false, "");
+            this(name, command, cwd, environment, shell, problemMatcher, presentation, null, null, false, List.of(), TaskGroup.NONE, false, false, "", null);
         }
 
         private WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                               ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation,
                               List<String> directArguments, List<String> shellArguments, boolean sessionOnly,
-                              List<String> dependencies, TaskGroup group, boolean defaultGroup, boolean background, String readyWhen) {
+                              List<String> dependencies, TaskGroup group, boolean defaultGroup, boolean background, String readyWhen,
+                              TaskDiagnosticTemplate customProblemMatcher) {
             this.name = name;
             this.command = command;
             this.cwd = cwd;
@@ -157,6 +161,7 @@ public class TaskService {
             this.defaultGroup = defaultGroup && this.group != TaskGroup.NONE;
             this.background = background;
             this.readyWhen = readyWhen == null ? "" : readyWhen;
+            this.customProblemMatcher = customProblemMatcher;
         }
 
         String name() { return name; }
@@ -176,6 +181,7 @@ public class TaskService {
         boolean defaultGroup() { return defaultGroup; }
         boolean background() { return background; }
         String readyWhen() { return readyWhen; }
+        TaskDiagnosticTemplate customProblemMatcher() { return customProblemMatcher; }
     }
 
     static final class TaskLoadResult {
@@ -356,6 +362,7 @@ public class TaskService {
             if (task.problemMatcher() != ProblemMatcher.GENERIC) {
                 lines.add("problem_matcher = " + tomlString(task.problemMatcher().configValue()));
             }
+            if (task.customProblemMatcher() != null) lines.add("problem_pattern = " + tomlString(task.customProblemMatcher().source()));
             if (task.presentation() != Presentation.ON_FAILURE) {
                 lines.add("presentation = " + tomlString(task.presentation().configValue()));
             }
@@ -481,7 +488,7 @@ public class TaskService {
         }
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.DIRECT, problemMatcher, presentation,
-            values, null, true, List.of(), TaskGroup.NONE, false, false, "");
+            values, null, true, List.of(), TaskGroup.NONE, false, false, "", null);
     }
 
     /**
@@ -498,7 +505,7 @@ public class TaskService {
         Map<String, String> valuesEnvironment = validatedEnvironment(environment);
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.SHELL, problemMatcher, presentation,
-            null, values, true, List.of(), TaskGroup.NONE, false, false, "");
+            null, values, true, List.of(), TaskGroup.NONE, false, false, "", null);
     }
 
     /** Creates an ephemeral shell task whose sole command is intentionally raw shell syntax. */
@@ -511,28 +518,30 @@ public class TaskService {
         Map<String, String> valuesEnvironment = validatedEnvironment(environment);
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, command.trim(), cwd, valuesEnvironment, ShellPolicy.SHELL, problemMatcher, presentation,
-            null, null, true, List.of(), TaskGroup.NONE, false, false, "");
+            null, null, true, List.of(), TaskGroup.NONE, false, false, "", null);
     }
 
     static WorkspaceTask withDependencies(WorkspaceTask task, List<String> dependencies) {
         if (task == null) throw new IllegalArgumentException("task required");
         List<String> values = validatedDependencies(dependencies);
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
-            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), values, task.group(), task.defaultGroup(), task.background(), task.readyWhen());
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), values, task.group(), task.defaultGroup(), task.background(),
+            task.readyWhen(), task.customProblemMatcher());
     }
 
     static WorkspaceTask withGroup(WorkspaceTask task, TaskGroup group, boolean defaultGroup) {
         if (task == null) throw new IllegalArgumentException("task required");
         if (group == null) throw new IllegalArgumentException("task group required");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
-            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), group, defaultGroup, task.background(), task.readyWhen());
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), group, defaultGroup, task.background(),
+            task.readyWhen(), task.customProblemMatcher());
     }
 
     static WorkspaceTask withBackground(WorkspaceTask task, boolean background) {
         if (task == null) throw new IllegalArgumentException("task required");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
             task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(), background,
-            background ? task.readyWhen() : "");
+            background ? task.readyWhen() : "", task.customProblemMatcher());
     }
 
     static WorkspaceTask withReadinessMarker(WorkspaceTask task, String readyWhen) {
@@ -541,7 +550,15 @@ public class TaskService {
         if (!marker.isEmpty() && !task.background()) throw new IllegalArgumentException("ready_when requires background = true");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
             task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(),
-            task.background(), marker);
+            task.background(), marker, task.customProblemMatcher());
+    }
+
+    static WorkspaceTask withCustomProblemMatcher(WorkspaceTask task, TaskDiagnosticTemplate matcher) {
+        if (task == null || matcher == null) throw new IllegalArgumentException("custom problem matcher is required");
+        if (task.problemMatcher() != ProblemMatcher.CUSTOM) throw new IllegalArgumentException("custom matcher requires problem_matcher = custom");
+        return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(),
+            task.background(), task.readyWhen(), matcher);
     }
 
     /** A watcher may only be the final plan because it does not complete until explicitly stopped. */
@@ -592,10 +609,13 @@ public class TaskService {
             throw new IllegalArgumentException("env must be a TOML table");
         }
         Map<String, String> environment = environment((TomlTable) environmentValue);
+        ProblemMatcher matcher = ProblemMatcher.parse(table.get("problem_matcher"));
+        TaskDiagnosticTemplate customMatcher = customProblemMatcher(table, matcher);
         WorkspaceTask task = new WorkspaceTask(name, ((String) command).trim(), cwdValue, environment,
-            ShellPolicy.parse(table.get("shell")), ProblemMatcher.parse(table.get("problem_matcher")),
+            ShellPolicy.parse(table.get("shell")), matcher,
             Presentation.parse(table.get("presentation")));
-        return withReadinessMarker(withBackground(withDependencies(task, dependencies(table)), background(table)), readinessMarker(table));
+        task = withReadinessMarker(withBackground(withDependencies(task, dependencies(table)), background(table)), readinessMarker(table));
+        return customMatcher == null ? task : withCustomProblemMatcher(task, customMatcher);
     }
 
     private static boolean background(TomlTable table) {
@@ -620,6 +640,16 @@ public class TaskService {
         return value;
     }
 
+    private static TaskDiagnosticTemplate customProblemMatcher(TomlTable table, ProblemMatcher matcher) {
+        Object value = table.get("problem_pattern");
+        if (matcher != ProblemMatcher.CUSTOM) {
+            if (value != null) throw new IllegalArgumentException("problem_pattern requires problem_matcher = custom");
+            return null;
+        }
+        if (!(value instanceof String)) throw new IllegalArgumentException("custom problem_matcher requires problem_pattern TOML string");
+        return TaskDiagnosticTemplate.parse((String) value);
+    }
+
     private void validateTask(WorkspaceTask task) {
         if (!isValidTaskName(task.name())) throw new IllegalArgumentException("invalid task name: " + task.name());
         if (task.sessionOnly()) {
@@ -630,6 +660,12 @@ public class TaskService {
         validateSingleLine(task.cwd(), "cwd");
         if (task.shell() == null || task.problemMatcher() == null || task.presentation() == null) {
             throw new IllegalArgumentException("task settings required");
+        }
+        if (task.problemMatcher() == ProblemMatcher.CUSTOM && task.customProblemMatcher() == null) {
+            throw new IllegalArgumentException("custom problem_matcher requires problem_pattern");
+        }
+        if (task.problemMatcher() != ProblemMatcher.CUSTOM && task.customProblemMatcher() != null) {
+            throw new IllegalArgumentException("problem_pattern requires problem_matcher = custom");
         }
         for (Map.Entry<String, String> entry : task.environment().entrySet()) {
             if (!ENVIRONMENT_NAME.matcher(entry.getKey()).matches()) throw new IllegalArgumentException("invalid env name: " + entry.getKey());
@@ -642,7 +678,8 @@ public class TaskService {
         for (String field : table.keySet()) {
             if (!"command".equals(field) && !"cwd".equals(field) && !"env".equals(field)
                 && !"shell".equals(field) && !"problem_matcher".equals(field) && !"presentation".equals(field)
-                && !"depends_on".equals(field) && !"background".equals(field) && !"ready_when".equals(field)) {
+                && !"depends_on".equals(field) && !"background".equals(field) && !"ready_when".equals(field)
+                && !"problem_pattern".equals(field)) {
                 throw new IllegalArgumentException("unknown field " + field);
             }
         }

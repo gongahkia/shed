@@ -1,6 +1,7 @@
 package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -75,5 +76,24 @@ public class TaskProblemParserTest {
         assertEquals(5, entries.get(1).getLine());
         assertEquals(3, entries.get(1).getColumn());
         assertEquals(QuickfixService.Severity.ERROR, entries.get(1).getSeverity());
+    }
+
+    @Test
+    void parsesLiteralDelimitedCustomDiagnosticsWithoutWorkspaceRegexes() throws Exception {
+        Path cwd = tempDir.resolve("custom");
+        Files.createDirectories(cwd.resolve("src"));
+        TaskDiagnosticTemplate template = TaskDiagnosticTemplate.parse("diagnostic {{file}} @ {{line}}:{{column}} [{{severity}}] {{message}}");
+
+        List<QuickfixService.Entry> entries = TaskProblemParser.parse(
+            "diagnostic src/Main.java @ 7:3 [warning] use a record\nnot a diagnostic", "task:custom", cwd.toFile(),
+            TaskService.ProblemMatcher.CUSTOM, template);
+
+        assertEquals(1, entries.size());
+        assertEquals(cwd.resolve("src/Main.java").toFile().getCanonicalPath(), entries.getFirst().getFilePath());
+        assertEquals(7, entries.getFirst().getLine());
+        assertEquals(3, entries.getFirst().getColumn());
+        assertEquals("use a record", entries.getFirst().getMessage());
+        assertEquals(QuickfixService.Severity.WARNING, entries.getFirst().getSeverity());
+        assertThrows(IllegalArgumentException.class, () -> TaskDiagnosticTemplate.parse("{{file}}:{{line}}"));
     }
 }

@@ -1280,7 +1280,8 @@ final class JobQuickfixController {
         }
         List<QuickfixService.Entry> parsedEntries = plan.task().problemMatcher() == TaskService.ProblemMatcher.NONE
             ? List.of()
-            : parseTaskQuickfixEntries(output, "task:" + taskName, plan.workingDirectory(), plan.task().problemMatcher());
+            : parseTaskQuickfixEntries(output, "task:" + taskName, plan.workingDirectory(), plan.task().problemMatcher(),
+                plan.task().customProblemMatcher());
         if (parsedEntries.isEmpty()) editor.problemsController.clearQuickfixSource("task:" + taskName);
         if (!parsedEntries.isEmpty()) {
             updateQuickfixEntries("task " + taskName + " #" + jobId, parsedEntries);
@@ -1331,7 +1332,12 @@ final class JobQuickfixController {
 
     List<QuickfixService.Entry> parseTaskQuickfixEntries(String output, String source, File workingDirectory,
                                                           TaskService.ProblemMatcher matcher) {
-        return TaskProblemParser.parse(output, source, workingDirectory, matcher);
+        return parseTaskQuickfixEntries(output, source, workingDirectory, matcher, null);
+    }
+
+    List<QuickfixService.Entry> parseTaskQuickfixEntries(String output, String source, File workingDirectory,
+                                                          TaskService.ProblemMatcher matcher, TaskDiagnosticTemplate customMatcher) {
+        return TaskProblemParser.parse(output, source, workingDirectory, matcher, customMatcher);
     }
 
 

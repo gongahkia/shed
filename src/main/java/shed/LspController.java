@@ -113,7 +113,7 @@ final class LspController {
         flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|links [index]|colors|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|links [index]|colors|pulldiagnostics|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -162,6 +162,10 @@ final class LspController {
             case "documentcolors":
             case "document-colors":
                 return lspDocumentColors();
+            case "pulldiagnostics":
+            case "pull-diagnostics":
+            case "pulldiag":
+                return lspPullDiagnostics();
             case "format":
                 return lspFormat();
             case "peek":
@@ -845,6 +849,29 @@ final class LspController {
         if (colors.isEmpty()) text.append("No document colors\n");
         editor.showScratchBuffer("[lsp document colors]", text.toString());
         return "Showing " + colors.size() + " document color" + (colors.size() == 1 ? "" : "s");
+    }
+
+    public String lspPullDiagnostics() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP pull diagnostics require a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        String unavailable = capabilityUnavailable(client, LspCapability.PULL_DIAGNOSTICS);
+        if (unavailable != null) return unavailable;
+        syncLspOpen(buffer);
+        flushPendingLspChange(buffer);
+        String uri = bufferUri(buffer);
+        Integer version = editor.lspDocumentVersions.get(uri);
+        List<LspClient.Diagnostic> diagnostics = client.pullDiagnostics(uri);
+        if (!Objects.equals(version, editor.lspDocumentVersions.get(uri))) return "Pull diagnostics became stale; refresh again";
+        if (diagnostics.isEmpty()) {
+            editor.problemsController.clearQuickfixSource("diagnostics");
+            return "No pull diagnostics";
+        }
+        List<QuickfixService.Entry> entries = diagnosticsToQuickfixEntries(buffer.getFilePath(), diagnostics);
+        if (entries.isEmpty()) return "No pull diagnostics";
+        editor.updateQuickfixEntries("pull diagnostics", entries);
+        return editor.openQuickfixList();
     }
 
     public String lspFormat() {

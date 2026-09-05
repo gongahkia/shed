@@ -596,6 +596,7 @@ public class LspClient {
     private final BlockingQueue<Map<String, Object>> messageQueue;
     private final List<Map<String, Object>> deferredMessages;
     private final Map<String, List<Diagnostic>> diagnostics;
+    private final Map<String, String> pullDiagnosticResultIds;
     private final Set<Integer> staleRequestIds;
     private final LspFeatureSettings featureSettings;
     private WorkspaceEditHandler workspaceEditHandler;
@@ -635,6 +636,7 @@ public class LspClient {
         this.messageQueue = new LinkedBlockingQueue<>();
         this.deferredMessages = new ArrayList<>();
         this.diagnostics = new ConcurrentHashMap<>();
+        this.pullDiagnosticResultIds = new ConcurrentHashMap<>();
         this.staleRequestIds = ConcurrentHashMap.newKeySet();
         this.featureSettings = featureSettings == null ? LspFeatureSettings.defaults() : featureSettings;
         this.requestId = 0;
@@ -1224,6 +1226,30 @@ public class LspClient {
         return Double.isFinite(component) && component >= 0.0 && component <= 1.0 ? component : null;
     }
 
+    public List<Diagnostic> pullDiagnostics(String uri) {
+        if (!supports(LspCapability.PULL_DIAGNOSTICS) || uri == null || uri.isBlank()) return List.of();
+        Map<String, Object> textDocument = Map.of("uri", uri);
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("textDocument", textDocument);
+        String previousResultId = pullDiagnosticResultIds.get(uri);
+        if (previousResultId != null && !previousResultId.isBlank()) params.put("previousResultId", previousResultId);
+        Map<String, Object> response = sendRequest("textDocument/diagnostic", params, 3000L);
+        Map<String, Object> result = MiniJson.asObject(response == null ? null : response.get("result"));
+        String kind = MiniJson.asString(result == null ? null : result.get("kind"));
+        if ("unchanged".equals(kind)) return getDiagnostics(uri);
+        if (!"full".equals(kind)) return List.of();
+        List<Object> values = MiniJson.asArray(result.get("items"));
+        if (values == null) return List.of();
+        List<Diagnostic> parsed = parseDiagnostics(values);
+        diagnostics.put(uri, parsed);
+        String resultId = MiniJson.asString(result.get("resultId"));
+        if (resultId == null || resultId.isBlank()) pullDiagnosticResultIds.remove(uri);
+        else pullDiagnosticResultIds.put(uri, resultId);
+        Runnable handler = diagnosticsChangedHandler;
+        if (handler != null) handler.run();
+        return List.copyOf(parsed);
+    }
+
     public Location definition(String uri, int line, int character) {
         if (!supports(LspCapability.DEFINITION)) {
             return null;
@@ -1570,6 +1596,9 @@ public class LspClient {
         documentLink.put("tooltipSupport", Boolean.TRUE);
         Map<String, Object> colorProvider = new LinkedHashMap<>();
         colorProvider.put("dynamicRegistration", Boolean.FALSE);
+        Map<String, Object> diagnostic = new LinkedHashMap<>();
+        diagnostic.put("dynamicRegistration", Boolean.FALSE);
+        diagnostic.put("relatedDocumentSupport", Boolean.FALSE);
         Map<String, Object> diagnosticsCapability = new LinkedHashMap<>();
         diagnosticsCapability.put("relatedInformation", Boolean.FALSE);
         Map<String, Object> changeAnnotationSupport = new LinkedHashMap<>();
@@ -1600,6 +1629,7 @@ public class LspClient {
         textDocument.put("selectionRange", selectionRange);
         textDocument.put("documentLink", documentLink);
         textDocument.put("colorProvider", colorProvider);
+        textDocument.put("diagnostic", diagnostic);
         capabilities.put("textDocument", textDocument);
         capabilities.put("workspace", workspace);
 
@@ -1871,6 +1901,14 @@ public class LspClient {
         if (uri == null || diagnosticObjects == null) {
             return;
         }
+        List<Diagnostic> parsed = parseDiagnostics(diagnosticObjects);
+        diagnostics.put(uri, parsed);
+        Runnable handler = diagnosticsChangedHandler;
+        if (handler != null) handler.run();
+    }
+
+    static List<Diagnostic> parseDiagnostics(List<Object> diagnosticObjects) {
+        if (diagnosticObjects == null || diagnosticObjects.isEmpty()) return List.of();
         List<Diagnostic> parsed = new ArrayList<>();
         for (Object diagnosticObject : diagnosticObjects) {
             Map<String, Object> entry = MiniJson.asObject(diagnosticObject);
@@ -1888,9 +1926,7 @@ public class LspClient {
             String messageText = MiniJson.asString(entry.get("message"));
             parsed.add(new Diagnostic(line, character, endLine, endCharacter, severity, messageText == null ? "" : messageText));
         }
-        diagnostics.put(uri, parsed);
-        Runnable handler = diagnosticsChangedHandler;
-        if (handler != null) handler.run();
+        return List.copyOf(parsed);
     }
 
     private void handleIncomingMethod(Map<String, Object> message) {

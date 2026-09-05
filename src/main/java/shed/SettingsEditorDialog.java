@@ -1,6 +1,8 @@
 package shed;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
@@ -14,23 +16,38 @@ import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JList;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
+import javax.swing.border.TitledBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 /** Two-way typed settings editor; TOML remains canonical. */
 final class SettingsEditorDialog extends JDialog {
+    private record DialogTheme(Color surface, Color raised, Color field, Color border, Color foreground, Color muted,
+                               Color accent, Color selection, Color selectionText) {
+        static DialogTheme from(ConfigManager config) {
+            Color surface = config.getNormalColor();
+            Color foreground = config.getEditorForeground();
+            return new DialogTheme(surface, blend(surface, foreground, 0.07), config.getCommandBarBackground(),
+                blend(surface, foreground, 0.18), foreground, blend(foreground, surface, 0.42), config.getCaretColor(),
+                config.getSelectionColor(), config.getSelectionTextColor());
+        }
+    }
+
     private final Texteditor editor;
     private final JTextField search = new JTextField();
     private final JList<String> categories = new JList<>();
     private final JPanel settings = new JPanel(new GridBagLayout());
+    private DialogTheme theme;
     private boolean refreshing;
 
     static void showFor(Texteditor editor) { new SettingsEditorDialog(editor).setVisible(true); }
@@ -38,6 +55,7 @@ final class SettingsEditorDialog extends JDialog {
     private SettingsEditorDialog(Texteditor editor) {
         super(editor, "Settings", false);
         this.editor = editor;
+        theme = DialogTheme.from(editor.configManager);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));
@@ -55,6 +73,7 @@ final class SettingsEditorDialog extends JDialog {
         categories.addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) refresh(); });
         populateCategories();
         refresh();
+        applyTheme(this);
     }
 
     private JPanel header() {
@@ -80,9 +99,9 @@ final class SettingsEditorDialog extends JDialog {
         categories.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         AccessibilitySupport.describe(categories, "Settings categories", "Select a category of typed Shed settings.");
         JScrollPane left = new JScrollPane(categories);
-        left.setBorder(BorderFactory.createTitledBorder("Categories"));
+        left.setBorder(titledBorder("Categories"));
         JScrollPane right = new JScrollPane(settings);
-        right.setBorder(BorderFactory.createTitledBorder("Settings"));
+        right.setBorder(titledBorder("Settings"));
         javax.swing.JSplitPane split = new javax.swing.JSplitPane(javax.swing.JSplitPane.HORIZONTAL_SPLIT, left, right);
         split.setResizeWeight(0.19);
         JPanel panel = new JPanel(new BorderLayout());
@@ -121,6 +140,7 @@ final class SettingsEditorDialog extends JDialog {
         refreshing = true;
         try {
             settings.removeAll();
+            theme = DialogTheme.from(editor.configManager);
             String category = categories.getSelectedValue();
             List<TypedSettings.Descriptor> descriptors = editor.configManager.searchTypedSettings(search.getText());
             int row = 0;
@@ -130,7 +150,11 @@ final class SettingsEditorDialog extends JDialog {
             }
             GridBagConstraints fill = constraints(0, row);
             fill.weighty = 1;
-            settings.add(new JPanel(), fill);
+            JPanel filler = new JPanel();
+            filler.setOpaque(true);
+            filler.setBackground(theme.surface());
+            settings.add(filler, fill);
+            applyTheme(settings);
             settings.revalidate();
             settings.repaint();
         } finally {
@@ -140,6 +164,8 @@ final class SettingsEditorDialog extends JDialog {
 
     private void addDescriptor(TypedSettings.Descriptor descriptor, int row) {
         JPanel panel = new JPanel(new GridBagLayout());
+        panel.setOpaque(true);
+        panel.setBackground(theme.surface());
         panel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, editor.configManager.getStatusBarBackground()),
             BorderFactory.createEmptyBorder(7, 9, 7, 9)));
         GridBagConstraints left = constraints(0, 0);
@@ -192,6 +218,8 @@ final class SettingsEditorDialog extends JDialog {
         if (result.startsWith("Error")) {
             javax.swing.JOptionPane.showMessageDialog(this, result, "Settings", javax.swing.JOptionPane.ERROR_MESSAGE);
         }
+        theme = DialogTheme.from(editor.configManager);
+        applyTheme(this);
         refresh();
     }
 
@@ -214,5 +242,75 @@ final class SettingsEditorDialog extends JDialog {
 
     private static String escape(String value) {
         return (value == null ? "" : value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private TitledBorder titledBorder(String title) {
+        TitledBorder border = BorderFactory.createTitledBorder(BorderFactory.createLineBorder(theme.border()), title);
+        border.setTitleColor(theme.foreground());
+        return border;
+    }
+
+    private void applyTheme(Component component) {
+        if (component == null) return;
+        if (component instanceof JPanel panel) {
+            panel.setOpaque(true);
+            panel.setBackground(theme.surface());
+            panel.setForeground(theme.foreground());
+        }
+        if (component instanceof JLabel label) label.setForeground(theme.foreground());
+        if (component instanceof JButton button) {
+            button.setOpaque(true);
+            button.setContentAreaFilled(true);
+            button.setBackground(theme.raised());
+            button.setForeground(theme.foreground());
+            button.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(theme.border()),
+                BorderFactory.createEmptyBorder(4, 9, 4, 9)));
+        }
+        if (component instanceof JTextField field) {
+            field.setOpaque(true);
+            field.setBackground(theme.field());
+            field.setForeground(theme.foreground());
+            field.setCaretColor(theme.accent());
+            field.setSelectionColor(theme.selection());
+            field.setSelectedTextColor(theme.selectionText());
+            field.setBorder(BorderFactory.createLineBorder(theme.border()));
+        }
+        if (component instanceof JCheckBox box) {
+            box.setOpaque(true);
+            box.setBackground(theme.surface());
+            box.setForeground(theme.foreground());
+        }
+        if (component instanceof JComboBox<?> combo) {
+            combo.setOpaque(true);
+            combo.setBackground(theme.field());
+            combo.setForeground(theme.foreground());
+        }
+        if (component instanceof JList<?> list) {
+            list.setBackground(theme.raised());
+            list.setForeground(theme.foreground());
+            list.setSelectionBackground(theme.selection());
+            list.setSelectionForeground(theme.selectionText());
+        }
+        if (component instanceof JScrollPane scroll) {
+            scroll.setBackground(theme.surface());
+            scroll.getViewport().setBackground(theme.surface());
+            scroll.getHorizontalScrollBar().setBackground(theme.raised());
+            scroll.getVerticalScrollBar().setBackground(theme.raised());
+        }
+        if (component instanceof JSplitPane split) split.setBackground(theme.surface());
+        if (component instanceof JComponent swing && swing.getBorder() instanceof TitledBorder border) {
+            border.setTitleColor(theme.foreground());
+        }
+        if (component instanceof java.awt.Container container) {
+            for (Component child : container.getComponents()) applyTheme(child);
+        }
+        component.repaint();
+    }
+
+    private static Color blend(Color first, Color second, double amount) {
+        double ratio = Math.max(0.0, Math.min(1.0, amount));
+        return new Color((int) Math.round(first.getRed() * (1.0 - ratio) + second.getRed() * ratio),
+            (int) Math.round(first.getGreen() * (1.0 - ratio) + second.getGreen() * ratio),
+            (int) Math.round(first.getBlue() * (1.0 - ratio) + second.getBlue() * ratio));
     }
 }

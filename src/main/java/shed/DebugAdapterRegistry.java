@@ -235,6 +235,16 @@ final class DebugAdapterRegistry {
         return new Validation(new DebugAdapterRegistry(adapters), configurations, source.errors());
     }
 
+    /** Replaces an existing adapter without changing its validated configurations. */
+    static Validation withAdapterReplacement(Validation base, Adapter replacement) {
+        Validation source = base == null ? validate(Map.of()) : base;
+        if (!source.valid() || replacement == null || replacement.id().isBlank()
+            || source.registry().adapter(replacement.id()) == null) return source;
+        Map<String, Adapter> adapters = new LinkedHashMap<>(source.registry().adapters());
+        adapters.put(replacement.id(), replacement);
+        return new Validation(new DebugAdapterRegistry(adapters), source.configurations(), source.errors());
+    }
+
     /**
      * Adds externally supplied, already-validated launch profiles without changing the
      * adapter registry. This is intentionally package-private: callers must retain a

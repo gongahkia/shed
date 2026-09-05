@@ -4,12 +4,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class BuiltInDebugAdapterSupportTest {
+    @TempDir
+    Path temporaryDirectory;
+
     @Test
     void contributesUserInstalledPythonGoCsharpAndNativeDebugSupport() {
         DebugAdapterRegistry.Validation validation = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
@@ -70,6 +75,32 @@ class BuiltInDebugAdapterSupportTest {
 
         assertEquals("custom-debug-adapter", validation.registry().adapter(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY).command());
         assertFalse(validation.configurations().containsKey(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY));
+    }
+
+    @Test
+    void prefersAnExecutableProjectVirtualEnvironmentDebugpyAdapter() throws Exception {
+        Path workspace = Files.createDirectories(temporaryDirectory.resolve("workspace"));
+        Path launcher = Files.writeString(Files.createDirectories(workspace.resolve(".venv/bin")).resolve("debugpy-adapter"), "#!/bin/sh\n");
+        assertTrue(launcher.toFile().setExecutable(true));
+
+        DebugAdapterRegistry.Validation validation = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()), workspace);
+
+        assertEquals(launcher.toString(), validation.registry().adapter(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY).command());
+        assertTrue(validation.configurations().containsKey(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY));
+    }
+
+    @Test
+    void keepsAnExplicitPythonAdapterWhenAProjectVirtualEnvironmentExists() throws Exception {
+        Path workspace = Files.createDirectories(temporaryDirectory.resolve("workspace"));
+        Path launcher = Files.writeString(Files.createDirectories(workspace.resolve(".venv/bin")).resolve("debugpy-adapter"), "#!/bin/sh\n");
+        assertTrue(launcher.toFile().setExecutable(true));
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("debug.adapter.python-debugpy.command", "custom-debug-adapter");
+        values.put("debug.adapter.python-debugpy.capabilities", "launch");
+
+        DebugAdapterRegistry.Validation validation = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(values), workspace);
+
+        assertEquals("custom-debug-adapter", validation.registry().adapter(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY).command());
     }
 
     @Test

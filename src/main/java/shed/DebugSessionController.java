@@ -551,7 +551,7 @@ final class DebugSessionController {
     }
 
     private DebugAdapterRegistry.Validation baseValidation(Path workspace) {
-        return ExtensionDebugAdapterSupport.effective(BuiltInDebugAdapterSupport.effective(editor.configManager.getDebugConfigurationForWorkspace(workspace)),
+        return ExtensionDebugAdapterSupport.effective(BuiltInDebugAdapterSupport.effective(editor.configManager.getDebugConfigurationForWorkspace(workspace), workspace),
             editor.extensionRegistry);
     }
 

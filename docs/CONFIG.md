@@ -307,7 +307,9 @@ To launch a compiled .NET artifact without a `launch.json`, add an explicit conf
 "debug.configuration.dotnet-app.cwd" = "${workspaceFolder}"
 ```
 
-Run `:debug start dotnet-app` only after the artifact exists. Shed does not infer a framework, assembly name, build output, or `launchSettings.json` profile.
+Run `:debug start dotnet-app` only after the artifact exists. A named profile does not infer an assembly name, custom build output, or `launchSettings.json` profile.
+
+For a root `.csproj` whose project-named DLL and matching `.runtimeconfig.json` already exist in the conventional `bin/Debug[/<framework>]/` or `bin/Release[/<framework>]/` output, Shed also exposes a session-only `suggested-csharp-netcoredbg-*` preset. It does not scan project subdirectories, infer a custom `AssemblyName` or output path, follow symbolic links, write configuration, or start debugging automatically; use `:debug configurations` to inspect the exact output. Configure a named profile for every other .NET layout.
 
 To launch a compiled C, C++, Rust, or other LLDB-supported native artifact, configure its exact executable explicitly:
 

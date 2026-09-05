@@ -143,8 +143,10 @@ public class CommandParsingTest {
         assertTrue(handler.getCommandNames().contains("languageservices"));
         assertTrue(handler.getCommandNames().contains("language-services"));
         List<String> actions = PaletteController.surfaceActionNames();
-        assertTrue(matcher.matchStrings("Language Services", actions, 0)
-            .contains(PaletteController.LANGUAGE_SERVICES_ACTION));
+        assertFalse(actions.contains("Language Services"));
+        List<String> candidates = PaletteController.commandPaletteCandidates();
+        assertEquals(actions, candidates);
+        assertFalse(candidates.stream().anyMatch(candidate -> candidate.startsWith(":")));
         assertTrue(matcher.matchStrings("Workspace Folders", actions, 0).contains("Workspace Folders"));
         assertTrue(matcher.matchStrings("Code Actions", actions, 0).contains("Code Actions"));
         assertTrue(matcher.matchStrings("Import Coverage Report", actions, 0).contains("Import Coverage Report"));
@@ -159,7 +161,7 @@ public class CommandParsingTest {
         for (String action : actions) {
             String command = PaletteController.surfaceActionCommand(action);
             String topLevel = command.substring(0, command.indexOf(' ') < 0 ? command.length() : command.indexOf(' '));
-            assertTrue(handler.getCommandNames().contains(topLevel), action + " must route through a registered command");
+        assertTrue(handler.getCommandNames().contains(topLevel), action + " must route through a registered command");
         }
     }
 

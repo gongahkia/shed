@@ -1766,7 +1766,13 @@ final class DebugSessionService {
     private static Map<String, Object> startArguments(DebugAdapterRegistry.Plan plan, Connection connection) throws IOException {
         DebugAdapterRegistry.Configuration configuration = plan.configuration();
         if (configuration.request() == DebugAdapterRegistry.Request.ATTACH) {
-            return Map.of("host", configuration.host(), "port", configuration.port(), "cwd", requireAdapterPath(connection, plan.cwd()), "args", plan.args());
+            Map<String, Object> arguments = new LinkedHashMap<>();
+            arguments.put("host", configuration.host());
+            arguments.put("port", configuration.port());
+            arguments.put("cwd", requireAdapterPath(connection, plan.cwd()));
+            arguments.put("args", plan.args());
+            arguments.putAll(configuration.adapterOptions());
+            return Map.copyOf(arguments);
         }
         Map<String, Object> arguments = new LinkedHashMap<>();
         if (!configuration.program().isBlank()) arguments.put("program", requireAdapterPath(connection, plan.program()));
@@ -1779,6 +1785,7 @@ final class DebugSessionService {
         for (Map.Entry<String, String> entry : plan.adapter().launchDefaults().entrySet()) {
             arguments.putIfAbsent(entry.getKey(), entry.getValue());
         }
+        arguments.putAll(configuration.adapterOptions());
         return Map.copyOf(arguments);
     }
 

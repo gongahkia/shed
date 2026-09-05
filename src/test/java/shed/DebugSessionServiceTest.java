@@ -73,7 +73,7 @@ public class DebugSessionServiceTest {
         Path file = workspace.resolve("Main.java");
         DebugAdapterRegistry.Configuration imported = new DebugAdapterRegistry.Configuration("vscode:With environment", "java",
             DebugAdapterRegistry.Request.LAUNCH, "workspace", "${file}", "", "", "${workspaceFolder}", List.of(), "", "127.0.0.1", 0,
-            List.of(), Map.of("APP_MODE", "development", "PORT", "3000"));
+            List.of(), Map.of("APP_MODE", "development", "PORT", "3000"), Map.of("type", "pwa-node", "sourceMaps", true));
         DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.withExternalConfigurations(validation(),
             Map.of(imported.name(), imported));
         FakeConnection connection = new FakeConnection();
@@ -83,6 +83,8 @@ public class DebugSessionServiceTest {
 
         assertTrue(result.succeeded());
         assertEquals(Map.of("APP_MODE", "development", "PORT", "3000"), connection.arguments.get(1).get("env"));
+        assertEquals("pwa-node", connection.arguments.get(1).get("type"));
+        assertEquals(true, connection.arguments.get(1).get("sourceMaps"));
     }
 
     @Test

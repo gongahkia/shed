@@ -67,7 +67,7 @@ final class DebugAdapterRegistry {
     }
 
     record Configuration(String name, String adapter, Request request, String scope, String program, String module, String code, String cwd, List<String> args,
-        String prelaunchTask, String host, int port, List<String> fileExtensions, Map<String, String> environment) {
+        String prelaunchTask, String host, int port, List<String> fileExtensions, Map<String, String> environment, Map<String, Object> adapterOptions) {
         Configuration {
             name = name == null ? "" : name;
             adapter = adapter == null ? "" : adapter;
@@ -86,6 +86,14 @@ final class DebugAdapterRegistry {
                 throw new IllegalArgumentException("debug configuration environment is invalid");
             }
             environment = Map.copyOf(new LinkedHashMap<>(suppliedEnvironment));
+            Map<String, Object> suppliedAdapterOptions = adapterOptions == null ? Map.of() : adapterOptions;
+            if (!safeAdapterOptions(suppliedAdapterOptions)) throw new IllegalArgumentException("debug configuration adapter options are invalid");
+            adapterOptions = Map.copyOf(new LinkedHashMap<>(suppliedAdapterOptions));
+        }
+
+        Configuration(String name, String adapter, Request request, String scope, String program, String module, String code, String cwd, List<String> args,
+            String prelaunchTask, String host, int port, List<String> fileExtensions, Map<String, String> environment) {
+            this(name, adapter, request, scope, program, module, code, cwd, args, prelaunchTask, host, port, fileExtensions, environment, Map.of());
         }
 
         Configuration(String name, String adapter, Request request, String scope, String program, String module, String code, String cwd, List<String> args,
@@ -157,7 +165,7 @@ final class DebugAdapterRegistry {
         "debug.stacktrace.enabled", "debug.scopes.enabled", "debug.variables.enabled", "debug.evaluate.enabled", "debug.attach.enabled",
         "debug.open.source.on.stop");
     private static final Set<String> ADAPTER_FIELDS = Set.of("transport", "command", "args", "capabilities");
-    private static final Set<String> CONFIGURATION_FIELDS = Set.of("adapter", "request", "scope", "program", "module", "code", "cwd", "args", "prelaunch_task", "host", "port", "file_extensions");
+    private static final Set<String> CONFIGURATION_FIELDS = Set.of("adapter", "request", "scope", "program", "module", "code", "cwd", "args", "prelaunch_task", "host", "port", "file_extensions", "adapter_options");
     private static final Set<String> FILE_ARGUMENT_VARIABLES = Set.of("${file}", "${fileWorkspaceFolder}", "${relativeFile}",
         "${relativeFileDirname}", "${fileBasename}", "${fileBasenameNoExtension}", "${fileExtname}", "${fileDirname}",
         "${fileDirnameBasename}");
@@ -274,6 +282,7 @@ final class DebugAdapterRegistry {
         }
         if (!safeArguments(configuration.args())) return "args contain an invalid control character or exceed 64 KiB";
         if (!safeEnvironment(configuration.environment())) return "environment contains an invalid name/value or exceeds 64 KiB";
+        if (!safeAdapterOptions(configuration.adapterOptions())) return "adapter options contain an invalid field or exceed limits";
         if (configuration.request() == Request.ATTACH && !configuration.environment().isEmpty()) {
             return "environment is launch-only";
         }
@@ -390,6 +399,7 @@ final class DebugAdapterRegistry {
             if (request == Request.LAUNCH && program.isBlank() && !fileExtensions.isEmpty()) {
                 errors.add(new Error(prefix + ".file_extensions", prefix + ".file_extensions requires a program launch target"));
             }
+            Map<String, Object> adapterOptions = adapterOptions(prefix + ".adapter_options", fields.get("adapter_options"), errors);
             String host = fields.getOrDefault("host", "127.0.0.1").trim();
             int port = port(fieldKey(prefix, fields, "port"), prefix + ".port", fields.get("port"), request, errors);
             if (request == Request.ATTACH && !loopback(host)) errors.add(new Error(prefix + ".host", prefix + ".host must be loopback in M0"));
@@ -397,7 +407,8 @@ final class DebugAdapterRegistry {
             if (adapter == null) errors.add(new Error(fieldKey(prefix, fields, "adapter"), prefix + ".adapter is not registered"));
             else if (!adapter.supports(request)) errors.add(new Error(prefix + ".request", prefix + ".request is not supported by adapter " + adapterId));
             if (errorsFor(errors, prefix)) continue;
-            result.put(name, new Configuration(name, adapterId, request, scope, program, module, code, cwd, args, prelaunchTask, host, port, fileExtensions));
+            result.put(name, new Configuration(name, adapterId, request, scope, program, module, code, cwd, args, prelaunchTask, host, port,
+                fileExtensions, Map.of(), adapterOptions));
         }
         return result;
     }
@@ -436,6 +447,25 @@ final class DebugAdapterRegistry {
             if (!result.contains(extension)) result.add(extension);
         }
         return List.copyOf(result);
+    }
+
+    private static Map<String, Object> adapterOptions(String key, String value, List<Error> errors) {
+        if (value == null || value.isBlank()) return Map.of();
+        if (value.length() > 64 * 1024) {
+            errors.add(new Error(key, key + " exceeds 64 KiB"));
+            return Map.of();
+        }
+        try {
+            Map<String, Object> parsed = MiniJson.asObject(MiniJson.parse(value));
+            if (parsed == null || !safeAdapterOptions(parsed)) {
+                errors.add(new Error(key, key + " must be a bounded JSON object with non-core adapter fields"));
+                return Map.of();
+            }
+            return Map.copyOf(new LinkedHashMap<>(parsed));
+        } catch (RuntimeException error) {
+            errors.add(new Error(key, key + " must be a valid JSON object"));
+            return Map.of();
+        }
     }
 
     private static int port(String key, String field, String value, Request request, List<Error> errors) {
@@ -484,6 +514,47 @@ final class DebugAdapterRegistry {
             if (length > 64 * 1024) return false;
         }
         return true;
+    }
+    static boolean safeAdapterOptions(Map<String, Object> values) {
+        if (values == null || values.size() > 100) return false;
+        int[] length = {0};
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || !key.matches("[A-Za-z_][A-Za-z0-9_]*") || coreAdapterOption(key)) return false;
+            if (!safeAdapterOptionValue(entry.getValue(), 0, length)) return false;
+        }
+        return length[0] <= 64 * 1024;
+    }
+    private static boolean safeAdapterOptionValue(Object value, int depth, int[] length) {
+        if (depth > 16 || length == null || length.length == 0) return false;
+        if (value == null || value instanceof Boolean) return true;
+        if (value instanceof Number number) return Double.isFinite(number.doubleValue());
+        if (value instanceof String text) {
+            if (text.length() > 8 * 1024 || text.indexOf('\u0000') >= 0 || text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0) return false;
+            length[0] += text.length();
+            return length[0] <= 64 * 1024;
+        }
+        if (value instanceof List<?> list) {
+            if (list.size() > 100) return false;
+            for (Object item : list) if (!safeAdapterOptionValue(item, depth + 1, length)) return false;
+            return true;
+        }
+        if (value instanceof Map<?, ?> map) {
+            if (map.size() > 100) return false;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (!(entry.getKey() instanceof String key) || !key.matches("[A-Za-z_][A-Za-z0-9_]*")) return false;
+                length[0] += key.length();
+                if (length[0] > 64 * 1024 || !safeAdapterOptionValue(entry.getValue(), depth + 1, length)) return false;
+            }
+            return true;
+        }
+        return false;
+    }
+    private static boolean coreAdapterOption(String key) {
+        return switch (key) {
+            case "program", "module", "code", "cwd", "args", "env", "host", "port", "request" -> true;
+            default -> false;
+        };
     }
     private static boolean safeModule(String value) { return value != null && value.matches("[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*"); }
     private static boolean safeCode(String value) { return value != null && !value.isBlank() && value.length() <= 64 * 1024 && value.indexOf('\u0000') < 0; }

@@ -252,6 +252,49 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void sendsReverseControlsOnlyWhenTheAdapterDeclaresAndAdvertisesThem() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-reverse-controls").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsReverseContinue", true, "supportsStepBack", true), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,reverse_continue,step_back"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+
+        assertTrue(service.control(workspace, DebugSessionService.Control.REVERSE_CONTINUE, Duration.ofSeconds(1)).succeeded());
+        assertEquals("reverseContinue", connection.commands.getLast());
+        assertEquals(Map.of("threadId", 7), connection.arguments.getLast());
+        listener.get().onEvent(new DebugAdapterTransport.Event(2, "stopped", Map.of("reason", "step", "threadId", 7)));
+        assertTrue(service.control(workspace, DebugSessionService.Control.STEP_BACK, Duration.ofSeconds(1)).succeeded());
+        assertEquals("stepBack", connection.commands.getLast());
+    }
+
+    @Test
+    void restartsTheSelectedPausedFrameOnlyWhenTheAdapterAdvertisesSupport() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-restart-frame").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+        connection.responses.put("initialize", response("initialize", true, Map.of("supportsRestartFrame", true), ""));
+        connection.responses.put("stackTrace", response("stackTrace", true,
+            Map.of("stackFrames", List.of(Map.of("id", 44, "name", "main"))), ""));
+
+        assertTrue(service.start(workspace, file, validation("launch,stack_trace,restart_frame"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+        assertTrue(service.refreshInspection(workspace, Duration.ofSeconds(1)).succeeded());
+
+        assertTrue(service.restartFrame(workspace, Duration.ofSeconds(1)).succeeded());
+        assertEquals("restartFrame", connection.commands.getLast());
+        assertEquals(Map.of("frameId", 44), connection.arguments.getLast());
+        assertFalse(service.inspection(workspace).paused());
+    }
+
+    @Test
     void sendsRunToCursorOnlyWhenDeclaredAndAdvertised() {
         DebugSessionService service = new DebugSessionService();
         Path workspace = Path.of("build/debug-goto").toAbsolutePath();

@@ -3,7 +3,10 @@ package shed;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -15,7 +18,13 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.JTree;
 import javax.swing.DefaultListModel;
+import javax.swing.event.TreeExpansionEvent;
+import javax.swing.event.TreeWillExpandListener;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreePath;
 
 final class DebugToolPanel implements ToolWindowHost.ToolSurface {
     private final Texteditor editor;
@@ -41,17 +50,32 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
     private final JTextField functionBreakpointCondition = new JTextField();
     private final JTextField functionBreakpointHitCondition = new JTextField();
     private final JCheckBox exceptionBreakpointEnabled = new JCheckBox("Enabled", true);
-    private final JTextArea inspector = textArea();
+    private final DefaultMutableTreeNode variableRoot = new DefaultMutableTreeNode("Variables");
+    private final DefaultTreeModel variableModel = new DefaultTreeModel(variableRoot);
+    private final JTree variableTree = new JTree(variableModel);
     private final JTextArea console = textArea();
     private final JTextField watchInput = new JTextField();
+    private final JTextField evaluationInput = new JTextField();
+    private final Set<Integer> loadingVariableReferences = new HashSet<>();
     private boolean refreshing;
+
+    private record VariableNode(DebugInspection.Variable variable) {
+        @Override public String toString() {
+            if (variable == null) return "";
+            StringBuilder text = new StringBuilder(variable.name()).append(" = ").append(variable.value());
+            if (!variable.type().isBlank()) text.append(" : ").append(variable.type());
+            return text.toString();
+        }
+    }
 
     DebugToolPanel(Texteditor editor, ToolWindowHost host) {
         this.editor = editor;
         panel.setBorder(BorderFactory.createEmptyBorder(5, 7, 7, 7));
         panel.add(toolbar(), BorderLayout.NORTH);
         panel.add(content(), BorderLayout.CENTER);
+        variableTree.setRootVisible(false);
         AccessibilitySupport.describe(frameList, "Debug call stack", "Select a paused stack frame to inspect variables.");
+        AccessibilitySupport.describe(variableTree, "Debug variables", "Expand a structured variable to inspect its nested values.");
         AccessibilitySupport.describe(watchList, "Debug watches", "Session-local watch expressions.");
         AccessibilitySupport.describe(breakpointList, "Source breakpoints", "Configure enabled, condition, hit-count, or log-message settings for a source breakpoint.");
         AccessibilitySupport.describe(functionBreakpointList, "Function breakpoints", "Configure enabled, condition, or hit-count settings for a DAP function breakpoint.");
@@ -64,6 +88,10 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         });
         exceptionBreakpointList.addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting()) loadExceptionBreakpoint(exceptionBreakpointList.getSelectedValue());
+        });
+        variableTree.addTreeWillExpandListener(new TreeWillExpandListener() {
+            @Override public void treeWillExpand(TreeExpansionEvent event) { requestVariableExpansion(event); }
+            @Override public void treeWillCollapse(TreeExpansionEvent event) { }
         });
     }
 
@@ -158,9 +186,17 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
 
         JPanel left = new JPanel(new GridLayout(5, 1, 4, 4));
         left.add(framesPanel); left.add(watchPanel); left.add(breakpointPanel); left.add(functionBreakpointPanel); left.add(exceptionBreakpointPanel);
-        inspector.setBorder(BorderFactory.createTitledBorder("Variables and Scopes"));
-        console.setBorder(BorderFactory.createTitledBorder("Debug Console"));
-        JSplitPane right = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(inspector), new JScrollPane(console));
+        JPanel variablesPanel = new JPanel(new BorderLayout());
+        variablesPanel.setBorder(BorderFactory.createTitledBorder("Variables and Scopes"));
+        variablesPanel.add(new JScrollPane(variableTree), BorderLayout.CENTER);
+        JPanel consolePanel = new JPanel(new BorderLayout(3, 3));
+        consolePanel.setBorder(BorderFactory.createTitledBorder("Debug Console"));
+        consolePanel.add(new JScrollPane(console), BorderLayout.CENTER);
+        JPanel evaluate = new JPanel(new BorderLayout(3, 0));
+        evaluate.add(evaluationInput, BorderLayout.CENTER);
+        evaluate.add(button("Evaluate", this::evaluate), BorderLayout.EAST);
+        consolePanel.add(evaluate, BorderLayout.SOUTH);
+        JSplitPane right = new JSplitPane(JSplitPane.VERTICAL_SPLIT, variablesPanel, consolePanel);
         right.setResizeWeight(0.56);
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
         split.setResizeWeight(0.28);
@@ -226,7 +262,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
                 }
             }
             if (exceptionBreakpointList.getSelectedIndex() < 0) loadExceptionBreakpoint(null);
-            inspector.setText(renderInspection(snapshot));
+            refreshVariableTree(snapshot);
             DebugConsole.Snapshot output = editor.debugSessionController.consoleForPanel();
             console.setText(output.output());
             console.setCaretPosition(0);
@@ -245,6 +281,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     private void addWatch() { message(editor.debugSessionController.addWatchForPanel(watchInput.getText())); watchInput.setText(""); }
+    private void evaluate() { message(editor.debugSessionController.evaluateForPanel(evaluationInput.getText())); evaluationInput.setText(""); }
     private void removeWatch() {
         DebugInspection.Watch watch = watchList.getSelectedValue();
         message(watch == null ? "Select a watch." : editor.debugSessionController.removeWatchForPanel(watch.expression()));
@@ -281,16 +318,69 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         exceptionBreakpointEnabled.setSelected(breakpoint == null || breakpoint.enabled());
     }
 
+    private void requestVariableExpansion(TreeExpansionEvent event) {
+        Object candidate = event == null || event.getPath() == null ? null : event.getPath().getLastPathComponent();
+        if (!(candidate instanceof DefaultMutableTreeNode node) || !(node.getUserObject() instanceof VariableNode variable)) return;
+        if (node.getChildCount() != 1 || !(node.getFirstChild() instanceof DefaultMutableTreeNode child)
+            || !"Expand to inspect".equals(String.valueOf(child.getUserObject()))) return;
+        int reference = variable.variable().variablesReference();
+        if (reference < 1 || !loadingVariableReferences.add(reference)) return;
+        editor.showMessage(editor.debugSessionController.expandVariablesForPanel(reference));
+    }
+
+    private void refreshVariableTree(DebugInspection.Snapshot snapshot) {
+        variableRoot.removeAllChildren();
+        loadingVariableReferences.clear();
+        int scopeCount = snapshot == null ? 0 : snapshot.scopes().size();
+        if (snapshot == null || snapshot.scopes().isEmpty()) {
+            variableRoot.add(new DefaultMutableTreeNode("No paused variables."));
+        } else {
+            for (DebugInspection.Scope scope : snapshot.scopes()) {
+                DefaultMutableTreeNode scopeNode = new DefaultMutableTreeNode(scope.name() + (scope.expensive() ? " (expensive)" : ""));
+                variableRoot.add(scopeNode);
+                for (DebugInspection.Variable variable : scope.variables()) {
+                    appendVariable(scopeNode, variable, snapshot.expandedVariables(), Set.of(), 0);
+                }
+            }
+        }
+        variableModel.reload();
+        for (int row = 0; row < scopeCount; row++) variableTree.expandRow(row);
+        expandLoadedVariables(variableRoot, snapshot == null ? Map.of() : snapshot.expandedVariables());
+    }
+
+    private void expandLoadedVariables(DefaultMutableTreeNode node, Map<Integer, List<DebugInspection.Variable>> expanded) {
+        if (node == null) return;
+        Object value = node.getUserObject();
+        if (value instanceof VariableNode variable && expanded.containsKey(variable.variable().variablesReference())) {
+            variableTree.expandPath(new TreePath(node.getPath()));
+        }
+        for (int index = 0; index < node.getChildCount(); index++) {
+            Object child = node.getChildAt(index);
+            if (child instanceof DefaultMutableTreeNode childNode) expandLoadedVariables(childNode, expanded);
+        }
+    }
+
+    private static void appendVariable(DefaultMutableTreeNode parent, DebugInspection.Variable variable, Map<Integer, List<DebugInspection.Variable>> expanded,
+                                       Set<Integer> ancestors, int depth) {
+        DefaultMutableTreeNode node = new DefaultMutableTreeNode(new VariableNode(variable));
+        parent.add(node);
+        int reference = variable == null ? 0 : variable.variablesReference();
+        if (reference < 1 || depth >= 12) return;
+        if (ancestors.contains(reference)) {
+            node.add(new DefaultMutableTreeNode("Cyclic variable reference"));
+            return;
+        }
+        List<DebugInspection.Variable> children = expanded.get(reference);
+        if (children == null) {
+            node.add(new DefaultMutableTreeNode("Expand to inspect"));
+            return;
+        }
+        Set<Integer> childAncestors = new HashSet<>(ancestors);
+        childAncestors.add(reference);
+        for (DebugInspection.Variable child : children) appendVariable(node, child, expanded, Set.copyOf(childAncestors), depth + 1);
+    }
+
     private void message(String text) { editor.showMessage(text); refresh(); }
     private static JButton button(String text, Runnable action) { JButton button = new JButton(text); button.addActionListener(event -> action.run()); return button; }
     private static JTextArea textArea() { JTextArea area = new JTextArea(); area.setEditable(false); area.setLineWrap(false); return area; }
-    private static String renderInspection(DebugInspection.Snapshot snapshot) {
-        StringBuilder text = new StringBuilder(snapshot.state().name()).append(" — ").append(snapshot.detail()).append('\n');
-        for (DebugInspection.Scope scope : snapshot.scopes()) {
-            text.append('\n').append(scope.name()).append('\n');
-            for (DebugInspection.Variable variable : scope.variables()) text.append("  ").append(variable.name()).append(" = ").append(variable.value())
-                .append(variable.type().isBlank() ? "" : " : " + variable.type()).append('\n');
-        }
-        return text.toString();
-    }
 }

@@ -34,6 +34,17 @@ final class DebugConsole {
         events++;
     }
 
+    void appendEvaluation(DebugSessionService.Evaluation evaluation) {
+        if (evaluation == null || evaluation.expression().isBlank()) return;
+        StringBuilder entry = new StringBuilder("[repl] > ").append(evaluation.expression()).append('\n').append("[repl] ")
+            .append(evaluation.result());
+        if (!evaluation.type().isBlank()) entry.append(" : ").append(evaluation.type());
+        if (evaluation.variablesReference() > 0) entry.append("  (structured value)");
+        entry.append('\n');
+        append(entry.toString());
+        events++;
+    }
+
     void disconnected(String detail) {
         if (state == State.STOPPED || state == State.FAILED) return;
         state = State.DISCONNECTED;

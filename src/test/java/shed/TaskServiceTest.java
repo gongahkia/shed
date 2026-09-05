@@ -304,6 +304,7 @@ public class TaskServiceTest {
             [task.watch]
             command = "tool --watch"
             background = true
+            ready_when = "watcher ready"
 
             [task.check]
             command = "tool check"
@@ -316,10 +317,31 @@ public class TaskServiceTest {
 
         assertTrue(loaded.isValid());
         assertTrue(loaded.tasks().get("watch").background());
+        assertEquals("watcher ready", loaded.tasks().get("watch").readyWhen());
         assertNull(TaskService.backgroundPlanError(watch));
         assertEquals("background task 'watch' cannot be a dependency", TaskService.backgroundPlanError(check));
         service.saveWorkspaceTasks(project.toFile(), loaded.tasks());
         assertTrue(Files.readString(project.resolve(".shedtasks")).contains("background = true"));
+        assertTrue(Files.readString(project.resolve(".shedtasks")).contains("ready_when = \"watcher ready\""));
+    }
+
+    @Test
+    void rejectsAReadinessMarkerUnlessTheTaskIsBackground() throws IOException {
+        TaskService service = new TaskService();
+        Path project = tempDir.resolve("invalid-readiness-marker");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve(".shedtasks"), """
+            schema_version = 1
+
+            [task.check]
+            command = "tool check"
+            ready_when = "ready"
+            """);
+
+        TaskService.TaskLoadResult loaded = service.loadWorkspaceTasks(project.toFile());
+
+        assertTrue(!loaded.isValid());
+        assertTrue(loaded.diagnostics().getFirst().contains("ready_when requires background = true"));
     }
 
     @Test

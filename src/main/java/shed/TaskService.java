@@ -131,16 +131,17 @@ public class TaskService {
         private final TaskGroup group;
         private final boolean defaultGroup;
         private final boolean background;
+        private final String readyWhen;
 
         WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                       ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation) {
-            this(name, command, cwd, environment, shell, problemMatcher, presentation, null, null, false, List.of(), TaskGroup.NONE, false, false);
+            this(name, command, cwd, environment, shell, problemMatcher, presentation, null, null, false, List.of(), TaskGroup.NONE, false, false, "");
         }
 
         private WorkspaceTask(String name, String command, String cwd, Map<String, String> environment,
                               ShellPolicy shell, ProblemMatcher problemMatcher, Presentation presentation,
                               List<String> directArguments, List<String> shellArguments, boolean sessionOnly,
-                              List<String> dependencies, TaskGroup group, boolean defaultGroup, boolean background) {
+                              List<String> dependencies, TaskGroup group, boolean defaultGroup, boolean background, String readyWhen) {
             this.name = name;
             this.command = command;
             this.cwd = cwd;
@@ -155,6 +156,7 @@ public class TaskService {
             this.group = group == null ? TaskGroup.NONE : group;
             this.defaultGroup = defaultGroup && this.group != TaskGroup.NONE;
             this.background = background;
+            this.readyWhen = readyWhen == null ? "" : readyWhen;
         }
 
         String name() { return name; }
@@ -173,6 +175,7 @@ public class TaskService {
         TaskGroup group() { return group; }
         boolean defaultGroup() { return defaultGroup; }
         boolean background() { return background; }
+        String readyWhen() { return readyWhen; }
     }
 
     static final class TaskLoadResult {
@@ -357,6 +360,7 @@ public class TaskService {
                 lines.add("presentation = " + tomlString(task.presentation().configValue()));
             }
             if (task.background()) lines.add("background = true");
+            if (!task.readyWhen().isBlank()) lines.add("ready_when = " + tomlString(task.readyWhen()));
             if (!task.dependencies().isEmpty()) {
                 lines.add("depends_on = [" + task.dependencies().stream().map(this::tomlString)
                     .collect(java.util.stream.Collectors.joining(", ")) + "]");
@@ -477,7 +481,7 @@ public class TaskService {
         }
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.DIRECT, problemMatcher, presentation,
-            values, null, true, List.of(), TaskGroup.NONE, false, false);
+            values, null, true, List.of(), TaskGroup.NONE, false, false, "");
     }
 
     /**
@@ -494,7 +498,7 @@ public class TaskService {
         Map<String, String> valuesEnvironment = validatedEnvironment(environment);
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, displayDirectCommand(values), cwd, valuesEnvironment, ShellPolicy.SHELL, problemMatcher, presentation,
-            null, values, true, List.of(), TaskGroup.NONE, false, false);
+            null, values, true, List.of(), TaskGroup.NONE, false, false, "");
     }
 
     /** Creates an ephemeral shell task whose sole command is intentionally raw shell syntax. */
@@ -507,27 +511,37 @@ public class TaskService {
         Map<String, String> valuesEnvironment = validatedEnvironment(environment);
         if (problemMatcher == null || presentation == null) throw new IllegalArgumentException("task settings required");
         return new WorkspaceTask(name, command.trim(), cwd, valuesEnvironment, ShellPolicy.SHELL, problemMatcher, presentation,
-            null, null, true, List.of(), TaskGroup.NONE, false, false);
+            null, null, true, List.of(), TaskGroup.NONE, false, false, "");
     }
 
     static WorkspaceTask withDependencies(WorkspaceTask task, List<String> dependencies) {
         if (task == null) throw new IllegalArgumentException("task required");
         List<String> values = validatedDependencies(dependencies);
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
-            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), values, task.group(), task.defaultGroup(), task.background());
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), values, task.group(), task.defaultGroup(), task.background(), task.readyWhen());
     }
 
     static WorkspaceTask withGroup(WorkspaceTask task, TaskGroup group, boolean defaultGroup) {
         if (task == null) throw new IllegalArgumentException("task required");
         if (group == null) throw new IllegalArgumentException("task group required");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
-            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), group, defaultGroup, task.background());
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), group, defaultGroup, task.background(), task.readyWhen());
     }
 
     static WorkspaceTask withBackground(WorkspaceTask task, boolean background) {
         if (task == null) throw new IllegalArgumentException("task required");
         return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
-            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(), background);
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(), background,
+            background ? task.readyWhen() : "");
+    }
+
+    static WorkspaceTask withReadinessMarker(WorkspaceTask task, String readyWhen) {
+        if (task == null) throw new IllegalArgumentException("task required");
+        String marker = readyWhen == null || readyWhen.isEmpty() ? "" : validatedReadinessMarker(readyWhen);
+        if (!marker.isEmpty() && !task.background()) throw new IllegalArgumentException("ready_when requires background = true");
+        return new WorkspaceTask(task.name(), task.command(), task.cwd(), task.environment(), task.shell(), task.problemMatcher(),
+            task.presentation(), task.directArguments, task.shellArguments, task.sessionOnly(), task.dependencies(), task.group(), task.defaultGroup(),
+            task.background(), marker);
     }
 
     /** A watcher may only be the final plan because it does not complete until explicitly stopped. */
@@ -581,7 +595,7 @@ public class TaskService {
         WorkspaceTask task = new WorkspaceTask(name, ((String) command).trim(), cwdValue, environment,
             ShellPolicy.parse(table.get("shell")), ProblemMatcher.parse(table.get("problem_matcher")),
             Presentation.parse(table.get("presentation")));
-        return withBackground(withDependencies(task, dependencies(table)), background(table));
+        return withReadinessMarker(withBackground(withDependencies(task, dependencies(table)), background(table)), readinessMarker(table));
     }
 
     private static boolean background(TomlTable table) {
@@ -589,6 +603,21 @@ public class TaskService {
         if (value == null) return false;
         if (!(value instanceof Boolean)) throw new IllegalArgumentException("background must be TOML boolean");
         return (Boolean) value;
+    }
+
+    private static String readinessMarker(TomlTable table) {
+        Object value = table.get("ready_when");
+        if (value == null) return "";
+        if (!(value instanceof String)) throw new IllegalArgumentException("ready_when must be TOML string");
+        return validatedReadinessMarker((String) value);
+    }
+
+    private static String validatedReadinessMarker(String value) {
+        if (value == null || value.isEmpty() || value.length() > 256) {
+            throw new IllegalArgumentException("ready_when must be a non-empty single-line marker of at most 256 characters");
+        }
+        validateSingleLine(value, "ready_when");
+        return value;
     }
 
     private void validateTask(WorkspaceTask task) {
@@ -613,7 +642,7 @@ public class TaskService {
         for (String field : table.keySet()) {
             if (!"command".equals(field) && !"cwd".equals(field) && !"env".equals(field)
                 && !"shell".equals(field) && !"problem_matcher".equals(field) && !"presentation".equals(field)
-                && !"depends_on".equals(field) && !"background".equals(field)) {
+                && !"depends_on".equals(field) && !"background".equals(field) && !"ready_when".equals(field)) {
                 throw new IllegalArgumentException("unknown field " + field);
             }
         }

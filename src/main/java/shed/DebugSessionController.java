@@ -101,7 +101,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|memory <reference> [offset [count]]|disassemble <reference> [offset [count]]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|instruction list|add|enable|disable|remove|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|memory <reference> [offset [count]]|disassemble <reference> [offset [count]]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|instruction list|add|enable|disable|remove|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|thread <id>|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -135,6 +135,7 @@ final class DebugSessionController {
             case "console", "output" -> console(args);
             case "stack", "frames", "inspect", "refresh" -> submitInspection();
             case "variables", "variable" -> variables(args);
+            case "thread" -> selectThread(args);
             case "frame" -> selectFrame(args);
             case "watch", "watches" -> watch(args);
             case "eval", "evaluate", "repl" -> evaluate(args);
@@ -287,6 +288,10 @@ final class DebugSessionController {
 
     String selectFrameForPanel(int id) {
         return sessions.selectFrame(workspace(), id).succeeded() ? refreshInspectionForPanel() : "Debug frame is unavailable.";
+    }
+
+    String selectThreadForPanel(int id) {
+        return sessions.selectThread(workspace(), id).succeeded() ? refreshInspectionForPanel() : "Debug thread is unavailable.";
     }
 
     String openFrameSourceForPanel(DebugInspection.Frame frame) {
@@ -604,6 +609,16 @@ final class DebugSessionController {
         if (frameId < 1) return "Usage: :debug frame <positive-id>";
         DebugSessionService.InspectionResult result = sessions.selectFrame(workspace(), frameId);
         if (!result.succeeded()) return "Debug frame " + frameId + " is unavailable for the active paused session.";
+        return submitInspection();
+    }
+
+    private String selectThread(String argument) {
+        int threadId;
+        try { threadId = Integer.parseInt(argument == null ? "" : argument.trim()); }
+        catch (NumberFormatException error) { return "Usage: :debug thread <id>"; }
+        if (threadId < 1) return "Usage: :debug thread <id>";
+        DebugSessionService.InspectionResult result = sessions.selectThread(workspace(), threadId);
+        if (!result.succeeded()) return "Debug thread is unavailable.";
         return submitInspection();
     }
 

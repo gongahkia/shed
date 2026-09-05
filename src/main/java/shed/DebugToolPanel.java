@@ -30,6 +30,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
     private final Texteditor editor;
     private final JPanel panel = new JPanel(new BorderLayout(6, 6));
     private final JComboBox<String> configurations = new JComboBox<>();
+    private final JComboBox<DebugInspection.ThreadInfo> threads = new JComboBox<>();
     private final JLabel state = new JLabel("No debug session selected.");
     private final DefaultListModel<DebugInspection.Frame> frames = new DefaultListModel<>();
     private final JList<DebugInspection.Frame> frameList = new JList<>(frames);
@@ -76,6 +77,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         panel.add(content(), BorderLayout.CENTER);
         variableTree.setRootVisible(false);
         AccessibilitySupport.describe(frameList, "Debug call stack", "Select a paused stack frame to inspect variables.");
+        AccessibilitySupport.describe(threads, "Debug thread", "Select a paused thread to inspect its frames and variables.");
         AccessibilitySupport.describe(variableTree, "Debug variables", "Expand a structured variable to inspect its nested values.");
         AccessibilitySupport.describe(watchList, "Debug watches", "Session-local watch expressions.");
         AccessibilitySupport.describe(breakpointList, "Source breakpoints", "Configure enabled, condition, hit-count, or log-message settings for a source breakpoint.");
@@ -107,6 +109,12 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
             if (!refreshing && configurations.getSelectedItem() != null) message(editor.debugSessionController.selectForPanel(String.valueOf(configurations.getSelectedItem())));
         });
         controls.add(configurations);
+        controls.add(new JLabel("Thread"));
+        threads.addActionListener(event -> {
+            DebugInspection.ThreadInfo thread = (DebugInspection.ThreadInfo) threads.getSelectedItem();
+            if (!refreshing && thread != null) message(editor.debugSessionController.selectThreadForPanel(thread.id()));
+        });
+        controls.add(threads);
         JButton start = button("Start", () -> message(editor.debugSessionController.startForPanel()));
         JButton stop = button("Stop", () -> message(editor.debugSessionController.stopForPanel()));
         JButton restart = button("Restart", () -> message(editor.debugSessionController.restartForPanel()));
@@ -225,6 +233,14 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
             else configurations.setSelectedItem(selected);
             state.setText(session.lifecycle().name().toLowerCase() + " — " + session.detail());
             DebugInspection.Snapshot snapshot = editor.debugSessionController.inspectionForPanel();
+            threads.removeAllItems();
+            for (DebugInspection.ThreadInfo thread : snapshot.threads()) threads.addItem(thread);
+            for (int index = 0; index < threads.getItemCount(); index++) {
+                if (threads.getItemAt(index).id() == snapshot.threadId()) {
+                    threads.setSelectedIndex(index);
+                    break;
+                }
+            }
             frames.clear();
             for (DebugInspection.Frame frame : snapshot.frames()) frames.addElement(frame);
             watches.clear();

@@ -962,6 +962,29 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void reloadsFramesForOnlyTheSelectedPausedThread(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("threads", response("threads", true, Map.of("threads", List.of(Map.of("id", 7, "name", "main"),
+            Map.of("id", 8, "name", "worker"))), ""));
+        connection.responses.put("stackTrace", response("stackTrace", true, Map.of("stackFrames", List.of(Map.of("id", 44, "name", "run"))), ""));
+        connection.responses.put("scopes", response("scopes", true, Map.of("scopes", List.of()), ""));
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+
+        assertTrue(service.start(workspace, file, validation("launch,threads,stack_trace,scopes"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+        assertTrue(service.refreshInspection(workspace, Duration.ofSeconds(1)).succeeded());
+        assertTrue(service.selectThread(workspace, 8).succeeded());
+
+        assertTrue(service.refreshInspection(workspace, Duration.ofSeconds(1)).succeeded());
+        int stackTraceIndex = connection.commands.lastIndexOf("stackTrace");
+        assertEquals(8, connection.arguments.get(stackTraceIndex).get("threadId"));
+    }
+
+    @Test
     void retainsOrderedDapOutputAndReportsAConsoleDisconnect(@TempDir Path tempDir) throws Exception {
         DebugSessionService service = new DebugSessionService();
         Path workspace = tempDir.resolve("workspace");

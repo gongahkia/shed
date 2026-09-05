@@ -38,6 +38,23 @@ public class DebugInspectionTest {
     }
 
     @Test
+    void acceptsOnlyReturnedThreadSelectionAndResetsDependentViews() {
+        DebugInspection inspection = new DebugInspection();
+        inspection.stopped(7, "breakpoint", "");
+        DebugInspection.Load load = inspection.beginLoad();
+        assertTrue(inspection.complete(load.generation(), List.of(new DebugInspection.ThreadInfo(7, "main"), new DebugInspection.ThreadInfo(8, "worker")),
+            List.of(new DebugInspection.Frame(44, "main", "Main.java", 8, 1)), 44,
+            List.of(new DebugInspection.Scope("Locals", 2, false, List.of())), List.of(), "ready", DebugInspection.State.READY));
+
+        assertFalse(inspection.selectThread(9).succeeded());
+        assertTrue(inspection.selectThread(8).succeeded());
+        assertEquals(8, inspection.snapshot().threadId());
+        assertEquals(0, inspection.snapshot().frameId());
+        assertTrue(inspection.snapshot().frames().isEmpty());
+        assertTrue(inspection.snapshot().scopes().isEmpty());
+    }
+
+    @Test
     void discardsNestedVariablesWhenThePausedStateChanges() {
         DebugInspection inspection = new DebugInspection();
         inspection.stopped(7, "breakpoint", "");

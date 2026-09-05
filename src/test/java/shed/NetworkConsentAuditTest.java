@@ -76,7 +76,7 @@ public class NetworkConsentAuditTest {
         assertEquals(Set.of("DebugAdapterTransport.java"), sourcesContaining("new Socket("));
         assertEquals(Set.of("EditActionController.java", "LspController.java", "MarkdownController.java", "TerminalController.java", "UpdateController.java"), sourcesContaining(".browse("));
         assertEquals(Set.of(
-            "BuiltInRemoteWorkspaceProviders.java", "BuiltInScmContributions.java", "DebugAdapterTransport.java", "DevContainerController.java", "DevContainerRuntime.java", "ExternalFormatter.java",
+            "BackgroundTaskProcess.java", "BuiltInRemoteWorkspaceProviders.java", "BuiltInScmContributions.java", "DebugAdapterTransport.java", "DevContainerController.java", "DevContainerRuntime.java", "ExternalFormatter.java",
             "JobQuickfixController.java", "LanguageServerDetector.java", "LspClient.java", "LuaEngine.java", "NotebookController.java",
             "NpmManagedLanguageInstaller.java", "PaletteController.java", "SshPortForwardService.java", "SyntaxUiController.java", "WorkspaceIndexService.java"
         ), sourcesContaining("new ProcessBuilder("));

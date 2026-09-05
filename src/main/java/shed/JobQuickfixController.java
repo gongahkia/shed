@@ -506,10 +506,37 @@ final class JobQuickfixController {
         }
         String validationError = validateTaskPlans(plans);
         if (validationError != null) return new DebugSessionService.PreLaunchResult(false, List.of(validationError));
-        if (TaskService.hasBackgroundTask(plans)) {
-            return new DebugSessionService.PreLaunchResult(false, List.of("Debug pre-launch tasks cannot be background watchers without readiness tracking."));
-        }
         TaskService.TaskExecutionPlan plan = plans.get(plans.size() - 1);
+        if (TaskService.hasBackgroundTask(plans)) {
+            if (plan.task().readyWhen().isBlank()) {
+                return new DebugSessionService.PreLaunchResult(false, List.of("Debug background pre-launch task requires ready_when."));
+            }
+            RemoteWorkspaceTaskTargets.Target remote = editor.remoteWorkspaceTaskTargets == null ? null
+                : editor.remoteWorkspaceTaskTargets.targetForPath(debugPlan.workspace());
+            if (remote != null && remote.workspace().executionRoot() != null
+                && !remote.workspace().executionRoot().trim().equals(remote.localRoot().toString())) {
+                return new DebugSessionService.PreLaunchResult(false, List.of("Debug background pre-launch tasks are supported only in the local workspace."));
+            }
+            if ((editor.devContainerSessions != null && editor.devContainerSessions.connectionFor(debugPlan.workspace()) != null)
+                || (editor.devContainerController != null && editor.devContainerController.hasConfiguration(debugPlan.workspace()))) {
+                return new DebugSessionService.PreLaunchResult(false, List.of("Debug background pre-launch tasks are supported only in the local workspace."));
+            }
+            try {
+                if (plans.size() > 1) {
+                    CommandResult prerequisites = runLocalTaskPlans(plans.subList(0, plans.size() - 1), token);
+                    if (prerequisites.exitCode != 0) {
+                        String detail = taskOutput(prerequisites);
+                        return new DebugSessionService.PreLaunchResult(false, List.of("Debug pre-launch prerequisite failed"
+                            + (detail.isBlank() ? "." : ": " + detail)));
+                    }
+                }
+                return startDebugBackgroundTask(taskName, plan, token);
+            } catch (Exception error) {
+                String message = error.getMessage();
+                return new DebugSessionService.PreLaunchResult(false, List.of("Debug background pre-launch task failed: "
+                    + (message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' '))));
+            }
+        }
         CommandResult result;
         RemoteWorkspaceTaskTargets.Target remote = editor.remoteWorkspaceTaskTargets == null ? null
             : editor.remoteWorkspaceTaskTargets.targetForPath(debugPlan.workspace());
@@ -564,6 +591,18 @@ final class JobQuickfixController {
                 + (detail.isBlank() ? "." : ": " + detail)));
         }
         return new DebugSessionService.PreLaunchResult(true, List.of("Debug pre-launch task '" + taskName + "' completed."));
+    }
+
+    private DebugSessionService.PreLaunchResult startDebugBackgroundTask(String taskName, TaskService.TaskExecutionPlan plan,
+                                                                          AsyncJobService.JobToken token) throws IOException {
+        BackgroundTaskProcess.Running process = BackgroundTaskProcess.start(plan.processCommand(), plan.workingDirectory(), plan.environment(),
+            editor.configManager.getProcessOutputMaxBytes(), plan.task().readyWhen());
+        String description = "task " + plan.task().name() + " [watch]: " + plan.task().name();
+        int jobId = editor.asyncJobService.submitLongRunning(description, process::awaitCompletion,
+            (snapshot, result, error) -> handleTaskJobCompletion(plan.task().name(), plan, snapshot, result, error));
+        String readiness = process.awaitReadiness(editor.configManager.getProcessTimeoutMs(), token);
+        if (!readiness.isBlank()) return new DebugSessionService.PreLaunchResult(false, List.of(readiness));
+        return new DebugSessionService.PreLaunchResult(true, List.of("Debug pre-launch watcher '" + taskName + "' is ready (task job " + jobId + ")."));
     }
 
     private String runRemoteTask(String connectionId, String taskName, File projectRoot,

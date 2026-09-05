@@ -53,7 +53,7 @@ final class NativeDebugPresetDetector {
                 for (Path entry : sorted) {
                     if (result.size() >= MAXIMUM_ARTIFACTS) break;
                     if (Files.isSymbolicLink(entry) || !Files.isRegularFile(entry, LinkOption.NOFOLLOW_LINKS) || !Files.isExecutable(entry)
-                        || !nativeExecutable(entry)) continue;
+                        || !launchableName(entry) || !nativeExecutable(entry)) continue;
                     Path normalized = entry.toAbsolutePath().normalize();
                     if (normalized.startsWith(root)) result.add(normalized);
                 }
@@ -62,6 +62,15 @@ final class NativeDebugPresetDetector {
             }
         }
         return List.copyOf(result);
+    }
+
+    private static boolean launchableName(Path candidate) {
+        Path fileName = candidate == null ? null : candidate.getFileName();
+        if (fileName == null) return false;
+        String name = fileName.toString().toLowerCase(java.util.Locale.ROOT);
+        return !name.endsWith(".so") && !name.contains(".so.") && !name.endsWith(".dylib") && !name.endsWith(".dll")
+            && !name.endsWith(".a") && !name.endsWith(".lib") && !name.endsWith(".o") && !name.endsWith(".obj")
+            && !name.endsWith(".pdb") && !name.endsWith(".d");
     }
 
     private static boolean nativeExecutable(Path candidate) {

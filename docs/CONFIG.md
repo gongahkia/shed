@@ -333,7 +333,7 @@ For a compiled GDB-supported artifact, configure its exact executable explicitly
 
 `native-gdb` starts the user-installed `gdb --interpreter=dap` over stdio. GDB’s DAP interpreter requires a build with Python support. It does not choose an executable, infer compiler output, or translate `cppdbg` MI settings.
 
-When a native executable regular file exists directly in `build/`, `target/debug/`, or `target/release/`, Shed exposes session-only `suggested-native-gdb-*` and `suggested-native-lldb-*` configurations for it. Discovery accepts ELF, Mach-O, or PE headers, does not modify configuration files, never follows symbolic links, and remains an explicit start; use `:debug configurations` to inspect the exact target. Configure a named profile when the artifact directory, adapter, arguments, working directory, or pre-launch task differs.
+When a native executable regular file exists directly in `build/`, `target/debug/`, or `target/release/`, Shed exposes session-only `suggested-native-gdb-*` and `suggested-native-lldb-*` configurations for it. Discovery accepts ELF, Mach-O, or PE headers; excludes conventional library and object names; does not modify configuration files; never follows symbolic links; and remains an explicit start. Use `:debug configurations` to inspect the exact target. Configure a named profile when the artifact directory, adapter, arguments, working directory, or pre-launch task differs.
 
 ## Undo History Policy
 

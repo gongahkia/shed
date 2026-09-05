@@ -18,6 +18,8 @@ class NativeDebugPresetDetectorTest {
         Path root = Files.createDirectories(temporaryDirectory.resolve("workspace"));
         Path artifact = Files.write(Files.createDirectories(root.resolve("build")).resolve("demo-app"), new byte[] {0x7f, 'E', 'L', 'F'});
         assertTrue(artifact.toFile().setExecutable(true));
+        Path library = Files.write(root.resolve("build/libdemo.so"), new byte[] {0x7f, 'E', 'L', 'F'});
+        assertTrue(library.toFile().setExecutable(true));
         DebugAdapterRegistry.Validation base = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
 
         DebugAdapterRegistry.Validation effective = NativeDebugPresetDetector.effective(base, root);
@@ -29,6 +31,7 @@ class NativeDebugPresetDetectorTest {
         assertEquals(BuiltInDebugAdapterSupport.NATIVE_LLDB, lldb.adapter());
         assertEquals("${workspaceFolder}/build/demo-app", gdb.program());
         assertTrue(DebugAdapterRegistry.plan(effective, gdb.name(), root).launchable());
+        assertFalse(effective.configurations().containsKey("suggested-native-gdb-libdemo-so"));
         assertFalse(base.configurations().containsKey(gdb.name()));
     }
 

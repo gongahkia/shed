@@ -25,6 +25,7 @@ public final class ReferenceDocumentHighlightLanguageServer {
                 case "initialize" -> respond(System.out, request.get("id"), Map.of(
                     "capabilities", Map.of("documentHighlightProvider", Boolean.TRUE,
                         "codeLensProvider", Map.of("resolveProvider", Boolean.TRUE),
+                        "selectionRangeProvider", Boolean.TRUE,
                         "executeCommandProvider", Map.of("commands", List.of("test.run")))
                 ));
                 case "textDocument/documentHighlight" -> respond(System.out, request.get("id"), highlights(request));
@@ -33,6 +34,7 @@ public final class ReferenceDocumentHighlightLanguageServer {
                     "data", Map.of("id", "run-test")
                 )));
                 case "codeLens/resolve" -> respond(System.out, request.get("id"), resolvedCodeLens(request));
+                case "textDocument/selectionRange" -> respond(System.out, request.get("id"), List.of(selectionRange()));
                 case "workspace/executeCommand" -> respond(System.out, request.get("id"), null);
                 case "shutdown" -> respond(System.out, request.get("id"), null);
                 case "exit" -> {
@@ -73,6 +75,16 @@ public final class ReferenceDocumentHighlightLanguageServer {
             "range", range == null ? Map.of("start", Map.of("line", 0, "character", 0), "end", Map.of("line", 0, "character", 0)) : range,
             "command", Map.of("title", "Run test", "command", "test.run", "arguments", List.of("AppTest"))
         );
+    }
+
+    private static Map<String, Object> selectionRange() {
+        return Map.of("range", Map.of(
+            "start", Map.of("line", 4, "character", 3),
+            "end", Map.of("line", 4, "character", 7)
+        ), "parent", Map.of("range", Map.of(
+            "start", Map.of("line", 4, "character", 0),
+            "end", Map.of("line", 4, "character", 12)
+        )));
     }
 
     private static void respond(OutputStream output, Object id, Object result) throws IOException {

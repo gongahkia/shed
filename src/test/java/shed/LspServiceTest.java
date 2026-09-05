@@ -76,7 +76,7 @@ public class LspServiceTest {
     @Test
     void recognizesServerAdvertisedSymbolCapabilities() {
         Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
-            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true}}}}"
+            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true},\"selectionRangeProvider\":true}}}"
         ));
 
         LspCapabilityModel model = LspCapabilityModel.fromInitializeResult(response, LspFeatureSettings.defaults().capabilityEnablement());
@@ -84,6 +84,7 @@ public class LspServiceTest {
         assertTrue(model.allows(LspCapability.DOCUMENT_SYMBOLS));
         assertTrue(model.allows(LspCapability.WORKSPACE_SYMBOLS));
         assertTrue(model.allows(LspCapability.CODE_LENS));
+        assertTrue(model.allows(LspCapability.SELECTION_RANGES));
         assertTrue(LspClient.parseCodeLensResolveSupport(response));
     }
 
@@ -154,6 +155,23 @@ public class LspServiceTest {
             assertEquals("Run test", lenses.getFirst().getTitle());
             assertEquals("test.run", lenses.getFirst().getCommandId());
             assertTrue(client.executeCommand(lenses.getFirst().getCommandId(), lenses.getFirst().getCommandArguments()));
+        } finally {
+            client.stop();
+        }
+    }
+
+    @Test
+    void requestsSelectionRangeChainsFromAnAdvertisedLanguageServer() throws Exception {
+        Path workspace = Files.createTempDirectory("shed-lsp-selection-range-");
+        Path java = Path.of(System.getProperty("java.home"), "bin", javaExecutable());
+        Assumptions.assumeTrue(Files.isExecutable(java), "Java runtime executable is unavailable");
+        String uri = workspace.resolve("Main.java").toUri().toString();
+        LspClient client = new LspClient(List.of(java.toString(), "-cp", System.getProperty("java.class.path"),
+            ReferenceDocumentHighlightLanguageServer.class.getName()), workspace, workspace.toUri().toString(), LspFeatureSettings.defaults());
+        try {
+            assertTrue(client.supports(LspCapability.SELECTION_RANGES));
+            assertEquals(List.of(new LspClient.SelectionRange(4, 3, 4, 7), new LspClient.SelectionRange(4, 0, 4, 12)),
+                client.selectionRanges(uri, 4, 4));
         } finally {
             client.stop();
         }
@@ -255,6 +273,16 @@ public class LspServiceTest {
         assertEquals("test.run", lenses.getFirst().getCommandId());
         assertTrue(lenses.getFirst().hasCommand());
         assertFalse(lenses.get(1).hasCommand());
+    }
+
+    @Test
+    void parsesOnlyNestedSelectionRanges() {
+        List<LspClient.SelectionRange> ranges = LspClient.parseSelectionRanges(MiniJson.parse("["
+            + "{\"range\":{\"start\":{\"line\":1,\"character\":4},\"end\":{\"line\":1,\"character\":6}},\"parent\":{"
+            + "\"range\":{\"start\":{\"line\":1,\"character\":0},\"end\":{\"line\":2,\"character\":2}},\"parent\":{"
+            + "\"range\":{\"start\":{\"line\":1,\"character\":5},\"end\":{\"line\":2,\"character\":3}}}}}]"));
+
+        assertEquals(List.of(new LspClient.SelectionRange(1, 4, 1, 6), new LspClient.SelectionRange(1, 0, 2, 2)), ranges);
     }
 
     @Test

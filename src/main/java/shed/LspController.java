@@ -113,7 +113,7 @@ final class LspController {
         flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -150,6 +150,10 @@ final class LspController {
             case "code-lens":
             case "lenses":
                 return lspCodeLenses(args);
+            case "selection":
+            case "selectionrange":
+            case "selection-ranges":
+                return lspSelectionRange(args);
             case "format":
                 return lspFormat();
             case "peek":
@@ -695,6 +699,56 @@ final class LspController {
         if (!client.executeCommand(lens.getCommandId(), lens.getCommandArguments())) return "Code lens command failed";
         String title = lens.getTitle().isBlank() ? lens.getCommandId() : editor.safePreviewText(lens.getTitle(), 160);
         return "Executed code lens: " + title;
+    }
+
+    public String lspSelectionRange(String argument) {
+        if (argument != null && !argument.isBlank() && !"expand".equalsIgnoreCase(argument.trim())) {
+            return "Usage: :lsp selection [expand]";
+        }
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP selection ranges require a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        String unavailable = capabilityUnavailable(client, LspCapability.SELECTION_RANGES);
+        if (unavailable != null) return unavailable;
+        syncLspOpen(buffer);
+        flushPendingLspChange(buffer);
+        String uri = bufferUri(buffer);
+        Integer version = editor.lspDocumentVersions.get(uri);
+        VersionedTextSnapshot text = buffer.textSnapshot();
+        int caret = editor.writingArea.getCaretPosition();
+        VersionedTextSnapshot.Position position = text.positionAt(caret);
+        int currentStart = editor.writingArea.getSelectionStart();
+        int currentEnd = editor.writingArea.getSelectionEnd();
+        List<LspClient.SelectionRange> ranges = client.selectionRanges(uri, position.line(), position.character());
+        if (text != buffer.textSnapshot() || !Objects.equals(version, editor.lspDocumentVersions.get(uri))) {
+            return "Selection ranges became stale; refresh again";
+        }
+        for (LspClient.SelectionRange range : ranges) {
+            GraphemeEditRange.Range candidate = selectionRangeOffsets(text, range);
+            if (candidate == null || candidate.empty() || candidate.start() > currentStart || candidate.end() < currentEnd
+                || (candidate.start() == currentStart && candidate.end() == currentEnd)) continue;
+            editor.writingArea.setCaretPosition(candidate.start());
+            editor.writingArea.moveCaretPosition(candidate.end());
+            return "Expanded selection to " + (range.startLine() + 1) + ":" + (range.startCharacter() + 1)
+                + "–" + (range.endLine() + 1) + ":" + (range.endCharacter() + 1);
+        }
+        return "No larger LSP selection range";
+    }
+
+    private static GraphemeEditRange.Range selectionRangeOffsets(VersionedTextSnapshot text, LspClient.SelectionRange range) {
+        if (text == null || range == null) return null;
+        int start = strictOffsetForPosition(text, range.startLine(), range.startCharacter());
+        int end = strictOffsetForPosition(text, range.endLine(), range.endCharacter());
+        if (start < 0 || end < start) return null;
+        return GraphemeEditRange.selection(text.text(), start, end);
+    }
+
+    private static int strictOffsetForPosition(VersionedTextSnapshot text, int line, int character) {
+        if (line < 0 || character < 0 || line >= text.lineCount()) return -1;
+        int start = text.lineStartOffset(line);
+        int end = text.lineEndOffset(line);
+        return character > end - start ? -1 : start + character;
     }
 
     public String lspFormat() {

@@ -299,6 +299,7 @@ public class ConfigManager {
         defineDefault("lsp.inlay.hints.enabled", lspFeatures.inlayHints());
         defineDefault("lsp.code.lens.enabled", lspFeatures.codeLens());
         defineDefault("lsp.selection.ranges.enabled", lspFeatures.selectionRanges());
+        defineDefault("lsp.document.links.enabled", lspFeatures.documentLinks());
         defineDefault("lsp.semantic.tokens.inline", DEFAULT_LSP_SEMANTIC_TOKENS_INLINE);
         defineDefault("lsp.inlay.hints.inline", DEFAULT_LSP_INLAY_HINTS_INLINE);
         defineDefault("lsp.definition.enabled", lspFeatures.definition());
@@ -1038,6 +1039,7 @@ public class ConfigManager {
             getBoolean("lsp.inlay.hints.enabled", defaults.inlayHints()),
             getBoolean("lsp.code.lens.enabled", defaults.codeLens()),
             getBoolean("lsp.selection.ranges.enabled", defaults.selectionRanges()),
+            getBoolean("lsp.document.links.enabled", defaults.documentLinks()),
             getBoolean("lsp.definition.enabled", defaults.definition()),
             getBoolean("lsp.type.definition.enabled", defaults.typeDefinition()),
             getBoolean("lsp.implementation.enabled", defaults.implementation()),

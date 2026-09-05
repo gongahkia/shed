@@ -76,7 +76,7 @@ public class LspServiceTest {
     @Test
     void recognizesServerAdvertisedSymbolCapabilities() {
         Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
-            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true},\"selectionRangeProvider\":true}}}"
+            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true},\"selectionRangeProvider\":true,\"documentLinkProvider\":{\"resolveProvider\":true}}}}"
         ));
 
         LspCapabilityModel model = LspCapabilityModel.fromInitializeResult(response, LspFeatureSettings.defaults().capabilityEnablement());
@@ -85,7 +85,9 @@ public class LspServiceTest {
         assertTrue(model.allows(LspCapability.WORKSPACE_SYMBOLS));
         assertTrue(model.allows(LspCapability.CODE_LENS));
         assertTrue(model.allows(LspCapability.SELECTION_RANGES));
+        assertTrue(model.allows(LspCapability.DOCUMENT_LINKS));
         assertTrue(LspClient.parseCodeLensResolveSupport(response));
+        assertTrue(LspClient.parseDocumentLinkResolveSupport(response));
     }
 
     @Test
@@ -172,6 +174,25 @@ public class LspServiceTest {
             assertTrue(client.supports(LspCapability.SELECTION_RANGES));
             assertEquals(List.of(new LspClient.SelectionRange(4, 3, 4, 7), new LspClient.SelectionRange(4, 0, 4, 12)),
                 client.selectionRanges(uri, 4, 4));
+        } finally {
+            client.stop();
+        }
+    }
+
+    @Test
+    void resolvesDocumentLinksFromAnAdvertisedLanguageServer() throws Exception {
+        Path workspace = Files.createTempDirectory("shed-lsp-document-link-");
+        Path java = Path.of(System.getProperty("java.home"), "bin", javaExecutable());
+        Assumptions.assumeTrue(Files.isExecutable(java), "Java runtime executable is unavailable");
+        String uri = workspace.resolve("Main.java").toUri().toString();
+        LspClient client = new LspClient(List.of(java.toString(), "-cp", System.getProperty("java.class.path"),
+            ReferenceDocumentHighlightLanguageServer.class.getName()), workspace, workspace.toUri().toString(), LspFeatureSettings.defaults());
+        try {
+            assertTrue(client.supports(LspCapability.DOCUMENT_LINKS));
+            List<LspClient.DocumentLink> links = client.documentLinks(uri);
+            assertEquals(1, links.size());
+            assertEquals("https://example.test/guide", links.getFirst().getTarget());
+            assertEquals("Open guide", links.getFirst().getTooltip());
         } finally {
             client.stop();
         }
@@ -283,6 +304,19 @@ public class LspServiceTest {
             + "\"range\":{\"start\":{\"line\":1,\"character\":5},\"end\":{\"line\":2,\"character\":3}}}}}]"));
 
         assertEquals(List.of(new LspClient.SelectionRange(1, 4, 1, 6), new LspClient.SelectionRange(1, 0, 2, 2)), ranges);
+    }
+
+    @Test
+    void parsesDocumentLinksAndRejectsInvalidRanges() {
+        List<LspClient.DocumentLink> links = LspClient.parseDocumentLinks(MiniJson.parse("["
+            + "{\"range\":{\"start\":{\"line\":1,\"character\":2},\"end\":{\"line\":1,\"character\":8}},"
+            + "\"target\":\"file:///project/README.md\",\"tooltip\":\"Open README\"},"
+            + "{\"range\":{\"start\":{\"line\":3,\"character\":4},\"end\":{\"line\":3,\"character\":3}},\"target\":\"https://example.test\"}]"));
+
+        assertEquals(1, links.size());
+        assertEquals(1, links.getFirst().getStartLine());
+        assertEquals("file:///project/README.md", links.getFirst().getTarget());
+        assertEquals("Open README", links.getFirst().getTooltip());
     }
 
     @Test

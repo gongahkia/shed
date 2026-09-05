@@ -285,6 +285,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:lsp hover` | Show hover info |
 | `:lsp semantic`, `:lsp semantictokens` | Show current-document semantic tokens when supported; supported tokens also render inline by default |
 | `:lsp inlay`, `:lsp inlayhints` | Show current-document inlay hints when supported; supported hints also render inline by default |
+| `:lsp codelens [index]`, `:lsp code-lens [index]` | List current-document CodeLens commands; an explicit index executes one resolved lens only when the server advertises command execution |
 | `:lsp format` | Apply server formatting edits to the current document when supported |
 | `:format`, `:fmt` | Format with the current extension's selected formatter policy |
 | `:formatter`, `:formatpolicy` | Edit the current extension's formatter mode, direct command, args, and format-on-save policy |

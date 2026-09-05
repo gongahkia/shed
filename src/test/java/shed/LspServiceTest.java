@@ -76,13 +76,15 @@ public class LspServiceTest {
     @Test
     void recognizesServerAdvertisedSymbolCapabilities() {
         Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
-            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{}}}}"
+            "{\"result\":{\"capabilities\":{\"documentSymbolProvider\":true,\"workspaceSymbolProvider\":{},\"codeLensProvider\":{\"resolveProvider\":true}}}}"
         ));
 
         LspCapabilityModel model = LspCapabilityModel.fromInitializeResult(response, LspFeatureSettings.defaults().capabilityEnablement());
 
         assertTrue(model.allows(LspCapability.DOCUMENT_SYMBOLS));
         assertTrue(model.allows(LspCapability.WORKSPACE_SYMBOLS));
+        assertTrue(model.allows(LspCapability.CODE_LENS));
+        assertTrue(LspClient.parseCodeLensResolveSupport(response));
     }
 
     @Test
@@ -132,6 +134,26 @@ public class LspServiceTest {
                 new LspClient.DocumentHighlight(2, 3, 2, 7, 2),
                 new LspClient.DocumentHighlight(3, 0, 3, 4, 3)
             ), client.documentHighlights(uri, 2, 3));
+        } finally {
+            client.stop();
+        }
+    }
+
+    @Test
+    void resolvesAndExecutesCodeLensesFromAnAdvertisedLanguageServer() throws Exception {
+        Path workspace = Files.createTempDirectory("shed-lsp-codelens-");
+        Path java = Path.of(System.getProperty("java.home"), "bin", javaExecutable());
+        Assumptions.assumeTrue(Files.isExecutable(java), "Java runtime executable is unavailable");
+        String uri = workspace.resolve("Main.java").toUri().toString();
+        LspClient client = new LspClient(List.of(java.toString(), "-cp", System.getProperty("java.class.path"),
+            ReferenceDocumentHighlightLanguageServer.class.getName()), workspace, workspace.toUri().toString(), LspFeatureSettings.defaults());
+        try {
+            assertTrue(client.supports(LspCapability.CODE_LENS));
+            List<LspClient.CodeLens> lenses = client.codeLenses(uri);
+            assertEquals(1, lenses.size());
+            assertEquals("Run test", lenses.getFirst().getTitle());
+            assertEquals("test.run", lenses.getFirst().getCommandId());
+            assertTrue(client.executeCommand(lenses.getFirst().getCommandId(), lenses.getFirst().getCommandArguments()));
         } finally {
             client.stop();
         }
@@ -214,6 +236,25 @@ public class LspServiceTest {
 
         assertEquals(List.of(new LspClient.SemanticToken(0, 2, 3, 1), new LspClient.SemanticToken(1, 4, 2, 5)), tokens);
         assertEquals(List.of(new LspClient.InlayHint(2, 8, ": String")), hints);
+    }
+
+    @Test
+    void parsesExecutableAndUnresolvedCodeLenses() {
+        List<LspClient.CodeLens> lenses = LspClient.parseCodeLenses(MiniJson.parse("["
+            + "{\"range\":{\"start\":{\"line\":2,\"character\":3},\"end\":{\"line\":2,\"character\":8}},"
+            + "\"command\":{\"title\":\"Run test\",\"command\":\"test.run\",\"arguments\":[\"AppTest\"]}},"
+            + "{\"range\":{\"start\":{\"line\":5,\"character\":0},\"end\":{\"line\":5,\"character\":1}},\"data\":{\"id\":7}},"
+            + "{\"range\":{\"start\":{\"line\":3,\"character\":4},\"end\":{\"line\":3,\"character\":2}}},"
+            + "{\"range\":{\"start\":{\"line\":4,\"character\":0},\"end\":{\"line\":4,\"character\":-1}}}"
+            + "]"));
+
+        assertEquals(2, lenses.size());
+        assertEquals(2, lenses.getFirst().getLine());
+        assertEquals(3, lenses.getFirst().getCharacter());
+        assertEquals("Run test", lenses.getFirst().getTitle());
+        assertEquals("test.run", lenses.getFirst().getCommandId());
+        assertTrue(lenses.getFirst().hasCommand());
+        assertFalse(lenses.get(1).hasCommand());
     }
 
     @Test

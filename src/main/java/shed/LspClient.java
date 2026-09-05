@@ -19,6 +19,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class LspClient {
+    private static final int MAX_CODE_LENSES = 500;
     private static final List<String> STANDARD_SEMANTIC_TOKEN_TYPES = List.of(
         "namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter", "variable",
         "property", "enumMember", "event", "function", "method", "macro", "keyword", "modifier", "comment",
@@ -175,6 +176,34 @@ public class LspClient {
     }
 
     public record InlayHint(int line, int character, String label) {
+    }
+
+    public static class CodeLens {
+        private final int line;
+        private final int character;
+        private final String title;
+        private final String commandId;
+        private final Object commandArguments;
+        private final Map<String, Object> resolvePayload;
+
+        private CodeLens(int line, int character, String title, String commandId, Object commandArguments,
+                         Map<String, Object> resolvePayload) {
+            this.line = line;
+            this.character = character;
+            this.title = title == null ? "" : title;
+            this.commandId = commandId == null ? "" : commandId;
+            this.commandArguments = commandArguments;
+            this.resolvePayload = resolvePayload == null || resolvePayload.isEmpty() ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(resolvePayload));
+        }
+
+        public int getLine() { return line; }
+        public int getCharacter() { return character; }
+        public String getTitle() { return title; }
+        public String getCommandId() { return commandId; }
+        public Object getCommandArguments() { return commandArguments; }
+        public boolean hasCommand() { return !commandId.isBlank(); }
+        Map<String, Object> getResolvePayload() { return resolvePayload; }
     }
 
     public record DocumentHighlight(int startLine, int startCharacter, int endLine, int endCharacter, int kind) {
@@ -530,6 +559,7 @@ public class LspClient {
     private List<String> semanticTokenTypes;
     private Set<String> completionTriggerCharacters;
     private boolean completionResolveSupported;
+    private boolean codeLensResolveSupported;
 
     public LspClient(String command, String[] args, Path rootPath) throws IOException {
         this(command, args, rootPath, LspFeatureSettings.defaults());
@@ -565,6 +595,7 @@ public class LspClient {
         this.semanticTokenTypes = List.of();
         this.completionTriggerCharacters = Set.of();
         this.completionResolveSupported = false;
+        this.codeLensResolveSupported = false;
         startReaderThread();
         initialize(rootUri);
     }
@@ -949,6 +980,57 @@ public class LspClient {
         return hints;
     }
 
+    public List<CodeLens> codeLenses(String uri) {
+        if (!supports(LspCapability.CODE_LENS) || uri == null || uri.isBlank()) return List.of();
+        Map<String, Object> response = sendRequest("textDocument/codeLens", Map.of("textDocument", Map.of("uri", uri)), 2500L);
+        List<CodeLens> lenses = parseCodeLenses(response == null ? null : response.get("result"));
+        if (!codeLensResolveSupported || lenses.isEmpty()) return lenses;
+        List<CodeLens> resolved = new ArrayList<>(lenses.size());
+        for (CodeLens lens : lenses) {
+            resolved.add(lens.hasCommand() ? lens : resolveCodeLens(lens));
+        }
+        return List.copyOf(resolved);
+    }
+
+    static List<CodeLens> parseCodeLenses(Object value) {
+        List<Object> values = MiniJson.asArray(value);
+        if (values == null || values.isEmpty()) return List.of();
+        List<CodeLens> lenses = new ArrayList<>();
+        for (Object valueItem : values) {
+            if (lenses.size() >= MAX_CODE_LENSES) break;
+            CodeLens lens = parseCodeLens(MiniJson.asObject(valueItem));
+            if (lens != null) lenses.add(lens);
+        }
+        return List.copyOf(lenses);
+    }
+
+    private CodeLens resolveCodeLens(CodeLens lens) {
+        if (lens == null || lens.hasCommand() || lens.getResolvePayload().isEmpty()) return lens;
+        Map<String, Object> response = sendRequest("codeLens/resolve", lens.getResolvePayload(), 2500L);
+        Map<String, Object> result = MiniJson.asObject(response == null ? null : response.get("result"));
+        if (result == null) return lens;
+        Map<String, Object> merged = new LinkedHashMap<>(lens.getResolvePayload());
+        merged.putAll(result);
+        CodeLens resolved = parseCodeLens(merged);
+        return resolved == null ? lens : resolved;
+    }
+
+    private static CodeLens parseCodeLens(Map<String, Object> lens) {
+        Map<String, Object> range = MiniJson.asObject(lens == null ? null : lens.get("range"));
+        Map<String, Object> start = MiniJson.asObject(range == null ? null : range.get("start"));
+        Map<String, Object> end = MiniJson.asObject(range == null ? null : range.get("end"));
+        Integer line = MiniJson.asInt(start == null ? null : start.get("line"));
+        Integer character = MiniJson.asInt(start == null ? null : start.get("character"));
+        Integer endLine = MiniJson.asInt(end == null ? null : end.get("line"));
+        Integer endCharacter = MiniJson.asInt(end == null ? null : end.get("character"));
+        if (line == null || character == null || endLine == null || endCharacter == null || line < 0 || character < 0
+            || endLine < 0 || endCharacter < 0 || endLine < line || (endLine.equals(line) && endCharacter < character)) return null;
+        Map<String, Object> command = MiniJson.asObject(lens.get("command"));
+        String title = MiniJson.asString(command == null ? null : command.get("title"));
+        String commandId = MiniJson.asString(command == null ? null : command.get("command"));
+        return new CodeLens(line, character, title, commandId, command == null ? null : command.get("arguments"), lens);
+    }
+
     public Location definition(String uri, int line, int character) {
         if (!supports(LspCapability.DEFINITION)) {
             return null;
@@ -1286,6 +1368,8 @@ public class LspClient {
         semanticTokens.put("formats", List.of("relative"));
         Map<String, Object> inlayHint = new LinkedHashMap<>();
         inlayHint.put("dynamicRegistration", Boolean.FALSE);
+        Map<String, Object> codeLens = new LinkedHashMap<>();
+        codeLens.put("dynamicRegistration", Boolean.FALSE);
         Map<String, Object> diagnosticsCapability = new LinkedHashMap<>();
         diagnosticsCapability.put("relatedInformation", Boolean.FALSE);
         Map<String, Object> changeAnnotationSupport = new LinkedHashMap<>();
@@ -1312,6 +1396,7 @@ public class LspClient {
         textDocument.put("publishDiagnostics", diagnosticsCapability);
         textDocument.put("semanticTokens", semanticTokens);
         textDocument.put("inlayHint", inlayHint);
+        textDocument.put("codeLens", codeLens);
         capabilities.put("textDocument", textDocument);
         capabilities.put("workspace", workspace);
 
@@ -1329,6 +1414,7 @@ public class LspClient {
         semanticTokenTypes = parseSemanticTokenTypes(response);
         completionTriggerCharacters = parseCompletionTriggerCharacters(response);
         completionResolveSupported = parseCompletionResolveSupport(response);
+        codeLensResolveSupported = parseCodeLensResolveSupport(response);
         sendNotification("initialized", new LinkedHashMap<>());
         initialized = true;
     }
@@ -1376,6 +1462,13 @@ public class LspClient {
             if (character != null && !character.isEmpty()) characters.add(character);
         }
         return Set.copyOf(characters);
+    }
+
+    static boolean parseCodeLensResolveSupport(Map<String, Object> response) {
+        Map<String, Object> result = MiniJson.asObject(response == null ? null : response.get("result"));
+        Map<String, Object> capabilities = MiniJson.asObject(result == null ? null : result.get("capabilities"));
+        Map<String, Object> provider = MiniJson.asObject(capabilities == null ? null : capabilities.get("codeLensProvider"));
+        return Boolean.TRUE.equals(provider == null ? null : provider.get("resolveProvider"));
     }
 
     static boolean parseCompletionResolveSupport(Map<String, Object> response) {

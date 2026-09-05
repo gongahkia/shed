@@ -113,7 +113,7 @@ final class LspController {
         flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|typedefinition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -146,6 +146,10 @@ final class LspController {
             case "inlay":
             case "inlayhints":
                 return lspInlayHints();
+            case "codelens":
+            case "code-lens":
+            case "lenses":
+                return lspCodeLenses(args);
             case "format":
                 return lspFormat();
             case "peek":
@@ -653,6 +657,44 @@ final class LspController {
         } catch (BadLocationException error) {
             return "LSP inlay hints failed: " + error.getMessage();
         }
+    }
+
+    public String lspCodeLenses(String selectionArgument) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP code lenses require a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        String unavailable = capabilityUnavailable(client, LspCapability.CODE_LENS);
+        if (unavailable != null) return unavailable;
+        int requestedIndex = parseOneBasedIndex(selectionArgument);
+        if (selectionArgument != null && !selectionArgument.isBlank() && requestedIndex < 1) return "Usage: :lsp codelens [index]";
+        syncLspOpen(buffer);
+        flushPendingLspChange(buffer);
+        String uri = bufferUri(buffer);
+        Integer version = editor.lspDocumentVersions.get(uri);
+        List<LspClient.CodeLens> lenses = client.codeLenses(uri);
+        if (!Objects.equals(version, editor.lspDocumentVersions.get(uri))) return "Code lenses became stale; refresh again";
+        if (lenses.isEmpty()) return "No code lenses";
+        if (requestedIndex < 1) {
+            StringBuilder text = new StringBuilder("LSP Code Lenses\n\n");
+            for (int i = 0; i < lenses.size(); i++) {
+                LspClient.CodeLens lens = lenses.get(i);
+                String title = lens.getTitle().isBlank() ? "(unresolved code lens)" : editor.safePreviewText(lens.getTitle(), 160);
+                text.append(i + 1).append(". ").append(lens.getLine() + 1).append(":").append(lens.getCharacter() + 1)
+                    .append("  ").append(title).append(lens.hasCommand() ? "\n" : "  (no executable command)\n");
+            }
+            text.append("\nRun :lsp codelens <index> to execute an available lens.\n");
+            editor.showScratchBuffer("[lsp code lenses]", text.toString());
+            return "Showing " + lenses.size() + " code lens" + (lenses.size() == 1 ? "" : "es");
+        }
+        if (requestedIndex > lenses.size()) return "Code lens index out of range: " + requestedIndex;
+        LspClient.CodeLens lens = lenses.get(requestedIndex - 1);
+        if (!lens.hasCommand()) return "Code lens " + requestedIndex + " has no executable command";
+        unavailable = capabilityUnavailable(client, LspCapability.EXECUTE_COMMAND);
+        if (unavailable != null) return unavailable;
+        if (!client.executeCommand(lens.getCommandId(), lens.getCommandArguments())) return "Code lens command failed";
+        String title = lens.getTitle().isBlank() ? lens.getCommandId() : editor.safePreviewText(lens.getTitle(), 160);
+        return "Executed code lens: " + title;
     }
 
     public String lspFormat() {

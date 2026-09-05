@@ -16,6 +16,7 @@ enum LspCapability {
     FORMATTING("formatting", "documentFormattingProvider"),
     SEMANTIC_TOKENS("semantic tokens", "semanticTokensProvider"),
     INLAY_HINTS("inlay hints", "inlayHintProvider"),
+    CODE_LENS("code lenses", "codeLensProvider"),
     DOCUMENT_SYMBOLS("document symbols", "documentSymbolProvider"),
     WORKSPACE_SYMBOLS("workspace symbols", "workspaceSymbolProvider"),
     EXECUTE_COMMAND("command execution", "executeCommandProvider");

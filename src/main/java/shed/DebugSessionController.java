@@ -360,8 +360,9 @@ final class DebugSessionController {
             output.append("  ").append(configuration.name()).append("  ").append(configuration.request()).append("  ")
                 .append(configuration.availability()).append("\n    ").append(configuration.remediation()).append("\n");
             DebugAdapterRegistry.Configuration configured = validation.configurations().get(configuration.name());
-            if (configured != null && NativeDebugPresetDetector.isSuggestedConfiguration(configuration.name())) {
-                output.append("    Session-only native artifact preset: ").append(configured.program()).append("\n");
+            if (configured != null && (NativeDebugPresetDetector.isSuggestedConfiguration(configuration.name())
+                || DotnetDebugPresetDetector.isSuggestedConfiguration(configuration.name()))) {
+                output.append("    Session-only artifact preset: ").append(configured.program()).append("\n");
             }
         }
         if (!report.validationErrors().isEmpty()) output.append("\nValidation:\n  ").append(String.join("\n  ", report.validationErrors())).append("\n");
@@ -542,7 +543,7 @@ final class DebugSessionController {
 
     private DebugAdapterRegistry.Validation validation(Path workspace) {
         DebugAdapterRegistry.Validation base = baseValidation(workspace);
-        DebugAdapterRegistry.Validation suggested = NativeDebugPresetDetector.effective(base, workspace);
+        DebugAdapterRegistry.Validation suggested = DotnetDebugPresetDetector.effective(NativeDebugPresetDetector.effective(base, workspace), workspace);
         VsCodeLaunchReports imported = vsCodeLaunchReports(workspace, suggested);
         Map<String, DebugAdapterRegistry.Configuration> configurations = new LinkedHashMap<>(imported.folder().configurations());
         configurations.putAll(imported.workspace().configurations());

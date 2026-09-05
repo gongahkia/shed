@@ -138,6 +138,12 @@ public class SyntaxHighlightService {
                 return new String[] {"true", "false", "null", "yes", "no", "on", "off"};
             case TOML:
                 return new String[] {"true", "false"};
+            case CMAKE:
+                return new String[] {"if", "elseif", "else", "endif", "foreach", "endforeach", "while", "endwhile", "function",
+                    "endfunction", "macro", "endmacro", "block", "endblock", "return", "break", "continue", "cmake_minimum_required",
+                    "project", "add_executable", "add_library", "add_subdirectory", "target_link_libraries", "target_include_directories",
+                    "target_compile_definitions", "target_compile_features", "find_package", "include", "set", "unset", "option", "message",
+                    "configure_file", "file", "install", "enable_testing", "add_test", "include_directories", "link_directories"};
             case SQL:
                 return new String[] {"select", "from", "where", "join", "left", "right", "inner", "outer", "on", "as", "insert", "into", "values", "update", "set", "delete", "create", "alter", "drop", "table", "index", "view", "with", "group", "by", "order", "having", "limit", "offset", "union", "all", "distinct", "null", "and", "or", "not", "case", "when", "then", "else", "end"};
             case SHELL:
@@ -172,6 +178,7 @@ public class SyntaxHighlightService {
                 return new String[] {"#"};
             case YAML:
             case TOML:
+            case CMAKE:
             case SHELL:
                 return new String[] {"#"};
             case SQL:

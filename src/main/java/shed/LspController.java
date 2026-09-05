@@ -2396,6 +2396,8 @@ final class LspController {
         if (path == null) {
             return "";
         }
+        String name = Path.of(path).getFileName().toString().toLowerCase(Locale.ROOT);
+        if (name.equals("cmakelists.txt") || name.endsWith(".cmake.in")) return "cmake";
         int dot = path.lastIndexOf('.');
         if (dot < 0 || dot >= path.length() - 1) {
             return canonicalExtension(buffer.getFileType());
@@ -2411,6 +2413,7 @@ final class LspController {
             case PHP -> "php";
             case RUBY -> "rb";
             case SWIFT -> "swift";
+            case CMAKE -> "cmake";
             default -> "";
         };
     }

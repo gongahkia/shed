@@ -82,6 +82,10 @@ public class SymbolServiceTest {
 
         List<SymbolService.Symbol> shell = service.collectSymbols("deploy() { echo deploy; }\nif true; then :; fi\n", FileType.SHELL);
         assertEquals(List.of("deploy"), shell.stream().map(SymbolService.Symbol::getName).toList());
+
+        List<SymbolService.Symbol> cmake = service.collectSymbols("function(register_target)\nendfunction()\nADD_EXECUTABLE(app main.cpp)\n", FileType.CMAKE);
+        assertEquals(List.of("register_target", "app"), cmake.stream().map(SymbolService.Symbol::getName).toList());
+        assertEquals(List.of("function", "target"), cmake.stream().map(SymbolService.Symbol::getKind).toList());
     }
 
     @Test

@@ -62,6 +62,8 @@ public class SymbolService {
     private static final Pattern SWIFT_FUNCTION = Pattern.compile("^\\s*(?:public|private|fileprivate|internal|open|static|class|mutating|nonmutating|override|final|async|throws|rethrows|\\s)*func\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(");
     private static final Pattern YAML_KEY = Pattern.compile("^(\\s*)(?:-\\s+)?([A-Za-z0-9_.-]+):");
     private static final Pattern TOML_TABLE = Pattern.compile("^\\s*\\[\\[?\\s*([^\\]]+?)\\s*\\]\\]?\\s*(?:#.*)?$");
+    private static final Pattern CMAKE_DEFINITION = Pattern.compile("^\\s*(?:function|macro)\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_]*)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CMAKE_TARGET = Pattern.compile("^\\s*add_(?:executable|library)\\s*\\(\\s*([A-Za-z_][A-Za-z0-9_.+-]*)", Pattern.CASE_INSENSITIVE);
     private static final Pattern SQL_DEFINITION = Pattern.compile("^\\s*create\\s+(?:or\\s+replace\\s+)?(?:table|view|index|schema|function|procedure)\\s+(?:if\\s+not\\s+exists\\s+)?([A-Za-z_][A-Za-z0-9_.$]*)\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern SHELL_FUNCTION = Pattern.compile("^\\s*(?:function\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s*(?:\\(\\s*\\))?\\s*\\{");
     private static final Pattern JAVA_METHOD = Pattern.compile(
@@ -306,6 +308,19 @@ public class SymbolService {
             Matcher table = TOML_TABLE.matcher(value);
             if (table.find()) {
                 symbols.add(new Symbol(table.group(1), "table", lineNumber, 1));
+                return true;
+            }
+            return false;
+        }
+        if (fileType == FileType.CMAKE) {
+            Matcher definition = CMAKE_DEFINITION.matcher(value);
+            if (definition.find()) {
+                symbols.add(new Symbol(definition.group(1), "function", lineNumber, 1));
+                return true;
+            }
+            Matcher target = CMAKE_TARGET.matcher(value);
+            if (target.find()) {
+                symbols.add(new Symbol(target.group(1), "target", lineNumber, 1));
                 return true;
             }
             return false;

@@ -234,12 +234,15 @@ public class LspServiceTest {
         assertEquals("swift", service.languageId(FileType.SWIFT));
         assertEquals("powershell", service.languageId("ps1", FileType.SHELL));
         assertEquals("powershell", service.languageId("psm1", FileType.SHELL));
+        assertEquals("cmake", service.languageId("cmake", FileType.CMAKE));
         assertEquals("text", service.languageId("sh", FileType.SHELL));
         assertEquals(FileType.JAVASCRIPT, FileType.detect(new java.io.File("component.jsx"), ""));
         assertEquals(FileType.TYPESCRIPT, FileType.detect(new java.io.File("component.tsx"), ""));
         assertEquals(FileType.JSON, FileType.detect(new java.io.File("settings.jsonc"), ""));
         assertEquals(FileType.YAML, FileType.detect(new java.io.File("compose.yaml"), ""));
         assertEquals(FileType.TOML, FileType.detect(new java.io.File("Cargo.toml"), ""));
+        assertEquals(FileType.CMAKE, FileType.detect(new java.io.File("CMakeLists.txt"), ""));
+        assertEquals(FileType.CMAKE, FileType.detect(new java.io.File("toolchain.cmake.in"), ""));
         assertEquals(FileType.SQL, FileType.detect(new java.io.File("schema.sql"), ""));
         assertEquals(FileType.SHELL, FileType.detect(new java.io.File("deploy"), "#!/usr/bin/env bash"));
         assertEquals(FileType.SHELL, FileType.detect(new java.io.File("setup.ps1"), ""));

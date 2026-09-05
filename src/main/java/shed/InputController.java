@@ -1636,7 +1636,7 @@ final class InputController {
                     }
                 }
                 if (editor.configManager.getAutoIndent()) {
-                    String indent = editor.currentLineIndentation();
+                    String indent = editor.indentationForNewLine();
                     SwingUtilities.invokeLater(() -> editor.writingArea.insert(indent, editor.writingArea.getCaretPosition()));
                     editor.lastInsertedText += "\n" + indent;
                 }

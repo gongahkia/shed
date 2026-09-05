@@ -125,7 +125,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:set wrap`, `:set nowrap` | Toggle soft wrap |
 | `:set hls`, `:set hlsearch` | Enable search highlight |
 | `:set nohls`, `:set nohlsearch` | Disable search highlight |
-| `:set ai`, `:set autoindent` | Enable auto-indent |
+| `:set ai`, `:set autoindent` | Enable leading and bounded lexical block auto-indent |
 | `:set noai`, `:set noautoindent` | Disable auto-indent |
 | `:set et`, `:set expandtab` | Enable expand-tab |
 | `:set noet`, `:set noexpandtab` | Disable expand-tab |

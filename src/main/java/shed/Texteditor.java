@@ -79,6 +79,7 @@ public class Texteditor extends JFrame implements KeyListener {
     LspService lspService;
     SyntaxHighlightService syntaxHighlightService;
     GrammarHighlightService grammarHighlightService;
+    StructuralIndentationService structuralIndentationService;
     AsyncJobService asyncJobService;
     BackupScheduler backupScheduler;
     UpdateController updateController;
@@ -269,6 +270,7 @@ public class Texteditor extends JFrame implements KeyListener {
         debugSessionController = new DebugSessionController(this);
         syntaxHighlightService = new SyntaxHighlightService();
         grammarHighlightService = new GrammarHighlightService();
+        structuralIndentationService = new StructuralIndentationService();
         asyncJobService = new AsyncJobService(200, this.errorReporter);
         backupScheduler = new BackupScheduler();
         gitHubCapabilityController = new GitHubCapabilityController(this);
@@ -1127,6 +1129,13 @@ public class Texteditor extends JFrame implements KeyListener {
 
     String currentLineIndentation() {
         return editActionController.currentLineIndentation();
+    }
+
+    String indentationForNewLine() {
+        FileBuffer buffer = getCurrentBuffer();
+        FileType type = buffer == null ? FileType.UNKNOWN : buffer.getFileType();
+        return structuralIndentationService.indentationForNewLine(writingArea.getText(), writingArea.getCaretPosition(), type,
+            effectiveExpandTab(), writingArea.getTabSize(), grammarHighlightService);
     }
 
     void moveLineIndentStart() {

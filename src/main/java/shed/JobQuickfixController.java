@@ -462,20 +462,25 @@ final class JobQuickfixController {
         RemoteWorkspaceSessionService.Connection remoteConnection = editor.remoteWorkspaceSessions == null
             ? null : editor.remoteWorkspaceSessions.connectionFor(projectRoot.toPath());
         if (remoteConnection != null) {
+            if (TaskService.hasBackgroundTask(plans)) return "Background tasks are supported only in the local workspace";
             return runActivatedRemoteTask(normalizedName, plans, activeFile, remoteConnection, dryRun);
         }
         DevContainerSessionService.Connection connection = editor.devContainerSessions == null
             ? null : editor.devContainerSessions.connectionFor(projectRoot.toPath());
         if (connection != null) {
+            if (TaskService.hasBackgroundTask(plans)) return "Background tasks are supported only in the local workspace";
             return runConnectedContainerTask(normalizedName, plans, activeFile, connection, dryRun, false);
         }
         if (dryRun) return showTaskDryRun(plans);
-        int jobId = editor.asyncJobService.submit(
-            "task " + normalizedName + ": " + taskPlanDescription(plans),
-            token -> runLocalTaskPlans(plans, token),
-            (snapshot, result, error) -> handleTaskJobCompletion(normalizedName, plan, snapshot, result, error)
-        );
-        return "Task job " + jobId + " started (" + normalizedName + ")";
+        boolean background = TaskService.hasBackgroundTask(plans);
+        String description = "task " + normalizedName + (background ? " [watch]: " : ": ") + taskPlanDescription(plans);
+        AsyncJobService.JobTask<CommandResult> execution = token -> runLocalTaskPlans(plans, token);
+        AsyncJobService.JobCompletion<CommandResult> completion = (snapshot, result, error) ->
+            handleTaskJobCompletion(normalizedName, plan, snapshot, result, error);
+        int jobId = background
+            ? editor.asyncJobService.submitLongRunning(description, execution, completion)
+            : editor.asyncJobService.submit(description, execution, completion);
+        return (background ? "Background task job " : "Task job ") + jobId + " started (" + normalizedName + ")";
     }
 
     DebugSessionService.PreLaunchResult runDebugPreLaunchTask(DebugAdapterRegistry.Plan debugPlan, AsyncJobService.JobToken token) {
@@ -501,6 +506,9 @@ final class JobQuickfixController {
         }
         String validationError = validateTaskPlans(plans);
         if (validationError != null) return new DebugSessionService.PreLaunchResult(false, List.of(validationError));
+        if (TaskService.hasBackgroundTask(plans)) {
+            return new DebugSessionService.PreLaunchResult(false, List.of("Debug pre-launch tasks cannot be background watchers without readiness tracking."));
+        }
         TaskService.TaskExecutionPlan plan = plans.get(plans.size() - 1);
         CommandResult result;
         RemoteWorkspaceTaskTargets.Target remote = editor.remoteWorkspaceTaskTargets == null ? null
@@ -573,6 +581,7 @@ final class JobQuickfixController {
         }
         String validationError = validateTaskPlans(plans);
         if (validationError != null) return validationError;
+        if (TaskService.hasBackgroundTask(plans)) return "Background tasks are supported only in the local workspace";
         RemoteWorkspaceTaskTargets.Target target = editor.remoteWorkspaceTaskTargets == null ? null
             : editor.remoteWorkspaceTaskTargets.targetFor(connectionId, projectRoot.toPath());
         if (target == null) return "Remote task requires a connected workspace containing: " + projectRoot.getAbsolutePath();
@@ -625,6 +634,7 @@ final class JobQuickfixController {
         }
         String validationError = validateTaskPlans(plans);
         if (validationError != null) return validationError;
+        if (TaskService.hasBackgroundTask(plans)) return "Background tasks are supported only in the local workspace";
         DevContainerSessionService.Connection connection = editor.devContainerSessions == null
             ? null : editor.devContainerSessions.connectionFor(projectRoot.toPath());
         if (connection != null) {
@@ -900,6 +910,8 @@ final class JobQuickfixController {
 
     private String validateTaskPlans(List<TaskService.TaskExecutionPlan> plans) {
         if (plans == null || plans.isEmpty()) return "Task validation failed: no execution plans";
+        String lifecycleError = TaskService.backgroundPlanError(plans);
+        if (lifecycleError != null) return "Task validation failed: " + lifecycleError;
         for (TaskService.TaskExecutionPlan plan : plans) {
             String error = validateTaskPlan(plan);
             if (error != null) return error + " (task " + plan.task().name() + ")";
@@ -914,7 +926,8 @@ final class JobQuickfixController {
 
     private CommandResult runLocalTaskPlans(List<TaskService.TaskExecutionPlan> plans, AsyncJobService.JobToken token) throws Exception {
         return runTaskPlans(plans, token, plan -> runExternalCommand(plan.processCommand(), plan.workingDirectory(), null, token,
-            editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true, plan.environment()));
+            plan.task().background() ? 0 : editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true,
+            plan.environment()));
     }
 
     private CommandResult runTaskPlans(List<TaskService.TaskExecutionPlan> plans, AsyncJobService.JobToken token,
@@ -1661,7 +1674,13 @@ final class JobQuickfixController {
             outputReader.setDaemon(true);
             outputReader.start();
 
-            boolean finished = runningProcess.waitFor(Math.max(500, timeoutMs), TimeUnit.MILLISECONDS);
+            boolean finished;
+            if (timeoutMs <= 0) {
+                runningProcess.waitFor();
+                finished = true;
+            } else {
+                finished = runningProcess.waitFor(Math.max(500, timeoutMs), TimeUnit.MILLISECONDS);
+            }
             if (!finished) {
                 runningProcess.destroyForcibly();
                 outputReader.join(500);

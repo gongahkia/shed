@@ -78,12 +78,14 @@ final class ReferenceDebugAdapter implements AutoCloseable {
 
     private void handle(String command, int requestSeq, Map<String, Object> request) throws IOException {
         switch (command) {
-            case "initialize" -> response(requestSeq, command, true, Map.of("supportsCancelRequest", true, "supportsConfigurationDoneRequest", true), "");
+            case "initialize" -> response(requestSeq, command, true,
+                Map.of("supportsCancelRequest", true, "supportsConfigurationDoneRequest", true, "supportsFunctionBreakpoints", true), "");
             case "launch", "attach" -> {
                 launchRequest = requestSeq;
                 event("initialized", Map.of());
             }
             case "setBreakpoints" -> response(requestSeq, command, true, Map.of("breakpoints", breakpoints(request)), "");
+            case "setFunctionBreakpoints" -> response(requestSeq, command, true, Map.of("breakpoints", breakpoints(request)), "");
             case "configurationDone" -> {
                 response(requestSeq, command, true, Map.of(), "");
                 if (launchRequest > 0) response(launchRequest, "launch", true, Map.of(), "");

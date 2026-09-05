@@ -35,36 +35,48 @@ final class DebugSessionController {
     private final DebugSessionService sessions;
     private final BreakpointStore breakpoints;
     private final ExceptionBreakpointStore exceptionBreakpoints;
+    private final FunctionBreakpointStore functionBreakpoints;
     private final Map<Path, Boolean> openSourceOnStop = new ConcurrentHashMap<>();
     private Path lastWorkspace;
     private Path lastActiveFile;
 
     DebugSessionController(Texteditor editor) {
         this(editor, new DebugSessionService(), new BreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")),
-            new ExceptionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
+            new ExceptionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")),
+            new FunctionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
     }
 
     DebugSessionController(Texteditor editor, DebugSessionService sessions) {
         this(editor, sessions, new BreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")),
-            new ExceptionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
+            new ExceptionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")),
+            new FunctionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
     }
 
     DebugSessionController(Texteditor editor, DebugSessionService sessions, BreakpointStore breakpoints) {
-        this(editor, sessions, breakpoints, new ExceptionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
+        this(editor, sessions, breakpoints, new ExceptionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")),
+            new FunctionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
     }
 
     DebugSessionController(Texteditor editor, DebugSessionService sessions, BreakpointStore breakpoints, ExceptionBreakpointStore exceptionBreakpoints) {
+        this(editor, sessions, breakpoints, exceptionBreakpoints,
+            new FunctionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")));
+    }
+
+    DebugSessionController(Texteditor editor, DebugSessionService sessions, BreakpointStore breakpoints, ExceptionBreakpointStore exceptionBreakpoints,
+        FunctionBreakpointStore functionBreakpoints) {
         this.editor = editor;
         this.sessions = sessions == null ? new DebugSessionService() : sessions;
         this.breakpoints = breakpoints == null ? new BreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")) : breakpoints;
         this.exceptionBreakpoints = exceptionBreakpoints == null
             ? new ExceptionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")) : exceptionBreakpoints;
+        this.functionBreakpoints = functionBreakpoints == null
+            ? new FunctionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")) : functionBreakpoints;
     }
 
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|goto [line]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|exception list|enable|disable|console [clear]|stack|variables|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|continue|next|stepin|stepout|pause|goto [line]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|exception list|enable|disable|console [clear]|stack|variables|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -84,6 +96,7 @@ final class DebugSessionController {
             case "pause" -> submitControl(DebugSessionService.Control.PAUSE);
             case "goto", "run-to-cursor", "runtocursor" -> runToCursor(args);
             case "breakpoint", "breakpoints", "bp" -> breakpoint(args);
+            case "function", "functions", "function-breakpoint", "function-breakpoints" -> functionBreakpoint(args);
             case "exception", "exceptions" -> exceptionBreakpoint(args);
             case "console", "output" -> console(args);
             case "stack", "frames", "variables", "inspect", "refresh" -> submitInspection();
@@ -148,6 +161,32 @@ final class DebugSessionController {
     String configureBreakpointForPanel(BreakpointStore.Breakpoint breakpoint, boolean enabled, String condition, String hitCondition, String logMessage) {
         if (breakpoint == null) return "Select a source breakpoint.";
         return configureBreakpoint(breakpoint.source(), breakpoint.line(), enabled, condition, hitCondition, logMessage);
+    }
+
+    List<FunctionBreakpointStore.Breakpoint> functionBreakpointsForPanel() {
+        try {
+            return functionBreakpoints.breakpoints(workspace());
+        } catch (IOException | IllegalArgumentException error) {
+            return List.of();
+        }
+    }
+
+    String addFunctionBreakpointForPanel(String name) { return addFunctionBreakpoint(name); }
+
+    String configureFunctionBreakpointForPanel(FunctionBreakpointStore.Breakpoint breakpoint, boolean enabled, String condition, String hitCondition) {
+        if (breakpoint == null) return "Select a function breakpoint.";
+        return configureFunctionBreakpoint(breakpoint.name(), enabled, condition, hitCondition);
+    }
+
+    String removeFunctionBreakpointForPanel(FunctionBreakpointStore.Breakpoint breakpoint) {
+        if (breakpoint == null) return "Select a function breakpoint.";
+        try {
+            if (!functionBreakpoints.remove(workspace(), breakpoint.name())) return "Function breakpoint is unavailable.";
+            if (sessions.snapshot(workspace()).lifecycle() == DebugSessionService.Lifecycle.RUNNING) synchronizeBreakpoints(workspace());
+            return "Function breakpoint removed.";
+        } catch (IOException | IllegalArgumentException error) {
+            return "Unable to remove function breakpoint: " + error.getMessage();
+        }
     }
 
     List<ExceptionBreakpointView> exceptionBreakpointsForPanel() {
@@ -338,7 +377,7 @@ final class DebugSessionController {
         int jobId = editor.asyncJobService.submit("debug " + operation, token -> sessions.start(workspace, context,
             configuration, features, name,
             Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs())), this::startTransport, breakpoints, exceptionBreakpoints,
-            plan -> editor.jobQuickfixController.runDebugPreLaunchTask(plan, token)), (job, result, error) -> {
+            functionBreakpoints, plan -> editor.jobQuickfixController.runDebugPreLaunchTask(plan, token)), (job, result, error) -> {
                 if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
                     editor.showMessage("Debug " + operation + " cancelled.");
                     return;
@@ -653,6 +692,82 @@ final class DebugSessionController {
         return configureExceptionBreakpoint(filter, "enable".equals(command));
     }
 
+    private String functionBreakpoint(String argument) {
+        String trimmed = argument == null ? "" : argument.trim();
+        if (trimmed.isEmpty() || "list".equalsIgnoreCase(trimmed)) {
+            showFunctionBreakpoints();
+            return "Showing function breakpoints.";
+        }
+        int split = trimmed.indexOf(' ');
+        String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase(java.util.Locale.ROOT);
+        String rest = split < 0 ? "" : trimmed.substring(split + 1).trim();
+        if ("add".equals(command)) return addFunctionBreakpoint(rest);
+        if ("enable".equals(command) || "disable".equals(command) || "remove".equals(command) || "delete".equals(command)
+            || "clear-condition".equals(command) || "clear-hit".equals(command)) {
+            FunctionBreakpointStore.Breakpoint breakpoint = functionBreakpointByName(rest);
+            if (breakpoint == null) return "Usage: :debug function " + command + " <name>";
+            if ("remove".equals(command) || "delete".equals(command)) return removeFunctionBreakpointForPanel(breakpoint);
+            String condition = "clear-condition".equals(command) ? "" : breakpoint.condition();
+            String hit = "clear-hit".equals(command) ? "" : breakpoint.hitCondition();
+            return configureFunctionBreakpoint(breakpoint.name(), "enable".equals(command) || (!"disable".equals(command) && breakpoint.enabled()), condition, hit);
+        }
+        if ("condition".equals(command) || "hit".equals(command)) {
+            int delimiter = rest.indexOf(" -- ");
+            if (delimiter < 1) return "Usage: :debug function " + command + " <name> -- <value>";
+            FunctionBreakpointStore.Breakpoint breakpoint = functionBreakpointByName(rest.substring(0, delimiter));
+            String value = rest.substring(delimiter + 4).trim();
+            if (breakpoint == null || value.isEmpty()) return "Usage: :debug function " + command + " <name> -- <value>";
+            return configureFunctionBreakpoint(breakpoint.name(), breakpoint.enabled(), "condition".equals(command) ? value : breakpoint.condition(),
+                "hit".equals(command) ? value : breakpoint.hitCondition());
+        }
+        return "Usage: :debug function list|add <name>|enable <name>|disable <name>|remove <name>|condition <name> -- <value>|hit <name> -- <value>|clear-condition <name>|clear-hit <name>";
+    }
+
+    private String addFunctionBreakpoint(String name) {
+        try {
+            FunctionBreakpointStore.Breakpoint breakpoint = functionBreakpoints.add(workspace(), name);
+            if (sessions.snapshot(workspace()).lifecycle() == DebugSessionService.Lifecycle.RUNNING) synchronizeBreakpoints(workspace());
+            return "Function breakpoint '" + breakpoint.name() + "' added.";
+        } catch (IOException | IllegalArgumentException error) {
+            return "Unable to add function breakpoint: " + error.getMessage();
+        }
+    }
+
+    private FunctionBreakpointStore.Breakpoint functionBreakpointByName(String name) {
+        try {
+            String requested = new FunctionBreakpointStore.Breakpoint(name).name();
+            return functionBreakpoints.breakpoints(workspace()).stream().filter(value -> value.name().equals(requested)).findFirst().orElse(null);
+        } catch (IOException | IllegalArgumentException error) {
+            return null;
+        }
+    }
+
+    private String configureFunctionBreakpoint(String name, boolean enabled, String condition, String hitCondition) {
+        try {
+            FunctionBreakpointStore.Breakpoint breakpoint = functionBreakpoints.configure(workspace(), name, enabled, condition, hitCondition);
+            if (sessions.snapshot(workspace()).lifecycle() == DebugSessionService.Lifecycle.RUNNING) synchronizeBreakpoints(workspace());
+            return "Function breakpoint '" + breakpoint.name() + "' updated.";
+        } catch (IOException | IllegalArgumentException error) {
+            return "Unable to update function breakpoint: " + error.getMessage();
+        }
+    }
+
+    private void showFunctionBreakpoints() {
+        StringBuilder text = new StringBuilder("Function Breakpoints\n\n");
+        List<FunctionBreakpointStore.Breakpoint> values = functionBreakpointsForPanel();
+        if (values.isEmpty()) text.append("(none)\n");
+        for (FunctionBreakpointStore.Breakpoint breakpoint : values) {
+            text.append(breakpoint.enabled() ? "enabled " : "disabled ").append(breakpoint.state()).append("  ").append(breakpoint.name());
+            if (!breakpoint.condition().isBlank()) text.append("  condition=").append(breakpoint.condition());
+            if (!breakpoint.hitCondition().isBlank()) text.append("  hit=").append(breakpoint.hitCondition());
+            if (!breakpoint.message().isBlank()) text.append("  ").append(breakpoint.message());
+            text.append("\n");
+        }
+        text.append("\nActions: :debug function add <name> | enable <name> | disable <name> | remove <name>\n")
+            .append("         :debug function condition <name> -- <value> | hit <name> -- <value>\n");
+        editor.showScratchBuffer("[debug function breakpoints]", text.toString());
+    }
+
     private String configureExceptionBreakpoint(DebugSessionService.ExceptionFilter filter, boolean enabled) {
         if (filter == null) return "Select an exception breakpoint.";
         try {
@@ -769,13 +884,13 @@ final class DebugSessionController {
     }
 
     private void synchronizeBreakpoints(Path workspace) {
-        editor.asyncJobService.submit("debug breakpoints", token -> sessions.synchronizeBreakpoints(workspace, breakpoints, exceptionBreakpoints,
+        editor.asyncJobService.submit("debug breakpoints", token -> sessions.synchronizeBreakpoints(workspace, breakpoints, exceptionBreakpoints, functionBreakpoints,
             Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
                 refreshBreakpointMarkers();
                 if (error != null || result == null || !result.succeeded()) {
-                    editor.showMessage("Source breakpoint synchronization failed.");
+                    editor.showMessage("Breakpoint synchronization failed.");
                 } else if (!result.snapshot().diagnostics().isEmpty()) {
-                    editor.showMessage("Source breakpoint synchronization completed; inspect :debug status for diagnostics.");
+                    editor.showMessage("Breakpoint synchronization completed; inspect :debug status for diagnostics.");
                 }
             });
     }

@@ -31,7 +31,8 @@ final class BuiltInDebugAdapterSupport {
         DebugAdapterRegistry.Adapter delve = new DebugAdapterRegistry.Adapter(GO_DELVE, DebugAdapterRegistry.Transport.TCP, "dlv", List.of("dap"),
             Set.of(DebugAdapterRegistry.Capability.LAUNCH, DebugAdapterRegistry.Capability.CONFIGURATION_DONE,
                 DebugAdapterRegistry.Capability.BREAKPOINTS, DebugAdapterRegistry.Capability.CONDITIONAL_BREAKPOINTS,
-                DebugAdapterRegistry.Capability.HIT_CONDITIONAL_BREAKPOINTS, DebugAdapterRegistry.Capability.THREADS,
+                DebugAdapterRegistry.Capability.HIT_CONDITIONAL_BREAKPOINTS, DebugAdapterRegistry.Capability.FUNCTION_BREAKPOINTS,
+                DebugAdapterRegistry.Capability.THREADS,
                 DebugAdapterRegistry.Capability.STACK_TRACE, DebugAdapterRegistry.Capability.SCOPES, DebugAdapterRegistry.Capability.VARIABLES,
                 DebugAdapterRegistry.Capability.EVALUATE, DebugAdapterRegistry.Capability.CONTINUE, DebugAdapterRegistry.Capability.NEXT,
                 DebugAdapterRegistry.Capability.STEP_IN, DebugAdapterRegistry.Capability.STEP_OUT, DebugAdapterRegistry.Capability.PAUSE),
@@ -45,7 +46,7 @@ final class BuiltInDebugAdapterSupport {
                 DebugAdapterRegistry.Capability.STEP_OUT, DebugAdapterRegistry.Capability.PAUSE));
         DebugAdapterRegistry.Adapter lldb = new DebugAdapterRegistry.Adapter(NATIVE_LLDB, DebugAdapterRegistry.Transport.STDIO,
             "lldb-dap", List.of(), Set.of(DebugAdapterRegistry.Capability.LAUNCH, DebugAdapterRegistry.Capability.CONFIGURATION_DONE,
-                DebugAdapterRegistry.Capability.BREAKPOINTS, DebugAdapterRegistry.Capability.THREADS,
+                DebugAdapterRegistry.Capability.BREAKPOINTS, DebugAdapterRegistry.Capability.FUNCTION_BREAKPOINTS, DebugAdapterRegistry.Capability.THREADS,
                 DebugAdapterRegistry.Capability.STACK_TRACE, DebugAdapterRegistry.Capability.SCOPES,
                 DebugAdapterRegistry.Capability.VARIABLES, DebugAdapterRegistry.Capability.EVALUATE,
                 DebugAdapterRegistry.Capability.CONTINUE, DebugAdapterRegistry.Capability.NEXT, DebugAdapterRegistry.Capability.STEP_IN,

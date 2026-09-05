@@ -28,12 +28,18 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
     private final JList<DebugInspection.Watch> watchList = new JList<>(watches);
     private final DefaultListModel<BreakpointStore.Breakpoint> breakpoints = new DefaultListModel<>();
     private final JList<BreakpointStore.Breakpoint> breakpointList = new JList<>(breakpoints);
+    private final DefaultListModel<FunctionBreakpointStore.Breakpoint> functionBreakpoints = new DefaultListModel<>();
+    private final JList<FunctionBreakpointStore.Breakpoint> functionBreakpointList = new JList<>(functionBreakpoints);
     private final DefaultListModel<DebugSessionController.ExceptionBreakpointView> exceptionBreakpoints = new DefaultListModel<>();
     private final JList<DebugSessionController.ExceptionBreakpointView> exceptionBreakpointList = new JList<>(exceptionBreakpoints);
     private final JCheckBox breakpointEnabled = new JCheckBox("Enabled", true);
     private final JTextField breakpointCondition = new JTextField();
     private final JTextField breakpointHitCondition = new JTextField();
     private final JTextField breakpointLogMessage = new JTextField();
+    private final JTextField functionBreakpointName = new JTextField();
+    private final JCheckBox functionBreakpointEnabled = new JCheckBox("Enabled", true);
+    private final JTextField functionBreakpointCondition = new JTextField();
+    private final JTextField functionBreakpointHitCondition = new JTextField();
     private final JCheckBox exceptionBreakpointEnabled = new JCheckBox("Enabled", true);
     private final JTextArea inspector = textArea();
     private final JTextArea console = textArea();
@@ -48,9 +54,13 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         AccessibilitySupport.describe(frameList, "Debug call stack", "Select a paused stack frame to inspect variables.");
         AccessibilitySupport.describe(watchList, "Debug watches", "Session-local watch expressions.");
         AccessibilitySupport.describe(breakpointList, "Source breakpoints", "Configure enabled, condition, hit-count, or log-message settings for a source breakpoint.");
+        AccessibilitySupport.describe(functionBreakpointList, "Function breakpoints", "Configure enabled, condition, or hit-count settings for a DAP function breakpoint.");
         AccessibilitySupport.describe(exceptionBreakpointList, "Exception breakpoints", "Enable or disable exception breakpoint filters advertised by the active debug adapter.");
         breakpointList.addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting()) loadBreakpoint(breakpointList.getSelectedValue());
+        });
+        functionBreakpointList.addListSelectionListener(event -> {
+            if (!event.getValueIsAdjusting()) loadFunctionBreakpoint(functionBreakpointList.getSelectedValue());
         });
         exceptionBreakpointList.addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting()) loadExceptionBreakpoint(exceptionBreakpointList.getSelectedValue());
@@ -121,6 +131,23 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         breakpointBottom.add(breakpointActions, BorderLayout.SOUTH);
         breakpointPanel.add(breakpointBottom, BorderLayout.SOUTH);
 
+        JPanel functionBreakpointPanel = new JPanel(new BorderLayout(3, 3));
+        functionBreakpointPanel.setBorder(BorderFactory.createTitledBorder("Function Breakpoints"));
+        functionBreakpointPanel.add(new JScrollPane(functionBreakpointList), BorderLayout.CENTER);
+        JPanel functionBreakpointForm = new JPanel(new GridLayout(4, 2, 3, 3));
+        functionBreakpointForm.add(new JLabel("Name")); functionBreakpointForm.add(functionBreakpointName);
+        functionBreakpointForm.add(functionBreakpointEnabled); functionBreakpointForm.add(new JLabel(""));
+        functionBreakpointForm.add(new JLabel("Condition")); functionBreakpointForm.add(functionBreakpointCondition);
+        functionBreakpointForm.add(new JLabel("Hit count")); functionBreakpointForm.add(functionBreakpointHitCondition);
+        JPanel functionBreakpointActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 3, 0));
+        functionBreakpointActions.add(button("Add", this::addFunctionBreakpoint));
+        functionBreakpointActions.add(button("Apply", this::applyFunctionBreakpoint));
+        functionBreakpointActions.add(button("Remove", this::removeFunctionBreakpoint));
+        JPanel functionBreakpointBottom = new JPanel(new BorderLayout(3, 3));
+        functionBreakpointBottom.add(functionBreakpointForm, BorderLayout.CENTER);
+        functionBreakpointBottom.add(functionBreakpointActions, BorderLayout.SOUTH);
+        functionBreakpointPanel.add(functionBreakpointBottom, BorderLayout.SOUTH);
+
         JPanel exceptionBreakpointPanel = new JPanel(new BorderLayout(3, 3));
         exceptionBreakpointPanel.setBorder(BorderFactory.createTitledBorder("Exception Breakpoints"));
         exceptionBreakpointPanel.add(new JScrollPane(exceptionBreakpointList), BorderLayout.CENTER);
@@ -129,8 +156,8 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         exceptionBreakpointActions.add(button("Apply", this::applyExceptionBreakpoint));
         exceptionBreakpointPanel.add(exceptionBreakpointActions, BorderLayout.SOUTH);
 
-        JPanel left = new JPanel(new GridLayout(4, 1, 4, 4));
-        left.add(framesPanel); left.add(watchPanel); left.add(breakpointPanel); left.add(exceptionBreakpointPanel);
+        JPanel left = new JPanel(new GridLayout(5, 1, 4, 4));
+        left.add(framesPanel); left.add(watchPanel); left.add(breakpointPanel); left.add(functionBreakpointPanel); left.add(exceptionBreakpointPanel);
         inspector.setBorder(BorderFactory.createTitledBorder("Variables and Scopes"));
         console.setBorder(BorderFactory.createTitledBorder("Debug Console"));
         JSplitPane right = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(inspector), new JScrollPane(console));
@@ -170,6 +197,20 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
                 }
             }
             if (breakpointList.getSelectedIndex() < 0) loadBreakpoint(null);
+            FunctionBreakpointStore.Breakpoint selectedFunctionBreakpoint = functionBreakpointList.getSelectedValue();
+            functionBreakpoints.clear();
+            for (FunctionBreakpointStore.Breakpoint breakpoint : editor.debugSessionController.functionBreakpointsForPanel()) {
+                functionBreakpoints.addElement(breakpoint);
+            }
+            if (selectedFunctionBreakpoint != null) {
+                for (int index = 0; index < functionBreakpoints.size(); index++) {
+                    if (functionBreakpoints.get(index).name().equals(selectedFunctionBreakpoint.name())) {
+                        functionBreakpointList.setSelectedIndex(index);
+                        break;
+                    }
+                }
+            }
+            if (functionBreakpointList.getSelectedIndex() < 0) loadFunctionBreakpoint(null);
             DebugSessionController.ExceptionBreakpointView selectedExceptionBreakpoint = exceptionBreakpointList.getSelectedValue();
             exceptionBreakpoints.clear();
             for (DebugSessionController.ExceptionBreakpointView breakpoint : editor.debugSessionController.exceptionBreakpointsForPanel()) {
@@ -214,6 +255,13 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
             breakpointHitCondition.getText(), breakpointLogMessage.getText()));
     }
     private void removeBreakpoint() { message(editor.debugSessionController.removeBreakpointForPanel(breakpointList.getSelectedValue())); }
+    private void addFunctionBreakpoint() { message(editor.debugSessionController.addFunctionBreakpointForPanel(functionBreakpointName.getText())); }
+    private void applyFunctionBreakpoint() {
+        FunctionBreakpointStore.Breakpoint breakpoint = functionBreakpointList.getSelectedValue();
+        message(editor.debugSessionController.configureFunctionBreakpointForPanel(breakpoint, functionBreakpointEnabled.isSelected(),
+            functionBreakpointCondition.getText(), functionBreakpointHitCondition.getText()));
+    }
+    private void removeFunctionBreakpoint() { message(editor.debugSessionController.removeFunctionBreakpointForPanel(functionBreakpointList.getSelectedValue())); }
     private void applyExceptionBreakpoint() {
         message(editor.debugSessionController.configureExceptionBreakpointForPanel(exceptionBreakpointList.getSelectedValue(), exceptionBreakpointEnabled.isSelected()));
     }
@@ -222,6 +270,12 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         breakpointCondition.setText(breakpoint == null ? "" : breakpoint.condition());
         breakpointHitCondition.setText(breakpoint == null ? "" : breakpoint.hitCondition());
         breakpointLogMessage.setText(breakpoint == null ? "" : breakpoint.logMessage());
+    }
+    private void loadFunctionBreakpoint(FunctionBreakpointStore.Breakpoint breakpoint) {
+        functionBreakpointName.setText(breakpoint == null ? "" : breakpoint.name());
+        functionBreakpointEnabled.setSelected(breakpoint == null || breakpoint.enabled());
+        functionBreakpointCondition.setText(breakpoint == null ? "" : breakpoint.condition());
+        functionBreakpointHitCondition.setText(breakpoint == null ? "" : breakpoint.hitCondition());
     }
     private void loadExceptionBreakpoint(DebugSessionController.ExceptionBreakpointView breakpoint) {
         exceptionBreakpointEnabled.setSelected(breakpoint == null || breakpoint.enabled());

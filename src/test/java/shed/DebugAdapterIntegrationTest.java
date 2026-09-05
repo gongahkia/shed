@@ -48,6 +48,23 @@ public class DebugAdapterIntegrationTest {
     }
 
     @Test
+    void referenceAdapterSynchronizesFunctionBreakpointsOverFramedTransport(@TempDir Path tempDir) throws Exception {
+        Path workspace = tempDir.resolve("workspace");
+        Path source = workspace.resolve("Main.java");
+        FunctionBreakpointStore functions = new FunctionBreakpointStore(tempDir.resolve("state"));
+        functions.add(workspace, "demo.Main.main");
+        DebugSessionService service = new DebugSessionService();
+        try (ReferenceDebugAdapter adapter = new ReferenceDebugAdapter(ReferenceDebugAdapter.Mode.NORMAL)) {
+            DebugSessionService.Result started = service.start(workspace, source, validation(), enabled(), "main", Duration.ofSeconds(1),
+                starter(adapter), null, null, functions);
+
+            assertTrue(started.succeeded());
+            assertEquals(List.of("initialize", "launch", "setFunctionBreakpoints", "configurationDone"), adapter.commands());
+            assertEquals(FunctionBreakpointStore.State.VERIFIED, functions.breakpoints(workspace).getFirst().state());
+        }
+    }
+
+    @Test
     void timeoutSendsCancellationAndTheReferenceAdapterRecovers() throws Exception {
         try (ReferenceDebugAdapter adapter = new ReferenceDebugAdapter(ReferenceDebugAdapter.Mode.TIMEOUT_THREADS)) {
             DebugAdapterTransport transport = DebugAdapterTransport.forStreams(adapter.clientInput(), adapter.clientOutput(), adapter.process(), null);
@@ -100,7 +117,7 @@ public class DebugAdapterIntegrationTest {
     private static DebugAdapterRegistry.Validation validation() {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("debug.adapter.reference.command", "reference-adapter");
-        values.put("debug.adapter.reference.capabilities", "launch,breakpoints,configuration_done,threads,stack_trace,scopes,variables,evaluate");
+        values.put("debug.adapter.reference.capabilities", "launch,breakpoints,function_breakpoints,configuration_done,threads,stack_trace,scopes,variables,evaluate");
         values.put("debug.configuration.main.adapter", "reference");
         values.put("debug.configuration.main.request", "launch");
         values.put("debug.configuration.main.scope", "workspace");

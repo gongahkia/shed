@@ -872,6 +872,34 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void debugInstructionBreakpointCommandsPersistOpaqueLocations() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-debug-instruction-breakpoints");
+        Path file = tempDir.resolve("debug-instruction-breakpoints.cpp");
+        Files.createDirectories(home);
+        Files.writeString(file, "int main() { return 0; }\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertEquals("Instruction breakpoint 'module!0x100' added.",
+                onEdt(() -> editor.commandHandler.execute("debug instruction add module!0x100 4")));
+            assertEquals("Instruction breakpoint 'module!0x100' updated.",
+                onEdt(() -> editor.commandHandler.execute("debug instruction condition module!0x100 4 -- counter > 0")));
+            assertEquals("Instruction breakpoint 'module!0x100' updated.",
+                onEdt(() -> editor.commandHandler.execute("debug instruction hit module!0x100 4 -- 3")));
+            assertEquals("Instruction breakpoint 'module!0x100' updated.",
+                onEdt(() -> editor.commandHandler.execute("debug instruction disable module!0x100 4")));
+            assertEquals("Showing instruction breakpoints.", onEdt(() -> editor.commandHandler.execute("debug instruction list")));
+            String content = onEdt(() -> editor.getCurrentBuffer().getContent());
+            assertTrue(content.contains("module!0x100"));
+            assertTrue(content.contains("offset=4"));
+            assertTrue(content.contains("counter > 0"));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void debugPreLaunchTaskRunsBeforeAnAdapterProcessIsOpened() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-debug-prelaunch");

@@ -18,6 +18,7 @@ import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import javax.imageio.ImageIO;
 import javax.swing.AbstractAction;
@@ -61,8 +62,8 @@ final class ShedWelcomePanel extends JPanel {
     private JLabel descriptor;
     private JLabel heading;
     private JLabel detail;
-    private final List<ScaledSpacer> scaledSpacers = new java.util.ArrayList<>();
-    private final List<WelcomeButton> actionButtons = new java.util.ArrayList<>();
+    private final List<ScaledSpacer> scaledSpacers = new ArrayList<>();
+    private final List<WelcomeButton> actionButtons = new ArrayList<>();
     private double appliedScale = -1.0;
 
     ShedWelcomePanel(Texteditor editor) {
@@ -229,7 +230,7 @@ final class ShedWelcomePanel extends JPanel {
 
         JLabel label = label(action.label(), Math.max(13, editor.configManager.getUiFontSize() + 7), foreground);
         button.add(label, BorderLayout.WEST);
-        List<JLabel> keyLabels = new java.util.ArrayList<>();
+        List<JLabel> keyLabels = new ArrayList<>();
         button.add(keyCaps(action.keys(), keyLabels), BorderLayout.EAST);
         actionButtons.add(new WelcomeButton(button, label, keyLabels));
         button.addActionListener(event -> action.run().run());

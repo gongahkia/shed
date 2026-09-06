@@ -73,7 +73,7 @@ class ToolchainServiceTest {
     void selectsAndDiscoversTheFourteenAdditionalRuntimeBackedLanguages(@TempDir Path temporaryDirectory) throws Exception {
         Path workspace = temporaryDirectory.resolve("workspace");
         Path bin = temporaryDirectory.resolve("runtimes/bin");
-        for (String executable : java.util.List.of("dotnet", "php", "bash", "rustc", "pwsh", "kotlin", "ruby", "dart", "lua", "swift", "R", "perl", "scala", "ghc")) {
+        for (String executable : java.util.List.of("bash", "dotnet", "pwsh", "php", "rustc", "kotlin", "lua", "nasm", "ruby", "dart", "swift", "R", "groovy", "perl")) {
             executable(bin.resolve(executable));
         }
         ToolchainService service = new ToolchainService(temporaryDirectory.resolve("state"), Map.of("PATH", bin.toString()));
@@ -81,9 +81,10 @@ class ToolchainServiceTest {
         assertEquals(ToolchainService.Runtime.CSHARP, ToolchainService.Runtime.parse("c#"));
         assertEquals(ToolchainService.Runtime.SHELL, ToolchainService.Runtime.parse("bash"));
         assertEquals(ToolchainService.Runtime.POWERSHELL, ToolchainService.Runtime.parse("pwsh"));
-        assertEquals(14, service.report(workspace).candidates().stream().map(ToolchainService.Candidate::runtime).distinct().count());
-        service.select(workspace, ToolchainService.Runtime.HASKELL, bin.resolve("ghc").toString());
-        assertEquals(bin.resolve("ghc").toRealPath(), service.report(workspace).selections().get(ToolchainService.Runtime.HASKELL));
+        assertEquals(ToolchainService.Runtime.ASSEMBLY, ToolchainService.Runtime.parse("asm"));
+        assertEquals(14L, service.report(workspace).candidates().stream().map(ToolchainService.Candidate::runtime).distinct().count());
+        service.select(workspace, ToolchainService.Runtime.GROOVY, bin.resolve("groovy").toString());
+        assertEquals(bin.resolve("groovy").toRealPath(), service.report(workspace).selections().get(ToolchainService.Runtime.GROOVY));
     }
 
     private static Path executable(Path path) throws Exception {

@@ -51,6 +51,7 @@ final class DebugSessionController {
     private final FunctionBreakpointStore functionBreakpoints;
     private final DataBreakpointStore dataBreakpoints;
     private final InstructionBreakpointStore instructionBreakpoints;
+    private final ImportedDebugProfileStore importedProfiles;
     private final Map<Path, Boolean> openSourceOnStop = new ConcurrentHashMap<>();
     private Path lastWorkspace;
     private Path lastActiveFile;
@@ -106,12 +107,13 @@ final class DebugSessionController {
             ? new DataBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")) : dataBreakpoints;
         this.instructionBreakpoints = instructionBreakpoints == null
             ? new InstructionBreakpointStore(Path.of(editor.configManager.getSessionDirectory(), "breakpoints")) : instructionBreakpoints;
+        this.importedProfiles = new ImportedDebugProfileStore(Path.of(editor.configManager.getSessionDirectory(), "debug-profiles"));
     }
 
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|vscode|select [name]|start [name] [-- input=value ...]|stop|restart [name] [-- input=value ...]|restart-request|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|memory <reference> [offset [count]]|disassemble <reference> [offset [count]]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|instruction list|add|enable|disable|remove|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|thread <id>|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|vscode|import [vscode]|imports|forget-imports|select [name]|start [name] [-- input=value ...]|stop|restart [name] [-- input=value ...]|restart-request|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|memory <reference> [offset [count]]|disassemble <reference> [offset [count]]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|instruction list|add|enable|disable|remove|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|thread <id>|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -120,6 +122,9 @@ final class DebugSessionController {
             case "status" -> status();
             case "configurations", "configs", "list" -> configurations();
             case "vscode", "launch-json", "launchjson" -> showVsCodeLaunchConfigurations();
+            case "import" -> importVsCodeLaunchConfigurations(args);
+            case "imports", "imported" -> showImportedProfiles();
+            case "forget-imports", "clear-imports" -> clearImportedProfiles(args);
             case "select", "configuration", "config" -> select(args);
             case "start", "launch", "attach" -> start(args);
             case "stop" -> stop();
@@ -394,6 +399,65 @@ final class DebugSessionController {
             ? "Showing VS Code launch compatibility" : "No .vscode/launch.json or imported workspace launch configuration was found for this workspace.";
     }
 
+    private String importVsCodeLaunchConfigurations(String argument) {
+        String source = argument == null ? "" : argument.trim();
+        if (!source.isEmpty() && !"vscode".equalsIgnoreCase(source)) return "Usage: :debug import [vscode]";
+        Path workspace = workspace();
+        if (!editor.ensureProjectTrustForFile(workspace.toFile())) return "VS Code debug import blocked: workspace is untrusted";
+        DebugAdapterRegistry.Validation suggested = DotnetDebugPresetDetector.effective(
+            NativeDebugPresetDetector.effective(baseValidation(workspace), workspace), workspace);
+        VsCodeLaunchReports reports = vsCodeLaunchReports(workspace, suggested);
+        Map<String, DebugAdapterRegistry.Configuration> profiles = new LinkedHashMap<>();
+        for (DebugAdapterRegistry.Configuration configuration : reports.folder().configurations().values()) {
+            profiles.put(persistedProfileName(configuration.name()), persistedProfile(configuration));
+        }
+        for (DebugAdapterRegistry.Configuration configuration : reports.workspace().configurations().values()) {
+            profiles.put(persistedProfileName(configuration.name()), persistedProfile(configuration));
+        }
+        if (profiles.isEmpty()) return "No accepted VS Code launch profiles are available to import.";
+        try {
+            int count = importedProfiles.replace(workspace, profiles);
+            return "Persisted " + count + " accepted VS Code debug profile" + (count == 1 ? "." : "s.");
+        } catch (IOException | IllegalArgumentException error) {
+            return "Unable to persist VS Code debug profiles: " + safeMessage(error);
+        }
+    }
+
+    private String showImportedProfiles() {
+        Path workspace = workspace();
+        ImportedDebugProfileStore.Report report = importedProfiles.profiles(workspace);
+        StringBuilder output = new StringBuilder("Persisted debug profiles\n\nWorkspace: ").append(workspace).append("\n\n");
+        if (!report.usable()) output.append("Storage unavailable: ").append(report.failure()).append('\n');
+        else if (report.profiles().isEmpty()) output.append("(none)\n");
+        else {
+            DebugAdapterRegistry.Validation validation = baseValidation(workspace);
+            for (DebugAdapterRegistry.Configuration profile : report.profiles().values().stream()
+                .sorted(Comparator.comparing(DebugAdapterRegistry.Configuration::name)).toList()) {
+                String unavailable = DebugAdapterRegistry.externalConfigurationError(profile, validation.registry().adapters());
+                output.append(profile.name()).append("  ").append(unavailable == null ? "available" : unavailable).append('\n');
+            }
+        }
+        editor.showScratchBuffer("[persisted debug profiles]", output.toString());
+        return report.usable() ? "Showing persisted debug profiles" : "Persisted debug profile storage is unavailable.";
+    }
+
+    private String clearImportedProfiles(String argument) {
+        if (argument != null && !argument.isBlank()) return "Usage: :debug forget-imports";
+        try {
+            return importedProfiles.clear(workspace()) ? "Persisted debug profiles removed." : "No persisted debug profiles are stored for this workspace.";
+        } catch (IOException | IllegalArgumentException error) {
+            return "Unable to remove persisted debug profiles: " + safeMessage(error);
+        }
+    }
+
+    private static String persistedProfileName(String name) { return "imported:" + name; }
+
+    private static DebugAdapterRegistry.Configuration persistedProfile(DebugAdapterRegistry.Configuration source) {
+        return new DebugAdapterRegistry.Configuration(persistedProfileName(source.name()), source.adapter(), source.request(), source.scope(),
+            source.program(), source.module(), source.code(), source.cwd(), source.args(), source.prelaunchTask(), source.host(), source.port(),
+            source.fileExtensions(), source.environment(), source.adapterOptions(), Map.of());
+    }
+
     private static void appendVsCodeLaunchReports(StringBuilder output, VsCodeLaunchReports reports) {
         if (reports == null) return;
         appendVsCodeLaunchReport(output, "VS Code launch.json", reports.folder());
@@ -592,10 +656,11 @@ final class DebugSessionController {
     private DebugAdapterRegistry.Validation validation(Path workspace) {
         DebugAdapterRegistry.Validation base = baseValidation(workspace);
         DebugAdapterRegistry.Validation suggested = DotnetDebugPresetDetector.effective(NativeDebugPresetDetector.effective(base, workspace), workspace);
-        VsCodeLaunchReports imported = vsCodeLaunchReports(workspace, suggested);
+        DebugAdapterRegistry.Validation persisted = DebugAdapterRegistry.withExternalConfigurations(suggested, importedProfiles.profiles(workspace).profiles());
+        VsCodeLaunchReports imported = vsCodeLaunchReports(workspace, persisted);
         Map<String, DebugAdapterRegistry.Configuration> configurations = new LinkedHashMap<>(imported.folder().configurations());
         configurations.putAll(imported.workspace().configurations());
-        return DebugAdapterRegistry.withExternalConfigurations(suggested, configurations);
+        return DebugAdapterRegistry.withExternalConfigurations(persisted, configurations);
     }
 
     private DebugAdapterRegistry.Validation baseValidation(Path workspace) {
@@ -629,6 +694,12 @@ final class DebugSessionController {
         if (workspace == null) return Map.of();
         TaskService.TaskLoadResult local = editor.taskService.loadWorkspaceTasks(workspace.toFile());
         return editor.jobQuickfixController.acceptedVsCodeTaskNames(workspace.toFile(), local);
+    }
+
+    private static String safeMessage(Exception error) {
+        String message = error == null ? "" : error.getMessage();
+        if (message == null || message.isBlank()) return error == null ? "unknown error" : error.getClass().getSimpleName();
+        return message.replace('\n', ' ').replace('\r', ' ');
     }
 
     private boolean remoteDebugAdapterAvailable(Path workspace, List<String> command) throws IOException {

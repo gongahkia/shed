@@ -20,14 +20,14 @@ final class ToolchainController {
         String rest = split < 0 ? "" : value.substring(split + 1).trim();
         if ("select".equals(command)) return select(rest);
         if ("clear".equals(command)) return clear(rest);
-        return "Usage: :toolchain [status|detect|select <python|node|go|java|c|cpp> <absolute-executable>|clear <python|node|go|java|c|cpp>]";
+        return "Usage: :toolchain [status|detect|select <runtime> <absolute-executable>|clear <runtime>] (use :toolchain status for runtime ids)";
     }
 
     private String select(String arguments) {
         int split = arguments.indexOf(' ');
-        if (split < 0) return "Usage: :toolchain select <python|node|go|java|c|cpp> <absolute-executable>";
+        if (split < 0) return "Usage: :toolchain select <runtime> <absolute-executable> (use :toolchain status for runtime ids)";
         ToolchainService.Runtime runtime = ToolchainService.Runtime.parse(arguments.substring(0, split));
-        if (runtime == null) return "Toolchain runtime must be python, node, go, java, c, or cpp";
+        if (runtime == null) return "Toolchain runtime is unsupported; use :toolchain status for supported ids";
         try {
             Path selected = editor.toolchainService.select(workspace(), runtime, arguments.substring(split + 1).trim());
             return "Selected " + runtime.id() + " toolchain: " + selected;
@@ -38,7 +38,7 @@ final class ToolchainController {
 
     private String clear(String arguments) {
         ToolchainService.Runtime runtime = ToolchainService.Runtime.parse(arguments);
-        if (runtime == null) return "Usage: :toolchain clear <python|node|go|java|c|cpp>";
+        if (runtime == null) return "Usage: :toolchain clear <runtime> (use :toolchain status for runtime ids)";
         try {
             return editor.toolchainService.clear(workspace(), runtime) ? "Cleared " + runtime.id() + " toolchain selection"
                 : "No " + runtime.id() + " toolchain selection";
@@ -65,7 +65,7 @@ final class ToolchainController {
                 lines.add("  " + candidate.runtime().id() + " " + candidate.executable() + " [" + candidate.source() + "]");
             }
         }
-        lines.add("Select with: :toolchain select <python|node|go|java|c|cpp> <absolute-executable>");
+        lines.add("Select with: :toolchain select <runtime> <absolute-executable>");
         editor.showScratchBuffer("[toolchains]", String.join("\n", lines) + "\n");
         return "Showing local toolchains";
     }

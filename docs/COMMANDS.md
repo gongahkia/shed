@@ -72,9 +72,9 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:drop <cmd>` | Run async command against current file path (`%` expands to quoted file path) |
 | `:jobs` | Show async jobs buffer |
 | `:jobcancel <id>`, `:jobkill <id>` | Cancel running async job |
-| `:toolchain status`, `:toolchain detect` | Show explicit local Python, Node, Go, Java, C, and C++ selections and advisory candidates; does not select or run a candidate |
-| `:toolchain select <python\|node\|go\|java\|c\|cpp> <absolute-executable>` | Persist one reviewed local executable for the active workspace |
-| `:toolchain clear <python\|node\|go\|java\|c\|cpp>` | Remove one active-workspace toolchain selection |
+| `:toolchain status`, `:toolchain detect` | Show explicit local toolchain selections, supported runtime ids, and advisory candidates; does not select or run a candidate |
+| `:toolchain select <runtime> <absolute-executable>` | Persist one reviewed local executable for the active workspace |
+| `:toolchain clear <runtime>` | Remove one active-workspace toolchain selection |
 | `:task`, `:task ui` | Open graphical Tasks/Jobs panel |
 | `:task text`, `:task text list` | Show legacy task scratch buffer |
 | `:task vscode` | Inspect strict runtime-only `.vscode/tasks.json` and imported `.code-workspace` task compatibility; accepted process and POSIX-shell tasks are session-only and still require explicit run |

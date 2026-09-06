@@ -13,6 +13,8 @@ import javax.swing.text.TabExpander;
 import javax.swing.text.Utilities;
 import javax.imageio.ImageIO;
 import java.awt.*;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
@@ -42,6 +44,7 @@ final class EditorUiController {
         editor.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setApplicationIcon();
         applyUiFont();
+        installUiZoomShortcuts();
 
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         editor.setSize(screenSize.width / 2, screenSize.height);
@@ -496,7 +499,7 @@ final class EditorUiController {
 
 
     Font resolveEditorFont() {
-        int fontSize = editor.configManager.getFontSize();
+        int fontSize = UiZoom.scale(editor.configManager.getFontSize(), editor.configManager.getUiZoom());
         String configuredFamily = editor.configManager.getFontFamily();
         Font configuredFont = resolveInstalledFont(configuredFamily, fontSize);
         return configuredFont != null ? configuredFont : new Font(Font.MONOSPACED, Font.PLAIN, fontSize);
@@ -507,8 +510,15 @@ final class EditorUiController {
         return configuredUiFont(systemFont);
     }
 
+    Font resolveUiFont(float unscaledSize) {
+        Font systemFont = systemUiFonts.getOrDefault("Label.font", new Font(Font.DIALOG, Font.PLAIN, 13));
+        Font configuredFamily = resolveInstalledFont(editor.configManager.getUiFontFamily(), Math.max(1, Math.round(unscaledSize)));
+        String family = configuredFamily == null ? systemFont.getFamily() : configuredFamily.getFamily();
+        return new Font(family, systemFont.getStyle(), UiZoom.scale(Math.round(unscaledSize), editor.configManager.getUiZoom()));
+    }
+
     Font resolveTerminalFont() {
-        int fontSize = editor.configManager.getTerminalFontSize();
+        int fontSize = UiZoom.scale(editor.configManager.getTerminalFontSize(), editor.configManager.getUiZoom());
         Font configuredFont = resolveInstalledFont(editor.configManager.getTerminalFontFamily(), fontSize);
         return configuredFont != null ? configuredFont : new Font(Font.MONOSPACED, Font.PLAIN, fontSize);
     }
@@ -535,7 +545,29 @@ final class EditorUiController {
         Font configuredFamily = resolveInstalledFont(editor.configManager.getUiFontFamily(), Math.max(1, requestedSize));
         String family = configuredFamily == null ? systemFont.getFamily() : configuredFamily.getFamily();
         int size = requestedSize == 0 ? systemFont.getSize() : requestedSize;
-        return new Font(family, systemFont.getStyle(), size);
+        return new Font(family, systemFont.getStyle(), UiZoom.scale(size, editor.configManager.getUiZoom()));
+    }
+
+    private void installUiZoomShortcuts() {
+        bindUiZoomShortcut("shed.ui-zoom.in.ctrl.equals", KeyEvent.VK_EQUALS, InputEvent.CTRL_DOWN_MASK, 1);
+        bindUiZoomShortcut("shed.ui-zoom.in.ctrl.plus", KeyEvent.VK_EQUALS, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK, 1);
+        bindUiZoomShortcut("shed.ui-zoom.in.ctrl.numpad", KeyEvent.VK_ADD, InputEvent.CTRL_DOWN_MASK, 1);
+        bindUiZoomShortcut("shed.ui-zoom.in.meta.equals", KeyEvent.VK_EQUALS, InputEvent.META_DOWN_MASK, 1);
+        bindUiZoomShortcut("shed.ui-zoom.in.meta.plus", KeyEvent.VK_EQUALS, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK, 1);
+        bindUiZoomShortcut("shed.ui-zoom.in.meta.numpad", KeyEvent.VK_ADD, InputEvent.META_DOWN_MASK, 1);
+        bindUiZoomShortcut("shed.ui-zoom.out.ctrl", KeyEvent.VK_MINUS, InputEvent.CTRL_DOWN_MASK, -1);
+        bindUiZoomShortcut("shed.ui-zoom.out.ctrl.numpad", KeyEvent.VK_SUBTRACT, InputEvent.CTRL_DOWN_MASK, -1);
+        bindUiZoomShortcut("shed.ui-zoom.out.meta", KeyEvent.VK_MINUS, InputEvent.META_DOWN_MASK, -1);
+        bindUiZoomShortcut("shed.ui-zoom.out.meta.numpad", KeyEvent.VK_SUBTRACT, InputEvent.META_DOWN_MASK, -1);
+    }
+
+    private void bindUiZoomShortcut(String id, int keyCode, int modifiers, int direction) {
+        editor.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(keyCode, modifiers), id);
+        editor.getRootPane().getActionMap().put(id, new AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) {
+                editor.showMessage(editor.adjustUiZoom(direction));
+            }
+        });
     }
 
 

@@ -41,6 +41,14 @@ class PlainKeymapTest {
         assertEquals(InputController.PaneShortcut.NONE, InputController.paneShortcut(keyEvent(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK)));
     }
 
+    @Test
+    void adjustsUiZoomInBoundedTenthSteps() {
+        assertEquals(1.1, UiZoom.adjust(1.0, 1));
+        assertEquals(0.9, UiZoom.adjust(1.0, -1));
+        assertEquals(UiZoom.MAXIMUM, UiZoom.adjust(UiZoom.MAXIMUM, 1));
+        assertEquals(UiZoom.MINIMUM, UiZoom.adjust(UiZoom.MINIMUM, -1));
+    }
+
     private PlainKeymap.Action action(int keyCode, int modifiers) {
         return PlainKeymap.actionFor(keyEvent(keyCode, modifiers));
     }

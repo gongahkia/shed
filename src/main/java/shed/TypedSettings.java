@@ -283,6 +283,7 @@ final class TypedSettings {
             case "font.size", "terminal.font.size" -> "integer >= 1";
             case "terminal.default.profile" -> "system | builtin:<id> | <extension-id>:<id>";
             case "ui.font.size" -> "integer >= 0";
+            case "ui.zoom" -> "number " + UiZoom.MINIMUM + ".." + UiZoom.MAXIMUM;
             case "line.numbers" -> "none | absolute | relative | relativeabsolute | hybrid";
             case "multi.selection.max.cursors" -> "integer " + MultiSelectionPolicy.MIN_MAX_CURSORS + ".." + MultiSelectionPolicy.MAX_MAX_CURSORS;
             case "minimap.width" -> "integer >= 40";
@@ -329,7 +330,7 @@ final class TypedSettings {
         if (key.startsWith("terminal.font.")) {
             return "Live: used by newly opened terminals";
         }
-        if (key.startsWith("ui.font.")) {
+        if (key.startsWith("ui.font.") || key.equals("ui.zoom")) {
             return "Live: applies to the application UI";
         }
         if (key.startsWith("landing.")) {
@@ -478,6 +479,9 @@ final class TypedSettings {
             }
             if ("limelight.coefficient".equals(key) && (number < 0.0 || number > 1.0)) {
                 return key + " must be between 0.0 and 1.0";
+            }
+            if ("ui.zoom".equals(key) && (number < UiZoom.MINIMUM || number > UiZoom.MAXIMUM)) {
+                return key + " must be between " + UiZoom.MINIMUM + " and " + UiZoom.MAXIMUM;
             }
         }
         if ("line.numbers".equals(key) && value instanceof String) {

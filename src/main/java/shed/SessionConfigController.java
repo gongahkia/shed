@@ -475,6 +475,11 @@ final class SessionConfigController {
             buffer.applyUndoHistoryPolicy();
         }
         editor.applyUiFont();
+        for (EditorPane pane : editor.editorPanes) {
+            if (pane.getCustomEditorComponent() instanceof ShedWelcomePanel welcome) {
+                welcome.refreshScale();
+            }
+        }
         editor.refreshMarkdownPreviews();
         Font editorFont = editor.resolveEditorFont();
         for (EditorPane pane : editor.editorPanes) {
@@ -494,6 +499,17 @@ final class SessionConfigController {
             editor.activeMinimapPanel.setPixelWidth(editor.configManager.getMinimapWidth());
         }
         editor.updateStatusBar();
+    }
+
+    String adjustUiZoom(int direction) {
+        double zoom = UiZoom.adjust(editor.configManager.getUiZoom(), direction);
+        try {
+            editor.configManager.setAndPersist("ui.zoom", String.format(java.util.Locale.ROOT, "%.1f", zoom));
+        } catch (IOException error) {
+            return "Unable to change UI zoom: " + error.getMessage();
+        }
+        applyRuntimeConfigFromSettings();
+        return "UI zoom: " + Math.round(zoom * 100.0) + "%";
     }
 
 

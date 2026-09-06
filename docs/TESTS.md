@@ -1,6 +1,6 @@
 # Testing
 
-Shed's Test Explorer is explicit-refresh only. Opening the Tests panel performs no detection, filesystem walk, process launch, watcher registration, indexing, or network I/O. Click **Refresh** or run `:test refresh` to discover tests; runs start only through an explicit Run action or `:test run` command.
+Shed's Test Explorer is explicit-refresh only. Opening the Tests panel performs no detection, filesystem walk, process launch, watcher registration, indexing, or network I/O. Click **Refresh** or run `:test refresh` to discover tests; runs start only through an explicit Run action, `:test run`, or the deliberate local **Watch** action.
 
 ## Built-in adapters
 

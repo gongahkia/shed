@@ -25,7 +25,7 @@ final class ToolchainController {
 
     private String select(String arguments) {
         int split = arguments.indexOf(' ');
-        if (split < 0) return "Usage: :toolchain select <python|node|go> <absolute-executable>";
+        if (split < 0) return "Usage: :toolchain select <python|node|go|java|c|cpp> <absolute-executable>";
         ToolchainService.Runtime runtime = ToolchainService.Runtime.parse(arguments.substring(0, split));
         if (runtime == null) return "Toolchain runtime must be python, node, go, java, c, or cpp";
         try {

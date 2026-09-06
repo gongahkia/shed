@@ -17,10 +17,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-/** Selects already-installed local Python, Node, and Go executables for one workspace. */
+/** Selects already-installed local Python, Node, Go, Java, C, and C++ executables for one workspace. */
 final class ToolchainService {
     enum Runtime {
-        PYTHON("python"), NODE("node"), GO("go");
+        PYTHON("python"), NODE("node"), GO("go"), JAVA("java"), C("c"), CPP("cpp");
 
         private final String id;
 
@@ -31,6 +31,7 @@ final class ToolchainService {
         static Runtime parse(String value) {
             if (value == null) return null;
             String normalized = value.trim().toLowerCase(Locale.ROOT);
+            if ("c++".equals(normalized) || "cplusplus".equals(normalized) || "cxx".equals(normalized)) return CPP;
             for (Runtime runtime : values()) if (runtime.id.equals(normalized)) return runtime;
             return null;
         }
@@ -123,6 +124,7 @@ final class ToolchainService {
         if (!report.usable() || report.selections().isEmpty()) return Map.of();
         List<String> directories = new ArrayList<>();
         Path python = report.selections().get(Runtime.PYTHON);
+        Path java = report.selections().get(Runtime.JAVA);
         for (Runtime runtime : Runtime.values()) {
             Path executable = report.selections().get(runtime);
             if (executable == null || executable.getParent() == null) continue;
@@ -139,6 +141,8 @@ final class ToolchainService {
             && Files.isRegularFile(python.getParent().getParent().resolve("pyvenv.cfg"))) {
             result.put("VIRTUAL_ENV", python.getParent().getParent().toString());
         }
+        Path javaHome = javaHome(java);
+        if (javaHome != null) result.put("JAVA_HOME", javaHome.toString());
         return Map.copyOf(result);
     }
 
@@ -158,6 +162,11 @@ final class ToolchainService {
         addPathCandidate(values, Runtime.PYTHON, "python3");
         addPathCandidate(values, Runtime.NODE, isWindows() ? "node.exe" : "node");
         addPathCandidate(values, Runtime.GO, isWindows() ? "go.exe" : "go");
+        addPathCandidate(values, Runtime.JAVA, isWindows() ? "java.exe" : "java");
+        addPathCandidate(values, Runtime.C, isWindows() ? "gcc.exe" : "gcc");
+        addPathCandidate(values, Runtime.C, isWindows() ? "clang.exe" : "clang");
+        addPathCandidate(values, Runtime.CPP, isWindows() ? "g++.exe" : "g++");
+        addPathCandidate(values, Runtime.CPP, isWindows() ? "clang++.exe" : "clang++");
         return values.values().stream().sorted(Comparator.comparing((Candidate candidate) -> candidate.runtime().ordinal())
             .thenComparing(candidate -> candidate.executable().toString())).toList();
     }
@@ -268,6 +277,15 @@ final class ToolchainService {
     }
 
     private static boolean isWindows() { return File.separatorChar == '\\'; }
+
+    private static Path javaHome(Path java) {
+        if (java == null || java.getParent() == null || java.getParent().getParent() == null || !"bin".equals(java.getParent().getFileName().toString())) {
+            return null;
+        }
+        Path home = java.getParent().getParent();
+        Path launcher = home.resolve("bin").resolve(isWindows() ? "java.exe" : "java");
+        return Files.isExecutable(launcher) ? home : null;
+    }
 
     private static String hash(String value) {
         try {

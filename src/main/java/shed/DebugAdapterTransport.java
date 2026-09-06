@@ -178,7 +178,8 @@ final class DebugAdapterTransport implements AutoCloseable {
     private static void applyEnvironment(ProcessBuilder processBuilder, Map<String, String> environment) {
         if (environment == null || environment.isEmpty()) return;
         for (Map.Entry<String, String> entry : environment.entrySet()) {
-            if (("PATH".equals(entry.getKey()) || "VIRTUAL_ENV".equals(entry.getKey())) && entry.getValue() != null) {
+            if (("PATH".equals(entry.getKey()) || "VIRTUAL_ENV".equals(entry.getKey()) || "JAVA_HOME".equals(entry.getKey()))
+                && entry.getValue() != null) {
                 processBuilder.environment().put(entry.getKey(), entry.getValue());
             }
         }

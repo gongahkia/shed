@@ -25,7 +25,7 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 * Fully Extensible [Plugin](./docs/PLUGINS.md) System
 * Java [extension API](./docs/EXTENSIONS.md) for language services, debuggers, test/SCM providers, terminal profiles, custom editors, remote workspaces, and docked tool views
 * Multi-root workspaces, portable [`.shed-workspace` / `.code-workspace` folder lists](./docs/WORKSPACE_MANIFESTS.md), notebooks, integrated terminals, and explicit [remote](./docs/REMOTE_WORKSPACES.md)/Dev Container workflows
-* Explicit local [Python, Node, and Go toolchain selection](./docs/TOOLCHAINS.md) for new local development processes
+* Explicit local [Python, Node, Go, Java, C, and C++ toolchain selection](./docs/TOOLCHAINS.md) for new local development processes
 * No [telemetry](https://en.wikipedia.org/wiki/Telemetry) whatsoever
 * Bundled-runtime platform installers
 

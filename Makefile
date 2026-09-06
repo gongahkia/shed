@@ -26,7 +26,7 @@ clean:
 
 help:
 	@printf '%s\n' 'make build              package Shed without tests'
-	@printf '%s\n' 'make run [ARGS=<file>]  build and launch Shed'
+	@printf '%s\n' 'make run [ARGS=<file>]  rebuild if needed, then launch Shed'
 	@printf '%s\n' 'make test               run the headless test suite'
 	@printf '%s\n' 'make check              test, then package'
 	@printf '%s\n' 'make clean              remove Maven build output'

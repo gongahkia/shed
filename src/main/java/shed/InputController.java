@@ -159,6 +159,12 @@ final class InputController {
     }
 
     public void keyPressed(KeyEvent e) {
+        int uiZoomDirection = uiZoomDirection(e);
+        if (uiZoomDirection != 0) {
+            e.consume();
+            editor.showMessage(editor.adjustUiZoom(uiZoomDirection));
+            return;
+        }
         if (handlePaneShortcut(e)) {
             editor.requestStatusBarRefresh();
             return;
@@ -210,6 +216,17 @@ final class InputController {
     static boolean isCommandPaletteShortcut(KeyEvent event) {
         return event != null && event.getKeyCode() == KeyEvent.VK_P && event.isShiftDown()
             && (event.isControlDown() || event.isMetaDown()) && !event.isAltDown();
+    }
+
+    static int uiZoomDirection(KeyEvent event) {
+        if (event == null || event.isAltDown() || !(event.isControlDown() || event.isMetaDown())) {
+            return 0;
+        }
+        return switch (event.getKeyCode()) {
+            case KeyEvent.VK_EQUALS, KeyEvent.VK_PLUS, KeyEvent.VK_ADD -> 1;
+            case KeyEvent.VK_MINUS, KeyEvent.VK_SUBTRACT -> -1;
+            default -> 0;
+        };
     }
 
     enum PaneShortcut { NONE, HORIZONTAL_SPLIT, VERTICAL_SPLIT, CLOSE }

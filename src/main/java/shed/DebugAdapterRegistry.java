@@ -3,6 +3,7 @@ package shed;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -66,8 +67,29 @@ final class DebugAdapterRegistry {
         }
     }
 
+    record Input(String name, String defaultValue, List<String> options) {
+        Input {
+            name = name == null ? "" : name;
+            defaultValue = defaultValue == null ? "" : defaultValue;
+            options = options == null ? List.of() : List.copyOf(options);
+            if (!inputName(name) || (!defaultValue.isEmpty() && !safeInputValue(defaultValue)) || options.size() > 100) {
+                throw new IllegalArgumentException("debug input is invalid");
+            }
+            Set<String> seen = new HashSet<>();
+            for (String option : options) {
+                if (!safeInputValue(option) || !seen.add(option)) {
+                    throw new IllegalArgumentException("debug input option is invalid");
+                }
+            }
+            if (!defaultValue.isEmpty() && !options.isEmpty() && !options.contains(defaultValue)) {
+                throw new IllegalArgumentException("debug input default is not an option");
+            }
+        }
+    }
+
     record Configuration(String name, String adapter, Request request, String scope, String program, String module, String code, String cwd, List<String> args,
-        String prelaunchTask, String host, int port, List<String> fileExtensions, Map<String, String> environment, Map<String, Object> adapterOptions) {
+        String prelaunchTask, String host, int port, List<String> fileExtensions, Map<String, String> environment, Map<String, Object> adapterOptions,
+        Map<String, Input> inputs) {
         Configuration {
             name = name == null ? "" : name;
             adapter = adapter == null ? "" : adapter;
@@ -89,11 +111,24 @@ final class DebugAdapterRegistry {
             Map<String, Object> suppliedAdapterOptions = adapterOptions == null ? Map.of() : adapterOptions;
             if (!safeAdapterOptions(suppliedAdapterOptions)) throw new IllegalArgumentException("debug configuration adapter options are invalid");
             adapterOptions = Map.copyOf(new LinkedHashMap<>(suppliedAdapterOptions));
+            Map<String, Input> suppliedInputs = inputs == null ? Map.of() : inputs;
+            if (suppliedInputs.size() > 32) throw new IllegalArgumentException("too many debug inputs");
+            for (Map.Entry<String, Input> entry : suppliedInputs.entrySet()) {
+                if (!inputName(entry.getKey()) || entry.getValue() == null || !entry.getKey().equals(entry.getValue().name())) {
+                    throw new IllegalArgumentException("debug configuration input is invalid");
+                }
+            }
+            inputs = Map.copyOf(new LinkedHashMap<>(suppliedInputs));
         }
 
         Configuration(String name, String adapter, Request request, String scope, String program, String module, String code, String cwd, List<String> args,
             String prelaunchTask, String host, int port, List<String> fileExtensions, Map<String, String> environment) {
-            this(name, adapter, request, scope, program, module, code, cwd, args, prelaunchTask, host, port, fileExtensions, environment, Map.of());
+            this(name, adapter, request, scope, program, module, code, cwd, args, prelaunchTask, host, port, fileExtensions, environment, Map.of(), Map.of());
+        }
+
+        Configuration(String name, String adapter, Request request, String scope, String program, String module, String code, String cwd, List<String> args,
+            String prelaunchTask, String host, int port, List<String> fileExtensions, Map<String, String> environment, Map<String, Object> adapterOptions) {
+            this(name, adapter, request, scope, program, module, code, cwd, args, prelaunchTask, host, port, fileExtensions, environment, adapterOptions, Map.of());
         }
 
         Configuration(String name, String adapter, Request request, String scope, String program, String module, String code, String cwd, List<String> args,
@@ -166,6 +201,7 @@ final class DebugAdapterRegistry {
         "debug.open.source.on.stop");
     private static final Set<String> ADAPTER_FIELDS = Set.of("transport", "command", "args", "capabilities");
     private static final Set<String> CONFIGURATION_FIELDS = Set.of("adapter", "request", "scope", "program", "module", "code", "cwd", "args", "prelaunch_task", "host", "port", "file_extensions", "adapter_options");
+    private static final Set<String> INPUT_FIELDS = Set.of("default", "options");
     private static final Set<String> FILE_ARGUMENT_VARIABLES = Set.of("${file}", "${fileWorkspaceFolder}", "${relativeFile}",
         "${relativeFileDirname}", "${fileBasename}", "${fileBasenameNoExtension}", "${fileExtname}", "${fileDirname}",
         "${fileDirnameBasename}");
@@ -189,7 +225,7 @@ final class DebugAdapterRegistry {
             String value = entry.getValue() instanceof String ? (String) entry.getValue() : null;
             if (value == null) { errors.add(new Error(key, key + " must be a TOML string")); continue; }
             collect(key, value, "debug.adapter.", ADAPTER_FIELDS, adapters, errors);
-            collect(key, value, "debug.configuration.", CONFIGURATION_FIELDS, configurations, errors);
+            collectConfiguration(key, value, configurations, errors);
             if (!key.startsWith("debug.adapter.") && !key.startsWith("debug.configuration.")) {
                 errors.add(new Error(key, "unsupported debug key " + key));
             }
@@ -313,14 +349,18 @@ final class DebugAdapterRegistry {
     }
 
     static PlanResult plan(Validation validation, String configurationName, Path workspace) {
-        return plan(validation, configurationName, workspace, new LaunchContext(null, "", null));
+        return plan(validation, configurationName, workspace, new LaunchContext(null, "", null), Map.of());
     }
 
     static PlanResult plan(Validation validation, String configurationName, Path workspace, Path activeFile) {
-        return plan(validation, configurationName, workspace, new LaunchContext(activeFile, "", null));
+        return plan(validation, configurationName, workspace, new LaunchContext(activeFile, "", null), Map.of());
     }
 
     static PlanResult plan(Validation validation, String configurationName, Path workspace, LaunchContext context) {
+        return plan(validation, configurationName, workspace, context, Map.of());
+    }
+
+    static PlanResult plan(Validation validation, String configurationName, Path workspace, LaunchContext context, Map<String, String> inputValues) {
         if (validation == null || !validation.valid()) return new PlanResult(null, "Debug configuration is invalid; no process will be launched.");
         Configuration configuration = validation.configurations().get(configurationName == null ? "" : configurationName);
         if (configuration == null) return new PlanResult(null, "Debug configuration is unavailable; no process will be launched.");
@@ -335,8 +375,10 @@ final class DebugAdapterRegistry {
         if (cwd == null || (configuration.request() == Request.LAUNCH && !configuration.program().isBlank() && program == null)) {
             return new PlanResult(null, "Debug configuration escapes the workspace scope; no process will be launched.");
         }
-        List<String> args = resolveArguments(configuration.args(), root, launchContext);
-        if (args == null) return new PlanResult(null, "Debug configuration has invalid launch placeholders; no process will be launched.");
+        InputValues resolvedInputs = resolveInputValues(configuration, inputValues);
+        if (!resolvedInputs.valid()) return new PlanResult(null, resolvedInputs.error());
+        List<String> args = resolveArguments(configuration.args(), root, launchContext, configuration.inputs(), resolvedInputs.values());
+        if (args == null) return new PlanResult(null, "Debug configuration has invalid launch placeholders or unresolved inputs; no process will be launched.");
         if (configuration.request() == Request.LAUNCH && !matchesFileExtension(program, configuration.fileExtensions())) {
             return new PlanResult(null, "Debug configuration does not support this file type; no process will be launched.");
         }
@@ -351,6 +393,21 @@ final class DebugAdapterRegistry {
             return;
         }
         grouped.computeIfAbsent(parts[0], ignored -> new LinkedHashMap<>()).put(parts[1], value);
+    }
+
+    private static void collectConfiguration(String key, String value, Map<String, Map<String, String>> grouped, List<Error> errors) {
+        String prefix = "debug.configuration.";
+        if (!key.startsWith(prefix)) return;
+        String[] parts = key.substring(prefix.length()).split("\\.", -1);
+        if (parts.length == 2 && identifier(parts[0]) && CONFIGURATION_FIELDS.contains(parts[1])) {
+            grouped.computeIfAbsent(parts[0], ignored -> new LinkedHashMap<>()).put(parts[1], value);
+            return;
+        }
+        if (parts.length == 4 && identifier(parts[0]) && "input".equals(parts[1]) && inputName(parts[2]) && INPUT_FIELDS.contains(parts[3])) {
+            grouped.computeIfAbsent(parts[0], ignored -> new LinkedHashMap<>()).put("input." + parts[2] + "." + parts[3], value);
+            return;
+        }
+        errors.add(new Error(key, "invalid debug key " + key));
     }
 
     private static Map<String, Adapter> parseAdapters(Map<String, Map<String, String>> source, List<Error> errors) {
@@ -410,6 +467,7 @@ final class DebugAdapterRegistry {
                 errors.add(new Error(prefix + ".file_extensions", prefix + ".file_extensions requires a program launch target"));
             }
             Map<String, Object> adapterOptions = adapterOptions(prefix + ".adapter_options", fields.get("adapter_options"), errors);
+            Map<String, Input> inputs = inputs(prefix, fields, errors);
             String host = fields.getOrDefault("host", "127.0.0.1").trim();
             int port = port(fieldKey(prefix, fields, "port"), prefix + ".port", fields.get("port"), request, errors);
             if (request == Request.ATTACH && !loopback(host)) errors.add(new Error(prefix + ".host", prefix + ".host must be loopback in M0"));
@@ -418,9 +476,51 @@ final class DebugAdapterRegistry {
             else if (!adapter.supports(request)) errors.add(new Error(prefix + ".request", prefix + ".request is not supported by adapter " + adapterId));
             if (errorsFor(errors, prefix)) continue;
             result.put(name, new Configuration(name, adapterId, request, scope, program, module, code, cwd, args, prelaunchTask, host, port,
-                fileExtensions, Map.of(), adapterOptions));
+                fileExtensions, Map.of(), adapterOptions, inputs));
         }
         return result;
+    }
+
+    private static Map<String, Input> inputs(String prefix, Map<String, String> fields, List<Error> errors) {
+        Map<String, Map<String, String>> grouped = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : fields.entrySet()) {
+            String key = entry.getKey();
+            if (!key.startsWith("input.")) continue;
+            String[] parts = key.split("\\.", -1);
+            if (parts.length == 3) grouped.computeIfAbsent(parts[1], ignored -> new LinkedHashMap<>()).put(parts[2], entry.getValue());
+        }
+        if (grouped.size() > 32) {
+            errors.add(new Error(prefix + ".input", prefix + " may declare at most 32 inputs"));
+            return Map.of();
+        }
+        Map<String, Input> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Map<String, String>> entry : grouped.entrySet()) {
+            String name = entry.getKey();
+            Map<String, String> input = entry.getValue();
+            String defaultValue = input.getOrDefault("default", "").trim();
+            List<String> options = inputOptions(prefix + ".input." + name + ".options", input.get("options"), errors);
+            if (!defaultValue.isEmpty() && !safeInputValue(defaultValue)) {
+                errors.add(new Error(prefix + ".input." + name + ".default", prefix + ".input." + name + ".default must be a non-empty single-line value up to 256 characters"));
+            } else if (!defaultValue.isEmpty() && !options.isEmpty() && !options.contains(defaultValue)) {
+                errors.add(new Error(prefix + ".input." + name + ".default", prefix + ".input." + name + ".default must be one of its options"));
+            }
+            if (!errorsFor(errors, prefix + ".input." + name)) result.put(name, new Input(name, defaultValue, options));
+        }
+        return Map.copyOf(result);
+    }
+
+    private static List<String> inputOptions(String key, String value, List<Error> errors) {
+        if (value == null || value.isBlank()) return List.of();
+        List<String> result = new ArrayList<>();
+        for (String raw : value.split(",", -1)) {
+            String option = raw.trim();
+            if (!safeInputValue(option) || result.contains(option) || result.size() >= 100) {
+                errors.add(new Error(key, key + " must be up to 100 distinct non-empty single-line values of at most 256 characters"));
+                return List.of();
+            }
+            result.add(option);
+        }
+        return List.copyOf(result);
     }
 
     private static Transport transport(String key, String value, List<Error> errors) {
@@ -502,6 +602,10 @@ final class DebugAdapterRegistry {
     }
 
     private static boolean identifier(String value) { return value != null && value.matches("[A-Za-z0-9_-]+"); }
+    private static boolean inputName(String value) { return value != null && value.matches("[A-Za-z][A-Za-z0-9_-]{0,63}"); }
+    private static boolean safeInputValue(String value) {
+        return value != null && !value.isBlank() && value.length() <= 256 && value.indexOf('\u0000') < 0 && value.indexOf('\n') < 0 && value.indexOf('\r') < 0;
+    }
     private static boolean safeText(String value) { return value != null && !value.isBlank() && value.indexOf('\u0000') < 0 && value.indexOf('\n') < 0 && value.indexOf('\r') < 0; }
     private static boolean safeArguments(List<String> values) {
         int length = 0;
@@ -609,7 +713,39 @@ final class DebugAdapterRegistry {
         return resolved.startsWith(workspace) ? resolved : null;
     }
 
-    private static List<String> resolveArguments(List<String> configured, Path workspace, LaunchContext context) {
+    private record InputValues(Map<String, String> values, String error) {
+        InputValues {
+            values = values == null ? Map.of() : Map.copyOf(values);
+            error = error == null ? "" : error;
+        }
+
+        boolean valid() { return error.isEmpty(); }
+    }
+
+    private static InputValues resolveInputValues(Configuration configuration, Map<String, String> supplied) {
+        Map<String, String> values = supplied == null ? Map.of() : supplied;
+        if (values.size() > 32) return new InputValues(Map.of(), "Too many debug input values; no process will be launched.");
+        Map<String, String> resolved = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            String name = entry.getKey();
+            String value = entry.getValue();
+            Input input = configuration.inputs().get(name);
+            if (!inputName(name) || input == null) {
+                return new InputValues(Map.of(), "Debug input '" + name + "' is not declared by configuration '" + configuration.name() + "'; no process will be launched.");
+            }
+            if (!safeInputValue(value)) {
+                return new InputValues(Map.of(), "Debug input '" + name + "' must be a non-empty single-line value up to 256 characters; no process will be launched.");
+            }
+            if (!input.options().isEmpty() && !input.options().contains(value)) {
+                return new InputValues(Map.of(), "Debug input '" + name + "' must be one of its configured options; no process will be launched.");
+            }
+            resolved.put(name, value);
+        }
+        return new InputValues(resolved, "");
+    }
+
+    private static List<String> resolveArguments(List<String> configured, Path workspace, LaunchContext context, Map<String, Input> definitions,
+        Map<String, String> inputValues) {
         List<String> resolved = new ArrayList<>();
         for (String value : configured == null ? List.<String>of() : configured) {
             String argument = value == null ? "" : value;
@@ -622,7 +758,7 @@ final class DebugAdapterRegistry {
                 int end = argument.indexOf('}', start + 2);
                 if (end < 0) return null;
                 String token = argument.substring(start, end + 1);
-                String replacement = resolveArgumentVariable(token, workspace, context);
+                String replacement = resolveArgumentVariable(token, workspace, context, definitions, inputValues);
                 if (replacement == null) return null;
                 output.append(replacement);
                 index = end + 1;
@@ -632,7 +768,15 @@ final class DebugAdapterRegistry {
         return List.copyOf(resolved);
     }
 
-    private static String resolveArgumentVariable(String token, Path workspace, LaunchContext context) {
+    private static String resolveArgumentVariable(String token, Path workspace, LaunchContext context, Map<String, Input> definitions,
+        Map<String, String> inputValues) {
+        if (token.startsWith("${input:") && token.endsWith("}")) {
+            String name = token.substring("${input:".length(), token.length() - 1);
+            Input input = inputName(name) && definitions != null ? definitions.get(name) : null;
+            if (input == null) return null;
+            String value = inputValues == null ? null : inputValues.get(name);
+            return value == null ? (input.defaultValue().isEmpty() ? null : input.defaultValue()) : value;
+        }
         if ("${workspaceFolder}".equals(token)) return workspace.toString();
         if ("${workspaceFolderBasename}".equals(token)) {
             Path name = workspace.getFileName();

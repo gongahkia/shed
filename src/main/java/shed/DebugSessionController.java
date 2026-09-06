@@ -23,6 +23,16 @@ final class DebugSessionController {
 
     private record InstructionTarget(String reference, int offset) { }
 
+    private record StartRequest(String name, Map<String, String> inputs, String error) {
+        StartRequest {
+            name = name == null ? "" : name;
+            inputs = inputs == null ? Map.of() : Map.copyOf(inputs);
+            error = error == null ? "" : error;
+        }
+
+        boolean valid() { return error.isEmpty(); }
+    }
+
     record ExceptionBreakpointView(DebugSessionService.ExceptionFilter filter, boolean enabled, boolean adapterDefault) {
         ExceptionBreakpointView {
             if (filter == null) throw new IllegalArgumentException("exception breakpoint filter is required");
@@ -101,7 +111,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|vscode|select [name]|start [name]|stop|restart|restart-request|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|memory <reference> [offset [count]]|disassemble <reference> [offset [count]]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|instruction list|add|enable|disable|remove|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|thread <id>|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|vscode|select [name]|start [name] [-- input=value ...]|stop|restart [name] [-- input=value ...]|restart-request|continue|next|stepin|stepout|pause|reverse-continue|stepback|restart-frame|goto [line]|modules [start [count]]|sources|memory <reference> [offset [count]]|disassemble <reference> [offset [count]]|breakpoint list|enable|disable|remove|condition|hit|log|clear-*|function list|add|enable|disable|remove|condition|hit|clear-*|data list|add|enable|disable|remove|access|condition|hit|clear-*|instruction list|add|enable|disable|remove|condition|hit|clear-*|exception list|details|enable|disable|console [clear]|eval <expression>|set <reference> <name> -- <value>|stack|variables [reference]|thread <id>|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -175,7 +185,7 @@ final class DebugSessionController {
         String requested = configuration == null ? "" : configuration.trim();
         if (requested.isBlank()) requested = inferredTestConfiguration(validation, test);
         if (requested.isBlank()) return "No safe built-in test debug configuration is available for " + test.adapterId() + ".";
-        return submitStart(workspace, new DebugAdapterRegistry.LaunchContext(file, test.id(), file), requested, false, "test debug");
+        return submitStart(workspace, new DebugAdapterRegistry.LaunchContext(file, test.id(), file), requested, Map.of(), false, "test debug");
     }
 
     static String inferredTestConfiguration(DebugAdapterRegistry.Validation validation, TestService.TestCase test) {
@@ -432,19 +442,25 @@ final class DebugSessionController {
         return result.snapshot().detail() + diagnosticSuffix(result.snapshot());
     }
 
-    private String start(String requested) { return submitStart(requested, false); }
+    private String start(String requested) {
+        StartRequest request = startRequest(requested);
+        return request.valid() ? submitStart(request.name(), request.inputs(), false) : request.error();
+    }
     private String restart(String requested) {
+        StartRequest request = startRequest(requested);
+        if (!request.valid()) return request.error();
         sessions.stop(workspace());
-        return submitStart(requested, true);
+        return submitStart(request.name(), request.inputs(), true);
     }
 
-    private String submitStart(String requested, boolean restart) {
+    private String submitStart(String requested, Map<String, String> inputs, boolean restart) {
         Path workspace = workspace();
         Path activeFile = activeFile();
-        return submitStart(workspace, new DebugAdapterRegistry.LaunchContext(activeFile, "", null), requested, restart, restart ? "restart" : "start");
+        return submitStart(workspace, new DebugAdapterRegistry.LaunchContext(activeFile, "", null), requested, inputs, restart, restart ? "restart" : "start");
     }
 
-    private String submitStart(Path workspace, DebugAdapterRegistry.LaunchContext context, String requested, boolean restart, String operation) {
+    private String submitStart(Path workspace, DebugAdapterRegistry.LaunchContext context, String requested, Map<String, String> inputs, boolean restart,
+        String operation) {
         if (workspace != null) lastWorkspace = workspace.toAbsolutePath().normalize();
         if (context != null && context.activeFile() != null) lastActiveFile = context.activeFile();
         String name = requested == null ? "" : requested.trim();
@@ -454,7 +470,7 @@ final class DebugSessionController {
         int jobId = editor.asyncJobService.submit("debug " + operation, token -> sessions.start(workspace, context,
             configuration, features, name,
             Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs())), this::startTransport, breakpoints, exceptionBreakpoints,
-            functionBreakpoints, dataBreakpoints, instructionBreakpoints, plan -> editor.jobQuickfixController.runDebugPreLaunchTask(plan, token)), (job, result, error) -> {
+            functionBreakpoints, dataBreakpoints, instructionBreakpoints, inputs, plan -> editor.jobQuickfixController.runDebugPreLaunchTask(plan, token)), (job, result, error) -> {
                 if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
                     editor.showMessage("Debug " + operation + " cancelled.");
                     return;
@@ -475,6 +491,35 @@ final class DebugSessionController {
                 editor.showMessage(result.succeeded() ? result.snapshot().detail() : result.snapshot().detail() + diagnosticSuffix(result.snapshot()));
             });
         return "Explicit debug " + operation + " requested (job " + jobId + ").";
+    }
+
+    private static StartRequest startRequest(String requested) {
+        String value = requested == null ? "" : requested.trim();
+        int separator = value.startsWith("-- ") ? 0 : value.indexOf(" -- ");
+        if (separator < 0) return new StartRequest(value, Map.of(), "");
+        int valuesStart = separator == 0 ? 3 : separator + 4;
+        String name = separator == 0 ? "" : value.substring(0, separator).trim();
+        String assignments = value.substring(valuesStart).trim();
+        if (assignments.isEmpty()) return new StartRequest("", Map.of(), "Debug input assignments are required after --.");
+        Map<String, String> inputs = new LinkedHashMap<>();
+        for (String assignment : assignments.split("\\s+")) {
+            int equals = assignment.indexOf('=');
+            String input = equals < 0 ? "" : assignment.substring(0, equals);
+            String inputValue = equals < 0 ? "" : assignment.substring(equals + 1);
+            if (!input.matches("[A-Za-z][A-Za-z0-9_-]{0,63}") || inputValue.isBlank() || containsWhitespace(inputValue) || inputValue.length() > 256
+                || inputValue.indexOf('\u0000') >= 0 || inputValue.indexOf('\n') >= 0 || inputValue.indexOf('\r') >= 0) {
+                return new StartRequest("", Map.of(), "Debug inputs must use input=value with a non-empty value without whitespace and up to 256 characters.");
+            }
+            if (inputs.putIfAbsent(input, inputValue) != null) {
+                return new StartRequest("", Map.of(), "Debug input '" + input + "' was supplied more than once.");
+            }
+            if (inputs.size() > 32) return new StartRequest("", Map.of(), "At most 32 debug input values may be supplied.");
+        }
+        return new StartRequest(name, inputs, "");
+    }
+
+    private static boolean containsWhitespace(String value) {
+        return value.codePoints().anyMatch(character -> Character.isWhitespace(character) || Character.isSpaceChar(character));
     }
 
     private DebugSessionService.Connection startTransport(DebugAdapterRegistry.Plan plan, DebugFeatureSettings features,

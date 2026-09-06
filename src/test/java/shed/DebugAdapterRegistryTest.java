@@ -195,6 +195,58 @@ public class DebugAdapterRegistryTest {
         assertFalse(DebugAdapterRegistry.validate(values).valid());
     }
 
+    @Test
+    void resolvesDeclaredDebugInputsOnlyInsideLaunchArguments() {
+        Map<String, Object> values = configuration("launch");
+        values.put("debug.configuration.main.args", "--target ${input:target} --literal ${input:literal}");
+        values.put("debug.configuration.main.input.target.default", "staging");
+        values.put("debug.configuration.main.input.target.options", "staging,production");
+        values.put("debug.configuration.main.input.literal.default", "initial");
+        DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.validate(values);
+        Path workspace = Path.of("build/debug-input-workspace").toAbsolutePath();
+
+        DebugAdapterRegistry.PlanResult defaultPlan = DebugAdapterRegistry.plan(validation, "main", workspace,
+            new DebugAdapterRegistry.LaunchContext(workspace.resolve("Main.java"), "", null), Map.of("literal", "${file}"));
+        DebugAdapterRegistry.PlanResult productionPlan = DebugAdapterRegistry.plan(validation, "main", workspace,
+            new DebugAdapterRegistry.LaunchContext(workspace.resolve("Main.java"), "", null), Map.of("target", "production", "literal", "literal"));
+
+        assertTrue(validation.valid());
+        assertEquals(java.util.List.of("--target", "staging", "--literal", "${file}"), defaultPlan.plan().args());
+        assertEquals(java.util.List.of("--target", "production", "--literal", "literal"), productionPlan.plan().args());
+        assertFalse(DebugAdapterRegistry.plan(validation, "main", workspace, null, Map.of("target", "preview")).launchable());
+        assertFalse(DebugAdapterRegistry.plan(validation, "main", workspace, null, Map.of("unknown", "value")).launchable());
+    }
+
+    @Test
+    void rejectsUndeclaredOrUnresolvedDebugInputsBeforePlanning() {
+        Map<String, Object> values = configuration("launch");
+        values.put("debug.configuration.main.args", "${input:target}");
+        DebugAdapterRegistry.Validation unresolved = DebugAdapterRegistry.validate(values);
+
+        assertTrue(unresolved.valid());
+        assertFalse(DebugAdapterRegistry.plan(unresolved, "main", Path.of("build/debug-input-workspace"), null, Map.of()).launchable());
+
+        values.put("debug.configuration.main.input.target.default", "staging");
+        values.put("debug.configuration.main.input.target.options", "production");
+        DebugAdapterRegistry.Validation invalidDefault = DebugAdapterRegistry.validate(values);
+        assertFalse(invalidDefault.valid());
+        assertTrue(invalidDefault.errors().stream().anyMatch(error -> error.key().endsWith(".input.target.default")));
+
+        values.remove("debug.configuration.main.input.target.options");
+        values.put("debug.configuration.main.input.target.invalid", "value");
+        DebugAdapterRegistry.Validation invalidKey = DebugAdapterRegistry.validate(values);
+        assertFalse(invalidKey.valid());
+        assertTrue(invalidKey.errors().stream().anyMatch(error -> error.key().endsWith(".input.target.invalid")));
+
+        Map<String, Object> tooManyInputs = configuration("launch");
+        for (int index = 0; index < 33; index++) {
+            tooManyInputs.put("debug.configuration.main.input.value" + index + ".default", "value");
+        }
+        DebugAdapterRegistry.Validation tooMany = DebugAdapterRegistry.validate(tooManyInputs);
+        assertFalse(tooMany.valid());
+        assertTrue(tooMany.errors().stream().anyMatch(error -> error.key().endsWith(".input")));
+    }
+
     private static Map<String, Object> configuration(String request) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("debug.adapter.java.command", "java-debug-adapter");

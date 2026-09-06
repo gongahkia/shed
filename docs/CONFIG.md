@@ -298,6 +298,16 @@ Update checks require a global consent receipt, HTTPS metadata endpoint, and Bas
 
 Shed includes `python-debugpy` for a separately installed `debugpy-adapter` executable and `go-delve` for a separately installed `dlv` executable; it also recognizes separately installed `netcoredbg --interpreter=vscode`, `lldb-dap`, and `gdb --interpreter=dap` adapters for explicit compiled C#/.NET and native programs. Shed does not bundle or download these debuggers. When Shed supplies `python-debugpy`, it prefers a regular executable local `.venv/bin/debugpy-adapter` or `.venv/Scripts/debugpy-adapter.exe`; otherwise it uses `debugpy-adapter` from `PATH`. An explicit `debug.adapter.python-debugpy` configuration takes precedence. `go-delve` starts local `dlv dap` only after an explicit debug request and accepts only its announced `127.0.0.1` endpoint. A workspace `.vscode/launch.json`, or the `launch` object of an explicitly imported standard `.code-workspace`, can contribute a strict, non-persistent compatibility subset only when it refers to an adapter already configured in Shed; use `:debug vscode` to inspect accepted and skipped profiles. See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/attach schema, compatibility boundary, and capability declarations.
 
+Native debug configurations can declare up to 32 bounded launch inputs. Declare a default and optional comma-separated choices, then reference the input only in `args`:
+
+```toml
+"debug.configuration.main.input.target.default" = "staging"
+"debug.configuration.main.input.target.options" = "staging,production"
+"debug.configuration.main.args" = "--target ${input:target}"
+```
+
+Start with the default using `:debug start main`, or override it with `:debug start main -- target=production`; `:debug restart` accepts the same suffix. Command-line overrides are at most 32 `input=value` tokens, with no whitespace and values up to 256 characters. Input names begin with a letter and may contain letters, digits, `_`, and `-`. An unknown input, a value outside configured choices, or a referenced input without a value or default rejects planning before a task or adapter starts. Input substitutions occur only in native configuration `args`, are not expanded a second time, and do not apply to literal adapter options, paths, imported VS Code profiles, or task settings.
+
 To launch a compiled .NET artifact without a `launch.json`, add an explicit configuration whose `program` is the project-relative output selected by your build:
 
 ```toml

@@ -101,12 +101,36 @@ final class BuiltInDebugAdapterSupport {
         return DebugAdapterRegistry.withAdapterReplacement(result, localAdapter);
     }
 
+    /** A selected Python environment wins over implicit .venv debugpy discovery. */
+    static DebugAdapterRegistry.Validation effective(DebugAdapterRegistry.Validation base, Path workspace, ToolchainService toolchains) {
+        if (toolchains == null || workspace == null) return effective(base, workspace);
+        Path python = toolchains.report(workspace).selections().get(ToolchainService.Runtime.PYTHON);
+        if (python == null) return effective(base, workspace);
+        boolean contributedPythonAdapter = base == null || base.registry().adapter(PYTHON_DEBUGPY) == null;
+        DebugAdapterRegistry.Validation result = effective(base);
+        if (!contributedPythonAdapter) return result;
+        Path launcher = selectedDebugpyAdapter(python);
+        if (launcher == null) return result;
+        DebugAdapterRegistry.Adapter defaultAdapter = result.registry().adapter(PYTHON_DEBUGPY);
+        DebugAdapterRegistry.Adapter localAdapter = new DebugAdapterRegistry.Adapter(defaultAdapter.id(), defaultAdapter.transport(), launcher.toString(),
+            defaultAdapter.args(), defaultAdapter.capabilities(), defaultAdapter.spawnedTcpStartup(), defaultAdapter.launchDefaults());
+        return DebugAdapterRegistry.withAdapterReplacement(result, localAdapter);
+    }
+
     private static Path localDebugpyAdapter(Path workspace) {
         if (workspace == null) return null;
         Path root = workspace.toAbsolutePath().normalize();
         Path unix = root.resolve(".venv/bin/debugpy-adapter");
         if (localExecutable(unix)) return unix;
         Path windows = root.resolve(".venv/Scripts/debugpy-adapter.exe");
+        return localExecutable(windows) ? windows : null;
+    }
+
+    private static Path selectedDebugpyAdapter(Path python) {
+        if (python == null || python.getParent() == null) return null;
+        Path unix = python.getParent().resolve("debugpy-adapter");
+        if (localExecutable(unix)) return unix;
+        Path windows = python.getParent().resolve("debugpy-adapter.exe");
         return localExecutable(windows) ? windows : null;
     }
 

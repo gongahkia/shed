@@ -621,10 +621,19 @@ public class LspClient {
     }
 
     LspClient(String command, String[] args, Path rootPath, LspFeatureSettings featureSettings) throws IOException {
-        this(commandLine(command, args), rootPath, localRootUri(rootPath), featureSettings);
+        this(commandLine(command, args), rootPath, localRootUri(rootPath), featureSettings, Map.of());
     }
 
     LspClient(List<String> commandLine, Path rootPath, String rootUri, LspFeatureSettings featureSettings) throws IOException {
+        this(commandLine, rootPath, rootUri, featureSettings, Map.of());
+    }
+
+    LspClient(String command, String[] args, Path rootPath, LspFeatureSettings featureSettings, Map<String, String> environment) throws IOException {
+        this(commandLine(command, args), rootPath, localRootUri(rootPath), featureSettings, environment);
+    }
+
+    LspClient(List<String> commandLine, Path rootPath, String rootUri, LspFeatureSettings featureSettings,
+              Map<String, String> environment) throws IOException {
         if (rootPath == null || rootUri == null || rootUri.isBlank()) throw new IOException("LSP workspace root is required");
         List<String> invocation = commandLine == null ? List.of() : List.copyOf(commandLine);
         if (invocation.isEmpty() || invocation.getFirst() == null || invocation.getFirst().isBlank()) throw new IOException("LSP command is required");
@@ -636,6 +645,7 @@ public class LspClient {
 
         ProcessBuilder processBuilder = new ProcessBuilder(invocation);
         processBuilder.directory(rootPath.toFile());
+        if (environment != null && !environment.isEmpty()) processBuilder.environment().putAll(environment);
         this.process = processBuilder.start();
         this.stdin = new BufferedOutputStream(process.getOutputStream());
         this.messageQueue = new LinkedBlockingQueue<>();

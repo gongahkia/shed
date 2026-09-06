@@ -66,7 +66,8 @@ final class ToolchainController {
             }
         }
         lines.add("Select with: :toolchain select <python|node|go> <absolute-executable>");
-        return String.join("\n", lines);
+        editor.showScratchBuffer("[toolchains]", String.join("\n", lines) + "\n");
+        return "Showing local toolchains";
     }
 
     private Path workspace() {

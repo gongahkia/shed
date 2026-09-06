@@ -2412,7 +2412,8 @@ final class LspController {
                 }
             }
             LspClient client = remote == null
-                ? new LspClient(command, args, workspaceRoot, editor.configManager.getLspFeatureSettings())
+                ? new LspClient(command, args, workspaceRoot, editor.configManager.getLspFeatureSettings(),
+                    editor.toolchainService.environment(workspaceRoot))
                 : new LspClient(remote.command(), workspaceRoot, remote.rootUri(), editor.configManager.getLspFeatureSettings());
             client.setWorkspaceEditHandler(this::applyWorkspaceEditFromServer);
             client.setDiagnosticsChangedHandler(() -> SwingUtilities.invokeLater(() -> {

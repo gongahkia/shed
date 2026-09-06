@@ -72,6 +72,9 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:drop <cmd>` | Run async command against current file path (`%` expands to quoted file path) |
 | `:jobs` | Show async jobs buffer |
 | `:jobcancel <id>`, `:jobkill <id>` | Cancel running async job |
+| `:toolchain status`, `:toolchain detect` | Show explicit local Python, Node, and Go selections and advisory candidates; does not select or run a candidate |
+| `:toolchain select <python\|node\|go> <absolute-executable>` | Persist one reviewed local executable for the active workspace |
+| `:toolchain clear <python\|node\|go>` | Remove one active-workspace toolchain selection |
 | `:task`, `:task ui` | Open graphical Tasks/Jobs panel |
 | `:task text`, `:task text list` | Show legacy task scratch buffer |
 | `:task vscode` | Inspect strict runtime-only `.vscode/tasks.json` and imported `.code-workspace` task compatibility; accepted process and POSIX-shell tasks are session-only and still require explicit run |
@@ -89,6 +92,7 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 Notes:
 - `:task run test` and `:task run build` first honor a same-named task, then one explicit default imported VS Code group, then use built-in fallbacks for Maven, Gradle Wrapper, npm, Make, Cargo, Go modules, an unambiguous top-level .NET project/solution, and a sole conventional generated CMake tree. Gradle uses the project wrapper; no global Gradle fallback is inferred. .NET requires exactly one `.sln`, `.slnx`, `.csproj`, `.fsproj`, or `.vbproj` at the workspace root. Use `:task cmake` with an explicit name to configure, build, test, package, or run a workflow CMake Preset; ordinary fallback never chooses one. CPack package and workflow presets require CMake 3.25+ upstream.
 - Task schema, variable, shell, quickfix, and presentation policy: [Workspace Tasks](TASKS.md).
+- Local selection, persistence, and process-environment boundaries: [Local Toolchains](TOOLCHAINS.md).
 
 ## Test Explorer
 

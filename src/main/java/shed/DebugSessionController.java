@@ -603,7 +603,8 @@ final class DebugSessionController {
         RemoteDebugEndpoint remote = plan.adapter().transport() != DebugAdapterRegistry.Transport.STDIO ? null
             : remoteDebugAdapterEndpoint(plan.workspace(), adapterCommand);
         DebugAdapterTransport transport = remote == null
-            ? DebugAdapterTransport.start(plan, features, combinedListener, new DiagnosticLog(editor.errorReporter.getLogPath()))
+            ? DebugAdapterTransport.start(plan, features, combinedListener, new DiagnosticLog(editor.errorReporter.getLogPath()),
+                editor.toolchainService.environment(plan.workspace()))
             : DebugAdapterTransport.startRemote(plan, remote.command(), features, combinedListener, new DiagnosticLog(editor.errorReporter.getLogPath()));
         return new DebugSessionService.Connection() {
             @Override public DebugAdapterTransport.Response request(String command, Map<String, Object> arguments, Duration timeout)
@@ -663,7 +664,8 @@ final class DebugSessionController {
     }
 
     private DebugAdapterRegistry.Validation baseValidation(Path workspace) {
-        return ExtensionDebugAdapterSupport.effective(BuiltInDebugAdapterSupport.effective(editor.configManager.getDebugConfigurationForWorkspace(workspace), workspace),
+        return ExtensionDebugAdapterSupport.effective(BuiltInDebugAdapterSupport.effective(editor.configManager.getDebugConfigurationForWorkspace(workspace), workspace,
+            editor.toolchainService),
             editor.extensionRegistry);
     }
 

@@ -104,6 +104,23 @@ class BuiltInDebugAdapterSupportTest {
     }
 
     @Test
+    void prefersTheSelectedPythonEnvironmentOverImplicitVirtualEnvironmentDiscovery() throws Exception {
+        Path workspace = Files.createDirectories(temporaryDirectory.resolve("workspace"));
+        Path implicit = Files.writeString(Files.createDirectories(workspace.resolve(".venv/bin")).resolve("debugpy-adapter"), "#!/bin/sh\n");
+        assertTrue(implicit.toFile().setExecutable(true));
+        Path python = Files.writeString(Files.createDirectories(workspace.resolve("selected/bin")).resolve("python"), "#!/bin/sh\n");
+        Path selected = Files.writeString(python.getParent().resolve("debugpy-adapter"), "#!/bin/sh\n");
+        assertTrue(python.toFile().setExecutable(true));
+        assertTrue(selected.toFile().setExecutable(true));
+        ToolchainService toolchains = new ToolchainService(temporaryDirectory.resolve("state"), Map.of());
+        toolchains.select(workspace, ToolchainService.Runtime.PYTHON, python.toString());
+
+        DebugAdapterRegistry.Validation validation = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()), workspace, toolchains);
+
+        assertEquals(selected.toString(), validation.registry().adapter(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY).command());
+    }
+
+    @Test
     void infersOnlyUnambiguousBuiltInTestDebugProfiles() {
         DebugAdapterRegistry.Validation validation = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()));
 

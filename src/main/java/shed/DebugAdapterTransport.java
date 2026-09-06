@@ -92,6 +92,11 @@ final class DebugAdapterTransport implements AutoCloseable {
     }
 
     static DebugAdapterTransport start(DebugAdapterRegistry.Plan plan, DebugFeatureSettings features, Listener listener, DiagnosticLog diagnosticLog) throws IOException {
+        return start(plan, features, listener, diagnosticLog, Map.of());
+    }
+
+    static DebugAdapterTransport start(DebugAdapterRegistry.Plan plan, DebugFeatureSettings features, Listener listener, DiagnosticLog diagnosticLog,
+                                       Map<String, String> environment) throws IOException {
         if (plan == null || plan.adapter() == null || plan.configuration() == null || plan.cwd() == null) {
             throw new IOException("A validated debug adapter plan is required");
         }
@@ -105,7 +110,7 @@ final class DebugAdapterTransport implements AutoCloseable {
         boolean terminateDebuggee = plan.configuration().request() == DebugAdapterRegistry.Request.LAUNCH;
         if (adapter.transport() == DebugAdapterRegistry.Transport.TCP) {
             if (adapter.spawnedTcpStartup() != null) {
-                return startSpawnedTcpAdapter(plan, adapter, listener, diagnosticLog, terminateDebuggee);
+                return startSpawnedTcpAdapter(plan, adapter, listener, diagnosticLog, terminateDebuggee, environment);
             }
             String host = plan.configuration().host();
             if (!loopback(host) || plan.configuration().port() < 1 || plan.configuration().port() > 65535) {
@@ -131,12 +136,14 @@ final class DebugAdapterTransport implements AutoCloseable {
             if (argument == null || containsControl(argument)) throw new IOException("Debug adapter argument is invalid");
             command.add(argument);
         }
-        Process process = new ProcessBuilder(command).directory(plan.cwd().toFile()).start();
+        ProcessBuilder processBuilder = new ProcessBuilder(command).directory(plan.cwd().toFile());
+        applyEnvironment(processBuilder, environment);
+        Process process = processBuilder.start();
         return new DebugAdapterTransport(process.getInputStream(), process.getOutputStream(), process, null, listener, diagnosticLog, terminateDebuggee);
     }
 
     private static DebugAdapterTransport startSpawnedTcpAdapter(DebugAdapterRegistry.Plan plan, DebugAdapterRegistry.Adapter adapter,
-        Listener listener, DiagnosticLog diagnosticLog, boolean terminateDebuggee) throws IOException {
+        Listener listener, DiagnosticLog diagnosticLog, boolean terminateDebuggee, Map<String, String> environment) throws IOException {
         if (adapter.command().isBlank() || containsControl(adapter.command())) throw new IOException("Debug adapter command is invalid");
         java.util.List<String> command = new java.util.ArrayList<>();
         command.add(adapter.command());
@@ -145,7 +152,9 @@ final class DebugAdapterTransport implements AutoCloseable {
             command.add(argument);
         }
         command.addAll(adapter.spawnedTcpStartup().arguments());
-        Process process = new ProcessBuilder(command).directory(plan.cwd().toFile()).start();
+        ProcessBuilder processBuilder = new ProcessBuilder(command).directory(plan.cwd().toFile());
+        applyEnvironment(processBuilder, environment);
+        Process process = processBuilder.start();
         try {
             SpawnedTcpEndpoint endpoint = awaitSpawnedTcpEndpoint(process, adapter.spawnedTcpStartup());
             Socket socket = new Socket();
@@ -165,6 +174,15 @@ final class DebugAdapterTransport implements AutoCloseable {
     }
 
     record SpawnedTcpEndpoint(String host, int port) { }
+
+    private static void applyEnvironment(ProcessBuilder processBuilder, Map<String, String> environment) {
+        if (environment == null || environment.isEmpty()) return;
+        for (Map.Entry<String, String> entry : environment.entrySet()) {
+            if (("PATH".equals(entry.getKey()) || "VIRTUAL_ENV".equals(entry.getKey())) && entry.getValue() != null) {
+                processBuilder.environment().put(entry.getKey(), entry.getValue());
+            }
+        }
+    }
 
     static SpawnedTcpEndpoint spawnedTcpEndpoint(DebugAdapterRegistry.SpawnedTcpStartup startup, String line) throws IOException {
         if (startup == null || line == null) return null;

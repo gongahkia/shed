@@ -40,6 +40,7 @@ final class ShedWelcomePanel extends JPanel {
     private static final double MINIMUM_SCALE = 1.10;
     private static final double MAXIMUM_SCALE = 1.65;
     private static final int ACTION_CONTENT_HEIGHT = 420;
+    private static final int ACTION_GAP = 18;
     private static final BufferedImage LOGO = loadLogo();
 
     private record WelcomeAction(String id, String label, List<String> keys, Runnable run) { }
@@ -217,7 +218,7 @@ final class ShedWelcomePanel extends JPanel {
 
     private JButton createActionButton(WelcomeAction action) {
         JButton button = new JButton();
-        button.setLayout(new BorderLayout(18, 0));
+        button.setLayout(new BorderLayout(ACTION_GAP, 0));
         button.setText(null);
         button.setFocusPainted(true);
         button.setContentAreaFilled(true);
@@ -233,8 +234,9 @@ final class ShedWelcomePanel extends JPanel {
         JLabel label = label(action.label(), Math.max(13, editor.configManager.getUiFontSize() + 7), foreground);
         button.add(label, BorderLayout.WEST);
         List<JLabel> keyLabels = new ArrayList<>();
-        button.add(keyCaps(action.keys(), keyLabels), BorderLayout.EAST);
-        actionButtons.add(new WelcomeButton(button, label, keyLabels));
+        JPanel keyCaps = keyCaps(action.keys(), keyLabels);
+        button.add(keyCaps, BorderLayout.EAST);
+        actionButtons.add(new WelcomeButton(button, label, keyCaps, keyLabels));
         button.addActionListener(event -> action.run().run());
         button.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override public void mouseEntered(java.awt.event.MouseEvent event) {
@@ -325,11 +327,11 @@ final class ShedWelcomePanel extends JPanel {
             int height = scaled(spacer.baseHeight(), layoutScale);
             spacer.component().changeShape(new Dimension(0, height), new Dimension(0, height), new Dimension(Short.MAX_VALUE, height));
         }
+        int verticalPadding = scaled(24, layoutScale);
+        int horizontalPadding = Math.min(scaled(42, layoutScale), Math.max(scaled(12, layoutScale), actionPane.getWidth() / 10));
+        int actionWidth = Math.max(1, actionPane.getWidth() - horizontalPadding * 2);
         for (WelcomeButton action : actionButtons) {
             action.button().setBorder(actionButtonBorder(layoutScale));
-            action.button().setMinimumSize(new Dimension(scaled(280, layoutScale), scaled(44, layoutScale)));
-            action.button().setPreferredSize(new Dimension(scaled(470, layoutScale), scaled(52, layoutScale)));
-            action.button().setMaximumSize(new Dimension(scaled(620, layoutScale), scaled(52, layoutScale)));
             setLabelFont(action.label(), Math.max(13, editor.configManager.getUiFontSize() + 7), fontScale);
             for (JLabel keyLabel : action.keyLabels()) {
                 setLabelFont(keyLabel, Math.max(11, editor.configManager.getUiFontSize() + 4), fontScale);
@@ -338,9 +340,14 @@ final class ShedWelcomePanel extends JPanel {
                     BorderFactory.createEmptyBorder(scaled(3, layoutScale), scaled(6, layoutScale), scaled(3, layoutScale), scaled(6, layoutScale))
                 ));
             }
+            int actionHeight = scaled(52, layoutScale);
+            int preferredWidth = Math.min(scaled(470, layoutScale), actionWidth);
+            action.button().setMinimumSize(new Dimension(Math.min(scaled(280, layoutScale), actionWidth), scaled(44, layoutScale)));
+            action.button().setPreferredSize(new Dimension(preferredWidth, actionHeight));
+            action.button().setMaximumSize(new Dimension(actionWidth, actionHeight));
+            int requiredWidth = action.label().getPreferredSize().width + ACTION_GAP + action.keyCaps().getPreferredSize().width;
+            action.keyCaps().setVisible(actionWidth >= requiredWidth);
         }
-        int verticalPadding = scaled(24, layoutScale);
-        int horizontalPadding = scaled(42, layoutScale);
         actionContentConstraints.insets = new Insets(verticalPadding, horizontalPadding, verticalPadding, horizontalPadding);
         brandContent.revalidate();
         actionContent.revalidate();
@@ -444,5 +451,5 @@ final class ShedWelcomePanel extends JPanel {
     }
 
     private record ScaledSpacer(Box.Filler component, int baseHeight) { }
-    private record WelcomeButton(JButton button, JLabel label, List<JLabel> keyLabels) { }
+    private record WelcomeButton(JButton button, JLabel label, JPanel keyCaps, List<JLabel> keyLabels) { }
 }

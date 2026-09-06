@@ -22,6 +22,7 @@ import javax.swing.JComponent;
 final class PtyTerminalPane implements AutoCloseable {
     private static final int INITIAL_COLUMNS = 100;
     private static final int INITIAL_ROWS = 28;
+    private static final double MINIMUM_TEXT_CONTRAST = 4.5;
 
     private final JediTermWidget widget;
     private final PtyTerminalConnector connector;
@@ -202,8 +203,8 @@ final class PtyTerminalPane implements AutoCloseable {
                 ? new Font(family == null || family.isBlank() ? "Monospaced" : family, Font.PLAIN, size)
                 : resolvedFont;
             this.fontSize = size;
-            Color fg = configManager == null ? Color.WHITE : configManager.getEditorForeground();
             Color bg = configManager == null ? Color.BLACK : configManager.getNormalColor();
+            Color fg = ShedTerminalColorPalette.readableColor(configManager == null ? Color.WHITE : configManager.getEditorForeground(), bg);
             Color selection = configManager == null ? new Color(64, 96, 160) : configManager.getSelectionColor();
             this.foreground = toTerminalColor(fg);
             this.background = toTerminalColor(bg);
@@ -262,7 +263,7 @@ final class PtyTerminalPane implements AutoCloseable {
 
         private ShedTerminalColorPalette(ConfigManager configManager) {
             Color bg = configManager == null ? Color.BLACK : configManager.getNormalColor();
-            Color fg = configManager == null ? Color.WHITE : configManager.getEditorForeground();
+            Color fg = readableColor(configManager == null ? Color.WHITE : configManager.getEditorForeground(), bg);
             Color accent = configManager == null ? new Color(97, 175, 239) : configManager.getCaretColor();
             Color string = configManager == null ? new Color(152, 195, 121) : configManager.getSyntaxStringColor();
             Color command = configManager == null ? new Color(229, 192, 123) : configManager.getCommandColor();
@@ -270,22 +271,22 @@ final class PtyTerminalPane implements AutoCloseable {
             Color visual = configManager == null ? new Color(198, 120, 221) : configManager.getVisualColor();
             Color function = configManager == null ? new Color(86, 182, 194) : configManager.getSyntaxFunctionColor();
             this.colors = new com.jediterm.core.Color[] {
-                toCoreColor(bg),
-                toCoreColor(replace),
-                toCoreColor(string),
-                toCoreColor(command),
-                toCoreColor(accent),
-                toCoreColor(visual),
-                toCoreColor(function),
-                toCoreColor(fg),
-                toCoreColor(brighten(bg)),
-                toCoreColor(brighten(replace)),
-                toCoreColor(brighten(string)),
-                toCoreColor(brighten(command)),
-                toCoreColor(brighten(accent)),
-                toCoreColor(brighten(visual)),
-                toCoreColor(brighten(function)),
-                toCoreColor(Color.WHITE)
+                toCoreColor(readableColor(blend(bg, fg, 0.55), bg)),
+                toCoreColor(readableColor(replace, bg)),
+                toCoreColor(readableColor(string, bg)),
+                toCoreColor(readableColor(command, bg)),
+                toCoreColor(readableColor(accent, bg)),
+                toCoreColor(readableColor(visual, bg)),
+                toCoreColor(readableColor(function, bg)),
+                toCoreColor(readableColor(fg, bg)),
+                toCoreColor(readableColor(blend(bg, fg, 0.80), bg)),
+                toCoreColor(readableColor(brighten(replace), bg)),
+                toCoreColor(readableColor(brighten(string), bg)),
+                toCoreColor(readableColor(brighten(command), bg)),
+                toCoreColor(readableColor(brighten(accent), bg)),
+                toCoreColor(readableColor(brighten(visual), bg)),
+                toCoreColor(readableColor(brighten(function), bg)),
+                toCoreColor(readableColor(Color.WHITE, bg))
             };
         }
 
@@ -311,6 +312,21 @@ final class PtyTerminalPane implements AutoCloseable {
 
         private static Color brighten(Color color) {
             return blend(color, Color.WHITE, 0.30);
+        }
+
+        private static Color readableColor(Color candidate, Color background) {
+            if (AccessibilitySupport.contrastRatio(candidate, background) >= MINIMUM_TEXT_CONTRAST) {
+                return candidate;
+            }
+            Color endpoint = AccessibilitySupport.contrastRatio(Color.WHITE, background)
+                >= AccessibilitySupport.contrastRatio(Color.BLACK, background) ? Color.WHITE : Color.BLACK;
+            for (int step = 1; step <= 100; step++) {
+                Color adjusted = blend(candidate, endpoint, step / 100.0);
+                if (AccessibilitySupport.contrastRatio(adjusted, background) >= MINIMUM_TEXT_CONTRAST) {
+                    return adjusted;
+                }
+            }
+            return endpoint;
         }
 
         private static Color blend(Color base, Color overlay, double ratio) {

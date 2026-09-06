@@ -2,15 +2,39 @@ package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.jediterm.core.Color;
+import com.jediterm.terminal.TerminalColor;
 import java.awt.Font;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.nio.file.Path;
 import java.util.Locale;
 import javax.swing.KeyStroke;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class PtyTerminalPaneSettingsTest {
+    @TempDir
+    Path tempDir;
+
+    private String originalHome;
+
+    @BeforeEach
+    void saveHome() {
+        originalHome = System.getProperty("user.home");
+    }
+
+    @AfterEach
+    void restoreHome() {
+        if (originalHome != null) {
+            System.setProperty("user.home", originalHome);
+        }
+    }
+
     @Test
     void keepsPlatformClipboardShortcutsAndAvoidsX11SelectionSemantics() {
         PtyTerminalPane.ShedTerminalSettingsProvider settings = new PtyTerminalPane.ShedTerminalSettingsProvider(null, new Font("Monospaced", Font.PLAIN, 14));
@@ -22,5 +46,31 @@ public class PtyTerminalPaneSettingsTest {
         assertFalse(settings.copyOnSelect());
         assertFalse(settings.pasteOnMiddleMouseClick());
         assertFalse(settings.emulateX11CopyPaste());
+    }
+
+    @Test
+    void keepsEveryAnsiForegroundReadableAgainstTheTerminalBackground() {
+        PtyTerminalPane.ShedTerminalSettingsProvider settings = new PtyTerminalPane.ShedTerminalSettingsProvider(null, new Font("Monospaced", Font.PLAIN, 14));
+        assertReadableAnsiPalette(settings);
+    }
+
+    @Test
+    void keepsTheActiveThemeAnsiPaletteReadableAgainstItsBackground() {
+        System.setProperty("user.home", tempDir.resolve("home-terminal-palette").toString());
+        ConfigManager configManager = new ConfigManager();
+        PtyTerminalPane.ShedTerminalSettingsProvider settings = new PtyTerminalPane.ShedTerminalSettingsProvider(configManager, new Font("Monospaced", Font.PLAIN, 14));
+
+        assertReadableAnsiPalette(settings);
+    }
+
+    private void assertReadableAnsiPalette(PtyTerminalPane.ShedTerminalSettingsProvider settings) {
+        Color background = settings.getDefaultBackground().toColor();
+        java.awt.Color terminalBackground = new java.awt.Color(background.getRed(), background.getGreen(), background.getBlue());
+
+        for (int index = 0; index < 16; index++) {
+            Color foreground = settings.getTerminalColorPalette().getForeground(TerminalColor.index(index));
+            java.awt.Color terminalForeground = new java.awt.Color(foreground.getRed(), foreground.getGreen(), foreground.getBlue());
+            assertTrue(AccessibilitySupport.meetsTextContrast(terminalForeground, terminalBackground), "ANSI color " + index);
+        }
     }
 }

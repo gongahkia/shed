@@ -3053,6 +3053,10 @@ public class Texteditor extends JFrame implements KeyListener {
         sessionConfigController.applyRuntimeConfigFromSettings();
     }
 
+    String adjustUiZoom(int direction) {
+        return sessionConfigController.adjustUiZoom(direction);
+    }
+
     public String showThemes() {
         return sessionConfigController.showThemes();
     }

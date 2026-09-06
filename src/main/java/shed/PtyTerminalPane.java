@@ -195,7 +195,7 @@ final class PtyTerminalPane implements AutoCloseable {
         private final ColorPalette colorPalette;
 
         ShedTerminalSettingsProvider(ConfigManager configManager, Font terminalFont) {
-            int size = configManager == null ? 14 : configManager.getTerminalFontSize();
+            int size = terminalFont == null ? (configManager == null ? 14 : configManager.getTerminalFontSize()) : Math.round(terminalFont.getSize2D());
             String family = configManager == null ? "Monospaced" : configManager.getTerminalFontFamily();
             Font resolvedFont = terminalFont == null ? null : terminalFont.deriveFont(Font.PLAIN, (float) size);
             this.font = resolvedFont == null

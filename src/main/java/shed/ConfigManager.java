@@ -52,6 +52,7 @@ public class ConfigManager {
     private static final int DEFAULT_FONT_SIZE = 16;
     private static final String DEFAULT_UI_FONT_FAMILY = "";
     private static final int DEFAULT_UI_FONT_SIZE = 0;
+    private static final double DEFAULT_UI_ZOOM = UiZoom.DEFAULT;
     private static final String DEFAULT_TERMINAL_FONT_FAMILY = "Monospaced";
     private static final int DEFAULT_TERMINAL_FONT_SIZE = 14;
     private static final String DEFAULT_TERMINAL_DEFAULT_PROFILE = "system";
@@ -234,6 +235,7 @@ public class ConfigManager {
         defineDefault("font.size", DEFAULT_FONT_SIZE);
         defineDefault("ui.font.family", DEFAULT_UI_FONT_FAMILY);
         defineDefault("ui.font.size", DEFAULT_UI_FONT_SIZE);
+        defineDefault("ui.zoom", DEFAULT_UI_ZOOM);
         defineDefault("terminal.font.family", DEFAULT_TERMINAL_FONT_FAMILY);
         defineDefault("terminal.font.size", DEFAULT_TERMINAL_FONT_SIZE);
         defineDefault("terminal.default.profile", DEFAULT_TERMINAL_DEFAULT_PROFILE);
@@ -374,6 +376,7 @@ public class ConfigManager {
             case "font.size" -> "Editor font size";
             case "ui.font.family" -> "Application UI font family; empty uses the system UI font";
             case "ui.font.size" -> "Application UI font size; zero uses each system UI default size";
+            case "ui.zoom" -> "Application interface scale; Ctrl/Cmd + and Ctrl/Cmd - adjust it live";
             case "terminal.font.family" -> "Terminal font family";
             case "terminal.font.size" -> "Terminal font size";
             case "terminal.default.profile" -> "Default profile for newly opened terminals";
@@ -824,6 +827,10 @@ public class ConfigManager {
 
     public int getUiFontSize() {
         return getInt("ui.font.size", DEFAULT_UI_FONT_SIZE);
+    }
+
+    public double getUiZoom() {
+        return UiZoom.clamp(getDouble("ui.zoom", DEFAULT_UI_ZOOM));
     }
 
     public String getTerminalFontFamily() {

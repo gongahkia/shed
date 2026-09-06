@@ -55,6 +55,7 @@ public class ConfigManagerTest {
         assertEquals(16, config.getFontSize());
         assertEquals("", config.getUiFontFamily());
         assertEquals(0, config.getUiFontSize());
+        assertEquals(1.0, config.getUiZoom());
         assertEquals("Monospaced", config.getTerminalFontFamily());
         assertEquals(14, config.getTerminalFontSize());
         assertEquals("system", config.getTerminalDefaultProfile());
@@ -183,6 +184,7 @@ public class ConfigManagerTest {
         config.set("font.size", "15");
         config.set("ui.font.family", "SF Pro Text");
         config.set("ui.font.size", "13");
+        config.set("ui.zoom", "1.5");
         config.set("terminal.font.family", "JetBrains Mono");
         config.set("terminal.font.size", "12");
         config.set("terminal.default.profile", "builtin:bash");
@@ -191,10 +193,12 @@ public class ConfigManagerTest {
         assertEquals(15, config.getFontSize());
         assertEquals("SF Pro Text", config.getUiFontFamily());
         assertEquals(13, config.getUiFontSize());
+        assertEquals(1.5, config.getUiZoom());
         assertEquals("JetBrains Mono", config.getTerminalFontFamily());
         assertEquals(12, config.getTerminalFontSize());
         assertEquals("builtin:bash", config.getTerminalDefaultProfile());
         assertEquals("ui.font.size must be non-negative", config.validateSettingValue("ui.font.size", "-1"));
+        assertEquals("ui.zoom must be between 0.5 and 4.0", config.validateSettingValue("ui.zoom", "4.1"));
         assertEquals("terminal.font.size must be at least 1", config.validateSettingValue("terminal.font.size", "0"));
         assertEquals("terminal.default.profile must be system, builtin:<id>, or an extension profile id",
             config.validateSettingValue("terminal.default.profile", "/bin/bash"));

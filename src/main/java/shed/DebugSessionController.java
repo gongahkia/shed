@@ -403,7 +403,6 @@ final class DebugSessionController {
         String source = argument == null ? "" : argument.trim();
         if (!source.isEmpty() && !"vscode".equalsIgnoreCase(source)) return "Usage: :debug import [vscode]";
         Path workspace = workspace();
-        if (!editor.ensureProjectTrustForFile(workspace.toFile())) return "VS Code debug import blocked: workspace is untrusted";
         DebugAdapterRegistry.Validation suggested = DotnetDebugPresetDetector.effective(
             NativeDebugPresetDetector.effective(baseValidation(workspace), workspace), workspace);
         VsCodeLaunchReports reports = vsCodeLaunchReports(workspace, suggested);

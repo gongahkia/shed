@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 final class EditorUiController {
     private static final int STATUS_REFRESH_DEBOUNCE_MS = 33;
     private static final String BASE_UI_FONT_PROPERTY = "shed.base-ui-font";
+    private static final String BASE_DIALOG_SIZE_PROPERTY = "shed.base-dialog-size";
     private static final String DIALOG_UI_READY_PROPERTY = "shed.dialog-ui-ready";
     private static final String DIALOG_UI_MANAGED_PROPERTY = "shed.dialog-ui-managed";
     private final Texteditor editor;
@@ -536,12 +537,14 @@ final class EditorUiController {
             if (window != editor && window.isDisplayable() && (!(window instanceof JDialog dialog)
                 || !Boolean.TRUE.equals(dialog.getRootPane().getClientProperty(DIALOG_UI_MANAGED_PROPERTY)))) {
                 applyUiFont(window);
+                if (window instanceof JDialog dialog) applyDialogSize(dialog);
             }
         }
     }
 
     void prepareDialog(JDialog dialog, int unscaledWidth, int unscaledHeight) {
         if (dialog == null) return;
+        dialog.getRootPane().putClientProperty(BASE_DIALOG_SIZE_PROPERTY, new Dimension(unscaledWidth, unscaledHeight));
         dialog.getContentPane().setPreferredSize(scaleUiDimension(unscaledWidth, unscaledHeight));
         applyUiFont(dialog);
         markDialogUiReady(dialog);
@@ -559,6 +562,13 @@ final class EditorUiController {
         if (dialog == null) return;
         markDialogUiReady(dialog);
         dialog.getRootPane().putClientProperty(DIALOG_UI_MANAGED_PROPERTY, Boolean.TRUE);
+    }
+
+    private void applyDialogSize(JDialog dialog) {
+        Object stored = dialog.getRootPane().getClientProperty(BASE_DIALOG_SIZE_PROPERTY);
+        if (!(stored instanceof Dimension base)) return;
+        dialog.getContentPane().setPreferredSize(scaleUiDimension(base.width, base.height));
+        dialog.pack();
     }
 
     void applyUiFont(Component root) {

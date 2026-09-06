@@ -189,6 +189,14 @@ public class TexteditorSwingIntegrationTest {
             List<javax.swing.JTextField> fields = onEdt(() -> descendants(shown, javax.swing.JTextField.class));
             assertFalse(fields.isEmpty());
             assertTrue(fields.stream().allMatch(field -> field.getFont().getSize() >= UiZoom.scale(12, 1.5)));
+
+            onEdt(() -> {
+                editor.configManager.set("ui.zoom", "1.6");
+                editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                return null;
+            });
+            assertEquals(UiZoom.scale(1040, 1.6), onEdt(() -> shown.getContentPane().getPreferredSize().width));
+            assertEquals(onEdt(() -> editor.resolveUiFont().getSize()), onEdt(() -> editor.statusBar.getFont().getSize()));
         } finally {
             SettingsEditorDialog currentDialog = dialog;
             if (currentDialog != null) onEdt(() -> { currentDialog.dispose(); return null; });

@@ -56,6 +56,19 @@ class ToolchainServiceTest {
         assertFalse(service.report(temporaryDirectory.resolve("workspace")).selections().containsKey(ToolchainService.Runtime.GO));
     }
 
+    @Test
+    void exportsJavaHomeAndAcceptsCPlusPlusAsAnAlias(@TempDir Path temporaryDirectory) throws Exception {
+        Path workspace = temporaryDirectory.resolve("workspace");
+        Path java = executable(temporaryDirectory.resolve("jdk/bin/java"));
+        ToolchainService service = new ToolchainService(temporaryDirectory.resolve("state"), Map.of("PATH", "/system/bin"));
+
+        service.select(workspace, ToolchainService.Runtime.JAVA, java.toString());
+        service.select(workspace, ToolchainService.Runtime.parse("c++"), executable(temporaryDirectory.resolve("llvm/bin/clang++")).toString());
+
+        assertEquals(temporaryDirectory.resolve("jdk").toString(), service.environment(workspace).get("JAVA_HOME"));
+        assertEquals(ToolchainService.Runtime.CPP, ToolchainService.Runtime.parse("c++"));
+    }
+
     private static Path executable(Path path) throws Exception {
         Files.createDirectories(path.getParent());
         Files.writeString(path, "#!/bin/sh\nexit 0\n");

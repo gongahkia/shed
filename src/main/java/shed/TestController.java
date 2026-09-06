@@ -10,10 +10,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import javax.swing.SwingUtilities;
 
 final class TestController {
     record Snapshot(Path root, List<TestService.AdapterSpec> adapters, List<TestService.TestCase> tests, List<String> diagnostics, String output, int runningJobs,
-                    CoverageService.Summary coverage, String ctestPreset) {
+                    CoverageService.Summary coverage, String ctestPreset, boolean continuous) {
         Snapshot {
             adapters = adapters == null ? List.of() : List.copyOf(adapters);
             tests = tests == null ? List.of() : List.copyOf(tests);
@@ -34,6 +35,8 @@ final class TestController {
         final Map<Integer, String> jobs = new LinkedHashMap<>();
         CoverageService.Report importedCoverage = CoverageService.Report.empty();
         CoverageService.Report generatedGoCoverage = CoverageService.Report.empty();
+        TestWatchService watch;
+        boolean watchRerunPending;
         CoverageService.Report coverage() { return importedCoverage.merge(generatedGoCoverage); }
         State(Path root) { this.root = root; }
     }
@@ -75,13 +78,15 @@ final class TestController {
         }
         if ("refresh".equalsIgnoreCase(value)) return refresh(selectedRoot()).message();
         if ("run".equalsIgnoreCase(value) || "all".equalsIgnoreCase(value)) return runAll(selectedRoot());
+        if ("watch".equalsIgnoreCase(value) || "continuous".equalsIgnoreCase(value)) return startWatch(selectedRoot());
+        if ("unwatch".equalsIgnoreCase(value) || "watch off".equalsIgnoreCase(value) || "continuous off".equalsIgnoreCase(value)) return stopWatch(selectedRoot());
         if ("failed".equalsIgnoreCase(value) || "rerun-failed".equalsIgnoreCase(value)) return rerunFailed(selectedRoot());
         if ("cancel".equalsIgnoreCase(value)) return cancel(selectedRoot());
         if ("text".equalsIgnoreCase(value)) return showText(selectedRoot());
         if (value.equalsIgnoreCase("ctest") || value.regionMatches(true, 0, "ctest ", 0, 6)) return handleCtest(selectedRoot(), value.substring(5).trim());
         if (value.regionMatches(true, 0, "run ", 0, 4)) return runId(selectedRoot(), value.substring(4).trim());
         if (value.regionMatches(true, 0, "debug ", 0, 6)) return debugId(selectedRoot(), value.substring(6).trim());
-        return "Usage: :test [ui|refresh|run [test-id]|debug <test-id>|failed|cancel|text|ctest [use <preset>|clear]]";
+        return "Usage: :test [ui|refresh|run [test-id]|watch|unwatch|debug <test-id>|failed|cancel|text|ctest [use <preset>|clear]]";
     }
 
     private String handleCtest(Path root, String argument) {
@@ -213,7 +218,8 @@ final class TestController {
 
     Snapshot snapshot(Path root) {
         State state = state(root == null ? selectedRoot() : root);
-        return new Snapshot(state.root, state.specs, state.tests, state.diagnostics, state.output, state.jobs.size(), state.coverage().summary(), state.ctestPreset);
+        return new Snapshot(state.root, state.specs, state.tests, state.diagnostics, state.output, state.jobs.size(), state.coverage().summary(), state.ctestPreset,
+            state.watch != null && state.watch.watching());
     }
 
     Result refresh(Path root) {
@@ -263,9 +269,62 @@ final class TestController {
     String runAll(Path root) {
         State state = state(root);
         if (state.specs.isEmpty()) return "Refresh tests first";
+        int started = runAll(state);
+        return started == 0 ? "No test runner available" : "Test run requested (" + started + " job" + (started == 1 ? "" : "s") + ")";
+    }
+
+    private int runAll(State state) {
         int started = 0;
         for (TestService.AdapterSpec raw : state.specs) started += run(state, raw, List.of());
-        return started == 0 ? "No test runner available" : "Test run requested (" + started + " job" + (started == 1 ? "" : "s") + ")";
+        return started;
+    }
+
+    private String startWatch(Path root) {
+        State state = state(root);
+        if (state.watch != null && state.watch.watching()) return "Continuous test watch is already enabled";
+        if (state.specs.isEmpty()) return "Refresh tests before starting continuous watch";
+        if (remoteExecutionTarget(state.root) != null || usesDevContainer(state.root)) {
+            return "Continuous test watch is available only for local workspaces";
+        }
+        try {
+            state.watch = TestWatchService.start(state.root, changed -> SwingUtilities.invokeLater(() -> changed(state, changed)));
+        } catch (IOException error) {
+            return "Continuous test watch unavailable: " + concise(error);
+        }
+        if (state.jobs.isEmpty()) startWatchedRun(state);
+        else state.watchRerunPending = true;
+        refreshPanel();
+        return "Continuous test watch enabled";
+    }
+
+    private String stopWatch(Path root) {
+        State state = state(root);
+        if (state.watch == null) return "Continuous test watch is not enabled";
+        state.watch.close();
+        state.watch = null;
+        state.watchRerunPending = false;
+        state.output = "Continuous test watch disabled";
+        refreshPanel();
+        return "Continuous test watch disabled";
+    }
+
+    private void changed(State expected, Path changed) {
+        State state = states.get(expected.root);
+        if (state != expected || state.watch == null || !state.watch.watching()) return;
+        if (!state.jobs.isEmpty()) {
+            state.watchRerunPending = true;
+            state.output = "Test changes detected; continuous rerun queued.";
+            refreshPanel();
+            return;
+        }
+        startWatchedRun(state);
+    }
+
+    private void startWatchedRun(State state) {
+        int started = runAll(state);
+        state.output = started == 0 ? "Continuous test watch is idle: no test runner is available." :
+            "Continuous test run requested (" + started + " job" + (started == 1 ? "" : "s") + ").";
+        refreshPanel();
     }
 
     String runSelection(Path root, TestService.TestCase test) {
@@ -312,6 +371,7 @@ final class TestController {
 
     String cancel(Path root) {
         State state = state(root);
+        state.watchRerunPending = false;
         int cancelled = 0;
         for (Integer job : List.copyOf(state.jobs.keySet())) if (editor.asyncJobService.cancel(job)) cancelled++;
         return cancelled == 0 ? "No test job is running" : "Cancelled " + cancelled + " test job" + (cancelled == 1 ? "" : "s");
@@ -553,6 +613,10 @@ final class TestController {
             String cleanup = DevContainerTestExecution.cleanupReportCache(execution.root(), execution.devContainerReportCache());
             if (!cleanup.isBlank()) state.output = state.output.isBlank() ? cleanup : state.output + "\n" + cleanup;
         }
+        if (state.watchRerunPending && state.watch != null && state.watch.watching() && state.jobs.isEmpty()) {
+            state.watchRerunPending = false;
+            startWatchedRun(state);
+        }
         refreshPanel();
     }
 
@@ -636,6 +700,9 @@ final class TestController {
     }
 
     private void refreshPanel() { if (editor.toolWindowHost != null) editor.toolWindowHost.refresh(ToolWindowHost.Tab.TESTS); }
+    void shutdown() {
+        for (State state : states.values()) if (state.watch != null) state.watch.close();
+    }
     private static String firstLine(String value) { return value == null ? "" : value.lines().findFirst().orElse("").strip(); }
     private static String concise(Exception error) {
         String message = error == null ? "" : error.getMessage();

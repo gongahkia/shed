@@ -49,6 +49,14 @@ class PlainKeymapTest {
         assertEquals(UiZoom.MINIMUM, UiZoom.adjust(UiZoom.MINIMUM, -1));
     }
 
+    @Test
+    void recognizesControlAndCommandUiZoomShortcuts() {
+        assertEquals(1, InputController.uiZoomDirection(keyEvent(KeyEvent.VK_EQUALS, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)));
+        assertEquals(1, InputController.uiZoomDirection(keyEvent(KeyEvent.VK_ADD, InputEvent.META_DOWN_MASK)));
+        assertEquals(-1, InputController.uiZoomDirection(keyEvent(KeyEvent.VK_MINUS, InputEvent.CTRL_DOWN_MASK)));
+        assertEquals(0, InputController.uiZoomDirection(keyEvent(KeyEvent.VK_MINUS, InputEvent.ALT_DOWN_MASK)));
+    }
+
     private PlainKeymap.Action action(int keyCode, int modifiers) {
         return PlainKeymap.actionFor(keyEvent(keyCode, modifiers));
     }

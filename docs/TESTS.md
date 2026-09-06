@@ -42,6 +42,12 @@ command = ["./node_modules/.bin/vitest"]
 
 Results are session-only. Pytest/Jest/Vitest report files go under the configured Shed data directory's `test-reports/` cache (default `~/.shed/test-reports/`); ordinary local tests do not make app-owned changes to source projects. Maven/Gradle use the XML reports their normal test tasks produce. Failed tests with a source location appear in Problems as `test:<adapter>`; no test failure replaces the quickfix list.
 
+## Continuous local runs
+
+After an explicit refresh, use **Watch** or `:test watch` to start a per-root local continuous run. Shed starts one initial Run All, then watches regular workspace directories recursively to a depth of 32 and a limit of 4,096 directories. It ignores generated and dependency directories (`.git`, `.gradle`, `.idea`, `.vscode`, virtual environments, `node_modules`, `target`, `build`, `out`, and the generated Dev Container report directory), debounces changes for 300 ms, and coalesces changes received while a test run is active into one follow-up Run All. **Stop Watch** or `:test unwatch` closes the watcher; `:test cancel` also clears a queued follow-up run. Watching is session-only and stops when Shed closes.
+
+Continuous watch is deliberately local-only. Connected SSH, Docker, and WSL roots plus Dev Container roots must use explicit refresh/run because a local mirror event does not prove remote workspace state changed. Watching does not install tools, start a container, synchronize files, or run on opening the Tests panel.
+
 ## Local Dev Containers
 
 For a selected root with `.devcontainer/devcontainer.json`, explicit dynamic discovery, Run All, Run Selection, and rerun-failed run through the user-installed `devcontainer exec` CLI in the already-running container. Auto-detection and Maven/Gradle's Java plus unittest's Python static source scans stay on the local mounted workspace; Run uses the already-running container. **Debug Selection** remains explicit: it uses a configured stdio DAP bridge or the bounded local built-in inference described above; it never downloads an adapter or infers a remote TCP adapter.

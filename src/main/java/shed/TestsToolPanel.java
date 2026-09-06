@@ -64,6 +64,8 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
         controls.add(new JLabel("Root")); controls.add(roots);
         controls.add(button("Refresh", () -> message(editor.testController.refresh(editor.testController.selectedRoot()).message())));
         controls.add(button("Run All", () -> message(editor.testController.runAll(editor.testController.selectedRoot()))));
+        controls.add(button("Watch", () -> message(editor.testController.handle("watch"))));
+        controls.add(button("Stop Watch", () -> message(editor.testController.handle("unwatch"))));
         controls.add(button("Run Selection", () -> message(editor.testController.runSelection(editor.testController.selectedRoot(), selectedTest()))));
         controls.add(button("Debug Selection", () -> message(editor.testController.debugSelection(editor.testController.selectedRoot(), selectedTest()))));
         controls.add(button("Rerun Failed", () -> message(editor.testController.rerunFailed(editor.testController.selectedRoot()))));
@@ -149,7 +151,8 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
         long failed = value.tests().stream().filter(test -> test.status().failed()).count();
         String coverage = value.coverage().lines() == 0 ? "" : " — coverage " + value.coverage().display();
         String preset = value.ctestPreset().isBlank() ? "" : " — CTest preset " + value.ctestPreset();
-        return (value.tests().isEmpty() ? "Refresh to discover tests." : value.tests().size() + " tests" + (failed == 0 ? "" : ", " + failed + " failing")) + coverage + preset;
+        String watch = value.continuous() ? " — continuous" : "";
+        return (value.tests().isEmpty() ? "Refresh to discover tests." : value.tests().size() + " tests" + (failed == 0 ? "" : ", " + failed + " failing")) + coverage + preset + watch;
     }
 
     private void selectCtestPreset() {

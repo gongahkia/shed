@@ -3400,6 +3400,9 @@ public class Texteditor extends JFrame implements KeyListener {
             }
             ptyTerminalPanes.clear();
         }
+        if (testController != null) {
+            testController.shutdown();
+        }
         if (asyncJobService != null) {
             asyncJobService.shutdownNow();
         }

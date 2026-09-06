@@ -19,4 +19,10 @@ class ShedWelcomePanelResponsiveTest {
         assertTrue(ShedWelcomePanel.usesWideLayout(800, 600));
         assertTrue(ShedWelcomePanel.usesWideLayout(1_920, 1_080));
     }
+
+    @Test
+    void calculatesLargerContentScaleFromAvailableWindowSpace() {
+        assertEquals(1.10, ShedWelcomePanel.contentScale(960, 640));
+        assertTrue(ShedWelcomePanel.contentScale(1_440, 960) > ShedWelcomePanel.contentScale(960, 640));
+    }
 }

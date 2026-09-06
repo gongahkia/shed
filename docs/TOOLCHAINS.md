@@ -25,9 +25,9 @@ Use `:toolchain status` to inspect the supported ids, current workspace selectio
 
 ## Supported runtime ids
 
-The initial set is `python`, `node`, `go`, `java`, `c`, and `cpp`. The fourteen additional executable-backed language entries below are ordered by the 2025 Stack Overflow language-use survey after removing already-covered entries and choices without a standalone language executable: `csharp`, `php`, `shell`, `rust`, `powershell`, `kotlin`, `ruby`, `dart`, `lua`, `swift`, `r`, `perl`, `scala`, and `haskell`.
+The initial set is `python`, `node`, `go`, `java`, `c`, and `cpp`. The fourteen additional executable-backed language entries below follow the [2025 Stack Overflow language-use survey](https://survey.stackoverflow.co/2025/technology), ordered by all-respondent reported use after removing the already-covered entries, HTML/CSS, SQL, and JavaScript/TypeScript: `shell`, `csharp`, `powershell`, `php`, `rust`, `kotlin`, `lua`, `assembly`, `ruby`, `dart`, `swift`, `r`, `groovy`, and `perl`.
 
-Their conventional candidate names are, respectively: `dotnet`; `php`; `bash`, `zsh`, or `sh`; `rustc` or `cargo`; `pwsh`; `kotlin` or `kotlinc`; `ruby`; `dart`; `lua` or `luajit`; `swift`; `R` or `Rscript`; `perl`; `scala` or `scalac`; and `ghc`.
+Their conventional candidate names are, respectively: `bash`, `zsh`, or `sh`; `dotnet`; `pwsh` (or Windows `powershell`); `php`; `rustc` or `cargo`; `kotlin` or `kotlinc`; `lua` or `luajit`; `nasm`, `yasm`, or `as`; `ruby`; `dart`; `swift`; `R` or `Rscript`; `groovy` or `groovyc`; and `perl`.
 
 For new local processes, Shed prepends selected executable directories to `PATH`. A selected Python virtual environment also contributes `VIRTUAL_ENV` only when its parent contains `pyvenv.cfg`; a selected conventional Java `bin/java` contributes `JAVA_HOME`. This applies to local LSP servers, terminals, tasks, Test Explorer runs, and local DAP adapter processes. Restart an already-running LSP client after changing its selection. An explicit `.shedtests` command and a task's explicit environment still take precedence; only automatically inferred pytest and unittest commands are rewritten to the selected Python executable.
 

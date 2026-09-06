@@ -17,10 +17,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-/** Selects already-installed local Python, Node, Go, Java, C, and C++ executables for one workspace. */
+/** Selects reviewed, already-installed local language runtimes and compilers for one workspace. */
 final class ToolchainService {
     enum Runtime {
-        PYTHON("python"), NODE("node"), GO("go"), JAVA("java"), C("c"), CPP("cpp");
+        PYTHON("python"), NODE("node"), GO("go"), JAVA("java"), C("c"), CPP("cpp"),
+        CSHARP("csharp"), PHP("php"), SHELL("shell"), RUST("rust"), POWERSHELL("powershell"), KOTLIN("kotlin"),
+        RUBY("ruby"), DART("dart"), LUA("lua"), SWIFT("swift"), R("r"), PERL("perl"), SCALA("scala"), HASKELL("haskell");
 
         private final String id;
 
@@ -32,6 +34,9 @@ final class ToolchainService {
             if (value == null) return null;
             String normalized = value.trim().toLowerCase(Locale.ROOT);
             if ("c++".equals(normalized) || "cplusplus".equals(normalized) || "cxx".equals(normalized)) return CPP;
+            if ("c#".equals(normalized) || "cs".equals(normalized) || "dotnet".equals(normalized)) return CSHARP;
+            if ("bash".equals(normalized) || "sh".equals(normalized) || "zsh".equals(normalized)) return SHELL;
+            if ("pwsh".equals(normalized)) return POWERSHELL;
             for (Runtime runtime : values()) if (runtime.id.equals(normalized)) return runtime;
             return null;
         }
@@ -167,6 +172,27 @@ final class ToolchainService {
         addPathCandidate(values, Runtime.C, isWindows() ? "clang.exe" : "clang");
         addPathCandidate(values, Runtime.CPP, isWindows() ? "g++.exe" : "g++");
         addPathCandidate(values, Runtime.CPP, isWindows() ? "clang++.exe" : "clang++");
+        addPathCandidate(values, Runtime.CSHARP, isWindows() ? "dotnet.exe" : "dotnet");
+        addPathCandidate(values, Runtime.PHP, isWindows() ? "php.exe" : "php");
+        addPathCandidate(values, Runtime.SHELL, isWindows() ? "bash.exe" : "bash");
+        addPathCandidate(values, Runtime.SHELL, isWindows() ? "zsh.exe" : "zsh");
+        addPathCandidate(values, Runtime.SHELL, isWindows() ? "sh.exe" : "sh");
+        addPathCandidate(values, Runtime.RUST, isWindows() ? "rustc.exe" : "rustc");
+        addPathCandidate(values, Runtime.RUST, isWindows() ? "cargo.exe" : "cargo");
+        addPathCandidate(values, Runtime.POWERSHELL, isWindows() ? "pwsh.exe" : "pwsh");
+        addPathCandidate(values, Runtime.KOTLIN, isWindows() ? "kotlin.bat" : "kotlin");
+        addPathCandidate(values, Runtime.KOTLIN, isWindows() ? "kotlinc.bat" : "kotlinc");
+        addPathCandidate(values, Runtime.RUBY, isWindows() ? "ruby.exe" : "ruby");
+        addPathCandidate(values, Runtime.DART, isWindows() ? "dart.exe" : "dart");
+        addPathCandidate(values, Runtime.LUA, isWindows() ? "lua.exe" : "lua");
+        addPathCandidate(values, Runtime.LUA, isWindows() ? "luajit.exe" : "luajit");
+        addPathCandidate(values, Runtime.SWIFT, isWindows() ? "swift.exe" : "swift");
+        addPathCandidate(values, Runtime.R, isWindows() ? "R.exe" : "R");
+        addPathCandidate(values, Runtime.R, isWindows() ? "Rscript.exe" : "Rscript");
+        addPathCandidate(values, Runtime.PERL, isWindows() ? "perl.exe" : "perl");
+        addPathCandidate(values, Runtime.SCALA, isWindows() ? "scala.bat" : "scala");
+        addPathCandidate(values, Runtime.SCALA, isWindows() ? "scalac.bat" : "scalac");
+        addPathCandidate(values, Runtime.HASKELL, isWindows() ? "ghc.exe" : "ghc");
         return values.values().stream().sorted(Comparator.comparing((Candidate candidate) -> candidate.runtime().ordinal())
             .thenComparing(candidate -> candidate.executable().toString())).toList();
     }

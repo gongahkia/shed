@@ -69,6 +69,23 @@ class ToolchainServiceTest {
         assertEquals(ToolchainService.Runtime.CPP, ToolchainService.Runtime.parse("c++"));
     }
 
+    @Test
+    void selectsAndDiscoversTheFourteenAdditionalRuntimeBackedLanguages(@TempDir Path temporaryDirectory) throws Exception {
+        Path workspace = temporaryDirectory.resolve("workspace");
+        Path bin = temporaryDirectory.resolve("runtimes/bin");
+        for (String executable : java.util.List.of("dotnet", "php", "bash", "rustc", "pwsh", "kotlin", "ruby", "dart", "lua", "swift", "R", "perl", "scala", "ghc")) {
+            executable(bin.resolve(executable));
+        }
+        ToolchainService service = new ToolchainService(temporaryDirectory.resolve("state"), Map.of("PATH", bin.toString()));
+
+        assertEquals(ToolchainService.Runtime.CSHARP, ToolchainService.Runtime.parse("c#"));
+        assertEquals(ToolchainService.Runtime.SHELL, ToolchainService.Runtime.parse("bash"));
+        assertEquals(ToolchainService.Runtime.POWERSHELL, ToolchainService.Runtime.parse("pwsh"));
+        assertEquals(14, service.report(workspace).candidates().stream().map(ToolchainService.Candidate::runtime).distinct().count());
+        service.select(workspace, ToolchainService.Runtime.HASKELL, bin.resolve("ghc").toString());
+        assertEquals(bin.resolve("ghc").toRealPath(), service.report(workspace).selections().get(ToolchainService.Runtime.HASKELL));
+    }
+
     private static Path executable(Path path) throws Exception {
         Files.createDirectories(path.getParent());
         Files.writeString(path, "#!/bin/sh\nexit 0\n");

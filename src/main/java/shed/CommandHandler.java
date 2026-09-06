@@ -137,6 +137,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleTaskCommand(args), "task");
         registerCommand((args, range, force) -> editor.handleTestCommand(args), "test");
         registerCommand((args, range, force) -> editor.handleCoverageCommand(args), "coverage", "cov");
+        registerCommand((args, range, force) -> editor.handleToolchainCommand(args), "toolchain", "toolchains");
         registerCommand((args, range, force) -> editor.handleTreeCommand(args), "tree");
         registerCommand((args, range, force) -> editor.handleGitCommand(args), "git");
         registerCommand((args, range, force) -> editor.handleScmCommand(args), "scm");

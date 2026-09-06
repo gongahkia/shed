@@ -109,6 +109,8 @@ public class Texteditor extends JFrame implements KeyListener {
     TestController testController;
     FormatOnSaveController formatOnSaveController;
     FormatterController formatterController;
+    ToolchainService toolchainService;
+    ToolchainController toolchainController;
     PeekView peekView;
     TerminalController terminalController;
     MarkdownController markdownController;
@@ -247,6 +249,7 @@ public class Texteditor extends JFrame implements KeyListener {
         this.errorReporter = errorReporter == null ? new ApplicationErrorReporter() : errorReporter;
         // Initialize managers
         configManager = new ConfigManager();
+        toolchainService = new ToolchainService(Path.of(configManager.getSessionDirectory(), "toolchains"));
         extensionRegistry = new ExtensionRegistry();
         languageProfileSelection = new LanguageProfileSelection();
         devContainerSessions = new DevContainerSessionService();
@@ -282,6 +285,7 @@ public class Texteditor extends JFrame implements KeyListener {
         testController = new TestController(this, new TestService(extensionRegistry));
         formatOnSaveController = new FormatOnSaveController(this);
         formatterController = new FormatterController(this);
+        toolchainController = new ToolchainController(this);
         editorState = new EditorState();
         modeEngine = new ModeEngine();
         buffers = new ArrayList<>();
@@ -1537,6 +1541,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String handleCoverageCommand(String argument) {
         return testController.handleCoverage(argument);
+    }
+
+    public String handleToolchainCommand(String argument) {
+        return toolchainController.handle(argument);
     }
 
     File resolveTaskProjectRoot() {

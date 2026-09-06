@@ -159,6 +159,19 @@ final class TestService {
         return spec.command().isEmpty() ? new AdapterSpec(spec.id(), adapter.defaultCommand(root), spec.debugConfiguration()) : spec;
     }
 
+    /** An explicit Python selection takes precedence over automatic Python test-runner discovery. */
+    AdapterSpec resolvedSpec(Path root, AdapterSpec spec, ToolchainService toolchains) {
+        AdapterSpec resolved = resolvedSpec(root, spec);
+        if (spec == null || !spec.command().isEmpty() || toolchains == null || resolved == null) return resolved;
+        Path python = toolchains.report(root).selections().get(ToolchainService.Runtime.PYTHON);
+        if (python == null) return resolved;
+        return switch (resolved.id()) {
+            case "pytest" -> new AdapterSpec(resolved.id(), List.of(python.toString(), "-m", "pytest"), resolved.debugConfiguration());
+            case "unittest" -> new AdapterSpec(resolved.id(), List.of(python.toString(), "-m", "unittest"), resolved.debugConfiguration());
+            default -> resolved;
+        };
+    }
+
     /** Replaces automatic CTest-tree detection with one explicit, session-selected test preset. */
     static List<AdapterSpec> withCtestPreset(LoadResult loaded, Path root, String preset) {
         if (loaded == null || !loaded.valid()) throw new IllegalArgumentException("test configuration is invalid");

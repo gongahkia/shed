@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -41,6 +42,24 @@ class TestServiceTest {
         assertEquals(List.of("pytest"), loaded.specs().stream().map(TestService.AdapterSpec::id).toList());
         assertEquals(List.of("python", "-m", "pytest"), loaded.specs().getFirst().command());
         assertEquals("pytest-test", loaded.specs().getFirst().debugConfiguration());
+    }
+
+    @Test
+    void usesTheSelectedPythonForImplicitPythonTestCommands() throws Exception {
+        Path python = root.resolve("runtime/bin/python");
+        Files.createDirectories(python.getParent());
+        Files.writeString(python, "#!/bin/sh\nexit 0\n");
+        assertTrue(python.toFile().setExecutable(true));
+        ToolchainService toolchains = new ToolchainService(root.resolve("state"), Map.of());
+        toolchains.select(root, ToolchainService.Runtime.PYTHON, python.toString());
+        TestService service = new TestService();
+
+        TestService.AdapterSpec selected = service.resolvedSpec(root, new TestService.AdapterSpec("pytest", List.of()), toolchains);
+        TestService.AdapterSpec explicit = service.resolvedSpec(root,
+            new TestService.AdapterSpec("pytest", List.of("custom-pytest")), toolchains);
+
+        assertEquals(List.of(python.toRealPath().toString(), "-m", "pytest"), selected.command());
+        assertEquals(List.of("custom-pytest"), explicit.command());
     }
 
     @Test

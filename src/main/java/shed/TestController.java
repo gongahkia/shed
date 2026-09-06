@@ -120,7 +120,8 @@ final class TestController {
         if (usesDevContainer(root)) return startDevContainerCtestPresetListing(state, command);
         int jobId = editor.asyncJobService.submit("ctest preset list", token -> new CtestPresetListing(root,
             editor.jobQuickfixController.runExternalCommand(command.argv(), root.toFile(), null, token,
-                editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true), List.of()),
+                editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true,
+                editor.toolchainService.environment(root)), List.of()),
             (job, listed, error) -> completeCtestPresetListing(job, state, listed, error));
         state.jobs.put(jobId, "ctest preset list");
         state.output = "CTest preset listing running (job " + jobId + ")";
@@ -245,7 +246,7 @@ final class TestController {
         int started = 0;
         for (TestService.AdapterSpec raw : state.specs) {
             TestAdapter adapter = tests.adapter(raw.id());
-            TestService.AdapterSpec spec = tests.resolvedSpec(state.root, raw);
+            TestService.AdapterSpec spec = resolvedSpec(state.root, raw);
             if (adapter == null || spec == null) continue;
             if ("maven".equals(spec.id()) || "gradle".equals(spec.id()) || "unittest".equals(spec.id())) {
                 started += startStaticDiscovery(state, spec);
@@ -456,7 +457,7 @@ final class TestController {
 
     private int run(State state, TestService.AdapterSpec raw, List<TestService.TestCase> selection) {
         TestAdapter adapter = tests.adapter(raw.id());
-        TestService.AdapterSpec spec = tests.resolvedSpec(state.root, raw);
+        TestService.AdapterSpec spec = resolvedSpec(state.root, raw);
         if (adapter == null || spec == null || spec.command().isEmpty()) return 0;
         if (selection != null && selection.size() > 1 && !adapter.supportsMultipleSelection()) {
             int started = 0;
@@ -500,13 +501,19 @@ final class TestController {
         if (usesDevContainer(state.root)) return startDevContainer(state, operation, spec, adapter, command, reportCache);
         int jobId = editor.asyncJobService.submit("test " + spec.id() + " " + operation, token -> {
             CommandResult result = editor.jobQuickfixController.runExternalCommand(command.argv(), state.root.toFile(), null, token,
-                editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true);
+                editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true,
+                editor.toolchainService.environment(state.root));
             return execution(state.root, spec, adapter, command, result, List.of(), null);
         }, (job, execution, error) -> complete(state, job, execution, error));
         state.jobs.put(jobId, spec.id());
         state.output = operation + " " + spec.id() + " running (job " + jobId + ")";
         refreshPanel();
         return 1;
+    }
+
+    private TestService.AdapterSpec resolvedSpec(Path root, TestService.AdapterSpec raw) {
+        if (remoteExecutionTarget(root) != null || usesDevContainer(root)) return tests.resolvedSpec(root, raw);
+        return tests.resolvedSpec(root, raw, editor.toolchainService);
     }
 
     private int startDevContainer(State state, String operation, TestService.AdapterSpec spec, TestAdapter adapter, TestService.Command command,

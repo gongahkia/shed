@@ -271,6 +271,14 @@ final class DebugSessionService {
         String requestedConfiguration, Duration timeout, Starter starter, BreakpointStore breakpointStore, ExceptionBreakpointStore exceptionBreakpointStore,
         FunctionBreakpointStore functionBreakpointStore, DataBreakpointStore dataBreakpointStore, InstructionBreakpointStore instructionBreakpointStore,
         PreLaunch preLaunch) {
+        return start(workspace, context, validation, features, requestedConfiguration, timeout, starter, breakpointStore, exceptionBreakpointStore,
+            functionBreakpointStore, dataBreakpointStore, instructionBreakpointStore, Map.of(), preLaunch);
+    }
+
+    Result start(Path workspace, DebugAdapterRegistry.LaunchContext context, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
+        String requestedConfiguration, Duration timeout, Starter starter, BreakpointStore breakpointStore, ExceptionBreakpointStore exceptionBreakpointStore,
+        FunctionBreakpointStore functionBreakpointStore, DataBreakpointStore dataBreakpointStore, InstructionBreakpointStore instructionBreakpointStore,
+        Map<String, String> inputValues, PreLaunch preLaunch) {
         Path root = root(workspace);
         DebugFeatureSettings settings = features == null ? DebugFeatureSettings.defaults() : features;
         String name;
@@ -285,7 +293,7 @@ final class DebugSessionService {
             if (validation == null || !validation.valid()) return fail(root, session, "Debug configuration is invalid", validationErrors(validation));
             if (name.isBlank()) return fail(root, session, "Select a debug configuration before launch", List.of(
                 "Use :debug select <name>, or open a matching file for an available built-in profile."));
-            DebugAdapterRegistry.PlanResult planned = DebugAdapterRegistry.plan(validation, name, root, context);
+            DebugAdapterRegistry.PlanResult planned = DebugAdapterRegistry.plan(validation, name, root, context, inputValues);
             if (!planned.launchable()) return fail(root, session, planned.error(), List.of(planned.error()));
             if (session.lifecycle == Lifecycle.RUNNING || session.lifecycle == Lifecycle.STARTING) {
                 return fail(root, session, "A debug session is already active; use :debug restart or :debug stop", List.of());

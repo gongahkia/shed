@@ -90,6 +90,25 @@ public class DebugSessionServiceTest {
     }
 
     @Test
+    void passesExplicitNativeDebugInputOverridesIntoTheValidatedLaunchPlan() {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = Path.of("build/debug-input-session").toAbsolutePath();
+        Path file = workspace.resolve("Main.java");
+        DebugAdapterRegistry.Configuration configuration = new DebugAdapterRegistry.Configuration("input", "java",
+            DebugAdapterRegistry.Request.LAUNCH, "workspace", "${file}", "", "", "${workspaceFolder}", List.of("--target", "${input:target}"),
+            "", "127.0.0.1", 0, List.of(), Map.of(), Map.of(), Map.of("target", new DebugAdapterRegistry.Input("target", "staging",
+                List.of("staging", "production"))));
+        DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.withExternalConfigurations(validation(), Map.of("input", configuration));
+        FakeConnection connection = new FakeConnection();
+
+        DebugSessionService.Result result = service.start(workspace, new DebugAdapterRegistry.LaunchContext(file, "", null), validation, enabled(), "input",
+            Duration.ofSeconds(1), (plan, features, listener) -> connection, null, null, null, null, null, Map.of("target", "production"), null);
+
+        assertTrue(result.succeeded());
+        assertEquals(List.of("--target", "production"), connection.arguments.get(1).get("args"));
+    }
+
+    @Test
     void runsAConfiguredPreLaunchTaskBeforeOpeningTheDebugAdapter() {
         DebugSessionService service = new DebugSessionService();
         Path workspace = Path.of("build/debug-prelaunch").toAbsolutePath();

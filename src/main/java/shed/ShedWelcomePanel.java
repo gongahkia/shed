@@ -33,7 +33,12 @@ import javax.swing.SwingConstants;
 
 /** Native startup surface for the default, otherwise unconfigured landing page. */
 final class ShedWelcomePanel extends JPanel {
-    private static final int COMPACT_WIDTH = 760;
+    private static final int COMPACT_WIDTH = 960;
+    private static final int DESIGN_WIDTH = 960;
+    private static final int DESIGN_HEIGHT = 640;
+    private static final double MINIMUM_SCALE = 1.10;
+    private static final double MAXIMUM_SCALE = 1.65;
+    private static final int ACTION_CONTENT_HEIGHT = 420;
     private static final BufferedImage LOGO = loadLogo();
 
     private record WelcomeAction(String id, String label, List<String> keys, Runnable run) { }
@@ -47,6 +52,18 @@ final class ShedWelcomePanel extends JPanel {
     private final Color mutedForeground;
     private final Color accent;
     private final Color keyBackground;
+    private JPanel brandContent;
+    private JPanel actionContent;
+    private GridBagConstraints actionContentConstraints;
+    private ShedLogoMark logo;
+    private JLabel title;
+    private JLabel version;
+    private JLabel descriptor;
+    private JLabel heading;
+    private JLabel detail;
+    private final List<ScaledSpacer> scaledSpacers = new java.util.ArrayList<>();
+    private final List<WelcomeButton> actionButtons = new java.util.ArrayList<>();
+    private double appliedScale = -1.0;
 
     ShedWelcomePanel(Texteditor editor) {
         this.editor = editor;
@@ -75,15 +92,18 @@ final class ShedWelcomePanel extends JPanel {
     public void doLayout() {
         int width = getWidth();
         int height = getHeight();
-        if (width >= COMPACT_WIDTH) {
+        boolean wide = usesWideLayout(width, height);
+        if (wide) {
             int brandWidth = Math.max(280, Math.min(width - 320, (int) Math.round(width * 0.38)));
             brandPane.setBounds(0, 0, brandWidth, height);
             actionPane.setBounds(brandWidth, 0, width - brandWidth, height);
-            return;
+        } else {
+            int minimumActionHeight = scaled(ACTION_CONTENT_HEIGHT, contentScale(width, height));
+            int brandHeight = Math.max(0, Math.min(Math.max(0, height - minimumActionHeight), (int) Math.round(height * 0.46)));
+            brandPane.setBounds(0, 0, width, brandHeight);
+            actionPane.setBounds(0, brandHeight, width, height - brandHeight);
         }
-        int brandHeight = Math.max(0, Math.min(Math.max(0, height - 180), (int) Math.round(height * 0.46)));
-        brandPane.setBounds(0, 0, width, brandHeight);
-        actionPane.setBounds(0, brandHeight, width, height - brandHeight);
+        applyResponsiveMetrics(contentScale(width, height));
     }
 
     @Override
@@ -92,7 +112,7 @@ final class ShedWelcomePanel extends JPanel {
         Graphics2D g = (Graphics2D) graphics.create();
         try {
             g.setColor(brandSurface);
-            if (getWidth() >= COMPACT_WIDTH) {
+            if (usesWideLayout(getWidth(), getHeight())) {
                 int brandWidth = brandPane.getWidth();
                 g.fillRect(0, 0, brandWidth, getHeight());
                 g.setColor(blend(brandSurface, surface, 0.64));
@@ -111,34 +131,34 @@ final class ShedWelcomePanel extends JPanel {
     private JPanel createBrandPane() {
         JPanel pane = new JPanel(new GridBagLayout());
         pane.setOpaque(false);
-        JPanel content = new JPanel();
-        content.setOpaque(false);
-        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        brandContent = new JPanel();
+        brandContent.setOpaque(false);
+        brandContent.setLayout(new BoxLayout(brandContent, BoxLayout.Y_AXIS));
 
-        ShedLogoMark logo = new ShedLogoMark();
+        logo = new ShedLogoMark();
         logo.setAlignmentX(Component.CENTER_ALIGNMENT);
-        content.add(logo);
-        content.add(Box.createVerticalStrut(20));
+        brandContent.add(logo);
+        brandContent.add(verticalSpacer(20));
 
-        JLabel title = label("Shed", Math.max(25, editor.configManager.getUiFontSize() + 27), foreground);
+        title = label("Shed", Math.max(25, editor.configManager.getUiFontSize() + 27), foreground);
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
-        content.add(title);
-        content.add(Box.createVerticalStrut(7));
+        brandContent.add(title);
+        brandContent.add(verticalSpacer(7));
 
-        JLabel version = label("Version " + editor.VERSION, Math.max(14, editor.configManager.getUiFontSize() + 9), mutedForeground);
+        version = label("Version " + editor.VERSION, Math.max(14, editor.configManager.getUiFontSize() + 9), mutedForeground);
         version.setAlignmentX(Component.CENTER_ALIGNMENT);
-        content.add(version);
-        content.add(Box.createVerticalStrut(8));
+        brandContent.add(version);
+        brandContent.add(verticalSpacer(8));
 
-        JLabel descriptor = label("Local-first desktop editor", Math.max(12, editor.configManager.getUiFontSize() + 6), mutedForeground);
+        descriptor = label("Local-first desktop editor", Math.max(12, editor.configManager.getUiFontSize() + 6), mutedForeground);
         descriptor.setAlignmentX(Component.CENTER_ALIGNMENT);
-        content.add(descriptor);
+        brandContent.add(descriptor);
 
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.anchor = GridBagConstraints.CENTER;
         constraints.weightx = 1.0;
         constraints.weighty = 1.0;
-        pane.add(content, constraints);
+        pane.add(brandContent, constraints);
         AccessibilitySupport.describe(pane, "Shed product information", "Shed version " + editor.VERSION + ".");
         return pane;
     }
@@ -146,33 +166,33 @@ final class ShedWelcomePanel extends JPanel {
     private JPanel createActionPane() {
         JPanel pane = new JPanel(new GridBagLayout());
         pane.setOpaque(false);
-        JPanel content = new JPanel();
-        content.setOpaque(false);
-        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        actionContent = new JPanel();
+        actionContent.setOpaque(false);
+        actionContent.setLayout(new BoxLayout(actionContent, BoxLayout.Y_AXIS));
 
-        JLabel heading = label("Start working", Math.max(18, editor.configManager.getUiFontSize() + 15), foreground);
+        heading = label("Start working", Math.max(18, editor.configManager.getUiFontSize() + 15), foreground);
         heading.setAlignmentX(Component.LEFT_ALIGNMENT);
-        content.add(heading);
-        content.add(Box.createVerticalStrut(8));
-        JLabel detail = label("Every action below is available by keyboard.", Math.max(12, editor.configManager.getUiFontSize() + 5), mutedForeground);
+        actionContent.add(heading);
+        actionContent.add(verticalSpacer(8));
+        detail = label("Every action below is available by keyboard.", Math.max(12, editor.configManager.getUiFontSize() + 5), mutedForeground);
         detail.setAlignmentX(Component.LEFT_ALIGNMENT);
-        content.add(detail);
-        content.add(Box.createVerticalStrut(24));
+        actionContent.add(detail);
+        actionContent.add(verticalSpacer(24));
 
         for (WelcomeAction action : actions()) {
             JButton button = createActionButton(action);
             button.setAlignmentX(Component.LEFT_ALIGNMENT);
-            content.add(button);
-            content.add(Box.createVerticalStrut(8));
+            actionContent.add(button);
+            actionContent.add(verticalSpacer(8));
         }
 
-        GridBagConstraints constraints = new GridBagConstraints();
-        constraints.anchor = GridBagConstraints.CENTER;
-        constraints.fill = GridBagConstraints.HORIZONTAL;
-        constraints.weightx = 1.0;
-        constraints.weighty = 1.0;
-        constraints.insets = new Insets(24, 42, 24, 42);
-        pane.add(content, constraints);
+        actionContentConstraints = new GridBagConstraints();
+        actionContentConstraints.anchor = GridBagConstraints.CENTER;
+        actionContentConstraints.fill = GridBagConstraints.HORIZONTAL;
+        actionContentConstraints.weightx = 1.0;
+        actionContentConstraints.weighty = 1.0;
+        actionContentConstraints.insets = new Insets(24, 42, 24, 42);
+        pane.add(actionContent, actionContentConstraints);
         return pane;
     }
 
@@ -200,10 +220,7 @@ final class ShedWelcomePanel extends JPanel {
         button.setContentAreaFilled(true);
         button.setOpaque(true);
         button.setBackground(surface);
-        button.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(blend(surface, foreground, 0.13)),
-            BorderFactory.createEmptyBorder(11, 13, 11, 13)
-        ));
+        button.setBorder(actionButtonBorder(1.0));
         button.setMaximumSize(new Dimension(620, 52));
         button.setPreferredSize(new Dimension(470, 52));
         button.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -212,7 +229,9 @@ final class ShedWelcomePanel extends JPanel {
 
         JLabel label = label(action.label(), Math.max(13, editor.configManager.getUiFontSize() + 7), foreground);
         button.add(label, BorderLayout.WEST);
-        button.add(keyCaps(action.keys()), BorderLayout.EAST);
+        List<JLabel> keyLabels = new java.util.ArrayList<>();
+        button.add(keyCaps(action.keys(), keyLabels), BorderLayout.EAST);
+        actionButtons.add(new WelcomeButton(button, label, keyLabels));
         button.addActionListener(event -> action.run().run());
         button.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override public void mouseEntered(java.awt.event.MouseEvent event) {
@@ -227,7 +246,7 @@ final class ShedWelcomePanel extends JPanel {
         return button;
     }
 
-    private JPanel keyCaps(List<String> keys) {
+    private JPanel keyCaps(List<String> keys, List<JLabel> labels) {
         JPanel panel = new JPanel(new GridLayout(1, keys.size(), 4, 0));
         panel.setOpaque(false);
         for (String key : keys) {
@@ -240,6 +259,7 @@ final class ShedWelcomePanel extends JPanel {
                 BorderFactory.createEmptyBorder(3, 6, 3, 6)
             ));
             panel.add(label);
+            labels.add(label);
         }
         return panel;
     }
@@ -281,6 +301,72 @@ final class ShedWelcomePanel extends JPanel {
         return label;
     }
 
+    private Component verticalSpacer(int pixels) {
+        Box.Filler spacer = new Box.Filler(new Dimension(0, pixels), new Dimension(0, pixels), new Dimension(Short.MAX_VALUE, pixels));
+        scaledSpacers.add(new ScaledSpacer(spacer, pixels));
+        return spacer;
+    }
+
+    private void applyResponsiveMetrics(double scale) {
+        if (Math.abs(scale - appliedScale) < 0.01) {
+            return;
+        }
+        appliedScale = scale;
+        logo.setScale(scale);
+        setLabelFont(title, Math.max(25, editor.configManager.getUiFontSize() + 27), scale);
+        setLabelFont(version, Math.max(14, editor.configManager.getUiFontSize() + 9), scale);
+        setLabelFont(descriptor, Math.max(12, editor.configManager.getUiFontSize() + 6), scale);
+        setLabelFont(heading, Math.max(18, editor.configManager.getUiFontSize() + 15), scale);
+        setLabelFont(detail, Math.max(12, editor.configManager.getUiFontSize() + 5), scale);
+        for (ScaledSpacer spacer : scaledSpacers) {
+            int height = scaled(spacer.baseHeight(), scale);
+            spacer.component().changeShape(new Dimension(0, height), new Dimension(0, height), new Dimension(Short.MAX_VALUE, height));
+        }
+        for (WelcomeButton action : actionButtons) {
+            action.button().setBorder(actionButtonBorder(scale));
+            action.button().setMinimumSize(new Dimension(scaled(280, scale), scaled(44, scale)));
+            action.button().setPreferredSize(new Dimension(scaled(470, scale), scaled(52, scale)));
+            action.button().setMaximumSize(new Dimension(scaled(620, scale), scaled(52, scale)));
+            setLabelFont(action.label(), Math.max(13, editor.configManager.getUiFontSize() + 7), scale);
+            for (JLabel keyLabel : action.keyLabels()) {
+                setLabelFont(keyLabel, Math.max(11, editor.configManager.getUiFontSize() + 4), scale);
+                keyLabel.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(blend(keyBackground, accent, 0.25)),
+                    BorderFactory.createEmptyBorder(scaled(3, scale), scaled(6, scale), scaled(3, scale), scaled(6, scale))
+                ));
+            }
+        }
+        int verticalPadding = scaled(24, scale);
+        int horizontalPadding = scaled(42, scale);
+        actionContentConstraints.insets = new Insets(verticalPadding, horizontalPadding, verticalPadding, horizontalPadding);
+        brandContent.revalidate();
+        actionContent.revalidate();
+    }
+
+    private javax.swing.border.Border actionButtonBorder(double scale) {
+        return BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(blend(surface, foreground, 0.13)),
+            BorderFactory.createEmptyBorder(scaled(11, scale), scaled(13, scale), scaled(11, scale), scaled(13, scale))
+        );
+    }
+
+    private void setLabelFont(JLabel label, int baseSize, double scale) {
+        label.setFont(editor.editorUiController.resolveUiFont().deriveFont(Font.PLAIN, (float) scaled(baseSize, scale)));
+    }
+
+    static boolean usesWideLayout(int width, int height) {
+        return width >= COMPACT_WIDTH || height < DESIGN_HEIGHT;
+    }
+
+    static double contentScale(int width, int height) {
+        double scale = Math.min(Math.max(0, width) / (double) DESIGN_WIDTH, Math.max(0, height) / (double) DESIGN_HEIGHT);
+        return Math.max(MINIMUM_SCALE, Math.min(MAXIMUM_SCALE, scale));
+    }
+
+    private static int scaled(int pixels, double scale) {
+        return Math.max(1, (int) Math.round(pixels * scale));
+    }
+
     private static BufferedImage loadLogo() {
         try (InputStream stream = ShedWelcomePanel.class.getClassLoader().getResourceAsStream("assets/logo/shed.png")) {
             return stream == null ? null : ImageIO.read(stream);
@@ -307,6 +393,13 @@ final class ShedWelcomePanel extends JPanel {
             setPreferredSize(new Dimension(230, 230));
             setMinimumSize(new Dimension(120, 120));
             AccessibilitySupport.describe(this, "Shed logo", "The Shed application logo.");
+        }
+
+        void setScale(double scale) {
+            int preferred = scaled(230, scale);
+            int minimum = scaled(120, scale);
+            setPreferredSize(new Dimension(preferred, preferred));
+            setMinimumSize(new Dimension(minimum, minimum));
         }
 
         @Override
@@ -339,4 +432,7 @@ final class ShedWelcomePanel extends JPanel {
             }
         }
     }
+
+    private record ScaledSpacer(Box.Filler component, int baseHeight) { }
+    private record WelcomeButton(JButton button, JLabel label, List<JLabel> keyLabels) { }
 }

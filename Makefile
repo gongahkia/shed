@@ -2,15 +2,18 @@ MVN ?= mvn
 JAVA ?= java
 JAR := target/shed-2.0.0.jar
 ARGS ?=
+SOURCES := $(shell find src/main assets -type f 2>/dev/null)
 
 .PHONY: all build run test check clean help
 
 all: build
 
-build:
+build: $(JAR)
+
+$(JAR): pom.xml $(SOURCES)
 	$(MVN) -B -q -DskipTests package
 
-run: build
+run: $(JAR)
 	$(JAVA) -jar $(JAR) $(ARGS)
 
 test:

@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import java.awt.Component;
 import java.awt.GraphicsEnvironment;
 import java.awt.Window;
+import java.awt.event.ActionEvent;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.io.File;
@@ -81,6 +82,31 @@ public class TexteditorSwingIntegrationTest {
             assertFalse(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
             assertSame(onEdt(() -> editor.getActivePane().getScrollPane()), onEdt(() -> editor.renderedLayoutComponent));
             assertEquals(1, onEdt(() -> editor.buffers.size()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void globalUiZoomShortcutUpdatesTheVisibleInterfaceAndPersistsTheSetting() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-ui-zoom-shortcut");
+        Files.createDirectories(home);
+
+        Texteditor editor = createEmptyEditor(home);
+        try {
+            onEdt(() -> {
+                Object binding = editor.getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
+                    .get(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_EQUALS, java.awt.event.InputEvent.CTRL_DOWN_MASK));
+                assertEquals("shed.ui-zoom.in.ctrl.equals", binding);
+                javax.swing.Action action = editor.getRootPane().getActionMap().get(binding);
+                assertNotNull(action);
+                action.actionPerformed(new ActionEvent(editor, ActionEvent.ACTION_PERFORMED, "zoom-in"));
+                return null;
+            });
+
+            assertEquals(1.1, onEdt(() -> editor.configManager.getUiZoom()));
+            assertTrue(Files.readString(home.resolve(".shed/config.toml")).contains("\"ui.zoom\" = 1.1"));
         } finally {
             disposeEditor(editor);
         }

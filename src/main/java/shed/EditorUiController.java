@@ -551,9 +551,11 @@ final class EditorUiController {
     private void installUiZoomShortcuts() {
         bindUiZoomShortcut("shed.ui-zoom.in.ctrl.equals", KeyEvent.VK_EQUALS, InputEvent.CTRL_DOWN_MASK, 1);
         bindUiZoomShortcut("shed.ui-zoom.in.ctrl.plus", KeyEvent.VK_EQUALS, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK, 1);
+        bindUiZoomShortcut("shed.ui-zoom.in.ctrl.plus-key", KeyEvent.VK_PLUS, InputEvent.CTRL_DOWN_MASK, 1);
         bindUiZoomShortcut("shed.ui-zoom.in.ctrl.numpad", KeyEvent.VK_ADD, InputEvent.CTRL_DOWN_MASK, 1);
         bindUiZoomShortcut("shed.ui-zoom.in.meta.equals", KeyEvent.VK_EQUALS, InputEvent.META_DOWN_MASK, 1);
         bindUiZoomShortcut("shed.ui-zoom.in.meta.plus", KeyEvent.VK_EQUALS, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK, 1);
+        bindUiZoomShortcut("shed.ui-zoom.in.meta.plus-key", KeyEvent.VK_PLUS, InputEvent.META_DOWN_MASK, 1);
         bindUiZoomShortcut("shed.ui-zoom.in.meta.numpad", KeyEvent.VK_ADD, InputEvent.META_DOWN_MASK, 1);
         bindUiZoomShortcut("shed.ui-zoom.out.ctrl", KeyEvent.VK_MINUS, InputEvent.CTRL_DOWN_MASK, -1);
         bindUiZoomShortcut("shed.ui-zoom.out.ctrl.numpad", KeyEvent.VK_SUBTRACT, InputEvent.CTRL_DOWN_MASK, -1);

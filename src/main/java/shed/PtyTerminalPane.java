@@ -54,6 +54,12 @@ final class PtyTerminalPane implements AutoCloseable {
 
     static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font terminalFont, List<String> requestedCommand,
                                 Consumer<TerminalLinkResolver.Link> linkOpener, TerminalLinkResolver.SourcePathMapper sourcePathMapper) throws IOException {
+        return open(workingDirectory, configManager, terminalFont, requestedCommand, linkOpener, sourcePathMapper, Map.of());
+    }
+
+    static PtyTerminalPane open(File workingDirectory, ConfigManager configManager, Font terminalFont, List<String> requestedCommand,
+                                Consumer<TerminalLinkResolver.Link> linkOpener, TerminalLinkResolver.SourcePathMapper sourcePathMapper,
+                                Map<String, String> toolchainEnvironment) throws IOException {
         List<String> requested = validateCommand(requestedCommand);
         TerminalShellIntegration.Launch launch = TerminalShellIntegration.prepare(requested, configManager);
         List<String> command = launch.command();
@@ -62,6 +68,7 @@ final class PtyTerminalPane implements AutoCloseable {
         env.put("TERM", "xterm-256color");
         env.put("COLORTERM", "truecolor");
         env.putAll(launch.environment());
+        if (toolchainEnvironment != null) env.putAll(toolchainEnvironment);
         if (isShell(command.getFirst())) {
             env.put("SHELL", command.getFirst());
         }

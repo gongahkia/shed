@@ -37,7 +37,9 @@ final class TerminalController {
 
     String openDirect(String label, File workingDirectory, List<String> command, TerminalLinkResolver.SourcePathMapper sourcePathMapper) {
         String normalizedLabel = label == null || label.isBlank() ? "Terminal" : label.trim();
-        return openTerminal(normalizedLabel, workingDirectory, command, "Terminal opened with " + normalizedLabel, sourcePathMapper);
+        Map<String, String> environment = workingDirectory == null ? Map.of() : editor.toolchainService.environment(workingDirectory.toPath());
+        return openTerminal(normalizedLabel, workingDirectory, command, "Terminal opened with " + normalizedLabel, sourcePathMapper,
+            WindowLayoutNode.Orientation.VERTICAL, environment);
     }
 
     String handle(String argument) {
@@ -105,7 +107,8 @@ final class TerminalController {
         DevContainerSessionService.Connection connection = editor.devContainerSessions == null
             ? null : editor.devContainerSessions.connectionFor(startDirectory.toPath());
         if (connection == null) {
-            return openTerminal(label, startDirectory, command, message, null, orientation);
+            return openTerminal(label, startDirectory, command, message, null, orientation,
+                editor.toolchainService.environment(startDirectory.toPath()));
         }
         try {
             List<String> invocation = DevContainerRuntime.terminalInvocation(connection.workspace(), profile == null
@@ -131,11 +134,17 @@ final class TerminalController {
 
     private String openTerminal(String label, File startDirectory, List<String> command, String successMessage,
                                 TerminalLinkResolver.SourcePathMapper sourcePathMapper, WindowLayoutNode.Orientation orientation) {
+        return openTerminal(label, startDirectory, command, successMessage, sourcePathMapper, orientation, Map.of());
+    }
+
+    private String openTerminal(String label, File startDirectory, List<String> command, String successMessage,
+                                TerminalLinkResolver.SourcePathMapper sourcePathMapper, WindowLayoutNode.Orientation orientation,
+                                Map<String, String> toolchainEnvironment) {
         String title = nextTerminalTitle(label);
         PtyTerminalPane terminalPane;
         try {
             terminalPane = PtyTerminalPane.open(startDirectory, editor.configManager, editor.resolveTerminalFont(), command, this::openTerminalLink,
-                sourcePathMapper);
+                sourcePathMapper, toolchainEnvironment);
         } catch (IOException e) {
             return "Terminal failed: " + e.getMessage();
         }

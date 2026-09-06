@@ -610,7 +610,8 @@ final class JobQuickfixController {
 
     private DebugSessionService.PreLaunchResult startDebugBackgroundTask(String taskName, TaskService.TaskExecutionPlan plan,
                                                                           AsyncJobService.JobToken token) throws IOException {
-        BackgroundTaskProcess.Running process = BackgroundTaskProcess.start(plan.processCommand(), plan.workingDirectory(), plan.environment(),
+        BackgroundTaskProcess.Running process = BackgroundTaskProcess.start(plan.processCommand(), plan.workingDirectory(),
+            editor.toolchainService.environment(plan.workspace().toPath(), plan.environment()),
             editor.configManager.getProcessOutputMaxBytes(), plan.task().readyWhen());
         String description = "task " + plan.task().name() + " [watch]: " + plan.task().name();
         int jobId = editor.asyncJobService.submitLongRunning(description, process::awaitCompletion,
@@ -993,7 +994,7 @@ final class JobQuickfixController {
                                             boolean parallelDependencies) throws Exception {
         return runTaskPlans(plans, token, parallelDependencies, plan -> runExternalCommand(plan.processCommand(), plan.workingDirectory(), null, token,
             plan.task().background() ? 0 : editor.configManager.getProcessTimeoutMs(), editor.configManager.getProcessOutputMaxBytes(), true,
-            plan.environment()));
+            editor.toolchainService.environment(plan.workspace().toPath(), plan.environment())));
     }
 
     private CommandResult runTaskPlans(List<TaskService.TaskExecutionPlan> plans, AsyncJobService.JobToken token,

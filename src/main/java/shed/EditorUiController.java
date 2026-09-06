@@ -15,6 +15,7 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
@@ -26,12 +27,16 @@ import java.util.regex.Pattern;
 
 final class EditorUiController {
     private static final int STATUS_REFRESH_DEBOUNCE_MS = 33;
+    private static final String BASE_UI_FONT_PROPERTY = "shed.base-ui-font";
+    private static final String DIALOG_UI_READY_PROPERTY = "shed.dialog-ui-ready";
+    private static final String DIALOG_UI_MANAGED_PROPERTY = "shed.dialog-ui-managed";
     private final Texteditor editor;
     private final Map<Object, Font> systemUiFonts;
     private final DefaultListModel<String> commandPathModel = new DefaultListModel<>();
     private JPopupMenu commandPathPopup;
     private JList<String> commandPathList;
     private boolean updatingCommandBar;
+    private boolean dialogUiScalingListenerInstalled;
     private Timer statusRefreshTimer;
 
     EditorUiController(Texteditor editor) {
@@ -44,6 +49,7 @@ final class EditorUiController {
         editor.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setApplicationIcon();
         applyUiFont();
+        installDialogUiScaling();
         installUiZoomShortcuts();
 
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
@@ -71,15 +77,11 @@ final class EditorUiController {
         editor.statusBar = new JLabel();
         editor.statusBar.setBackground(editor.configManager.getStatusBarBackground());
         editor.statusBar.setOpaque(true);
-        editor.statusBar.setPreferredSize(new Dimension(screenSize.width / 2, 30));
-        editor.statusBar.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
         editor.statusBar.setForeground(editor.configManager.getStatusBarForeground());
 
         editor.commandBar = new JTextField();
         editor.commandBar.setBackground(editor.configManager.getCommandBarBackground());
         editor.commandBar.setOpaque(true);
-        editor.commandBar.setPreferredSize(new Dimension(screenSize.width / 2, 28));
-        editor.commandBar.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
         editor.commandBar.setForeground(editor.configManager.getCommandBarForeground());
         editor.commandBar.setCaret(new BlockCaret());
         editor.commandBar.getCaret().setBlinkRate(500);
@@ -91,6 +93,7 @@ final class EditorUiController {
         editor.footerPanel = new JPanel(new BorderLayout());
         editor.footerPanel.add(editor.statusBar, BorderLayout.NORTH);
         editor.footerPanel.add(editor.commandBar, BorderLayout.SOUTH);
+        applyFooterUiMetrics();
 
         editor.toolWindowHost = new ToolWindowHost(editor);
         editor.toolWindowHost.setVisible(false);
@@ -528,6 +531,124 @@ final class EditorUiController {
             UIManager.put(entry.getKey(), new FontUIResource(configuredUiFont(entry.getValue())));
         }
         SwingUtilities.updateComponentTreeUI(editor);
+        applyFooterUiMetrics();
+        for (Window window : Window.getWindows()) {
+            if (window != editor && window.isDisplayable() && (!(window instanceof JDialog dialog)
+                || !Boolean.TRUE.equals(dialog.getRootPane().getClientProperty(DIALOG_UI_MANAGED_PROPERTY)))) {
+                applyUiFont(window);
+            }
+        }
+    }
+
+    void prepareDialog(JDialog dialog, int unscaledWidth, int unscaledHeight) {
+        if (dialog == null) return;
+        dialog.getContentPane().setPreferredSize(scaleUiDimension(unscaledWidth, unscaledHeight));
+        applyUiFont(dialog);
+        markDialogUiReady(dialog);
+    }
+
+    Dimension scaleUiDimension(int width, int height) {
+        return new Dimension(UiZoom.scale(width, editor.configManager.getUiZoom()), UiZoom.scale(height, editor.configManager.getUiZoom()));
+    }
+
+    void markDialogUiReady(JDialog dialog) {
+        if (dialog != null) dialog.getRootPane().putClientProperty(DIALOG_UI_READY_PROPERTY, Boolean.TRUE);
+    }
+
+    void markDialogUiFontsManaged(JDialog dialog) {
+        if (dialog == null) return;
+        markDialogUiReady(dialog);
+        dialog.getRootPane().putClientProperty(DIALOG_UI_MANAGED_PROPERTY, Boolean.TRUE);
+    }
+
+    void applyUiFont(Component root) {
+        if (root == null) return;
+        SwingUtilities.updateComponentTreeUI(root);
+        applyUiFontRecursively(root);
+        if (root instanceof Container container) {
+            container.revalidate();
+            container.repaint();
+        }
+    }
+
+    private void applyUiFontRecursively(Component component) {
+        Font font = component.getFont();
+        if (font != null) {
+            component.setFont(resolveUiFont(baseUiFont(component, font)));
+        }
+        if (component instanceof JTable table) {
+            int minimumRowHeight = table.getFontMetrics(table.getFont()).getHeight() + UiZoom.scale(4, editor.configManager.getUiZoom());
+            table.setRowHeight(minimumRowHeight);
+        }
+        if (component instanceof Container container) {
+            for (Component child : container.getComponents()) {
+                applyUiFontRecursively(child);
+            }
+        }
+    }
+
+    private Font baseUiFont(Component component, Font currentFont) {
+        if (component instanceof JComponent swingComponent) {
+            Object stored = swingComponent.getClientProperty(BASE_UI_FONT_PROPERTY);
+            if (stored instanceof Font font) return font;
+            Font base = matchingSystemUiFont(currentFont);
+            swingComponent.putClientProperty(BASE_UI_FONT_PROPERTY, base);
+            return base;
+        }
+        return matchingSystemUiFont(currentFont);
+    }
+
+    private Font matchingSystemUiFont(Font currentFont) {
+        for (Font systemFont : systemUiFonts.values()) {
+            if (systemFont.getStyle() == currentFont.getStyle()
+                && systemFont.getFamily().equalsIgnoreCase(currentFont.getFamily())
+                && UiZoom.scale(systemFont.getSize(), editor.configManager.getUiZoom()) == currentFont.getSize()) {
+                return systemFont;
+            }
+        }
+        return currentFont;
+    }
+
+    private Font resolveUiFont(Font unscaledFont) {
+        Font configuredFamily = resolveInstalledFont(editor.configManager.getUiFontFamily(), Math.max(1, unscaledFont.getSize()));
+        String family = configuredFamily == null ? unscaledFont.getFamily() : configuredFamily.getFamily();
+        return new Font(family, unscaledFont.getStyle(), UiZoom.scale(unscaledFont.getSize(), editor.configManager.getUiZoom()));
+    }
+
+    private void applyFooterUiMetrics() {
+        if (editor.statusBar == null || editor.commandBar == null) return;
+        double zoom = editor.configManager.getUiZoom();
+        int statusVerticalPadding = UiZoom.scale(5, zoom);
+        int commandVerticalPadding = UiZoom.scale(4, zoom);
+        Font font = resolveUiFont();
+        editor.statusBar.setFont(font);
+        editor.commandBar.setFont(font);
+        editor.statusBar.setBorder(BorderFactory.createEmptyBorder(statusVerticalPadding, UiZoom.scale(10, zoom), statusVerticalPadding, UiZoom.scale(10, zoom)));
+        editor.commandBar.setBorder(BorderFactory.createEmptyBorder(commandVerticalPadding, UiZoom.scale(10, zoom), commandVerticalPadding, UiZoom.scale(10, zoom)));
+        int statusHeight = editor.statusBar.getFontMetrics(font).getHeight() + statusVerticalPadding * 2;
+        int commandHeight = editor.commandBar.getFontMetrics(font).getHeight() + commandVerticalPadding * 2;
+        editor.statusBar.setPreferredSize(new Dimension(0, statusHeight));
+        editor.commandBar.setPreferredSize(new Dimension(0, commandHeight));
+        if (editor.footerPanel != null) {
+            editor.footerPanel.revalidate();
+            editor.footerPanel.repaint();
+        }
+    }
+
+    private void installDialogUiScaling() {
+        if (dialogUiScalingListenerInstalled) return;
+        dialogUiScalingListenerInstalled = true;
+        Toolkit.getDefaultToolkit().addAWTEventListener(event -> {
+            if (!(event instanceof WindowEvent windowEvent) || windowEvent.getID() != WindowEvent.WINDOW_OPENED
+                || !(windowEvent.getWindow() instanceof JDialog dialog)) {
+                return;
+            }
+            SwingUtilities.invokeLater(() -> {
+                if (!Boolean.TRUE.equals(dialog.getRootPane().getClientProperty(DIALOG_UI_READY_PROPERTY))) {
+                    applyUiFont(dialog);
+                }
+            });
+        }, AWTEvent.WINDOW_EVENT_MASK);
     }
 
     private Map<Object, Font> captureSystemUiFonts() {

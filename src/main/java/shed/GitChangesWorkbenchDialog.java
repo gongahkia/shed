@@ -64,7 +64,7 @@ final class GitChangesWorkbenchDialog extends JDialog {
         add(header(), BorderLayout.NORTH);
         add(content(), BorderLayout.CENTER);
         add(actions(), BorderLayout.SOUTH);
-        setPreferredSize(new Dimension(720, 460));
+        editor.editorUiController.prepareDialog(this, 720, 460);
         pack();
         WorkbenchToolWindowPlacement.restore(editor, this, WorkbenchLayout.SurfaceType.GIT, "changes");
     }

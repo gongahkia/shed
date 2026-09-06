@@ -60,7 +60,7 @@ final class GitHistoryRemoteDialog extends JDialog {
         add(content(), BorderLayout.CENTER);
         add(actions(), BorderLayout.SOUTH);
         updateRemoteActions();
-        setPreferredSize(new Dimension(820, 560));
+        editor.editorUiController.prepareDialog(this, 820, 560);
         pack();
         WorkbenchToolWindowPlacement.restore(editor, this, WorkbenchLayout.SurfaceType.GIT, "history");
     }

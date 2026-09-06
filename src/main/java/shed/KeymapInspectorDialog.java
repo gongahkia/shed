@@ -57,7 +57,7 @@ final class KeymapInspectorDialog extends JDialog {
         add(header(), BorderLayout.NORTH);
         add(new JScrollPane(table), BorderLayout.CENTER);
         add(actions(), BorderLayout.SOUTH);
-        setPreferredSize(new Dimension(1080, 480));
+        editor.editorUiController.prepareDialog(this, 1080, 480);
         pack();
         setLocationRelativeTo(editor);
         searchField.getDocument().addDocumentListener(new DocumentListener() {

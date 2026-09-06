@@ -57,7 +57,7 @@ final class GitRepositoryDialog extends JDialog {
         stashList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         AccessibilitySupport.describe(worktreeList, "Git worktrees", "Main and linked Git worktrees for this repository.");
         AccessibilitySupport.describe(stashList, "Git stashes", "Saved local Git stash entries.");
-        setPreferredSize(new Dimension(860, 480));
+        editor.editorUiController.prepareDialog(this, 860, 480);
         pack();
         WorkbenchToolWindowPlacement.restore(editor, this, WorkbenchLayout.SurfaceType.GIT, "repository-tools");
     }

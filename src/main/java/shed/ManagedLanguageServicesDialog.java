@@ -49,7 +49,7 @@ final class ManagedLanguageServicesDialog extends JDialog {
         setLayout(new BorderLayout(8, 8));
         add(content(), BorderLayout.CENTER);
         add(actions(), BorderLayout.SOUTH);
-        setPreferredSize(new Dimension(900, 540));
+        editor.editorUiController.prepareDialog(this, 900, 540);
         pack();
         setLocationRelativeTo(editor);
         services.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);

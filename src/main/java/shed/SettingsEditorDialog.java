@@ -62,7 +62,7 @@ final class SettingsEditorDialog extends JDialog {
         add(header(), BorderLayout.NORTH);
         add(content(), BorderLayout.CENTER);
         add(actions(), BorderLayout.SOUTH);
-        setPreferredSize(new Dimension(1040, 650));
+        editor.editorUiController.prepareDialog(this, 1040, 650);
         pack();
         setLocationRelativeTo(editor);
         search.getDocument().addDocumentListener(new DocumentListener() {
@@ -78,7 +78,7 @@ final class SettingsEditorDialog extends JDialog {
 
     private JPanel header() {
         JPanel panel = new JPanel(new BorderLayout(8, 0));
-        panel.setBorder(BorderFactory.createEmptyBorder(8, 8, 0, 8));
+        panel.setBorder(BorderFactory.createEmptyBorder(uiPixels(8), uiPixels(8), 0, uiPixels(8)));
         panel.add(new JLabel("Search settings"), BorderLayout.WEST);
         panel.add(search, BorderLayout.CENTER);
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
@@ -155,6 +155,7 @@ final class SettingsEditorDialog extends JDialog {
             filler.setBackground(theme.surface());
             settings.add(filler, fill);
             applyTheme(settings);
+            editor.editorUiController.applyUiFont(settings);
             settings.revalidate();
             settings.repaint();
         } finally {
@@ -167,7 +168,7 @@ final class SettingsEditorDialog extends JDialog {
         panel.setOpaque(true);
         panel.setBackground(theme.surface());
         panel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, editor.configManager.getStatusBarBackground()),
-            BorderFactory.createEmptyBorder(7, 9, 7, 9)));
+            BorderFactory.createEmptyBorder(uiPixels(7), uiPixels(9), uiPixels(7), uiPixels(9))));
         GridBagConstraints left = constraints(0, 0);
         left.weightx = 0.56;
         JLabel name = new JLabel(descriptor.key());
@@ -230,14 +231,18 @@ final class SettingsEditorDialog extends JDialog {
         return values;
     }
 
-    private static GridBagConstraints constraints(int x, int y) {
+    private GridBagConstraints constraints(int x, int y) {
         GridBagConstraints constraints = new GridBagConstraints();
         constraints.gridx = x;
         constraints.gridy = y;
         constraints.anchor = GridBagConstraints.WEST;
         constraints.fill = GridBagConstraints.HORIZONTAL;
-        constraints.insets = new Insets(2, 2, 2, 2);
+        constraints.insets = new Insets(uiPixels(2), uiPixels(2), uiPixels(2), uiPixels(2));
         return constraints;
+    }
+
+    private int uiPixels(int value) {
+        return UiZoom.scale(value, editor.configManager.getUiZoom());
     }
 
     private static String escape(String value) {
@@ -264,7 +269,7 @@ final class SettingsEditorDialog extends JDialog {
             button.setBackground(theme.raised());
             button.setForeground(theme.foreground());
             button.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(theme.border()),
-                BorderFactory.createEmptyBorder(4, 9, 4, 9)));
+                BorderFactory.createEmptyBorder(uiPixels(4), uiPixels(9), uiPixels(4), uiPixels(9))));
         }
         if (component instanceof JTextField field) {
             field.setOpaque(true);

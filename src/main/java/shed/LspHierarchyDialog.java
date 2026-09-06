@@ -75,8 +75,9 @@ final class LspHierarchyDialog extends JDialog {
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(tree), new JScrollPane(details));
         split.setResizeWeight(0.62);
         add(split, BorderLayout.CENTER);
-        setMinimumSize(new Dimension(620, 360));
-        setSize(820, 520);
+        setMinimumSize(editor.editorUiController.scaleUiDimension(620, 360));
+        setSize(editor.editorUiController.scaleUiDimension(820, 520));
+        editor.editorUiController.applyUiFont(this);
         setLocationRelativeTo(editor);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         rebuild();

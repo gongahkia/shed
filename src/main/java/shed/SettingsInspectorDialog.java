@@ -61,7 +61,7 @@ final class SettingsInspectorDialog extends JDialog {
         add(header(), BorderLayout.NORTH);
         add(content(), BorderLayout.CENTER);
         add(actions(), BorderLayout.SOUTH);
-        setPreferredSize(new Dimension(1180, 540));
+        editor.editorUiController.prepareDialog(this, 1180, 540);
         pack();
         setLocationRelativeTo(editor);
         populateCategories();

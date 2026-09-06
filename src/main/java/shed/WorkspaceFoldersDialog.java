@@ -38,7 +38,7 @@ final class WorkspaceFoldersDialog extends JDialog {
         scroll.setBorder(BorderFactory.createTitledBorder("Folders"));
         add(scroll, BorderLayout.CENTER);
         add(actions(), BorderLayout.SOUTH);
-        setPreferredSize(new Dimension(680, 360));
+        editor.editorUiController.prepareDialog(this, 680, 360);
         pack();
         refresh();
     }

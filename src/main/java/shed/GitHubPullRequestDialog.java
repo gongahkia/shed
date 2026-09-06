@@ -111,7 +111,7 @@ final class GitHubPullRequestDialog extends JDialog {
         actions.add(progress); actions.add(refresh); actions.add(viewDetails); actions.add(reviewAction); actions.add(saveDraft); actions.add(discardDraft);
         actions.add(submitReview); actions.add(cancel); actions.add(close);
         add(actions, BorderLayout.SOUTH);
-        setPreferredSize(new Dimension(760, 440));
+        editor.editorUiController.prepareDialog(this, 760, 440);
         pack(); setLocationRelativeTo(editor);
     }
 

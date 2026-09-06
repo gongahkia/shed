@@ -59,7 +59,7 @@ final class GitConflictResolutionDialog extends JDialog {
         add(header(), BorderLayout.NORTH);
         add(content(), BorderLayout.CENTER);
         add(actions(), BorderLayout.SOUTH);
-        setPreferredSize(new Dimension(1120, 680));
+        editor.editorUiController.prepareDialog(this, 1120, 680);
         pack();
         WorkbenchToolWindowPlacement.restore(editor, this, WorkbenchLayout.SurfaceType.GIT, "conflicts");
     }

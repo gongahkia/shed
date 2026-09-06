@@ -96,7 +96,7 @@ final class RecoveryWorkspaceDialog extends JDialog {
         add(header(), BorderLayout.NORTH);
         add(content(), BorderLayout.CENTER);
         add(actions(), BorderLayout.SOUTH);
-        setPreferredSize(new Dimension(1080, 700));
+        editor.editorUiController.prepareDialog(this, 1080, 700);
         pack();
         setLocationRelativeTo(editor);
         populateTable();

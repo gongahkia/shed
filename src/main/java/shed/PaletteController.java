@@ -806,7 +806,8 @@ final class PaletteController {
         if (previewProvider != null) dialog.add(previewArea, BorderLayout.EAST);
         syncPreview.run();
         Dimension targetSize = previewProvider == null ? new Dimension(620, 400) : new Dimension(720, 420);
-        dialog.setSize(targetSize);
+        dialog.setSize(editor.editorUiController.scaleUiDimension(targetSize.width, targetSize.height));
+        editor.editorUiController.markDialogUiFontsManaged(dialog);
         dialog.setLocationRelativeTo(editor);
         dialog.setVisible(true);
         return selection[0];

@@ -163,6 +163,40 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void uiZoomScalesTheFooterAndSettingsDialog() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-ui-zoom-settings");
+        Path file = tempDir.resolve("ui-zoom-settings.txt");
+        Path config = home.resolve(".shed/config.toml");
+        Files.createDirectories(config.getParent());
+        Files.writeString(config, "schema_version = 1\n\"ui.zoom\" = 1.5\n", StandardCharsets.UTF_8);
+        Files.writeString(file, "settings\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        SettingsEditorDialog dialog = null;
+        try {
+            assertEquals(1.5, editor.configManager.getUiZoom());
+            assertEquals(onEdt(() -> editor.resolveUiFont().getSize()), onEdt(() -> editor.statusBar.getFont().getSize()));
+            assertEquals(onEdt(() -> editor.resolveUiFont().getSize()), onEdt(() -> editor.commandBar.getFont().getSize()));
+
+            dialog = onEdt(() -> {
+                SettingsEditorDialog.showFor(editor);
+                return Arrays.stream(Window.getWindows()).filter(SettingsEditorDialog.class::isInstance)
+                    .map(SettingsEditorDialog.class::cast).filter(Window::isDisplayable).findFirst().orElseThrow();
+            });
+            SettingsEditorDialog shown = dialog;
+            assertEquals(UiZoom.scale(1040, 1.5), onEdt(() -> shown.getContentPane().getPreferredSize().width));
+            List<javax.swing.JTextField> fields = onEdt(() -> descendants(shown, javax.swing.JTextField.class));
+            assertFalse(fields.isEmpty());
+            assertTrue(fields.stream().allMatch(field -> field.getFont().getSize() >= UiZoom.scale(12, 1.5)));
+        } finally {
+            SettingsEditorDialog currentDialog = dialog;
+            if (currentDialog != null) onEdt(() -> { currentDialog.dispose(); return null; });
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void configuredLandingSourceRemainsAnEditableBuffer() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-configured-landing");

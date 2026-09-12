@@ -1,6 +1,9 @@
 package shed;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.WindowAdapter;
@@ -20,11 +23,26 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
+import javax.swing.table.JTableHeader;
 import javax.swing.JTextArea;
 import javax.swing.ListSelectionModel;
+import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
 
 final class RecoveryWorkspaceDialog extends JDialog {
+    private record DialogTheme(Color surface, Color raised, Color field, Color border, Color foreground, Color accent,
+                               Color selection, Color selectionText) {
+        static DialogTheme from(ConfigManager config) {
+            Color surface = config.getNormalColor();
+            Color foreground = config.getEditorForeground();
+            return new DialogTheme(surface, blend(surface, foreground, 0.07), config.getCommandBarBackground(),
+                blend(surface, foreground, 0.18), foreground, config.getCaretColor(), config.getSelectionColor(),
+                config.getSelectionTextColor());
+        }
+    }
+
+    private final Texteditor editor;
+    private final DialogTheme theme;
     private final List<EntryView> entries;
     private final DefaultTableModel tableModel;
     private final JTable table;
@@ -68,6 +86,8 @@ final class RecoveryWorkspaceDialog extends JDialog {
 
     private RecoveryWorkspaceDialog(Texteditor editor, List<EntryView> entries) {
         super(editor, "Crash Recovery Workspace", true);
+        this.editor = editor;
+        this.theme = DialogTheme.from(editor.configManager);
         this.entries = entries;
         this.tableModel = new DefaultTableModel(new Object[] {"Restore", "Document", "Original", "Recovery"}, 0) {
             @Override
@@ -97,6 +117,7 @@ final class RecoveryWorkspaceDialog extends JDialog {
         add(content(), BorderLayout.CENTER);
         add(actions(), BorderLayout.SOUTH);
         editor.editorUiController.prepareDialog(this, 1080, 700);
+        applyTheme();
         pack();
         setLocationRelativeTo(editor);
         populateTable();
@@ -120,11 +141,11 @@ final class RecoveryWorkspaceDialog extends JDialog {
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setFillsViewportHeight(true);
         JScrollPane tableScroll = new JScrollPane(table);
-        tableScroll.setBorder(BorderFactory.createTitledBorder("Recoverable documents"));
+        tableScroll.setBorder(titledBorder("Recoverable documents"));
         JScrollPane originalScroll = new JScrollPane(originalPreview);
-        originalScroll.setBorder(BorderFactory.createTitledBorder("Original/current content"));
+        originalScroll.setBorder(titledBorder("Original/current content"));
         JScrollPane recoveryScroll = new JScrollPane(recoveryPreview);
-        recoveryScroll.setBorder(BorderFactory.createTitledBorder("Recovery snapshot"));
+        recoveryScroll.setBorder(titledBorder("Recovery snapshot"));
         JSplitPane previews = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, originalScroll, recoveryScroll);
         previews.setResizeWeight(0.5);
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, tableScroll, previews);
@@ -207,6 +228,73 @@ final class RecoveryWorkspaceDialog extends JDialog {
     private void defer() {
         result = Result.defer();
         dispose();
+    }
+
+    private TitledBorder titledBorder(String title) {
+        TitledBorder border = BorderFactory.createTitledBorder(BorderFactory.createLineBorder(theme.border()), title);
+        border.setTitleColor(theme.foreground());
+        return border;
+    }
+
+    private void applyTheme() {
+        getContentPane().setBackground(theme.surface());
+        applyTheme(getContentPane());
+    }
+
+    private void applyTheme(Component component) {
+        if (component instanceof JPanel panel) {
+            panel.setOpaque(true);
+            panel.setBackground(theme.surface());
+            panel.setForeground(theme.foreground());
+        }
+        if (component instanceof JLabel label) label.setForeground(theme.foreground());
+        if (component instanceof JButton button) {
+            button.setOpaque(true);
+            button.setContentAreaFilled(true);
+            button.setBackground(theme.raised());
+            button.setForeground(theme.foreground());
+            button.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(theme.border()),
+                BorderFactory.createEmptyBorder(UiZoom.scale(4, editor.configManager.getUiZoom()), UiZoom.scale(9, editor.configManager.getUiZoom()),
+                    UiZoom.scale(4, editor.configManager.getUiZoom()), UiZoom.scale(9, editor.configManager.getUiZoom()))));
+        }
+        if (component instanceof JTextArea area) {
+            area.setBackground(theme.surface());
+            area.setForeground(theme.foreground());
+            area.setCaretColor(theme.accent());
+            area.setSelectionColor(theme.selection());
+            area.setSelectedTextColor(theme.selectionText());
+        }
+        if (component instanceof JTable value) {
+            value.setBackground(theme.field());
+            value.setForeground(theme.foreground());
+            value.setSelectionBackground(theme.selection());
+            value.setSelectionForeground(theme.selectionText());
+            value.setGridColor(theme.border());
+            JTableHeader header = value.getTableHeader();
+            header.setBackground(theme.raised());
+            header.setForeground(theme.foreground());
+        }
+        if (component instanceof JScrollPane scroll) {
+            scroll.setBackground(theme.surface());
+            scroll.getViewport().setBackground(theme.surface());
+            scroll.getHorizontalScrollBar().setBackground(theme.raised());
+            scroll.getVerticalScrollBar().setBackground(theme.raised());
+        }
+        if (component instanceof JSplitPane split) {
+            split.setBackground(theme.surface());
+            split.getDivider().setBackground(theme.border());
+        }
+        if (component instanceof Container container) {
+            for (Component child : container.getComponents()) applyTheme(child);
+        }
+        component.repaint();
+    }
+
+    private static Color blend(Color first, Color second, double amount) {
+        double ratio = Math.max(0.0, Math.min(1.0, amount));
+        return new Color((int) Math.round(first.getRed() * (1.0 - ratio) + second.getRed() * ratio),
+            (int) Math.round(first.getGreen() * (1.0 - ratio) + second.getGreen() * ratio),
+            (int) Math.round(first.getBlue() * (1.0 - ratio) + second.getBlue() * ratio));
     }
 
     record EntryView(RecoveryJournal.Entry entry, String originalState, String originalContent) {

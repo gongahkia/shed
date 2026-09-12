@@ -437,7 +437,7 @@ public class Texteditor extends JFrame implements KeyListener {
         updateStatusBar();
 
         this.setVisible(true);
-        if (configManager.hasConfigLoadFailure()) {
+        if (configManager.hasConfigLoadFailure() || configManager.hasConfigRepairs()) {
             showScratchBuffer("[config recovery]", configManager.getConfigLoadReport());
         }
         updateController.startOnLaunch();
@@ -1729,6 +1729,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return treeGitController.showFolderFinder();
     }
 
+    String openFolder() {
+        return treeGitController.openFolder();
+    }
+
     String showFileFinderFromFolder(File folder) {
         return treeGitController.showFileFinderFromFolder(folder);
     }
@@ -2979,6 +2983,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String resetConfigOptionPersistent(String key) {
         return sessionConfigController.resetConfigOptionPersistent(key);
+    }
+
+    public String persistSuggestedConfigRepairs() {
+        return sessionConfigController.persistSuggestedConfigRepairs();
     }
 
     String setKeybindingPersistent(String scope, String lhs, String mapping) {

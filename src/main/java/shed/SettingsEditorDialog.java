@@ -218,6 +218,8 @@ final class SettingsEditorDialog extends JDialog {
         String result = editor.setConfigOptionPersistent(key, value);
         if (result.startsWith("Error")) {
             javax.swing.JOptionPane.showMessageDialog(this, result, "Settings", javax.swing.JOptionPane.ERROR_MESSAGE);
+        } else if (result.contains("(self-healed ")) {
+            javax.swing.JOptionPane.showMessageDialog(this, result, "Settings", javax.swing.JOptionPane.INFORMATION_MESSAGE);
         }
         theme = DialogTheme.from(editor.configManager);
         applyTheme(this);

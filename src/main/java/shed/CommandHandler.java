@@ -412,6 +412,9 @@ public class CommandHandler {
         if ("save".equals(trimmed) || "write".equals(trimmed)) {
             return editor.saveConfigToDisk();
         }
+        if ("heal".equals(trimmed)) {
+            return editor.persistSuggestedConfigRepairs();
+        }
         if ("status".equals(trimmed)) {
             return editor.showConfigLoadStatus();
         }
@@ -427,7 +430,7 @@ public class CommandHandler {
         if (trimmed.startsWith("reset ")) {
             return editor.resetConfigOptionPersistent(args.substring("reset".length()).trim());
         }
-        return "Usage: :config[!] [file|save|status|defaults|inspector|reference|reset <key>]";
+        return "Usage: :config[!] [file|save|heal|status|defaults|inspector|reference|reset <key>]";
     }
 
     private String handleKeymap(String args) {

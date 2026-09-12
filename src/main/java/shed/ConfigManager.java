@@ -1666,7 +1666,9 @@ public class ConfigManager {
             if (FontFamilyCatalog.resolve(value) != null) {
                 return null;
             }
-            return key + " names no installed font family: " + value.trim();
+            List<String> suggestions = FontFamilyCatalog.closest(value, 3);
+            String hint = suggestions.isEmpty() ? "" : ". Closest installed families: " + String.join(", ", suggestions);
+            return key + " names no installed font family: " + value.trim() + hint;
         } catch (SecurityException | java.awt.HeadlessException error) {
             return key + " could not inspect installed font families: " + loadErrorMessage(error);
         }

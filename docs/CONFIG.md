@@ -456,6 +456,8 @@ Overlays apply only while `keymap.profile = "vim"`. Scope-specific overlays take
 
 Color values should be hex (`#RRGGBB` or `#RGB`).
 
+Configured font families are validated against the Java runtime's installed family list. An unavailable family rejects the configuration and reports the closest installed names in the configuration-recovery buffer; correct the setting and run `:reload`.
+
 ## Built-in Themes
 
 `one-dark-pro`, `dracula`, `material-theme`, `night-owl`, `ayu-mirage`, `monokai-pro`, `tokyo-night`, `nord`, `gruvbox-dark`, `shades-of-purple`, `palenight`, `catppuccin-mocha`, `github-dark`, `rose-pine`, `synthwave-84`, `cobalt2`, `andromeda`, `everforest-dark`, `kanagawa`, `poimandres`, `solarized-dark`, `noctis`, `oxocarbon-dark`, `vesper`, `sonokai`, `doom-one`, `horizon`, `papercolor-dark`, `xcode-dark`, `dimmed-monokai`, `fleet-dark`, `nightfox`.

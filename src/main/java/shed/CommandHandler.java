@@ -157,6 +157,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleWordCount(), "wc", "wordcount");
         registerCommand((args, range, force) -> editor.showRecentFiles(), "recent");
         registerCommand((args, range, force) -> handleDelete(range), "d", "delete");
+        registerCommand((args, range, force) -> handleOpen(args), "open");
         registerCommand((args, range, force) -> editor.showFileFinder(), "files");
         registerCommand((args, range, force) -> editor.showFolderFinder(), "folder", "folders");
         registerCommand((args, range, force) -> editor.showBufferFinder(), "buffers", "buf");
@@ -265,6 +266,18 @@ public class CommandHandler {
         } catch (IOException e) {
             return "Error opening file: " + e.getMessage();
         }
+    }
+
+    private String handleOpen(String target) {
+        String selection = target == null ? "" : target.trim().toLowerCase(Locale.ROOT);
+        if (selection.isEmpty() || "file".equals(selection)) {
+            editor.openFileChooser();
+            return "Open file dialog shown";
+        }
+        if ("folder".equals(selection)) {
+            return editor.openFolder();
+        }
+        return "Usage: :open [file|folder]";
     }
 
     private String handleSet(String option, boolean persist) {

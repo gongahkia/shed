@@ -63,6 +63,7 @@ public class HelpService {
                    "  :drop cmd      Run async command with current file path\n" +
                    "  :task ...      Run/save project tasks with quickfix integration\n" +
                    "  :customeditor  List/reopen extension editors and the built-in binary Hex Editor\n" +
+                   "  :open [target] Open a file chooser or a workspace folder\n" +
                    "  :files         File finder\n" +
                    "  :folder        Folder finder\n" +
                    "  :tree [path]   Toggle/open file tree pane\n" +

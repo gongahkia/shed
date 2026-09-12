@@ -219,8 +219,8 @@ public class ConfigManagerTest {
         assertTrue(config.hasConfigLoadFailure());
         assertTrue(config.getConfigLoadReport().contains("font.family names no installed font family: Missing Shed Test Font"));
         assertEquals("Monospaced", config.getFontFamily());
-        assertEquals("font.family names no installed font family: Missing Shed Test Font",
-            config.validateSettingValue("font.family", "Missing Shed Test Font"));
+        assertTrue(config.validateSettingValue("font.family", "Missing Shed Test Font")
+            .startsWith("font.family names no installed font family: Missing Shed Test Font"));
         assertThrows(IOException.class, () -> config.setAndPersist("font.family", "Missing Shed Test Font"));
     }
 

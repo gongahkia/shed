@@ -62,6 +62,10 @@ Set `keymap.profile = "emacs"` for fixed Emacs bindings. Emacs bypasses Vim mode
 | `k` or `↑` | Move one line up |
 | `l` or `→` | Move one character right |
 
+#### Counts and Macros
+
+Prefix supported motions and operators with a positive count: `600j` moves down 600 lines, and `45gg` goes to line 45. `q{a-z}` records a macro, `q{A-Z}` appends to it, `q` stops recording, `[count]@{register}` replays it, and `@@` replays the last executed macro. Insert-mode keystrokes are recorded and replayed as text.
+
 #### Word Movement
 
 | Key-binds | Function |

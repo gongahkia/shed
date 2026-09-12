@@ -22,7 +22,7 @@ public class HelpService {
                    "  >>/<</==       Indent/dedent/auto-indent line\n" +
                    "  J/gJ           Join lines with/without space\n" +
                    "  cs/ds/ys       Surround change/delete/add\n" +
-                   "  q{a-z} @a @@   Macro record and playback\n" +
+                   "  q{a-z}/q{A-Z} @a @@  Macro record, append, and playback\n" +
                    "  m{a-z}         Set mark\n" +
                    "  '{a-z}/`{a-z}  Jump to mark\n" +
                    "  Ctrl-o/Ctrl-i  Jump back/forward\n" +
@@ -202,9 +202,9 @@ public class HelpService {
             case "macros":
             case "macro":
                 return "Help: macros\n\n"
-                    + "q{register} starts recording into a named register.\n"
-                    + "q stops recording.\n"
-                    + "@{register} replays a macro and @@ replays the last executed macro.\n"
+                    + "q{a-z} records into a named register; q{A-Z} appends to that register.\n"
+                    + "q stops recording. Recorded Insert-mode keys are replayed as text.\n"
+                    + "[count]@{register} replays a macro count times; @@ replays the last executed macro.\n"
                     + "Macro playback is recursion-limited to avoid runaway loops.\n";
             case "textobjects":
             case "text-objects":

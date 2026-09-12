@@ -1601,12 +1601,18 @@ final class EditActionController {
 
 
     String playMacro(Character register) {
+        return playMacro(register, 1);
+    }
+
+
+    String playMacro(Character register, int count) {
         if (register == null) {
             return "No previously executed macro";
         }
-        RegisterContent content = editor.registerManager.get(register);
+        char macroRegister = Character.toLowerCase(register);
+        RegisterContent content = editor.registerManager.get(macroRegister);
         if (content == null || !content.isMacro()) {
-            return "Register @" + register + " is empty or not a macro";
+            return "Register @" + macroRegister + " is empty or not a macro";
         }
         if (editor.macroPlaybackDepth >= 20) {
             return "Macro recursion limit reached";
@@ -1614,14 +1620,16 @@ final class EditActionController {
 
         editor.macroPlaybackDepth++;
         try {
-            editor.lastMacroRegister = register;
-            for (NormalizedKeyStroke keyStroke : content.getMacroKeys()) {
-                editor.keyPressed(keyStroke.toKeyEvent(editor.writingArea));
+            editor.lastMacroRegister = macroRegister;
+            for (int execution = 0; execution < Math.max(1, count); execution++) {
+                for (NormalizedKeyStroke keyStroke : content.getMacroKeys()) {
+                    editor.inputController.replayMacroKey(keyStroke);
+                }
             }
         } finally {
             editor.macroPlaybackDepth--;
         }
-        return "Executed macro @" + register;
+        return count > 1 ? "Executed macro @" + macroRegister + " " + count + " times" : "Executed macro @" + macroRegister;
     }
 
 

@@ -31,6 +31,7 @@ final class EditorUiController {
     private static final String BASE_DIALOG_SIZE_PROPERTY = "shed.base-dialog-size";
     private static final String DIALOG_UI_READY_PROPERTY = "shed.dialog-ui-ready";
     private static final String DIALOG_UI_MANAGED_PROPERTY = "shed.dialog-ui-managed";
+    private static final int SCREEN_EDGE_MARGIN = 24;
     private final Texteditor editor;
     private final Map<Object, Font> systemUiFonts;
     private final DefaultListModel<String> commandPathModel = new DefaultListModel<>();
@@ -545,7 +546,7 @@ final class EditorUiController {
     void prepareDialog(JDialog dialog, int unscaledWidth, int unscaledHeight) {
         if (dialog == null) return;
         dialog.getRootPane().putClientProperty(BASE_DIALOG_SIZE_PROPERTY, new Dimension(unscaledWidth, unscaledHeight));
-        dialog.getContentPane().setPreferredSize(scaleUiDimension(unscaledWidth, unscaledHeight));
+        dialog.getContentPane().setPreferredSize(constrainDialogContentSize(dialog, unscaledWidth, unscaledHeight));
         applyUiFont(dialog);
         markDialogUiReady(dialog);
     }
@@ -567,8 +568,58 @@ final class EditorUiController {
     private void applyDialogSize(JDialog dialog) {
         Object stored = dialog.getRootPane().getClientProperty(BASE_DIALOG_SIZE_PROPERTY);
         if (!(stored instanceof Dimension base)) return;
-        dialog.getContentPane().setPreferredSize(scaleUiDimension(base.width, base.height));
+        dialog.getContentPane().setPreferredSize(constrainDialogContentSize(dialog, base.width, base.height));
         dialog.pack();
+    }
+
+    Dimension fitPopupSize(Component anchor, Dimension requested) {
+        if (requested == null) return new Dimension(1, 1);
+        Rectangle usable = usableScreenBounds(anchor);
+        return constrainSize(requested, new Dimension(usable.width, usable.height));
+    }
+
+    Point fitPopupLocation(Component anchor, Point requested, Dimension size) {
+        Rectangle usable = usableScreenBounds(anchor);
+        Dimension constrained = constrainSize(size, new Dimension(usable.width, usable.height));
+        int maxX = usable.x + usable.width - constrained.width;
+        int maxY = usable.y + usable.height - constrained.height;
+        int x = Math.max(usable.x, Math.min(requested.x, maxX));
+        int y = Math.max(usable.y, Math.min(requested.y, maxY));
+        return new Point(x, y);
+    }
+
+    static Dimension constrainSize(Dimension requested, Dimension available) {
+        int width = requested == null ? 1 : Math.max(1, requested.width);
+        int height = requested == null ? 1 : Math.max(1, requested.height);
+        int maximumWidth = available == null ? width : Math.max(1, available.width);
+        int maximumHeight = available == null ? height : Math.max(1, available.height);
+        return new Dimension(Math.min(width, maximumWidth), Math.min(height, maximumHeight));
+    }
+
+    private Dimension constrainDialogContentSize(JDialog dialog, int unscaledWidth, int unscaledHeight) {
+        Dimension scaled = scaleUiDimension(unscaledWidth, unscaledHeight);
+        Rectangle usable = usableScreenBounds(dialog);
+        Insets insets = dialog.getInsets();
+        Dimension contentBounds = new Dimension(
+            Math.max(1, usable.width - insets.left - insets.right),
+            Math.max(1, usable.height - insets.top - insets.bottom)
+        );
+        return constrainSize(scaled, contentBounds);
+    }
+
+    private Rectangle usableScreenBounds(Component component) {
+        GraphicsConfiguration configuration = component == null ? null : component.getGraphicsConfiguration();
+        if (configuration == null) configuration = editor.getGraphicsConfiguration();
+        if (configuration == null || GraphicsEnvironment.isHeadless()) {
+            return new Rectangle(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE);
+        }
+        Rectangle screen = configuration.getBounds();
+        Insets insets = Toolkit.getDefaultToolkit().getScreenInsets(configuration);
+        int x = screen.x + insets.left + SCREEN_EDGE_MARGIN;
+        int y = screen.y + insets.top + SCREEN_EDGE_MARGIN;
+        int width = Math.max(1, screen.width - insets.left - insets.right - SCREEN_EDGE_MARGIN * 2);
+        int height = Math.max(1, screen.height - insets.top - insets.bottom - SCREEN_EDGE_MARGIN * 2);
+        return new Rectangle(x, y, width, height);
     }
 
     void applyUiFont(Component root) {

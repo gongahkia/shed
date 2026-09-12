@@ -39,7 +39,7 @@ final class ShedWelcomePanel extends JPanel {
     private static final int DESIGN_HEIGHT = 640;
     private static final double MINIMUM_SCALE = 1.10;
     private static final double MAXIMUM_SCALE = 1.65;
-    private static final int ACTION_CONTENT_HEIGHT = 420;
+    private static final int ACTION_CONTENT_HEIGHT = 520;
     private static final int ACTION_GAP = 18;
     private static final BufferedImage LOGO = loadLogo();
 
@@ -95,8 +95,9 @@ final class ShedWelcomePanel extends JPanel {
         int width = getWidth();
         int height = getHeight();
         double contentScale = contentScale(width, height);
-        double layoutScale = contentScale * editor.configManager.getUiZoom();
+        double zoom = editor.configManager.getUiZoom();
         boolean wide = usesWideLayout(width, height);
+        double layoutScale = layoutScale(width, height, zoom);
         if (wide) {
             int brandWidth = Math.max(280, Math.min(width - 320, (int) Math.round(width * 0.38)));
             brandPane.setBounds(0, 0, brandWidth, height);
@@ -107,7 +108,7 @@ final class ShedWelcomePanel extends JPanel {
             brandPane.setBounds(0, 0, width, brandHeight);
             actionPane.setBounds(0, brandHeight, width, height - brandHeight);
         }
-        applyResponsiveMetrics(layoutScale, contentScale);
+        applyResponsiveMetrics(layoutScale, layoutScale / zoom);
     }
 
     @Override
@@ -381,6 +382,17 @@ final class ShedWelcomePanel extends JPanel {
     static double contentScale(int width, int height) {
         double scale = Math.min(Math.max(0, width) / (double) DESIGN_WIDTH, Math.max(0, height) / (double) DESIGN_HEIGHT);
         return Math.max(MINIMUM_SCALE, Math.min(MAXIMUM_SCALE, scale));
+    }
+
+    static double layoutScale(int width, int height, double zoom) {
+        double requested = contentScale(width, height) * UiZoom.clamp(zoom);
+        double heightLimit = Math.max(1.0, Math.max(0, height) / (double) ACTION_CONTENT_HEIGHT);
+        if (!usesWideLayout(width, height)) {
+            return Math.min(requested, heightLimit);
+        }
+        int brandWidth = Math.max(280, Math.min(Math.max(0, width) - 320, (int) Math.round(Math.max(0, width) * 0.38)));
+        double brandWidthLimit = Math.max(1.0, brandWidth / 250.0);
+        return Math.min(requested, Math.min(heightLimit, brandWidthLimit));
     }
 
 

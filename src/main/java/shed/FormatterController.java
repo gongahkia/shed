@@ -80,7 +80,7 @@ final class FormatterController {
         constraints.gridx = 1; constraints.gridy = 4; panel.add(save, constraints);
         constraints.gridx = 2; panel.add(cancel, constraints);
         dialog.setContentPane(panel);
-        editor.editorUiController.applyUiFont(dialog);
+        editor.editorUiController.prepareDialog(dialog, 620, 300);
         dialog.pack();
         dialog.setLocationRelativeTo(editor);
         dialog.setVisible(true);

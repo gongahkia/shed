@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.awt.Component;
 import java.awt.GraphicsEnvironment;
+import java.awt.Insets;
+import java.awt.Rectangle;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.FocusEvent;
@@ -197,6 +199,16 @@ public class TexteditorSwingIntegrationTest {
             });
             assertEquals(UiZoom.scale(1040, 1.6), onEdt(() -> shown.getContentPane().getPreferredSize().width));
             assertEquals(onEdt(() -> editor.resolveUiFont().getSize()), onEdt(() -> editor.statusBar.getFont().getSize()));
+
+            onEdt(() -> {
+                editor.configManager.set("ui.zoom", "4.0");
+                editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                return null;
+            });
+            Rectangle screen = onEdt(() -> shown.getGraphicsConfiguration().getBounds());
+            Insets insets = onEdt(() -> java.awt.Toolkit.getDefaultToolkit().getScreenInsets(shown.getGraphicsConfiguration()));
+            assertTrue(onEdt(() -> shown.getWidth() <= screen.width - insets.left - insets.right));
+            assertTrue(onEdt(() -> shown.getHeight() <= screen.height - insets.top - insets.bottom));
         } finally {
             SettingsEditorDialog currentDialog = dialog;
             if (currentDialog != null) onEdt(() -> { currentDialog.dispose(); return null; });

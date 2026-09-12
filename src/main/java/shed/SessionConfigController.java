@@ -1450,10 +1450,11 @@ final class SessionConfigController {
     void showBufferListDialog(String list) {
         JTextArea textArea = new JTextArea(list);
         textArea.setEditable(false);
-        textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        Font font = editor.resolveInstalledFont(editor.configManager.getFontFamily(), UiZoom.scale(12, editor.configManager.getUiZoom()));
+        textArea.setFont(font == null ? new Font(Font.MONOSPACED, Font.PLAIN, UiZoom.scale(12, editor.configManager.getUiZoom())) : font);
 
         JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setPreferredSize(new Dimension(400, 200));
+        scrollPane.setPreferredSize(editor.editorUiController.fitPopupSize(editor, editor.editorUiController.scaleUiDimension(400, 200)));
 
         JOptionPane.showMessageDialog(editor, scrollPane, "Buffer List", JOptionPane.INFORMATION_MESSAGE);
     }

@@ -2504,6 +2504,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return editActionController.playMacro(register);
     }
 
+    String playMacro(Character register, int count) {
+        return editActionController.playMacro(register, count);
+    }
+
     String yankToEndOfLine() {
         return editActionController.yankToEndOfLine();
     }

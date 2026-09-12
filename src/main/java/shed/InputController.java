@@ -33,6 +33,8 @@ final class InputController {
     private final CompletionRequestState signatureHelpRequestState;
     private int signatureHelpJobId;
     private EmacsKeymap.Prefix emacsPrefix;
+    private Character macroAutoPairAfterText;
+    private String macroIndentAfterNewline;
 
     InputController(Texteditor editor) {
         this.editor = editor;
@@ -56,6 +58,8 @@ final class InputController {
         this.signatureHelpRequestState = new CompletionRequestState();
         this.signatureHelpJobId = -1;
         this.emacsPrefix = EmacsKeymap.Prefix.NONE;
+        this.macroAutoPairAfterText = null;
+        this.macroIndentAfterNewline = null;
     }
 
     void onDocumentChanged(DocumentEvent event) {
@@ -193,7 +197,8 @@ final class InputController {
             e = new KeyEvent(e.getComponent(), e.getID(), e.getWhen(), 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED);
         }
         EditorMode previousMode = editor.editorState.mode;
-        if (editor.editorState.mode == EditorMode.NORMAL && editor.recordingRegister != null && !(editor.editorState.pendingKey == '\0' && e.getKeyChar() == 'q')) {
+        if (editor.recordingRegister != null && editor.macroPlaybackDepth == 0
+            && !(editor.editorState.mode == EditorMode.NORMAL && editor.editorState.pendingKey == '\0' && e.getKeyChar() == 'q')) {
             editor.macroBuffer.add(NormalizedKeyStroke.fromKeyEvent(e));
         }
         if (applyConfiguredKeybinding(e)) {
@@ -237,6 +242,43 @@ final class InputController {
     static boolean isUiZoomResetShortcut(KeyEvent event) {
         return event != null && !event.isAltDown() && (event.isControlDown() || event.isMetaDown())
             && (event.getKeyCode() == KeyEvent.VK_0 || event.getKeyCode() == KeyEvent.VK_NUMPAD0);
+    }
+
+    void replayMacroKey(NormalizedKeyStroke keyStroke) {
+        if (keyStroke == null) {
+            return;
+        }
+        macroAutoPairAfterText = null;
+        macroIndentAfterNewline = null;
+        EditorMode modeBefore = editor.editorState.mode;
+        KeyEvent event = keyStroke.toKeyEvent(editor.writingArea);
+        keyPressed(event);
+        editor.suppressNextTypedChar = false;
+
+        if (modeBefore != EditorMode.INSERT || editor.editorState.mode != EditorMode.INSERT
+            || event.isConsumed() || !isMacroTextInput(event)) {
+            return;
+        }
+
+        editor.writingArea.replaceSelection(String.valueOf(event.getKeyChar()));
+        if (macroAutoPairAfterText != null) {
+            int position = editor.writingArea.getCaretPosition();
+            editor.writingArea.insert(String.valueOf(macroAutoPairAfterText), position);
+            editor.writingArea.setCaretPosition(position);
+        }
+        if (macroIndentAfterNewline != null && !macroIndentAfterNewline.isEmpty()) {
+            editor.writingArea.insert(macroIndentAfterNewline, editor.writingArea.getCaretPosition());
+        }
+        editor.markModified();
+    }
+
+    private static boolean isMacroTextInput(KeyEvent event) {
+        if (event.isControlDown() || event.isAltDown() || event.isMetaDown()) {
+            return false;
+        }
+        char character = event.getKeyChar();
+        return (character != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(character))
+            || event.getKeyCode() == KeyEvent.VK_ENTER || event.getKeyCode() == KeyEvent.VK_TAB;
     }
 
     enum PaneShortcut { NONE, HORIZONTAL_SPLIT, VERTICAL_SPLIT, CLOSE }
@@ -785,7 +827,6 @@ final class InputController {
         } else if (c == 'q') {
             if (editor.recordingRegister != null) {
                 editor.registerManager.setMacro(editor.recordingRegister, editor.macroBuffer);
-                editor.lastMacroRegister = editor.recordingRegister;
                 editor.showMessage("Recorded macro to @" + editor.recordingRegister);
                 editor.recordingRegister = null;
                 editor.macroBuffer = new ArrayList<>();
@@ -1106,6 +1147,7 @@ final class InputController {
             case 't':
             case 'T':
             case 'r':
+            case '@':
                 return true;
             default:
                 return false;
@@ -1368,15 +1410,29 @@ final class InputController {
             editor.editorState.pendingKey = '\0';
             editor.editorState.pendingCount = "";
         } else if (editor.editorState.pendingKey == 'q') {
-            editor.recordingRegister = c;
-            editor.macroBuffer = new ArrayList<>();
+            if (!isMacroRegister(c)) {
+                editor.showMessage("Macro register must be a-z or A-Z");
+                editor.editorState.pendingKey = '\0';
+                return;
+            }
+            char register = Character.toLowerCase(c);
+            RegisterContent existing = editor.registerManager.get(register);
+            if (Character.isUpperCase(c) && existing != null && !existing.isMacro()) {
+                editor.showMessage("Register @" + register + " is not a macro");
+                editor.editorState.pendingKey = '\0';
+                return;
+            }
+            editor.recordingRegister = register;
+            editor.macroBuffer = Character.isUpperCase(c) && existing != null
+                ? existing.getMacroKeys() : new ArrayList<>();
             editor.editorState.pendingKey = '\0';
-            editor.showMessage("recording @" + c);
+            editor.showMessage("recording @" + register + (Character.isUpperCase(c) ? " (append)" : ""));
         } else if (editor.editorState.pendingKey == '@') {
+            int count = editor.consumePendingCount();
             if (c == '@') {
-                editor.showMessage(editor.playMacro(editor.lastMacroRegister));
+                editor.showMessage(editor.playMacro(editor.lastMacroRegister, count));
             } else {
-                editor.showMessage(editor.playMacro(c));
+                editor.showMessage(editor.playMacro(c, count));
             }
             editor.editorState.pendingKey = '\0';
         } else if (editor.editorState.pendingKey == '"') {
@@ -1664,7 +1720,11 @@ final class InputController {
                 }
                 if (editor.configManager.getAutoIndent()) {
                     String indent = editor.indentationForNewLine();
-                    SwingUtilities.invokeLater(() -> editor.writingArea.insert(indent, editor.writingArea.getCaretPosition()));
+                    if (editor.macroPlaybackDepth > 0) {
+                        macroIndentAfterNewline = indent;
+                    } else {
+                        SwingUtilities.invokeLater(() -> editor.writingArea.insert(indent, editor.writingArea.getCaretPosition()));
+                    }
                     editor.lastInsertedText += "\n" + indent;
                 }
             } else if (c != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(c)) {
@@ -1673,11 +1733,15 @@ final class InputController {
                     if (closer != null) {
                         // auto-insert closing pair after the char is processed
                         final char cl = closer;
-                        SwingUtilities.invokeLater(() -> {
-                            int p = editor.writingArea.getCaretPosition();
-                            editor.writingArea.insert(String.valueOf(cl), p);
-                            editor.writingArea.setCaretPosition(p);
-                        });
+                        if (editor.macroPlaybackDepth > 0) {
+                            macroAutoPairAfterText = cl;
+                        } else {
+                            SwingUtilities.invokeLater(() -> {
+                                int p = editor.writingArea.getCaretPosition();
+                                editor.writingArea.insert(String.valueOf(cl), p);
+                                editor.writingArea.setCaretPosition(p);
+                            });
+                        }
                     } else if (editor.isClosingPairChar(c)) {
                         // skip over if next char matches
                         String text = editor.writingArea.getText();
@@ -2688,5 +2752,9 @@ final class InputController {
 
 
     public void keyReleased(KeyEvent e) {}
+
+    private static boolean isMacroRegister(char register) {
+        return register >= 'a' && register <= 'z' || register >= 'A' && register <= 'Z';
+    }
 
 }

@@ -16,6 +16,7 @@ import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.awt.event.KeyEvent;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
@@ -321,6 +322,108 @@ public class TexteditorSwingIntegrationTest {
             });
             assertEquals(1, onEdt(() -> editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition()) + 1));
             assertNotNull(onEdt(() -> editor.currentLineHighlightTag));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void vimCountPrefixMovesSixHundredLines() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-counted-motion");
+        Path file = tempDir.resolve("counted-motion.txt");
+        Files.createDirectories(home);
+        StringBuilder content = new StringBuilder();
+        for (int line = 0; line < 1000; line++) content.append("line ").append(line).append('\n');
+        Files.writeString(file, content, StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                press(editor, '6');
+                press(editor, '0');
+                press(editor, '0');
+                press(editor, 'j');
+                return null;
+            });
+
+            assertEquals(601, onEdt(() -> editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition()) + 1));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void vimMacrosRecordInsertKeysAndReplayCounted() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-macros");
+        Path file = tempDir.resolve("macros.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                press(editor, 'q');
+                press(editor, 'a');
+                press(editor, 'i');
+                press(editor, 'X');
+                pressEscape(editor);
+                press(editor, 'q');
+
+                RegisterContent macro = editor.registerManager.get('a');
+                assertNotNull(macro);
+                assertTrue(macro.isMacro());
+                assertEquals(3, macro.getMacroKeys().size());
+
+                press(editor, '2');
+                press(editor, '@');
+                press(editor, 'a');
+                assertEquals("Executed macro @a 2 times", editor.lastMessage);
+                assertEquals("XX", editor.writingArea.getText());
+                assertEquals(EditorMode.NORMAL, editor.editorState.mode);
+                assertEquals(Character.valueOf('a'), editor.lastMacroRegister);
+                assertEquals(3, macro.getMacroKeys().size());
+
+                press(editor, '@');
+                press(editor, '@');
+                assertEquals("XXX", editor.writingArea.getText());
+                return null;
+            });
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void vimMacroUppercaseRegisterAppendsToItsLowercaseMacro() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-macro-append");
+        Path file = tempDir.resolve("macro-append.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "one\ntwo\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                press(editor, 'q');
+                press(editor, 'a');
+                press(editor, 'j');
+                press(editor, 'q');
+
+                press(editor, 'q');
+                press(editor, 'A');
+                press(editor, 'k');
+                press(editor, 'q');
+
+                RegisterContent macro = editor.registerManager.get('a');
+                assertNotNull(macro);
+                assertTrue(macro.isMacro());
+                assertEquals(2, macro.getMacroKeys().size());
+                assertEquals('j', macro.getMacroKeys().get(0).toKeyEvent(editor.writingArea).getKeyChar());
+                assertEquals('k', macro.getMacroKeys().get(1).toKeyEvent(editor.writingArea).getKeyChar());
+                return null;
+            });
         } finally {
             disposeEditor(editor);
         }
@@ -1547,6 +1650,16 @@ public class TexteditorSwingIntegrationTest {
     private static void initializeGit(Path root) throws Exception {
         Process process = new ProcessBuilder("git", "init", "--quiet", root.toString()).start();
         assertEquals(0, process.waitFor());
+    }
+
+    private static void press(Texteditor editor, char character) {
+        editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0L, 0,
+            KeyEvent.getExtendedKeyCodeForChar(character), character));
+    }
+
+    private static void pressEscape(Texteditor editor) {
+        editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0L, 0,
+            KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED));
     }
 
     private static Texteditor createEditor(Path home, Path file) throws Exception {

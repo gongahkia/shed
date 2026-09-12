@@ -386,6 +386,8 @@ See [Update Checks](UPDATES.md) for endpoint/key configuration and metadata vali
 | `:tree rm <path>`, `:tree delete <path>` | Delete file or empty directory |
 | `:tree rm! <path>`, `:tree delete! <path>` | Force recursive delete |
 
+The Explorer loads directories when expanded. Use arrows or `j`/`k` to select, Left/Right to collapse or expand, and `Enter` or `o` to open the selected file.
+
 ## Session and Workspace Commands
 
 | Command | Action |

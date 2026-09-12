@@ -347,32 +347,8 @@ final class TreeGitController {
         }
         setWorkspaceTreeRoot(root.getAbsoluteFile(), false);
 
-        StringBuilder builder = new StringBuilder();
-        List<String> lineTargets = new ArrayList<>();
-        appendTreeLine(builder, lineTargets, "File tree", null);
-        appendTreeLine(builder, lineTargets, "", null);
-        appendTreeLine(builder, lineTargets, root.getAbsolutePath(), root.isFile() ? root.getAbsolutePath() : null);
-        int[] rendered = new int[] {0};
-        if (root.isDirectory()) {
-            File[] children = listTreeChildren(root);
-            if (children.length == 0) {
-                appendTreeLine(builder, lineTargets, "(empty)", null);
-            } else {
-                for (int i = 0; i < children.length; i++) {
-                    appendTreeEntry(builder, lineTargets, children[i], "", i == children.length - 1, rendered, 1200);
-                }
-            }
-        } else {
-            appendTreeLine(builder, lineTargets, "\\-- " + root.getName(), root.getAbsolutePath());
-        }
-
-        if (rendered[0] >= 1200) {
-            appendTreeLine(builder, lineTargets, "", null);
-            appendTreeLine(builder, lineTargets, "... output truncated (1200 entries)", null);
-        }
-
         String titleSuffix = treeTitleSuffix(root);
-        FileBuffer tree = createOrReplaceTreeBuffer(titleSuffix, builder.toString(), lineTargets);
+        FileBuffer tree = createOrReplaceTreeBuffer(titleSuffix, "File tree: " + root.getAbsolutePath() + "\n", List.of());
         EditorPane contentPane = resolveTreeContentPaneForTreeCommand();
         if (contentPane == null) {
             return "No active window";
@@ -382,8 +358,11 @@ final class TreeGitController {
             return "Unable to open tree pane";
         }
         editor.loadBufferIntoPane(pane, tree, 0);
+        FileTreePanel explorer = new FileTreePanel(editor, root, this::listTreeChildren, file -> editor.showMessage(openTreeFile(file)),
+            () -> editor.activateEditorPane(pane));
+        pane.setCustomEditorComponent(explorer);
         editor.activateEditorPane(pane);
-        pane.getTextArea().requestFocusInWindow();
+        explorer.focusTree();
         return "Tree pane opened";
     }
 
@@ -545,6 +524,10 @@ final class TreeGitController {
             return "Tree pane not active";
         }
 
+        if (editor.treePane != null && editor.treePane.getCustomEditorComponent() instanceof FileTreePanel explorer) {
+            return openTreeFile(explorer.selectedFile());
+        }
+
         List<String> targets = editor.treeLineTargets.get(current);
         if (targets == null || targets.isEmpty()) {
             return "No file on this line";
@@ -559,9 +542,13 @@ final class TreeGitController {
             return "No file on this line";
         }
 
-        File file = new File(path);
-        if (!file.exists() || !file.isFile()) {
-            return "File not found: " + path;
+        return openTreeFile(new File(path));
+    }
+
+
+    private String openTreeFile(File file) {
+        if (file == null || !file.exists() || !file.isFile()) {
+            return "Select a file to open";
         }
 
         EditorPane contentPane = resolveTreeContentPaneForOpen();

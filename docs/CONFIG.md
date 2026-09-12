@@ -65,7 +65,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `font.size` | `16` | int | Buffer font size |
 | `ui.font.family` | empty | string | UI font family; empty retains the system UI font, otherwise must resolve uniquely to a Java-installed family |
 | `ui.font.size` | `0` | int | UI font size; `0` retains each system UI default size |
-| `ui.zoom` | `1.0` | number | Interface scale from `0.5` to `4.0`; `Ctrl/Cmd` + `+` or `-` adjusts it live |
+| `ui.zoom` | `1.0` | number | Interface scale from `0.5` to `4.0`; `Ctrl/Cmd` + `+` or `-` adjusts it live and `Ctrl/Cmd` + `0` resets it |
 | `terminal.font.family` | `Monospaced` | string | Terminal font family; must resolve uniquely to a Java-installed family |
 | `terminal.font.size` | `14` | int | Terminal font size |
 | `terminal.default.profile` | `system` | string | Default terminal: `system`, a detected `builtin:<id>`, or an installed `<extension-id>:<id>` profile |

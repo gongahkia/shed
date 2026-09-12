@@ -2843,6 +2843,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return paneBufferController.splitWindow(vertical);
     }
 
+    String openFileInSplit(File file, EditorPane targetPane, WindowLayoutNode.Orientation orientation, boolean newPaneFirst) {
+        return paneBufferController.openFileInSplit(file, targetPane, orientation, newPaneFirst);
+    }
+
     public String closeActiveWindow() {
         return paneBufferController.closeActiveWindow();
     }

@@ -5,6 +5,9 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -20,11 +23,13 @@ import javax.swing.JScrollPane;
 import javax.swing.JTree;
 import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
+import javax.swing.TransferHandler;
 import javax.swing.tree.TreeCellRenderer;
 import javax.swing.tree.TreePath;
 
 /** The native Explorer surface shown beside editor content. */
 final class FileTreePanel extends JPanel {
+    static final DataFlavor EXPLORER_FILE_FLAVOR = new DataFlavor(java.io.File.class, "Shed Explorer file");
     private final Texteditor editor;
     private final FileTreeModel model;
     private final JTree tree;
@@ -53,6 +58,8 @@ final class FileTreePanel extends JPanel {
         tree.setShowsRootHandles(true);
         tree.setToggleClickCount(2);
         tree.setCellRenderer(new ExplorerRenderer());
+        tree.setDragEnabled(true);
+        tree.setTransferHandler(new ExplorerFileTransferHandler());
         tree.setToolTipText("");
         tree.addTreeWillExpandListener(new javax.swing.event.TreeWillExpandListener() {
             @Override public void treeWillExpand(javax.swing.event.TreeExpansionEvent event) {
@@ -130,6 +137,38 @@ final class FileTreePanel extends JPanel {
     private void openSelectedFile() {
         java.io.File file = selectedFile();
         if (file != null && file.isFile()) openFile.accept(file);
+    }
+
+    private final class ExplorerFileTransferHandler extends TransferHandler {
+        @Override protected Transferable createTransferable(javax.swing.JComponent component) {
+            java.io.File file = selectedFile();
+            return file != null && file.isFile() ? new ExplorerFileTransferable(file) : null;
+        }
+
+        @Override public int getSourceActions(javax.swing.JComponent component) {
+            return COPY;
+        }
+    }
+
+    private static final class ExplorerFileTransferable implements Transferable {
+        private final java.io.File file;
+
+        private ExplorerFileTransferable(java.io.File file) {
+            this.file = file;
+        }
+
+        @Override public DataFlavor[] getTransferDataFlavors() {
+            return new DataFlavor[] {EXPLORER_FILE_FLAVOR};
+        }
+
+        @Override public boolean isDataFlavorSupported(DataFlavor flavor) {
+            return EXPLORER_FILE_FLAVOR.equals(flavor);
+        }
+
+        @Override public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException {
+            if (!isDataFlavorSupported(flavor)) throw new UnsupportedFlavorException(flavor);
+            return file;
+        }
     }
 
     private void selectRelativeRow(int direction) {

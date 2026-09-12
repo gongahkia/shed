@@ -380,7 +380,8 @@ public class TexteditorSwingIntegrationTest {
                 press(editor, '@');
                 press(editor, 'a');
                 assertEquals("Executed macro @a 2 times", editor.lastMessage);
-                assertEquals("XX", editor.writingArea.getText());
+                assertEquals("XX", editor.writingArea.getText() + " caret=" + editor.writingArea.getCaretPosition()
+                    + " selection=" + editor.writingArea.getSelectionStart() + ":" + editor.writingArea.getSelectionEnd());
                 assertEquals(EditorMode.NORMAL, editor.editorState.mode);
                 assertEquals(Character.valueOf('a'), editor.lastMacroRegister);
                 assertEquals(3, macro.getMacroKeys().size());

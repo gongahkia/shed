@@ -483,20 +483,7 @@ final class PaneBufferController {
 
     public void openFile(File file) throws IOException {
         persistCurrentBufferState();
-        boolean trustedForLocalExecution = editor.ensureProjectTrustForFile(file);
-        String projectConfigMessage = "";
-        if (trustedForLocalExecution) {
-            projectConfigMessage = editor.configManager.applyProjectConfigForFile(file);
-            if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
-                editor.applyRuntimeConfigFromSettings();
-            }
-        } else {
-            projectConfigMessage = "Project local config/plugins blocked (untrusted project)";
-            String cleared = editor.configManager.applyProjectConfigForFile(null);
-            if (cleared != null && !cleared.isEmpty()) {
-                editor.applyRuntimeConfigFromSettings();
-            }
-        }
+        String projectConfigMessage = applyProjectConfigurationForFile(file);
 
         FileBuffer existing = findBufferByPath(file);
         if (existing != null) {
@@ -533,6 +520,74 @@ final class PaneBufferController {
         } else if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
             editor.showMessage(projectConfigMessage);
         }
+    }
+
+
+    String openFileInSplit(File file, EditorPane targetPane, WindowLayoutNode.Orientation orientation, boolean newPaneFirst) {
+        if (file == null || !file.isFile()) {
+            return "Drop a file from the Explorer onto an editor";
+        }
+        if (targetPane == null || !editor.editorPanes.contains(targetPane) || targetPane == editor.treePane) {
+            return "No editor window available for the drop";
+        }
+
+        try {
+            persistCurrentBufferState();
+            applyProjectConfigurationForFile(file);
+            FileBuffer targetBuffer = findBufferByPath(file);
+            boolean newBuffer = targetBuffer == null;
+            if (newBuffer) {
+                targetBuffer = new FileBuffer(file, editor.configManager);
+                if (shouldReplaceSingleLandingBuffer()) {
+                    editor.buffers.set(0, targetBuffer);
+                } else {
+                    editor.buffers.add(targetBuffer);
+                }
+            }
+
+            EditorPane newPane = editor.createEditorPane(editor.getSize());
+            editor.editorPanes.add(newPane);
+            if (editor.windowLayoutRoot == null) {
+                editor.windowLayoutRoot = WindowLayoutNode.leaf(targetPane);
+            }
+            if (!editor.windowLayoutRoot.splitLeaf(targetPane, newPane, orientation, newPaneFirst, 0.5)) {
+                editor.editorPanes.remove(newPane);
+                return "Unable to split the target window";
+            }
+
+            loadBufferIntoPane(newPane, targetBuffer, 0);
+            editor.renderWindowLayout();
+            editor.activateEditorPane(newPane);
+            editor.showCustomEditorIfAvailable(newPane, targetBuffer);
+            newPane.getTextArea().requestFocusInWindow();
+            editor.addToRecentFiles(file.getAbsolutePath());
+            if (newBuffer) {
+                editor.registerFileWatch(targetBuffer);
+                editor.firePluginEvent("BufOpen");
+                editor.refreshGitGutter();
+            }
+            return "Opened in split: " + file.getAbsolutePath();
+        } catch (IOException error) {
+            return "Error opening file: " + error.getMessage();
+        }
+    }
+
+
+    private String applyProjectConfigurationForFile(File file) {
+        boolean trustedForLocalExecution = editor.ensureProjectTrustForFile(file);
+        if (trustedForLocalExecution) {
+            String message = editor.configManager.applyProjectConfigForFile(file);
+            if (message != null && !message.isEmpty()) {
+                editor.applyRuntimeConfigFromSettings();
+            }
+            return message == null ? "" : message;
+        }
+
+        String cleared = editor.configManager.applyProjectConfigForFile(null);
+        if (cleared != null && !cleared.isEmpty()) {
+            editor.applyRuntimeConfigFromSettings();
+        }
+        return "Project local config/plugins blocked (untrusted project)";
     }
 
 

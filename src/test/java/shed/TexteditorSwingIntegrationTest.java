@@ -455,6 +455,37 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void explorerFileDropOpensTheFileInASplitWithoutReplacingTheTargetPane() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-explorer-drop");
+        Path workspace = tempDir.resolve("explorer-drop-workspace");
+        Path source = workspace.resolve("source.txt");
+        Path dropped = workspace.resolve("dropped.txt");
+        Files.createDirectories(home);
+        Files.createDirectories(workspace);
+        Files.writeString(source, "source\n", StandardCharsets.UTF_8);
+        Files.writeString(dropped, "dropped\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, source);
+        try {
+            EditorPane targetPane = onEdt(editor::getActivePane);
+            assertEquals("Tree pane opened", onEdt(() -> editor.showFileTree(workspace.toString())));
+
+            String result = onEdt(() -> editor.openFileInSplit(dropped.toFile(), targetPane,
+                WindowLayoutNode.Orientation.HORIZONTAL, false));
+
+            assertEquals("Opened in split: " + dropped.toAbsolutePath(), result);
+            assertEquals(3, onEdt(() -> editor.editorPanes.size()));
+            assertEquals(source.toAbsolutePath().toString(), onEdt(() -> targetPane.getBuffer().getFilePath()));
+            assertEquals(dropped.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
+            assertTrue(onEdt(() -> editor.treePane.getCustomEditorComponent() instanceof FileTreePanel));
+            assertEquals(WindowLayoutNode.Orientation.HORIZONTAL, onEdt(() -> editor.windowLayoutRoot.getOrientation()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void markdownPreviewUsesNativeSplitAndRefreshesFromSourceBuffer() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-markdown-preview");

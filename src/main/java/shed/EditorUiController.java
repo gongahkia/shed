@@ -18,6 +18,12 @@ import java.awt.event.KeyEvent;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.awt.geom.Rectangle2D;
+import java.awt.datatransfer.Transferable;
+import java.awt.dnd.DnDConstants;
+import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetAdapter;
+import java.awt.dnd.DropTargetDragEvent;
+import java.awt.dnd.DropTargetDropEvent;
 import java.io.File;
 import java.io.InputStream;
 import java.util.*;
@@ -392,6 +398,7 @@ final class EditorUiController {
 
         EditorPane pane = new EditorPane(textArea, paneLineNumberPanel, paneScrollPane, paneSearchManager);
         paneRef[0] = pane;
+        installExplorerFileDropTarget(textArea, pane);
         paneLineNumberPanel.setBreakpointToggleListener(line -> {
             if (paneRef[0] == null) return;
             activateEditorPane(paneRef[0]);
@@ -410,6 +417,75 @@ final class EditorUiController {
             }
         });
         return pane;
+    }
+
+
+    private void installExplorerFileDropTarget(JTextArea textArea, EditorPane pane) {
+        new DropTarget(textArea, DnDConstants.ACTION_COPY, new DropTargetAdapter() {
+            @Override public void dragEnter(DropTargetDragEvent event) {
+                acceptExplorerFileDrag(event);
+            }
+
+            @Override public void dragOver(DropTargetDragEvent event) {
+                acceptExplorerFileDrag(event);
+            }
+
+            @Override public void drop(DropTargetDropEvent event) {
+                if (!event.isDataFlavorSupported(FileTreePanel.EXPLORER_FILE_FLAVOR)) {
+                    event.rejectDrop();
+                    return;
+                }
+                try {
+                    event.acceptDrop(DnDConstants.ACTION_COPY);
+                    Transferable transferable = event.getTransferable();
+                    Object value = transferable.getTransferData(FileTreePanel.EXPLORER_FILE_FLAVOR);
+                    if (!(value instanceof File file) || !file.isFile()) {
+                        event.dropComplete(false);
+                        return;
+                    }
+                    FileTreeDropPlacement placement = FileTreeDropPlacement.forPoint(event.getLocation(), textArea.getSize());
+                    String result = editor.openFileInSplit(file, pane, placement.orientation, placement.newPaneFirst);
+                    editor.showMessage(result);
+                    event.dropComplete(result.startsWith("Opened in split:"));
+                } catch (Exception error) {
+                    editor.showMessage("File drop failed: " + error.getMessage());
+                    event.dropComplete(false);
+                }
+            }
+
+            private void acceptExplorerFileDrag(DropTargetDragEvent event) {
+                if (event.isDataFlavorSupported(FileTreePanel.EXPLORER_FILE_FLAVOR)) {
+                    event.acceptDrag(DnDConstants.ACTION_COPY);
+                } else {
+                    event.rejectDrag();
+                }
+            }
+        }, true);
+    }
+
+
+    private enum FileTreeDropPlacement {
+        LEFT(WindowLayoutNode.Orientation.HORIZONTAL, true),
+        RIGHT(WindowLayoutNode.Orientation.HORIZONTAL, false),
+        TOP(WindowLayoutNode.Orientation.VERTICAL, true),
+        BOTTOM(WindowLayoutNode.Orientation.VERTICAL, false);
+
+        private final WindowLayoutNode.Orientation orientation;
+        private final boolean newPaneFirst;
+
+        FileTreeDropPlacement(WindowLayoutNode.Orientation orientation, boolean newPaneFirst) {
+            this.orientation = orientation;
+            this.newPaneFirst = newPaneFirst;
+        }
+
+        private static FileTreeDropPlacement forPoint(Point point, Dimension size) {
+            if (point == null || size == null || size.width <= 0 || size.height <= 0) {
+                return RIGHT;
+            }
+            if (point.y < size.height / 4) return TOP;
+            if (point.y >= size.height * 3 / 4) return BOTTOM;
+            return point.x < size.width / 2 ? LEFT : RIGHT;
+        }
     }
 
 

@@ -246,16 +246,18 @@ final class SessionConfigController {
         if (editor.configManager.isSchemaVersionKey(key)) {
             return "Error: schema_version is managed by Shed";
         }
-        String validationError = editor.configManager.validateSettingValue(key, value);
+        String requestedValue = value == null ? "" : value;
+        String appliedValue = editor.configManager.selfHealedSettingValue(key, requestedValue);
+        String validationError = editor.configManager.validateSettingValue(key, appliedValue);
         if (validationError != null) {
             return "Error: " + validationError;
         }
-        editor.configManager.set(key, value == null ? "" : value);
+        editor.configManager.set(key, appliedValue);
         applyRuntimeConfigFromSettings();
         if (isThemeRelatedConfigKey(key)) {
             firePluginEvent("ThemeChange");
         }
-        return "Set " + key;
+        return configSetResult("Set", key, requestedValue, appliedValue);
     }
 
 
@@ -266,20 +268,29 @@ final class SessionConfigController {
         if (editor.configManager.isSchemaVersionKey(key)) {
             return "Error: schema_version is managed by Shed";
         }
-        String validationError = editor.configManager.validateSettingValue(key, value);
+        String requestedValue = value == null ? "" : value;
+        String appliedValue = editor.configManager.selfHealedSettingValue(key, requestedValue);
+        String validationError = editor.configManager.validateSettingValue(key, appliedValue);
         if (validationError != null) {
             return "Error: " + validationError;
         }
         try {
-            editor.configManager.setAndPersist(key, value == null ? "" : value);
+            editor.configManager.setAndPersist(key, appliedValue);
             applyRuntimeConfigFromSettings();
             if (isThemeRelatedConfigKey(key)) {
                 firePluginEvent("ThemeChange");
             }
-            return "Set and saved " + key;
+            return configSetResult("Set and saved", key, requestedValue, appliedValue);
         } catch (IOException e) {
             return "Error saving config: " + e.getMessage();
         }
+    }
+
+    private String configSetResult(String action, String key, String requestedValue, String appliedValue) {
+        if (Objects.equals(requestedValue, appliedValue)) {
+            return action + " " + key;
+        }
+        return action + " " + key + " (self-healed \"" + requestedValue + "\" -> \"" + appliedValue + "\")";
     }
 
     public String resetConfigOptionPersistent(String key) {
@@ -347,6 +358,16 @@ final class SessionConfigController {
         }
     }
 
+    public String persistSuggestedConfigRepairs() {
+        try {
+            int repaired = editor.configManager.persistSuggestedRepairs();
+            return repaired == 0 ? "No configuration repairs are pending"
+                : "Saved " + repaired + " configuration repair" + (repaired == 1 ? "" : "s");
+        } catch (IOException error) {
+            return "Error saving configuration repairs: " + error.getMessage();
+        }
+    }
+
     public String materializeDefaultConfig(boolean overwrite) {
         try {
             editor.configManager.materializeDefaultConfig(overwrite);
@@ -411,6 +432,10 @@ final class SessionConfigController {
         if (editor.configManager.hasConfigLoadFailure()) {
             showScratchBuffer("[config recovery]", editor.configManager.getConfigLoadReport());
             return "Configuration rejected; last-known-good configuration remains active";
+        }
+        if (editor.configManager.hasConfigRepairs()) {
+            showScratchBuffer("[config recovery]", editor.configManager.getConfigLoadReport());
+            return "Configuration self-healed; review the repair before saving it";
         }
         return "Settings reloaded";
     }

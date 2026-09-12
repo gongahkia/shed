@@ -88,6 +88,17 @@ final class TreeGitController {
         return showFileFinderFromFolder(selection);
     }
 
+    String openFolder() {
+        File selection = chooseWithNavigator(JFileChooser.DIRECTORIES_ONLY, null, "Open Folder");
+        if (selection == null) {
+            return "Open folder cancelled";
+        }
+        if (!selection.isDirectory()) {
+            return "Not a folder: " + selection.getPath();
+        }
+        return editor.workspaceController.addDirectory(selection, true);
+    }
+
 
     String showFileFinderFromFolder(File folder) {
         File selection = chooseWithNavigator(JFileChooser.FILES_ONLY, folder, "Open File in " + folder.getPath());

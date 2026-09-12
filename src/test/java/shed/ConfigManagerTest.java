@@ -225,6 +225,27 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void selfHealsAnUnambiguousFontAliasWithoutWritingTheConfigUntilRequested() throws Exception {
+        Path home = tempDir.resolve("home-font-repair");
+        Path configFile = home.resolve(".shed/config.toml");
+        Files.createDirectories(configFile.getParent());
+        Files.writeString(configFile, "schema_version = 1\n\"font.family\" = \"Mono-spaced\"\n");
+        System.setProperty("user.home", home.toString());
+
+        ConfigManager config = new ConfigManager();
+
+        assertFalse(config.hasConfigLoadFailure());
+        assertTrue(config.hasConfigRepairs());
+        assertEquals("Monospaced", config.getFontFamily());
+        assertTrue(config.getConfigLoadReport().contains("\"Mono-spaced\" -> \"Monospaced\""));
+        assertTrue(Files.readString(configFile).contains("\"font.family\" = \"Mono-spaced\""));
+
+        assertEquals(1, config.persistSuggestedRepairs());
+        assertFalse(config.hasConfigRepairs());
+        assertTrue(Files.readString(configFile).contains("\"font.family\" = \"Monospaced\""));
+    }
+
+    @Test
     void configuresPlainKeymapProfile() throws IOException {
         Path home = tempDir.resolve("home-plain-keymap");
         System.setProperty("user.home", home.toString());

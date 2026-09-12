@@ -81,7 +81,7 @@ final class ShedWelcomePanel extends JPanel {
         setBackground(surface);
         setFocusable(true);
         setMinimumSize(new Dimension(320, 240));
-        AccessibilitySupport.describe(this, "Shed welcome", "Shed startup screen with actions to open files, search, and access help.");
+        AccessibilitySupport.describe(this, "Shed welcome", "Shed startup screen with actions to open files and folders, search, and access help.");
 
         brandPane = createBrandPane();
         actionPane = createActionPane();
@@ -205,6 +205,8 @@ final class ShedWelcomePanel extends JPanel {
             new WelcomeAction("palette", "Show Command Palette", List.of("Ctrl/Cmd", "Shift", "P"),
                 () -> showResult(editor.showCommandPalette())),
             new WelcomeAction("open-file", "Open File", List.of("Ctrl/Cmd", "O"), editor::openFileChooser),
+            new WelcomeAction("open-folder", "Open Folder", List.of("Ctrl/Cmd", "Shift", "O"),
+                () -> showResult(editor.openFolder())),
             new WelcomeAction("find-file", "Find File", List.of("Ctrl/Cmd", "P"),
                 () -> showResult(editor.showFileFinder())),
             new WelcomeAction("buffers", "Switch Between Open Files", List.of("Ctrl/Cmd", "B"),
@@ -274,6 +276,8 @@ final class ShedWelcomePanel extends JPanel {
         bindShortcut("palette.meta", KeyEvent.VK_P, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK, () -> showResult(editor.showCommandPalette()));
         bindShortcut("open.ctrl", KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK, editor::openFileChooser);
         bindShortcut("open.meta", KeyEvent.VK_O, InputEvent.META_DOWN_MASK, editor::openFileChooser);
+        bindShortcut("open-folder.ctrl", KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK, () -> showResult(editor.openFolder()));
+        bindShortcut("open-folder.meta", KeyEvent.VK_O, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK, () -> showResult(editor.openFolder()));
         bindShortcut("find.ctrl", KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK, () -> showResult(editor.showFileFinder()));
         bindShortcut("find.meta", KeyEvent.VK_P, InputEvent.META_DOWN_MASK, () -> showResult(editor.showFileFinder()));
         bindShortcut("buffers.ctrl", KeyEvent.VK_B, InputEvent.CTRL_DOWN_MASK, () -> showResult(editor.showBufferFinder()));

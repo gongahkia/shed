@@ -50,6 +50,7 @@ public class HelpService {
                    "  :recent        Show recent files\n" +
                    "  :settings      Open user settings file\n" +
                    "  :config save   Persist current runtime config to ~/.shed/config.toml\n" +
+                   "  :config heal   Persist reviewed deterministic config repairs\n" +
                    "  :config status Show config load/recovery details\n" +
                    "  :config inspector Open typed settings inspector\n" +
                    "  :log           Open command log file\n" +
@@ -101,6 +102,7 @@ public class HelpService {
                    "  :goyo          Toggle Goyo layout\n" +
                    "  :limelight     Toggle paragraph focus dimming\n" +
                    "  :reload        Reload ~/.shed/config.toml now\n" +
+                   "  :config heal   Persist reviewed deterministic config repairs\n" +
                    "  :config status Show config load/recovery details\n" +
                    "  :config reference Open generated typed settings reference\n" +
                    "  :help settings  Open generated typed settings reference\n" +

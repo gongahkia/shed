@@ -24,9 +24,11 @@ The Settings Editor writes `~/.shed/config.toml`; `settings.toml` is not loaded.
 | Keys | Quote the full Shed key: `"tab.size" = 4` |
 | Strings | Quote values: `"theme" = "nightfox"` |
 | Booleans | Use `true` / `false` |
-| Persistence | `:set! key=value` writes one key, `:config save` writes current runtime overrides |
+| Persistence | `:set! key=value` writes one key, `:config save` writes current runtime overrides, and `:config heal` persists reviewed automatic repairs |
 
 Shed validates the full TOML document at startup. If parsing fails, a value is unsupported, or the file cannot be read, Shed leaves it unchanged and starts with built-in defaults; `[config recovery]` lists each exact failure and directs you to correct it, then run `:reload`. Typed-value diagnostics include the file line and column, expected type or range, and active fallback value. While running, Shed polls for global config changes and applies valid edits; an invalid edit leaves the last-known-good configuration active and opens the recovery report. Use `:config status` to reopen the report. A missing config file also uses built-in defaults and can be created with `:config save`.
+
+For configured font families, Shed first checks the Java runtime's installed family names. It then accepts only a unique canonical spelling or deterministic alias, including case and punctuation variants plus `Nerd Font`/`NF`, `Nerd Font Mono`/`NFM`, and `Nerd Font Propo`/`NFP` naming differences. A repaired font is applied for the running session and announced in `[config recovery]`; the TOML file is left unchanged until you review it and run `:config heal`. Ambiguous or unavailable names still reject the configuration and list the nearest installed candidates rather than silently choosing a font.
 
 ## Schema Version and Ownership
 
@@ -43,6 +45,7 @@ Every global `config.toml` and project `.shed.toml` starts with the unquoted roo
 | `:set key=value` | Set runtime value only |
 | `:set! key=value` | Set and persist one key to disk |
 | `:config save` / `:config write` | Persist current runtime config |
+| `:config heal` | Persist the currently reported deterministic configuration repairs |
 | `:config defaults` | Create a complete commented default config only when no config exists |
 | `:config! defaults` | Confirm replacement with a complete commented default config |
 | `:config inspector`, `:config ui` | Open the Settings Editor; search by key or description, select a category, edit typed controls, or open raw TOML |
@@ -58,12 +61,12 @@ The inspector and generated reference derive each typed setting's identifier, de
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
 | `theme` | `one-dark-pro` | string | Built-in theme id |
-| `font.family` | `Monospaced` | string | Buffer font family; must exactly name a Java-installed family |
+| `font.family` | `Monospaced` | string | Buffer font family; must resolve uniquely to a Java-installed family |
 | `font.size` | `16` | int | Buffer font size |
-| `ui.font.family` | empty | string | UI font family; empty retains the system UI font, otherwise must exactly name a Java-installed family |
+| `ui.font.family` | empty | string | UI font family; empty retains the system UI font, otherwise must resolve uniquely to a Java-installed family |
 | `ui.font.size` | `0` | int | UI font size; `0` retains each system UI default size |
 | `ui.zoom` | `1.0` | number | Interface scale from `0.5` to `4.0`; `Ctrl/Cmd` + `+` or `-` adjusts it live |
-| `terminal.font.family` | `Monospaced` | string | Terminal font family; must exactly name a Java-installed family |
+| `terminal.font.family` | `Monospaced` | string | Terminal font family; must resolve uniquely to a Java-installed family |
 | `terminal.font.size` | `14` | int | Terminal font size |
 | `terminal.default.profile` | `system` | string | Default terminal: `system`, a detected `builtin:<id>`, or an installed `<extension-id>:<id>` profile |
 | `snippets.directory` | `~/.shed/snippets` | path | User snippet directory; applies immediately |
@@ -93,7 +96,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 
 ## Landing Page
 
-At startup without a file argument or restored session, Shed shows a native, non-editable welcome screen by default. It uses the bundled Shed logo, the active theme, and working keyboard/click actions for the command palette, opening and finding files, buffer switching, and help. The welcome screen is an ephemeral `[landing]` buffer: opening a file replaces it instead of creating `~/.shed/landing.md`.
+At startup without a file argument or restored session, Shed shows a native, non-editable welcome screen by default. It uses the bundled Shed logo, the active theme, and working keyboard/click actions for the command palette, opening files or folders, finding files, buffer switching, and help. Opening a folder activates it as the workspace and shows its tree. The welcome screen is an ephemeral `[landing]` buffer: opening a file replaces it instead of creating `~/.shed/landing.md`.
 
 `landing.welcome.enabled = false` restores the legacy editable landing buffer. Shed also preserves an existing default `~/.shed/landing.md` when its content differs from the old generated starter text, so a prior customization is not replaced. Any non-default `landing.source` remains an editable local buffer; relative paths resolve from the user home directory and `file:` URIs are local paths.
 

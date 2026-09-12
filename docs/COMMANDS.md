@@ -160,6 +160,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:config file`, `:config toml`, `:config text` | Open user config file |
 | `:config inspector`, `:config ui` | Open graphical Settings Editor |
 | `:config save`, `:config write` | Persist current runtime config to disk |
+| `:config heal` | Persist the deterministic repairs reported for the current config load |
 | `:config status` | Show the current config load or recovery report |
 | `:reload`, `:source` | Reload config from disk |
 | `:clean`, `:shedclean` | Remove Shed data under `~/.shed` and reset in-memory history |

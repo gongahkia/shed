@@ -27,6 +27,9 @@ import java.awt.Color;
 import java.awt.Toolkit;
 
 public class ConfigManager {
+    private record ConfigRepair(String key, String requested, String resolved) {
+    }
+
     private final Map<String, String> config;
     private final Map<String, String> defaultConfig;
     private final Map<String, String> persistedConfig;
@@ -38,6 +41,7 @@ public class ConfigManager {
     private String configPath;
     private String configLoadReport;
     private boolean configLoadFailed;
+    private final List<ConfigRepair> configRepairs;
     private Map<String, String> reloadFallbackConfig;
     private DebugAdapterRegistry.Validation debugConfiguration;
 
@@ -217,6 +221,7 @@ public class ConfigManager {
         this.activeProjectConfigFile = null;
         this.configLoadReport = "";
         this.configLoadFailed = false;
+        this.configRepairs = new ArrayList<>();
         this.debugConfiguration = DebugAdapterRegistry.validate(Map.of());
         Path home = Path.of(System.getProperty("user.home"));
         this.shedDirectoryPath = home.resolve(SHED_DIRECTORY_NAME).toString();
@@ -497,11 +502,12 @@ public class ConfigManager {
     private void loadConfig() {
         persistedConfig.clear();
         configLoadFailed = false;
+        configRepairs.clear();
         Path path = Path.of(configPath);
         List<String> errors = new ArrayList<>();
         Map<String, Object> parsed;
         try {
-            parsed = parseTomlConfig(path, errors, true);
+            parsed = parseTomlConfig(path, errors, true, configRepairs);
         } catch (java.nio.file.NoSuchFileException error) {
             configLoadReport = "Configuration not found: " + path
                 + "\nSafe defaults are active. Run :config save to create it.";
@@ -522,10 +528,15 @@ public class ConfigManager {
             persistedConfig.put(entry.getKey(), value);
             config.put(entry.getKey(), value);
         }
-        configLoadReport = "Configuration loaded: " + path;
+        configLoadReport = configRepairs.isEmpty() ? "Configuration loaded: " + path : configRepairReport(path);
     }
 
     private Map<String, Object> parseTomlConfig(Path path, List<String> errors, boolean validateDebug) throws IOException {
+        return parseTomlConfig(path, errors, validateDebug, null);
+    }
+
+    private Map<String, Object> parseTomlConfig(Path path, List<String> errors, boolean validateDebug,
+                                                  List<ConfigRepair> repairs) throws IOException {
         TomlParseResult result = Toml.parse(path);
         for (TomlParseError error : result.errors()) {
             errors.add(tomlLocation(error.position()) + error.getMessage());
@@ -553,6 +564,15 @@ public class ConfigManager {
                 continue;
             }
             String validationError = settings.validateToml(key, value);
+            if (validationError == null && value instanceof String fontFamily) {
+                FontFamilyCatalog.Resolution repair = fontFamilyRepair(key, fontFamily);
+                if (repair != null && repair.repaired()) {
+                    value = repair.family();
+                    if (repairs != null) {
+                        repairs.add(new ConfigRepair(key, fontFamily.trim(), repair.family()));
+                    }
+                }
+            }
             if (validationError == null) {
                 validationError = fontFamilyValidationError(key, value instanceof String ? (String) value : null);
             }
@@ -619,6 +639,17 @@ public class ConfigManager {
             report.append("\n- ").append(error);
         }
         return report.append("\n\nRemediation: correct the listed line(s), then run :reload.").toString();
+    }
+
+    private String configRepairReport(Path path) {
+        StringBuilder report = new StringBuilder("Configuration self-healed: ").append(path)
+            .append("\nThe file remains unchanged. Runtime corrections:");
+        for (ConfigRepair repair : configRepairs) {
+            report.append("\n- ").append(repair.key()).append(": \"").append(repair.requested())
+                .append("\" -> \"").append(repair.resolved()).append("\"");
+        }
+        return report.append("\n\nRemediation: review the corrections, then run :config heal to write them to disk. ")
+            .append("Edit the file and run :reload to choose a different value.").toString();
     }
 
     // Get color setting
@@ -1297,7 +1328,7 @@ public class ConfigManager {
         } catch (IOException error) {
             return;
         }
-        String normalizedValue = value == null ? "" : value;
+        String normalizedValue = selfHealedSettingValue(normalizedKey, value == null ? "" : value);
         if (validateSettingValue(normalizedKey, normalizedValue) != null) {
             return;
         }
@@ -1310,7 +1341,7 @@ public class ConfigManager {
             throw new IOException(ConfigSchema.VERSION_KEY + " is managed by Shed");
         }
         String normalizedKey = normalizePersistedKey(key);
-        String normalizedValue = normalizePersistedValue(value == null ? "" : value);
+        String normalizedValue = selfHealedSettingValue(normalizedKey, normalizePersistedValue(value == null ? "" : value));
         String validationError = validateSettingValue(normalizedKey, normalizedValue);
         if (validationError != null) {
             throw new IOException(validationError);
@@ -1375,6 +1406,17 @@ public class ConfigManager {
         return persistedConfig.size();
     }
 
+    public int persistSuggestedRepairs() throws IOException {
+        if (configRepairs.isEmpty()) {
+            return 0;
+        }
+        int repaired = configRepairs.size();
+        writeConfigFile();
+        configRepairs.clear();
+        configLoadReport = "Configuration repairs saved: " + configPath;
+        return repaired;
+    }
+
     public void reload() {
         Map<String, String> configBeforeReload = new HashMap<>(config);
         Map<String, String> defaultsBeforeReload = new HashMap<>(defaultConfig);
@@ -1384,6 +1426,7 @@ public class ConfigManager {
         Map<String, Object> settingsBeforeReload = settings.copyValues();
         File activeProjectBeforeReload = activeProjectConfigFile;
         DebugAdapterRegistry.Validation debugBeforeReload = debugConfiguration;
+        List<ConfigRepair> repairsBeforeReload = List.copyOf(configRepairs);
         reloadFallbackConfig = configBeforeReload;
         try {
             config.clear();
@@ -1411,6 +1454,8 @@ public class ConfigManager {
         settings.restoreValues(settingsBeforeReload);
         activeProjectConfigFile = activeProjectBeforeReload;
         debugConfiguration = debugBeforeReload;
+        configRepairs.clear();
+        configRepairs.addAll(repairsBeforeReload);
         configLoadReport = configLoadReport.replace("Safe defaults are active.", "Last-known-good configuration remains active.");
     }
 
@@ -1638,7 +1683,7 @@ public class ConfigManager {
 
     public String validateSettingValue(String key, String value) {
         String normalizedKey = key == null ? "" : key.trim();
-        String normalizedValue = value == null ? "" : value;
+        String normalizedValue = selfHealedSettingValue(normalizedKey, value == null ? "" : value);
         String typedError = settings.validateRuntime(normalizedKey, normalizedValue);
         if (typedError != null) {
             return typedError;
@@ -1672,6 +1717,29 @@ public class ConfigManager {
         } catch (SecurityException | java.awt.HeadlessException error) {
             return key + " could not inspect installed font families: " + loadErrorMessage(error);
         }
+    }
+
+    private FontFamilyCatalog.Resolution fontFamilyRepair(String key, String value) {
+        String normalizedKey = key == null ? "" : key.trim().toLowerCase(Locale.ROOT);
+        if (!"font.family".equals(normalizedKey) && !"ui.font.family".equals(normalizedKey) && !"terminal.font.family".equals(normalizedKey)) {
+            return null;
+        }
+        if ("ui.font.family".equals(normalizedKey) && (value == null || value.isBlank())) {
+            return null;
+        }
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return FontFamilyCatalog.resolveRepair(value);
+        } catch (SecurityException | java.awt.HeadlessException error) {
+            return null;
+        }
+    }
+
+    String selfHealedSettingValue(String key, String value) {
+        FontFamilyCatalog.Resolution repair = fontFamilyRepair(key, value);
+        return repair == null ? value : repair.family();
     }
 
     Set<String> typedSettingKeys() {
@@ -1708,6 +1776,10 @@ public class ConfigManager {
 
     public boolean hasConfigLoadFailure() {
         return configLoadFailed;
+    }
+
+    public boolean hasConfigRepairs() {
+        return !configRepairs.isEmpty();
     }
 
     public String getConfigLoadReport() {
@@ -1983,7 +2055,7 @@ public class ConfigManager {
         }
         List<String> lines = new ArrayList<>();
         lines.add("# Shed configuration (TOML)");
-        lines.add("# Auto-generated by :set! and :config save");
+        lines.add("# Auto-generated by :set!, :config save, and :config heal");
         lines.add("");
         lines.add(ConfigSchema.VERSION_KEY + " = " + ConfigSchema.VERSION);
         lines.add("");
@@ -2004,6 +2076,10 @@ public class ConfigManager {
             StandardOpenOption.TRUNCATE_EXISTING,
             StandardOpenOption.WRITE
         );
+        if (!configRepairs.isEmpty()) {
+            configRepairs.clear();
+            configLoadReport = "Configuration repairs saved: " + configPath;
+        }
     }
 
     private String tomlKey(String key) {

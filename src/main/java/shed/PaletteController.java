@@ -21,6 +21,9 @@ final class PaletteController {
     private static final List<PaletteAction> SURFACE_ACTIONS = List.of(
         action("Settings", "settings", "Open the Settings inspector, including font, landing-buffer, and Markdown-preview settings."),
         action("Open Settings TOML", "settings file", "Open the persisted settings.toml buffer."),
+        action("Open File", "open file", "Choose and open a local file."),
+        action("Open Folder", "open folder", "Choose a local folder, activate it as the workspace, and show its file tree."),
+        action("Open File Tree", "tree", "Open or close the workspace file tree."),
         action("Keymap Inspector", "keymap", "Inspect and edit validated keymap overlays."),
         action("Edit Snippets", "snippets edit", "Open the user snippets buffer for editing."),
         action("Markdown Preview", "markdownpreview", "Open the live native Markdown preview beside the source buffer."),

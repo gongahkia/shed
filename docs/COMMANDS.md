@@ -172,6 +172,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:split`, `:sp` | Horizontal split (`Cmd+D`) |
 | `:vsplit`, `:vsp` | Vertical split (`Cmd+Shift+D`) |
 | `:close`, `:clo` | Close active window (`Cmd+W`) |
+| `:open [file\|folder]` | Native file chooser, or workspace-folder chooser that opens its tree |
 | `:files` | Project file finder |
 | `:folder`, `:folders` | Folder chooser + file picker |
 | `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search; opens quickfix on completion |

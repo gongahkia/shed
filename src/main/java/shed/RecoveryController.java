@@ -188,6 +188,7 @@ final class RecoveryController {
         String name = source == null ? "conflict-copy" : source.getName() + ".conflict";
         chooser.setSelectedFile(new File(chooser.getCurrentDirectory(), name));
         chooser.setDialogTitle("Save My Conflict Copy");
+        editor.editorUiController.applyUiTheme(chooser);
         if (chooser.showSaveDialog(editor) != JFileChooser.APPROVE_OPTION) {
             buffer.refreshExternalTimestamp();
             editor.showMessage("Save As cancelled; dirty buffer retained");

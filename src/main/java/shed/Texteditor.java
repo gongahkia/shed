@@ -43,6 +43,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
@@ -1442,30 +1443,10 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     List<String> getAllCommandNames() {
-        List<String> commands = new ArrayList<>();
-        commands.add("w"); commands.add("write"); commands.add("q"); commands.add("quit");
-        commands.add("wq"); commands.add("x"); commands.add("e"); commands.add("edit");
-        commands.add("bn"); commands.add("bp"); commands.add("ls"); commands.add("buffers");
-        commands.add("bd"); commands.add("set"); commands.add("settings"); commands.add("config");
-        commands.add("log"); commands.add("session"); commands.add("workspace"); commands.add("jobs"); commands.add("jobcancel");
-        commands.add("drop"); commands.add("task"); commands.add("test"); commands.add("coverage"); commands.add("cov"); commands.add("help"); commands.add("wc"); commands.add("recent");
-        commands.add("d"); commands.add("delete"); commands.add("files"); commands.add("folder"); commands.add("projectreplace");
-        commands.add("tree"); commands.add("git"); commands.add("grep"); commands.add("copen");
-        commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
-        commands.add("lsp"); commands.add("peek"); commands.add("format"); commands.add("formatter"); commands.add("debug"); commands.add("dap"); commands.add("definition"); commands.add("typedefinition"); commands.add("implementation"); commands.add("highlights"); commands.add("hover"); commands.add("references");
-        commands.add("diagnostics"); commands.add("diag"); commands.add("problems"); commands.add("dnext"); commands.add("dprev"); commands.add("symbols"); commands.add("sym");
-        commands.add("registers"); commands.add("yankring"); commands.add("marks"); commands.add("zen"); commands.add("goyo"); commands.add("limelight"); commands.add("normal");
-        commands.add("reload"); commands.add("source"); commands.add("clean"); commands.add("shedclean");
-        commands.add("noh"); commands.add("split");
-        commands.add("vsplit"); commands.add("close"); commands.add("themes");
-        // New markdown commands
-        commands.add("toc"); commands.add("outline"); commands.add("toggle");
-        commands.add("markdown"); commands.add("md"); commands.add("markdownpreview"); commands.add("mdpreview");
-        commands.add("table"); commands.add("link"); commands.add("img");
-        commands.add("snippets"); commands.add("bracketcolor");
-        commands.add("term"); commands.add("terminal");
+        LinkedHashSet<String> commands = new LinkedHashSet<>();
+        if (commandHandler != null) commands.addAll(commandHandler.getCommandNames());
         commands.addAll(configManager.getConfiguredCommandAliases());
-        return commands;
+        return new ArrayList<>(commands);
     }
 
     // --- Integrated terminal ---

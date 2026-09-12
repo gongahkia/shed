@@ -172,6 +172,8 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:split`, `:sp` | Horizontal split (`Cmd+D`) |
 | `:vsplit`, `:vsp` | Vertical split (`Cmd+Shift+D`) |
 | `:close`, `:clo` | Close active window (`Cmd+W`) |
+| `:window`, `:win` `next\|left\|right\|up\|down\|equalize\|grow\|shrink` | Focus, equalize, or resize editor splits |
+| `:zoom`, `:uizoom` `in\|out\|reset` | Adjust UI zoom by 10% or restore it to 100% |
 | `:open [file\|folder]` | Native file chooser, or workspace-folder chooser that opens its tree |
 | `:files` | Project file finder |
 | `:folder`, `:folders` | Folder chooser + file picker |
@@ -189,7 +191,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:projectreplace cancel` | Discard the current replacement preview |
 | `:projectreplace preview-required on\|off`, `:projectreplace confirm on\|off`, `:projectreplace backup on\|off` | Persist preview, confirmation, or backup controls |
 | `:projectreplace scope workspace\|current-file` | Persist replacement preview scope |
-| `:palette`, `:commands` | Command palette. Lists only named graphical and contextual actions such as Settings, Workspace Folders, Git Changes, Tests, Debug, coverage import, formatter policy, code actions, peek, hierarchies, Markdown Preview, and snippets. Typed `:command` entries remain available in the command bar but are not duplicated in the palette. |
+| `:palette`, `:commands` | Open the deduplicated command palette. Its complete action list is in [Command Palette](COMMAND_PALETTE.md); commands requiring arguments, force variants, and the palette opener itself remain in the command bar. |
 | `:undolist`, `:undotree` | Show undo state summary |
 | `:themes` | Show built-in themes |
 | `:zen` | Toggle Goyo layout with Limelight; restores Limelight's prior state when disabled |
@@ -316,7 +318,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:lsp stop [ext]` | Stop LSP for extension |
 | `:lsp servers` | List configured + built-in server mappings |
 | `:lsp manage`, `:lsp manage ui` | Open the local Language Services panel; each install/update requires a fresh GUI confirmation |
-| `:languageservices`, `:language-services`, `:lspmanage` | Direct-command aliases that open Language Services; typed commands are intentionally absent from the command palette |
+| `:languageservices`, `:language-services`, `:lspmanage` | Direct-command aliases that open Language Services; the command palette uses `:lsp manage` |
 | `:lsp manage status` | Show managed-LSP status without probing or network access |
 | `:lsp log` | Show LSP error log |
 

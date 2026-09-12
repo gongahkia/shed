@@ -4,6 +4,7 @@ import com.jediterm.terminal.TextStyle;
 import com.jediterm.terminal.TerminalColor;
 import com.jediterm.terminal.emulator.ColorPalette;
 import com.jediterm.terminal.emulator.ColorPaletteImpl;
+import com.jediterm.terminal.model.JediTerminal;
 import com.jediterm.terminal.ui.JediTermWidget;
 import com.jediterm.terminal.ui.settings.DefaultSettingsProvider;
 import com.pty4j.PtyProcess;
@@ -25,15 +26,17 @@ final class PtyTerminalPane implements AutoCloseable {
     private static final double MINIMUM_TEXT_CONTRAST = 4.5;
 
     private final JediTermWidget widget;
+    private final ShedTerminalSettingsProvider settingsProvider;
     private final PtyTerminalConnector connector;
     private final PtyProcess process;
     private final File workingDirectory;
     private final TerminalShellIntegrationTracker shellIntegration;
     private boolean closed;
 
-    private PtyTerminalPane(JediTermWidget widget, PtyTerminalConnector connector, PtyProcess process, File workingDirectory,
+    private PtyTerminalPane(JediTermWidget widget, ShedTerminalSettingsProvider settingsProvider, PtyTerminalConnector connector, PtyProcess process, File workingDirectory,
                             TerminalShellIntegrationTracker shellIntegration) {
         this.widget = widget;
+        this.settingsProvider = settingsProvider;
         this.connector = connector;
         this.process = process;
         this.workingDirectory = workingDirectory;
@@ -83,11 +86,12 @@ final class PtyTerminalPane implements AutoCloseable {
             .start();
 
         PtyTerminalConnector connector = new PtyTerminalConnector(process, command, StandardCharsets.UTF_8);
-        JediTermWidget widget = new JediTermWidget(INITIAL_COLUMNS, INITIAL_ROWS, new ShedTerminalSettingsProvider(configManager, terminalFont));
+        ShedTerminalSettingsProvider settingsProvider = new ShedTerminalSettingsProvider(configManager, terminalFont);
+        JediTermWidget widget = new JediTermWidget(INITIAL_COLUMNS, INITIAL_ROWS, settingsProvider);
         widget.setTtyConnector(connector);
         TerminalShellIntegrationTracker shellIntegration = launch.enabled() ? new TerminalShellIntegrationTracker() : null;
         if (shellIntegration != null) widget.getTerminal().addCustomCommandListener(shellIntegration::accept);
-        PtyTerminalPane pane = new PtyTerminalPane(widget, connector, process, cwd, shellIntegration);
+        PtyTerminalPane pane = new PtyTerminalPane(widget, settingsProvider, connector, process, cwd, shellIntegration);
         if (linkOpener != null) {
             widget.addHyperlinkFilter(TerminalLinkResolver.create(pane::linkWorkingDirectory, linkOpener, sourcePathMapper));
         }
@@ -105,6 +109,16 @@ final class PtyTerminalPane implements AutoCloseable {
 
     void requestFocusInWindow() {
         widget.requestFocusInWindow();
+    }
+
+    void refreshAppearance(ConfigManager configManager, Font terminalFont) {
+        settingsProvider.refresh(configManager, terminalFont);
+        if (widget.getTerminal() instanceof JediTerminal terminal) {
+            terminal.getStyleState().setDefaultStyle(settingsProvider.getDefaultStyle());
+        }
+        widget.getTerminalPanel().setFont(settingsProvider.getTerminalFont());
+        widget.getTerminalPanel().revalidate();
+        widget.repaint();
     }
 
     File getWorkingDirectory() {
@@ -187,15 +201,19 @@ final class PtyTerminalPane implements AutoCloseable {
     }
 
     static final class ShedTerminalSettingsProvider extends DefaultSettingsProvider {
-        private final Font font;
-        private final float fontSize;
-        private final TerminalColor foreground;
-        private final TerminalColor background;
-        private final TextStyle defaultStyle;
-        private final TextStyle selectionColor;
-        private final ColorPalette colorPalette;
+        private Font font;
+        private float fontSize;
+        private TerminalColor foreground;
+        private TerminalColor background;
+        private TextStyle defaultStyle;
+        private TextStyle selectionColor;
+        private ColorPalette colorPalette;
 
         ShedTerminalSettingsProvider(ConfigManager configManager, Font terminalFont) {
+            refresh(configManager, terminalFont);
+        }
+
+        void refresh(ConfigManager configManager, Font terminalFont) {
             int size = terminalFont == null ? (configManager == null ? 14 : configManager.getTerminalFontSize()) : Math.round(terminalFont.getSize2D());
             String family = configManager == null ? "Monospaced" : configManager.getTerminalFontFamily();
             Font resolvedFont = terminalFont == null ? null : terminalFont.deriveFont(Font.PLAIN, (float) size);

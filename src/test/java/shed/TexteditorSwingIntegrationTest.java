@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.awt.Component;
+import java.awt.Color;
 import java.awt.GraphicsEnvironment;
 import java.awt.Insets;
 import java.awt.Rectangle;
@@ -30,6 +31,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Callable;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -111,6 +113,9 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(1.1, onEdt(() -> editor.configManager.getUiZoom()));
             assertTrue(Files.readString(home.resolve(".shed/config.toml")).contains("\"ui.zoom\" = 1.1"));
 
+            assertEquals("UI zoom: 120%", onEdt(() -> editor.commandHandler.execute("zoom in")));
+            assertEquals(1.2, onEdt(() -> editor.configManager.getUiZoom()));
+
             onEdt(() -> {
                 Object binding = editor.getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
                     .get(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_0, java.awt.event.InputEvent.CTRL_DOWN_MASK));
@@ -174,6 +179,77 @@ public class TexteditorSwingIntegrationTest {
         } finally {
             SettingsEditorDialog currentDialog = dialog;
             if (currentDialog != null) onEdt(() -> { currentDialog.dispose(); return null; });
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void gitHistoryAndStandardSwingSurfacesFollowThemeChanges() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-themed-git-history");
+        Path file = tempDir.resolve("themed-git-history.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "history\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        GitHistoryRemoteDialog dialog = null;
+        try {
+            dialog = onEdt(() -> {
+                GitHistoryRemoteDialog.showFor(editor, new GitHistoryRemoteDialog.Loader() {
+                    @Override public GitHistoryModel.Snapshot load(AsyncJobService.JobToken token) {
+                        return new GitHistoryModel.Snapshot(GitHistoryModel.State.READY, tempDir.toString(), List.of(), List.of("origin"), "Ready");
+                    }
+
+                    @Override public GitHistoryModel.RemoteResult run(GitHistoryModel.RemoteAction action, AsyncJobService.JobToken token) {
+                        return new GitHistoryModel.RemoteResult(action, true, "Done");
+                    }
+                });
+                return Arrays.stream(Window.getWindows()).filter(GitHistoryRemoteDialog.class::isInstance)
+                    .map(GitHistoryRemoteDialog.class::cast).filter(Window::isDisplayable).findFirst().orElseThrow();
+            });
+            GitHistoryRemoteDialog shown = dialog;
+
+            assertEquals(editor.configManager.getNormalColor(), onEdt(() -> shown.getContentPane().getBackground()));
+            assertTrue(onEdt(() -> descendants(shown, javax.swing.JList.class).stream()
+                .allMatch(list -> editor.configManager.getCommandBarBackground().equals(list.getBackground()))));
+            assertTrue(onEdt(() -> descendants(shown, javax.swing.JTextArea.class).stream()
+                .allMatch(area -> editor.configManager.getNormalColor().equals(area.getBackground()))));
+            assertEquals(editor.configManager.getNormalColor(), onEdt(() -> UIManager.getColor("OptionPane.background")));
+            assertEquals(editor.configManager.getNormalColor(), onEdt(() -> UIManager.getColor("FileChooser.background")));
+
+            assertEquals("Theme set to dracula", onEdt(() -> editor.setThemeFromCommand("dracula")));
+            assertEquals(editor.configManager.getNormalColor(), onEdt(() -> shown.getContentPane().getBackground()));
+            assertTrue(onEdt(() -> descendants(shown, javax.swing.JButton.class).stream()
+                .allMatch(button -> editor.configManager.getEditorForeground().equals(button.getForeground()))));
+            assertFalse(onEdt(() -> Color.WHITE.equals(shown.getContentPane().getBackground())));
+        } finally {
+            GitHistoryRemoteDialog currentDialog = dialog;
+            if (currentDialog != null) onEdt(() -> { currentDialog.dispose(); return null; });
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void welcomeAndExplorerRefreshWhenTheThemeChanges() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-themed-start-surfaces");
+        Path workspace = tempDir.resolve("themed-workspace");
+        Files.createDirectories(home);
+        Files.createDirectories(workspace);
+        Files.writeString(workspace.resolve("note.txt"), "note\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEmptyEditor(home);
+        try {
+            ShedWelcomePanel welcome = onEdt(() -> (ShedWelcomePanel) editor.getActivePane().getComponent());
+            assertEquals("Tree pane opened", onEdt(() -> editor.showFileTree(workspace.toString())));
+            FileTreePanel explorer = onEdt(() -> (FileTreePanel) editor.treePane.getComponent());
+
+            assertEquals("Theme set to dracula", onEdt(() -> editor.setThemeFromCommand("dracula")));
+            assertEquals(editor.configManager.getNormalColor(), onEdt(welcome::getBackground));
+            assertEquals(editor.configManager.getNormalColor(), onEdt(explorer::getBackground));
+            assertTrue(onEdt(() -> descendants(explorer, javax.swing.JTree.class).stream()
+                .allMatch(tree -> editor.configManager.getNormalColor().equals(tree.getBackground()))));
+        } finally {
             disposeEditor(editor);
         }
     }
@@ -444,6 +520,9 @@ public class TexteditorSwingIntegrationTest {
             assertEquals("Vertical split created", split);
             assertEquals(2, onEdt(() -> editor.editorPanes.size()));
             assertSame(initial, onEdt(editor::getCurrentBuffer));
+            assertEquals("Window focus changed", onEdt(() -> editor.commandHandler.execute("window next")));
+            assertEquals("Window resized", onEdt(() -> editor.commandHandler.execute("window grow")));
+            assertEquals("Windows equalized", onEdt(() -> editor.commandHandler.execute("window equalize")));
 
             String close = onEdt(() -> editor.commandHandler.execute("close"));
             assertEquals("Window closed", close);
@@ -828,6 +907,8 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(":container", onEdt(() -> editor.completeCommand(":cont")));
             assertEquals(":notebook", onEdt(() -> editor.completeCommand(":noteb")));
             assertEquals(":extension", onEdt(() -> editor.completeCommand(":extens")));
+            assertEquals(":window", onEdt(() -> editor.completeCommand(":wind")));
+            assertEquals(":zoom", onEdt(() -> editor.completeCommand(":zoo")));
             assertEquals(":edit " + candidate, onEdt(() -> editor.completeCommand(":edit " + directory.resolve("cand"))));
             assertEquals(":write " + candidate, onEdt(() -> editor.completeCommand(":write " + directory.resolve("cand"))));
         } finally {

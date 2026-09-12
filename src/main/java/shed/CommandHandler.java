@@ -164,6 +164,8 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.splitWindow(false), "split", "sp");
         registerCommand((args, range, force) -> editor.splitWindow(true), "vsplit", "vsp");
         registerCommand((args, range, force) -> editor.closeActiveWindow(), "close", "clo");
+        registerCommand((args, range, force) -> handleWindow(args), "window", "win");
+        registerCommand((args, range, force) -> handleZoom(args), "zoom", "uizoom");
         registerCommand((args, range, force) -> editor.showGrepFinder(args), "grep", "rg");
         registerCommand((args, range, force) -> editor.handleProjectReplace(args), "projectreplace", "preplace");
         registerCommand((args, range, force) -> editor.openQuickfixList(), "copen");
@@ -278,6 +280,31 @@ public class CommandHandler {
             return editor.openFolder();
         }
         return "Usage: :open [file|folder]";
+    }
+
+    private String handleWindow(String argument) {
+        String operation = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
+        return switch (operation) {
+            case "next", "cycle" -> editor.cycleWindowFocus();
+            case "left" -> editor.focusWindowDirection(-1, 0);
+            case "right" -> editor.focusWindowDirection(1, 0);
+            case "up", "above" -> editor.focusWindowDirection(0, -1);
+            case "down", "below" -> editor.focusWindowDirection(0, 1);
+            case "equalize", "balance" -> editor.equalizeWindows();
+            case "grow", "+" -> editor.resizeActiveWindow(0.05);
+            case "shrink", "-" -> editor.resizeActiveWindow(-0.05);
+            default -> "Usage: :window next|left|right|up|down|equalize|grow|shrink";
+        };
+    }
+
+    private String handleZoom(String argument) {
+        String operation = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
+        return switch (operation) {
+            case "in", "+" -> editor.adjustUiZoom(1);
+            case "out", "-" -> editor.adjustUiZoom(-1);
+            case "reset", "default", "0" -> editor.resetUiZoom();
+            default -> "Usage: :zoom in|out|reset";
+        };
     }
 
     private String handleSet(String option, boolean persist) {

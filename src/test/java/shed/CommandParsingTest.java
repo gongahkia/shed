@@ -143,8 +143,14 @@ public class CommandParsingTest {
 
         assertTrue(handler.getCommandNames().contains("languageservices"));
         assertTrue(handler.getCommandNames().contains("language-services"));
+        assertTrue(handler.getCommandNames().contains("window"));
+        assertTrue(handler.getCommandNames().contains("zoom"));
         List<String> actions = PaletteController.surfaceActionNames();
-        assertFalse(actions.contains("Language Services"));
+        assertTrue(actions.containsAll(List.of(
+            "Language Services", "Open File", "Open Folder", "Open File Tree",
+            "Save Current Buffer", "Split Below", "Focus Next Split", "Reset UI Zoom",
+            "Configuration Status", "Go to Definition", "Toolchain Status", "Update Status"
+        )));
         List<String> candidates = PaletteController.commandPaletteCandidates();
         assertEquals(actions, candidates);
         assertFalse(candidates.stream().anyMatch(candidate -> candidate.startsWith(":")));
@@ -164,7 +170,11 @@ public class CommandParsingTest {
         assertEquals("tree", PaletteController.surfaceActionCommand("Open File Tree"));
         assertEquals("remote list", PaletteController.surfaceActionCommand("Remote Workspaces"));
         assertEquals("container status", PaletteController.surfaceActionCommand("Dev Container"));
+        assertEquals("zoom reset", PaletteController.surfaceActionCommand("Reset UI Zoom"));
+        assertEquals("window next", PaletteController.surfaceActionCommand("Focus Next Split"));
         assertEquals(actions.size(), new java.util.HashSet<>(actions).size());
+        List<String> commands = PaletteController.surfaceActionCommands();
+        assertEquals(commands.size(), new java.util.HashSet<>(commands).size());
         for (String action : actions) {
             String command = PaletteController.surfaceActionCommand(action);
             String topLevel = command.substring(0, command.indexOf(' ') < 0 ? command.length() : command.indexOf(' '));

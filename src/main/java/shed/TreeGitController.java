@@ -123,6 +123,7 @@ final class TreeGitController {
         chooser.setFileSelectionMode(selectionMode);
         chooser.setDialogTitle(title);
         chooser.setCurrentDirectory(resolveNavigatorStartDirectory(startDirectory));
+        editor.editorUiController.applyUiTheme(chooser);
         int result = chooser.showOpenDialog(editor);
         if (result != JFileChooser.APPROVE_OPTION) {
             return null;

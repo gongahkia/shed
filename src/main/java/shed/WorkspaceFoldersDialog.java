@@ -56,6 +56,7 @@ final class WorkspaceFoldersDialog extends JDialog {
     private void add() {
         JFileChooser chooser = new JFileChooser();
         chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        editor.editorUiController.applyUiTheme(chooser);
         if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
         message(controller.addDirectory(chooser.getSelectedFile(), false));
         refresh();

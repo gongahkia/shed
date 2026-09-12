@@ -34,6 +34,7 @@ final class EditorUiController {
     private static final int SCREEN_EDGE_MARGIN = 24;
     private final Texteditor editor;
     private final Map<Object, Font> systemUiFonts;
+    private final Map<?, ?> desktopTextRenderingHints;
     private final DefaultListModel<String> commandPathModel = new DefaultListModel<>();
     private JPopupMenu commandPathPopup;
     private JList<String> commandPathList;
@@ -44,6 +45,7 @@ final class EditorUiController {
     EditorUiController(Texteditor editor) {
         this.editor = editor;
         this.systemUiFonts = captureSystemUiFonts();
+        this.desktopTextRenderingHints = desktopTextRenderingHints();
     }
 
     void initializeUI() {
@@ -259,6 +261,9 @@ final class EditorUiController {
         JTextArea textArea = new JTextArea() {
             @Override
             protected void paintComponent(Graphics g) {
+                if (g instanceof Graphics2D graphics) {
+                    applyDesktopTextRenderingHints(graphics, desktopTextRenderingHints);
+                }
                 super.paintComponent(g);
                 FontMetrics fm = g.getFontMetrics(getFont());
                 int charW = fm.charWidth(' ');
@@ -508,6 +513,21 @@ final class EditorUiController {
         String configuredFamily = editor.configManager.getFontFamily();
         Font configuredFont = resolveInstalledFont(configuredFamily, fontSize);
         return configuredFont != null ? configuredFont : new Font(Font.MONOSPACED, Font.PLAIN, fontSize);
+    }
+
+    private static Map<?, ?> desktopTextRenderingHints() {
+        try {
+            Object value = Toolkit.getDefaultToolkit().getDesktopProperty("awt.font.desktophints");
+            return value instanceof Map<?, ?> hints ? Map.copyOf(hints) : Map.of();
+        } catch (HeadlessException ignored) {
+            return Map.of();
+        }
+    }
+
+    static void applyDesktopTextRenderingHints(Graphics2D graphics, Map<?, ?> hints) {
+        if (graphics != null && hints != null && !hints.isEmpty()) {
+            graphics.addRenderingHints(hints);
+        }
     }
 
     Font resolveUiFont() {

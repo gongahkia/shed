@@ -763,6 +763,10 @@ final class EditorUiController {
         bindUiZoomShortcut("shed.ui-zoom.out.ctrl.numpad", KeyEvent.VK_SUBTRACT, InputEvent.CTRL_DOWN_MASK, -1);
         bindUiZoomShortcut("shed.ui-zoom.out.meta", KeyEvent.VK_MINUS, InputEvent.META_DOWN_MASK, -1);
         bindUiZoomShortcut("shed.ui-zoom.out.meta.numpad", KeyEvent.VK_SUBTRACT, InputEvent.META_DOWN_MASK, -1);
+        bindUiZoomResetShortcut("shed.ui-zoom.reset.ctrl", KeyEvent.VK_0, InputEvent.CTRL_DOWN_MASK);
+        bindUiZoomResetShortcut("shed.ui-zoom.reset.ctrl.numpad", KeyEvent.VK_NUMPAD0, InputEvent.CTRL_DOWN_MASK);
+        bindUiZoomResetShortcut("shed.ui-zoom.reset.meta", KeyEvent.VK_0, InputEvent.META_DOWN_MASK);
+        bindUiZoomResetShortcut("shed.ui-zoom.reset.meta.numpad", KeyEvent.VK_NUMPAD0, InputEvent.META_DOWN_MASK);
     }
 
     private void bindUiZoomShortcut(String id, int keyCode, int modifiers, int direction) {
@@ -770,6 +774,15 @@ final class EditorUiController {
         editor.getRootPane().getActionMap().put(id, new AbstractAction() {
             @Override public void actionPerformed(java.awt.event.ActionEvent event) {
                 editor.showMessage(editor.adjustUiZoom(direction));
+            }
+        });
+    }
+
+    private void bindUiZoomResetShortcut(String id, int keyCode, int modifiers) {
+        editor.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(keyCode, modifiers), id);
+        editor.getRootPane().getActionMap().put(id, new AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) {
+                editor.showMessage(editor.resetUiZoom());
             }
         });
     }

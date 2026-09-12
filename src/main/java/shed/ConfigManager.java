@@ -381,7 +381,7 @@ public class ConfigManager {
             case "font.size" -> "Editor font size";
             case "ui.font.family" -> "Application UI font family; empty uses the system UI font";
             case "ui.font.size" -> "Application UI font size; zero uses each system UI default size";
-            case "ui.zoom" -> "Application interface scale; Ctrl/Cmd + and Ctrl/Cmd - adjust it live";
+            case "ui.zoom" -> "Application interface scale; Ctrl/Cmd + and Ctrl/Cmd - adjust it live; Ctrl/Cmd 0 resets it";
             case "terminal.font.family" -> "Terminal font family";
             case "terminal.font.size" -> "Terminal font size";
             case "terminal.default.profile" -> "Default profile for newly opened terminals";

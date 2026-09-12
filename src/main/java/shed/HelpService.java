@@ -329,7 +329,7 @@ public class HelpService {
                     + ":tree reveal sets tree root to the current file's directory.\n"
                     + ":tree new/mkdir/rename/rm perform file operations from command mode.\n"
                     + "tree.delete.protect.critical blocks deleting root/home/cwd unless disabled.\n"
-                    + "Use j/k to move and Enter or o to open the file in the other pane.\n";
+                    + "Use arrows or j/k to move, Left/Right to collapse/expand, and Enter or o to open the selected file.\n";
             case "session":
             case "sessions":
                 return "Help: sessions\n\n"

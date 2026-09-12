@@ -2,6 +2,7 @@ package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.io.File;
 import org.junit.jupiter.api.Test;
 
 class FileFinderIconsTest {
@@ -14,5 +15,14 @@ class FileFinderIconsTest {
         assertEquals("\ue628", FileFinderIcons.iconFor("web/app.tsx"));
         assertEquals("\ue73e", FileFinderIcons.iconFor("README.md"));
         assertEquals("\ue64e", FileFinderIcons.iconFor("notes.unknown"));
+    }
+
+    @Test
+    void mapsFoldersToNerdFontGlyphs() {
+        File folder = new File("src");
+
+        assertEquals("\uf07b", FileFinderIcons.iconForDirectory(folder, false));
+        assertEquals("\uf115", FileFinderIcons.iconForDirectory(folder, true));
+        assertEquals("\ue70c", FileFinderIcons.iconForDirectory(new File(".vscode"), false));
     }
 }

@@ -109,6 +109,19 @@ public class TexteditorSwingIntegrationTest {
 
             assertEquals(1.1, onEdt(() -> editor.configManager.getUiZoom()));
             assertTrue(Files.readString(home.resolve(".shed/config.toml")).contains("\"ui.zoom\" = 1.1"));
+
+            onEdt(() -> {
+                Object binding = editor.getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
+                    .get(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_0, java.awt.event.InputEvent.CTRL_DOWN_MASK));
+                assertEquals("shed.ui-zoom.reset.ctrl", binding);
+                javax.swing.Action action = editor.getRootPane().getActionMap().get(binding);
+                assertNotNull(action);
+                action.actionPerformed(new ActionEvent(editor, ActionEvent.ACTION_PERFORMED, "zoom-reset"));
+                return null;
+            });
+
+            assertEquals(UiZoom.DEFAULT, onEdt(() -> editor.configManager.getUiZoom()));
+            assertTrue(Files.readString(home.resolve(".shed/config.toml")).contains("\"ui.zoom\" = 1.0"));
         } finally {
             disposeEditor(editor);
         }

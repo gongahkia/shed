@@ -17,6 +17,8 @@ import javax.swing.ListCellRenderer;
 /** File-type glyphs for the File Finder; rendered only when a local Nerd Font can display them. */
 final class FileFinderIcons {
     private static final String DEFAULT = "\ue64e";
+    private static final String FOLDER = "\uf07b";
+    private static final String OPEN_FOLDER = "\uf115";
 
     private FileFinderIcons() { }
 
@@ -53,18 +55,35 @@ final class FileFinderIcons {
         };
     }
 
+    static String iconForDirectory(java.io.File directory, boolean expanded) {
+        String name = directory == null ? "" : directory.getName().toLowerCase(Locale.ROOT);
+        if (".git".equals(name)) return "\ue702";
+        if (".vscode".equals(name)) return "\ue70c";
+        return expanded ? OPEN_FOLDER : FOLDER;
+    }
+
     static Font availableNerdFont(Font textFont) {
         Font base = textFont == null ? new Font(Font.DIALOG, Font.PLAIN, 13) : textFont;
         try {
+            if (canDisplayNerdIcons(base)) return base;
             for (String family : GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames(Locale.ROOT)) {
-                if (!family.toLowerCase(Locale.ROOT).contains("nerd font")) continue;
+                if (!isNerdFontFamily(family)) continue;
                 Font candidate = new Font(family, base.getStyle(), Math.max(12, base.getSize()));
-                if (candidate.canDisplay(DEFAULT.codePointAt(0))) return candidate;
+                if (canDisplayNerdIcons(candidate)) return candidate;
             }
         } catch (SecurityException | java.awt.HeadlessException ignored) {
             // The Finder remains textual when local font discovery is unavailable.
         }
         return null;
+    }
+
+    private static boolean canDisplayNerdIcons(Font font) {
+        return font != null && font.canDisplay(DEFAULT.codePointAt(0)) && font.canDisplay(FOLDER.codePointAt(0));
+    }
+
+    private static boolean isNerdFontFamily(String family) {
+        String normalized = family == null ? "" : family.toLowerCase(Locale.ROOT);
+        return normalized.contains("nerd") || normalized.matches(".*\\bnfm?\\b.*");
     }
 
     static ListCellRenderer<String> renderer(Texteditor editor, Map<String, String> pathsByCandidate) {

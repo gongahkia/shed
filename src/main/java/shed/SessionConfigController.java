@@ -503,6 +503,8 @@ final class SessionConfigController {
         for (EditorPane pane : editor.editorPanes) {
             if (pane.getCustomEditorComponent() instanceof ShedWelcomePanel welcome) {
                 welcome.refreshScale();
+            } else if (pane.getCustomEditorComponent() instanceof FileTreePanel explorer) {
+                explorer.refreshAppearance();
             }
         }
         editor.refreshMarkdownPreviews();
@@ -528,6 +530,14 @@ final class SessionConfigController {
 
     String adjustUiZoom(int direction) {
         double zoom = UiZoom.adjust(editor.configManager.getUiZoom(), direction);
+        return persistUiZoom(zoom);
+    }
+
+    String resetUiZoom() {
+        return persistUiZoom(UiZoom.DEFAULT);
+    }
+
+    private String persistUiZoom(double zoom) {
         try {
             editor.configManager.setAndPersist("ui.zoom", String.format(java.util.Locale.ROOT, "%.1f", zoom));
         } catch (IOException error) {

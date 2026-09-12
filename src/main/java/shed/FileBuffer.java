@@ -54,6 +54,7 @@ public class FileBuffer {
     private long lastKnownModifiedTime;
     private String savedContent;
     private boolean scratch;
+    private boolean syntaxHighlightingEnabled = true;
     private boolean largeFile;
     private String largeFileTail;
     private LargeFileStore largeFileStore;
@@ -134,6 +135,12 @@ public class FileBuffer {
         buffer.fileType = FileType.TEXT;
         buffer.setContent(content == null ? "" : content, false);
         buffer.setModified(false);
+        return buffer;
+    }
+
+    public static FileBuffer createPlainScratch(String name, String content) {
+        FileBuffer buffer = createScratch(name, content);
+        buffer.syntaxHighlightingEnabled = false;
         return buffer;
     }
 
@@ -549,6 +556,10 @@ public class FileBuffer {
 
     public boolean isScratch() {
         return scratch;
+    }
+
+    public boolean isSyntaxHighlightingEnabled() {
+        return syntaxHighlightingEnabled;
     }
 
     public void setScratch(boolean scratch) {

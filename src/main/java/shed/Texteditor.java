@@ -438,7 +438,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
         this.setVisible(true);
         if (configManager.hasConfigLoadFailure() || configManager.hasConfigRepairs()) {
-            showScratchBuffer("[config recovery]", configManager.getConfigLoadReport());
+            showPlainScratchBuffer("[config recovery]", configManager.getConfigLoadReport());
         }
         updateController.startOnLaunch();
 
@@ -1621,7 +1621,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String showConfigLoadStatus() {
-        showScratchBuffer("[config status]", configManager.getConfigLoadReport());
+        showPlainScratchBuffer("[config status]", configManager.getConfigLoadReport());
         return "Showing config status";
     }
 
@@ -3319,6 +3319,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public void showScratchBuffer(String title, String content) {
         sessionConfigController.showScratchBuffer(title, content);
+    }
+
+    public void showPlainScratchBuffer(String title, String content) {
+        sessionConfigController.showPlainScratchBuffer(title, content);
     }
 
     void openScratchBuffer(String title, String content, boolean returnable) {

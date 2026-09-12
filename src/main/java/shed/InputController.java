@@ -1429,12 +1429,12 @@ final class InputController {
             editor.showMessage("recording @" + register + (Character.isUpperCase(c) ? " (append)" : ""));
         } else if (editor.editorState.pendingKey == '@') {
             int count = editor.consumePendingCount();
+            editor.editorState.pendingKey = '\0';
             if (c == '@') {
                 editor.showMessage(editor.playMacro(editor.lastMacroRegister, count));
             } else {
                 editor.showMessage(editor.playMacro(c, count));
             }
-            editor.editorState.pendingKey = '\0';
         } else if (editor.editorState.pendingKey == '"') {
             editor.editorState.pendingRegister = c;
             editor.editorState.pendingKey = '\0';

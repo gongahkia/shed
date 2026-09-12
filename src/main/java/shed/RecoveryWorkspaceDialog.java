@@ -282,7 +282,6 @@ final class RecoveryWorkspaceDialog extends JDialog {
         }
         if (component instanceof JSplitPane split) {
             split.setBackground(theme.surface());
-            split.getDivider().setBackground(theme.border());
         }
         if (component instanceof Container container) {
             for (Component child : container.getComponents()) applyTheme(child);

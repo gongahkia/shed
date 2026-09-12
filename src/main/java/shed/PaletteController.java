@@ -742,13 +742,16 @@ final class PaletteController {
         titleLabel.setForeground(editor.configManager.getCaretColor());
         titleLabel.setFont(uiFont.deriveFont(java.awt.Font.BOLD));
         titleLabel.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 6, 2, 6));
-        JTextArea previewArea = new JTextArea();
+        JTextArea previewArea = new JTextArea() {
+            @Override public Dimension getPreferredSize() {
+                return editor.editorUiController.scaleUiDimension(260, 320);
+            }
+        };
         AccessibilitySupport.describe(previewArea, title + " preview", "Preview of the selected " + title.toLowerCase(Locale.ROOT) + " entry.");
         previewArea.setEditable(false);
         previewArea.setLineWrap(true);
         previewArea.setWrapStyleWord(true);
         previewArea.setFocusable(false);
-        previewArea.setPreferredSize(new Dimension(260, 320));
         previewArea.setFont(uiFont.deriveFont(Math.max(11f, uiFont.getSize2D() - 1f)));
         previewArea.setBackground(editor.configManager.getStatusBarBackground());
         previewArea.setForeground(editor.configManager.getStatusBarForeground());
@@ -797,17 +800,23 @@ final class PaletteController {
                 else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_UP) { int idx = list.getSelectedIndex(); if (idx > 0) list.setSelectedIndex(idx - 1); e.consume(); }
             }
         });
-        dialog.add(titleLabel, BorderLayout.NORTH);
-        dialog.add(filterField, BorderLayout.CENTER);
-        JScrollPane sp = new JScrollPane(list);
-        sp.setPreferredSize(new Dimension(600, 320));
+        JPanel header = new JPanel(new BorderLayout());
+        header.setOpaque(false);
+        header.add(titleLabel, BorderLayout.NORTH);
+        header.add(filterField, BorderLayout.SOUTH);
+        dialog.add(header, BorderLayout.NORTH);
+        JScrollPane sp = new JScrollPane(list) {
+            @Override public Dimension getPreferredSize() {
+                return editor.editorUiController.scaleUiDimension(600, 320);
+            }
+        };
         sp.setBorder(null);
-        dialog.add(sp, BorderLayout.SOUTH);
+        dialog.add(sp, BorderLayout.CENTER);
         if (previewProvider != null) dialog.add(previewArea, BorderLayout.EAST);
         syncPreview.run();
         Dimension targetSize = previewProvider == null ? new Dimension(620, 400) : new Dimension(720, 420);
-        dialog.setSize(editor.editorUiController.scaleUiDimension(targetSize.width, targetSize.height));
-        editor.editorUiController.markDialogUiFontsManaged(dialog);
+        editor.editorUiController.prepareDialog(dialog, targetSize.width, targetSize.height);
+        dialog.pack();
         dialog.setLocationRelativeTo(editor);
         dialog.setVisible(true);
         return selection[0];

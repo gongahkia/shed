@@ -37,7 +37,7 @@ class ShedWelcomePanelResponsiveTest {
     void reservesTheFullBrandBlockBeforeStackedActionsAtHighZoom() {
         int width = 959;
         int height = 1_115;
-        double zoom = 1.4;
+        double zoom = UiZoom.MAXIMUM;
         double scale = ShedWelcomePanel.layoutScale(width, height, zoom);
 
         assertTrue(scale <= height / 910.0);

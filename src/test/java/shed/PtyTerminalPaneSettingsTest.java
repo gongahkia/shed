@@ -2,6 +2,7 @@ package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.jediterm.core.Color;
@@ -60,6 +61,25 @@ public class PtyTerminalPaneSettingsTest {
         ConfigManager configManager = new ConfigManager();
         PtyTerminalPane.ShedTerminalSettingsProvider settings = new PtyTerminalPane.ShedTerminalSettingsProvider(configManager, new Font("Monospaced", Font.PLAIN, 14));
 
+        assertReadableAnsiPalette(settings);
+    }
+
+    @Test
+    void refreshAdoptsTheCurrentThemeForAnExistingTerminalSession() {
+        System.setProperty("user.home", tempDir.resolve("home-terminal-refresh").toString());
+        ConfigManager configManager = new ConfigManager();
+        PtyTerminalPane.ShedTerminalSettingsProvider settings = new PtyTerminalPane.ShedTerminalSettingsProvider(configManager,
+            new Font("Monospaced", Font.PLAIN, 14));
+        Color before = settings.getDefaultBackground().toColor();
+
+        assertEquals("dracula", configManager.setTheme("dracula"));
+        settings.refresh(configManager, new Font("Monospaced", Font.PLAIN, 14));
+
+        Color after = settings.getDefaultBackground().toColor();
+        assertNotEquals(before, after);
+        assertEquals(configManager.getNormalColor().getRed(), after.getRed());
+        assertEquals(configManager.getNormalColor().getGreen(), after.getGreen());
+        assertEquals(configManager.getNormalColor().getBlue(), after.getBlue());
         assertReadableAnsiPalette(settings);
     }
 

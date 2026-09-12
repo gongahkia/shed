@@ -141,6 +141,7 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
     private void importCoverage() {
         JFileChooser chooser = new JFileChooser(editor.testController.selectedRoot().toFile());
         chooser.setDialogTitle("Import coverage report");
+        editor.editorUiController.applyUiTheme(chooser);
         if (chooser.showOpenDialog(panel) == JFileChooser.APPROVE_OPTION) {
             message(editor.testController.importCoverage(editor.testController.selectedRoot(), chooser.getSelectedFile().toPath()));
         }

@@ -49,12 +49,12 @@ final class ShedWelcomePanel extends JPanel {
     private final Texteditor editor;
     private final JPanel brandPane;
     private final JPanel actionPane;
-    private final Color surface;
-    private final Color brandSurface;
-    private final Color foreground;
-    private final Color mutedForeground;
-    private final Color accent;
-    private final Color keyBackground;
+    private Color surface;
+    private Color brandSurface;
+    private Color foreground;
+    private Color mutedForeground;
+    private Color accent;
+    private Color keyBackground;
     private JPanel brandContent;
     private JPanel actionContent;
     private GridBagConstraints actionContentConstraints;
@@ -70,12 +70,7 @@ final class ShedWelcomePanel extends JPanel {
 
     ShedWelcomePanel(Texteditor editor) {
         this.editor = editor;
-        surface = editor.configManager.getNormalColor();
-        brandSurface = shade(surface, 0.18);
-        foreground = editor.configManager.getEditorForeground();
-        mutedForeground = blend(foreground, surface, 0.44);
-        accent = editor.configManager.getCaretColor();
-        keyBackground = blend(editor.configManager.getCommandBarBackground(), Color.BLACK, 0.20);
+        refreshPalette();
 
         setLayout(null);
         setOpaque(true);
@@ -372,6 +367,40 @@ final class ShedWelcomePanel extends JPanel {
         appliedScale = -1.0;
         revalidate();
         repaint();
+    }
+
+    void refreshAppearance() {
+        refreshPalette();
+        setBackground(surface);
+        title.setForeground(foreground);
+        version.setForeground(mutedForeground);
+        descriptor.setForeground(mutedForeground);
+        heading.setForeground(foreground);
+        detail.setForeground(mutedForeground);
+        for (WelcomeButton action : actionButtons) {
+            action.button().setBackground(surface);
+            action.button().setForeground(foreground);
+            action.button().setBorder(actionButtonBorder(appliedScale > 0 ? appliedScale : 1.0));
+            action.label().setForeground(foreground);
+            for (JLabel keyLabel : action.keyLabels()) {
+                keyLabel.setBackground(keyBackground);
+                keyLabel.setForeground(blend(foreground, accent, 0.35));
+                keyLabel.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(blend(keyBackground, accent, 0.25)),
+                    BorderFactory.createEmptyBorder(3, 6, 3, 6)
+                ));
+            }
+        }
+        refreshScale();
+    }
+
+    private void refreshPalette() {
+        surface = editor.configManager.getNormalColor();
+        brandSurface = shade(surface, 0.18);
+        foreground = editor.configManager.getEditorForeground();
+        mutedForeground = blend(foreground, surface, 0.44);
+        accent = editor.configManager.getCaretColor();
+        keyBackground = blend(editor.configManager.getCommandBarBackground(), Color.BLACK, 0.20);
     }
 
     static boolean usesWideLayout(int width, int height) {

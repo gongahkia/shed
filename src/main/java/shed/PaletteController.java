@@ -18,33 +18,93 @@ final class PaletteController {
      * Keep surface actions separate from raw Ex commands. A top-level command such as
      * :git is searchable, but it cannot communicate or invoke its graphical sub-surfaces.
      */
-    private static final List<PaletteAction> SURFACE_ACTIONS = List.of(
-        action("Settings", "settings", "Open the Settings inspector, including font, landing-buffer, and Markdown-preview settings."),
-        action("Open Settings TOML", "settings file", "Open the persisted settings.toml buffer."),
+    private static final List<PaletteAction> SURFACE_ACTIONS = actions(
         action("Open File", "open file", "Choose and open a local file."),
         action("Open Folder", "open folder", "Choose a local folder, activate it as the workspace, and show its file tree."),
         action("Open File Tree", "tree", "Open or close the workspace file tree."),
-        action("Keymap Inspector", "keymap", "Inspect and edit validated keymap overlays."),
-        action("Edit Snippets", "snippets edit", "Open the user snippets buffer for editing."),
-        action("Markdown Preview", "markdownpreview", "Open the live native Markdown preview beside the source buffer."),
-        action("Formatter Policy", "formatter", "Configure the current language's formatter and format-on-save policy."),
-        action("Workspace Folders", "workspace ui", "Open the workspace-folder manager."),
-        action("Git Changes", "git workbench", "Open the docked Git Changes workbench."),
-        action("Git Conflict Resolution", "git conflict", "Open the graphical conflict-resolution view."),
-        action("Git History and Remotes", "git history", "Open graphical local history and explicit remote controls."),
-        action("Git Worktrees and Stashes", "git worktrees", "Open graphical worktree and stash controls."),
-        action("Git Graph", "git log", "Open graphical local Git history when enabled."),
-        action("GitHub Pull Requests", "github prs", "Open pull-request review after GitHub review consent has been granted."),
-        action("Tests", "test", "Open the Test Explorer."),
-        action("Import Coverage Report", "coverage ui", "Open Tests, then use Import Coverage to choose a local coverage report."),
-        action("Debug", "debug", "Open the Debug tool panel."),
-        action("Tasks", "task", "Open the workspace Tasks panel."),
-        action("Remote Workspaces", "remote list", "Inspect explicit remote connections, active execution sessions, and loopback SSH forwards."),
-        action("Dev Container", "container status", "Inspect the active workspace's Dev Container configuration and session routing state."),
+        action("File Finder", "files", "Open the project file finder."),
+        action("Folder Finder", "folder", "Choose a folder, then find one of its files."),
+        action("Recent Files", "recent", "Open the recently used files list."),
+        action("Buffer Picker", "buffers", "Open the buffer picker."),
+        action("Next Buffer", "bn", "Focus the next open buffer."),
+        action("Previous Buffer", "bp", "Focus the previous open buffer."),
+        action("List Open Buffers", "ls", "Show all open buffers."),
+        action("Close Current Buffer", "bd", "Close the current buffer, prompting when needed."),
+        action("Save Current Buffer", "w", "Write the current buffer."),
+        action("Save All Buffers", "wa", "Write all modified file-backed buffers."),
+        action("Save and Quit", "wq", "Write the current buffer and quit."),
+        action("Save All and Quit", "wqa", "Write all modified buffers and quit."),
+        action("Quit Shed", "q", "Quit, prompting when buffers have unsaved changes."),
+        action("Quit All", "qa", "Quit all buffers, prompting when needed."),
+
+        action("Split Below", "split", "Create a horizontal split below the active editor."),
+        action("Split Right", "vsplit", "Create a vertical split beside the active editor."),
+        action("Close Current Split", "close", "Close the active editor split."),
+        action("Focus Next Split", "window next", "Focus the next editor split."),
+        action("Focus Split Left", "window left", "Focus the split to the left."),
+        action("Focus Split Right", "window right", "Focus the split to the right."),
+        action("Focus Split Above", "window up", "Focus the split above."),
+        action("Focus Split Below", "window down", "Focus the split below."),
+        action("Equalize Splits", "window equalize", "Give each editor split an equal share of space."),
+        action("Grow Current Split", "window grow", "Increase the active split's size."),
+        action("Shrink Current Split", "window shrink", "Decrease the active split's size."),
+        action("Zoom In", "zoom in", "Increase the entire interface scale by 10%."),
+        action("Zoom Out", "zoom out", "Decrease the entire interface scale by 10%."),
+        action("Reset UI Zoom", "zoom reset", "Restore the interface scale to 100%."),
+
+        action("Open Quickfix", "copen", "Open the current quickfix list."),
+        action("Next Quickfix Result", "cnext", "Move to the next quickfix result."),
+        action("Previous Quickfix Result", "cprev", "Move to the previous quickfix result."),
+        action("First Quickfix Result", "cfirst", "Move to the first quickfix result."),
+        action("Last Quickfix Result", "clast", "Move to the last quickfix result."),
+        action("Open Current Quickfix Result", "cc", "Open the selected quickfix result."),
         action("Problems", "problems", "Open the unified diagnostics and quickfix Problems panel."),
-        action("Project Replace", "projectreplace", "Open the reviewed project-wide replacement panel."),
+        action("Show Diagnostics", "diagnostics", "Show diagnostics for the active buffer."),
+        action("Next Diagnostic", "dnext", "Move to the next diagnostic."),
+        action("Previous Diagnostic", "dprev", "Move to the previous diagnostic."),
+
+        action("Settings", "settings", "Open the Settings inspector, including font, landing-buffer, and Markdown-preview settings."),
+        action("Open Settings TOML", "settings file", "Open the persisted settings.toml buffer."),
+        action("Configuration Status", "config status", "Show configuration loading and recovery details."),
+        action("Apply Suggested Config Repairs", "config heal", "Persist the reviewed deterministic configuration repairs."),
+        action("Reload Configuration", "reload", "Reload configuration from disk."),
+        action("Keymap Inspector", "keymap", "Inspect and edit validated keymap overlays."),
+        action("Themes", "themes", "Show built-in themes."),
+        action("Toggle Zen Mode", "zen", "Toggle the distraction-free Zen layout."),
+        action("Toggle Goyo Mode", "goyo", "Toggle the Goyo layout."),
+        action("Toggle Limelight", "limelight", "Toggle paragraph focus dimming."),
+        action("Toggle Minimap", "minimap", "Toggle the minimap panel."),
+        action("Undo History", "undolist", "Show the undo history summary."),
+        action("Clear Search Highlights", "noh", "Clear active search highlights."),
+        action("Command Log", "log", "Open the command log buffer."),
+        action("Show Help", "help", "Open the built-in help buffer."),
+        action("About Shed", "version", "Show Shed version and local runtime details."),
+
+        action("Format Current Buffer", "format", "Format the active buffer with its selected formatter."),
+        action("Formatter Policy", "formatter", "Configure the current language's formatter and format-on-save policy."),
+        action("Markdown Preview", "markdownpreview", "Open the live native Markdown preview beside the source buffer."),
+        action("Table of Contents", "toc", "Open the current Markdown document's table of contents."),
+        action("Document Outline", "outline", "Open the current document outline."),
+        action("Toggle Markdown Checkbox", "toggle", "Toggle the checkbox at the caret."),
+        action("Insert Markdown Table", "table", "Insert the default Markdown table template."),
+        action("Insert Link", "link", "Insert a link at the caret."),
+        action("Insert Image", "image", "Choose and insert a local image reference."),
+        action("Edit Snippets", "snippets edit", "Open the user snippets buffer for editing."),
+        action("Toggle Bracket Colors", "bracketcolor", "Toggle matching bracket colorization."),
+        action("Integrated Terminal", "terminal", "Open the integrated terminal split."),
+        action("Word Count", "wordcount", "Show line, word, and character counts."),
+        action("Registers", "registers", "Show register contents."),
+        action("Yank Ring", "yankring", "Open the copied and deleted text history."),
+        action("Marks", "marks", "Show marks for the active buffer."),
+
+        action("Language Services", "lsp manage", "Open the local Language Services panel."),
         action("Show Completions", "lsp completion", "Request completion candidates at the caret."),
+        action("Go to Definition", "definition", "Go to the definition at the caret."),
+        action("Go to Type Definition", "typedefinition", "Go to the type definition at the caret."),
+        action("Go to Implementation", "implementation", "Go to the implementation at the caret."),
         action("Highlight Symbol Occurrences", "lsp highlights", "Highlight server-reported occurrences for the symbol at the caret."),
+        action("Show Hover Information", "hover", "Show language-service hover information at the caret."),
+        action("Find References", "references", "Find references for the symbol at the caret."),
         action("Code Actions", "lsp codeaction", "Show diagnostic-anchored code actions at the caret."),
         action("Peek Definition", "peek definition", "Open a temporary read-only definition preview."),
         action("Peek Type Definition", "peek type", "Open a temporary read-only type-definition preview."),
@@ -53,13 +113,59 @@ final class PaletteController {
         action("Type Supertypes", "lsp typehierarchy supertypes", "Open the supertype hierarchy for the symbol at the caret."),
         action("Type Subtypes", "lsp typehierarchy subtypes", "Open the subtype hierarchy for the symbol at the caret."),
         action("Document Symbols", "symbols", "Open the document-symbol picker, with a local fallback."),
-        action("File Finder", "files", "Open the project file finder."),
-        action("Buffer Picker", "buffers", "Open the buffer picker."),
-        action("Integrated Terminal", "terminal", "Open the integrated terminal split.")
+
+        action("Workspace Folders", "workspace ui", "Open the workspace-folder manager."),
+        action("Workspace Index Status", "workspace index status", "Show the workspace search index status."),
+        action("Project Replace", "projectreplace", "Open the reviewed project-wide replacement panel."),
+        action("Tasks", "task", "Open the workspace Tasks panel."),
+        action("Tests", "test", "Open the Test Explorer."),
+        action("Import Coverage Report", "coverage ui", "Open Tests, then use Import Coverage to choose a local coverage report."),
+        action("Debug", "debug", "Open the Debug tool panel."),
+        action("Toolchain Status", "toolchain status", "Show selected local toolchains and advisory candidates."),
+        action("Large File Status", "largefile", "Show active large-file limits and status."),
+        action("Async Jobs", "jobs", "Show asynchronous jobs."),
+        action("Git Changes", "git workbench", "Open the docked Git Changes workbench."),
+        action("Git Status", "git status", "Show the active repository's Git status."),
+        action("Git Branches", "git branches", "Show the active repository's branches."),
+        action("Git Conflict Resolution", "git conflict", "Open the graphical conflict-resolution view."),
+        action("Git History and Remotes", "git history", "Open graphical local history and explicit remote controls."),
+        action("Git Worktrees and Stashes", "git worktrees", "Open graphical worktree and stash controls."),
+        action("Git Graph", "git log", "Open graphical local Git history when enabled."),
+        action("GitHub Pull Requests", "github prs", "Open pull-request review after GitHub review consent has been granted."),
+        action("Remote Workspaces", "remote list", "Inspect explicit remote connections, active execution sessions, and loopback SSH forwards."),
+        action("Dev Container", "container status", "Inspect the active workspace's Dev Container configuration and session routing state."),
+        action("Compose Status", "compose status", "Show workspace Compose configuration status."),
+        action("Database Status", "database status", "Show workspace database configuration status."),
+        action("Workspace Integrations", "integration", "Show configured workspace integrations."),
+        action("Plugin Manager", "plugin", "Show installed plugins."),
+        action("Extension Manager", "extension", "Show installed extensions and their contributions."),
+        action("Custom Editors", "customeditor", "Show available custom editors."),
+        action("Update Status", "update", "Show the configured update channel's status.")
     );
 
     private static PaletteAction action(String label, String command, String description) {
         return new PaletteAction(label, command, description);
+    }
+
+    private static List<PaletteAction> actions(PaletteAction... actions) {
+        Set<String> labels = new HashSet<>();
+        Set<String> commands = new HashSet<>();
+        for (PaletteAction action : actions) {
+            if (action == null || action.label().isBlank() || action.command().isBlank()) {
+                throw new IllegalStateException("Command palette actions require a label and command");
+            }
+            if (!labels.add(normalize(action.label()))) {
+                throw new IllegalStateException("Duplicate command palette label: " + action.label());
+            }
+            if (!commands.add(normalize(action.command()))) {
+                throw new IllegalStateException("Duplicate command palette command: " + action.command());
+            }
+        }
+        return List.copyOf(Arrays.asList(actions));
+    }
+
+    private static String normalize(String value) {
+        return value.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
 
     private final Texteditor editor;
@@ -86,6 +192,10 @@ final class PaletteController {
 
     static List<String> commandPaletteCandidates() {
         return surfaceActionNames();
+    }
+
+    static List<String> surfaceActionCommands() {
+        return SURFACE_ACTIONS.stream().map(PaletteAction::command).toList();
     }
 
     static String surfaceActionCommand(String label) {

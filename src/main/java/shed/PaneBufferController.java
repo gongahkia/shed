@@ -353,6 +353,7 @@ final class PaneBufferController {
     void openFileChooser() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setCurrentDirectory(new File(System.getProperty("user.home")));
+        editor.editorUiController.applyUiTheme(fileChooser);
         int result = fileChooser.showOpenDialog(editor);
 
         if (result == JFileChooser.APPROVE_OPTION) {

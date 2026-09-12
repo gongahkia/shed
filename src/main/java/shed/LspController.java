@@ -1250,6 +1250,7 @@ final class LspController {
             item.addActionListener(event -> prepareCodeActionPreview(action));
             popup.add(item);
         }
+        editor.editorUiController.applyUiTheme(popup);
         try {
             java.awt.Rectangle bounds = editor.writingArea.modelToView2D(editor.writingArea.getCaretPosition()).getBounds();
             popup.show(editor.writingArea, bounds.x, bounds.y + bounds.height);

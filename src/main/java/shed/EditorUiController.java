@@ -2,10 +2,13 @@ package shed;
 
 import shed.api.LanguageProfile;
 import javax.swing.*;
+import javax.swing.plaf.ColorUIResource;
 import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.plaf.FontUIResource;
+import javax.swing.table.JTableHeader;
+import javax.swing.text.JTextComponent;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Highlighter;
 import javax.swing.text.Segment;
@@ -639,10 +642,157 @@ final class EditorUiController {
         }
     }
 
+    /** Applies the selected Shed palette to every standard Swing surface. */
+    void applyUiTheme() {
+        installUiThemeDefaults();
+        applyUiTheme(editor);
+        if (commandPathPopup != null) applyUiTheme(commandPathPopup);
+        for (Window window : Window.getWindows()) {
+            if (window != editor && window.isDisplayable()) applyUiTheme(window);
+        }
+    }
+
+    void applyUiTheme(Component root) {
+        if (root == null) return;
+        SwingUtilities.updateComponentTreeUI(root);
+        applyUiThemeRecursively(root, uiThemeColors());
+        if (root instanceof Container container) {
+            container.revalidate();
+            container.repaint();
+        }
+    }
+
+    private void installUiThemeDefaults() {
+        UiThemeColors colors = uiThemeColors();
+        putUiColor(colors.surface(),
+            "control", "Panel.background", "Viewport.background", "ScrollPane.background", "SplitPane.background",
+            "TabbedPane.background", "OptionPane.background", "FileChooser.background", "Dialog.background");
+        putUiColor(colors.raised(),
+            "Button.background", "ToggleButton.background", "ToolBar.background", "MenuBar.background", "Menu.background",
+            "MenuItem.background", "CheckBoxMenuItem.background", "RadioButtonMenuItem.background", "PopupMenu.background",
+            "ScrollBar.background", "ProgressBar.background", "TableHeader.background");
+        putUiColor(colors.field(),
+            "TextField.background", "PasswordField.background", "FormattedTextField.background", "TextArea.background",
+            "TextPane.background", "EditorPane.background", "ComboBox.background", "List.background", "Tree.background", "Table.background");
+        putUiColor(colors.foreground(),
+            "Label.foreground", "Button.foreground", "ToggleButton.foreground", "CheckBox.foreground", "RadioButton.foreground",
+            "TextField.foreground", "PasswordField.foreground", "FormattedTextField.foreground", "TextArea.foreground",
+            "TextPane.foreground", "EditorPane.foreground", "ComboBox.foreground", "List.foreground", "Tree.foreground",
+            "Table.foreground", "TableHeader.foreground", "MenuBar.foreground", "Menu.foreground", "MenuItem.foreground",
+            "CheckBoxMenuItem.foreground", "RadioButtonMenuItem.foreground", "OptionPane.messageForeground", "ToolTip.foreground",
+            "TitledBorder.titleColor");
+        putUiColor(colors.selection(),
+            "TextField.selectionBackground", "PasswordField.selectionBackground", "FormattedTextField.selectionBackground",
+            "TextArea.selectionBackground", "TextPane.selectionBackground", "EditorPane.selectionBackground",
+            "List.selectionBackground", "Tree.selectionBackground", "Table.selectionBackground", "ComboBox.selectionBackground",
+            "Menu.selectionBackground", "MenuItem.selectionBackground", "CheckBoxMenuItem.selectionBackground",
+            "RadioButtonMenuItem.selectionBackground");
+        putUiColor(colors.selectionText(),
+            "TextField.selectionForeground", "PasswordField.selectionForeground", "FormattedTextField.selectionForeground",
+            "TextArea.selectionForeground", "TextPane.selectionForeground", "EditorPane.selectionForeground",
+            "List.selectionForeground", "Tree.selectionForeground", "Table.selectionForeground", "ComboBox.selectionForeground",
+            "Menu.selectionForeground", "MenuItem.selectionForeground", "CheckBoxMenuItem.selectionForeground",
+            "RadioButtonMenuItem.selectionForeground");
+        putUiColor(colors.accent(), "TextField.caretForeground", "TextArea.caretForeground", "TextPane.caretForeground", "EditorPane.caretForeground",
+            "ProgressBar.foreground", "Focus.color");
+        putUiColor(colors.border(), "Table.gridColor", "Separator.foreground", "controlShadow", "controlDkShadow");
+        putUiColor(colors.muted(), "Label.disabledForeground", "Button.disabledText", "MenuItem.disabledForeground");
+    }
+
+    private UiThemeColors uiThemeColors() {
+        Color surface = editor.configManager.getNormalColor();
+        Color foreground = editor.configManager.getEditorForeground();
+        return new UiThemeColors(surface, blend(surface, foreground, 0.07), editor.configManager.getCommandBarBackground(),
+            blend(surface, foreground, 0.18), foreground, blend(foreground, surface, 0.42), editor.configManager.getCaretColor(),
+            editor.configManager.getSelectionColor(), editor.configManager.getSelectionTextColor());
+    }
+
+    private void applyUiThemeRecursively(Component component, UiThemeColors colors) {
+        if (component instanceof JPanel panel) {
+            panel.setBackground(colors.surface());
+            panel.setForeground(colors.foreground());
+        }
+        if (component instanceof JLabel label) label.setForeground(colors.foreground());
+        if (component instanceof AbstractButton button) {
+            button.setBackground(colors.raised());
+            button.setForeground(colors.foreground());
+        }
+        if (component instanceof JTextComponent text) {
+            text.setBackground(component instanceof JTextField ? colors.field() : colors.surface());
+            text.setForeground(colors.foreground());
+            text.setCaretColor(colors.accent());
+            text.setSelectionColor(colors.selection());
+            text.setSelectedTextColor(colors.selectionText());
+        }
+        if (component instanceof JComboBox<?> combo) {
+            combo.setBackground(colors.field());
+            combo.setForeground(colors.foreground());
+        }
+        if (component instanceof JList<?> list) {
+            list.setBackground(colors.field());
+            list.setForeground(colors.foreground());
+            list.setSelectionBackground(colors.selection());
+            list.setSelectionForeground(colors.selectionText());
+        }
+        if (component instanceof JTree tree) {
+            tree.setBackground(colors.field());
+            tree.setForeground(colors.foreground());
+        }
+        if (component instanceof JTable table) {
+            table.setBackground(colors.field());
+            table.setForeground(colors.foreground());
+            table.setSelectionBackground(colors.selection());
+            table.setSelectionForeground(colors.selectionText());
+            table.setGridColor(colors.border());
+            JTableHeader header = table.getTableHeader();
+            if (header != null) {
+                header.setBackground(colors.raised());
+                header.setForeground(colors.foreground());
+            }
+        }
+        if (component instanceof JScrollPane scroll) {
+            scroll.setBackground(colors.surface());
+            scroll.getViewport().setBackground(colors.surface());
+            scroll.getHorizontalScrollBar().setBackground(colors.raised());
+            scroll.getVerticalScrollBar().setBackground(colors.raised());
+        }
+        if (component instanceof JSplitPane split) split.setBackground(colors.surface());
+        if (component instanceof JTabbedPane tabs) {
+            tabs.setBackground(colors.surface());
+            tabs.setForeground(colors.foreground());
+        }
+        if (component instanceof JProgressBar progress) {
+            progress.setBackground(colors.raised());
+            progress.setForeground(colors.accent());
+        }
+        if (component instanceof JComponent swing && swing.getBorder() instanceof javax.swing.border.TitledBorder border) {
+            border.setTitleColor(colors.foreground());
+        }
+        if (component instanceof Container container) {
+            for (Component child : container.getComponents()) applyUiThemeRecursively(child, colors);
+        }
+    }
+
+    private static void putUiColor(Color color, String... keys) {
+        ColorUIResource resource = new ColorUIResource(color);
+        for (String key : keys) UIManager.put(key, resource);
+    }
+
+    private static Color blend(Color first, Color second, double amount) {
+        double ratio = Math.max(0.0, Math.min(1.0, amount));
+        return new Color((int) Math.round(first.getRed() * (1.0 - ratio) + second.getRed() * ratio),
+            (int) Math.round(first.getGreen() * (1.0 - ratio) + second.getGreen() * ratio),
+            (int) Math.round(first.getBlue() * (1.0 - ratio) + second.getBlue() * ratio));
+    }
+
+    private record UiThemeColors(Color surface, Color raised, Color field, Color border, Color foreground, Color muted,
+                                 Color accent, Color selection, Color selectionText) { }
+
     void prepareDialog(JDialog dialog, int unscaledWidth, int unscaledHeight) {
         if (dialog == null) return;
         dialog.getRootPane().putClientProperty(BASE_DIALOG_SIZE_PROPERTY, new Dimension(unscaledWidth, unscaledHeight));
         dialog.getContentPane().setPreferredSize(constrainDialogContentSize(dialog, unscaledWidth, unscaledHeight));
+        applyUiTheme(dialog);
         applyUiFont(dialog);
         markDialogUiReady(dialog);
     }

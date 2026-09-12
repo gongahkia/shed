@@ -428,6 +428,7 @@ final class SyntaxUiController {
 
 
     void applyThemeColors() {
+        editor.editorUiController.applyUiTheme();
         Color editorForeground = editor.configManager.getEditorForeground();
         Color caretColor = editor.configManager.getCaretColor();
         Color selectionColor = editor.configManager.getSelectionColor();
@@ -452,6 +453,13 @@ final class SyntaxUiController {
             area.setCaretColor(caretColor);
             area.setSelectionColor(selectionColor);
             area.setSelectedTextColor(selectionTextColor);
+            if (pane.getCustomEditorComponent() instanceof ShedWelcomePanel welcome) welcome.refreshAppearance();
+            if (pane.getCustomEditorComponent() instanceof FileTreePanel explorer) explorer.refreshAppearance();
+        }
+
+        editor.refreshMarkdownPreviews();
+        for (PtyTerminalPane terminalPane : editor.ptyTerminalPanes.values()) {
+            terminalPane.refreshAppearance(editor.configManager, editor.resolveTerminalFont());
         }
 
         if (editor.editorState.mode != null) {

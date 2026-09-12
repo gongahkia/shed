@@ -40,6 +40,7 @@ final class ShedWelcomePanel extends JPanel {
     private static final double MINIMUM_SCALE = 1.10;
     private static final double MAXIMUM_SCALE = 1.65;
     private static final int ACTION_CONTENT_HEIGHT = 520;
+    private static final int BRAND_CONTENT_HEIGHT = 390;
     private static final int ACTION_GAP = 18;
     private static final BufferedImage LOGO = loadLogo();
 
@@ -94,7 +95,6 @@ final class ShedWelcomePanel extends JPanel {
     public void doLayout() {
         int width = getWidth();
         int height = getHeight();
-        double contentScale = contentScale(width, height);
         double zoom = editor.configManager.getUiZoom();
         boolean wide = usesWideLayout(width, height);
         double layoutScale = layoutScale(width, height, zoom);
@@ -103,8 +103,7 @@ final class ShedWelcomePanel extends JPanel {
             brandPane.setBounds(0, 0, brandWidth, height);
             actionPane.setBounds(brandWidth, 0, width - brandWidth, height);
         } else {
-            int minimumActionHeight = scaled(ACTION_CONTENT_HEIGHT, layoutScale);
-            int brandHeight = Math.max(0, Math.min(Math.max(0, height - minimumActionHeight), (int) Math.round(height * 0.46)));
+            int brandHeight = stackedBrandHeight(width, height, zoom);
             brandPane.setBounds(0, 0, width, brandHeight);
             actionPane.setBounds(0, brandHeight, width, height - brandHeight);
         }
@@ -386,13 +385,21 @@ final class ShedWelcomePanel extends JPanel {
 
     static double layoutScale(int width, int height, double zoom) {
         double requested = contentScale(width, height) * UiZoom.clamp(zoom);
-        double heightLimit = Math.max(1.0, Math.max(0, height) / (double) ACTION_CONTENT_HEIGHT);
         if (!usesWideLayout(width, height)) {
-            return Math.min(requested, heightLimit);
+            double stackedHeightLimit = Math.max(0, height) / (double) (BRAND_CONTENT_HEIGHT + ACTION_CONTENT_HEIGHT);
+            return Math.min(requested, stackedHeightLimit);
         }
+        double heightLimit = Math.max(0, height) / (double) ACTION_CONTENT_HEIGHT;
         int brandWidth = Math.max(280, Math.min(Math.max(0, width) - 320, (int) Math.round(Math.max(0, width) * 0.38)));
         double brandWidthLimit = Math.max(1.0, brandWidth / 250.0);
         return Math.min(requested, Math.min(heightLimit, brandWidthLimit));
+    }
+
+    static int stackedBrandHeight(int width, int height, double zoom) {
+        double scale = layoutScale(width, height, zoom);
+        int requiredBrandHeight = scaled(BRAND_CONTENT_HEIGHT, scale);
+        int requiredActionHeight = scaled(ACTION_CONTENT_HEIGHT, scale);
+        return Math.max(0, Math.min(requiredBrandHeight, Math.max(0, height - requiredActionHeight)));
     }
 
 

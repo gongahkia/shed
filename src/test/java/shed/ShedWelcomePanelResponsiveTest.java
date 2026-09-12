@@ -32,4 +32,16 @@ class ShedWelcomePanelResponsiveTest {
         assertTrue(ShedWelcomePanel.layoutScale(960, 640, 4.0) < ShedWelcomePanel.contentScale(960, 640) * 4.0);
         assertEquals(ShedWelcomePanel.contentScale(1_920, 1_080), ShedWelcomePanel.layoutScale(1_920, 1_080, 1.0));
     }
+
+    @Test
+    void reservesTheFullBrandBlockBeforeStackedActionsAtHighZoom() {
+        int width = 959;
+        int height = 1_115;
+        double zoom = 1.4;
+        double scale = ShedWelcomePanel.layoutScale(width, height, zoom);
+
+        assertTrue(scale <= height / 910.0);
+        assertEquals((int) Math.round(390 * scale), ShedWelcomePanel.stackedBrandHeight(width, height, zoom));
+        assertTrue(height - ShedWelcomePanel.stackedBrandHeight(width, height, zoom) >= (int) Math.round(520 * scale));
+    }
 }

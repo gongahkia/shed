@@ -2361,8 +2361,11 @@ final class InputController {
             int px = location.x + (int) caretRect.getX();
             int py = location.y + (int) (caretRect.getY() + caretRect.getHeight());
             int lineHeight = editor.writingArea.getFontMetrics(editor.writingArea.getFont()).getHeight();
-            editor.completionPopup.setLocation(px, py);
-            editor.completionPopup.setSize(760, Math.min(Math.max(max * lineHeight + 58, 150), 340));
+            double zoom = editor.configManager.getUiZoom();
+            int height = Math.min(Math.max(max * lineHeight + UiZoom.scale(58, zoom), UiZoom.scale(150, zoom)), UiZoom.scale(340, zoom));
+            Dimension size = editor.editorUiController.fitPopupSize(editor.writingArea, new Dimension(UiZoom.scale(760, zoom), height));
+            editor.completionPopup.setSize(size);
+            editor.completionPopup.setLocation(editor.editorUiController.fitPopupLocation(editor.writingArea, new Point(px, py), size));
             editor.completionPopup.setVisible(true);
         } catch (Exception ignored) {
             dismissCompletionPopup();
@@ -2390,7 +2393,8 @@ final class InputController {
         editor.completionDocumentation.setBackground(editor.configManager.getCommandBarBackground());
         editor.completionDocumentation.setForeground(editor.configManager.getCommandBarForeground());
         editor.completionSource = new JLabel();
-        editor.completionSource.setBorder(BorderFactory.createEmptyBorder(3, 5, 3, 5));
+        double zoom = editor.configManager.getUiZoom();
+        editor.completionSource.setBorder(BorderFactory.createEmptyBorder(UiZoom.scale(3, zoom), UiZoom.scale(5, zoom), UiZoom.scale(3, zoom), UiZoom.scale(5, zoom)));
         editor.completionSource.setFont(editor.writingArea.getFont().deriveFont(Math.max(10f, editor.writingArea.getFont().getSize2D() - 2f)));
         editor.completionSource.setForeground(editor.configManager.getStatusBarForeground());
         JScrollPane listScroll = new JScrollPane(editor.completionList);
@@ -2401,7 +2405,7 @@ final class InputController {
         listPanel.add(listScroll, BorderLayout.CENTER);
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listPanel, documentationScroll);
         split.setResizeWeight(0.48);
-        split.setDividerLocation(360);
+        split.setDividerLocation(UiZoom.scale(360, zoom));
         split.setBorder(BorderFactory.createLineBorder(editor.configManager.getCaretColor()));
         editor.completionPopup = new JWindow(editor);
         editor.completionPopup.add(split);
@@ -2611,8 +2615,12 @@ final class InputController {
             Rectangle2D caretRect = editor.writingArea.modelToView2D(editor.writingArea.getCaretPosition());
             if (caretRect == null || !editor.writingArea.isShowing()) return;
             Point location = editor.writingArea.getLocationOnScreen();
-            editor.signatureHelpPopup.setLocation(location.x + (int) caretRect.getX(), location.y + (int) caretRect.getY() - 88);
-            editor.signatureHelpPopup.setSize(460, 84);
+            double zoom = editor.configManager.getUiZoom();
+            Dimension size = editor.editorUiController.fitPopupSize(editor.writingArea,
+                editor.editorUiController.scaleUiDimension(460, 84));
+            Point preferred = new Point(location.x + (int) caretRect.getX(), location.y + (int) caretRect.getY() - UiZoom.scale(88, zoom));
+            editor.signatureHelpPopup.setSize(size);
+            editor.signatureHelpPopup.setLocation(editor.editorUiController.fitPopupLocation(editor.writingArea, preferred, size));
             editor.signatureHelpPopup.setVisible(true);
         } catch (Exception ignored) {
             dismissSignatureHelp();

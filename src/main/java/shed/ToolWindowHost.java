@@ -201,8 +201,8 @@ final class ToolWindowHost extends JPanel {
         KeyboardFocusSupport.installEscape(dialog.getRootPane(), dialog::dispose);
         dialog.setLayout(new BorderLayout());
         dialog.add(surface.component(), BorderLayout.CENTER);
-        dialog.setSize(editor.editorUiController.scaleUiDimension(820, 500));
-        editor.editorUiController.applyUiFont(dialog);
+        editor.editorUiController.prepareDialog(dialog, 820, 500);
+        dialog.pack();
         WorkbenchToolWindowPlacement.restore(editor, dialog, surfaceType(tab), "panel");
         detached.put(tab, dialog);
         dialog.addWindowListener(new java.awt.event.WindowAdapter() {

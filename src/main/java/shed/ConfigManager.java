@@ -553,6 +553,9 @@ public class ConfigManager {
                 continue;
             }
             String validationError = settings.validateToml(key, value);
+            if (validationError == null) {
+                validationError = fontFamilyValidationError(key, value instanceof String ? (String) value : null);
+            }
             if (key.startsWith("formatter.") && key.endsWith(".format.on.save")) {
                 validationError = value instanceof Boolean ? FormatterPolicy.validateConfig(key, Boolean.toString((Boolean) value)) : key + " must be a TOML boolean";
             } else if (validationError == null && key.startsWith("formatter.")) {
@@ -1640,9 +1643,33 @@ public class ConfigManager {
         if (typedError != null) {
             return typedError;
         }
+        String fontError = fontFamilyValidationError(normalizedKey, normalizedValue);
+        if (fontError != null) {
+            return fontError;
+        }
         String formatterError = FormatterPolicy.validateConfig(normalizedKey, normalizedValue);
         if (formatterError != null) return formatterError;
         return KeymapOverlay.isKeybindKey(normalizedKey) ? KeymapOverlay.validate(normalizedKey, normalizedValue) : null;
+    }
+
+    private String fontFamilyValidationError(String key, String value) {
+        if (!"font.family".equals(key) && !"ui.font.family".equals(key) && !"terminal.font.family".equals(key)) {
+            return null;
+        }
+        if ("ui.font.family".equals(key) && (value == null || value.isBlank())) {
+            return null;
+        }
+        if (value == null || value.isBlank()) {
+            return key + " must name an installed font family";
+        }
+        try {
+            if (FontFamilyCatalog.resolve(value) != null) {
+                return null;
+            }
+            return key + " names no installed font family: " + value.trim();
+        } catch (SecurityException | java.awt.HeadlessException error) {
+            return key + " could not inspect installed font families: " + loadErrorMessage(error);
+        }
     }
 
     Set<String> typedSettingKeys() {

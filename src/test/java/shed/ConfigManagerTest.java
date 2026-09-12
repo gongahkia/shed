@@ -180,21 +180,21 @@ public class ConfigManagerTest {
         System.setProperty("user.home", home.toString());
         ConfigManager config = new ConfigManager();
 
-        config.set("font.family", "Fira Code");
+        config.set("font.family", "Monospaced");
         config.set("font.size", "15");
-        config.set("ui.font.family", "SF Pro Text");
+        config.set("ui.font.family", "Dialog");
         config.set("ui.font.size", "13");
         config.set("ui.zoom", "1.5");
-        config.set("terminal.font.family", "JetBrains Mono");
+        config.set("terminal.font.family", "Monospaced");
         config.set("terminal.font.size", "12");
         config.set("terminal.default.profile", "builtin:bash");
 
-        assertEquals("Fira Code", config.getFontFamily());
+        assertEquals("Monospaced", config.getFontFamily());
         assertEquals(15, config.getFontSize());
-        assertEquals("SF Pro Text", config.getUiFontFamily());
+        assertEquals("Dialog", config.getUiFontFamily());
         assertEquals(13, config.getUiFontSize());
         assertEquals(1.5, config.getUiZoom());
-        assertEquals("JetBrains Mono", config.getTerminalFontFamily());
+        assertEquals("Monospaced", config.getTerminalFontFamily());
         assertEquals(12, config.getTerminalFontSize());
         assertEquals("builtin:bash", config.getTerminalDefaultProfile());
         assertEquals("ui.font.size must be non-negative", config.validateSettingValue("ui.font.size", "-1"));
@@ -204,6 +204,24 @@ public class ConfigManagerTest {
             config.validateSettingValue("terminal.default.profile", "/bin/bash"));
         assertEquals("terminal.default.profile must be system, builtin:<id>, or an extension profile id",
             config.validateSettingValue("terminal.default.profile", "builtin:"));
+    }
+
+    @Test
+    void rejectsUnavailableFontFamiliesInConfigurationAndRuntimeUpdates() throws Exception {
+        Path home = tempDir.resolve("home-invalid-font");
+        Path configFile = home.resolve(".shed/config.toml");
+        Files.createDirectories(configFile.getParent());
+        Files.writeString(configFile, "schema_version = 1\n\"font.family\" = \"Missing Shed Test Font\"\n");
+        System.setProperty("user.home", home.toString());
+
+        ConfigManager config = new ConfigManager();
+
+        assertTrue(config.hasConfigLoadFailure());
+        assertTrue(config.getConfigLoadReport().contains("font.family names no installed font family: Missing Shed Test Font"));
+        assertEquals("Monospaced", config.getFontFamily());
+        assertEquals("font.family names no installed font family: Missing Shed Test Font",
+            config.validateSettingValue("font.family", "Missing Shed Test Font"));
+        assertThrows(IOException.class, () -> config.setAndPersist("font.family", "Missing Shed Test Font"));
     }
 
     @Test

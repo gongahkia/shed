@@ -705,18 +705,8 @@ final class EditorUiController {
 
 
     Font resolveInstalledFont(String family, int fontSize) {
-        if (family == null || family.trim().isEmpty()) {
-            return null;
-        }
-
-        GraphicsEnvironment graphicsEnvironment = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        for (String availableFamily : graphicsEnvironment.getAvailableFontFamilyNames()) {
-            if (availableFamily.equalsIgnoreCase(family.trim())) {
-                return new Font(availableFamily, Font.PLAIN, fontSize);
-            }
-        }
-
-        return null;
+        String installedFamily = FontFamilyCatalog.resolve(family);
+        return installedFamily == null ? null : new Font(installedFamily, Font.PLAIN, fontSize);
     }
 
 

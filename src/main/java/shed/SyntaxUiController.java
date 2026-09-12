@@ -470,7 +470,7 @@ final class SyntaxUiController {
 
     void applySyntaxHighlighting() {
         FileBuffer buffer = editor.getCurrentBuffer();
-        if (buffer == null || buffer.isLargeFile()) {
+        if (!shouldHighlightSyntax(buffer)) {
             clearSyntaxHighlighting();
             editor.writingArea.repaint();
             return;
@@ -559,6 +559,10 @@ final class SyntaxUiController {
         } catch (RuntimeException ignored) {
             return new Range(0, text.length());
         }
+    }
+
+    static boolean shouldHighlightSyntax(FileBuffer buffer) {
+        return buffer != null && !buffer.isLargeFile() && buffer.isSyntaxHighlightingEnabled();
     }
 
     private List<Range> trailingWhitespace(VersionedTextSnapshot text, int visibleStart, int visibleEnd) {

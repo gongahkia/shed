@@ -430,11 +430,11 @@ final class SessionConfigController {
 
     private String configReloadResult() {
         if (editor.configManager.hasConfigLoadFailure()) {
-            showScratchBuffer("[config recovery]", editor.configManager.getConfigLoadReport());
+            showPlainScratchBuffer("[config recovery]", editor.configManager.getConfigLoadReport());
             return "Configuration rejected; last-known-good configuration remains active";
         }
         if (editor.configManager.hasConfigRepairs()) {
-            showScratchBuffer("[config recovery]", editor.configManager.getConfigLoadReport());
+            showPlainScratchBuffer("[config recovery]", editor.configManager.getConfigLoadReport());
             return "Configuration self-healed; review the repair before saving it";
         }
         return "Settings reloaded";
@@ -1719,11 +1719,19 @@ final class SessionConfigController {
         openScratchBuffer(title, content, true);
     }
 
+    public void showPlainScratchBuffer(String title, String content) {
+        openScratchBuffer(title, content, true, true);
+    }
+
 
     void openScratchBuffer(String title, String content, boolean returnable) {
+        openScratchBuffer(title, content, returnable, false);
+    }
+
+    private void openScratchBuffer(String title, String content, boolean returnable, boolean plainText) {
         editor.persistCurrentBufferState();
 
-        FileBuffer scratchBuffer = FileBuffer.createScratch(title, content);
+        FileBuffer scratchBuffer = plainText ? FileBuffer.createPlainScratch(title, content) : FileBuffer.createScratch(title, content);
         FileBuffer returnBuffer = editor.getCurrentBuffer();
         int returnCaretPosition = editor.writingArea.getCaretPosition();
 

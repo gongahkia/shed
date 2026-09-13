@@ -3,6 +3,9 @@ package shed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
 import javax.swing.JTextArea;
 import org.junit.jupiter.api.Test;
 
@@ -39,6 +42,21 @@ public class LineNumberPanelTest {
         assertTrue(markers.modified().contains(2));
         assertTrue(markers.added().contains(3));
         assertEquals(0, markers.deletedAfter().size());
+    }
+
+    @Test
+    void appliesEditorTextRenderingHintsToGutterNumbers() {
+        BufferedImage image = new BufferedImage(60, 80, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = image.createGraphics();
+        try {
+            LineNumberPanel.applyLineNumberTextRenderingHints(graphics);
+            assertEquals(RenderingHints.VALUE_TEXT_ANTIALIAS_ON,
+                graphics.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING));
+            assertEquals(RenderingHints.VALUE_FRACTIONALMETRICS_OFF,
+                graphics.getRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS));
+        } finally {
+            graphics.dispose();
+        }
     }
 
     private static final class RecordingLineNumberPanel extends LineNumberPanel {

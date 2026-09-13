@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.HashMap;
@@ -85,6 +86,7 @@ class LineNumberPanel extends JPanel {
 
     @Override
     protected void paintComponent(Graphics g) {
+        applyLineNumberTextRenderingHints(g);
         super.paintComponent(g);
         updatePreferredWidth();
         g.setColor(lineNumberColor);
@@ -180,6 +182,12 @@ class LineNumberPanel extends JPanel {
             }
         } catch (BadLocationException e) {
             e.printStackTrace();
+        }
+    }
+
+    static void applyLineNumberTextRenderingHints(Graphics graphics) {
+        if (graphics instanceof Graphics2D graphics2D) {
+            EditorUiController.applyEditorTextRenderingHints(graphics2D);
         }
     }
 

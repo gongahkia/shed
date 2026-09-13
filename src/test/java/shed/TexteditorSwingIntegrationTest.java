@@ -320,7 +320,7 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
-    void themeGalleryExplainsPersistenceAndRefreshesForLightThemes() throws Exception {
+    void themeGallerySavesAndRefreshesForLightThemes() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-themed-gallery");
         Path file = tempDir.resolve("gallery.txt");
@@ -338,10 +338,9 @@ public class TexteditorSwingIntegrationTest {
             ThemeGalleryDialog shown = dialog;
 
             List<javax.swing.JButton> buttons = onEdt(() -> descendants(shown, javax.swing.JButton.class));
-            javax.swing.JButton session = buttons.stream().filter(button -> "Apply for This Session".equals(button.getText())).findFirst().orElseThrow();
             javax.swing.JButton save = buttons.stream().filter(button -> "Apply and Save".equals(button.getText())).findFirst().orElseThrow();
-            assertFalse(onEdt(session::isEnabled));
             assertTrue(onEdt(save::isEnabled));
+            assertFalse(buttons.stream().anyMatch(button -> "Apply for This Session".equals(button.getText())));
 
             assertEquals("Theme set to catppuccin-latte", onEdt(() -> editor.setThemeFromCommand("catppuccin-latte")));
             assertEquals(editor.configManager.getNormalColor(), onEdt(() -> shown.getContentPane().getBackground()));

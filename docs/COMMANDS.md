@@ -231,12 +231,12 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:quickfix last`, `:clast` | Last quickfix entry |
 | `:quickfix current`, `:cc` | Jump to current quickfix entry |
 | `:quickfix current <index>`, `:cc <index>` | Jump to one-based quickfix entry index |
-| `:diagnostics`, `:diag`, `:ldiag` | Push current-buffer LSP diagnostics into quickfix |
+| `:diagnostic show`, `:diagnostics`, `:diag`, `:ldiag` | Push current-buffer LSP diagnostics into quickfix |
 | `:problems`, `:problems ui` | Open the docked, detachable Problems view of live LSP diagnostics plus retained quickfix producers |
 | `:problems text` | Open the current aggregated Problems list as a scratch buffer |
 | `:problems all\|errors\|warnings\|info\|hints\|other` | Open Problems with a severity filter |
-| `:dnext`, `:dn` | Jump to next diagnostic |
-| `:dprev`, `:dp` | Jump to previous diagnostic |
+| `:diagnostic next`, `:dnext`, `:dn` | Jump to next diagnostic |
+| `:diagnostic previous`, `:dprev`, `:dp` | Jump to previous diagnostic |
 
 ## Debug Commands
 

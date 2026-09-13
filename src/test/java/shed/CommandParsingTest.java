@@ -146,6 +146,7 @@ public class CommandParsingTest {
         assertTrue(handler.getCommandNames().contains("window"));
         assertTrue(handler.getCommandNames().contains("zoom"));
         assertTrue(handler.getCommandNames().contains("quickfix"));
+        assertTrue(handler.getCommandNames().contains("diagnostic"));
         assertTrue(handler.getCommandNames().contains("s"));
         assertTrue(handler.getCommandNames().contains("vs"));
         assertTrue(handler.getCommandNames().contains("discard"));
@@ -189,6 +190,9 @@ public class CommandParsingTest {
         assertEquals("quickfix next", PaletteController.surfaceActionCommand("Next Quickfix Result"));
         assertEquals("quickfix previous", PaletteController.surfaceActionCommand("Previous Quickfix Result"));
         assertEquals("quickfix first", PaletteController.surfaceActionCommand("First Quickfix Result"));
+        assertEquals("diagnostic show", PaletteController.surfaceActionCommand("Show Diagnostics"));
+        assertEquals("diagnostic next", PaletteController.surfaceActionCommand("Next Diagnostic"));
+        assertEquals("diagnostic previous", PaletteController.surfaceActionCommand("Previous Diagnostic"));
         assertEquals(actions.size(), new java.util.HashSet<>(actions).size());
         List<String> commands = PaletteController.surfaceActionCommands();
         assertEquals(commands.size(), new java.util.HashSet<>(commands).size());

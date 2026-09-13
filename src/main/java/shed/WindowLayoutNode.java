@@ -79,7 +79,10 @@ public class WindowLayoutNode {
 
     Component render(EditorPane activePane, int availableWidth, int availableHeight) {
         if (isLeaf()) {
-            return pane.isHiddenByFocusMode() ? null : pane.getComponent();
+            if (pane.isHiddenByFocusMode()) return null;
+            Component component = pane.getComponent();
+            component.setMinimumSize(new Dimension(MINIMUM_LEAF_WIDTH, MINIMUM_LEAF_HEIGHT));
+            return component;
         }
 
         int safeWidth = Math.max(0, availableWidth);
@@ -91,15 +94,19 @@ public class WindowLayoutNode {
         }
 
         int splitOrientation = orientation == Orientation.HORIZONTAL ? JSplitPane.HORIZONTAL_SPLIT : JSplitPane.VERTICAL_SPLIT;
-        int firstWidth = orientation == Orientation.HORIZONTAL ? (int) Math.round(safeWidth * ratio) : safeWidth;
-        int secondWidth = orientation == Orientation.HORIZONTAL ? Math.max(0, safeWidth - firstWidth - DIVIDER_SIZE) : safeWidth;
-        int firstHeight = orientation == Orientation.VERTICAL ? (int) Math.round(safeHeight * ratio) : safeHeight;
-        int secondHeight = orientation == Orientation.VERTICAL ? Math.max(0, safeHeight - firstHeight - DIVIDER_SIZE) : safeHeight;
+        int contentWidth = Math.max(0, safeWidth - DIVIDER_SIZE);
+        int contentHeight = Math.max(0, safeHeight - DIVIDER_SIZE);
+        int firstWidth = orientation == Orientation.HORIZONTAL ? (int) Math.round(contentWidth * ratio) : safeWidth;
+        int secondWidth = orientation == Orientation.HORIZONTAL ? Math.max(0, contentWidth - firstWidth) : safeWidth;
+        int firstHeight = orientation == Orientation.VERTICAL ? (int) Math.round(contentHeight * ratio) : safeHeight;
+        int secondHeight = orientation == Orientation.VERTICAL ? Math.max(0, contentHeight - firstHeight) : safeHeight;
         Component firstComponent = first == null ? null : first.render(activePane, firstWidth, firstHeight);
         Component secondComponent = second == null ? null : second.render(activePane, secondWidth, secondHeight);
         if (firstComponent == null) return secondComponent;
         if (secondComponent == null) return firstComponent;
         JSplitPane splitPane = new ThemedSplitPane(splitOrientation, firstComponent, secondComponent);
+        firstComponent.setMinimumSize(new Dimension(childMinimumWidth(first), childMinimumHeight(first)));
+        secondComponent.setMinimumSize(new Dimension(childMinimumWidth(second), childMinimumHeight(second)));
         Color surface = firstComponent.getBackground();
         Color divider = blend(surface, firstComponent.getForeground(), 0.16);
         splitPane.setBackground(surface);
@@ -108,7 +115,7 @@ public class WindowLayoutNode {
         splitPane.setContinuousLayout(true);
         splitPane.setDividerSize(DIVIDER_SIZE);
         splitPane.setBorder(BorderFactory.createEmptyBorder());
-        splitPane.setMinimumSize(new Dimension(MINIMUM_LEAF_WIDTH, MINIMUM_LEAF_HEIGHT));
+        splitPane.setMinimumSize(new Dimension(minimumWidth(), minimumHeight()));
         int dividerLocation = orientation == Orientation.HORIZONTAL ? firstWidth : firstHeight;
         javax.swing.SwingUtilities.invokeLater(() -> splitPane.setDividerLocation(Math.max(0, dividerLocation)));
         return splitPane;

@@ -59,9 +59,9 @@ final class PaletteController {
         action("Last Quickfix Result", "quickfix last", "Move to the last quickfix result."),
         action("Open Current Quickfix Result", "quickfix current", "Open the selected quickfix result."),
         action("Problems", "problems", "Open the unified diagnostics and quickfix Problems panel."),
-        action("Show Diagnostics", "diagnostics", "Show diagnostics for the active buffer."),
-        action("Next Diagnostic", "dnext", "Move to the next diagnostic."),
-        action("Previous Diagnostic", "dprev", "Move to the previous diagnostic."),
+        action("Show Diagnostics", "diagnostic show", "Show diagnostics for the active buffer."),
+        action("Next Diagnostic", "diagnostic next", "Move to the next diagnostic."),
+        action("Previous Diagnostic", "diagnostic previous", "Move to the previous diagnostic."),
 
         action("Settings", "settings", "Open the Settings inspector, including font, landing-buffer, and Markdown-preview settings."),
         action("Open Settings TOML", "settings file", "Open the persisted settings.toml buffer."),

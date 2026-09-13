@@ -27,4 +27,13 @@ class EditorUiControllerDropPlacementTest {
         assertEquals(new Rectangle(400, 0, 400, 600),
             EditorUiController.FileTreeDropPlacement.RIGHT.previewBounds(EDITOR_SIZE));
     }
+
+    @Test
+    void measuresTheDropAndPreviewAgainstTheVisibleViewport() {
+        Rectangle viewport = new Rectangle(640, 480, 800, 600);
+        EditorUiController.FileTreeDropPlacement placement = EditorUiController.FileTreeDropPlacement.forPoint(new Point(1040, 781), viewport);
+
+        assertEquals(EditorUiController.FileTreeDropPlacement.BOTTOM, placement);
+        assertEquals(new Rectangle(640, 780, 800, 300), placement.previewBounds(viewport));
+    }
 }

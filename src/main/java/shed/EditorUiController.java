@@ -454,7 +454,7 @@ final class EditorUiController {
                         event.dropComplete(false);
                         return;
                     }
-                    FileTreeDropPlacement placement = FileTreeDropPlacement.forPoint(event.getLocation(), textArea.getSize());
+                    FileTreeDropPlacement placement = FileTreeDropPlacement.forPoint(event.getLocation(), visibleDropBounds(textArea));
                     String result = editor.openFileInSplit(file, pane, placement.orientation, placement.newPaneFirst);
                     editor.showMessage(result);
                     event.dropComplete(result.startsWith("Opened in split:"));
@@ -478,7 +478,7 @@ final class EditorUiController {
 
 
     private void showExplorerFileDropPreview(JTextArea area, Point point) {
-        FileTreeDropPlacement placement = FileTreeDropPlacement.forPoint(point, area.getSize());
+        FileTreeDropPlacement placement = FileTreeDropPlacement.forPoint(point, visibleDropBounds(area));
         if (placement == explorerDropPreviews.put(area, placement)) return;
         area.repaint();
     }
@@ -491,7 +491,7 @@ final class EditorUiController {
         FileTreeDropPlacement placement = explorerDropPreviews.get(area);
         if (placement == null || area.getWidth() <= 0 || area.getHeight() <= 0) return;
         int inset = UiZoom.scale(8, editor.configManager.getUiZoom());
-        Rectangle region = placement.previewBounds(area.getSize());
+        Rectangle region = placement.previewBounds(visibleDropBounds(area));
         Rectangle preview = new Rectangle(region.x + inset, region.y + inset,
             Math.max(0, region.width - inset * 2), Math.max(0, region.height - inset * 2));
         if (preview.isEmpty()) return;
@@ -508,6 +508,12 @@ final class EditorUiController {
         } finally {
             overlay.dispose();
         }
+    }
+
+    private Rectangle visibleDropBounds(JTextArea area) {
+        Rectangle visible = area.getVisibleRect();
+        if (visible.width > 0 && visible.height > 0) return visible;
+        return new Rectangle(0, 0, Math.max(0, area.getWidth()), Math.max(0, area.getHeight()));
     }
 
 
@@ -535,6 +541,12 @@ final class EditorUiController {
             return point.y < size.height / 2 ? TOP : BOTTOM;
         }
 
+        static FileTreeDropPlacement forPoint(Point point, Rectangle bounds) {
+            if (bounds == null) return RIGHT;
+            Point relative = point == null ? null : new Point(point.x - bounds.x, point.y - bounds.y);
+            return forPoint(relative, bounds.getSize());
+        }
+
         Rectangle previewBounds(Dimension size) {
             int width = Math.max(0, size == null ? 0 : size.width);
             int height = Math.max(0, size == null ? 0 : size.height);
@@ -544,6 +556,13 @@ final class EditorUiController {
                 case TOP -> new Rectangle(0, 0, width, height / 2);
                 case BOTTOM -> new Rectangle(0, height / 2, width, height - height / 2);
             };
+        }
+
+        Rectangle previewBounds(Rectangle bounds) {
+            if (bounds == null) return new Rectangle();
+            Rectangle preview = previewBounds(bounds.getSize());
+            preview.translate(bounds.x, bounds.y);
+            return preview;
         }
     }
 

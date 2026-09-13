@@ -14,9 +14,9 @@ Each action is unique by visible label and normalized command. The application r
 | File Finder | `:files` | Open the project file finder. |
 | Recent Files | `:recent` | Open the recently used files list. |
 | Buffer Picker | `:buffers` | Open the buffer picker. |
-| Next Buffer | `:bn` | Focus the next open buffer. |
-| Previous Buffer | `:bp` | Focus the previous open buffer. |
-| List Open Buffers | `:ls` | Show all open buffers. |
+| Switch to Next Open Buffer | `:bn` | Switch to the next open buffer. |
+| Switch to Previous Open Buffer | `:bp` | Switch to the previous open buffer. |
+| Show All Open Buffers | `:ls` | Show the current and modified state of every open buffer. |
 | Close Current Buffer | `:bd` | Close the current buffer, prompting when needed. |
 | Save Current Buffer | `:w` | Write the current buffer. |
 | Save All Buffers | `:wa` | Write all modified file-backed buffers. |

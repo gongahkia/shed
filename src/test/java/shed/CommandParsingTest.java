@@ -152,7 +152,7 @@ public class CommandParsingTest {
         List<String> actions = PaletteController.surfaceActionNames();
         assertTrue(actions.containsAll(List.of(
             "Language Services", "Open File", "Open Folder", "Toggle File Tree",
-            "Save Current Buffer", "Split Below", "Focus Next Split", "Reset UI Zoom",
+            "Save Current Buffer", "Split Below", "Focus Next Split", "Focus Previous Split", "Reset UI Zoom",
             "Configuration Status", "Go to Definition", "Toolchain Status", "Update Status"
         )));
         List<String> candidates = PaletteController.commandPaletteCandidates();
@@ -182,6 +182,7 @@ public class CommandParsingTest {
         assertEquals("container status", PaletteController.surfaceActionCommand("Dev Container"));
         assertEquals("zoom reset", PaletteController.surfaceActionCommand("Reset UI Zoom"));
         assertEquals("window next", PaletteController.surfaceActionCommand("Focus Next Split"));
+        assertEquals("window previous", PaletteController.surfaceActionCommand("Focus Previous Split"));
         assertEquals(actions.size(), new java.util.HashSet<>(actions).size());
         List<String> commands = PaletteController.surfaceActionCommands();
         assertEquals(commands.size(), new java.util.HashSet<>(commands).size());

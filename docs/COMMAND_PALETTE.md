@@ -34,15 +34,16 @@ Each action is unique by visible label and normalized command. The application r
 | Split Below | `:s` | Create a horizontal split below the active editor. |
 | Split Right | `:vs` | Create a vertical split beside the active editor. |
 | Focus Next Split | `:window next` | Focus the next editor split. |
+| Focus Previous Split | `:window previous` | Focus the previous editor split. |
 | Focus Split Left | `:window left` | Focus the split to the left. |
 | Focus Split Right | `:window right` | Focus the split to the right. |
 | Focus Split Above | `:window up` | Focus the split above. |
 | Focus Split Below | `:window down` | Focus the split below. |
 | Equalize Splits | `:window equalize` | Give each editor split an equal share of space. |
-| Grow Current Split | `:window grow` | Increase the active split's size. |
-| Shrink Current Split | `:window shrink` | Decrease the active split's size. |
-| Zoom In | `:zoom in` | Increase the entire interface scale by 10%. |
-| Zoom Out | `:zoom out` | Decrease the entire interface scale by 10%. |
+| Grow Current Split | `:window grow [percent]` | Increase the active split by 5%, or by the specified percentage. |
+| Shrink Current Split | `:window shrink [percent]` | Decrease the active split by 5%, or by the specified percentage. |
+| Zoom In | `:zoom in [percent]` | Increase the interface scale by 10%, or by the specified percentage. |
+| Zoom Out | `:zoom out [percent]` | Decrease the interface scale by 10%, or by the specified percentage. |
 | Reset UI Zoom | `:zoom reset` | Restore the interface scale to 100%. |
 
 ## Quickfix and diagnostics

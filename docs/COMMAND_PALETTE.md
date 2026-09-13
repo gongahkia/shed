@@ -42,20 +42,19 @@ Each action is unique by visible label and normalized command. The application r
 | Equalize Splits | `:window equalize` | Give each editor split an equal share of space. |
 | Grow Current Split | `:window grow [percent]` | Increase the active split by 5%, or by the specified percentage. |
 | Shrink Current Split | `:window shrink [percent]` | Decrease the active split by 5%, or by the specified percentage. |
-| Zoom In | `:zoom in [percent]` | Increase the interface scale by 10%, or by the specified percentage. |
-| Zoom Out | `:zoom out [percent]` | Decrease the interface scale by 10%, or by the specified percentage. |
-| Reset UI Zoom | `:zoom reset` | Restore the interface scale to 100%. |
+| Zoom In | `:zoom in default` | Increase the interface scale by the default 10% increment. |
+| Zoom Out | `:zoom out default` | Decrease the interface scale by the default 10% increment. |
 
 ## Quickfix and diagnostics
 
 | Action | Command | Purpose |
 | :--- | :--- | :--- |
-| Open Quickfix | `:copen` | Open the current quickfix list. |
-| Next Quickfix Result | `:cnext` | Move to the next quickfix result. |
-| Previous Quickfix Result | `:cprev` | Move to the previous quickfix result. |
-| First Quickfix Result | `:cfirst` | Move to the first quickfix result. |
-| Last Quickfix Result | `:clast` | Move to the last quickfix result. |
-| Open Current Quickfix Result | `:cc` | Open the selected quickfix result. |
+| Open Quickfix | `:quickfix open` | Open the current quickfix list. |
+| Next Quickfix Result | `:quickfix next` | Move to the next quickfix result. |
+| Previous Quickfix Result | `:quickfix previous` | Move to the previous quickfix result. |
+| First Quickfix Result | `:quickfix first` | Move to the first quickfix result. |
+| Last Quickfix Result | `:quickfix last` | Move to the last quickfix result. |
+| Open Current Quickfix Result | `:quickfix current` | Open the selected quickfix result. |
 | Problems | `:problems` | Open the unified diagnostics and quickfix Problems panel. |
 | Show Diagnostics | `:diagnostics` | Show diagnostics for the active buffer. |
 | Next Diagnostic | `:dnext` | Move to the next diagnostic. |

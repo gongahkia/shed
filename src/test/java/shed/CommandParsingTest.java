@@ -145,6 +145,7 @@ public class CommandParsingTest {
         assertTrue(handler.getCommandNames().contains("language-services"));
         assertTrue(handler.getCommandNames().contains("window"));
         assertTrue(handler.getCommandNames().contains("zoom"));
+        assertTrue(handler.getCommandNames().contains("quickfix"));
         assertTrue(handler.getCommandNames().contains("s"));
         assertTrue(handler.getCommandNames().contains("vs"));
         assertTrue(handler.getCommandNames().contains("discard"));
@@ -152,7 +153,7 @@ public class CommandParsingTest {
         List<String> actions = PaletteController.surfaceActionNames();
         assertTrue(actions.containsAll(List.of(
             "Language Services", "Open File", "Open Folder", "Toggle File Tree",
-            "Save Current Buffer", "Split Below", "Focus Next Split", "Focus Previous Split", "Reset UI Zoom",
+            "Save Current Buffer", "Split Below", "Focus Next Split", "Focus Previous Split", "Zoom In", "Zoom Out",
             "Configuration Status", "Go to Definition", "Toolchain Status", "Update Status"
         )));
         List<String> candidates = PaletteController.commandPaletteCandidates();
@@ -180,9 +181,14 @@ public class CommandParsingTest {
         assertEquals("qa!", PaletteController.surfaceActionCommand("Quit All Without Saving"));
         assertEquals("remote list", PaletteController.surfaceActionCommand("Remote Workspaces"));
         assertEquals("container status", PaletteController.surfaceActionCommand("Dev Container"));
-        assertEquals("zoom reset", PaletteController.surfaceActionCommand("Reset UI Zoom"));
+        assertEquals("zoom in default", PaletteController.surfaceActionCommand("Zoom In"));
+        assertEquals("zoom out default", PaletteController.surfaceActionCommand("Zoom Out"));
         assertEquals("window next", PaletteController.surfaceActionCommand("Focus Next Split"));
         assertEquals("window previous", PaletteController.surfaceActionCommand("Focus Previous Split"));
+        assertEquals("quickfix open", PaletteController.surfaceActionCommand("Open Quickfix"));
+        assertEquals("quickfix next", PaletteController.surfaceActionCommand("Next Quickfix Result"));
+        assertEquals("quickfix previous", PaletteController.surfaceActionCommand("Previous Quickfix Result"));
+        assertEquals("quickfix first", PaletteController.surfaceActionCommand("First Quickfix Result"));
         assertEquals(actions.size(), new java.util.HashSet<>(actions).size());
         List<String> commands = PaletteController.surfaceActionCommands();
         assertEquals(commands.size(), new java.util.HashSet<>(commands).size());

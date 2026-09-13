@@ -208,7 +208,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.toggleLimelight(), "limelight");
         registerCommand((args, range, force) -> editor.toggleMinimap(), "minimap");
         registerCommand((args, range, force) -> handleNormal(args, range), "normal", "norm");
-        registerCommand((args, range, force) -> editor.reloadConfigFromDisk(), "reload", "source");
+        registerCommand((args, range, force) -> handleConfig("reload", force), "reload", "source");
         registerCommand((args, range, force) -> editor.cleanShedDataFiles(), "clean", "shedclean");
         registerCommand((args, range, force) -> editor.clearSearchHighlights(), "noh", "nohlsearch");
         registerCommand((args, range, force) -> editor.showCommandPalette(), "palette", "commands");
@@ -546,6 +546,9 @@ public class CommandHandler {
         if ("status".equals(trimmed)) {
             return editor.showConfigLoadStatus();
         }
+        if ("reload".equals(trimmed)) {
+            return editor.reloadConfigFromDisk();
+        }
         if ("defaults".equals(trimmed)) {
             return editor.materializeDefaultConfig(force);
         }
@@ -558,7 +561,7 @@ public class CommandHandler {
         if (trimmed.startsWith("reset ")) {
             return editor.resetConfigOptionPersistent(args.substring("reset".length()).trim());
         }
-        return "Usage: :config[!] [file|save|heal|status|defaults|inspector|reference|reset <key>]";
+        return "Usage: :config[!] [file|save|heal|status|reload|defaults|inspector|reference|reset <key>]";
     }
 
     private String handleKeymap(String args) {

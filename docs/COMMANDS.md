@@ -164,7 +164,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:config save`, `:config write` | Persist current runtime config to disk |
 | `:config heal` | Persist the deterministic repairs reported for the current config load |
 | `:config status` | Show the current config load or recovery report |
-| `:reload`, `:source` | Reload config from disk |
+| `:config reload`, `:reload`, `:source` | Reload config from disk |
 | `:clean`, `:shedclean` | Remove Shed data under `~/.shed` and reset in-memory history |
 
 ## Window, Picker, and UI Commands

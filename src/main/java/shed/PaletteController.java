@@ -67,7 +67,7 @@ final class PaletteController {
         action("Open Settings TOML", "settings file", "Open the persisted settings.toml buffer."),
         action("Configuration Status", "config status", "Show configuration loading and recovery details."),
         action("Apply Suggested Config Repairs", "config heal", "Persist the reviewed deterministic configuration repairs."),
-        action("Reload Configuration", "reload", "Reload configuration from disk."),
+        action("Reload Configuration", "config reload", "Reload configuration from disk."),
         action("Keymap Inspector", "keymap", "Inspect and edit validated keymap overlays."),
         action("Themes", "themes", "Show built-in themes."),
         action("Toggle Zen Mode", "zen", "Toggle the distraction-free Zen layout."),

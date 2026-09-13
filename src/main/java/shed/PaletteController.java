@@ -21,9 +21,8 @@ final class PaletteController {
     private static final List<PaletteAction> SURFACE_ACTIONS = actions(
         action("Open File", "open file", "Choose and open a local file."),
         action("Open Folder", "open folder", "Choose a local folder, activate it as the workspace, and show its file tree."),
-        action("Open File Tree", "tree", "Open or close the workspace file tree."),
+        action("Toggle File Tree", "tree", "Open or close the workspace file tree."),
         action("File Finder", "files", "Open the project file finder."),
-        action("Folder Finder", "folder", "Choose a folder, then find one of its files."),
         action("Recent Files", "recent", "Open the recently used files list."),
         action("Buffer Picker", "buffers", "Open the buffer picker."),
         action("Next Buffer", "bn", "Focus the next open buffer."),
@@ -645,9 +644,6 @@ final class PaletteController {
             case "projectreplace":
             case "preplace":
                 return "Preview and explicitly apply selected project-wide literal replacements.";
-            case "folder":
-            case "folders":
-                return "Pick folder, then open file picker.";
             case "split":
             case "sp":
                 return "Create horizontal split.";

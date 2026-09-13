@@ -189,6 +189,7 @@ public class HelpService {
                     + ":s / :split / :sp creates a horizontal split.\n"
                     + ":vs / :vsplit / :vsp creates a vertical split.\n"
                     + ":close closes the active split when more than one window exists.\n"
+                    + ":window next / previous cycles split focus; grow / shrink [percent] resizes the active split.\n"
                     + "Ctrl-w s/v/c mirrors the split commands.\n"
                     + "Ctrl-w h/j/k/l changes window focus.\n"
                     + "Ctrl-w w cycles focus and Ctrl-w = equalizes split ratios.\n";

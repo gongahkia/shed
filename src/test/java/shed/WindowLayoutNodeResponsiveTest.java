@@ -1,5 +1,6 @@
 package shed;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -50,6 +51,22 @@ public class WindowLayoutNodeResponsiveTest {
         assertTrue(root.render(second, 900, 800) instanceof javax.swing.JSplitPane);
         assertTrue(root.getFirst().isLeaf());
         assertTrue(root.getSecond().isLeaf());
+    }
+
+    @Test
+    void adjustsTheRatioTowardTheActivePane() {
+        EditorPane first = pane();
+        EditorPane second = pane();
+        WindowLayoutNode root = WindowLayoutNode.split(WindowLayoutNode.Orientation.HORIZONTAL, 0.5,
+            WindowLayoutNode.leaf(first), WindowLayoutNode.leaf(second));
+
+        assertTrue(root.adjustRatio(first, 0.2));
+        assertEquals(0.7, root.getRatio());
+
+        root = WindowLayoutNode.split(WindowLayoutNode.Orientation.HORIZONTAL, 0.5,
+            WindowLayoutNode.leaf(first), WindowLayoutNode.leaf(second));
+        assertTrue(root.adjustRatio(second, 0.2));
+        assertEquals(0.3, root.getRatio());
     }
 
     @Test

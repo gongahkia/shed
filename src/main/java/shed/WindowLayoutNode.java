@@ -285,7 +285,7 @@ public class WindowLayoutNode {
         boolean inFirst = firstLeaves.contains(target);
         boolean inSecond = secondLeaves.contains(target);
         if (inFirst || inSecond) {
-            double newRatio = ratio + delta;
+            double newRatio = ratio + (inFirst ? delta : -delta);
             if (newRatio >= 0.05 && newRatio <= 0.95) {
                 ratio = newRatio;
                 return true;

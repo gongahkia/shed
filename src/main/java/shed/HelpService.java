@@ -77,12 +77,12 @@ public class HelpService {
                    "  :cnext/:cprev  Next/previous quickfix entry\n" +
                    "  :cc [n]        Jump to quickfix entry\n" +
                    "  :lsp ...       LSP commands (def/type/hierarchies/refs/rename/actions)\n" +
-                   "  :format        Format using current extension policy\n" +
-                   "  :formatter     Edit current extension formatter policy\n" +
+                   "  :format        Format using current file-type policy\n" +
+                   "  :formatter     Edit current file-type formatter policy\n" +
                    "  :lsp status    Show running LSP servers\n" +
                    "  :lsp servers   List all configured + builtin LSP servers\n" +
                    "  :lsp manage    Open managed Language Services\n" +
-                   "  :lsp restart   Restart LSP server for current extension\n" +
+                   "  :lsp restart   Restart LSP server for current file type\n" +
                    "  :diagnostics   Push diagnostics into quickfix\n" +
                    "  :dnext/:dprev  Jump next/prev diagnostic\n" +
                    "  :symbols [q]   Symbol picker (class/function/heading)\n" +
@@ -239,7 +239,7 @@ public class HelpService {
                     + "  :lsp stop [ext]  stop a server\n"
                     + "  :lsp log         show LSP error log\n\n"
                     + "  :format          format using LSP or configured external formatter\n"
-                    + "  :formatter       edit current extension formatter policy\n\n"
+                    + "  :formatter       edit current file-type formatter policy\n\n"
                     + "CONFIGURATION\n"
                     + "  \"lsp.<ext>.command\" = \"<binary>\"   server command in ~/.shed/config.toml\n"
                     + "  \"lsp.<ext>.args\" = \"<flags>\"       server arguments\n"

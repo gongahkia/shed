@@ -77,7 +77,7 @@ public class ConfigManagerTest {
         assertEquals("Live: checked when saving or loading a session", terminalRestore.applyBehavior());
         TypedSettings.Descriptor terminalProfile = config.typedSettingDescriptors().stream()
             .filter(setting -> setting.key().equals("terminal.default.profile")).findFirst().orElseThrow();
-        assertEquals("system | builtin:<id> | <extension-id>:<id>", terminalProfile.allowedValues());
+        assertEquals("system | builtin:<id>", terminalProfile.allowedValues());
         assertEquals("Live: used when the next default terminal opens", terminalProfile.applyBehavior());
         assertFalse(config.getWorkspaceIndexEnabled());
         assertTrue(config.getGitAutoRefreshEnabled());
@@ -201,9 +201,9 @@ public class ConfigManagerTest {
         assertEquals("ui.font.size must be non-negative", config.validateSettingValue("ui.font.size", "-1"));
         assertEquals("ui.zoom must be between 0.5 and 4.0", config.validateSettingValue("ui.zoom", "4.1"));
         assertEquals("terminal.font.size must be at least 1", config.validateSettingValue("terminal.font.size", "0"));
-        assertEquals("terminal.default.profile must be system, builtin:<id>, or an extension profile id",
+        assertEquals("terminal.default.profile must be system or a built-in profile id",
             config.validateSettingValue("terminal.default.profile", "/bin/bash"));
-        assertEquals("terminal.default.profile must be system, builtin:<id>, or an extension profile id",
+        assertEquals("terminal.default.profile must be system or a built-in profile id",
             config.validateSettingValue("terminal.default.profile", "builtin:"));
     }
 

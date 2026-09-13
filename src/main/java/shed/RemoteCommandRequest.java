@@ -11,7 +11,7 @@ import java.util.Collections;
  * <p>The working directory is relative to that workspace's root. This avoids
  * leaking a local mirror path into a provider's remote command implementation.</p>
  */
-public record RemoteCommandRequest(List<String> command, String relativeWorkingDirectory, Map<String, String> environment) {
+record RemoteCommandRequest(List<String> command, String relativeWorkingDirectory, Map<String, String> environment) {
     public RemoteCommandRequest {
         command = List.copyOf(command == null ? List.of() : command);
         if (command.isEmpty()) throw new IllegalArgumentException("remote command is required");

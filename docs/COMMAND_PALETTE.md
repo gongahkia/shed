@@ -142,10 +142,7 @@ Each action is unique by visible label and normalized command. The application r
 | GitHub Pull Requests | `:github prs` | Open pull-request review after GitHub review consent has been granted. |
 | Remote Workspaces | `:remote list` | Inspect explicit remote connections, active execution sessions, and loopback SSH forwards. |
 | Dev Container | `:container status` | Inspect the active workspace's Dev Container configuration and session routing state. |
+| Docker Containers | `:docker list` | List local Docker containers and their state. |
 | Compose Status | `:compose status` | Show workspace Compose configuration status. |
 | Database Status | `:database status` | Show workspace database configuration status. |
-| Workspace Integrations | `:integration list` | Show configured workspace integrations. |
-| Plugin Manager | `:plugin list` | Show installed plugins. |
-| Extension Manager | `:extension list` | Show installed extensions and their contributions. |
-| Custom Editors | `:customeditor list` | Show available custom editors. |
 | Update Status | `:update status` | Show the configured update channel's status. |

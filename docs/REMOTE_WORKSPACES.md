@@ -1,14 +1,16 @@
 # Remote Workspaces
 
-Remote workspaces are explicit local working-tree connections. They do not install a server, start a background synchronizer, or run code on a remote machine merely because a URI is opened.
+Remote workspaces keep an explicit local working tree. Shed has built-in Git, SSH, Docker-container, and Windows WSL providers; it does not load third-party remote providers or run a remote extension host.
 
 ```text
 :remote providers
-:remote open git+https://host/owner/repository.git
-:remote open ssh://user@host/absolute/path
-:remote open container://container-name/absolute/path
+:remote open <uri>
+:remote reconnect <connection-id>
+:remote bootstrap ssh://[user@]host[:port]/absolute-workspace-path
 :remote pull <connection-id>
 :remote push <connection-id>
+:remote sync start <connection-id> [seconds]
+:remote sync stop <connection-id>
 :remote exec <connection-id> <command...>
 :remote terminal <connection-id> [command...]
 :remote use <connection-id>
@@ -21,89 +23,54 @@ Remote workspaces are explicit local working-tree connections. They do not insta
 
 ## Built-in providers
 
-| URI | Local representation | Pull | Push |
-| --- | --- | --- | --- |
-| `git:`, `git+https:`, `git+ssh:`, eligible `https:`/`ssh:` ending in `.git` | A Git clone below `~/.shed/remote-workspaces/` | `git fetch --all --prune`, then `git pull --ff-only` | `git push` |
-| `ssh://user@host/absolute/path` | An `rsync` mirror below `~/.shed/remote-workspaces/` | `rsync -az --protect-args` remote-to-local | the same explicit local-to-remote transfer |
-| `container://name/absolute/path` or `docker://name/absolute/path` | A Docker-copy mirror below `~/.shed/remote-workspaces/` | `docker cp` container-to-local | `docker cp` local-to-container |
-| `wsl://distribution/absolute/path` | Direct `//wsl$/` folder on Windows | no-op | no-op |
+| URI | Local representation | Pull | Push | Remote execution |
+| --- | --- | --- | --- | --- |
+| `git:`, `git+https:`, `git+ssh:`, eligible `.git` HTTPS/SSH URIs | Git clone below `~/.shed/remote-workspaces/` | fetch and fast-forward pull | Git push | local clone |
+| `ssh://user@host/absolute/path` | `rsync` mirror | remote-to-local `rsync` | local-to-remote `rsync` | SSH at the URI path |
+| `container://name/absolute/path` or `docker://name/absolute/path` | Docker-copy mirror | `docker cp` into mirror | `docker cp` into container | `docker exec --workdir` |
+| `wsl://distribution/absolute/path` | direct `//wsl$/` path on Windows | no-op | no-op | `wsl.exe` |
 
-SSH, Git, and Docker credentials remain with the user-installed tools and their credential helpers. URI passwords are rejected. Paths must be absolute, cannot contain `..`, and mirror paths are checked against traversal and symbolic-link escapes. Git and remote-command output is capped and commands time out rather than being left attached indefinitely.
+URIs require an absolute path with no traversal segments. URI passwords are rejected. Credentials remain with Git, SSH, Docker, WSL, and their configured credential helpers.
 
-## Explicit remote commands
+## Connection and synchronization
 
-`:remote exec <id> <command...>` runs only after a user requests it. The command is parsed as direct argv; Shed does not invoke a local shell to process it. The result opens in a scratch buffer and has a capped output size.
+`:remote open` connects asynchronously, fetches the first local representation, and adds it to the workspace. :remote reconnect <id>` opens the same URI again and replaces that connection only after the new mirror succeeds. An active automatic-pull schedule remains attached to that connection id after a successful reconnect.
 
-`:remote terminal <id> [command...]` opens an explicit interactive terminal at the connection root. SSH receives a PTY (`ssh -tt`) and a safely quoted remote shell/command; Docker receives `docker exec -it`; WSL starts the selected distribution shell. An optional command is direct argv. Terminal session state and remote command history are not restored.
+`:remote bootstrap <ssh-uri>` creates only the requested remote directory with `mkdir -p`; it does not install software, configure SSH, start a server, or leave a remote process behind. It is useful before the first SSH mirror connection when the workspace path does not yet exist.
 
-## Activated remote execution
+Pull and push are explicit. `:remote sync start <id> [seconds]` adds an opt-in automatic **pull** with an interval from 5 to 3,600 seconds. Each result, including failures, is recorded in Shed’s local command log. `:remote sync stop <id>` cancels it. Automatic sync is session-only, does not push, does not delete mirror files, and stops when the connection or application closes.
 
-`:remote use <id>` explicitly activates an in-memory execution session for a connected SSH, Docker-container, WSL, or contributed workspace that reports a distinct remote execution root. After that command, new ordinary `:terminal` panes and `:task run`/`:task dry-run` for files beneath that workspace use the provider's remote terminal or task boundary. A default terminal lets the provider choose its normal remote shell; an extension terminal profile retains its direct argv. `:remote unuse <id>` stops this routing but leaves the connection and mirror intact. `:remote close <id>` also stops it.
+## Execution, terminals, and tasks
 
-Opening a remote workspace alone still does not change ordinary task or terminal placement. The activation is process-local, has no automatic reconnect or persistence, does not move the editor, extension host, file watcher, or shell session to the remote host, and does not synchronize files on a timer. When both an active remote session and an explicitly connected local Dev Container could contain a task, the active remote session takes precedence by execution-routing order.
+`:remote exec` starts one explicit direct-argv command as a cancellable background job. Its bounded output opens in a scratch buffer. `:remote terminal` opens one PTY: SSH uses `ssh -tt`, Docker uses `docker exec -it`, and WSL uses `wsl.exe`.
 
-## Explicit SSH port forwarding
+`:remote use <id>` is the explicit routing switch. It makes new ordinary terminal panes and `:task run`/`:task dry-run` for files under that connection use the remote workspace. `:remote unuse` removes that routing without closing the mirror. An active remote session takes precedence over a connected Dev Container for the same files.
 
-`:remote forward <id> <local-port> <remote-host> <remote-port>` starts one local forward only for a connected `ssh://` workspace. It runs the user-installed SSH client with `-N`, `BatchMode=yes`, `ExitOnForwardFailure=yes`, a bounded connect attempt, and `-L 127.0.0.1:…`; the listening end is always loopback-only and cannot expose a port to the LAN. The connection URI's existing SSH host, user, and port are used. `:remote forward list` shows process state, and `:remote forward close <local-port>` stops one forward.
+`:remote forward` supports loopback-only SSH forwards. Shed starts the installed SSH client with `BatchMode=yes`, `ExitOnForwardFailure=yes`, and a `127.0.0.1` listener; it never scans ports or creates a forward on connection.
 
-Forwarding is explicit, session-only, and process-based. Shed does not scan remote ports, create a forward during connect, persist or restore forwards, publish them publicly, forward container/WSL connections, or automatically attach an LSP, debugger, browser, or task to a forwarded port. A forward stops when its SSH workspace is disconnected or the application exits. `BatchMode=yes` means password and host-key confirmation prompts are not handled by Shed; use SSH keys, an agent, and a trusted known-hosts entry or a normal SSH config alias.
-
-`:task remote <id> <name>` is the structured equivalent for a validated `.shedtasks` entry. It transfers only the direct command argv, a path relative to the connection root, and declared environment values to a provider that supports task execution. See [Workspace Tasks](TASKS.md#explicit-remote-tasks) for shell and cancellation boundaries.
-
-| Connection type | Execution location |
-| --- | --- |
-| SSH mirror | SSH host, after safely changing to the URI path |
-| Docker mirror | Container, through `docker exec --workdir` |
-| WSL | Selected distribution, through `wsl.exe -d … --cd` |
-| Git clone | The local clone |
-
-SSH necessarily passes a safely quoted command to the remote POSIX shell. For that route, Shed accepts DNS host names and simple SSH user names only; use a normal SSH config alias if the endpoint needs a more complex connection setup. This command path is explicit process execution, so it inherits the remote account/container's permissions and must be treated like opening a terminal there.
-
-## Opt-in remote language servers
-
-Set this **global** setting and configure the server command that already exists in the remote environment:
-
-```toml
-remote.lsp.enabled = true
-"lsp.py.command" = "pyright-langserver"
-"lsp.py.args" = "--stdio"
-```
-
-For a connected SSH, Docker-container, or WSL workspace, Shed carries that configured LSP process through `ssh`, `docker exec -i`, or `wsl.exe`; it initializes the server and document requests with the URI path from the remote workspace, while the editor keeps its local mirror. An already running local Dev Container is also supported: Shed first runs `devcontainer exec … pwd` to learn the mounted workspace path, then launches the server with `devcontainer exec`. Run `:lsp restart <ext>` after changing `remote.lsp.enabled`; a running client retains the URI mode it started with. Remote LSP is never enabled by a project `.shed.toml`, and Shed neither downloads the server nor runs managed local language-service artifacts remotely. Closing a remote workspace stops its associated LSP clients.
-
-Remote terminal output can open a source location only when its absolute remote path is beneath that same declared remote root and its mapped local-mirror file exists. This supports compiler-style `path:line[:column]` output without exposing remote paths outside the mirror. Relative links assume the terminal began at the remote workspace root; Shed does not infer a later remote `cd` for SSH/container terminals.
-
-### Explicit remote tests
-
-When the Tests panel selects a connected workspace root, explicit test discovery and test runs use that provider's remote command environment. Shed maps configured direct argv paths from the local mirror to the declared remote root and maps absolute remote output paths back before parsing. It retrieves only the declared report files/directories into a fresh app-owned cache; it does not pull the complete project after a test run. See [Testing](TESTS.md#connected-remote-roots) for report, size, cleanup, and cancellation boundaries.
-
-The bridges support only ordinary absolute `file:` URIs and DAP source paths inside the connected workspace root. An explicit configured stdio adapter can run remotely through SSH, Docker, or WSL; it does not support SSH login banners on stdout, remote URI schemes, remote TCP DAP, port-forwarded language servers, remote extension hosts, or a server bootstrap/reconnect protocol.
-
-## Semantics and limitations
-
-- Pull and push never happen on a timer. `:remote close` disconnects the workspace and retains its local mirror.
-- SSH mirroring deliberately omits `--delete`; a pull cannot silently delete an unrelated local mirror file.
-- Container remote-workspace support itself is file synchronization. It does not run an extension host inside a container; the separate local Dev Container CLI bridge below is explicit and does not alter that mirror model.
-- WSL support is Windows-only and uses the local WSL filesystem bridge rather than a remote server.
-- This is not VS Code or Zed remote-development parity: there is no remote extension host, automatic remote task placement without `:remote use`, SSH server bootstrap, port discovery or forwarding UI, Codespaces service, browser editor, persistent remote-server/reconnect protocol, or automatic conflict resolver. Remote LSP, testing, and debugging are narrow explicit process bridges, not a remote workbench host. An explicitly connected local Dev Container and an explicitly activated remote session can route new normal terminals and task runs only for the current application session.
-
-Extensions can add URI schemes using `RemoteWorkspaceProvider`; they must disclose their own authentication, synchronization, and network behavior.
+Remote LSP, testing, and debugging remain explicit bridges. Global `remote.lsp.enabled=true` plus a configured `lsp.<extension>.command` is required before Shed starts a user-selected server in an SSH, Docker, WSL, or connected Dev Container environment. Shed does not install the server or adapter.
 
 ## Local Dev Container CLI
 
-For a workspace containing `.devcontainer/devcontainer.json`, Shed also exposes an explicit local CLI bridge:
+For an active workspace containing `.devcontainer/devcontainer.json`, Shed delegates to the installed Development Containers CLI:
 
 ```text
 :container status
+:container build
 :container up
+:container lifecycle
+:container stop
+:container down
 :container connect
 :container disconnect
 :container exec <command...>
 :container terminal [command...]
+:container open <container> <absolute-container-path>
 :task container <name>
-:container open <container> <absolute-path>
 ```
 
-`up`, `exec`, and `:task container` use the user-installed `devcontainer` CLI as explicit, cancellable local processes; `terminal` opens a PTY using `devcontainer exec`. `connect` first runs `up`, then validates `devcontainer exec … pwd`; only after both succeed does Shed keep an in-memory host/container workspace mapping. That explicit session routes new ordinary terminals and `:task run` calls for the connected workspace through `devcontainer exec`, maps only verified in-workspace terminal source paths back to local files, and is removed by `disconnect` or application exit without stopping the container. A one-off container task first resolves the runtime workspace path, applies task environment values as `--remote-env`, and then runs the validated task. With global `remote.lsp.enabled=true` and a user-configured `lsp.<ext>.command`, opening a matching file in an already running container likewise probes that path and starts only that LSP process through `devcontainer exec`. Explicit Test Explorer dynamic discovery and runs use that same already-running-container bridge; static Java source discovery stays local because the mounted project is already local. Report-producing test adapters receive a generated, project-mounted directory that Shed validates and removes after parsing. An explicit configured stdio DAP adapter can use the same probe and bridge, including a configured pre-launch task; adapter discovery remains process-free. Shed does not start or rebuild a container for LSP, testing, or debugging, install a server/adapter, expose remote TCP DAP or port forwarding, invoke these commands during workspace open, or claim to run an extension host in the container. Direct tasks require the workspace-root cwd because the CLI exposes no cwd option; both login-shell and non-login shell tasks may explicitly change into a subdirectory. `open` creates the same explicit Docker-copy mirror described above.
+`build`, `up`, `lifecycle`, `stop`, and `down` map to the CLI’s corresponding lifecycle actions. `connect` runs `up`, probes the mounted workspace with `devcontainer exec … pwd`, then records an in-memory mapping used by new terminals and ordinary tasks. `disconnect` removes only that Shed mapping; it leaves the container running. LSP, tests, and debugging never start or rebuild a container implicitly.
 
-In a multi-root workspace, Dev Container commands use the deepest configured folder containing the current file. A scratch or outside file uses the Explorer-selected folder.
+## Boundary
+
+Remote support is intentionally a local-mirror and explicit-process model. There is no remote extension host, third-party remote provider API, automatic conflict resolution, automatic push, persisted remote session, remote file watcher, remote shell state restore, remote TCP DAP, port discovery, browser editor, or SSH software installation. Background remote execution is limited to user-requested `:remote exec`, tasks, and opt-in automatic pull jobs, all of which report through the normal local job/logging paths.

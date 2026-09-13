@@ -1821,7 +1821,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return databaseController.handle(argument);
     }
 
-    boolean showCustomEditorIfAvailable(EditorPane pane, FileBuffer buffer) {
+    boolean showAlternateSurfaceIfAvailable(EditorPane pane, FileBuffer buffer) {
         return notebookController.showIfAvailable(pane, buffer);
     }
 

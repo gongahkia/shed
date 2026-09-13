@@ -1,6 +1,6 @@
 # Accessibility QA
 
-Custom editor, palette, inspector, recovery, Git, and GitHub controls expose accessible names and descriptions. Native Swing controls retain their standard keyboard traversal and scalable Look-and-Feel fonts.
+Palette, inspector, recovery, Git, and GitHub controls expose accessible names and descriptions. Native Swing controls retain their standard keyboard traversal and scalable Look-and-Feel fonts.
 
 Before release, run this manual checklist on macOS, Windows, and Linux at default and increased system text scale:
 

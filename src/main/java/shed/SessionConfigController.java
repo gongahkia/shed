@@ -441,9 +441,9 @@ final class SessionConfigController {
         }
         editor.applyUiFont();
         for (EditorPane pane : editor.editorPanes) {
-            if (pane.getCustomEditorComponent() instanceof ShedWelcomePanel welcome) {
+            if (pane.getAlternateComponent() instanceof ShedWelcomePanel welcome) {
                 welcome.refreshScale();
-            } else if (pane.getCustomEditorComponent() instanceof FileTreePanel explorer) {
+            } else if (pane.getAlternateComponent() instanceof FileTreePanel explorer) {
                 explorer.refreshAppearance();
             }
         }

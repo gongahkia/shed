@@ -3,7 +3,7 @@ package shed;
 import java.net.URI;
 
 /** Provider for an explicitly requested remote workspace scheme. */
-public interface RemoteWorkspaceProvider {
+interface RemoteWorkspaceProvider {
     String id();
 
     String displayName();

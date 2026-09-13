@@ -60,7 +60,6 @@ public class HelpService {
                    "  :version       Show local version and support metadata\n" +
                    "  :drop cmd      Run async command with current file path\n" +
                    "  :task ...      Run/save project tasks with quickfix integration\n" +
-                   "  :customeditor  List/reopen extension editors and the built-in binary Hex Editor\n" +
                    "  :open [target] Open a file chooser or a workspace folder\n" +
                    "  :files         File finder\n" +
                    "  :folder        Folder finder\n" +
@@ -118,23 +117,12 @@ public class HelpService {
                    "  :s/a/b         Substitute current line\n" +
                    "  :1,5s/a/b/g    Substitute a range\n" +
                    "  :%s/a/b/g      Substitute whole buffer\n\n" +
-                   "PLUGINS\n" +
-                   "  :plugin           List loaded plugins\n" +
-                   "  :plugin packages  List managed plugin packages\n" +
-                   "  :plugin reload    Reload plugins from ~/.shed/plugins/\n" +
-                   "  :plugin enable/disable <name>  Toggle plugins\n" +
-                   "  :plugin install <name> <version> <source> [--checksum=sha256] [--pin]\n" +
-                   "  :plugin update [name]  Update managed package(s), skip pinned\n" +
-                   "  :plugin remove <name>  Remove managed package + plugin file\n" +
-                   "  :plugin pin/unpin <name>  Toggle package pinning\n" +
-                   "  :plugin new <name> Create + open plugin template\n" +
-                   "  :help plugins     Plugin authoring guide\n\n" +
                    "SETTINGS KEYS\n" +
                    "  project override file: .shed.toml (nearest parent)\n" +
                    "  project.config.allow.unsafe=false limits local overrides to UI/editor keys\n" +
                    "  tree.delete.protect.critical=true blocks deleting /, home, and cwd via :tree rm\n" +
                    "  ui.whichkey.hints=true shows prefix-key hints (g/z/Ctrl-w/...)\n" +
-                   "  first-open trust prompts gate local .shed.toml/.shed plugins per project\n" +
+                   "  first-open trust prompts gate local .shed.toml per project\n" +
                    "  \"command.alias.<name>\" = \"<builtin>\"\n" +
                    "  \"keybind.<mode>.<lhs>\" = \"<rhs>\"\n" +
                    "  modes: normal/insert/visual/visual_line/replace/command/search/global\n" +
@@ -283,25 +271,32 @@ public class HelpService {
                     + ":compose up/build [service...], ps, services, and logs [service...] are explicit jobs.\n"
                     + ":compose exec <service> <command...> runs direct argv; :compose terminal opens an interactive service shell.\n"
                     + ":compose redeploy <service> builds and recreates that service; :compose down does not forward volume/image deletion flags.\n";
+            case "docker":
+            case "containers":
+                return "Help: Docker containers\n\n"
+                    + ":docker list shows local containers.\n"
+                    + ":docker inspect|start|stop|restart <container> are explicit jobs.\n"
+                    + ":docker logs <container> [lines], :docker exec <container> <command...>, and :docker terminal <container> [command...] work with a named local container.\n"
+                    + ":docker open <container> <absolute-container-path> creates a local mirror workspace.\n";
+            case "container":
+            case "devcontainer":
+                return "Help: Dev Container\n\n"
+                    + ":container build, up, lifecycle, stop, and down use the installed Dev Container CLI for the active workspace.\n"
+                    + ":container connect routes new terminals and tasks through the running development container for this application session.\n"
+                    + ":container exec <command...> and :container terminal [command...] are explicit container actions.\n";
+            case "remote":
+            case "remotes":
+                return "Help: remote workspaces\n\n"
+                    + ":remote open <uri> creates a local mirror. :remote reconnect <id> refreshes that connection.\n"
+                    + ":remote bootstrap <ssh-uri> creates the requested remote SSH workspace directory without installing software.\n"
+                    + ":remote sync start <id> [seconds] enables opt-in automatic pulls; :remote sync stop <id> stops them.\n"
+                    + ":remote exec runs an explicit command in a background job; :remote use routes new terminals and tasks to a connected workspace.\n";
             case "database":
             case "db":
                 return "Help: PostgreSQL\n\n"
                     + ":database status is local-only and opens no connection.\n"
                     + ":database query <quoted-sql>, tables, and file <workspace-relative.sql> start explicit psql jobs.\n"
                     + ":database terminal opens interactive psql. Shed stores no connection strings or credentials.\n";
-            case "language":
-            case "lang":
-                return "Help: language\n\n"
-                    + ":language lists installed extension language profiles.\n"
-                    + ":language <extension-id:language-id> selects lexical metadata for the current buffer.\n"
-                    + ":language auto restores filename/shebang detection.\n";
-            case "customeditor":
-            case "customeditors":
-            case "custom-editor":
-                return "Help: custom editors\n\n"
-                    + ":customeditor list shows extension editors and Shed's bounded binary Hex Editor.\n"
-                    + ":customeditor reopen selects a matching extension editor first, then the Hex Editor for an eligible binary file.\n"
-                    + "The Hex Editor displays 4 KiB pages and can atomically change one byte at a time; it accepts regular binary files up to 8 MiB.\n";
             case "git":
                 return "Help: git\n\n"
                     + ":git shows status.\n"
@@ -361,73 +356,6 @@ public class HelpService {
                     + "Define in ~/.shed/config.toml as \"command.alias.<newname>\" = \"<builtin>\".\n"
                     + "Example: \"command.alias.ww\" = \"w\".\n"
                     + "Aliases are used by command execution and command completion.\n";
-            case "plugin":
-            case "plugins":
-                return "Help: plugins\n\n"
-                    + "Shed loads .shed and .lua plugin files from ~/.shed/plugins/ at startup.\n\n"
-                    + "DECLARATIVE PLUGINS (.shed)\n"
-                    + "  Directive comments starting with # @.\n\n"
-                    + "  DIRECTIVES\n"
-                    + "    # @name <plugin-name>\n"
-                    + "    # @description <one-line summary>\n"
-                    + "    # @command <name>=<shell command>\n"
-                    + "    # @bind <mode> <lhs>=<rhs>\n"
-                    + "    # @event <event>=:<command>\n\n"
-                    + "  INTERPOLATION (expanded in shell commands)\n"
-                    + "    %file %line %col %word %selection\n\n"
-                    + "  EXAMPLE (~/.shed/plugins/fmt.shed)\n"
-                    + "    # @name fmt\n"
-                    + "    # @description auto-format on save\n"
-                    + "    # @command fmt=!prettier --write %file\n"
-                    + "    # @event BufWrite=:fmt\n\n"
-                    + "LUA PLUGINS (.lua)\n"
-                    + "  Full scripting via embedded LuaJ. Each .lua file runs in a\n"
-                    + "  sandboxed environment with the shed.* API table.\n\n"
-                    + "  BUFFER API\n"
-                    + "    shed.get_line(n)        get line n (1-indexed)\n"
-                    + "    shed.set_line(n, text)  replace line n\n"
-                    + "    shed.line_count()       number of lines\n"
-                    + "    shed.get_text()         full buffer text\n"
-                    + "    shed.file_path()        current file path or \"\"\n"
-                    + "    shed.file_name()        display name\n"
-                    + "    shed.is_modified()      boolean\n\n"
-                    + "  CURSOR API\n"
-                    + "    shed.cursor_line()      1-indexed line\n"
-                    + "    shed.cursor_col()       0-indexed column\n\n"
-                    + "  COMMAND API\n"
-                    + "    shed.command(str)       execute ex command, returns result\n"
-                    + "    shed.message(str)       show in command bar\n"
-                    + "    shed.shell(cmd)         run shell, return stdout\n\n"
-                    + "  CONFIG API\n"
-                    + "    shed.config_get(key)    get config value\n"
-                    + "    shed.config_set(key,v[,persist])  set config value\n\n"
-                    + "  THEME API\n"
-                    + "    shed.theme()            current theme id\n"
-                    + "    shed.themes()           list available theme ids\n"
-                    + "    shed.theme_set(name[,persist]) apply theme\n"
-                    + "    shed.palette_get()      table of active palette colors\n"
-                    + "    shed.palette_set(tbl[,persist]) apply palette overrides\n"
-                    + "  MODE / EVENTS\n"
-                    + "    shed.mode()             current mode name\n"
-                    + "    shed.on(event, fn)      register callback\n\n"
-                    + "  EVENTS: BufOpen, BufWrite, ModeChange, ThemeChange\n\n"
-                    + "  EXAMPLE (~/.shed/plugins/autosave.lua)\n"
-                    + "    shed.on(\"BufWrite\", function()\n"
-                    + "      shed.message(\"saved: \" .. shed.file_name())\n"
-                    + "    end)\n\n"
-                    + "COMMANDS\n"
-                    + "  :plugin           list loaded plugins\n"
-                    + "  :plugin packages  list managed package metadata\n"
-                    + "  :plugin reload    reload all plugins from disk\n"
-                    + "  :plugin info X    show details for plugin X\n"
-                    + "  :plugin enable X  enable a disabled plugin\n"
-                    + "  :plugin disable X disable a plugin (renames to .disabled)\n"
-                    + "  :plugin install <name> <version> <source> [--checksum=sha256] [--pin]\n"
-                    + "  :plugin update [name]  update package(s), skip pinned\n"
-                    + "  :plugin remove <name>  remove managed package\n"
-                    + "  :plugin pin/unpin <name>  toggle version pinning\n"
-                    + "  :plugin new X     create and open a new plugin template\n"
-                    + "  :plugin path      show plugins directory + disabled list\n";
             default:
                 return "Shed help: " + topic + "\n\n"
                     + "No dedicated topic entry exists yet for this help topic.\n"

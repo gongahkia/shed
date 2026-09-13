@@ -3,7 +3,7 @@ package shed;
 import java.util.List;
 
 /** An explicitly requested interactive terminal scoped to a connected workspace. */
-public record RemoteTerminalRequest(String relativeWorkingDirectory, List<String> command) {
+record RemoteTerminalRequest(String relativeWorkingDirectory, List<String> command) {
     public RemoteTerminalRequest {
         relativeWorkingDirectory = normalizeDirectory(relativeWorkingDirectory);
         command = List.copyOf(command == null ? List.of() : command);

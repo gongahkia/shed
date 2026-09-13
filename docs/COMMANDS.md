@@ -15,7 +15,7 @@ This is the complete built-in command reference for command mode in `Shed`.
 | `:!cmd` | Run shell command asynchronously |
 | `:N,M!cmd` | Filter a line range through shell command asynchronously |
 
-In the `:` prompt, paste with `Cmd`/`Ctrl` + `V` and use Left/Right to move the block cursor. Press Tab after a partial command to complete from the registered built-in, extension, or configured user-command surface. Typing a path argument for `:e`, `:edit`, `:w`, or `:write` shows local path suggestions; click one or press Tab to insert it.
+In the `:` prompt, paste with `Cmd`/`Ctrl` + `V` and use Left/Right to move the block cursor. Press Tab after a partial command to complete from the registered built-in or configured user-command surface. Typing a path argument for `:e`, `:edit`, `:w`, or `:write` shows local path suggestions; click one or press Tab to insert it.
 
 ## Core File + Buffer Commands
 
@@ -176,7 +176,6 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:zoom`, `:uizoom` `in [default\|percent]\|out [default\|percent]\|reset` | Adjust UI zoom by the default 10%, or by a specified percentage; `reset` restores 100% |
 | `:open [file\|folder]` | Native file chooser, or workspace-folder chooser that opens its tree |
 | `:files` | Project file finder |
-| `:folder`, `:folders` | Folder chooser + file picker |
 | `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search; opens quickfix on completion |
 | `:project replace settings`, `:projectreplace settings` | Show persisted project-replace safety controls |
 | `:project replace`, `:projectreplace`, `:projectreplace ui` | Open the docked Project Replace review panel |
@@ -408,7 +407,7 @@ The Explorer loads directories when expanded. Use arrows or `j`/`k` to select, L
 | `:workspace reload`, `:workspace refresh` | Re-read the editor-settings snapshot of an imported `.code-workspace` only when its resolved folder set is unchanged; does not run tasks or a debugger |
 | `:workspace export <manifest>` | Write the current folders as a portable manifest |
 
-For a file inside a configured workspace folder, task discovery, extension SCM, Dev Container commands, and extension workspace integrations use the deepest folder containing that file. For a scratch or outside file, they use the selected workspace folder. The Tests panel intentionally exposes its own root selector, so a user can inspect or run a sibling project's tests without changing editors.
+For a file inside a configured workspace folder, task discovery, built-in SCM, and Dev Container commands use the deepest folder containing that file. For a scratch or outside file, they use the selected workspace folder. The Tests panel intentionally exposes its own root selector, so a user can inspect or run a sibling project's tests without changing editors.
 
 Portable-manifest format, safety boundary, and its distinction from private session profiles: [Workspace Manifests](WORKSPACE_MANIFESTS.md).
 
@@ -432,7 +431,7 @@ Portable-manifest format, safety boundary, and its distinction from private sess
 | `:markdown link insert`, `:link` | Insert markdown link template |
 | `:markdown image insert`, `:img`, `:image` | Insert markdown image template |
 | `:conceal 0|1|2`, `:conceallevel 0|1|2` | Set markdown conceal level |
-| `:snippets`, `:snippet` | Show user, extension, and built-in snippets for the current language |
+| `:snippets`, `:snippet` | Show user and built-in snippets for the current language |
 | `:snippet edit`, `:snippets open`, `:snippets edit` | Create if needed and open global user snippets |
 | `:bracket colors toggle`, `:bracketcolor`, `:bracketcolors` | Toggle bracket pair colorization |
 
@@ -449,54 +448,39 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:command log`, `:log`, `:commandlog` | Open command log file |
 | `:help open`, `:help [topic]`, `:h [topic]` | Open help buffer |
 
-## Plugin Management Commands
+## SCM, Docker, Remote Workspaces, and Notebooks
 
 | Command | Action |
 | :--- | :--- |
-| `:plugin`, `:plugins`, `:plugin list` | List loaded plugins |
-| `:plugin packages`, `:plugin pkg` | Show managed plugin package metadata |
-| `:plugin reload` | Reload plugins from disk |
-| `:plugin info <name>` | Show plugin details |
-| `:plugin path` | Show plugin directory + disabled plugins |
-| `:plugin enable <name>` | Enable disabled plugin |
-| `:plugin disable <name>` | Disable plugin (`.disabled`) |
-| `:plugin new <name>` | Create and open plugin template |
-| `:plugin install <name> <version> <source> [--checksum=<sha256>] [--pin]` | Install managed plugin package |
-| `:plugin update [name]` | Update managed package(s), skipping pinned |
-| `:plugin remove <name>`, `:plugin uninstall <name>` | Remove managed package |
-| `:plugin pin <name>` | Pin package version |
-| `:plugin unpin <name>` | Unpin package version |
-
-## Extensions, SCM, Remote Workspaces, and Notebooks
-
-| Command | Action |
-| :--- | :--- |
-| `:extension`, `:extension status` | Show installed Java extension receipts, errors, and contributions |
-| `:extension install <path-or-https> [--checksum=<sha256>]` | Explicitly install a Java extension JAR |
-| `:extension enable\|disable\|remove <id>`, `:extension reload` | Change local extension activation |
-| `:view`, `:view list` | List extension tool views |
-| `:view <extension:id>` | Open a contributed docked tool view |
-| `:customeditor`, `:customeditor list` | List the built-in bounded binary Hex Editor and contributed custom text/binary editors |
-| `:customeditor reopen` | Reopen the current file with its matching extension editor or the built-in Hex Editor fallback |
 | `:scm`, `:scm list` | List SCM providers that support the active workspace |
 | `:scm status [provider]` | Show SCM status from one/all supported providers |
 | `:scm <provider> <declared-action> [args]` | Run an explicitly declared provider action |
-| `:remote providers` | List built-in and contributed remote workspace providers |
+| `:remote providers` | List built-in remote workspace providers |
 | `:remote open <uri>` | Explicitly connect a remote workspace as a local working tree/mirror |
+| `:remote reconnect <id>` | Reconnect an existing mirror URI |
+| `:remote bootstrap <ssh-uri>` | Create an SSH workspace directory without installing host software |
 | `:remote pull\|push\|close <id>` | Synchronize or disconnect a remote workspace |
+| `:remote sync start <id> [seconds]`, `:remote sync stop <id>`, `:remote sync list` | Start, stop, or inspect opt-in automatic remote pulls |
 | `:remote exec <id> <command...>` | Explicitly run a direct-argv command in a connection when its provider supports execution |
 | `:remote terminal <id> [command...]` | Open an explicit interactive terminal at the connection root when its provider supports it |
 | `:remote use <id>`, `:remote unuse <id>` | Start/stop in-memory routing of new ordinary terminals and `:task run` calls through an eligible connected remote workspace |
 | `:remote forward <id> <local-port> <remote-host> <remote-port>` | Explicitly start a loopback-only local SSH forward for a connected `ssh://` workspace |
 | `:remote forward list`, `:remote forward close <local-port>` | Show forward state or stop one explicit SSH forward |
-| `:language`, `:language list` | List installed extension language profiles and the active buffer's profile mode |
-| `:language <extension-id:language-id>`, `:language auto` | Override profile detection for the current buffer, or restore automatic detection; a matching same-extension language contribution retargets its LSP client |
 | `:container status` | Show the active workspace's `.devcontainer/devcontainer.json` and whether it is connected for this application session |
-| `:container up` | Explicitly run the local `devcontainer up` workflow as a cancellable job |
+| `:container build` | Explicitly build the active workspace's Dev Container through the local CLI |
+| `:container up`, `:container start` | Explicitly run the local `devcontainer up` workflow as a cancellable job |
+| `:container lifecycle`, `:container run-user-commands` | Explicitly run Dev Container lifecycle user commands |
+| `:container stop`, `:container down` | Explicitly stop or tear down the active workspace's Dev Container through the local CLI |
 | `:container connect`, `:container reopen` | Explicitly start/verify the Dev Container, then route new ordinary terminals and tasks for that workspace through it for this application session |
 | `:container disconnect` | Stop that routing without stopping or deleting the container |
 | `:container exec <command...>`, `:container terminal [command...]` | Explicitly run/open a direct-argv command through the local Dev Container CLI |
 | `:container open <container> <absolute-path>` | Open an explicit Docker container mirror |
+| `:docker`, `:docker list` | List local Docker containers and their state |
+| `:docker inspect <container>` | Show one local container's metadata |
+| `:docker start\|stop\|restart <container>` | Explicitly change one local container's lifecycle state |
+| `:docker logs <container> [lines]` | Show bounded container logs (default 500 lines, maximum 10,000) |
+| `:docker exec <container> <command...>`, `:docker terminal <container> [command...]` | Explicitly run or open a PTY command in a running local container |
+| `:docker open <container> <absolute-path>` | Create a local mirror of an absolute container path |
 | `:compose`, `:compose status` | Show the nearest workspace-root local Compose configuration without contacting Docker |
 | `:compose up [service...]`, `:compose build [service...]`, `:compose ps`, `:compose services`, `:compose logs [service...]` | Explicitly manage, inspect, or read bounded local Compose output |
 | `:compose exec <service> <command...>`, `:compose terminal <service> [command...]` | Explicitly run or open a PTY in a running Compose service |
@@ -506,15 +490,12 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:database terminal` | Open an explicit interactive `psql` terminal |
 | `:database sqlite query <workspace-relative.db> <quoted-sql>`, `:database sqlite tables <workspace-relative.db>`, `:database sqlite terminal <workspace-relative.db>` | Query, list, or open an existing workspace-local SQLite database through `sqlite3` |
 | `:database mysql query <quoted-sql>`, `:database mysql tables`, `:database mysql terminal` | Query, list the selected database's tables, or open the installed `mysql` client using its user-managed option/login configuration |
-| `:integration`, `:integration list` | List supporting database, deployment, collaboration, and container extension integrations |
-| `:integration <extension:id> help` | Show provider-declared actions |
-| `:integration <extension:id> <action> [arguments]` | Run an explicitly declared workspace-integration action |
 | `:notebook open`, `:notebook run [kernel]`, `:notebook kernels`, `:notebook select`, `:notebook kernel [name]`, `:notebook console [kernel]`, `:notebook raw` | Open, execute with the persisted or one-shot local kernelspec, discover or select installed local kernels, persist a known kernel name, open a local Jupyter Console, or show raw JSON for the current `.ipynb` file |
-| `:terminal list`, `:terminal profile <builtin:id\|extension:id\|id>` | Show the configured default plus detected built-in and extension profiles; open one profile explicitly |
+| `:terminal list`, `:terminal profile <builtin:id\|id>` | Show the configured default plus detected built-in profiles; open one explicitly |
 | `:terminal split <side|bottom>` | Open the configured default terminal beside the active pane or below it |
 | `:terminal commands`, `:terminal cwd` | Show in-memory Bash/Zsh/Fish shell-integration events or latest reported cwd |
 
-See [Java Extensions](EXTENSIONS.md), [Workspace Integrations](WORKSPACE_INTEGRATIONS.md), [Remote Workspaces](REMOTE_WORKSPACES.md), [Jupyter Notebooks](NOTEBOOKS.md), and [Terminal](TERMINAL.md).
+See [Docker](DOCKER.md), [Remote Workspaces](REMOTE_WORKSPACES.md), [Jupyter Notebooks](NOTEBOOKS.md), and [Terminal](TERMINAL.md).
 
 ## Extended / User-Defined Commands
 
@@ -522,4 +503,3 @@ See [Java Extensions](EXTENSIONS.md), [Workspace Integrations](WORKSPACE_INTEGRA
 | :--- | :--- |
 | `"command.alias.<new>" = "<builtin>"` in `~/.shed/config.toml` | Adds command aliases resolved before execution |
 | `"command.user.<name>" = "<shell>"` in `~/.shed/config.toml` | Adds `:<name>` shell-backed user commands |
-| `.shed` plugins (`# @command name=shell`) | Adds plugin-defined `:<name>` commands |

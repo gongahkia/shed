@@ -32,4 +32,4 @@ sqlite3 -batch -bail <workspace-database> <sql>
 
 `tables` uses a fixed `sqlite_master` query. `terminal` opens interactive `sqlite3` for the selected file. Shed does not create database files, persist SQLite connection settings, or accept paths outside the workspace.
 
-Shed does not include JDBC drivers, connection persistence, credential storage, schema diff/migration UI, result editing, query plans, database-specific language services, MySQL/MSSQL/Oracle support, cloud-database auth, or collaborative database sessions. Use a Java extension integration for another database provider.
+Shed does not include JDBC drivers, connection persistence, credential storage, schema diff/migration UI, result editing, query plans, database-specific language services, MySQL/MSSQL/Oracle support, cloud-database auth, or collaborative database sessions. Use another tool for database providers outside this built-in PostgreSQL bridge.

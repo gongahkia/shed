@@ -40,7 +40,7 @@ final class NotebookController {
         if (pane == null || buffer == null || !isNotebook(buffer)) return false;
         try {
             NotebookDocument document = NotebookDocument.parse(buffer.getContent());
-            pane.setCustomEditorComponent(new NotebookPanel(document,
+            pane.setAlternateComponent(new NotebookPanel(document,
                 updated -> save(pane, buffer, updated),
                 updated -> run(pane, buffer, updated),
                 (updated, cellCount) -> runThrough(pane, buffer, updated, cellCount), buffer.getFile(),
@@ -69,7 +69,7 @@ final class NotebookController {
             case "select", "picker" -> chooseKernel(pane, buffer);
             case "kernel" -> currentKernel(buffer);
             case "raw", "text" -> {
-                pane.clearCustomEditorComponent();
+                pane.clearAlternateComponent();
                 editor.renderWindowLayout();
                 yield "Opened notebook JSON source";
             }
@@ -133,7 +133,7 @@ final class NotebookController {
                 String selected = editor.showPaletteDialog("Jupyter Kernels", new ArrayList<>(byLabel.keySet()));
                 KernelSpec kernel = selected == null ? null : byLabel.get(selected);
                 if (kernel == null || pane.getBuffer() != buffer) return;
-                if (pane.getCustomEditorComponent() instanceof NotebookPanel panel) {
+                if (pane.getAlternateComponent() instanceof NotebookPanel panel) {
                     panel.selectKernel(kernel);
                     editor.showMessage("Notebook kernel selected: " + kernel.name() + "; save or run to persist it");
                     return;

@@ -92,7 +92,6 @@ final class RemoteWorkspaceController {
             synchronized (connections) { prior = connections.put(result.id(), result); }
             editor.remoteWorkspaceTaskTargets.register(result.id(), result.workspace());
             if (prior != null) {
-                stopAutomaticSyncQuietly(prior.id());
                 portForwards.closeForConnection(prior.id());
                 editor.remoteWorkspaceSessions.deactivate(prior.id());
                 try { prior.workspace().close(); } catch (Exception ignored) { }
@@ -449,7 +448,7 @@ final class RemoteWorkspaceController {
                 Path path = new RemoteLspEndpoint(connection.workspace().localRoot(), remoteRoot, List.of()).localPathFor(uri);
                 if (path != null) return path;
             } catch (IllegalArgumentException ignored) {
-                // A contributed provider cannot make unrelated LSP locations unopenable.
+                // One malformed built-in mapping cannot make unrelated LSP locations unopenable.
             }
         }
         return null;
@@ -471,7 +470,7 @@ final class RemoteWorkspaceController {
             try {
                 if (provider.supports(uri)) return provider;
             } catch (RuntimeException ignored) {
-                // A broken provider cannot claim the URI.
+                // A malformed built-in provider cannot claim the URI.
             }
         }
         return null;

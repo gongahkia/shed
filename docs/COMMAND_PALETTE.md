@@ -68,7 +68,7 @@ Each action is unique by visible label and normalized command. The application r
 | Open Settings TOML | `:settings file` | Open the persisted settings.toml buffer. |
 | Configuration Status | `:config status` | Show configuration loading and recovery details. |
 | Apply Suggested Config Repairs | `:config heal` | Persist the reviewed deterministic configuration repairs. |
-| Reload Configuration | `:reload` | Reload configuration from disk. |
+| Reload Configuration | `:config reload` | Reload configuration from disk. |
 | Keymap Inspector | `:keymap` | Inspect and edit validated keymap overlays. |
 | Themes | `:themes` | Show built-in themes. |
 | Toggle Zen Mode | `:zen` | Toggle the distraction-free Zen layout. |

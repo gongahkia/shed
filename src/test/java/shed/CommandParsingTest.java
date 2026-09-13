@@ -193,6 +193,7 @@ public class CommandParsingTest {
         assertEquals("diagnostic show", PaletteController.surfaceActionCommand("Show Diagnostics"));
         assertEquals("diagnostic next", PaletteController.surfaceActionCommand("Next Diagnostic"));
         assertEquals("diagnostic previous", PaletteController.surfaceActionCommand("Previous Diagnostic"));
+        assertEquals("config reload", PaletteController.surfaceActionCommand("Reload Configuration"));
         assertEquals(actions.size(), new java.util.HashSet<>(actions).size());
         List<String> commands = PaletteController.surfaceActionCommands();
         assertEquals(commands.size(), new java.util.HashSet<>(commands).size());

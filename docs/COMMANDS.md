@@ -174,8 +174,8 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:s`, `:split`, `:sp` | Horizontal split (`Cmd+D`); `:s/old/new/` remains substitution |
 | `:vs`, `:vsplit`, `:vsp` | Vertical split (`Cmd+Shift+D`) |
 | `:close`, `:clo` | Close active window (`Cmd+W`) |
-| `:window`, `:win` `next\|left\|right\|up\|down\|equalize\|grow\|shrink` | Focus, equalize, or resize editor splits |
-| `:zoom`, `:uizoom` `in\|out\|reset` | Adjust UI zoom by 10% or restore it to 100% |
+| `:window`, `:win` `next\|previous\|left\|right\|up\|down\|equalize\|grow [percent]\|shrink [percent]` | Focus, equalize, or resize editor splits; omitted resize percentage is 5% |
+| `:zoom`, `:uizoom` `in [percent]\|out [percent]\|reset` | Adjust UI zoom by 10%, or by a specified percentage, or restore it to 100% |
 | `:open [file\|folder]` | Native file chooser, or workspace-folder chooser that opens its tree |
 | `:files` | Project file finder |
 | `:folder`, `:folders` | Folder chooser + file picker |

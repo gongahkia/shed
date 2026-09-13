@@ -210,6 +210,46 @@ public class ConfigManager {
             "#1F2430", "#252B39", "#2D3444", "#353D50", "#4A3B4F", "#CDD3DE", "#7CC4FF", "#B8E36A");
         registerTheme("nightfox", "Nightfox",
             "#192330", "#1F2A38", "#263445", "#2E3D52", "#4A3E57", "#CDCECF", "#719CD6", "#81B29A");
+        registerTheme("catppuccin-latte", "Catppuccin Latte",
+            "#EFF1F5", "#E6E9EF", "#CCD0DA", "#BCC0CC", "#EBA0AC", "#4C4F69", "#1E66F5", "#40A02B");
+        registerTheme("catppuccin-frappe", "Catppuccin Frappé",
+            "#303446", "#292C3C", "#414559", "#51576D", "#5B3A4A", "#C6D0F5", "#8CAAEE", "#A6D189");
+        registerTheme("catppuccin-macchiato", "Catppuccin Macchiato",
+            "#24273A", "#1E2030", "#363A4F", "#494D64", "#5C3A4B", "#CAD3F5", "#8AADF4", "#A6DA95");
+        registerTheme("github-light", "GitHub Light",
+            "#FFFFFF", "#F6F8FA", "#EAEEF2", "#B6E3FF", "#FFCECB", "#1F2328", "#0969DA", "#1A7F37");
+        registerTheme("github-dark-dimmed", "GitHub Dark Dimmed",
+            "#22272E", "#2D333B", "#373E47", "#2D4C6F", "#5A3840", "#ADBAC7", "#539BF5", "#57AB5A");
+        registerTheme("solarized-light", "Solarized Light",
+            "#FDF6E3", "#EEE8D5", "#E5DDC4", "#D3E8F0", "#F2C6C6", "#526A73", "#268BD2", "#859900");
+        registerTheme("gruvbox-light", "Gruvbox Light",
+            "#FBF1C7", "#F2E5BC", "#EBDBB2", "#D5C4A1", "#F2C6B5", "#3C3836", "#458588", "#98971A");
+        registerTheme("one-light", "One Light",
+            "#FAFAFA", "#F0F0F0", "#E5E5E6", "#D7EAFE", "#F7D4D7", "#383A42", "#4078F2", "#50A14F");
+        registerTheme("ayu-light", "Ayu Light",
+            "#FAFAFA", "#F3F4F5", "#E7E8E9", "#D8EAF8", "#F8D8D8", "#575F66", "#399EE6", "#86B300");
+        registerTheme("ayu-dark", "Ayu Dark",
+            "#0A0E14", "#0D1017", "#11161D", "#173A5E", "#4B2932", "#B3B1AD", "#39BAE6", "#AAD94C");
+        registerTheme("material-lighter", "Material Lighter",
+            "#FAFAFA", "#F5F5F5", "#EEEEEE", "#D6EFFF", "#F7D4D8", "#546E7A", "#6182B8", "#91B859");
+        registerTheme("material-ocean", "Material Ocean",
+            "#0F111A", "#141824", "#1A1F2D", "#1D3B5C", "#4C3240", "#8F93A2", "#82AAFF", "#C3E88D");
+        registerTheme("tokyo-night-storm", "Tokyo Night Storm",
+            "#24283B", "#1F2335", "#292E42", "#33467C", "#5A3044", "#C0CAF5", "#7AA2F7", "#9ECE6A");
+        registerTheme("tokyo-night-light", "Tokyo Night Light",
+            "#CBCCD1", "#D5D6DB", "#C4C8DA", "#B6C9E5", "#E4B7C0", "#343B58", "#2E7DE9", "#587539");
+        registerTheme("duskfox", "Duskfox",
+            "#232136", "#2A273F", "#393552", "#44415A", "#4A3046", "#E0DEF4", "#C4A7E7", "#9CCFD8");
+        registerTheme("carbonfox", "Carbonfox",
+            "#161616", "#1E1E1E", "#262626", "#333333", "#49333A", "#F2F4F8", "#78A9FF", "#42BE65");
+        registerTheme("dawnfox", "Dawnfox",
+            "#F2E9DE", "#E9E0D5", "#DED3C6", "#C8E4F4", "#E9C2C4", "#575279", "#286983", "#618774");
+        registerTheme("vscode-dark-modern", "VS Code Dark Modern",
+            "#1F1F1F", "#181818", "#2B2B2B", "#264F78", "#5A3038", "#CCCCCC", "#0078D4", "#89D185");
+        registerTheme("vscode-light-modern", "VS Code Light Modern",
+            "#FFFFFF", "#F3F3F3", "#E8E8E8", "#ADD6FF", "#F7D4D7", "#3B3B3B", "#0067C0", "#107C10");
+        registerTheme("jetbrains-darcula", "JetBrains Darcula",
+            "#2B2B2B", "#313335", "#3C3F41", "#214283", "#5B3333", "#A9B7C6", "#589DF6", "#6A8759");
     }
 
     public ConfigManager() {

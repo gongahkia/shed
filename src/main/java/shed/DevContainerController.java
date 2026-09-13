@@ -32,13 +32,17 @@ final class DevContainerController {
         }
         String operation = tokens.getFirst().toLowerCase(java.util.Locale.ROOT);
         return switch (operation) {
+            case "build" -> submit("build", List.of("devcontainer", "build", "--workspace-folder", workspace().toString()));
             case "up", "start" -> submit("up", List.of("devcontainer", "up", "--workspace-folder", workspace().toString()));
+            case "lifecycle", "run-user-commands" -> submit("lifecycle", List.of("devcontainer", "run-user-commands", "--workspace-folder", workspace().toString()));
+            case "stop" -> submit("stop", List.of("devcontainer", "stop", "--workspace-folder", workspace().toString()));
+            case "down" -> submit("down", List.of("devcontainer", "down", "--workspace-folder", workspace().toString()));
             case "connect", "reopen" -> connect();
             case "disconnect" -> disconnect();
             case "exec", "run" -> execute(tokens.subList(1, tokens.size()));
             case "terminal", "shell" -> openTerminal(tokens.subList(1, tokens.size()));
             case "open" -> openMirror(tokens.subList(1, tokens.size()));
-            default -> "Usage: :container [status|up|connect|disconnect|exec <command...>|terminal [command...]|open <container> <absolute-path>]";
+            default -> "Usage: :container [status|build|up|lifecycle|stop|down|connect|disconnect|exec <command...>|terminal [command...]|open <container> <absolute-path>]";
         };
     }
 
@@ -53,7 +57,7 @@ final class DevContainerController {
                 + (connection == null ? "\nRun :container connect to route normal terminals and tasks through this container.\n"
                     : "\nContainer workspace: " + connection.remoteWorkingDirectory() + "\n")
                 + "\nDev Container actions are explicit and require an installed devcontainer CLI.\n"
-                + "\n:container up\n:container connect\n:container disconnect\n:container exec <command...>\n:container terminal [command...]\n"
+                + "\n:container build\n:container up\n:container lifecycle\n:container stop\n:container down\n:container connect\n:container disconnect\n:container exec <command...>\n:container terminal [command...]\n"
                 + "\nConfiguration:\n\n" + text;
             editor.showScratchBuffer("[dev container]", output);
             return "Showing Dev Container configuration";

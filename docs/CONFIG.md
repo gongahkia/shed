@@ -465,7 +465,7 @@ Configured font families are validated against the Java runtime's installed fami
 
 `one-dark-pro`, `dracula`, `material-theme`, `night-owl`, `ayu-mirage`, `monokai-pro`, `tokyo-night`, `nord`, `gruvbox-dark`, `shades-of-purple`, `palenight`, `catppuccin-mocha`, `github-dark`, `rose-pine`, `synthwave-84`, `cobalt2`, `andromeda`, `everforest-dark`, `kanagawa`, `poimandres`, `solarized-dark`, `noctis`, `oxocarbon-dark`, `vesper`, `sonokai`, `doom-one`, `horizon`, `papercolor-dark`, `xcode-dark`, `dimmed-monokai`, `fleet-dark`, `nightfox`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `github-light`, `github-dark-dimmed`, `solarized-light`, `gruvbox-light`, `one-light`, `ayu-light`, `ayu-dark`, `material-lighter`, `material-ocean`, `tokyo-night-storm`, `tokyo-night-light`, `duskfox`, `carbonfox`, `dawnfox`, `vscode-dark-modern`, `vscode-light-modern`, `jetbrains-darcula`.
 
-The Theme Gallery's **Apply for This Session** button changes the running palette without writing configuration. **Apply and Save** changes it and writes the complete current configuration to disk.
+The Theme Gallery's **Apply and Save** button changes the palette and writes the complete current configuration to disk.
 
 ## Example `~/.shed/config.toml`
 

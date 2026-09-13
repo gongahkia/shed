@@ -99,7 +99,7 @@ final class PaletteController {
         action("Language Services", "lsp manage", "Open the local Language Services panel."),
         action("Show Completions", "lsp completion", "Request completion candidates at the caret."),
         action("Go to Definition", "lsp definition", "Go to the definition at the caret."),
-        action("Go to Type Definition", "lsp type-definition", "Go to the type definition at the caret."),
+        action("Go to Type Definition", "lsp type definition", "Go to the type definition at the caret."),
         action("Go to Implementation", "lsp implementation", "Go to the implementation at the caret."),
         action("Highlight Symbol Occurrences", "lsp highlights", "Highlight server-reported occurrences for the symbol at the caret."),
         action("Show Hover Information", "lsp hover", "Show language-service hover information at the caret."),

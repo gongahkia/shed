@@ -230,7 +230,7 @@ public class HelpService {
                     + "  Tab/Shift-Tab     move through unchanged LSP snippet placeholders\n"
                     + "  ( or , (insert)  async signature help; the next edit cancels it\n"
                     + "  :lsp definition  go to definition\n"
-                    + "  :lsp typedefinition  go to type definition\n"
+                    + "  :lsp type definition  go to type definition\n"
                     + "  :lsp implementation  go to implementation; multiple results use quickfix\n"
                     + "  :lsp highlights [clear]  highlight server-reported symbol occurrences\n"
                     + "  :lsp peek definition|type  temporary read-only peek; Enter opens, Escape closes\n"

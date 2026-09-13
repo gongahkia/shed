@@ -108,7 +108,7 @@ Each action is unique by visible label and normalized command. The application r
 | Language Services | `:lsp manage` | Open the local Language Services panel. |
 | Show Completions | `:lsp completion` | Request completion candidates at the caret. |
 | Go to Definition | `:lsp definition` | Go to the definition at the caret. |
-| Go to Type Definition | `:lsp type-definition` | Go to the type definition at the caret. |
+| Go to Type Definition | `:lsp type definition` | Go to the type definition at the caret. |
 | Go to Implementation | `:lsp implementation` | Go to the implementation at the caret. |
 | Highlight Symbol Occurrences | `:lsp highlights` | Highlight server-reported occurrences for the symbol at the caret. |
 | Show Hover Information | `:lsp hover` | Show language-service hover information at the caret. |

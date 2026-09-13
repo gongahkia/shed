@@ -172,6 +172,7 @@ public class CommandParsingTest {
         assertEquals("workspace folders", PaletteController.surfaceActionCommand("Workspace Folders"));
         assertEquals("lsp codeaction", PaletteController.surfaceActionCommand("Code Actions"));
         assertEquals("snippet edit", PaletteController.surfaceActionCommand("Edit Snippets"));
+        assertEquals("lsp type definition", PaletteController.surfaceActionCommand("Go to Type Definition"));
         assertEquals("open file", PaletteController.surfaceActionCommand("Open File"));
         assertEquals("open folder", PaletteController.surfaceActionCommand("Open Folder"));
         assertEquals("tree toggle", PaletteController.surfaceActionCommand("Toggle File Tree"));

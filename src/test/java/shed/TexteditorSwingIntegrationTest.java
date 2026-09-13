@@ -593,7 +593,6 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(1, onEdt(() -> editor.editorPanes.size()));
             assertTrue(onEdt(editor::isDisplayable));
 
-            assertEquals("Vertical split created", onEdt(() -> editor.commandHandler.execute("vsplit")));
             String writeQuit = onEdt(() -> {
                 editor.writingArea.setText("after\n");
                 return editor.commandHandler.execute("wq");
@@ -601,6 +600,7 @@ public class TexteditorSwingIntegrationTest {
             assertEquals("Saving…", writeQuit);
             assertEquals("after\n", Files.readString(file, StandardCharsets.UTF_8));
             assertEquals(1, onEdt(() -> editor.editorPanes.size()));
+            assertEquals("[landing]", onEdt(() -> editor.getCurrentBuffer().getDisplayName()));
             assertTrue(onEdt(editor::isDisplayable));
         } finally {
             disposeEditor(editor);

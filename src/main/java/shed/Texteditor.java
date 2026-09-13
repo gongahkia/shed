@@ -2873,6 +2873,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return paneBufferController.canCloseActiveWindow();
     }
 
+    String closeActiveBufferWithoutExiting(boolean force) {
+        return paneBufferController.closeActiveBufferWithoutExiting(force);
+    }
+
     String closePane(EditorPane paneToClose) {
         return paneBufferController.closePane(paneToClose);
     }

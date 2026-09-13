@@ -79,7 +79,7 @@ public class HelpService {
                    "  :copen         Open quickfix list\n" +
                    "  :cnext/:cprev  Next/previous quickfix entry\n" +
                    "  :cc [n]        Jump to quickfix entry\n" +
-                   "  :lsp ...       LSP commands (def/type/peek/hierarchies/refs/rename/actions)\n" +
+                   "  :lsp ...       LSP commands (def/type/hierarchies/refs/rename/actions)\n" +
                    "  :format        Format using current extension policy\n" +
                    "  :formatter     Edit current extension formatter policy\n" +
                    "  :lsp status    Show running LSP servers\n" +
@@ -233,7 +233,6 @@ public class HelpService {
                     + "  :lsp type definition  go to type definition\n"
                     + "  :lsp implementation  go to implementation; multiple results use quickfix\n"
                     + "  :lsp highlights [clear]  highlight server-reported symbol occurrences\n"
-                    + "  :lsp peek definition|type  temporary read-only peek; Enter opens, Escape closes\n"
                     + "  :lsp calls incoming|outgoing  searchable lazy call hierarchy\n"
                     + "  :lsp typehierarchy supertypes|subtypes  searchable lazy type hierarchy\n"
                     + "  :lsp hover       show hover info\n"

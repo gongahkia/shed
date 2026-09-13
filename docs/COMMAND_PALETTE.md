@@ -114,8 +114,6 @@ Each action is unique by visible label and normalized command. The application r
 | Show Hover Information | `:lsp hover` | Show language-service hover information at the caret. |
 | Find References | `:lsp references` | Find references for the symbol at the caret. |
 | Code Actions | `:lsp codeaction` | Show diagnostic-anchored code actions at the caret. |
-| Peek Definition | `:lsp peek definition` | Open a temporary read-only definition preview. |
-| Peek Type Definition | `:lsp peek type` | Open a temporary read-only type-definition preview. |
 | Incoming Call Hierarchy | `:lsp calls incoming` | Open the incoming-call hierarchy for the symbol at the caret. |
 | Outgoing Call Hierarchy | `:lsp calls outgoing` | Open the outgoing-call hierarchy for the symbol at the caret. |
 | Type Supertypes | `:lsp typehierarchy supertypes` | Open the supertype hierarchy for the symbol at the caret. |

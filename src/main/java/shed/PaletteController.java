@@ -105,8 +105,6 @@ final class PaletteController {
         action("Show Hover Information", "lsp hover", "Show language-service hover information at the caret."),
         action("Find References", "lsp references", "Find references for the symbol at the caret."),
         action("Code Actions", "lsp codeaction", "Show diagnostic-anchored code actions at the caret."),
-        action("Peek Definition", "lsp peek definition", "Open a temporary read-only definition preview."),
-        action("Peek Type Definition", "lsp peek type", "Open a temporary read-only type-definition preview."),
         action("Incoming Call Hierarchy", "lsp calls incoming", "Open the incoming-call hierarchy for the symbol at the caret."),
         action("Outgoing Call Hierarchy", "lsp calls outgoing", "Open the outgoing-call hierarchy for the symbol at the caret."),
         action("Type Supertypes", "lsp typehierarchy supertypes", "Open the supertype hierarchy for the symbol at the caret."),

@@ -185,7 +185,6 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleLspCommand("manage"),
             "languageservices", "language-services", "lspmanage");
         registerCommand((args, range, force) -> editor.handleLanguageCommand(args), "language", "lang");
-        registerCommand((args, range, force) -> editor.handleLspCommand("peek " + args), "peek");
         registerCommand((args, range, force) -> handleFormat(args), "format", "fmt");
         registerCommand((args, range, force) -> handleFormat("policy"), "formatter", "formatpolicy");
         registerCommand((args, range, force) -> editor.handleDebugCommand(args), "debug", "dap");

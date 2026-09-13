@@ -129,6 +129,7 @@ final class PaletteController {
         action("GitHub Pull Requests", "github prs", "Open pull-request review after GitHub review consent has been granted."),
         action("Remote Workspaces", "remote list", "Inspect explicit remote connections, active execution sessions, and loopback SSH forwards."),
         action("Dev Container", "container status", "Inspect the active workspace's Dev Container configuration and session routing state."),
+        action("Docker Containers", "docker list", "List local Docker containers and their state."),
         action("Compose Status", "compose status", "Show workspace Compose configuration status."),
         action("Database Status", "database status", "Show workspace database configuration status."),
         action("Update Status", "update status", "Show the configured update channel's status.")

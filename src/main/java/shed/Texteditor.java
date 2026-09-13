@@ -89,6 +89,7 @@ public class Texteditor extends JFrame implements KeyListener {
     NotebookController notebookController;
     DevContainerSessionService devContainerSessions;
     DevContainerController devContainerController;
+    DockerController dockerController;
     ComposeController composeController;
     DatabaseController databaseController;
     RemoteWorkspaceController remoteWorkspaceController;
@@ -247,6 +248,7 @@ public class Texteditor extends JFrame implements KeyListener {
         scmController = new ScmController(this);
         notebookController = new NotebookController(this);
         devContainerController = new DevContainerController(this);
+        dockerController = new DockerController(this);
         composeController = new ComposeController(this);
         databaseController = new DatabaseController(this);
         remoteWorkspaceSessions = new RemoteWorkspaceSessionService();
@@ -1805,6 +1807,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     String handleContainerCommand(String argument) {
         return devContainerController.handle(argument);
+    }
+
+    String handleDockerCommand(String argument) {
+        return dockerController.handle(argument);
     }
 
     String handleComposeCommand(String argument) {

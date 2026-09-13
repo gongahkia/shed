@@ -141,6 +141,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleScmCommand(args), "scm");
         registerCommand((args, range, force) -> editor.handleNotebookCommand(args), "notebook", "nb");
         registerCommand((args, range, force) -> editor.handleContainerCommand(args), "container", "devcontainer", "dev-container");
+        registerCommand((args, range, force) -> editor.handleDockerCommand(args), "docker", "containers");
         registerCommand((args, range, force) -> editor.handleComposeCommand(args), "compose", "docker-compose");
         registerCommand((args, range, force) -> editor.handleDatabaseCommand(args), "database", "db");
         registerCommand((args, range, force) -> editor.handleRemoteWorkspaceCommand(args), "remote", "remotes");

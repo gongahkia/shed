@@ -102,7 +102,7 @@ final class ShedWelcomePanel extends JPanel {
             brandPane.setBounds(0, 0, width, brandHeight);
             actionPane.setBounds(0, brandHeight, width, height - brandHeight);
         }
-        applyResponsiveMetrics(layoutScale, layoutScale / zoom);
+        applyResponsiveMetrics(layoutScale);
     }
 
     @Override
@@ -311,17 +311,17 @@ final class ShedWelcomePanel extends JPanel {
         return spacer;
     }
 
-    private void applyResponsiveMetrics(double layoutScale, double fontScale) {
+    private void applyResponsiveMetrics(double layoutScale) {
         if (Math.abs(layoutScale - appliedScale) < 0.01) {
             return;
         }
         appliedScale = layoutScale;
         logo.setScale(layoutScale);
-        setLabelFont(title, Math.max(25, editor.configManager.getUiFontSize() + 27), fontScale);
-        setLabelFont(version, Math.max(14, editor.configManager.getUiFontSize() + 9), fontScale);
-        setLabelFont(descriptor, Math.max(12, editor.configManager.getUiFontSize() + 6), fontScale);
-        setLabelFont(heading, Math.max(18, editor.configManager.getUiFontSize() + 15), fontScale);
-        setLabelFont(detail, Math.max(12, editor.configManager.getUiFontSize() + 5), fontScale);
+        setLabelFont(title, Math.max(25, editor.configManager.getUiFontSize() + 27), layoutScale);
+        setLabelFont(version, Math.max(14, editor.configManager.getUiFontSize() + 9), layoutScale);
+        setLabelFont(descriptor, Math.max(12, editor.configManager.getUiFontSize() + 6), layoutScale);
+        setLabelFont(heading, Math.max(18, editor.configManager.getUiFontSize() + 15), layoutScale);
+        setLabelFont(detail, Math.max(12, editor.configManager.getUiFontSize() + 5), layoutScale);
         for (ScaledSpacer spacer : scaledSpacers) {
             int height = scaled(spacer.baseHeight(), layoutScale);
             spacer.component().changeShape(new Dimension(0, height), new Dimension(0, height), new Dimension(Short.MAX_VALUE, height));
@@ -331,9 +331,9 @@ final class ShedWelcomePanel extends JPanel {
         int actionWidth = Math.max(1, actionPane.getWidth() - horizontalPadding * 2);
         for (WelcomeButton action : actionButtons) {
             action.button().setBorder(actionButtonBorder(layoutScale));
-            setLabelFont(action.label(), Math.max(13, editor.configManager.getUiFontSize() + 7), fontScale);
+            setLabelFont(action.label(), Math.max(13, editor.configManager.getUiFontSize() + 7), layoutScale);
             for (JLabel keyLabel : action.keyLabels()) {
-                setLabelFont(keyLabel, Math.max(11, editor.configManager.getUiFontSize() + 4), fontScale);
+                setLabelFont(keyLabel, Math.max(11, editor.configManager.getUiFontSize() + 4), layoutScale);
                 keyLabel.setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createLineBorder(blend(keyBackground, accent, 0.25)),
                     BorderFactory.createEmptyBorder(scaled(3, layoutScale), scaled(6, layoutScale), scaled(3, layoutScale), scaled(6, layoutScale))
@@ -360,7 +360,7 @@ final class ShedWelcomePanel extends JPanel {
     }
 
     private void setLabelFont(JLabel label, int baseSize, double scale) {
-        label.setFont(editor.editorUiController.resolveUiFont(scaled(baseSize, scale)));
+        label.setFont(editor.editorUiController.resolveUiFontAtSize(fontSizeForLayoutScale(baseSize, scale)));
     }
 
     void refreshScale() {
@@ -434,6 +434,10 @@ final class ShedWelcomePanel extends JPanel {
 
     private static int scaled(int pixels, double scale) {
         return Math.max(1, (int) Math.round(pixels * scale));
+    }
+
+    static int fontSizeForLayoutScale(int baseSize, double layoutScale) {
+        return scaled(baseSize, layoutScale);
     }
 
     private static BufferedImage loadLogo() {

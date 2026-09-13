@@ -24,6 +24,8 @@ class ThemePreviewTest {
         assertTrue(previews.stream().allMatch(preview -> preview.foreground() != null && preview.stringAccent() != null));
         assertEquals(52, previews.size());
         for (ThemePreview preview : previews) {
+            assertEquals(preview.id(), config.setTheme(preview.displayName()));
+            assertEquals(preview.id(), config.getThemeId());
             assertTrue(contrast(preview.foreground(), preview.normal()) >= 4.5,
                 preview.id() + " needs readable editor text");
         }

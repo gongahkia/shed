@@ -61,7 +61,11 @@ public class PtyTerminalPaneSettingsTest {
         ConfigManager configManager = new ConfigManager();
         PtyTerminalPane.ShedTerminalSettingsProvider settings = new PtyTerminalPane.ShedTerminalSettingsProvider(configManager, new Font("Monospaced", Font.PLAIN, 14));
 
-        assertReadableAnsiPalette(settings);
+        for (String theme : configManager.getThemeIds()) {
+            assertEquals(theme, configManager.setTheme(theme));
+            settings.refresh(configManager, new Font("Monospaced", Font.PLAIN, 14));
+            assertReadableAnsiPalette(settings);
+        }
     }
 
     @Test

@@ -34,6 +34,25 @@ class ShedWelcomePanelResponsiveTest {
     }
 
     @Test
+    void keepsWelcomeTextAtItsLargestFittingSizeAfterTheLayoutCap() {
+        int baseHeadingSize = 47;
+        for (int[] viewport : new int[][] { {800, 1_080}, {960, 640}, {1_920, 1_080}, {3_840, 2_160} }) {
+            int previous = 0;
+            for (double zoom = UiZoom.MINIMUM; zoom <= UiZoom.MAXIMUM; zoom += UiZoom.STEP) {
+                int current = ShedWelcomePanel.fontSizeForLayoutScale(baseHeadingSize,
+                    ShedWelcomePanel.layoutScale(viewport[0], viewport[1], zoom));
+                assertTrue(current >= previous, "welcome text must not shrink as UI zoom increases");
+                previous = current;
+            }
+        }
+
+        int capped = ShedWelcomePanel.fontSizeForLayoutScale(baseHeadingSize,
+            ShedWelcomePanel.layoutScale(960, 640, 2.0));
+        assertEquals(capped, ShedWelcomePanel.fontSizeForLayoutScale(baseHeadingSize,
+            ShedWelcomePanel.layoutScale(960, 640, UiZoom.MAXIMUM)));
+    }
+
+    @Test
     void reservesTheFullBrandBlockBeforeStackedActionsAtHighZoom() {
         int width = 959;
         int height = 1_115;

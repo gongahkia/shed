@@ -96,7 +96,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 
 ## Landing Page
 
-At startup without a file argument or restored session, Shed shows a native, non-editable welcome screen by default. It uses the bundled Shed logo, the active theme, and working keyboard/click actions for the command palette, opening files or folders, finding files, buffer switching, and help. Opening a folder activates it as the workspace and shows its tree. The welcome screen is an ephemeral `[landing]` buffer: opening a file replaces it instead of creating `~/.shed/landing.md`.
+At startup without a file argument or restored session, Shed shows a native, non-editable welcome screen by default. It uses the bundled Shed logo, the active theme, and working keyboard/click actions for the command palette, opening files or folders, finding files, buffer switching, and help. Opening a folder activates it as the workspace and shows its tree. The welcome screen is an ephemeral `[landing]` buffer: opening a file replaces it instead of creating `~/.shed/landing.md`. Its content grows with `ui.zoom` only while it fits the available pane; once it reaches that limit, its text and layout remain at the largest fitting size.
 
 `landing.welcome.enabled = false` restores the legacy editable landing buffer. Shed also preserves an existing default `~/.shed/landing.md` when its content differs from the old generated starter text, so a prior customization is not replaced. Any non-default `landing.source` remains an editable local buffer; relative paths resolve from the user home directory and `file:` URIs are local paths.
 

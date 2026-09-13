@@ -621,6 +621,14 @@ final class EditorUiController {
         return new Font(family, systemFont.getStyle(), UiZoom.scale(Math.round(unscaledSize), editor.configManager.getUiZoom()));
     }
 
+    Font resolveUiFontAtSize(int size) {
+        Font systemFont = systemUiFonts.getOrDefault("Label.font", new Font(Font.DIALOG, Font.PLAIN, 13));
+        int resolvedSize = Math.max(1, size);
+        Font configuredFamily = resolveInstalledFont(editor.configManager.getUiFontFamily(), resolvedSize);
+        String family = configuredFamily == null ? systemFont.getFamily() : configuredFamily.getFamily();
+        return new Font(family, systemFont.getStyle(), resolvedSize);
+    }
+
     Font resolveTerminalFont() {
         int fontSize = UiZoom.scale(editor.configManager.getTerminalFontSize(), editor.configManager.getUiZoom());
         Font configuredFont = resolveInstalledFont(editor.configManager.getTerminalFontFamily(), fontSize);

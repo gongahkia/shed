@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Supplier;
 
 public class CommandHandler {
     private final Texteditor editor;
@@ -128,13 +129,16 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleSet(args, force), "set");
         registerCommand((args, range, force) -> handleConfig(args, force), "settings", "config");
         registerCommand((args, range, force) -> handleKeymap(args), "keymap", "keymaps");
-        registerCommand((args, range, force) -> editor.openCommandLogBuffer(), "log", "commandlog");
+        registerCommand((args, range, force) -> handleCommand(args), "command");
+        registerCommand((args, range, force) -> handleCommand("log"), "log", "commandlog");
         registerCommand((args, range, force) -> editor.handleSessionCommand(args), "session", "sessions");
         registerCommand((args, range, force) -> editor.handleWorkspaceProfileCommand(args), "workspace", "ws");
-        registerCommand((args, range, force) -> editor.showJobs(), "jobs");
+        registerCommand((args, range, force) -> handleJob(args), "job");
+        registerCommand((args, range, force) -> handleJob("list"), "jobs");
         registerCommand((args, range, force) -> editor.showPerfReport(args), "perf");
-        registerCommand((args, range, force) -> editor.showLargeFileStatus(), "largefile", "lf");
-        registerCommand((args, range, force) -> editor.showBuildInfo(), "version", "about", "buildinfo");
+        registerCommand((args, range, force) -> handleLargeFile(args), "largefile", "lf");
+        registerCommand((args, range, force) -> handleApp(args), "app");
+        registerCommand((args, range, force) -> handleApp("about"), "version", "about", "buildinfo");
         registerCommand((args, range, force) -> editor.cancelJob(args), "jobcancel", "jobkill");
         registerCommand((args, range, force) -> editor.runDropCommand(args), "drop");
         registerCommand((args, range, force) -> editor.handleTaskCommand(args), "task");
@@ -153,10 +157,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleRemoteWorkspaceCommand(args), "remote", "remotes");
         registerCommand((args, range, force) -> editor.handleGitHubCommand(args), "github", "gh");
         registerCommand((args, range, force) -> editor.handleUpdateCommand(args), "update", "updates");
-        registerCommand((args, range, force) -> {
-            editor.showHelp(args);
-            return "Showing help";
-        }, "help", "h");
+        registerCommand((args, range, force) -> handleHelp(args), "help", "h");
         registerCommand((args, range, force) -> handleWordCount(), "wc", "wordcount");
         registerCommand((args, range, force) -> editor.showRecentFiles(), "recent");
         registerCommand((args, range, force) -> handleDelete(range), "d", "delete");
@@ -170,6 +171,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleWindow(args), "window", "win");
         registerCommand((args, range, force) -> handleZoom(args), "zoom", "uizoom");
         registerCommand((args, range, force) -> editor.showGrepFinder(args), "grep", "rg");
+        registerCommand((args, range, force) -> handleProject(args), "project");
         registerCommand((args, range, force) -> editor.handleProjectReplace(args), "projectreplace", "preplace");
         registerCommand((args, range, force) -> handleQuickfix(args), "quickfix", "qf");
         registerCommand((args, range, force) -> handleQuickfix("open"), "copen");

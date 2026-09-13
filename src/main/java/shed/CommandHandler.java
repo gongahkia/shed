@@ -467,6 +467,10 @@ public class CommandHandler {
         return switch (command.name()) {
             case "preview", "close", "refresh" -> command.argument().isEmpty()
                 ? editor.handleMarkdownPreview(command.name()) : "Usage: :markdown preview|close|refresh";
+            case "toc" -> command.argument().isEmpty()
+                ? editor.showTableOfContents() : "Usage: :markdown toc";
+            case "outline" -> command.argument().isEmpty()
+                ? editor.showOutline() : "Usage: :markdown outline";
             case "checkbox" -> "toggle".equalsIgnoreCase(command.argument())
                 ? editor.toggleCheckbox() : "Usage: :markdown checkbox toggle";
             case "table" -> "insert".equalsIgnoreCase(command.argument())
@@ -475,7 +479,7 @@ public class CommandHandler {
                 ? editor.insertLink() : "Usage: :markdown link insert";
             case "image" -> "insert".equalsIgnoreCase(command.argument())
                 ? editor.insertImage() : "Usage: :markdown image insert";
-            default -> "Usage: :markdown preview|close|refresh|checkbox toggle|table insert|link insert|image insert";
+            default -> "Usage: :markdown preview|close|refresh|toc|outline|checkbox toggle|table insert|link insert|image insert";
         };
     }
 

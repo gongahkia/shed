@@ -79,7 +79,7 @@ Each action is unique by visible label and normalized command. The application r
 | Clear Search Highlights | `:search highlights clear` | Clear active search highlights. |
 | Command Log | `:command log` | Open the command log buffer. |
 | Show Help | `:help open` | Open the built-in help buffer. |
-| About Shed | `:app about` | Show Shed version and local runtime details. |
+| About Shed | `:about` | Show Shed version and local runtime details. |
 
 ## Editing and local information
 
@@ -88,8 +88,7 @@ Each action is unique by visible label and normalized command. The application r
 | Format Current Buffer | `:format current` | Format the active buffer with its selected formatter. |
 | Formatter Policy | `:format policy` | Configure the current language's formatter and format-on-save policy. |
 | Markdown Preview | `:markdown preview` | Open the live native Markdown preview beside the source buffer. |
-| Table of Contents | `:document toc` | Open the current Markdown document's table of contents. |
-| Document Outline | `:document outline` | Open the current document outline. |
+| Table of Contents | `:markdown toc` | Open the current Markdown document's table of contents. |
 | Toggle Markdown Checkbox | `:markdown checkbox toggle` | Toggle the checkbox at the caret. |
 | Insert Markdown Table | `:markdown table insert` | Insert the default Markdown table template. |
 | Insert Link | `:markdown link insert` | Insert a link at the caret. |

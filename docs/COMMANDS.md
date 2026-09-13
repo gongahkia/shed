@@ -44,7 +44,7 @@ In the `:` prompt, paste with `Cmd`/`Ctrl` + `V` and use Left/Right to move the 
 
 | Command | Action |
 | :--- | :--- |
-| `:version`, `:about`, `:buildinfo` | Show version, available build commit/target, and local Java/OS details |
+| `:about`, `:version`, `:buildinfo` | Show version, available build commit/target, and local Java/OS details |
 
 Packaged jars include deterministic version and Java-target manifest entries. `Shed-Commit` is emitted only when the build supplies `-Dshed.build.commit=<commit>`; otherwise the manifest and support display omit it.
 
@@ -420,8 +420,8 @@ Portable-manifest format, safety boundary, and its distinction from private sess
 
 | Command | Action |
 | :--- | :--- |
-| `:document toc`, `:toc` | Open markdown table-of-contents buffer |
-| `:document outline`, `:outline` | Open markdown outline in split |
+| `:markdown toc`, `:document toc`, `:toc` | Open markdown table-of-contents buffer |
+| `:markdown outline`, `:document outline`, `:outline` | Open markdown outline in split |
 | `:markdown preview`, `:mdpreview` | Open a live native Markdown preview beside the source buffer |
 | `:markdown refresh` | Re-render the open Markdown preview |
 | `:markdown close` | Close the open Markdown preview |

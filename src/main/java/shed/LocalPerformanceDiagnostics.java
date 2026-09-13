@@ -31,8 +31,8 @@ final class LocalPerformanceDiagnostics {
         report.append("  Timings and heap observations vary by JDK, storage, workspace, CPU load, and OS caches; they are not portability guarantees.\n\n");
         report.append("Controls:\n");
         report.append("  :perf diagnostics   Show latest structured local errors\n");
-        report.append("  :perf benchmark     Start the cancellable local workspace-index benchmark\n");
-        report.append("  :jobs, :jobcancel <id>   Check or cancel the benchmark job\n");
+        report.append("  :perf benchmark     Start the local workspace-index benchmark\n");
+        report.append("  Failed background work is recorded in the local command log.\n");
         return report.toString();
     }
 

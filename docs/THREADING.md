@@ -15,7 +15,7 @@ Shed uses Swing's event dispatch thread (EDT) for the UI and `AsyncJobService` w
 - A job task must not access Swing/AWT components or their attached models. Capture immutable input on the EDT before submitting the task.
 - `AsyncJobService.JobCompletion` always runs on the EDT. It may update the UI directly and must stay short; do not add another `invokeLater` wrapper.
 - Completion handlers receive only completed-job data. They must verify cancellation and stale editor state before applying results.
-- Unexpected worker and completion failures are reported through `ApplicationErrorReporter`; cancellation uses the job token and interrupt path.
+- Unexpected worker and completion failures are reported through `ApplicationErrorReporter`; failed jobs are also appended to the local command log. Routine completions and automatic cancellations stay out of the log. Cancellation uses the job token and interrupt path.
 
 ## Verification
 

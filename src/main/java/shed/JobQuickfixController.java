@@ -1464,37 +1464,9 @@ final class JobQuickfixController {
     }
 
 
-    public String showJobs() {
-        List<AsyncJobService.JobSnapshot> jobs = editor.asyncJobService.list();
-        if (jobs.isEmpty()) {
-            return "No jobs";
-        }
-        StringBuilder builder = new StringBuilder();
-        builder.append("Jobs\n\n");
-        for (AsyncJobService.JobSnapshot job : jobs) {
-            builder.append(job.getId())
-                .append("  ")
-                .append(job.getStatus().name().toLowerCase())
-                .append("  ")
-                .append(job.getDescription());
-            Long finished = job.getFinishedAtMillis();
-            if (finished != null) {
-                long duration = Math.max(0L, finished - job.getStartedAtMillis());
-                builder.append("  (").append(duration).append(" ms)");
-            }
-            if (job.getErrorMessage() != null && !job.getErrorMessage().isBlank()) {
-                builder.append("  ").append(job.getErrorMessage().strip());
-            }
-            builder.append("\n");
-        }
-        editor.showScratchBuffer("[jobs]", builder.toString());
-        return "Showing jobs";
-    }
-
-
     public String cancelJob(String jobIdArgument) {
         if (jobIdArgument == null || jobIdArgument.isBlank()) {
-            return "Usage: :jobcancel <id>";
+            return "A job ID is required";
         }
         try {
             int jobId = Integer.parseInt(jobIdArgument.trim());

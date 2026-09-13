@@ -1,6 +1,6 @@
 # Command Palette
 
-The command palette is Shed’s discoverable surface for controls that run without user-supplied arguments. It intentionally omits its own opener, force variants, and commands that require a target, path, query, replacement, or explicit confirmation; use the `:` command bar for those.
+The command palette is Shed’s discoverable surface for controls that run without user-supplied arguments. It omits its own opener and commands that require a target, path, query, replacement, or explicit confirmation; use the `:` command bar for those.
 
 Each action is unique by visible label and normalized command. The application rejects duplicate entries when it starts.
 
@@ -16,20 +16,23 @@ Each action is unique by visible label and normalized command. The application r
 | Buffer Picker | `:buffers` | Show every open buffer, filter the list, and switch to a selected buffer. |
 | Switch to Next Open Buffer | `:bn` | Switch to the next open buffer. |
 | Switch to Previous Open Buffer | `:bp` | Switch to the previous open buffer. |
-| Close Current Buffer | `:bd` | Close the current buffer, prompting when needed. |
-| Save Current Buffer | `:w` | Write the current buffer. |
-| Save All Buffers | `:wa` | Write all modified file-backed buffers. |
+| Close Current Buffer | `:bdelete` | Close the current buffer, prompting when needed. |
+| Discard Current Buffer | `:bdelete!` | Close the current buffer without saving its changes. |
+| Save Current Buffer | `:write` | Write the current buffer. |
+| Save All Buffers | `:wall` | Write all modified file-backed buffers. |
 | Save and Close Active Window | `:wq` | Write the current buffer, then close its editor window. |
 | Save All and Quit | `:wqa` | Write all modified buffers and quit. |
 | Close Active Window | `:q` | Close the active editor window, or its last buffer and show the landing page. |
+| Close Active Window Without Saving | `:q!` | Close the active editor window without saving its changes. |
 | Quit All | `:qa` | Quit all buffers, prompting when needed. |
+| Quit All Without Saving | `:qa!` | Quit Shed without saving modified buffers. |
 
 ## Splits and interface scale
 
 | Action | Command | Purpose |
 | :--- | :--- | :--- |
-| Split Below | `:split` | Create a horizontal split below the active editor. |
-| Split Right | `:vsplit` | Create a vertical split beside the active editor. |
+| Split Below | `:s` | Create a horizontal split below the active editor. |
+| Split Right | `:vs` | Create a vertical split beside the active editor. |
 | Focus Next Split | `:window next` | Focus the next editor split. |
 | Focus Split Left | `:window left` | Focus the split to the left. |
 | Focus Split Right | `:window right` | Focus the split to the right. |

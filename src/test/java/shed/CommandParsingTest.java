@@ -145,6 +145,8 @@ public class CommandParsingTest {
         assertTrue(handler.getCommandNames().contains("language-services"));
         assertTrue(handler.getCommandNames().contains("window"));
         assertTrue(handler.getCommandNames().contains("zoom"));
+        assertTrue(handler.getCommandNames().contains("s"));
+        assertTrue(handler.getCommandNames().contains("vs"));
         assertFalse(handler.getCommandNames().contains("ls"));
         List<String> actions = PaletteController.surfaceActionNames();
         assertTrue(actions.containsAll(List.of(
@@ -170,6 +172,11 @@ public class CommandParsingTest {
         assertEquals("open file", PaletteController.surfaceActionCommand("Open File"));
         assertEquals("open folder", PaletteController.surfaceActionCommand("Open Folder"));
         assertEquals("tree", PaletteController.surfaceActionCommand("Toggle File Tree"));
+        assertEquals("s", PaletteController.surfaceActionCommand("Split Below"));
+        assertEquals("vs", PaletteController.surfaceActionCommand("Split Right"));
+        assertEquals("bdelete!", PaletteController.surfaceActionCommand("Discard Current Buffer"));
+        assertEquals("q!", PaletteController.surfaceActionCommand("Close Active Window Without Saving"));
+        assertEquals("qa!", PaletteController.surfaceActionCommand("Quit All Without Saving"));
         assertEquals("remote list", PaletteController.surfaceActionCommand("Remote Workspaces"));
         assertEquals("container status", PaletteController.surfaceActionCommand("Dev Container"));
         assertEquals("zoom reset", PaletteController.surfaceActionCommand("Reset UI Zoom"));
@@ -180,7 +187,8 @@ public class CommandParsingTest {
         for (String action : actions) {
             String command = PaletteController.surfaceActionCommand(action);
             String topLevel = command.substring(0, command.indexOf(' ') < 0 ? command.length() : command.indexOf(' '));
-        assertTrue(handler.getCommandNames().contains(topLevel), action + " must route through a registered command");
+            String registeredName = topLevel.endsWith("!") ? topLevel.substring(0, topLevel.length() - 1) : topLevel;
+            assertTrue(handler.getCommandNames().contains(registeredName), action + " must route through a registered command");
         }
     }
 

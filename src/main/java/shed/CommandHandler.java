@@ -160,9 +160,9 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.showFileFinder(), "files");
         registerCommand((args, range, force) -> editor.showFolderFinder(), "folder", "folders");
         registerCommand((args, range, force) -> editor.showBufferFinder(), "buffers", "buf");
-        registerCommand((args, range, force) -> editor.splitWindow(false), "split", "sp");
-        registerCommand((args, range, force) -> editor.splitWindow(true), "vsplit", "vsp");
-        registerCommand((args, range, force) -> editor.closeActiveWindow(), "close", "clo");
+        registerCommand((args, range, force) -> editor.splitWindow(false), "split", "sp", "s");
+        registerCommand((args, range, force) -> editor.splitWindow(true), "vsplit", "vsp", "vs");
+        registerCommand((args, range, force) -> force ? editor.requestCloseActiveWindow(true) : editor.closeActiveWindow(), "close", "clo");
         registerCommand((args, range, force) -> handleWindow(args), "window", "win");
         registerCommand((args, range, force) -> handleZoom(args), "zoom", "uizoom");
         registerCommand((args, range, force) -> editor.showGrepFinder(args), "grep", "rg");

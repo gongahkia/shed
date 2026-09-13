@@ -46,7 +46,6 @@ public class HelpService {
                    "  :qa / :wqa     Quit all editor windows\n" +
                    "  :e file        Edit file\n" +
                    "  :bn / :bp      Next/previous buffer\n" +
-                   "  :ls            List buffers\n" +
                    "  :bd            Delete buffer\n" +
                    "  :recent        Show recent files\n" +
                    "  :settings      Open user settings file\n" +

@@ -120,7 +120,6 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleEdit(args), "e", "edit");
         registerCommand((args, range, force) -> editor.nextBuffer(), "bn", "bnext");
         registerCommand((args, range, force) -> editor.prevBuffer(), "bp", "bprev");
-        registerCommand((args, range, force) -> editor.listBuffers(), "ls");
         registerCommand((args, range, force) -> editor.deleteBuffer(force), "bd", "bdelete");
         registerCommand((args, range, force) -> handleSet(args, force), "set");
         registerCommand((args, range, force) -> handleConfig(args, force), "settings", "config");

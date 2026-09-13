@@ -28,7 +28,6 @@ In the `:` prompt, paste with `Cmd`/`Ctrl` + `V` and use Left/Right to move the 
 | `:e <file>`, `:edit <file>` | Open file in a buffer |
 | `:bn`, `:bnext` | Next buffer |
 | `:bp`, `:bprev` | Previous buffer |
-| `:ls` | List open buffers |
 | `:bd`, `:bdelete` | Delete current buffer |
 | `:bd!` | Force delete current buffer |
 | `:buffers`, `:buf` | Open buffer picker |

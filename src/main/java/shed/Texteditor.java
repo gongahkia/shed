@@ -2845,10 +2845,6 @@ public class Texteditor extends JFrame implements KeyListener {
         return paneBufferController.prevBuffer();
     }
 
-    public String listBuffers() {
-        return paneBufferController.listBuffers();
-    }
-
     public String deleteBuffer(boolean force) {
         return paneBufferController.deleteBuffer(force);
     }
@@ -3240,10 +3236,6 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String showRecentFiles() {
         return sessionConfigController.showRecentFiles();
-    }
-
-    void showBufferListDialog(String list) {
-        sessionConfigController.showBufferListDialog(list);
     }
 
     // Quit handling

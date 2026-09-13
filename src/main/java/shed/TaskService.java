@@ -1,6 +1,5 @@
 package shed;
 
-import shed.api.RemoteCommandRequest;
 import org.tomlj.Toml;
 import org.tomlj.TomlParseError;
 import org.tomlj.TomlParseResult;

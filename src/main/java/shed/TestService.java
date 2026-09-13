@@ -37,7 +37,6 @@ final class TestService {
         Pattern.CASE_INSENSITIVE);
     private static final Pattern ANSI_ESCAPE = Pattern.compile("\\u001B\\[[0-?]*[ -/]*[@-~]");
     private final TestAdapterRegistry adapters;
-    private final ExtensionRegistry extensionRegistry;
 
     enum Status {
         UNKNOWN, PASSED, FAILED, SKIPPED, ERRORED;
@@ -88,12 +87,9 @@ final class TestService {
         boolean valid() { return diagnostics.isEmpty(); }
     }
 
-    TestService() { this(new TestAdapterRegistry(), null); }
-    TestService(TestAdapterRegistry adapters) { this(adapters, null); }
-    TestService(ExtensionRegistry extensionRegistry) { this(new TestAdapterRegistry(), extensionRegistry); }
-    TestService(TestAdapterRegistry adapters, ExtensionRegistry extensionRegistry) {
+    TestService() { this(new TestAdapterRegistry()); }
+    TestService(TestAdapterRegistry adapters) {
         this.adapters = adapters == null ? new TestAdapterRegistry() : adapters;
-        this.extensionRegistry = extensionRegistry;
     }
 
     LoadResult load(Path root) {
@@ -143,14 +139,7 @@ final class TestService {
     }
 
     TestAdapter adapter(String id) {
-        TestAdapter builtIn = adapters.find(id);
-        if (builtIn != null) return builtIn;
-        if (extensionRegistry == null || id == null) return null;
-        for (ExtensionRegistry.Owned<shed.api.TestContribution> contribution : extensionRegistry.tests()) {
-            ExtensionTestAdapter adapter = new ExtensionTestAdapter(contribution);
-            if (adapter.id().equalsIgnoreCase(id.trim())) return adapter;
-        }
-        return null;
+        return adapters.find(id);
     }
 
     AdapterSpec resolvedSpec(Path root, AdapterSpec spec) {
@@ -208,13 +197,7 @@ final class TestService {
     }
 
     private List<TestAdapter> allAdapters() {
-        List<TestAdapter> result = new ArrayList<>(adapters.all());
-        if (extensionRegistry != null) {
-            for (ExtensionRegistry.Owned<shed.api.TestContribution> contribution : extensionRegistry.tests()) {
-                result.add(new ExtensionTestAdapter(contribution));
-            }
-        }
-        return List.copyOf(result);
+        return adapters.all();
     }
 
     private AdapterSpec parseSpec(TomlTable table, int index, List<String> diagnostics) {

@@ -1,6 +1,5 @@
 package shed;
 
-import shed.api.LanguageProfile;
 import javax.swing.*;
 import javax.swing.plaf.ColorUIResource;
 import javax.swing.Timer;
@@ -1151,7 +1150,6 @@ final class EditorUiController {
         }
         updateStatusBar();
         if (oldMode != mode) {
-            editor.firePluginEvent("ModeChange");
         }
     }
 
@@ -1260,8 +1258,7 @@ final class EditorUiController {
 
     private String languageDisplayName(FileBuffer buffer) {
         if (buffer == null) return "text";
-        LanguageProfile profile = editor.languageProfileFor(buffer);
-        return profile == null ? buffer.getFileType().getDisplayName() : profile.displayName();
+        return buffer.getFileType().getDisplayName();
     }
 
     private void setCommandBarDisplay(String text) {

@@ -1,9 +1,5 @@
 package shed;
 
-import shed.api.RemoteWorkspace;
-import shed.api.RemoteCommandResult;
-import shed.api.RemoteWorkspaceProvider;
-import shed.api.RemoteWorkspaceRequest;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -213,7 +209,7 @@ final class RemoteWorkspaceController {
         if (connection == null) return "Remote workspace not connected: " + tokens.get(1);
         try {
             List<String> command = tokens.size() == 2 ? List.of() : List.copyOf(tokens.subList(2, tokens.size()));
-            List<String> invocation = connection.workspace().terminalCommand(new shed.api.RemoteTerminalRequest("", command));
+            List<String> invocation = connection.workspace().terminalCommand(new RemoteTerminalRequest("", command));
             if (invocation == null || invocation.isEmpty()) return "Remote terminal unavailable: provider returned no command";
             return editor.terminalController.openDirect("Remote " + connection.id(), connection.workspace().localRoot().toFile(), invocation,
                 terminalSourcePathMapper(connection.workspace()));
@@ -372,12 +368,7 @@ final class RemoteWorkspaceController {
     }
 
     private List<RemoteWorkspaceProvider> providers() {
-        List<RemoteWorkspaceProvider> result = new ArrayList<>();
-        if (editor.extensionManager != null) {
-            for (ExtensionRegistry.Owned<RemoteWorkspaceProvider> provider : editor.extensionManager.remoteWorkspaceProviders()) result.add(provider.value());
-        }
-        result.addAll(BuiltInRemoteWorkspaceProviders.all());
-        return List.copyOf(result);
+        return BuiltInRemoteWorkspaceProviders.all();
     }
 
     private Connection connection(String id) {

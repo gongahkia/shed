@@ -86,7 +86,6 @@ final class PaneBufferController {
             editor.closeMarkdownPreviewForSource(pane);
         }
         boolean replacedCustomEditor = pane.getCustomEditorComponent() != null;
-        editor.customEditorController.dispose(pane);
         pane.clearCustomEditorComponent();
 
         boolean activePane = pane == editor.getActivePane();
@@ -511,7 +510,6 @@ final class PaneBufferController {
         editor.showCustomEditorIfAvailable(editor.getActivePane(), buffer);
         editor.addToRecentFiles(file.getAbsolutePath());
         editor.registerFileWatch(buffer);
-        editor.firePluginEvent("BufOpen");
         editor.refreshGitGutter();
         if (buffer.isLargeFileUnavailable()) {
             editor.showMessage("Large-file unavailable: " + buffer.getLargeFileStatus());
@@ -563,7 +561,6 @@ final class PaneBufferController {
             editor.addToRecentFiles(file.getAbsolutePath());
             if (newBuffer) {
                 editor.registerFileWatch(targetBuffer);
-                editor.firePluginEvent("BufOpen");
                 editor.refreshGitGutter();
             }
             return "Opened in split: " + file.getAbsolutePath();
@@ -788,7 +785,6 @@ final class PaneBufferController {
         }
         editor.closeTerminalSession(closingBuffer);
         paneToClose.closeTerminalPane();
-        editor.customEditorController.dispose(paneToClose);
         editor.detachMarkdownPreview(paneToClose);
         if (editor.isTreeBuffer(closingBuffer)) {
             editor.treeLineTargets.remove(closingBuffer);

@@ -57,7 +57,7 @@ import java.io.BufferedWriter;
 import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 
-public class test extends JFrame implements KeyListener { // taking JFrame as the parent class, Texteditor as the child class
+public class shedv1 extends JFrame implements KeyListener { // taking JFrame as the parent class, Texteditor as the child class
 
 // --- static attributes
     static int editorMode = 0; // 0: Normal mode, 1: Insert mode, 2: Command mode
@@ -74,7 +74,7 @@ public class test extends JFrame implements KeyListener { // taking JFrame as th
     LocalDateTime timeAndDate;
 
 // --- constructor method
-    test() {
+    shedv1() {
         
         // --- initializing JFrame with JTextArea
         this.setTitle("Shed");
@@ -215,6 +215,6 @@ public class test extends JFrame implements KeyListener { // taking JFrame as th
     public void keyTyped (KeyEvent e) {}
 
     public static void main(String[] args) {
-        new test();
+        new shedv1();
     }
 }

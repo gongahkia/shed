@@ -70,7 +70,7 @@ Each action is unique by visible label and normalized command. The application r
 | Apply Suggested Config Repairs | `:config heal` | Persist the reviewed deterministic configuration repairs. |
 | Reload Configuration | `:config reload` | Reload configuration from disk. |
 | Keymap Inspector | `:keymap inspector` | Inspect and edit validated keymap overlays. |
-| Themes | `:theme list` | Show built-in themes. |
+| Themes | `:theme list` | Open the Theme Gallery to preview and apply built-in color schemes. |
 | Toggle Zen Mode | `:zen toggle` | Toggle the distraction-free Zen layout. |
 | Toggle Goyo Mode | `:goyo toggle` | Toggle the Goyo layout. |
 | Toggle Limelight | `:limelight toggle` | Toggle paragraph focus dimming. |

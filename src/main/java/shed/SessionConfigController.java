@@ -499,8 +499,8 @@ final class SessionConfigController {
 
 
     public String showThemes() {
-        showScratchBuffer("[themes]", editor.configManager.getThemeListText());
-        return "Showing themes";
+        ThemeGalleryDialog.showFor(editor);
+        return "Opened Theme Gallery";
     }
 
 

@@ -191,7 +191,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:projectreplace scope workspace\|current-file` | Persist replacement preview scope |
 | `:palette`, `:commands` | Open the deduplicated command palette. Its complete action list is in [Command Palette](COMMAND_PALETTE.md); commands requiring arguments, force variants, and the palette opener itself remain in the command bar. |
 | `:undo history`, `:undolist`, `:undotree` | Show undo state summary |
-| `:theme list`, `:themes` | Show built-in themes |
+| `:theme`, `:theme list`, `:theme gallery`, `:themes` | Open the Theme Gallery with visual palette previews; `:theme <name>` applies one built-in theme for the current session |
 | `:zen toggle`, `:zen` | Toggle Goyo layout with Limelight; restores Limelight's prior state when disabled |
 | `:goyo toggle`, `:goyo` | Toggle the distraction-free layout without changing Limelight; hides status/line numbers/minimap/tree/tool windows while retaining every pane and split |
 | `:limelight toggle`, `:limelight` | Toggle paragraph focus dimming; the current paragraph or selected text stays bright |

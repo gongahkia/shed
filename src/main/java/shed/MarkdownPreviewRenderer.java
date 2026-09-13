@@ -267,7 +267,7 @@ final class MarkdownPreviewRenderer {
             String width = imageDimension(attribute(attributes, "width"));
             String height = imageDimension(attribute(attributes, "height"));
             String local = resolveLocalImage(source, sourceFile);
-            MarkdownPreviewAssets.RemoteImageResolution remote = local == null || assets == null ? null : assets.resolveRemoteImage(source);
+            MarkdownPreviewAssets.RemoteImageResolution remote = local != null || assets == null ? null : assets.resolveRemoteImage(source);
             if (local == null && remote != null && remote.isAvailable()) local = remote.uri();
             String label = alt == null ? "image" : alt;
             String replacement = local == null

@@ -388,7 +388,7 @@ See [Update Checks](UPDATES.md) for endpoint/key configuration and metadata vali
 | `:tree rm <path>`, `:tree delete <path>` | Delete file or empty directory |
 | `:tree rm! <path>`, `:tree delete! <path>` | Force recursive delete |
 
-The Explorer loads directories when expanded. Use arrows or `j`/`k` to select, Left/Right to collapse or expand, and `Enter` or `o` to open the selected file. Drag a file onto an editor to open it in a split: drop in the top or bottom quarter for a stacked split, or the left or right half for a side-by-side split.
+The Explorer loads directories when expanded. Use arrows or `j`/`k` to select, Left/Right to collapse or expand, and `Enter` or `o` to open the selected file. Drag a file onto an editor to open it in a split. The left and right edges create side-by-side panes; the central top and bottom halves create stacked panes. A translucent, theme-colored preview marks the new pane's location before the drop.
 
 ## Session and Workspace Commands
 

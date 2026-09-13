@@ -1,6 +1,5 @@
 package shed;
 
-import shed.api.ScmContribution;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,11 +13,11 @@ final class BuiltInScmContributions {
     private BuiltInScmContributions() {
     }
 
-    static List<ExtensionRegistry.Owned<ScmContribution>> all() {
-        return List.of(new ExtensionRegistry.Owned<>("builtin", new CommandScm("mercurial", "Mercurial", "hg", ".hg",
-                List.of("status", "diff", "log", "add", "commit", "pull", "push", "update"))),
-            new ExtensionRegistry.Owned<>("builtin", new CommandScm("subversion", "Subversion", "svn", ".svn",
-                List.of("status", "diff", "log", "add", "commit", "update"))));
+    static List<ScmContribution> all() {
+        return List.of(new CommandScm("mercurial", "Mercurial", "hg", ".hg",
+                List.of("status", "diff", "log", "add", "commit", "pull", "push", "update")),
+            new CommandScm("subversion", "Subversion", "svn", ".svn",
+                List.of("status", "diff", "log", "add", "commit", "update")));
     }
 
     private static final class CommandScm implements ScmContribution {

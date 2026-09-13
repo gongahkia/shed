@@ -2,7 +2,6 @@ package shed;
 
 // SHit EDitor (Shed) Version 2.0 <Refactored Build>
 
-import shed.api.LanguageProfile;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -86,18 +85,12 @@ public class Texteditor extends JFrame implements KeyListener {
     UpdateController updateController;
     QuickfixService quickfixService;
     ProblemsService problemsService;
-    PluginManager pluginManager;
-    ExtensionRegistry extensionRegistry;
-    LanguageProfileSelection languageProfileSelection;
-    ExtensionManager extensionManager;
     ScmController scmController;
-    CustomEditorController customEditorController;
     NotebookController notebookController;
     DevContainerSessionService devContainerSessions;
     DevContainerController devContainerController;
     ComposeController composeController;
     DatabaseController databaseController;
-    WorkspaceToolController workspaceToolController;
     RemoteWorkspaceController remoteWorkspaceController;
     RemoteWorkspaceSessionService remoteWorkspaceSessions;
     RemoteWorkspaceTaskTargets remoteWorkspaceTaskTargets;
@@ -250,16 +243,12 @@ public class Texteditor extends JFrame implements KeyListener {
         // Initialize managers
         configManager = new ConfigManager();
         toolchainService = new ToolchainService(Path.of(configManager.getSessionDirectory(), "toolchains"));
-        extensionRegistry = new ExtensionRegistry();
-        languageProfileSelection = new LanguageProfileSelection();
         devContainerSessions = new DevContainerSessionService();
-        scmController = new ScmController(this, extensionRegistry);
-        customEditorController = new CustomEditorController(this);
+        scmController = new ScmController(this);
         notebookController = new NotebookController(this);
         devContainerController = new DevContainerController(this);
         composeController = new ComposeController(this);
         databaseController = new DatabaseController(this);
-        workspaceToolController = new WorkspaceToolController(this, extensionRegistry);
         remoteWorkspaceSessions = new RemoteWorkspaceSessionService();
         remoteWorkspaceTaskTargets = new RemoteWorkspaceTaskTargets();
         remoteWorkspaceController = new RemoteWorkspaceController(this);
@@ -282,7 +271,7 @@ public class Texteditor extends JFrame implements KeyListener {
         problemsService = new ProblemsService();
         jobQuickfixController = new JobQuickfixController(this);
         problemsController = new ProblemsController(this, problemsService);
-        testController = new TestController(this, new TestService(extensionRegistry));
+        testController = new TestController(this, new TestService());
         formatOnSaveController = new FormatOnSaveController(this);
         formatterController = new FormatterController(this);
         toolchainController = new ToolchainController(this);
@@ -406,9 +395,6 @@ public class Texteditor extends JFrame implements KeyListener {
         clipboardManager = new ClipboardManager();
         registerManager = new RegisterManager();
         commandHandler = new CommandHandler(this);
-        pluginManager = new PluginManager(configManager, this);
-        extensionManager = new ExtensionManager(configManager, extensionRegistry);
-        extensionManager.loadInstalled();
         if (toolWindowHost != null) {
             toolWindowHost.refreshExtensionViews();
         }
@@ -489,33 +475,6 @@ public class Texteditor extends JFrame implements KeyListener {
     // Initialize UI components
     void initializeUI() {
         editorUiController.initializeUI();
-    }
-
-    String handleExtensionCommand(String argument) {
-        if (extensionManager == null) {
-            return "Extension host is unavailable";
-        }
-        String result = extensionManager.handle(argument);
-        if (toolWindowHost != null) {
-            toolWindowHost.refreshExtensionViews();
-        }
-        if (result != null && (argument == null || argument.isBlank() || "list".equalsIgnoreCase(argument.trim()) || "status".equalsIgnoreCase(argument.trim()))) {
-            showScratchBuffer("[extensions]", result);
-            return "Showing extensions";
-        }
-        return result;
-    }
-
-    String executeExtensionCommand(String id, String arguments) {
-        return extensionManager == null ? null : extensionManager.executeCommand(id, arguments);
-    }
-
-    List<String> extensionCommandIds() {
-        return extensionManager == null ? List.of() : extensionManager.commandIds();
-    }
-
-    String handleExtensionViewCommand(String argument) {
-        return toolWindowHost == null ? "Tool window host is unavailable" : toolWindowHost.showExtensionView(argument);
     }
 
     EditorPane createEditorPane(Dimension screenSize) {
@@ -1841,10 +1800,6 @@ public class Texteditor extends JFrame implements KeyListener {
         return scmController.handle(argument);
     }
 
-    String handleCustomEditorCommand(String argument) {
-        return customEditorController.handle(argument);
-    }
-
     String handleNotebookCommand(String argument) {
         return notebookController.handle(argument);
     }
@@ -1861,12 +1816,8 @@ public class Texteditor extends JFrame implements KeyListener {
         return databaseController.handle(argument);
     }
 
-    String handleWorkspaceIntegrationCommand(String argument) {
-        return workspaceToolController.handle(argument);
-    }
-
     boolean showCustomEditorIfAvailable(EditorPane pane, FileBuffer buffer) {
-        return notebookController.showIfAvailable(pane, buffer) || customEditorController.showIfAvailable(pane, buffer);
+        return notebookController.showIfAvailable(pane, buffer);
     }
 
     String handleRemoteWorkspaceCommand(String argument) {
@@ -2731,85 +2682,21 @@ public class Texteditor extends JFrame implements KeyListener {
         return paneBufferController.getCurrentBuffer();
     }
 
-    LanguageProfile languageProfileFor(FileBuffer buffer) {
-        return languageProfileSelection == null ? null : languageProfileSelection.profileFor(buffer, extensionRegistry);
-    }
-
-    ExtensionRegistry.Owned<LanguageProfile> languageProfileOwnership(FileBuffer buffer) {
-        return languageProfileSelection == null ? null : languageProfileSelection.ownedProfileFor(buffer, extensionRegistry);
-    }
-
-    String snippetLanguageId(FileBuffer buffer) {
-        LanguageProfile profile = languageProfileFor(buffer);
-        if (profile != null) return profile.languageId();
-        if (buffer == null) return "text";
-        return lspController == null ? lspService.languageId(buffer.getFileType()) : lspController.languageId(buffer);
-    }
-
-    List<shed.api.SnippetContribution> snippetContributions() {
-        return extensionRegistry.snippets().stream().map(ExtensionRegistry.Owned::value).toList();
-    }
-
-    String handleLanguageCommand(String argument) {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null) return "Current buffer is unavailable";
-        String value = argument == null ? "" : argument.trim();
-        if (value.isEmpty() || "list".equalsIgnoreCase(value)) {
-            StringBuilder output = new StringBuilder("Extension Language Profiles\n\n");
-            List<ExtensionRegistry.Owned<LanguageProfile>> profiles = languageProfileSelection.profiles(extensionRegistry);
-            if (profiles.isEmpty()) output.append("No extension language profiles are installed.\n");
-            for (ExtensionRegistry.Owned<LanguageProfile> profile : profiles) {
-                String id = LanguageProfileSelection.qualified(profile);
-                output.append(id).append("  ").append(profile.value().displayName()).append('\n');
-            }
-            LanguageProfile active = languageProfileFor(buffer);
-            output.append("\nActive: ").append(active == null ? "automatic built-in/text" : active.displayName())
-                .append(languageProfileSelection.isManual(buffer) ? " (manual)" : " (automatic)")
-                .append("\n\nUse :language <extension-id:language-id|language-id> or :language auto.\n");
-            showScratchBuffer("[language profiles]", output.toString());
-            return "Showing extension language profiles";
-        }
-        if ("auto".equalsIgnoreCase(value) || "automatic".equalsIgnoreCase(value)) {
-            languageProfileSelection.automatic(buffer);
-            refreshIndentationPreferences(buffer);
-            applySyntaxHighlighting();
-            if (lspController != null) lspController.profileSelectionChanged(buffer);
-            updateStatusBar();
-            return "Language profile detection restored";
-        }
-        try {
-            LanguageProfile profile = languageProfileSelection.select(buffer, extensionRegistry, value);
-            refreshIndentationPreferences(buffer);
-            applySyntaxHighlighting();
-            if (lspController != null) lspController.profileSelectionChanged(buffer);
-            updateStatusBar();
-            return "Language profile selected: " + profile.displayName();
-        } catch (IllegalArgumentException error) {
-            return "Language profile unavailable: " + error.getMessage();
-        }
-    }
-
     int effectiveTabSize(FileBuffer buffer) {
         WorkspaceEditorSettings.Indentation workspace = workspaceEditorSettings(buffer);
         int result = workspace.generic().tabSize() == null ? configManager.getTabSize() : workspace.generic().tabSize();
-        LanguageProfile profile = languageProfileFor(buffer);
-        if (profile != null && profile.tabSize() != null) result = profile.tabSize();
         return workspace.language().tabSize() == null ? result : workspace.language().tabSize();
     }
 
     boolean effectiveExpandTab(FileBuffer buffer) {
         WorkspaceEditorSettings.Indentation workspace = workspaceEditorSettings(buffer);
         boolean result = workspace.generic().insertSpaces() == null ? configManager.getExpandTab() : workspace.generic().insertSpaces();
-        LanguageProfile profile = languageProfileFor(buffer);
-        if (profile != null && profile.insertSpaces() != null) result = profile.insertSpaces();
         return workspace.language().insertSpaces() == null ? result : workspace.language().insertSpaces();
     }
 
     private WorkspaceEditorSettings.Indentation workspaceEditorSettings(FileBuffer buffer) {
         if (workspaceController == null || buffer == null) return WorkspaceEditorSettings.Indentation.EMPTY;
-        LanguageProfile profile = languageProfileFor(buffer);
-        String languageId = profile != null ? profile.languageId()
-            : lspController == null ? lspService.languageId(buffer.getFileType()) : lspController.languageId(buffer);
+        String languageId = lspController == null ? lspService.languageId(buffer.getFileType()) : lspController.languageId(buffer);
         return workspaceController.editorSettingsFor(buffer, languageId);
     }
 
@@ -3257,66 +3144,6 @@ public class Texteditor extends JFrame implements KeyListener {
         return sessionConfigController.getConfigManager();
     }
 
-    public PluginManager getPluginManager() {
-        return sessionConfigController.getPluginManager();
-    }
-
-    void firePluginEvent(String event) {
-        sessionConfigController.firePluginEvent(event);
-    }
-
-    public String reloadPlugins() {
-        return sessionConfigController.reloadPlugins();
-    }
-
-    public String showPluginList() {
-        return sessionConfigController.showPluginList();
-    }
-
-    public String showPluginPackages() {
-        return sessionConfigController.showPluginPackages();
-    }
-
-    public String enablePlugin(String name) {
-        return sessionConfigController.enablePlugin(name);
-    }
-
-    public String disablePlugin(String name) {
-        return sessionConfigController.disablePlugin(name);
-    }
-
-    public String showPluginInfo(String name) {
-        return sessionConfigController.showPluginInfo(name);
-    }
-
-    public String showPluginPath() {
-        return sessionConfigController.showPluginPath();
-    }
-
-    public String createAndOpenPlugin(String name) {
-        return sessionConfigController.createAndOpenPlugin(name);
-    }
-
-    public String installPluginPackage(String args) {
-        return sessionConfigController.installPluginPackage(args);
-    }
-
-    public String updatePluginPackage(String args) {
-        return sessionConfigController.updatePluginPackage(args);
-    }
-
-    public String removePluginPackage(String name) {
-        return sessionConfigController.removePluginPackage(name);
-    }
-
-    public String pinPluginPackage(String name) {
-        return sessionConfigController.pinPluginPackage(name);
-    }
-
-    public String unpinPluginPackage(String name) {
-        return sessionConfigController.unpinPluginPackage(name);
-    }
-
     public String executeCommand(String cmd) {
         return sessionConfigController.executeCommand(cmd);
     }
@@ -3482,12 +3309,6 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         if (remoteWorkspaceController != null) {
             remoteWorkspaceController.closeAll();
-        }
-        if (customEditorController != null) {
-            customEditorController.disposeAll();
-        }
-        if (extensionManager != null) {
-            extensionManager.close();
         }
         dispose();
         System.exit(0);

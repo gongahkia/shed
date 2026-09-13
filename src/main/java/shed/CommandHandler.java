@@ -102,11 +102,6 @@ public class CommandHandler {
                 return editor.runUserCommand(resolvedCmd, shellCmd);
             }
 
-            String extensionResult = editor.executeExtensionCommand(resolvedCmd, args);
-            if (extensionResult != null) {
-                return extensionResult;
-            }
-
             try {
                 return editor.gotoLine(Integer.parseInt(resolvedCmd));
             } catch (NumberFormatException ignored) {
@@ -144,12 +139,10 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleTreeCommand(args), "tree");
         registerCommand((args, range, force) -> editor.handleGitCommand(args), "git");
         registerCommand((args, range, force) -> editor.handleScmCommand(args), "scm");
-        registerCommand((args, range, force) -> editor.handleCustomEditorCommand(args), "customeditor", "custom-editor");
         registerCommand((args, range, force) -> editor.handleNotebookCommand(args), "notebook", "nb");
         registerCommand((args, range, force) -> editor.handleContainerCommand(args), "container", "devcontainer", "dev-container");
         registerCommand((args, range, force) -> editor.handleComposeCommand(args), "compose", "docker-compose");
         registerCommand((args, range, force) -> editor.handleDatabaseCommand(args), "database", "db");
-        registerCommand((args, range, force) -> editor.handleWorkspaceIntegrationCommand(args), "integration", "integrations");
         registerCommand((args, range, force) -> editor.handleRemoteWorkspaceCommand(args), "remote", "remotes");
         registerCommand((args, range, force) -> editor.handleGitHubCommand(args), "github", "gh");
         registerCommand((args, range, force) -> editor.handleUpdateCommand(args), "update", "updates");
@@ -180,7 +173,6 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleLspCommand(args), "lsp");
         registerCommand((args, range, force) -> editor.handleLspCommand("manage"),
             "languageservices", "language-services", "lspmanage");
-        registerCommand((args, range, force) -> editor.handleLanguageCommand(args), "language", "lang");
         registerCommand((args, range, force) -> handleFormat(args), "format", "fmt");
         registerCommand((args, range, force) -> handleFormat("policy"), "formatter", "formatpolicy");
         registerCommand((args, range, force) -> editor.handleDebugCommand(args), "debug", "dap");
@@ -239,10 +231,6 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleTerminal(args), "term", "terminal");
         registerCommand((args, range, force) -> handleConceal(args), "conceal", "conceallevel");
 
-        // Plugin commands
-        registerCommand((args, range, force) -> handlePlugin(args), "plugin", "plugins");
-        registerCommand((args, range, force) -> editor.handleExtensionCommand(args), "extension", "extensions");
-        registerCommand((args, range, force) -> editor.handleExtensionViewCommand(args), "view", "views");
     }
 
     private void registerCommand(CommandAction action, String... names) {
@@ -255,7 +243,6 @@ public class CommandHandler {
 
     public List<String> getCommandNames() {
         List<String> names = new ArrayList<>(commandRegistry.keySet());
-        if (editor != null) names.addAll(editor.extensionCommandIds());
         Collections.sort(names);
         return names;
     }
@@ -765,40 +752,6 @@ public class CommandHandler {
             return editor.setConcealLevel(level);
         } catch (NumberFormatException e) {
             return "Invalid conceal level: " + args;
-        }
-    }
-
-    private String handlePlugin(String args) {
-        if (args == null || args.isEmpty()) return editor.showPluginList();
-        String trimmed = args.trim();
-        int space = trimmed.indexOf(' ');
-        String sub = (space < 0 ? trimmed : trimmed.substring(0, space)).toLowerCase(Locale.ROOT);
-        String subArgs = space < 0 ? "" : trimmed.substring(space + 1).trim();
-        switch (sub) {
-            case "list": return editor.showPluginList();
-            case "packages":
-            case "pkg":
-                return editor.showPluginPackages();
-            case "reload": return editor.reloadPlugins();
-            case "enable": return subArgs.isEmpty() ? "Usage: :plugin enable <name>" : editor.enablePlugin(subArgs);
-            case "disable": return subArgs.isEmpty() ? "Usage: :plugin disable <name>" : editor.disablePlugin(subArgs);
-            case "info": return subArgs.isEmpty() ? "Usage: :plugin info <name>" : editor.showPluginInfo(subArgs);
-            case "path": return editor.showPluginPath();
-            case "new": return subArgs.isEmpty() ? "Usage: :plugin new <name>" : editor.createAndOpenPlugin(subArgs);
-            case "install":
-                return subArgs.isEmpty()
-                    ? "Usage: :plugin install <name> <version> <source> [--checksum=<sha256>] [--pin]"
-                    : editor.installPluginPackage(subArgs);
-            case "update":
-                return editor.updatePluginPackage(subArgs);
-            case "remove":
-            case "uninstall":
-                return subArgs.isEmpty() ? "Usage: :plugin remove <name>" : editor.removePluginPackage(subArgs);
-            case "pin":
-                return subArgs.isEmpty() ? "Usage: :plugin pin <name>" : editor.pinPluginPackage(subArgs);
-            case "unpin":
-                return subArgs.isEmpty() ? "Usage: :plugin unpin <name>" : editor.unpinPluginPackage(subArgs);
-            default: return "Unknown :plugin subcommand: " + sub;
         }
     }
 

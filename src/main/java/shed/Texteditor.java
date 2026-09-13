@@ -2682,6 +2682,11 @@ public class Texteditor extends JFrame implements KeyListener {
         return paneBufferController.getCurrentBuffer();
     }
 
+    String snippetLanguageId(FileBuffer buffer) {
+        if (buffer == null) return "text";
+        return lspController == null ? lspService.languageId(buffer.getFileType()) : lspController.languageId(buffer);
+    }
+
     int effectiveTabSize(FileBuffer buffer) {
         WorkspaceEditorSettings.Indentation workspace = workspaceEditorSettings(buffer);
         int result = workspace.generic().tabSize() == null ? configManager.getTabSize() : workspace.generic().tabSize();

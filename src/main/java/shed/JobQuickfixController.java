@@ -1,7 +1,5 @@
 package shed;
 
-import shed.api.RemoteCommandRequest;
-import shed.api.RemoteCommandResult;
 import javax.swing.text.BadLocationException;
 import java.io.*;
 import java.nio.file.Path;

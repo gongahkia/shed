@@ -1,7 +1,5 @@
 package shed;
 
-import shed.api.RemoteTerminalRequest;
-import shed.api.RemoteWorkspace;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.LinkedHashMap;

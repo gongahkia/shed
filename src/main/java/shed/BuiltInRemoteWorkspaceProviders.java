@@ -1,11 +1,5 @@
 package shed;
 
-import shed.api.RemoteWorkspace;
-import shed.api.RemoteCommandResult;
-import shed.api.RemoteCommandRequest;
-import shed.api.RemoteTerminalRequest;
-import shed.api.RemoteWorkspaceProvider;
-import shed.api.RemoteWorkspaceRequest;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;

@@ -1,8 +1,5 @@
 package shed;
 
-import shed.api.RemoteCommandRequest;
-import shed.api.RemoteCommandResult;
-import shed.api.RemoteWorkspace;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;

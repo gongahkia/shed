@@ -664,9 +664,8 @@ final class DebugSessionController {
     }
 
     private DebugAdapterRegistry.Validation baseValidation(Path workspace) {
-        return ExtensionDebugAdapterSupport.effective(BuiltInDebugAdapterSupport.effective(editor.configManager.getDebugConfigurationForWorkspace(workspace), workspace,
-            editor.toolchainService),
-            editor.extensionRegistry);
+        return BuiltInDebugAdapterSupport.effective(editor.configManager.getDebugConfigurationForWorkspace(workspace), workspace,
+            editor.toolchainService);
     }
 
     private VsCodeLaunchReports vsCodeLaunchReports(Path workspace, DebugAdapterRegistry.Validation base) {

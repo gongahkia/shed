@@ -93,6 +93,21 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void startupMaximizesTheEditorWindow() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-maximized-startup");
+        Files.createDirectories(home);
+
+        Texteditor editor = createEmptyEditor(home);
+        try {
+            assertEquals(javax.swing.JFrame.MAXIMIZED_BOTH,
+                onEdt(() -> editor.getExtendedState() & javax.swing.JFrame.MAXIMIZED_BOTH));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void startupFolderCreatesAnActiveWorkspaceAndExplorer() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-startup-folder");

@@ -66,7 +66,8 @@ final class EditorUiController {
         installUiZoomShortcuts();
 
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        editor.setSize(screenSize.width / 2, screenSize.height);
+        editor.setSize(screenSize);
+        editor.setExtendedState(editor.getExtendedState() | JFrame.MAXIMIZED_BOTH);
         editor.setLayout(new BorderLayout(5, 5));
         editor.editorHostPanel = new JPanel(new BorderLayout());
         editor.editorHostPanel.addComponentListener(new java.awt.event.ComponentAdapter() {

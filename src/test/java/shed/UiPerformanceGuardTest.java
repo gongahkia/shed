@@ -24,14 +24,14 @@ public class UiPerformanceGuardTest {
     }
 
     @Test
-    void editorPaintUsesConsistentGrayscaleTextRenderingHints() {
+    void editorPaintUsesGrayscaleAntialiasingWithIntegerLayoutMetrics() {
         BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics = image.createGraphics();
         try {
             EditorUiController.applyEditorTextRenderingHints(graphics);
             assertEquals(RenderingHints.VALUE_TEXT_ANTIALIAS_ON,
                 graphics.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING));
-            assertEquals(RenderingHints.VALUE_FRACTIONALMETRICS_ON,
+            assertEquals(RenderingHints.VALUE_FRACTIONALMETRICS_OFF,
                 graphics.getRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS));
         } finally {
             graphics.dispose();

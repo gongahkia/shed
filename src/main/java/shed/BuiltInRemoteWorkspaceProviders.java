@@ -431,6 +431,23 @@ final class BuiltInRemoteWorkspaceProviders {
         return values;
     }
 
+    /** Creates only the requested remote directory; it does not install software or leave a host process behind. */
+    static void bootstrapSshWorkspace(URI uri) throws IOException {
+        if (uri == null || !"ssh".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || !safeRemotePath(uri.getPath())) {
+            throw new IOException("SSH bootstrap requires ssh://[user@]host[:port]/absolute-workspace-path");
+        }
+        validateNoPassword(uri);
+        List<String> invocation = new ArrayList<>(List.of("ssh"));
+        if (uri.getPort() > 0) {
+            invocation.add("-p");
+            invocation.add(Integer.toString(uri.getPort()));
+        }
+        invocation.add(safeSshTarget(uri));
+        invocation.add(posixCommand("/", List.of("mkdir", "-p", uri.getPath()), Map.of()));
+        ProcessResult result = executeProcess(invocation, Path.of(System.getProperty("user.home", ".")));
+        if (result.exitCode() != 0) throw new IOException(result.detail().isBlank() ? "SSH workspace bootstrap failed" : result.detail());
+    }
+
     static List<String> sshLanguageServerInvocation(URI uri, List<String> command) throws IOException {
         if (uri == null || !"ssh".equalsIgnoreCase(uri.getScheme()) || !safeRemotePath(uri.getPath())) {
             throw new IOException("SSH language server requires an absolute remote workspace path");

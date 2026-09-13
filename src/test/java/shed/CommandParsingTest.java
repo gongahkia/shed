@@ -162,6 +162,7 @@ public class CommandParsingTest {
         assertTrue(matcher.matchStrings("Toggle File Tree", actions, 0).contains("Toggle File Tree"));
         assertTrue(matcher.matchStrings("Remote Workspaces", actions, 0).contains("Remote Workspaces"));
         assertTrue(matcher.matchStrings("Dev Container", actions, 0).contains("Dev Container"));
+        assertFalse(actions.contains("Show All Open Buffers"));
         assertEquals("workspace ui", PaletteController.surfaceActionCommand("Workspace Folders"));
         assertEquals("lsp codeaction", PaletteController.surfaceActionCommand("Code Actions"));
         assertEquals("snippets edit", PaletteController.surfaceActionCommand("Edit Snippets"));
@@ -180,6 +181,16 @@ public class CommandParsingTest {
             String topLevel = command.substring(0, command.indexOf(' ') < 0 ? command.length() : command.indexOf(' '));
         assertTrue(handler.getCommandNames().contains(topLevel), action + " must route through a registered command");
         }
+    }
+
+    @Test
+    void bufferPickerListsEveryBufferWithModifiedAndCurrentState() {
+        FileBuffer first = FileBuffer.createScratch("first", "");
+        FileBuffer second = FileBuffer.createScratch("second", "");
+        second.setModified(true);
+
+        assertEquals(List.of("1: first (current)", "2: second [+]"),
+            PaletteController.bufferPickerCandidates(List.of(first, second), 0));
     }
 
     private static class RecordingHandler implements GitService.Handler {

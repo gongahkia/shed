@@ -13,10 +13,9 @@ Each action is unique by visible label and normalized command. The application r
 | Toggle File Tree | `:tree` | Open or close the workspace file tree. |
 | File Finder | `:files` | Open the project file finder. |
 | Recent Files | `:recent` | Open the recently used files list. |
-| Buffer Picker | `:buffers` | Open the buffer picker. |
+| Buffer Picker | `:buffers` | Show every open buffer, filter the list, and switch to a selected buffer. |
 | Switch to Next Open Buffer | `:bn` | Switch to the next open buffer. |
 | Switch to Previous Open Buffer | `:bp` | Switch to the previous open buffer. |
-| Show All Open Buffers | `:ls` | Show the current and modified state of every open buffer. |
 | Close Current Buffer | `:bd` | Close the current buffer, prompting when needed. |
 | Save Current Buffer | `:w` | Write the current buffer. |
 | Save All Buffers | `:wa` | Write all modified file-backed buffers. |

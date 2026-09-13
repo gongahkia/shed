@@ -22,9 +22,9 @@ In the `:` prompt, paste with `Cmd`/`Ctrl` + `V` and use Left/Right to move the 
 | Command | Action |
 | :--- | :--- |
 | `:w`, `:write` | Write current buffer (or `:w <path>` to save as) |
-| `:q`, `:quit` | Quit (prompts on unsaved changes) |
-| `:q!` | Force quit |
-| `:wq`, `:x` | Write and quit |
+| `:q`, `:quit` | Close the active editor window (prompts on unsaved changes) |
+| `:q!` | Close the active editor window without the unsaved-changes prompt |
+| `:wq`, `:x` | Write, then close the active editor window |
 | `:e <file>`, `:edit <file>` | Open file in a buffer |
 | `:bn`, `:bnext` | Next buffer |
 | `:bp`, `:bprev` | Previous buffer |

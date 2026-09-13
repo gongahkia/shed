@@ -62,6 +62,7 @@ public class ConfigManagerTest {
         assertEquals(KeymapProfile.VIM, config.getKeymapProfile());
         assertEquals(LineNumberMode.ABSOLUTE, config.getLineNumberMode());
         assertTrue(config.getHighlightSearch());
+        assertFalse(config.getEditorScrollbarsVisible());
         assertFalse(config.getSessionRestoreOnStart());
         assertFalse(config.getTerminalSessionRestoreEnabled());
         assertTrue(config.getMarkdownPreviewScrollSync());

@@ -115,8 +115,8 @@ public class CommandHandler {
 
     private void registerCommands() {
         registerCommand((args, range, force) -> handleWrite(args.isEmpty() ? null : args), "w", "write");
-        registerCommand((args, range, force) -> editor.requestQuit(force), "q", "quit");
-        registerCommand((args, range, force) -> handleWriteQuit(args.isEmpty() ? null : args), "wq", "x");
+        registerCommand((args, range, force) -> editor.requestCloseActiveWindow(force), "q", "quit");
+        registerCommand((args, range, force) -> handleWriteQuit(args.isEmpty() ? null : args, force), "wq", "x");
         registerCommand((args, range, force) -> handleEdit(args), "e", "edit");
         registerCommand((args, range, force) -> editor.nextBuffer(), "bn", "bnext");
         registerCommand((args, range, force) -> editor.prevBuffer(), "bp", "bprev");
@@ -251,11 +251,11 @@ public class CommandHandler {
     }
 
     private String handleWrite(String targetPath) {
-        return editor.formatOnSaveController.requestCurrent(targetPath, false);
+        return editor.formatOnSaveController.requestCurrent(targetPath, false, false);
     }
 
-    private String handleWriteQuit(String targetPath) {
-        return editor.formatOnSaveController.requestCurrent(targetPath, true);
+    private String handleWriteQuit(String targetPath, boolean force) {
+        return editor.formatOnSaveController.requestCurrent(targetPath, true, force);
     }
 
     private String handleEdit(String filename) {

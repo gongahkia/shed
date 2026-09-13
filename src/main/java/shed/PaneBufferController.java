@@ -749,6 +749,15 @@ final class PaneBufferController {
     }
 
 
+    boolean canCloseActiveWindow() {
+        EditorPane pane = editor.getActivePane();
+        if (pane == null || editor.hasMarkdownPreviewForSource(pane)) {
+            return false;
+        }
+        return pane.isMarkdownPreview() || pane.isHiddenByFocusMode() || visiblePaneCount() > 1;
+    }
+
+
     String closePane(EditorPane paneToClose) {
         if (paneToClose == null) {
             return "No active window";

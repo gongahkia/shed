@@ -3,7 +3,6 @@ package shed;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,17 +24,29 @@ public class UiPerformanceGuardTest {
     }
 
     @Test
-    void editorPaintAppliesTheDesktopTextRenderingHints() {
+    void editorPaintUsesConsistentGrayscaleTextRenderingHints() {
         BufferedImage image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics = image.createGraphics();
         try {
-            EditorUiController.applyDesktopTextRenderingHints(graphics,
-                Map.of(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB));
-            assertEquals(RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB,
+            EditorUiController.applyEditorTextRenderingHints(graphics);
+            assertEquals(RenderingHints.VALUE_TEXT_ANTIALIAS_ON,
                 graphics.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING));
+            assertEquals(RenderingHints.VALUE_FRACTIONALMETRICS_ON,
+                graphics.getRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS));
         } finally {
             graphics.dispose();
         }
+    }
+
+    @Test
+    void editorScrollbarsCanBeHiddenWithoutDisablingScrolling() {
+        javax.swing.JScrollPane scrollPane = new javax.swing.JScrollPane();
+        EditorUiController.applyEditorScrollBarVisibility(scrollPane, false);
+        assertEquals(javax.swing.JScrollPane.VERTICAL_SCROLLBAR_NEVER, scrollPane.getVerticalScrollBarPolicy());
+        assertEquals(javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_NEVER, scrollPane.getHorizontalScrollBarPolicy());
+        EditorUiController.applyEditorScrollBarVisibility(scrollPane, true);
+        assertEquals(javax.swing.JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, scrollPane.getVerticalScrollBarPolicy());
+        assertEquals(javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED, scrollPane.getHorizontalScrollBarPolicy());
     }
 
     @Test

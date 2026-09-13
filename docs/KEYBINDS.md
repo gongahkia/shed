@@ -187,9 +187,9 @@ Enable ``multi.selection.enabled`` first. ``Ctrl+Shift+D`` adds the next matchin
 | Key-binds | Function |
 | :---: | :---: |
 | `:w` | Save changes to file |
-| `:q` | Quit (prompts if unsaved changes) |
-| `:q!` | Force quit (discard changes) |
-| `:wq` or `:x` | Save and quit |
+| `:q` | Close the active editor window (prompts if unsaved changes) |
+| `:q!` | Close the active editor window without the unsaved-changes prompt |
+| `:wq` or `:x` | Save and close the active editor window |
 | `:e filename` | Edit file (add to buffers) |
 
 #### Buffer Management

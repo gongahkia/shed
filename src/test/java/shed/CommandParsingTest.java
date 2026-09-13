@@ -201,6 +201,9 @@ public class CommandParsingTest {
         assertEquals("document symbols", PaletteController.surfaceActionCommand("Document Symbols"));
         assertEquals("project replace", PaletteController.surfaceActionCommand("Project Replace"));
         assertEquals("update status", PaletteController.surfaceActionCommand("Update Status"));
+        assertEquals("about", PaletteController.surfaceActionCommand("About Shed"));
+        assertEquals("markdown toc", PaletteController.surfaceActionCommand("Table of Contents"));
+        assertFalse(actions.contains("Document Outline"));
         assertEquals(actions.size(), new java.util.HashSet<>(actions).size());
         List<String> commands = PaletteController.surfaceActionCommands();
         assertEquals(commands.size(), new java.util.HashSet<>(commands).size());

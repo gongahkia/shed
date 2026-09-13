@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+set -eu
+
+launcher_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+jar=${SHED_JAR:-}
+
+if [ -z "$jar" ]; then
+    for candidate in "$launcher_dir"/../target/shed-*.jar "$launcher_dir"/../lib/shed/shed-*.jar; do
+        if [ -r "$candidate" ]; then
+            jar=$candidate
+            break
+        fi
+    done
+fi
+
+if [ -z "$jar" ] || [ ! -r "$jar" ]; then
+    echo "shed: no installed JAR found; run 'make install' from the Shed source tree." >&2
+    exit 1
+fi
+
+exec "${JAVA:-java}" -jar "$jar" "$@"

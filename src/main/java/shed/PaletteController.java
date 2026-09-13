@@ -131,10 +131,6 @@ final class PaletteController {
         action("Dev Container", "container status", "Inspect the active workspace's Dev Container configuration and session routing state."),
         action("Compose Status", "compose status", "Show workspace Compose configuration status."),
         action("Database Status", "database status", "Show workspace database configuration status."),
-        action("Workspace Integrations", "integration list", "Show configured workspace integrations."),
-        action("Plugin Manager", "plugin list", "Show installed plugins."),
-        action("Extension Manager", "extension list", "Show installed extensions and their contributions."),
-        action("Custom Editors", "customeditor list", "Show available custom editors."),
         action("Update Status", "update status", "Show the configured update channel's status.")
     );
 
@@ -747,9 +743,6 @@ final class PaletteController {
             case "noh":
             case "nohlsearch":
                 return "Clear search highlights.";
-            case "plugin":
-            case "plugins":
-                return "Manage plugins and package install/update/pin flows.";
             case "palette":
             case "commands":
                 return "Open command palette.";

@@ -178,11 +178,6 @@
       <version>1.1.1</version>
     </dependency>
     <dependency>
-      <groupId>org.luaj</groupId>
-      <artifactId>luaj-jse</artifactId>
-      <version>3.0.1</version>
-    </dependency>
-    <dependency>
       <groupId>org.jetbrains.jediterm</groupId>
       <artifactId>jediterm-core</artifactId>
       <version>3.72</version>

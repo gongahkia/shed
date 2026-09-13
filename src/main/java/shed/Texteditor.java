@@ -112,7 +112,6 @@ public class Texteditor extends JFrame implements KeyListener {
     FormatterController formatterController;
     ToolchainService toolchainService;
     ToolchainController toolchainController;
-    PeekView peekView;
     TerminalController terminalController;
     MarkdownController markdownController;
     PaneBufferController paneBufferController;
@@ -370,7 +369,6 @@ public class Texteditor extends JFrame implements KeyListener {
         bracketColorService = new BracketColorService();
         markdownController = new MarkdownController(this);
         paneBufferController = new PaneBufferController(this);
-        peekView = new PeekView(this);
         sessionConfigController = new SessionConfigController(this);
         symbolService = new SymbolService();
         taskService = new TaskService();

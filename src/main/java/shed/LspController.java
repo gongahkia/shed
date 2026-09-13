@@ -41,7 +41,6 @@ final class LspController {
     private record CodeActionRequest(FileBuffer buffer, LspClient client, String uri, Integer version, int caretOffset,
                                      int line, int column, List<LspClient.Diagnostic> diagnostics, int requestedIndex, long generation) { }
     private record CodeActionResult(CodeActionRequest request, List<LspClient.CodeAction> actions) { }
-    private record PeekRequest(FileBuffer buffer, LspClient.Location location, String label, String uri, Integer version, int caret) { }
 
     LspController(Texteditor editor) {
         this.editor = editor;
@@ -113,7 +112,7 @@ final class LspController {
         flushPendingLspChange(editor.getCurrentBuffer());
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|type definition|implementation|highlights [clear]|peek definition|peek type|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|links [index]|colors|folding|pulldiagnostics|workspacediagnostics|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|type definition|implementation|highlights [clear]|calls incoming|outgoing|typehierarchy supertypes|subtypes|hover|semantic|inlay|codelens [index]|selection [expand]|links [index]|colors|folding|pulldiagnostics|workspacediagnostics|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -176,8 +175,6 @@ final class LspController {
                 return lspFoldingRanges();
             case "format":
                 return lspFormat();
-            case "peek":
-                return lspPeek(args);
             case "calls":
             case "callhierarchy":
                 return lspCallHierarchy(args);
@@ -508,56 +505,6 @@ final class LspController {
         } catch (BadLocationException error) {
             return "LSP document highlights failed: " + error.getMessage();
         }
-    }
-
-    private String lspPeek(String argument) {
-        String target = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
-        if ("definition".equals(target) || "def".equals(target)) return requestPeek(false);
-        if ("type".equals(target) || "typedefinition".equals(target) || "type-definition".equals(target)) return requestPeek(true);
-        return "Usage: :lsp peek definition|type";
-    }
-
-    private String requestPeek(boolean typeDefinition) {
-        FileBuffer buffer = editor.getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP peek requires a file-backed buffer";
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) return "LSP unavailable";
-        LspCapability capability = typeDefinition ? LspCapability.TYPE_DEFINITION : LspCapability.DEFINITION;
-        String unavailable = capabilityUnavailable(client, capability);
-        if (unavailable != null) return unavailable;
-        try {
-            syncLspOpen(buffer);
-            String uri = bufferUri(buffer);
-            int caret = editor.writingArea.getCaretPosition();
-            int line = editor.writingArea.getLineOfOffset(caret);
-            int column = caret - editor.writingArea.getLineStartOffset(line);
-            Integer version = editor.lspDocumentVersions.get(uri);
-            String label = typeDefinition ? "type definition" : "definition";
-            editor.asyncJobService.submit("LSP peek " + label, token -> {
-                LspClient.Location location = typeDefinition ? client.typeDefinition(uri, line, column) : client.definition(uri, line, column);
-                return location == null ? null : new PeekRequest(buffer, location, label, uri, version, caret);
-            }, (job, request, error) -> completePeek(job, request, error));
-            return "LSP peek requested";
-        } catch (BadLocationException error) {
-            return "LSP peek failed: " + error.getMessage();
-        }
-    }
-
-    private void completePeek(AsyncJobService.JobSnapshot job, PeekRequest request, Exception error) {
-        if (job.getStatus() == AsyncJobService.Status.CANCELLED) { editor.showMessage("LSP peek cancelled"); return; }
-        if (error != null) { editor.showMessage("LSP peek failed: " + error.getMessage()); return; }
-        if (request == null) { editor.showMessage("No LSP target found"); return; }
-        if (editor.getCurrentBuffer() != request.buffer() || editor.writingArea.getCaretPosition() != request.caret()
-            || !Objects.equals(editor.lspDocumentVersions.get(request.uri()), request.version())) {
-            editor.showMessage("LSP peek became stale");
-            return;
-        }
-        editor.asyncJobService.submit("LSP peek file", token -> editor.peekView.load(request.location(), request.label()),
-            (loadJob, preview, loadError) -> {
-                if (loadJob.getStatus() == AsyncJobService.Status.CANCELLED) return;
-                if (loadError != null) editor.showMessage("LSP peek unavailable: " + loadError.getMessage());
-                else editor.peekView.show(preview);
-            });
     }
 
     private String lspCallHierarchy(String argument) {

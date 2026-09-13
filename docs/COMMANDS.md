@@ -291,8 +291,6 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:lsp type definition`, `:lsp typedefinition`, `:lsp type`, `:lsp typedef` | Go to type definition |
 | `:lsp implementation`, `:lsp impl` | Go to implementation; multiple results open in quickfix |
 | `:lsp highlights` | Highlight server-reported occurrences for the caret symbol; `:lsp highlights clear` removes them |
-| `:lsp peek definition`, `:peek definition` | Asynchronously show a temporary read-only definition split; Enter opens and Escape restores the layout |
-| `:lsp peek type`, `:peek type` | Asynchronously show a temporary read-only type-definition split |
 | `:lsp calls incoming\|outgoing` | Open searchable lazy LSP call hierarchy |
 | `:lsp typehierarchy supertypes\|subtypes` | Open searchable lazy LSP type hierarchy |
 | `:lsp hover` | Show hover info |

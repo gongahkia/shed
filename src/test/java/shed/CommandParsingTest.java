@@ -151,6 +151,7 @@ public class CommandParsingTest {
         assertTrue(handler.getCommandNames().contains("vs"));
         assertTrue(handler.getCommandNames().contains("discard"));
         assertFalse(handler.getCommandNames().contains("ls"));
+        assertFalse(handler.getCommandNames().contains("peek"));
         List<String> actions = PaletteController.surfaceActionNames();
         assertTrue(actions.containsAll(List.of(
             "Language Services", "Open File", "Open Folder", "Toggle File Tree",
@@ -169,6 +170,8 @@ public class CommandParsingTest {
         assertTrue(matcher.matchStrings("Remote Workspaces", actions, 0).contains("Remote Workspaces"));
         assertTrue(matcher.matchStrings("Dev Container", actions, 0).contains("Dev Container"));
         assertFalse(actions.contains("Show All Open Buffers"));
+        assertFalse(actions.contains("Peek Definition"));
+        assertFalse(actions.contains("Peek Type Definition"));
         assertEquals("workspace folders", PaletteController.surfaceActionCommand("Workspace Folders"));
         assertEquals("lsp codeaction", PaletteController.surfaceActionCommand("Code Actions"));
         assertEquals("snippet edit", PaletteController.surfaceActionCommand("Edit Snippets"));

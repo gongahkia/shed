@@ -3,7 +3,10 @@ package shed;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
+import java.awt.Color;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.geom.Rectangle2D;
 
@@ -23,10 +26,35 @@ final class BlockCaret extends DefaultCaret {
             }
             Rectangle bounds = modelBounds.getBounds();
             int caretWidth = Math.max(1, blockWidth(component, getDot()));
-            g.setXORMode(component.getBackground());
-            g.fillRect(bounds.x, bounds.y, caretWidth, bounds.height);
-            g.setPaintMode();
+            paintBlockCaret(g, component, bounds, caretWidth, getDot());
         } catch (BadLocationException ignored) {
+        }
+    }
+
+    static void paintBlockCaret(Graphics graphics, JTextComponent component, Rectangle bounds, int caretWidth, int dot)
+        throws BadLocationException {
+        if (!(graphics instanceof Graphics2D graphics2D) || component == null || bounds == null) {
+            return;
+        }
+        Graphics2D caretGraphics = (Graphics2D) graphics2D.create();
+        try {
+            EditorUiController.applyEditorTextRenderingHints(caretGraphics);
+            Color caretColor = component.getCaretColor();
+            caretGraphics.setColor(caretColor == null ? component.getForeground() : caretColor);
+            caretGraphics.fillRect(bounds.x, bounds.y, caretWidth, bounds.height);
+            if (dot < 0 || dot >= component.getDocument().getLength()) {
+                return;
+            }
+            String glyph = component.getDocument().getText(dot, 1);
+            if (glyph.isEmpty() || glyph.charAt(0) == '\n' || glyph.charAt(0) == '\r' || glyph.charAt(0) == '\t') {
+                return;
+            }
+            caretGraphics.setFont(component.getFont());
+            FontMetrics metrics = caretGraphics.getFontMetrics();
+            caretGraphics.setColor(component.getBackground());
+            caretGraphics.drawString(glyph, bounds.x, bounds.y + metrics.getAscent());
+        } finally {
+            caretGraphics.dispose();
         }
     }
 

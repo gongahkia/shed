@@ -42,7 +42,7 @@ final class ThemeGalleryDialog extends JDialog {
     private final ThemeSwatchGrid swatchGrid = new ThemeSwatchGrid();
     private final JLabel title = new JLabel();
     private final JLabel status = new JLabel();
-    private final JButton apply = new JButton("Apply Theme");
+    private final JButton apply = new JButton("Apply for This Session");
     private final JButton applyAndSave = new JButton("Apply and Save");
 
     static void showFor(Texteditor editor) {
@@ -109,6 +109,8 @@ final class ThemeGalleryDialog extends JDialog {
     private JPanel actions() {
         apply.addActionListener(event -> applySelection());
         applyAndSave.addActionListener(event -> applyAndSaveSelection());
+        apply.setToolTipText("Use this theme until Shed closes or configuration is reloaded.");
+        applyAndSave.setToolTipText("Use this theme now and save it to ~/.shed/config.toml.");
         JButton close = new JButton("Close");
         close.addActionListener(event -> dispose());
         JPanel panel = new JPanel();
@@ -139,7 +141,7 @@ final class ThemeGalleryDialog extends JDialog {
         title.setText(preview.displayName() + (active ? " — active" : ""));
         status.setText(preview.id() + "    :theme " + preview.id());
         apply.setEnabled(!active);
-        applyAndSave.setEnabled(!active);
+        applyAndSave.setEnabled(true);
         codePreview.setTheme(preview);
         swatchGrid.setTheme(preview);
     }
@@ -164,7 +166,7 @@ final class ThemeGalleryDialog extends JDialog {
         status.setText(persist ? result + "    " + editor.saveConfigToDisk() : result + "    :config save to persist it.");
         title.setText(preview.displayName() + " — active");
         apply.setEnabled(false);
-        applyAndSave.setEnabled(false);
+        applyAndSave.setEnabled(true);
         themes.repaint();
         codePreview.repaint();
         swatchGrid.repaint();
@@ -250,8 +252,8 @@ final class ThemeGalleryDialog extends JDialog {
             }
         }
 
-        private static void drawLine(Graphics2D g, FontMetrics metrics, int gutter, int baseline, String number, Object... segments) {
-            g.setColor(blend(Color.WHITE, Color.BLACK, 0.45));
+        private void drawLine(Graphics2D g, FontMetrics metrics, int gutter, int baseline, String number, Object... segments) {
+            g.setColor(blend(theme.foreground(), theme.normal(), 0.45));
             int numberWidth = metrics.stringWidth(number);
             g.drawString(number, gutter - numberWidth - 10, baseline);
             int x = gutter + 12;

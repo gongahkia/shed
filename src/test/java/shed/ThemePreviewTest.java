@@ -22,9 +22,29 @@ class ThemePreviewTest {
         assertEquals("#61AFEF", hex(first.accent()));
         assertEquals(config.getThemeIds(), previews.stream().map(ThemePreview::id).toList());
         assertTrue(previews.stream().allMatch(preview -> preview.foreground() != null && preview.stringAccent() != null));
+        assertEquals(52, previews.size());
+        for (ThemePreview preview : previews) {
+            assertTrue(contrast(preview.foreground(), preview.normal()) >= 4.5,
+                preview.id() + " needs readable editor text");
+        }
     }
 
     private static String hex(java.awt.Color color) {
         return String.format("#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue());
+    }
+
+    private static double contrast(java.awt.Color first, java.awt.Color second) {
+        double lighter = Math.max(luminance(first), luminance(second));
+        double darker = Math.min(luminance(first), luminance(second));
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    private static double luminance(java.awt.Color color) {
+        return 0.2126 * channel(color.getRed()) + 0.7152 * channel(color.getGreen()) + 0.0722 * channel(color.getBlue());
+    }
+
+    private static double channel(int component) {
+        double value = component / 255.0;
+        return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
     }
 }

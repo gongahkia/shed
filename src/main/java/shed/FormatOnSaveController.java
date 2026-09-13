@@ -9,25 +9,30 @@ import java.util.List;
 import java.util.Objects;
 
 final class FormatOnSaveController {
-    private record Request(FileBuffer buffer, String targetPath, String content) { }
+    private enum PostSaveAction { NONE, CLOSE_ACTIVE_WINDOW, QUIT_ALL }
+
+    private record Request(FileBuffer buffer, String targetPath, String content, EditorPane pane) { }
     private record FormatResult(Request request, String uri, Integer version, String content, List<LspClient.TextEdit> edits) { }
     private record ExternalFormatResult(Request request, String content) { }
 
     private final Texteditor editor;
     private final ArrayDeque<Request> pending = new ArrayDeque<>();
     private boolean running;
-    private boolean quitAfterBatch;
-    private boolean quitForce;
+    private PostSaveAction postSaveAction;
+    private boolean postSaveForce;
+    private EditorPane postSavePane;
+    private FileBuffer postSaveBuffer;
     private int completed;
 
     FormatOnSaveController(Texteditor editor) { this.editor = editor; }
 
-    String requestCurrent(String targetPath, boolean quitAfterSave) {
+    String requestCurrent(String targetPath, boolean closeWindowAfterSave, boolean force) {
         FileBuffer buffer = editor.getCurrentBuffer();
         if (buffer == null) return "Error: No file open";
         if (running) return "Save already in progress";
         editor.persistCurrentBufferState();
-        enqueue(List.of(new Request(buffer, targetPath, buffer.getContent())), quitAfterSave, true);
+        enqueue(List.of(new Request(buffer, targetPath, buffer.getContent(), editor.getActivePane())),
+            closeWindowAfterSave ? PostSaveAction.CLOSE_ACTIVE_WINDOW : PostSaveAction.NONE, force);
         return formatsOnSave(buffer) ? "Formatting before save…" : "Saving…";
     }
 
@@ -37,24 +42,26 @@ final class FormatOnSaveController {
         for (FileBuffer buffer : editor.buffers) {
             if (buffer != null && buffer.isModified() && buffer.getFile() != null) {
                 if (buffer == editor.getCurrentBuffer()) editor.persistCurrentBufferState();
-                requests.add(new Request(buffer, null, buffer.getContent()));
+                requests.add(new Request(buffer, null, buffer.getContent(), null));
             }
         }
         if (requests.isEmpty()) {
             if (quitAfterSave) return editor.quitAll(force);
             return "0 file(s) written";
         }
-        enqueue(requests, quitAfterSave, force);
+        enqueue(requests, quitAfterSave ? PostSaveAction.QUIT_ALL : PostSaveAction.NONE, force);
         return "Saving " + requests.size() + " file(s)…";
     }
 
-    private void enqueue(List<Request> requests, boolean quit, boolean force) {
+    private void enqueue(List<Request> requests, PostSaveAction action, boolean force) {
         pending.clear();
         pending.addAll(requests);
         running = true;
         completed = 0;
-        quitAfterBatch = quit;
-        quitForce = force;
+        postSaveAction = action;
+        postSaveForce = force;
+        postSavePane = action == PostSaveAction.CLOSE_ACTIVE_WINDOW ? requests.getFirst().pane() : null;
+        postSaveBuffer = action == PostSaveAction.CLOSE_ACTIVE_WINDOW ? requests.getFirst().buffer() : null;
         startNext();
     }
 
@@ -62,8 +69,7 @@ final class FormatOnSaveController {
         Request request = pending.peekFirst();
         if (request == null) {
             running = false;
-            if (quitAfterBatch) editor.quitAll(quitForce);
-            else editor.showMessage(completed + " file(s) written");
+            finishPostSaveAction();
             return;
         }
         FormatterPolicy policy = policyFor(request.buffer());
@@ -197,7 +203,26 @@ final class FormatOnSaveController {
     private void fail(String message) {
         pending.clear();
         running = false;
-        quitAfterBatch = false;
+        postSaveAction = PostSaveAction.NONE;
         editor.showMessage(message == null || message.isBlank() ? "Formatting before save failed" : message);
+    }
+
+    private void finishPostSaveAction() {
+        if (postSaveAction == PostSaveAction.QUIT_ALL) {
+            editor.quitAll(postSaveForce);
+        } else if (postSaveAction == PostSaveAction.CLOSE_ACTIVE_WINDOW) {
+            if (postSavePane == null || !editor.editorPanes.contains(postSavePane)) {
+                editor.showMessage("File written; the original window is already closed");
+            } else if (postSavePane.getBuffer() != postSaveBuffer) {
+                editor.showMessage("File written; the original window now shows another buffer");
+            } else {
+                editor.showMessage(editor.closePane(postSavePane));
+            }
+        } else {
+            editor.showMessage(completed + " file(s) written");
+        }
+        postSaveAction = PostSaveAction.NONE;
+        postSavePane = null;
+        postSaveBuffer = null;
     }
 }

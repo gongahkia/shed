@@ -32,14 +32,13 @@ final class PaletteController {
         action("Close Current Buffer", "bd", "Close the current buffer, prompting when needed."),
         action("Save Current Buffer", "w", "Write the current buffer."),
         action("Save All Buffers", "wa", "Write all modified file-backed buffers."),
-        action("Save and Quit", "wq", "Write the current buffer and quit."),
+        action("Save and Close Active Window", "wq", "Write the current buffer, then close its editor split."),
         action("Save All and Quit", "wqa", "Write all modified buffers and quit."),
-        action("Quit Shed", "q", "Quit, prompting when buffers have unsaved changes."),
+        action("Close Active Window", "q", "Close the active editor split, prompting when its buffer has unsaved changes."),
         action("Quit All", "qa", "Quit all buffers, prompting when needed."),
 
         action("Split Below", "split", "Create a horizontal split below the active editor."),
         action("Split Right", "vsplit", "Create a vertical split beside the active editor."),
-        action("Close Current Split", "close", "Close the active editor split."),
         action("Focus Next Split", "window next", "Focus the next editor split."),
         action("Focus Split Left", "window left", "Focus the split to the left."),
         action("Focus Split Right", "window right", "Focus the split to the right."),
@@ -573,10 +572,10 @@ final class PaletteController {
             case "q":
             case "quit":
             case "q!":
-                return "Quit current buffer/editor.";
+                return "Close the active editor window.";
             case "wq":
             case "x":
-                return "Write buffer, then quit.";
+                return "Write the current buffer, then close its editor window.";
             case "e":
             case "edit":
                 return "Open file into a buffer.";

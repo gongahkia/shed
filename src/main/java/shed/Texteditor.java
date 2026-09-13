@@ -2869,6 +2869,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return paneBufferController.closeActiveWindow();
     }
 
+    boolean canCloseActiveWindow() {
+        return paneBufferController.canCloseActiveWindow();
+    }
+
     String closePane(EditorPane paneToClose) {
         return paneBufferController.closePane(paneToClose);
     }
@@ -3249,6 +3253,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String requestQuit(boolean force) {
         return sessionConfigController.requestQuit(force);
+    }
+
+    public String requestCloseActiveWindow(boolean force) {
+        return sessionConfigController.requestCloseActiveWindow(force);
     }
 
     public ConfigManager getConfigManager() {

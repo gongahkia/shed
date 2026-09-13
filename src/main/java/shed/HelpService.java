@@ -41,8 +41,9 @@ public class HelpService {
                    "  F1 or :help plain/:help emacs lists fixed shortcuts.\n\n" +
                    "COMMANDS\n" +
                    "  :w [file]      Write current buffer\n" +
-                   "  :q / :q!       Quit buffer/editor\n" +
-                   "  :wq / :x       Write and quit\n" +
+                   "  :q / :q!       Close active editor window\n" +
+                   "  :wq / :x       Write, then close active editor window\n" +
+                   "  :qa / :wqa     Quit all editor windows\n" +
                    "  :e file        Edit file\n" +
                    "  :bn / :bp      Next/previous buffer\n" +
                    "  :ls            List buffers\n" +

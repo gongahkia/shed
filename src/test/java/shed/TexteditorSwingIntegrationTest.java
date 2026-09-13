@@ -579,6 +579,64 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void quitCommandsCloseOnlyTheActiveEditorWindow() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-quit-window");
+        Path file = tempDir.resolve("quit-window.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "before\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertEquals("Vertical split created", onEdt(() -> editor.commandHandler.execute("vsplit")));
+            assertEquals("Window closed", onEdt(() -> editor.commandHandler.execute("q")));
+            assertEquals(1, onEdt(() -> editor.editorPanes.size()));
+            assertTrue(onEdt(editor::isDisplayable));
+
+            assertEquals("Vertical split created", onEdt(() -> editor.commandHandler.execute("vsplit")));
+            String writeQuit = onEdt(() -> {
+                editor.writingArea.setText("after\n");
+                return editor.commandHandler.execute("wq");
+            });
+            assertEquals("Saving…", writeQuit);
+            assertEquals("after\n", Files.readString(file, StandardCharsets.UTF_8));
+            assertEquals(1, onEdt(() -> editor.editorPanes.size()));
+            assertTrue(onEdt(editor::isDisplayable));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void editorScrollbarsFollowTheRuntimeVisibilitySetting() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-editor-scrollbars");
+        Path file = tempDir.resolve("editor-scrollbars.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "scrolling\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertEquals(javax.swing.JScrollPane.VERTICAL_SCROLLBAR_NEVER,
+                onEdt(() -> editor.getActivePane().getScrollPane().getVerticalScrollBarPolicy()));
+            assertEquals(javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_NEVER,
+                onEdt(() -> editor.getActivePane().getScrollPane().getHorizontalScrollBarPolicy()));
+
+            onEdt(() -> {
+                editor.configManager.set("editor.scrollbars.visible", "true");
+                editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                return null;
+            });
+            assertEquals(javax.swing.JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                onEdt(() -> editor.getActivePane().getScrollPane().getVerticalScrollBarPolicy()));
+            assertEquals(javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED,
+                onEdt(() -> editor.getActivePane().getScrollPane().getHorizontalScrollBarPolicy()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void explorerFileDropOpensTheFileInASplitWithoutReplacingTheTargetPane() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-explorer-drop");

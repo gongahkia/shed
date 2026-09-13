@@ -25,7 +25,7 @@ Large-file mode is a read-only file-buffer state with bounded source windows. It
 | Reload from disk | Explicit reload, or an unmodified externally changed or replaced file | Clean file buffer with new disk content and snapshot | Read/decode failure leaves the current buffer state unchanged. |
 | External change while dirty | Filesystem state is changed, deleted, replaced, or unsupported | Keep Mine and View Both retain dirty content; Reload Theirs replaces it only when a regular disk file is available | Dialog dismissal is Keep Mine: content remains dirty and the external state is acknowledged. |
 | External deletion or unsupported target while clean | Filesystem state is deleted or unsupported | Buffer content is retained and the external state is acknowledged | No buffer is discarded. |
-| Close / quit | Dirty buffer and no force flag | Multiple-buffer close is blocked; final-buffer close and quit request confirmation | Cancel leaves buffer membership, content, and dirty state unchanged. `:bd!`/`:q!` discard deliberately. |
+| Close window / quit all | Dirty buffer and no force flag | `:q` confirms before closing the active editor window; `:qa` confirms before closing Shed | Cancel leaves buffer membership, content, and dirty state unchanged. `:q!` skips the window-close prompt; `:bd!` discards the current buffer. |
 | Recovery restore | Snapshot decodes | Restored content is dirty until an explicit save | Declining restore leaves snapshots in place; restoration never overwrites disk automatically. |
 
 ## Ownership

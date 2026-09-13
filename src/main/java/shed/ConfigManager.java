@@ -89,6 +89,7 @@ public class ConfigManager {
     private static final boolean DEFAULT_SHELL_COMMAND_ENABLED = true;
     private static final int DEFAULT_SHELL_COMMAND_MAX_LENGTH = 4096;
     private static final int DEFAULT_SCROLLOFF = 0;
+    private static final boolean DEFAULT_EDITOR_SCROLLBARS_VISIBLE = false;
     private static final boolean DEFAULT_AUTO_PAIRS = true;
     private static final int DEFAULT_TEXTWIDTH = 0;
     private static final boolean DEFAULT_MINIMAP = false;
@@ -282,6 +283,7 @@ public class ConfigManager {
         defineDefault("shell.command.enabled", DEFAULT_SHELL_COMMAND_ENABLED);
         defineDefault("shell.command.max.length", DEFAULT_SHELL_COMMAND_MAX_LENGTH);
         defineDefault("scrolloff", DEFAULT_SCROLLOFF);
+        defineDefault("editor.scrollbars.visible", DEFAULT_EDITOR_SCROLLBARS_VISIBLE);
         defineDefault("auto.pairs", DEFAULT_AUTO_PAIRS);
         defineDefault("textwidth", DEFAULT_TEXTWIDTH);
         defineDefault("minimap", DEFAULT_MINIMAP);
@@ -422,6 +424,7 @@ public class ConfigManager {
             case "shell.command.enabled" -> "Enable shell command execution";
             case "shell.command.max.length" -> "Maximum accepted shell command length";
             case "scrolloff" -> "Context lines retained while scrolling";
+            case "editor.scrollbars.visible" -> "Show horizontal and vertical scrollbars in editor windows";
             case "auto.pairs" -> "Insert matching brackets and quotes";
             case "textwidth" -> "Paragraph width, zero disables wrapping";
             case "minimap" -> "Persisted minimap visibility setting";
@@ -1047,6 +1050,9 @@ public class ConfigManager {
     }
     public int getScrolloff() {
         return getInt("scrolloff", DEFAULT_SCROLLOFF);
+    }
+    public boolean getEditorScrollbarsVisible() {
+        return getBoolean("editor.scrollbars.visible", DEFAULT_EDITOR_SCROLLBARS_VISIBLE);
     }
     public boolean getAutoPairs() {
         return getBoolean("auto.pairs", DEFAULT_AUTO_PAIRS);

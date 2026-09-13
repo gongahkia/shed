@@ -21,9 +21,9 @@ Each action is unique by visible label and normalized command. The application r
 | Close Current Buffer | `:bd` | Close the current buffer, prompting when needed. |
 | Save Current Buffer | `:w` | Write the current buffer. |
 | Save All Buffers | `:wa` | Write all modified file-backed buffers. |
-| Save and Quit | `:wq` | Write the current buffer and quit. |
+| Save and Close Active Window | `:wq` | Write the current buffer, then close its editor window. |
 | Save All and Quit | `:wqa` | Write all modified buffers and quit. |
-| Quit Shed | `:q` | Quit, prompting when buffers have unsaved changes. |
+| Close Active Window | `:q` | Close the active editor window, prompting when needed. |
 | Quit All | `:qa` | Quit all buffers, prompting when needed. |
 
 ## Splits and interface scale
@@ -32,7 +32,6 @@ Each action is unique by visible label and normalized command. The application r
 | :--- | :--- | :--- |
 | Split Below | `:split` | Create a horizontal split below the active editor. |
 | Split Right | `:vsplit` | Create a vertical split beside the active editor. |
-| Close Current Split | `:close` | Close the active editor split. |
 | Focus Next Split | `:window next` | Focus the next editor split. |
 | Focus Split Left | `:window left` | Focus the split to the left. |
 | Focus Split Right | `:window right` | Focus the split to the right. |

@@ -44,7 +44,6 @@ final class EditorUiController {
     private static final int SCREEN_EDGE_MARGIN = 24;
     private final Texteditor editor;
     private final Map<Object, Font> systemUiFonts;
-    private final Map<?, ?> desktopTextRenderingHints;
     private final DefaultListModel<String> commandPathModel = new DefaultListModel<>();
     private final Map<JTextArea, FileTreeDropPlacement> explorerDropPreviews = new IdentityHashMap<>();
     private JPopupMenu commandPathPopup;
@@ -56,7 +55,6 @@ final class EditorUiController {
     EditorUiController(Texteditor editor) {
         this.editor = editor;
         this.systemUiFonts = captureSystemUiFonts();
-        this.desktopTextRenderingHints = desktopTextRenderingHints();
     }
 
     void initializeUI() {
@@ -273,7 +271,7 @@ final class EditorUiController {
             @Override
             protected void paintComponent(Graphics g) {
                 if (g instanceof Graphics2D graphics) {
-                    applyDesktopTextRenderingHints(graphics, desktopTextRenderingHints);
+                    applyEditorTextRenderingHints(graphics);
                 }
                 super.paintComponent(g);
                 FontMetrics fm = g.getFontMetrics(getFont());
@@ -348,6 +346,7 @@ final class EditorUiController {
 
         JScrollPane paneScrollPane = new JScrollPane(textArea);
         paneScrollPane.setWheelScrollingEnabled(true);
+        applyEditorScrollBarVisibility(paneScrollPane);
         paneScrollPane.getVerticalScrollBar().setUnitIncrement(Math.max(16, textArea.getFontMetrics(textArea.getFont()).getHeight()));
         if (editor.lineNumberMode != LineNumberMode.NONE) {
             paneScrollPane.setRowHeaderView(paneLineNumberPanel);
@@ -669,19 +668,34 @@ final class EditorUiController {
         return configuredFont != null ? configuredFont : new Font(Font.MONOSPACED, Font.PLAIN, fontSize);
     }
 
-    private static Map<?, ?> desktopTextRenderingHints() {
-        try {
-            Object value = Toolkit.getDefaultToolkit().getDesktopProperty("awt.font.desktophints");
-            return value instanceof Map<?, ?> hints ? Map.copyOf(hints) : Map.of();
-        } catch (HeadlessException ignored) {
-            return Map.of();
+    void applyEditorScrollBarVisibility() {
+        boolean visible = editor.configManager.getEditorScrollbarsVisible();
+        for (EditorPane pane : editor.editorPanes) {
+            applyEditorScrollBarVisibility(pane.getScrollPane(), visible);
         }
     }
 
-    static void applyDesktopTextRenderingHints(Graphics2D graphics, Map<?, ?> hints) {
-        if (graphics != null && hints != null && !hints.isEmpty()) {
-            graphics.addRenderingHints(hints);
+    private void applyEditorScrollBarVisibility(JScrollPane scrollPane) {
+        applyEditorScrollBarVisibility(scrollPane, editor.configManager.getEditorScrollbarsVisible());
+    }
+
+    static void applyEditorScrollBarVisibility(JScrollPane scrollPane, boolean visible) {
+        if (scrollPane == null) {
+            return;
         }
+        int verticalPolicy = visible ? JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED : JScrollPane.VERTICAL_SCROLLBAR_NEVER;
+        int horizontalPolicy = visible ? JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED : JScrollPane.HORIZONTAL_SCROLLBAR_NEVER;
+        scrollPane.setVerticalScrollBarPolicy(verticalPolicy);
+        scrollPane.setHorizontalScrollBarPolicy(horizontalPolicy);
+    }
+
+    static void applyEditorTextRenderingHints(Graphics2D graphics) {
+        if (graphics == null) {
+            return;
+        }
+        graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        graphics.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
     }
 
     Font resolveUiFont() {

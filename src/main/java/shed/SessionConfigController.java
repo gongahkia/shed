@@ -515,6 +515,7 @@ final class SessionConfigController {
             area.setTabSize(Math.max(1, editor.effectiveTabSize(pane.getBuffer())));
             pane.getScrollPane().getVerticalScrollBar().setUnitIncrement(Math.max(16, area.getFontMetrics(area.getFont()).getHeight()));
         }
+        editor.editorUiController.applyEditorScrollBarVisibility();
         if (!editor.configManager.getHighlightSearch() && editor.searchManager != null) {
             editor.searchManager.clearHighlights();
         }
@@ -1502,6 +1503,25 @@ final class SessionConfigController {
 
         editor.closeEditor();
         return "Quitting";
+    }
+
+
+    public String requestCloseActiveWindow(boolean force) {
+        if (closeReturnableScratchBuffer()) {
+            return "Returned from scratch buffer";
+        }
+        if (!editor.canCloseActiveWindow()) {
+            return editor.closeActiveWindow();
+        }
+
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (DocumentLifecycle.needsDiscardConfirmation(buffer, force)) {
+            int result = confirmDiscardChanges("File has unsaved changes. Close this window anyway?");
+            if (!DocumentLifecycle.discardConfirmed(result)) {
+                return "Window close cancelled";
+            }
+        }
+        return editor.closeActiveWindow();
     }
 
 

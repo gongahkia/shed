@@ -1,10 +1,15 @@
 package shed;
 
 import java.awt.Component;
+import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Graphics;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.BorderFactory;
 import javax.swing.JSplitPane;
+import javax.swing.plaf.basic.BasicSplitPaneDivider;
+import javax.swing.plaf.basic.BasicSplitPaneUI;
 
 public class WindowLayoutNode {
     static final int MINIMUM_LEAF_WIDTH = 280;
@@ -94,14 +99,68 @@ public class WindowLayoutNode {
         Component secondComponent = second == null ? null : second.render(activePane, secondWidth, secondHeight);
         if (firstComponent == null) return secondComponent;
         if (secondComponent == null) return firstComponent;
-        JSplitPane splitPane = new JSplitPane(splitOrientation, firstComponent, secondComponent);
+        JSplitPane splitPane = new ThemedSplitPane(splitOrientation, firstComponent, secondComponent);
+        Color surface = firstComponent.getBackground();
+        Color divider = blend(surface, firstComponent.getForeground(), 0.16);
+        splitPane.setBackground(surface);
+        splitPane.setForeground(divider);
         splitPane.setResizeWeight(ratio);
         splitPane.setContinuousLayout(true);
         splitPane.setDividerSize(DIVIDER_SIZE);
+        splitPane.setBorder(BorderFactory.createEmptyBorder());
         splitPane.setMinimumSize(new Dimension(MINIMUM_LEAF_WIDTH, MINIMUM_LEAF_HEIGHT));
         int dividerLocation = orientation == Orientation.HORIZONTAL ? firstWidth : firstHeight;
         javax.swing.SwingUtilities.invokeLater(() -> splitPane.setDividerLocation(Math.max(0, dividerLocation)));
         return splitPane;
+    }
+
+    private static Color blend(Color surface, Color foreground, double amount) {
+        if (surface == null) surface = Color.DARK_GRAY;
+        if (foreground == null) foreground = Color.LIGHT_GRAY;
+        double ratio = Math.max(0.0, Math.min(1.0, amount));
+        return new Color((int) Math.round(surface.getRed() * (1.0 - ratio) + foreground.getRed() * ratio),
+            (int) Math.round(surface.getGreen() * (1.0 - ratio) + foreground.getGreen() * ratio),
+            (int) Math.round(surface.getBlue() * (1.0 - ratio) + foreground.getBlue() * ratio));
+    }
+
+    /** A divider that follows the selected Swing palette instead of the platform's default texture. */
+    private static final class ThemedSplitPane extends JSplitPane {
+        ThemedSplitPane(int orientation, Component first, Component second) {
+            super(orientation, first, second);
+            setUI(new ThemedSplitPaneUi());
+        }
+
+        @Override
+        public void updateUI() {
+            setUI(new ThemedSplitPaneUi());
+        }
+    }
+
+    private static final class ThemedSplitPaneUi extends BasicSplitPaneUI {
+        @Override
+        public BasicSplitPaneDivider createDefaultDivider() {
+            return new BasicSplitPaneDivider(this) {
+                {
+                    setBorder(BorderFactory.createEmptyBorder());
+                }
+
+                @Override
+                public void paint(Graphics graphics) {
+                    Color surface = splitPane == null ? Color.DARK_GRAY : splitPane.getBackground();
+                    Color divider = splitPane == null ? Color.GRAY : splitPane.getForeground();
+                    graphics.setColor(surface == null ? Color.DARK_GRAY : surface);
+                    graphics.fillRect(0, 0, getWidth(), getHeight());
+                    graphics.setColor(divider == null ? Color.GRAY : divider);
+                    if (getWidth() <= getHeight()) {
+                        int x = Math.max(0, (getWidth() - 1) / 2);
+                        graphics.drawLine(x, 0, x, Math.max(0, getHeight() - 1));
+                    } else {
+                        int y = Math.max(0, (getHeight() - 1) / 2);
+                        graphics.drawLine(0, y, Math.max(0, getWidth() - 1), y);
+                    }
+                }
+            };
+        }
     }
 
     private boolean shouldCollapse(int width, int height) {

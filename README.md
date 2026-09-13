@@ -20,10 +20,10 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 * Written entirely in [Java](https://www.java.com/en/) & [Swing](https://en.wikipedia.org/wiki/Swing_(Java))
 * Sensible defaults [out-of-the-box](https://en.wikipedia.org/wiki/Out_of_the_Box)
 * First-class [Vim](./docs/KEYBINDS.md) and [Emacs](./docs/KEYBINDS.md) bindings
-* Highly customisable via [`~/.shed/config.toml`](./docs/CONFIG.md)
-* Command Palette, Snippets, LSP completion & Symbol navigation, Incremental Lexical Highlighting 
-* Built-in local [Docker](./docs/DOCKER.md), [Dev Container](./docs/REMOTE_WORKSPACES.md#local-dev-container-cli), and [SSH mirror](./docs/REMOTE_WORKSPACES.md) workflows
-* Multi-root workspaces, portable [`.shed-workspace` / `.code-workspace` folder lists](./docs/WORKSPACE_MANIFESTS.md), notebooks, integrated terminals, and explicit [remote](./docs/REMOTE_WORKSPACES.md)/Dev Container workflows
+* Highly customisable via the Theme Gallery and [`~/.shed/config.toml`](./docs/CONFIG.md)
+* Command Palette, snippets, LSP completion & symbol navigation, incremental lexical highlighting, and native Markdown preview with GitHub image attachments and Shields SVG badges
+* Built-in local [Docker Workbench](./docs/DOCKER.md), [Dev Container](./docs/REMOTE_WORKSPACES.md#local-dev-container-cli), and [SSH mirror](./docs/REMOTE_WORKSPACES.md) workflows
+* Multi-root workspaces, portable [`.shed-workspace` / `.code-workspace` folder lists](./docs/WORKSPACE_MANIFESTS.md), project file trees, drag-to-split editor panes, notebooks, integrated terminals, and explicit [remote](./docs/REMOTE_WORKSPACES.md)/Dev Container workflows
 * Explicit local [toolchain selection](./docs/TOOLCHAINS.md) for new local development processes across twenty runtime/compiler families
 * No [telemetry](https://en.wikipedia.org/wiki/Telemetry) whatsoever
 * Bundled-runtime platform installers

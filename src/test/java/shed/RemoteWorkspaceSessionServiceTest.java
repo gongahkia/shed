@@ -6,8 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import shed.api.RemoteTerminalRequest;
-import shed.api.RemoteWorkspace;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;

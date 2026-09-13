@@ -611,8 +611,8 @@ final class EditorUiController {
             pane.getTerminalPane().requestFocusInWindow();
             return;
         }
-        if (pane != null && pane.getCustomEditorComponent() != null) {
-            pane.getCustomEditorComponent().requestFocusInWindow();
+        if (pane != null && pane.getAlternateComponent() != null) {
+            pane.getAlternateComponent().requestFocusInWindow();
             return;
         }
         if (pane != null && pane.getMarkdownPreviewComponent() instanceof MarkdownPreviewPane preview) {

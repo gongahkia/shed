@@ -13,7 +13,7 @@ public class EditorPane {
     private LargeFileProjection largeFileProjection;
     private PtyTerminalPane terminalPane;
     private Component markdownPreviewComponent;
-    private Component customEditorComponent;
+    private Component alternateComponent;
     private boolean hiddenByFocusMode;
 
     public EditorPane(JTextArea textArea, LineNumberPanel lineNumberPanel, JScrollPane scrollPane, SearchManager searchManager) {
@@ -37,7 +37,7 @@ public class EditorPane {
 
     public Component getComponent() {
         if (terminalPane != null) return terminalPane.getComponent();
-        if (customEditorComponent != null) return customEditorComponent;
+        if (alternateComponent != null) return alternateComponent;
         return markdownPreviewComponent == null ? scrollPane : markdownPreviewComponent;
     }
 
@@ -83,7 +83,7 @@ public class EditorPane {
 
     public void setMarkdownPreviewComponent(Component component) {
         closeTerminalPane();
-        customEditorComponent = null;
+        alternateComponent = null;
         markdownPreviewComponent = component;
     }
 
@@ -91,18 +91,18 @@ public class EditorPane {
         markdownPreviewComponent = null;
     }
 
-    public void setCustomEditorComponent(Component component) {
+    public void setAlternateComponent(Component component) {
         closeTerminalPane();
         markdownPreviewComponent = null;
-        customEditorComponent = component;
+        alternateComponent = component;
     }
 
-    public void clearCustomEditorComponent() {
-        customEditorComponent = null;
+    public void clearAlternateComponent() {
+        alternateComponent = null;
     }
 
-    Component getCustomEditorComponent() {
-        return customEditorComponent;
+    Component getAlternateComponent() {
+        return alternateComponent;
     }
 
     Component getMarkdownPreviewComponent() {

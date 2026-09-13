@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 /** A connected remote workspace represented by a local synchronized working tree. */
-public interface RemoteWorkspace extends AutoCloseable {
+interface RemoteWorkspace extends AutoCloseable {
     String displayName();
 
     Path localRoot();
@@ -35,7 +35,7 @@ public interface RemoteWorkspace extends AutoCloseable {
     /**
      * Runs a direct-argv command with an optional workspace-relative directory
      * and declared environment. Providers should override this to support
-     * remote tasks; the default preserves API-v1 command-only providers.
+     * remote tasks; the default preserves command-only built-in providers.
      */
     default RemoteCommandResult execute(RemoteCommandRequest request) throws Exception {
         if (request == null) throw new IllegalArgumentException("remote command request is required");
@@ -49,7 +49,7 @@ public interface RemoteWorkspace extends AutoCloseable {
      * Copies one existing regular file or directory from a workspace-relative
      * remote path into an app-owned local directory and returns the resulting
      * local path. Implementations must reject traversal and symbolic-link
-     * escapes. The default retains API-v1 provider compatibility.
+     * escapes. The default retains built-in provider compatibility.
      */
     default Path fetchWorkspacePath(String relativePath, Path destinationDirectory) throws Exception {
         throw new UnsupportedOperationException("this remote workspace does not support artifact retrieval");

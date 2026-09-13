@@ -8,7 +8,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import shed.api.RemoteCommandRequest;
 
 class DevContainerTaskCommandTest {
     @Test

@@ -828,15 +828,6 @@ public class ConfigManagerTest {
     }
 
     @Test
-    void pluginsDirectoryPathDerivedFromShedDir() {
-        Path home = tempDir.resolve("home-plugins");
-        System.setProperty("user.home", home.toString());
-        ConfigManager config = new ConfigManager();
-        String expected = home.resolve(".shed/plugins").toString();
-        assertEquals(expected, config.getPluginsDirectoryPath());
-    }
-
-    @Test
     void supportsAdditionalBuiltInThemes() {
         Path home = tempDir.resolve("home-theme-extended");
         System.setProperty("user.home", home.toString());

@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import shed.api.RemoteTerminalRequest;
 
 class RemoteTerminalRequestTest {
     @Test

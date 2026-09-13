@@ -90,7 +90,7 @@ The transport has no UI dependency and records to `DiagnosticLog` only when its 
 
 An explicit debug start in a connected SSH, Docker, or WSL workspace, or an already-running local Dev Container, can run an already-installed stdio DAP adapter through that bridge. Shed translates launch paths, breakpoints, Run to Cursor, and stack-frame source paths only between the declared remote root and the local mirror or mounted workspace; a configured pre-launch task executes through that same target. The editor remains the local DAP client.
 
-TCP DAP remains local-loopback-only. The bridge does not install adapters, start or rebuild a Dev Container, forward ports, create a remote host service, automatically synchronize files, or run extensions remotely. SSH stdout must be a clean DAP byte stream; a login banner fails the session. Extension providers opt in only by implementing `debugAdapterCommand` and `debugAdapterRoot`; the Dev Container bridge first verifies its mounted workspace path with the user-installed CLI.
+TCP DAP remains local-loopback-only. The bridge does not install adapters, start or rebuild a Dev Container, forward ports, create a remote host service, automatically synchronize files, or run third-party code remotely. SSH stdout must be a clean DAP byte stream; a login banner fails the session. The Dev Container bridge first verifies its mounted workspace path with the user-installed CLI.
 
 ## Adapter Detection
 

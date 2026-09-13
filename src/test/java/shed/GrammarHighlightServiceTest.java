@@ -1,6 +1,5 @@
 package shed;
 
-import shed.api.LanguageProfile;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,20 +13,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 class GrammarHighlightServiceTest {
 
-    @Test
-    void extensionProfileLexesKeywordsCommentsAndMultilineStrings() {
-        LanguageProfile profile = new LanguageProfile("zed", "Zed", Set.of("zed"), Set.of(), Set.of(),
-            List.of("--"), List.of(new LanguageProfile.BlockComment("{-", "-}")),
-            List.of(new LanguageProfile.StringDelimiter("\"\"\"", true), new LanguageProfile.StringDelimiter("\"", false)),
-            Set.of("let", "module"));
-        String text = "module Demo\nlet value = \"\"\"one\ntwo\"\"\"\n-- trailing";
-
-        List<GrammarHighlightService.Token> tokens = new GrammarHighlightService().highlightSnapshot(text, profile);
-
-        assertTrue(tokens.stream().anyMatch(token -> token.scope() == GrammarHighlightService.Scope.KEYWORD && text.substring(token.start(), token.end()).equals("module")));
-        assertTrue(tokens.stream().anyMatch(token -> token.scope() == GrammarHighlightService.Scope.STRING && text.substring(token.start(), token.end()).contains("two")));
-        assertTrue(tokens.stream().anyMatch(token -> token.scope() == GrammarHighlightService.Scope.COMMENT && text.substring(token.start(), token.end()).equals("-- trailing")));
-    }
     @TempDir
     Path temporaryDirectory;
 

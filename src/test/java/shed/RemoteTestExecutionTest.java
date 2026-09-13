@@ -10,9 +10,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import shed.api.RemoteCommandRequest;
-import shed.api.RemoteCommandResult;
-import shed.api.RemoteWorkspace;
 
 class RemoteTestExecutionTest {
     @TempDir Path root;

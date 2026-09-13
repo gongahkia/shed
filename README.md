@@ -22,8 +22,7 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 * First-class [Vim](./docs/KEYBINDS.md) and [Emacs](./docs/KEYBINDS.md) bindings
 * Highly customisable via [`~/.shed/config.toml`](./docs/CONFIG.md)
 * Command Palette, Snippets, LSP completion & Symbol navigation, Incremental Lexical Highlighting 
-* Fully Extensible [Plugin](./docs/PLUGINS.md) System
-* Java [extension API](./docs/EXTENSIONS.md) for language services, debuggers, test/SCM providers, terminal profiles, custom editors, remote workspaces, and docked tool views
+* Built-in local [Docker](./docs/DOCKER.md), [Dev Container](./docs/REMOTE_WORKSPACES.md#local-dev-container-cli), and [SSH mirror](./docs/REMOTE_WORKSPACES.md) workflows
 * Multi-root workspaces, portable [`.shed-workspace` / `.code-workspace` folder lists](./docs/WORKSPACE_MANIFESTS.md), notebooks, integrated terminals, and explicit [remote](./docs/REMOTE_WORKSPACES.md)/Dev Container workflows
 * Explicit local [toolchain selection](./docs/TOOLCHAINS.md) for new local development processes across twenty runtime/compiler families
 * No [telemetry](https://en.wikipedia.org/wiki/Telemetry) whatsoever

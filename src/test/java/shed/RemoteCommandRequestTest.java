@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import shed.api.RemoteCommandRequest;
 
 class RemoteCommandRequestTest {
     @Test

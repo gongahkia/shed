@@ -1,6 +1,5 @@
 package shed;
 
-import shed.api.LanguageProfile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -121,7 +120,7 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(workspace.toRealPath(), onEdt(() -> editor.workspaceController.activeRoot()));
             assertEquals(workspace.toRealPath().toFile(), onEdt(() -> editor.treeRoot));
             assertNotNull(onEdt(() -> editor.treePane));
-            assertTrue(onEdt(() -> editor.treePane.getCustomEditorComponent() instanceof FileTreePanel));
+            assertTrue(onEdt(() -> editor.treePane.getAlternateComponent() instanceof FileTreePanel));
         } finally {
             disposeEditor(editor);
         }
@@ -142,7 +141,7 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, workspace, first, second);
         try {
             assertEquals(workspace.toRealPath(), onEdt(() -> editor.workspaceController.activeRoot()));
-            assertTrue(onEdt(() -> editor.treePane.getCustomEditorComponent() instanceof FileTreePanel));
+            assertTrue(onEdt(() -> editor.treePane.getAlternateComponent() instanceof FileTreePanel));
             List<String> filePaths = onEdt(() -> editor.buffers.stream()
                 .filter(FileBuffer::hasFilePath).map(FileBuffer::getFilePath).toList());
             assertTrue(filePaths.contains(first.toAbsolutePath().toString()));
@@ -389,51 +388,6 @@ public class TexteditorSwingIntegrationTest {
             assertFalse(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
             assertEquals(landing.toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
             assertTrue(Files.exists(landing));
-        } finally {
-            disposeEditor(editor);
-        }
-    }
-
-    @Test
-    void openingAnEligibleBinaryFileUsesTheBuiltInHexEditor() throws Exception {
-        assumeSwingAvailable();
-        Path home = tempDir.resolve("home-native-hex");
-        Path file = tempDir.resolve("asset.bin");
-        Files.createDirectories(home);
-        Files.write(file, new byte[] {'S', 0, 'H', 'E', 'D'});
-
-        Texteditor editor = createEditor(home, file);
-        try {
-            assertTrue(onEdt(() -> editor.getActivePane().getComponent() instanceof HexEditorPanel));
-            assertSame(onEdt(() -> editor.getActivePane().getComponent()), onEdt(() -> editor.renderedLayoutComponent));
-        } finally {
-            disposeEditor(editor);
-        }
-    }
-
-    @Test
-    void matchingExtensionCustomEditorTakesPriorityOverBuiltInHexEditor() throws Exception {
-        assumeSwingAvailable();
-        Path home = tempDir.resolve("home-extension-hex-priority");
-        Path file = tempDir.resolve("extension-asset.bin");
-        Files.createDirectories(home);
-        Files.write(file, new byte[] {'S', 0, 'H', 'E', 'D'});
-        javax.swing.JPanel contributed = new javax.swing.JPanel();
-
-        Texteditor editor = createEmptyEditor(home);
-        try {
-            onEdt(() -> {
-                editor.extensionRegistry.registerCustomEditor("test", new shed.api.CustomEditorContribution() {
-                    @Override public String id() { return "binary"; }
-                    @Override public String displayName() { return "Test binary editor"; }
-                    @Override public boolean supports(Path candidate) { return file.toAbsolutePath().equals(candidate); }
-                    @Override public javax.swing.JComponent createComponent(Path candidate, String content) { return contributed; }
-                });
-                editor.openFile(file.toFile());
-                return null;
-            });
-
-            assertSame(contributed, onEdt(() -> editor.getActivePane().getComponent()));
         } finally {
             disposeEditor(editor);
         }
@@ -718,7 +672,7 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(3, onEdt(() -> editor.editorPanes.size()));
             assertEquals(source.toAbsolutePath().toString(), onEdt(() -> targetPane.getBuffer().getFilePath()));
             assertEquals(dropped.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
-            assertTrue(onEdt(() -> editor.treePane.getCustomEditorComponent() instanceof FileTreePanel));
+            assertTrue(onEdt(() -> editor.treePane.getAlternateComponent() instanceof FileTreePanel));
             assertEquals(WindowLayoutNode.Orientation.HORIZONTAL, onEdt(() -> editor.windowLayoutRoot.getOrientation()));
         } finally {
             disposeEditor(editor);
@@ -962,7 +916,7 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, source);
         try {
             String result = onEdt(() -> {
-                editor.remoteWorkspaceSessions.activate("ssh-project", new shed.api.RemoteWorkspace() {
+                editor.remoteWorkspaceSessions.activate("ssh-project", new RemoteWorkspace() {
                     @Override public String displayName() { return "test SSH workspace"; }
                     @Override public Path localRoot() { return workspace; }
                     @Override public String executionRoot() { return "/srv/project"; }
@@ -1003,7 +957,7 @@ public class TexteditorSwingIntegrationTest {
         try {
             String result = onEdt(() -> {
                 editor.devContainerSessions.connect(workspace, "/workspaces/project");
-                editor.remoteWorkspaceSessions.activate("ssh-project", new shed.api.RemoteWorkspace() {
+                editor.remoteWorkspaceSessions.activate("ssh-project", new RemoteWorkspace() {
                     @Override public String displayName() { return "test SSH workspace"; }
                     @Override public Path localRoot() { return workspace; }
                     @Override public String executionRoot() { return "/srv/project"; }
@@ -1034,7 +988,7 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, source);
         try {
             onEdt(() -> {
-                editor.remoteWorkspaceSessions.activate("ssh-project", new shed.api.RemoteWorkspace() {
+                editor.remoteWorkspaceSessions.activate("ssh-project", new RemoteWorkspace() {
                     @Override public String displayName() { return "test SSH workspace"; }
                     @Override public Path localRoot() { return workspace; }
                     @Override public String executionRoot() { return "/srv/project"; }
@@ -1067,7 +1021,6 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(":remote", onEdt(() -> editor.completeCommand(":rem")));
             assertEquals(":container", onEdt(() -> editor.completeCommand(":cont")));
             assertEquals(":notebook", onEdt(() -> editor.completeCommand(":noteb")));
-            assertEquals(":extension", onEdt(() -> editor.completeCommand(":extens")));
             assertEquals(":window", onEdt(() -> editor.completeCommand(":wind")));
             assertEquals(":zoom", onEdt(() -> editor.completeCommand(":zoo")));
             assertEquals(":edit " + candidate, onEdt(() -> editor.completeCommand(":edit " + directory.resolve("cand"))));
@@ -1570,41 +1523,6 @@ public class TexteditorSwingIntegrationTest {
 
             assertTrue(visible.contains("visible.txt"));
             assertFalse(visible.contains("generated"));
-        } finally {
-            disposeEditor(editor);
-        }
-    }
-
-    @Test
-    void importedWorkspaceLanguageIndentationOverridesGenericSettingsAndLanguageProfiles() throws Exception {
-        assumeSwingAvailable();
-        Path home = tempDir.resolve("home-workspace-language-indent");
-        Path workspace = tempDir.resolve("workspace-language-indent");
-        Path file = workspace.resolve("Main.pref");
-        Path manifest = tempDir.resolve("language-indent.code-workspace");
-        Files.createDirectories(home.resolve(".shed"));
-        Files.createDirectories(workspace);
-        Files.writeString(file, "module sample\n", StandardCharsets.UTF_8);
-        Files.writeString(manifest, """
-            {"folders": [{"path": "workspace-language-indent"}], "settings": {"editor.tabSize": 2}}
-            """, StandardCharsets.UTF_8);
-
-        Texteditor editor = createEditor(home, file);
-        try {
-            onEdt(() -> {
-                editor.extensionRegistry.registerLanguageProfile("profile", new LanguageProfile("sample", "Sample", Set.of("pref"), Set.of(), Set.of(),
-                    List.of(), List.of(), List.of(), Set.of(), 7, false));
-                return null;
-            });
-            assertEquals("Language profile selected: Sample", onEdt(() -> editor.handleLanguageCommand("profile:sample")));
-            assertEquals("Imported 1 workspace folder", onEdt(() -> editor.handleWorkspaceProfileCommand("import " + manifest)));
-            assertEquals(7, onEdt(() -> editor.getTextArea().getTabSize()));
-
-            Files.writeString(manifest, """
-                {"folders": [{"path": "workspace-language-indent"}], "settings": {"editor.tabSize": 2, "[sample]": {"editor.tabSize": 3}}}
-                """, StandardCharsets.UTF_8);
-            assertEquals("Reloaded imported workspace editor settings", onEdt(() -> editor.handleWorkspaceProfileCommand("reload")));
-            assertEquals(3, onEdt(() -> editor.getTextArea().getTabSize()));
         } finally {
             disposeEditor(editor);
         }

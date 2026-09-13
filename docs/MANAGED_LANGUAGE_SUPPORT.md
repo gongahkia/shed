@@ -1,6 +1,6 @@
 # Managed Language Support Trust Model
 
-This model governs Shed-managed language runtimes and language servers. Existing `lsp.<ext>.command` and `lsp.<ext>.args` launches remain user-managed; the Language Services panel changes only the extensions selected during an explicitly approved managed install.
+This model governs Shed-managed language runtimes and language servers. Existing `lsp.<ext>.command` and `lsp.<ext>.args` launches remain user-managed; the Language Services panel changes only the file types selected during an explicitly approved managed install.
 
 ## Ownership Boundary
 
@@ -45,7 +45,7 @@ Eclipse JDT LS `java.eclipse-jdtls@1.60.0` is available for macOS, Windows, and 
 
 Pyright (`pyright@1.1.411`), TypeScript/JavaScript (`typescript-language-server@5.3.0` with `typescript@6.0.3`), JSON/HTML/CSS (`@zed-industries/vscode-langservers-extracted@4.10.8`), and Markdown (`remark-language-server@3.0.0`) are available through an explicitly approved npm action. HTML routes to `vscode-html-language-server`; CSS, SCSS, and Less route to `vscode-css-language-server`. Shed writes a minimal private `package.json` under its cache and runs `npm install` there only after approval. It requests the exact listed top-level package versions, keeps npm's generated package lockfile (which records registry-provided package-integrity values for the resolved dependency tree), and disables lifecycle scripts, audit, funding, and update notifications. This route does **not** claim an independently published SHA-256 for every npm dependency; that distinction is disclosed in the review dialog. It never installs globally or invokes Homebrew, pip, cargo, rustup, or Go tooling.
 
-On a successful managed install, Shed saves the exact cached launcher and LSP arguments for every extension that service covers, then restarts those clients. The installed server still runs as a user-controlled child process, and may have its own file or network behaviour.
+On a successful managed install, Shed saves the exact cached launcher and LSP arguments for every file type that service covers, then restarts those clients. The installed server still runs as a user-controlled child process, and may have its own file or network behaviour.
 
 gopls, rust-analyzer, clangd, Kotlin LSP, csharp-ls, Intelephense, Ruby LSP, and SourceKit-LSP remain user-managed. Their supported upstream paths rely on the user's Go/Rust/LLVM, Kotlin/Java, .NET, Node.js, Ruby/Bundler, or Swift toolchain/package setup, which Shed will not modify from this panel. The latter five have built-in direct launch commands once the user has installed them, and the Language Services panel can detect them or show manual configuration. Kotlin LSP is upstream alpha; csharp-ls requires .NET 10+; Intelephense is proprietary/freemium; Ruby LSP must receive the project’s Ruby/Bundler environment; SourceKit-LSP needs the selected Swift toolchain. No action in this panel installs any of them.
 

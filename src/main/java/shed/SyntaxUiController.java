@@ -452,8 +452,8 @@ final class SyntaxUiController {
             area.setCaretColor(caretColor);
             area.setSelectionColor(selectionColor);
             area.setSelectedTextColor(selectionTextColor);
-            if (pane.getCustomEditorComponent() instanceof ShedWelcomePanel welcome) welcome.refreshAppearance();
-            if (pane.getCustomEditorComponent() instanceof FileTreePanel explorer) explorer.refreshAppearance();
+            if (pane.getAlternateComponent() instanceof ShedWelcomePanel welcome) welcome.refreshAppearance();
+            if (pane.getAlternateComponent() instanceof FileTreePanel explorer) explorer.refreshAppearance();
         }
 
         editor.refreshMarkdownPreviews();

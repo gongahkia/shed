@@ -85,8 +85,8 @@ final class PaneBufferController {
         } else if (editor.hasMarkdownPreviewForSource(pane)) {
             editor.closeMarkdownPreviewForSource(pane);
         }
-        boolean replacedCustomEditor = pane.getCustomEditorComponent() != null;
-        pane.clearCustomEditorComponent();
+        boolean replacedAlternateSurface = pane.getAlternateComponent() != null;
+        pane.clearAlternateComponent();
 
         boolean activePane = pane == editor.getActivePane();
         if (activePane) {
@@ -139,7 +139,7 @@ final class PaneBufferController {
         } else {
             pane.getLineNumberPanel().repaint();
         }
-        if (replacedTerminalPane || replacedCustomEditor) {
+        if (replacedTerminalPane || replacedAlternateSurface) {
             editor.renderWindowLayout();
         }
     }
@@ -420,7 +420,7 @@ final class PaneBufferController {
             return;
         }
         ShedWelcomePanel panel = new ShedWelcomePanel(editor);
-        pane.setCustomEditorComponent(panel);
+        pane.setAlternateComponent(panel);
         panel.addFocusListener(new java.awt.event.FocusAdapter() {
             @Override public void focusGained(java.awt.event.FocusEvent event) {
                 editor.activateEditorPane(pane);
@@ -487,7 +487,7 @@ final class PaneBufferController {
         FileBuffer existing = findBufferByPath(file);
         if (existing != null) {
             loadBufferIntoEditor(existing);
-            editor.showCustomEditorIfAvailable(editor.getActivePane(), existing);
+            editor.showAlternateSurfaceIfAvailable(editor.getActivePane(), existing);
             if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
                 editor.showMessage(projectConfigMessage);
             }
@@ -507,7 +507,7 @@ final class PaneBufferController {
             editor.buffers.add(buffer);
         }
         loadBufferIntoEditor(buffer);
-        editor.showCustomEditorIfAvailable(editor.getActivePane(), buffer);
+        editor.showAlternateSurfaceIfAvailable(editor.getActivePane(), buffer);
         editor.addToRecentFiles(file.getAbsolutePath());
         editor.registerFileWatch(buffer);
         editor.refreshGitGutter();
@@ -556,7 +556,7 @@ final class PaneBufferController {
             loadBufferIntoPane(newPane, targetBuffer, 0);
             editor.renderWindowLayout();
             editor.activateEditorPane(newPane);
-            editor.showCustomEditorIfAvailable(newPane, targetBuffer);
+            editor.showAlternateSurfaceIfAvailable(newPane, targetBuffer);
             newPane.getTextArea().requestFocusInWindow();
             editor.addToRecentFiles(file.getAbsolutePath());
             if (newBuffer) {
@@ -584,7 +584,7 @@ final class PaneBufferController {
         if (cleared != null && !cleared.isEmpty()) {
             editor.applyRuntimeConfigFromSettings();
         }
-        return "Project local config/plugins blocked (untrusted project)";
+        return "Project local config blocked (untrusted project)";
     }
 
 

@@ -18,7 +18,7 @@ import java.util.Set;
  * or the {@code launch} object of an explicitly imported standard {@code .code-workspace}.
  *
  * <p>The file is never persisted into Shed configuration and never supplies an
- * adapter command. A profile can only refer to an adapter the user or an extension
+ * adapter command. A profile can only refer to an adapter the user
  * has already configured in Shed. This keeps an explicit compatibility bridge from
  * widening the trusted executable-configuration boundary.</p>
  */

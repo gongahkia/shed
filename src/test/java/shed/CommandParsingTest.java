@@ -147,6 +147,7 @@ public class CommandParsingTest {
         assertTrue(handler.getCommandNames().contains("zoom"));
         assertTrue(handler.getCommandNames().contains("quickfix"));
         assertTrue(handler.getCommandNames().contains("diagnostic"));
+        assertTrue(handler.getCommandNames().contains("docker"));
         assertTrue(handler.getCommandNames().contains("s"));
         assertTrue(handler.getCommandNames().contains("vs"));
         assertTrue(handler.getCommandNames().contains("discard"));
@@ -158,11 +159,15 @@ public class CommandParsingTest {
         assertFalse(handler.getCommandNames().contains("jobkill"));
         assertFalse(handler.getCommandNames().contains("largefile"));
         assertFalse(handler.getCommandNames().contains("lf"));
+        assertFalse(handler.getCommandNames().contains("plugin"));
+        assertFalse(handler.getCommandNames().contains("extension"));
+        assertFalse(handler.getCommandNames().contains("customeditor"));
+        assertFalse(handler.getCommandNames().contains("integration"));
         List<String> actions = PaletteController.surfaceActionNames();
         assertTrue(actions.containsAll(List.of(
             "Language Services", "Open File", "Open Folder", "Toggle File Tree",
             "Save Current Buffer", "Split Below", "Focus Next Split", "Focus Previous Split", "Zoom In", "Zoom Out",
-            "Configuration Status", "Go to Definition", "Toolchain Status", "Update Status"
+            "Configuration Status", "Go to Definition", "Toolchain Status", "Docker Containers", "Update Status"
         )));
         List<String> candidates = PaletteController.commandPaletteCandidates();
         assertEquals(actions, candidates);
@@ -175,11 +180,16 @@ public class CommandParsingTest {
         assertTrue(matcher.matchStrings("Toggle File Tree", actions, 0).contains("Toggle File Tree"));
         assertTrue(matcher.matchStrings("Remote Workspaces", actions, 0).contains("Remote Workspaces"));
         assertTrue(matcher.matchStrings("Dev Container", actions, 0).contains("Dev Container"));
+        assertTrue(matcher.matchStrings("Docker Containers", actions, 0).contains("Docker Containers"));
         assertFalse(actions.contains("Show All Open Buffers"));
         assertFalse(actions.contains("Peek Definition"));
         assertFalse(actions.contains("Peek Type Definition"));
         assertFalse(actions.contains("Large File Status"));
         assertFalse(actions.contains("Async Jobs"));
+        assertFalse(actions.contains("Plugin Manager"));
+        assertFalse(actions.contains("Extension Manager"));
+        assertFalse(actions.contains("Custom Editors"));
+        assertFalse(actions.contains("Workspace Integrations"));
         assertEquals("workspace folders", PaletteController.surfaceActionCommand("Workspace Folders"));
         assertEquals("lsp codeaction", PaletteController.surfaceActionCommand("Code Actions"));
         assertEquals("snippet edit", PaletteController.surfaceActionCommand("Edit Snippets"));
@@ -194,6 +204,7 @@ public class CommandParsingTest {
         assertEquals("qa!", PaletteController.surfaceActionCommand("Quit All Without Saving"));
         assertEquals("remote list", PaletteController.surfaceActionCommand("Remote Workspaces"));
         assertEquals("container status", PaletteController.surfaceActionCommand("Dev Container"));
+        assertEquals("docker list", PaletteController.surfaceActionCommand("Docker Containers"));
         assertEquals("zoom in default", PaletteController.surfaceActionCommand("Zoom In"));
         assertEquals("zoom out default", PaletteController.surfaceActionCommand("Zoom Out"));
         assertEquals("window next", PaletteController.surfaceActionCommand("Focus Next Split"));

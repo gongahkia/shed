@@ -361,7 +361,7 @@ final class TreeGitController {
         editor.loadBufferIntoPane(pane, tree, 0);
         FileTreePanel explorer = new FileTreePanel(editor, root, this::listTreeChildren, file -> editor.showMessage(openTreeFile(file)),
             () -> editor.activateEditorPane(pane));
-        pane.setCustomEditorComponent(explorer);
+        pane.setAlternateComponent(explorer);
         editor.activateEditorPane(pane);
         explorer.focusTree();
         return "Tree pane opened";
@@ -525,7 +525,7 @@ final class TreeGitController {
             return "Tree pane not active";
         }
 
-        if (editor.treePane != null && editor.treePane.getCustomEditorComponent() instanceof FileTreePanel explorer) {
+        if (editor.treePane != null && editor.treePane.getAlternateComponent() instanceof FileTreePanel explorer) {
             return openTreeFile(explorer.selectedFile());
         }
 
@@ -570,7 +570,7 @@ final class TreeGitController {
 
             editor.loadBufferIntoPane(contentPane, targetBuffer, 0);
             editor.activateEditorPane(contentPane);
-            editor.showCustomEditorIfAvailable(contentPane, targetBuffer);
+            editor.showAlternateSurfaceIfAvailable(contentPane, targetBuffer);
             contentPane.getTextArea().requestFocusInWindow();
             editor.addToRecentFiles(file.getAbsolutePath());
             return "Opened: " + file.getAbsolutePath();

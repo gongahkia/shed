@@ -171,13 +171,14 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleZoom(args), "zoom", "uizoom");
         registerCommand((args, range, force) -> editor.showGrepFinder(args), "grep", "rg");
         registerCommand((args, range, force) -> editor.handleProjectReplace(args), "projectreplace", "preplace");
-        registerCommand((args, range, force) -> editor.openQuickfixList(), "copen");
-        registerCommand((args, range, force) -> editor.closeQuickfixList(), "cclose");
-        registerCommand((args, range, force) -> editor.quickfixNext(), "cnext", "cn");
-        registerCommand((args, range, force) -> editor.quickfixPrev(), "cprev", "cp");
-        registerCommand((args, range, force) -> editor.quickfixFirst(), "cfirst");
-        registerCommand((args, range, force) -> editor.quickfixLast(), "clast");
-        registerCommand((args, range, force) -> editor.quickfixCurrent(args), "cc");
+        registerCommand((args, range, force) -> handleQuickfix(args), "quickfix", "qf");
+        registerCommand((args, range, force) -> handleQuickfix("open"), "copen");
+        registerCommand((args, range, force) -> handleQuickfix("close"), "cclose");
+        registerCommand((args, range, force) -> handleQuickfix("next"), "cnext", "cn");
+        registerCommand((args, range, force) -> handleQuickfix("previous"), "cprev", "cp");
+        registerCommand((args, range, force) -> handleQuickfix("first"), "cfirst");
+        registerCommand((args, range, force) -> handleQuickfix("last"), "clast");
+        registerCommand((args, range, force) -> handleQuickfix("current " + args), "cc");
         registerCommand((args, range, force) -> editor.handleLspCommand(args), "lsp");
         registerCommand((args, range, force) -> editor.handleLspCommand("manage"),
             "languageservices", "language-services", "lspmanage");
@@ -323,6 +324,20 @@ public class CommandHandler {
         };
     }
 
+    private String handleQuickfix(String argument) {
+        CommandOperation command = CommandOperation.parse(argument);
+        return switch (command.name()) {
+            case "open" -> editor.openQuickfixList();
+            case "close" -> editor.closeQuickfixList();
+            case "next" -> editor.quickfixNext();
+            case "previous", "prev" -> editor.quickfixPrev();
+            case "first" -> editor.quickfixFirst();
+            case "last" -> editor.quickfixLast();
+            case "current" -> editor.quickfixCurrent(command.argument());
+            default -> "Usage: :quickfix open|close|next|previous|first|last|current [index]";
+        };
+    }
+
     private String resizeWindow(String percentageArgument, int direction) {
         Double percentage = parsePercentage(percentageArgument, 5.0);
         if (percentage == null) {
@@ -342,6 +357,9 @@ public class CommandHandler {
     private static Double parsePercentage(String value, double defaultValue) {
         String normalized = value == null ? "" : value.trim();
         if (normalized.isEmpty()) {
+            return defaultValue;
+        }
+        if ("default".equalsIgnoreCase(normalized)) {
             return defaultValue;
         }
         if (normalized.endsWith("%")) {

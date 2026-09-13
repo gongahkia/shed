@@ -16,8 +16,9 @@ final class LandingPageSource {
             + "swing modal editor\\R\\R"
             + ":help        view help\\R"
             + ":e <file>    open a file\\R"
-            + ":recent      show recent files\\R\\R"
-            + "edit and save this local landing file to customize it\\.\\R?\\z"
+            + ":recent      show recent files\\R"
+            + "(?::ls          list open buffers\\R)?"
+            + "\\Redit and save this local landing file to customize it\\.\\R?\\z"
     );
 
     record Resolved(File file, URI remoteUri) {

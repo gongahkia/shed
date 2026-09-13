@@ -475,7 +475,8 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 | `:container disconnect` | Stop that routing without stopping or deleting the container |
 | `:container exec <command...>`, `:container terminal [command...]` | Explicitly run/open a direct-argv command through the local Dev Container CLI |
 | `:container open <container> <absolute-path>` | Open an explicit Docker container mirror |
-| `:docker`, `:docker list` | List local Docker containers and their state |
+| `:docker`, `:docker ui`, `:docker workbench` | Open the themed local Docker workbench |
+| `:docker list`, `:docker ps`, `:docker status` | Show the text listing of local Docker containers and their state |
 | `:docker inspect <container>` | Show one local container's metadata |
 | `:docker start\|stop\|restart <container>` | Explicitly change one local container's lifecycle state |
 | `:docker logs <container> [lines]` | Show bounded container logs (default 500 lines, maximum 10,000) |

@@ -85,6 +85,19 @@ public class LandingPageSourceTest {
             """);
         assertTrue(LandingPageSource.resolveStartupTarget(config, legacyContent).showNativeWelcome());
 
+        Files.writeString(defaultLanding, """
+            shed 2.0
+            swing modal editor
+
+            :help        view help
+            :e <file>    open a file
+            :recent      show recent files
+            :ls          list open buffers
+
+            edit and save this local landing file to customize it.
+            """);
+        assertTrue(LandingPageSource.resolveStartupTarget(config, legacyContent).showNativeWelcome());
+
         Files.writeString(defaultLanding, "my own start page\n");
         assertFalse(LandingPageSource.resolveStartupTarget(config, legacyContent).showNativeWelcome());
 

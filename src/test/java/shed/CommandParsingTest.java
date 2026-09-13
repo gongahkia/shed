@@ -204,7 +204,7 @@ public class CommandParsingTest {
         assertEquals("qa!", PaletteController.surfaceActionCommand("Quit All Without Saving"));
         assertEquals("remote list", PaletteController.surfaceActionCommand("Remote Workspaces"));
         assertEquals("container status", PaletteController.surfaceActionCommand("Dev Container"));
-        assertEquals("docker list", PaletteController.surfaceActionCommand("Docker Containers"));
+        assertEquals("docker", PaletteController.surfaceActionCommand("Docker Containers"));
         assertEquals("zoom in default", PaletteController.surfaceActionCommand("Zoom In"));
         assertEquals("zoom out default", PaletteController.surfaceActionCommand("Zoom Out"));
         assertEquals("window next", PaletteController.surfaceActionCommand("Focus Next Split"));

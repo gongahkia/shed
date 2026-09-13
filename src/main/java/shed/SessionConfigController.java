@@ -545,7 +545,11 @@ final class SessionConfigController {
 
     private String persistUiZoom(double zoom) {
         try {
-            editor.configManager.setAndPersist("ui.zoom", java.math.BigDecimal.valueOf(zoom).stripTrailingZeros().toPlainString());
+            java.math.BigDecimal value = java.math.BigDecimal.valueOf(zoom).stripTrailingZeros();
+            if (value.scale() < 1) {
+                value = value.setScale(1);
+            }
+            editor.configManager.setAndPersist("ui.zoom", value.toPlainString());
         } catch (IOException error) {
             return "Unable to change UI zoom: " + error.getMessage();
         }

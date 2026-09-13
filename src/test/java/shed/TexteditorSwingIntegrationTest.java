@@ -177,6 +177,8 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(1.2, onEdt(() -> editor.configManager.getUiZoom()));
             assertEquals("UI zoom: 140%", onEdt(() -> editor.commandHandler.execute("zoom in 20")));
             assertEquals(1.4, onEdt(() -> editor.configManager.getUiZoom()));
+            assertEquals("UI zoom: 120%", onEdt(() -> editor.commandHandler.execute("zoom out 20%")));
+            assertEquals(1.2, onEdt(() -> editor.configManager.getUiZoom()));
 
             onEdt(() -> {
                 Object binding = editor.getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
@@ -588,6 +590,8 @@ public class TexteditorSwingIntegrationTest {
             assertSame(second, onEdt(editor::getActivePane));
             assertEquals("Window resized", onEdt(() -> editor.commandHandler.execute("window grow 20")));
             assertEquals(0.3, onEdt(() -> editor.windowLayoutRoot.getRatio()));
+            assertEquals("Window resized", onEdt(() -> editor.commandHandler.execute("window shrink 20%")));
+            assertEquals(0.5, onEdt(() -> editor.windowLayoutRoot.getRatio()));
             assertEquals("Windows equalized", onEdt(() -> editor.commandHandler.execute("window equalize")));
             assertEquals("Command not recognised: close!", onEdt(() -> editor.commandHandler.execute("close!")));
             assertEquals(2, onEdt(() -> editor.editorPanes.size()));

@@ -147,7 +147,7 @@ public class CommandParsingTest {
         assertTrue(handler.getCommandNames().contains("zoom"));
         List<String> actions = PaletteController.surfaceActionNames();
         assertTrue(actions.containsAll(List.of(
-            "Language Services", "Open File", "Open Folder", "Open File Tree",
+            "Language Services", "Open File", "Open Folder", "Toggle File Tree",
             "Save Current Buffer", "Split Below", "Focus Next Split", "Reset UI Zoom",
             "Configuration Status", "Go to Definition", "Toolchain Status", "Update Status"
         )));
@@ -159,7 +159,7 @@ public class CommandParsingTest {
         assertTrue(matcher.matchStrings("Import Coverage Report", actions, 0).contains("Import Coverage Report"));
         assertTrue(matcher.matchStrings("Open File", actions, 0).contains("Open File"));
         assertTrue(matcher.matchStrings("Open Folder", actions, 0).contains("Open Folder"));
-        assertTrue(matcher.matchStrings("Open File Tree", actions, 0).contains("Open File Tree"));
+        assertTrue(matcher.matchStrings("Toggle File Tree", actions, 0).contains("Toggle File Tree"));
         assertTrue(matcher.matchStrings("Remote Workspaces", actions, 0).contains("Remote Workspaces"));
         assertTrue(matcher.matchStrings("Dev Container", actions, 0).contains("Dev Container"));
         assertEquals("workspace ui", PaletteController.surfaceActionCommand("Workspace Folders"));
@@ -167,7 +167,7 @@ public class CommandParsingTest {
         assertEquals("snippets edit", PaletteController.surfaceActionCommand("Edit Snippets"));
         assertEquals("open file", PaletteController.surfaceActionCommand("Open File"));
         assertEquals("open folder", PaletteController.surfaceActionCommand("Open Folder"));
-        assertEquals("tree", PaletteController.surfaceActionCommand("Open File Tree"));
+        assertEquals("tree", PaletteController.surfaceActionCommand("Toggle File Tree"));
         assertEquals("remote list", PaletteController.surfaceActionCommand("Remote Workspaces"));
         assertEquals("container status", PaletteController.surfaceActionCommand("Dev Container"));
         assertEquals("zoom reset", PaletteController.surfaceActionCommand("Reset UI Zoom"));

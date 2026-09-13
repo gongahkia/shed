@@ -320,6 +320,45 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void themeGalleryExplainsPersistenceAndRefreshesForLightThemes() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-themed-gallery");
+        Path file = tempDir.resolve("gallery.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "gallery\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        ThemeGalleryDialog dialog = null;
+        try {
+            dialog = onEdt(() -> {
+                ThemeGalleryDialog.showFor(editor);
+                return Arrays.stream(Window.getWindows()).filter(ThemeGalleryDialog.class::isInstance)
+                    .map(ThemeGalleryDialog.class::cast).filter(Window::isDisplayable).findFirst().orElseThrow();
+            });
+            ThemeGalleryDialog shown = dialog;
+
+            List<javax.swing.JButton> buttons = onEdt(() -> descendants(shown, javax.swing.JButton.class));
+            javax.swing.JButton session = buttons.stream().filter(button -> "Apply for This Session".equals(button.getText())).findFirst().orElseThrow();
+            javax.swing.JButton save = buttons.stream().filter(button -> "Apply and Save".equals(button.getText())).findFirst().orElseThrow();
+            assertFalse(onEdt(session::isEnabled));
+            assertTrue(onEdt(save::isEnabled));
+
+            assertEquals("Theme set to catppuccin-latte", onEdt(() -> editor.setThemeFromCommand("catppuccin-latte")));
+            assertEquals(editor.configManager.getNormalColor(), onEdt(() -> shown.getContentPane().getBackground()));
+            assertTrue(onEdt(() -> descendants(shown, javax.swing.JList.class).stream()
+                .allMatch(list -> editor.configManager.getCommandBarBackground().equals(list.getBackground()))));
+            assertTrue(onEdt(() -> descendants(shown, javax.swing.JButton.class).stream()
+                .allMatch(button -> editor.configManager.getEditorForeground().equals(button.getForeground()))));
+            assertTrue(onEdt(() -> descendants(shown, javax.swing.JScrollPane.class).stream()
+                .allMatch(scroll -> editor.configManager.getNormalColor().equals(scroll.getViewport().getBackground()))));
+        } finally {
+            ThemeGalleryDialog currentDialog = dialog;
+            if (currentDialog != null) onEdt(() -> { currentDialog.dispose(); return null; });
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void uiZoomScalesTheFooterAndSettingsDialog() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-ui-zoom-settings");

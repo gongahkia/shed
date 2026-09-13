@@ -1,13 +1,9 @@
 package shed;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.TimeUnit;
 
 /** Explicit local Docker Engine actions. Every command is direct argv and runs as an observable async job. */
 final class DockerController {
@@ -21,7 +17,11 @@ final class DockerController {
 
     String handle(String argument) {
         String value = argument == null ? "" : argument.trim();
-        if (value.isEmpty() || "list".equalsIgnoreCase(value) || "ps".equalsIgnoreCase(value) || "status".equalsIgnoreCase(value)) {
+        if (value.isEmpty() || "ui".equalsIgnoreCase(value) || "workbench".equalsIgnoreCase(value)) {
+            DockerWorkbenchDialog.showFor(editor);
+            return "Opened Docker workbench";
+        }
+        if ("list".equalsIgnoreCase(value) || "ps".equalsIgnoreCase(value) || "status".equalsIgnoreCase(value)) {
             return submit("list", List.of("docker", "container", "ls", "--all", "--format", "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"));
         }
         List<String> tokens;
@@ -88,37 +88,18 @@ final class DockerController {
     }
 
     private String submit(String operation, List<String> command) {
-        int job = editor.asyncJobService.submit("docker " + operation, token -> run(command, token),
+        int job = editor.asyncJobService.submit("docker " + operation, token -> DockerRuntime.run(command, token),
             (snapshot, output, error) -> complete(operation, output, error));
         return "Docker " + operation + " requested (job " + job + ").";
     }
 
     private void complete(String operation, String output, Exception error) {
         String heading = "Docker " + operation;
-        String content = error == null ? output : heading + " failed: " + concise(error);
+        String content = error == null ? output : heading + " failed: " + DockerRuntime.concise(error);
         editor.showScratchBuffer("[docker " + operation + "]", content == null || content.isBlank() ? "(no output)\n" : content);
         editor.showMessage(error == null ? heading + " completed" : heading + " failed");
     }
 
-    private static String run(List<String> command, AsyncJobService.JobToken token) throws Exception {
-        Path output = Files.createTempFile("shed-docker-", ".log");
-        try {
-            Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(output.toFile()).start();
-            token.onCancel(process::destroyForcibly);
-            if (!process.waitFor(15, TimeUnit.MINUTES)) {
-                process.destroyForcibly();
-                throw new IOException("Docker command timed out after 15 minutes");
-            }
-            String text = DevContainerRuntime.readCapped(output);
-            if (process.exitValue() != 0) throw new IOException(text.isBlank() ? "docker exited " + process.exitValue() : text.strip());
-            return text;
-        } catch (InterruptedException error) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Docker command interrupted", error);
-        } finally {
-            Files.deleteIfExists(output);
-        }
-    }
 
     private Path workspace() {
         FileBuffer buffer = editor.getCurrentBuffer();
@@ -135,12 +116,8 @@ final class DockerController {
         return value != null && value.matches("[A-Za-z0-9][A-Za-z0-9_.-]*");
     }
 
-    private static String concise(Exception error) {
-        String message = error == null ? null : error.getMessage();
-        return message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' ');
-    }
 
     private static String usage() {
-        return "Usage: :docker [list|inspect <container>|start|stop|restart <container>|logs <container> [lines]|exec <container> <command...>|terminal <container> [command...]|open <container> <absolute-container-path>]";
+        return "Usage: :docker [ui|list|inspect <container>|start|stop|restart <container>|logs <container> [lines]|exec <container> <command...>|terminal <container> [command...]|open <container> <absolute-container-path>]";
     }
 }

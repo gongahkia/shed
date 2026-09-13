@@ -274,10 +274,10 @@ public class HelpService {
             case "docker":
             case "containers":
                 return "Help: Docker containers\n\n"
-                    + ":docker list shows local containers.\n"
+                    + ":docker opens the themed Docker workbench; :docker list keeps the text listing.\n"
                     + ":docker inspect|start|stop|restart <container> are explicit jobs.\n"
                     + ":docker logs <container> [lines], :docker exec <container> <command...>, and :docker terminal <container> [command...] work with a named local container.\n"
-                    + ":docker open <container> <absolute-container-path> creates a local mirror workspace.\n";
+                    + ":docker ui and :docker workbench are explicit aliases for the Docker workbench.\n:docker open <container> <absolute-container-path> creates a local mirror workspace.\n";
             case "container":
             case "devcontainer":
                 return "Help: Dev Container\n\n"

@@ -128,7 +128,6 @@ final class SessionConfigController {
             return "Unknown theme: " + value;
         }
         editor.applyThemeColors();
-        firePluginEvent("ThemeChange");
         return "Theme set to " + appliedTheme;
     }
 
@@ -146,7 +145,6 @@ final class SessionConfigController {
             }
         }
         editor.applyThemeColors();
-        firePluginEvent("ThemeChange");
         return persist ? "Theme set and saved to " + appliedTheme : "Theme set to " + appliedTheme;
     }
 
@@ -179,7 +177,6 @@ final class SessionConfigController {
                 return "Applied " + applied + " palette key(s), but failed to save: " + e.getMessage();
             }
         }
-        firePluginEvent("ThemeChange");
         return (persist ? "Applied and saved " : "Applied ") + applied + " palette key" + (applied == 1 ? "" : "s");
     }
 
@@ -255,8 +252,7 @@ final class SessionConfigController {
         editor.configManager.set(key, appliedValue);
         applyRuntimeConfigFromSettings();
         if (isThemeRelatedConfigKey(key)) {
-            firePluginEvent("ThemeChange");
-        }
+            }
         return configSetResult("Set", key, requestedValue, appliedValue);
     }
 
@@ -278,8 +274,7 @@ final class SessionConfigController {
             editor.configManager.setAndPersist(key, appliedValue);
             applyRuntimeConfigFromSettings();
             if (isThemeRelatedConfigKey(key)) {
-                firePluginEvent("ThemeChange");
-            }
+                    }
             return configSetResult("Set and saved", key, requestedValue, appliedValue);
         } catch (IOException e) {
             return "Error saving config: " + e.getMessage();
@@ -301,8 +296,7 @@ final class SessionConfigController {
             editor.configManager.resetAndPersist(key);
             applyRuntimeConfigFromSettings();
             if (isThemeRelatedConfigKey(key)) {
-                firePluginEvent("ThemeChange");
-            }
+                    }
             return "Reset and saved " + key;
         } catch (IOException e) {
             return "Error resetting config: " + e.getMessage();
@@ -1521,104 +1515,6 @@ final class SessionConfigController {
     }
 
 
-    public PluginManager getPluginManager() {
-        return editor.pluginManager;
-    }
-
-
-    void firePluginEvent(String event) {
-        if (editor.pluginManager == null) return;
-        editor.pluginManager.fireEvent(event);
-    }
-
-
-    public String reloadPlugins() {
-        editor.pluginManager.reload();
-        int count = editor.pluginManager.getPlugins().size();
-        return "Reloaded " + count + " plugin(s)";
-    }
-
-
-    public String showPluginList() {
-        showScratchBuffer("[plugins]", editor.pluginManager.getPluginListText());
-        return "Showing plugins";
-    }
-
-
-    public String showPluginPackages() {
-        showScratchBuffer("[plugin packages]", editor.pluginManager.getPackageListText());
-        return "Showing plugin packages";
-    }
-
-
-    public String enablePlugin(String name) {
-        return editor.pluginManager.enablePlugin(name);
-    }
-
-
-    public String disablePlugin(String name) {
-        return editor.pluginManager.disablePlugin(name);
-    }
-
-
-    public String showPluginInfo(String name) {
-        String text = editor.pluginManager.getPluginInfoText(name);
-        showScratchBuffer("[plugin " + name + "]", text);
-        return "Showing plugin info";
-    }
-
-
-    public String showPluginPath() {
-        String path = editor.pluginManager.getPluginsDirectoryPath();
-        List<String> disabled = editor.pluginManager.listDisabledPlugins();
-        StringBuilder sb = new StringBuilder();
-        sb.append("Plugin directory: ").append(path).append("\n\n");
-        if (!disabled.isEmpty()) {
-            sb.append("Disabled plugins:\n");
-            for (String d : disabled) sb.append("  ").append(d).append("\n");
-        }
-        showScratchBuffer("[plugin path]", sb.toString());
-        return path;
-    }
-
-
-    public String createAndOpenPlugin(String name) {
-        try {
-            File file = editor.pluginManager.createPluginFile(name);
-            editor.openFile(file);
-            editor.pluginManager.reload();
-            return "Opened plugin: " + file.getName();
-        } catch (IOException e) {
-            return "Error creating plugin: " + e.getMessage();
-        }
-    }
-
-
-    public String installPluginPackage(String args) {
-        return editor.pluginManager.installPackage(args);
-    }
-
-
-    public String updatePluginPackage(String args) {
-        return editor.pluginManager.updatePackage(args);
-    }
-
-
-    public String removePluginPackage(String name) {
-        return editor.pluginManager.removePackage(name);
-    }
-
-
-    public String pinPluginPackage(String name) {
-        return editor.pluginManager.setPackagePinned(name, true);
-    }
-
-
-    public String unpinPluginPackage(String name) {
-        return editor.pluginManager.setPackagePinned(name, false);
-    }
-
-
     public String executeCommand(String cmd) {
         if (editor.commandHandler == null) return "";
         return editor.commandHandler.execute(cmd);
@@ -1639,7 +1535,7 @@ final class SessionConfigController {
             try { col = editor.writingArea.getCaretPosition() - editor.writingArea.getLineStartOffset(editor.getCurrentCaretLine()); } catch (BadLocationException ignored) {}
             String word = editor.getWordAtCaret();
             String selection = editor.writingArea.getSelectedText();
-            String interpolated = PluginManager.interpolate(shellCmd, filePath, line, col, word, selection);
+            String interpolated = UserCommandInterpolator.interpolate(shellCmd, filePath, line, col, word, selection);
             String validationError = editor.validateShellCommand(interpolated);
             if (validationError != null) {
                 return validationError;
@@ -1875,8 +1771,8 @@ final class SessionConfigController {
 
         int result = JOptionPane.showConfirmDialog(
             editor,
-            "This project contains local execution surfaces (.shed.toml and/or .shed/plugins).\n"
-                + "Trust this project root for local config/plugin behavior?\n"
+            "This project contains local execution settings (.shed.toml).\n"
+                + "Trust this project root for local configuration behavior?\n"
                 + canonicalRoot,
             "Project Trust",
             JOptionPane.YES_NO_OPTION,
@@ -1920,15 +1816,8 @@ final class SessionConfigController {
         if (localConfig.isFile()) {
             return true;
         }
-        File pluginDir = new File(projectRoot, ".shed/plugins");
-        if (!pluginDir.isDirectory()) {
-            return false;
-        }
-        File[] pluginFiles = pluginDir.listFiles(file -> file.isFile()
-            && (file.getName().endsWith(".shed") || file.getName().endsWith(".lua")));
-        return pluginFiles != null && pluginFiles.length > 0;
+        return false;
     }
-
 
     synchronized void appendCommandLog(String entry) {
         if (entry == null || entry.isBlank()) {

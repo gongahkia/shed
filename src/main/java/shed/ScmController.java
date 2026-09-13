@@ -3,14 +3,14 @@ package shed;
 import java.io.File;
 import java.nio.file.Path;
 
-/** UI boundary for extension-provided SCM capabilities. */
+/** UI boundary for built-in SCM capabilities. */
 final class ScmController {
     private final Texteditor editor;
     private final ScmContributionService providers;
 
-    ScmController(Texteditor editor, ExtensionRegistry registry) {
+    ScmController(Texteditor editor) {
         this.editor = editor;
-        this.providers = new ScmContributionService(registry);
+        this.providers = new ScmContributionService();
     }
 
     String handle(String argument) {

@@ -174,7 +174,7 @@ public class CommandParsingTest {
         assertEquals("snippet edit", PaletteController.surfaceActionCommand("Edit Snippets"));
         assertEquals("open file", PaletteController.surfaceActionCommand("Open File"));
         assertEquals("open folder", PaletteController.surfaceActionCommand("Open Folder"));
-        assertEquals("tree", PaletteController.surfaceActionCommand("Toggle File Tree"));
+        assertEquals("tree toggle", PaletteController.surfaceActionCommand("Toggle File Tree"));
         assertEquals("s", PaletteController.surfaceActionCommand("Split Below"));
         assertEquals("vs", PaletteController.surfaceActionCommand("Split Right"));
         assertEquals("discard current buffer", PaletteController.surfaceActionCommand("Discard Current Buffer"));

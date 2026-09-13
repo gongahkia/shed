@@ -380,6 +380,7 @@ See [Update Checks](UPDATES.md) for endpoint/key configuration and metadata vali
 
 | Command | Action |
 | :--- | :--- |
+| `:tree toggle` | Toggle tree pane (open/close) |
 | `:tree` | Toggle tree pane (open/close) |
 | `:tree <path>` | Open tree rooted at path |
 | `:tree refresh` | Refresh tree |

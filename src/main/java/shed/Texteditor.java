@@ -1540,7 +1540,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String handleTaskCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
-        if (trimmed.isEmpty() || "ui".equalsIgnoreCase(trimmed)) {
+        if (trimmed.isEmpty() || "ui".equalsIgnoreCase(trimmed) || "open".equalsIgnoreCase(trimmed)) {
             showToolWindow(ToolWindowHost.Tab.TASKS);
             return "Tasks panel opened";
         }
@@ -2165,7 +2165,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String handleDebugCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
-        if (trimmed.isEmpty() || "ui".equalsIgnoreCase(trimmed)) {
+        if (trimmed.isEmpty() || "ui".equalsIgnoreCase(trimmed) || "open".equalsIgnoreCase(trimmed)) {
             showToolWindow(ToolWindowHost.Tab.DEBUG);
             return "Debug panel opened";
         }

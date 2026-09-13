@@ -72,7 +72,7 @@ final class TestController {
 
     String handle(String argument) {
         String value = argument == null ? "" : argument.trim();
-        if (value.isEmpty() || "ui".equalsIgnoreCase(value)) {
+        if (value.isEmpty() || "ui".equalsIgnoreCase(value) || "open".equalsIgnoreCase(value)) {
             editor.showToolWindow(ToolWindowHost.Tab.TESTS);
             return "Tests panel opened";
         }
@@ -187,7 +187,7 @@ final class TestController {
     String handleCoverage(String argument) {
         String value = argument == null ? "" : argument.trim();
         Path root = selectedRoot();
-        if (value.isEmpty() || "ui".equalsIgnoreCase(value)) {
+        if (value.isEmpty() || "ui".equalsIgnoreCase(value) || "open".equalsIgnoreCase(value)) {
             editor.showToolWindow(ToolWindowHost.Tab.TESTS);
             return "Tests panel opened";
         }

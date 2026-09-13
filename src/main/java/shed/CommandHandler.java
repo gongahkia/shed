@@ -186,8 +186,8 @@ public class CommandHandler {
             "languageservices", "language-services", "lspmanage");
         registerCommand((args, range, force) -> editor.handleLanguageCommand(args), "language", "lang");
         registerCommand((args, range, force) -> editor.handleLspCommand("peek " + args), "peek");
-        registerCommand((args, range, force) -> editor.formatCurrentBuffer(), "format", "fmt");
-        registerCommand((args, range, force) -> editor.showFormatterPolicy(), "formatter", "formatpolicy");
+        registerCommand((args, range, force) -> handleFormat(args), "format", "fmt");
+        registerCommand((args, range, force) -> handleFormat("policy"), "formatter", "formatpolicy");
         registerCommand((args, range, force) -> editor.handleDebugCommand(args), "debug", "dap");
         registerCommand((args, range, force) -> editor.lspGoToDefinition(), "definition");
         registerCommand((args, range, force) -> editor.lspGoToTypeDefinition(), "typedefinition", "typedef");
@@ -200,31 +200,38 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleProblemsCommand(args), "problems", "problem");
         registerCommand((args, range, force) -> handleDiagnostic("next"), "dnext", "dn");
         registerCommand((args, range, force) -> handleDiagnostic("previous"), "dprev", "dp");
-        registerCommand((args, range, force) -> editor.showSymbols(args), "symbols", "sym");
-        registerCommand((args, range, force) -> editor.showRegisters(), "registers", "reg");
-        registerCommand((args, range, force) -> editor.showYankRingPicker(), "yankring", "pastepicker", "yr");
-        registerCommand((args, range, force) -> editor.showMarks(), "marks");
-        registerCommand((args, range, force) -> editor.showThemes(), "themes");
-        registerCommand((args, range, force) -> editor.toggleZenMode(), "zen");
-        registerCommand((args, range, force) -> editor.toggleGoyoMode(), "goyo");
-        registerCommand((args, range, force) -> editor.toggleLimelight(), "limelight");
-        registerCommand((args, range, force) -> editor.toggleMinimap(), "minimap");
+        registerCommand((args, range, force) -> handleDocument(args), "document");
+        registerCommand((args, range, force) -> handleDocument("symbols " + args), "symbols", "sym");
+        registerCommand((args, range, force) -> handleRegister(args), "register");
+        registerCommand((args, range, force) -> handleRegister("list"), "registers", "reg");
+        registerCommand((args, range, force) -> handleYank(args), "yank");
+        registerCommand((args, range, force) -> handleYank("ring"), "yankring", "pastepicker", "yr");
+        registerCommand((args, range, force) -> handleMark(args), "mark");
+        registerCommand((args, range, force) -> handleMark("list"), "marks");
+        registerCommand((args, range, force) -> handleTheme(args), "theme");
+        registerCommand((args, range, force) -> handleTheme("list"), "themes");
+        registerCommand((args, range, force) -> handleToggle(args, "zen", editor::toggleZenMode), "zen");
+        registerCommand((args, range, force) -> handleToggle(args, "goyo", editor::toggleGoyoMode), "goyo");
+        registerCommand((args, range, force) -> handleToggle(args, "limelight", editor::toggleLimelight), "limelight");
+        registerCommand((args, range, force) -> handleToggle(args, "minimap", editor::toggleMinimap), "minimap");
         registerCommand((args, range, force) -> handleNormal(args, range), "normal", "norm");
         registerCommand((args, range, force) -> handleConfig("reload", force), "reload", "source");
         registerCommand((args, range, force) -> editor.cleanShedDataFiles(), "clean", "shedclean");
-        registerCommand((args, range, force) -> editor.clearSearchHighlights(), "noh", "nohlsearch");
+        registerCommand((args, range, force) -> handleSearch(args), "search");
+        registerCommand((args, range, force) -> handleSearch("highlights clear"), "noh", "nohlsearch");
         registerCommand((args, range, force) -> editor.showCommandPalette(), "palette", "commands");
-        registerCommand((args, range, force) -> editor.showUndoHistory(), "undolist", "undotree");
+        registerCommand((args, range, force) -> handleUndo(args), "undo");
+        registerCommand((args, range, force) -> handleUndo("history"), "undolist", "undotree");
         registerCommand((args, range, force) -> editor.writeAll(), "wa", "wall");
         registerCommand((args, range, force) -> editor.quitAll(force), "qa", "qall");
         registerCommand((args, range, force) -> editor.writeAllAndQuit(force), "wqa", "wqall", "xa", "xall");
 
         // Markdown / orgmode commands
-        registerCommand((args, range, force) -> editor.showTableOfContents(), "toc");
-        registerCommand((args, range, force) -> editor.showOutline(), "outline");
-        registerCommand((args, range, force) -> editor.handleMarkdownPreview(args), "markdown", "md");
-        registerCommand((args, range, force) -> editor.openMarkdownPreview(), "markdownpreview", "mdpreview");
-        registerCommand((args, range, force) -> editor.toggleCheckbox(), "toggle", "checkbox");
+        registerCommand((args, range, force) -> handleDocument("toc"), "toc");
+        registerCommand((args, range, force) -> handleDocument("outline"), "outline");
+        registerCommand((args, range, force) -> handleMarkdown(args), "markdown", "md");
+        registerCommand((args, range, force) -> handleMarkdown("preview"), "markdownpreview", "mdpreview");
+        registerCommand((args, range, force) -> handleMarkdown("checkbox toggle"), "toggle", "checkbox");
         registerCommand((args, range, force) -> handleTableCommand(args), "table");
         registerCommand((args, range, force) -> editor.insertLink(), "link");
         registerCommand((args, range, force) -> editor.insertImage(), "img", "image");
@@ -232,8 +239,9 @@ public class CommandHandler {
             String operation = args == null ? "" : args.trim().toLowerCase(Locale.ROOT);
             return operation.equals("open") || operation.equals("edit") ? editor.openSnippetsBuffer() : editor.listSnippets();
         }, "snippets", "snippet");
-        registerCommand((args, range, force) -> editor.toggleBracketColors(), "bracketcolor", "bracketcolors");
-        registerCommand((args, range, force) -> editor.handleTerminalCommand(args), "term", "terminal");
+        registerCommand((args, range, force) -> handleBrackets(args), "bracket");
+        registerCommand((args, range, force) -> handleBrackets("colors toggle"), "bracketcolor", "bracketcolors");
+        registerCommand((args, range, force) -> handleTerminal(args), "term", "terminal");
         registerCommand((args, range, force) -> handleConceal(args), "conceal", "conceallevel");
 
         // Plugin commands
@@ -349,6 +357,139 @@ public class CommandHandler {
             case "previous", "prev" -> editor.diagnosticsPrev();
             default -> "Usage: :diagnostic show|next|previous";
         };
+    }
+
+    private String handleCommand(String argument) {
+        return "log".equalsIgnoreCase(argument == null ? "" : argument.trim())
+            ? editor.openCommandLogBuffer()
+            : "Usage: :command log";
+    }
+
+    private String handleJob(String argument) {
+        String operation = argument == null ? "" : argument.trim();
+        return operation.isEmpty() || "list".equalsIgnoreCase(operation)
+            ? editor.showJobs()
+            : "Usage: :job list";
+    }
+
+    private String handleLargeFile(String argument) {
+        String operation = argument == null ? "" : argument.trim();
+        return operation.isEmpty() || "status".equalsIgnoreCase(operation)
+            ? editor.showLargeFileStatus()
+            : "Usage: :largefile status";
+    }
+
+    private String handleApp(String argument) {
+        String operation = argument == null ? "" : argument.trim();
+        return operation.isEmpty() || "about".equalsIgnoreCase(operation)
+            ? editor.showBuildInfo()
+            : "Usage: :app about";
+    }
+
+    private String handleHelp(String argument) {
+        String topic = argument == null ? "" : argument.trim();
+        editor.showHelp("open".equalsIgnoreCase(topic) ? "" : topic);
+        return "Showing help";
+    }
+
+    private String handleProject(String argument) {
+        CommandOperation command = CommandOperation.parse(argument);
+        if (!"replace".equals(command.name())) return "Usage: :project replace [settings]";
+        return editor.handleProjectReplace(command.argument());
+    }
+
+    private String handleFormat(String argument) {
+        String operation = argument == null ? "" : argument.trim();
+        if (operation.isEmpty() || "current".equalsIgnoreCase(operation)) return editor.formatCurrentBuffer();
+        if ("policy".equalsIgnoreCase(operation)) return editor.showFormatterPolicy();
+        return "Usage: :format current|policy";
+    }
+
+    private String handleTheme(String argument) {
+        String operation = argument == null ? "" : argument.trim();
+        return operation.isEmpty() || "list".equalsIgnoreCase(operation)
+            ? editor.showThemes()
+            : "Usage: :theme list";
+    }
+
+    private String handleToggle(String argument, String feature, Supplier<String> toggle) {
+        String operation = argument == null ? "" : argument.trim();
+        return operation.isEmpty() || "toggle".equalsIgnoreCase(operation)
+            ? toggle.get()
+            : "Usage: :" + feature + " toggle";
+    }
+
+    private String handleUndo(String argument) {
+        String operation = argument == null ? "" : argument.trim();
+        return operation.isEmpty() || "history".equalsIgnoreCase(operation)
+            ? editor.showUndoHistory()
+            : "Usage: :undo history";
+    }
+
+    private String handleSearch(String argument) {
+        return "highlights clear".equalsIgnoreCase(argument == null ? "" : argument.trim())
+            ? editor.clearSearchHighlights()
+            : "Usage: :search highlights clear";
+    }
+
+    private String handleDocument(String argument) {
+        CommandOperation command = CommandOperation.parse(argument);
+        return switch (command.name()) {
+            case "toc" -> command.argument().isEmpty() ? editor.showTableOfContents() : "Usage: :document toc";
+            case "outline" -> command.argument().isEmpty() ? editor.showOutline() : "Usage: :document outline";
+            case "symbols" -> editor.showSymbols(command.argument());
+            case "wordcount" -> command.argument().isEmpty() ? handleWordCount() : "Usage: :document wordcount";
+            default -> "Usage: :document toc|outline|symbols|wordcount";
+        };
+    }
+
+    private String handleRegister(String argument) {
+        String operation = argument == null ? "" : argument.trim();
+        return operation.isEmpty() || "list".equalsIgnoreCase(operation)
+            ? editor.showRegisters()
+            : "Usage: :register list";
+    }
+
+    private String handleYank(String argument) {
+        String operation = argument == null ? "" : argument.trim();
+        return "ring".equalsIgnoreCase(operation) ? editor.showYankRingPicker() : "Usage: :yank ring";
+    }
+
+    private String handleMark(String argument) {
+        String operation = argument == null ? "" : argument.trim();
+        return operation.isEmpty() || "list".equalsIgnoreCase(operation)
+            ? editor.showMarks()
+            : "Usage: :mark list";
+    }
+
+    private String handleMarkdown(String argument) {
+        CommandOperation command = CommandOperation.parse(argument);
+        return switch (command.name()) {
+            case "preview", "close", "refresh" -> command.argument().isEmpty()
+                ? editor.handleMarkdownPreview(command.name()) : "Usage: :markdown preview|close|refresh";
+            case "checkbox" -> "toggle".equalsIgnoreCase(command.argument())
+                ? editor.toggleCheckbox() : "Usage: :markdown checkbox toggle";
+            case "table" -> "insert".equalsIgnoreCase(command.argument())
+                ? handleTableCommand("") : "Usage: :markdown table insert";
+            case "link" -> "insert".equalsIgnoreCase(command.argument())
+                ? editor.insertLink() : "Usage: :markdown link insert";
+            case "image" -> "insert".equalsIgnoreCase(command.argument())
+                ? editor.insertImage() : "Usage: :markdown image insert";
+            default -> "Usage: :markdown preview|close|refresh|checkbox toggle|table insert|link insert|image insert";
+        };
+    }
+
+    private String handleBrackets(String argument) {
+        return "colors toggle".equalsIgnoreCase(argument == null ? "" : argument.trim())
+            ? editor.toggleBracketColors()
+            : "Usage: :bracket colors toggle";
+    }
+
+    private String handleTerminal(String argument) {
+        String operation = argument == null ? "" : argument.trim();
+        return operation.isEmpty() || "open".equalsIgnoreCase(operation)
+            ? editor.handleTerminalCommand("")
+            : editor.handleTerminalCommand(argument);
     }
 
     private String resizeWindow(String percentageArgument, int direction) {

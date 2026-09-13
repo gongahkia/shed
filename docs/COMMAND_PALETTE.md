@@ -40,8 +40,8 @@ Each action is unique by visible label and normalized command. The application r
 | Focus Split Above | `:window up` | Focus the split above. |
 | Focus Split Below | `:window down` | Focus the split below. |
 | Equalize Splits | `:window equalize` | Give each editor split an equal share of space. |
-| Grow Current Split | `:window grow [percent]` | Increase the active split by 5%, or by the specified percentage. |
-| Shrink Current Split | `:window shrink [percent]` | Decrease the active split by 5%, or by the specified percentage. |
+| Grow Current Split | `:window grow` | Increase the active split by 5%, or by the specified percentage. |
+| Shrink Current Split | `:window shrink` | Decrease the active split by 5%, or by the specified percentage. |
 | Zoom In | `:zoom in default` | Increase the interface scale by the default 10% increment. |
 | Zoom Out | `:zoom out default` | Decrease the interface scale by the default 10% increment. |
 
@@ -69,38 +69,38 @@ Each action is unique by visible label and normalized command. The application r
 | Configuration Status | `:config status` | Show configuration loading and recovery details. |
 | Apply Suggested Config Repairs | `:config heal` | Persist the reviewed deterministic configuration repairs. |
 | Reload Configuration | `:config reload` | Reload configuration from disk. |
-| Keymap Inspector | `:keymap` | Inspect and edit validated keymap overlays. |
-| Themes | `:themes` | Show built-in themes. |
-| Toggle Zen Mode | `:zen` | Toggle the distraction-free Zen layout. |
-| Toggle Goyo Mode | `:goyo` | Toggle the Goyo layout. |
-| Toggle Limelight | `:limelight` | Toggle paragraph focus dimming. |
-| Toggle Minimap | `:minimap` | Toggle the minimap panel. |
-| Undo History | `:undolist` | Show the undo history summary. |
-| Clear Search Highlights | `:noh` | Clear active search highlights. |
-| Command Log | `:log` | Open the command log buffer. |
-| Show Help | `:help` | Open the built-in help buffer. |
-| About Shed | `:version` | Show Shed version and local runtime details. |
+| Keymap Inspector | `:keymap inspector` | Inspect and edit validated keymap overlays. |
+| Themes | `:theme list` | Show built-in themes. |
+| Toggle Zen Mode | `:zen toggle` | Toggle the distraction-free Zen layout. |
+| Toggle Goyo Mode | `:goyo toggle` | Toggle the Goyo layout. |
+| Toggle Limelight | `:limelight toggle` | Toggle paragraph focus dimming. |
+| Toggle Minimap | `:minimap toggle` | Toggle the minimap panel. |
+| Undo History | `:undo history` | Show the undo history summary. |
+| Clear Search Highlights | `:search highlights clear` | Clear active search highlights. |
+| Command Log | `:command log` | Open the command log buffer. |
+| Show Help | `:help open` | Open the built-in help buffer. |
+| About Shed | `:app about` | Show Shed version and local runtime details. |
 
 ## Editing and local information
 
 | Action | Command | Purpose |
 | :--- | :--- | :--- |
-| Format Current Buffer | `:format` | Format the active buffer with its selected formatter. |
-| Formatter Policy | `:formatter` | Configure the current language's formatter and format-on-save policy. |
-| Markdown Preview | `:markdownpreview` | Open the live native Markdown preview beside the source buffer. |
-| Table of Contents | `:toc` | Open the current Markdown document's table of contents. |
-| Document Outline | `:outline` | Open the current document outline. |
-| Toggle Markdown Checkbox | `:toggle` | Toggle the checkbox at the caret. |
-| Insert Markdown Table | `:table` | Insert the default Markdown table template. |
-| Insert Link | `:link` | Insert a link at the caret. |
-| Insert Image | `:image` | Choose and insert a local image reference. |
-| Edit Snippets | `:snippets edit` | Open the user snippets buffer for editing. |
-| Toggle Bracket Colors | `:bracketcolor` | Toggle matching bracket colorization. |
-| Integrated Terminal | `:terminal` | Open the integrated terminal split. |
-| Word Count | `:wordcount` | Show line, word, and character counts. |
-| Registers | `:registers` | Show register contents. |
-| Yank Ring | `:yankring` | Open the copied and deleted text history. |
-| Marks | `:marks` | Show marks for the active buffer. |
+| Format Current Buffer | `:format current` | Format the active buffer with its selected formatter. |
+| Formatter Policy | `:format policy` | Configure the current language's formatter and format-on-save policy. |
+| Markdown Preview | `:markdown preview` | Open the live native Markdown preview beside the source buffer. |
+| Table of Contents | `:document toc` | Open the current Markdown document's table of contents. |
+| Document Outline | `:document outline` | Open the current document outline. |
+| Toggle Markdown Checkbox | `:markdown checkbox toggle` | Toggle the checkbox at the caret. |
+| Insert Markdown Table | `:markdown table insert` | Insert the default Markdown table template. |
+| Insert Link | `:markdown link insert` | Insert a link at the caret. |
+| Insert Image | `:markdown image insert` | Choose and insert a local image reference. |
+| Edit Snippets | `:snippet edit` | Open the user snippets buffer for editing. |
+| Toggle Bracket Colors | `:bracket colors toggle` | Toggle matching bracket colorization. |
+| Integrated Terminal | `:terminal open` | Open the integrated terminal split. |
+| Word Count | `:document wordcount` | Show line, word, and character counts. |
+| Registers | `:register list` | Show register contents. |
+| Yank Ring | `:yank ring` | Open the copied and deleted text history. |
+| Marks | `:mark list` | Show marks for the active buffer. |
 
 ## Language services
 
@@ -108,35 +108,35 @@ Each action is unique by visible label and normalized command. The application r
 | :--- | :--- | :--- |
 | Language Services | `:lsp manage` | Open the local Language Services panel. |
 | Show Completions | `:lsp completion` | Request completion candidates at the caret. |
-| Go to Definition | `:definition` | Go to the definition at the caret. |
-| Go to Type Definition | `:typedefinition` | Go to the type definition at the caret. |
-| Go to Implementation | `:implementation` | Go to the implementation at the caret. |
+| Go to Definition | `:lsp definition` | Go to the definition at the caret. |
+| Go to Type Definition | `:lsp type-definition` | Go to the type definition at the caret. |
+| Go to Implementation | `:lsp implementation` | Go to the implementation at the caret. |
 | Highlight Symbol Occurrences | `:lsp highlights` | Highlight server-reported occurrences for the symbol at the caret. |
-| Show Hover Information | `:hover` | Show language-service hover information at the caret. |
-| Find References | `:references` | Find references for the symbol at the caret. |
+| Show Hover Information | `:lsp hover` | Show language-service hover information at the caret. |
+| Find References | `:lsp references` | Find references for the symbol at the caret. |
 | Code Actions | `:lsp codeaction` | Show diagnostic-anchored code actions at the caret. |
-| Peek Definition | `:peek definition` | Open a temporary read-only definition preview. |
-| Peek Type Definition | `:peek type` | Open a temporary read-only type-definition preview. |
+| Peek Definition | `:lsp peek definition` | Open a temporary read-only definition preview. |
+| Peek Type Definition | `:lsp peek type` | Open a temporary read-only type-definition preview. |
 | Incoming Call Hierarchy | `:lsp calls incoming` | Open the incoming-call hierarchy for the symbol at the caret. |
 | Outgoing Call Hierarchy | `:lsp calls outgoing` | Open the outgoing-call hierarchy for the symbol at the caret. |
 | Type Supertypes | `:lsp typehierarchy supertypes` | Open the supertype hierarchy for the symbol at the caret. |
 | Type Subtypes | `:lsp typehierarchy subtypes` | Open the subtype hierarchy for the symbol at the caret. |
-| Document Symbols | `:symbols` | Open the document-symbol picker, with a local fallback. |
+| Document Symbols | `:document symbols` | Open the document-symbol picker, with a local fallback. |
 
 ## Workspace and tools
 
 | Action | Command | Purpose |
 | :--- | :--- | :--- |
-| Workspace Folders | `:workspace ui` | Open the workspace-folder manager. |
+| Workspace Folders | `:workspace folders` | Open the workspace-folder manager. |
 | Workspace Index Status | `:workspace index status` | Show the workspace search index status. |
-| Project Replace | `:projectreplace` | Open the reviewed project-wide replacement panel. |
-| Tasks | `:task` | Open the workspace Tasks panel. |
-| Tests | `:test` | Open the Test Explorer. |
-| Import Coverage Report | `:coverage ui` | Open Tests, then use Import Coverage to choose a local coverage report. |
-| Debug | `:debug` | Open the Debug tool panel. |
+| Project Replace | `:project replace` | Open the reviewed project-wide replacement panel. |
+| Tasks | `:task open` | Open the workspace Tasks panel. |
+| Tests | `:test open` | Open the Test Explorer. |
+| Import Coverage Report | `:coverage open` | Open Tests, then use Import Coverage to choose a local coverage report. |
+| Debug | `:debug open` | Open the Debug tool panel. |
 | Toolchain Status | `:toolchain status` | Show selected local toolchains and advisory candidates. |
-| Large File Status | `:largefile` | Show active large-file limits and status. |
-| Async Jobs | `:jobs` | Show asynchronous jobs. |
+| Large File Status | `:largefile status` | Show active large-file limits and status. |
+| Async Jobs | `:job list` | Show asynchronous jobs. |
 | Git Changes | `:git workbench` | Open the docked Git Changes workbench. |
 | Git Status | `:git status` | Show the active repository's Git status. |
 | Git Branches | `:git branches` | Show the active repository's branches. |
@@ -149,8 +149,8 @@ Each action is unique by visible label and normalized command. The application r
 | Dev Container | `:container status` | Inspect the active workspace's Dev Container configuration and session routing state. |
 | Compose Status | `:compose status` | Show workspace Compose configuration status. |
 | Database Status | `:database status` | Show workspace database configuration status. |
-| Workspace Integrations | `:integration` | Show configured workspace integrations. |
-| Plugin Manager | `:plugin` | Show installed plugins. |
-| Extension Manager | `:extension` | Show installed extensions and their contributions. |
-| Custom Editors | `:customeditor` | Show available custom editors. |
-| Update Status | `:update` | Show the configured update channel's status. |
+| Workspace Integrations | `:integration list` | Show configured workspace integrations. |
+| Plugin Manager | `:plugin list` | Show installed plugins. |
+| Extension Manager | `:extension list` | Show installed extensions and their contributions. |
+| Custom Editors | `:customeditor list` | Show available custom editors. |
+| Update Status | `:update status` | Show the configured update channel's status. |

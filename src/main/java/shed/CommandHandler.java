@@ -296,28 +296,74 @@ public class CommandHandler {
     }
 
     private String handleWindow(String argument) {
-        String operation = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
+        CommandOperation command = CommandOperation.parse(argument);
+        String operation = command.name();
         return switch (operation) {
             case "next", "cycle" -> editor.cycleWindowFocus();
+            case "previous", "prev" -> editor.cycleWindowFocus(-1);
             case "left" -> editor.focusWindowDirection(-1, 0);
             case "right" -> editor.focusWindowDirection(1, 0);
             case "up", "above" -> editor.focusWindowDirection(0, -1);
             case "down", "below" -> editor.focusWindowDirection(0, 1);
             case "equalize", "balance" -> editor.equalizeWindows();
-            case "grow", "+" -> editor.resizeActiveWindow(0.05);
-            case "shrink", "-" -> editor.resizeActiveWindow(-0.05);
-            default -> "Usage: :window next|left|right|up|down|equalize|grow|shrink";
+            case "grow", "+" -> resizeWindow(command.argument(), 1);
+            case "shrink", "-" -> resizeWindow(command.argument(), -1);
+            default -> "Usage: :window next|previous|left|right|up|down|equalize|grow [percent]|shrink [percent]";
         };
     }
 
     private String handleZoom(String argument) {
-        String operation = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
+        CommandOperation command = CommandOperation.parse(argument);
+        String operation = command.name();
         return switch (operation) {
-            case "in", "+" -> editor.adjustUiZoom(1);
-            case "out", "-" -> editor.adjustUiZoom(-1);
+            case "in", "+" -> adjustUiZoom(command.argument(), 1);
+            case "out", "-" -> adjustUiZoom(command.argument(), -1);
             case "reset", "default", "0" -> editor.resetUiZoom();
-            default -> "Usage: :zoom in|out|reset";
+            default -> "Usage: :zoom in [percent]|out [percent]|reset";
         };
+    }
+
+    private String resizeWindow(String percentageArgument, int direction) {
+        Double percentage = parsePercentage(percentageArgument, 5.0);
+        if (percentage == null) {
+            return "Usage: :window " + (direction < 0 ? "shrink" : "grow") + " [positive percent]";
+        }
+        return editor.resizeActiveWindow(direction * percentage / 100.0);
+    }
+
+    private String adjustUiZoom(String percentageArgument, int direction) {
+        Double percentage = parsePercentage(percentageArgument, 10.0);
+        if (percentage == null) {
+            return "Usage: :zoom " + (direction < 0 ? "out" : "in") + " [positive percent]";
+        }
+        return editor.adjustUiZoom(direction, percentage);
+    }
+
+    private static Double parsePercentage(String value, double defaultValue) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isEmpty()) {
+            return defaultValue;
+        }
+        if (normalized.endsWith("%")) {
+            normalized = normalized.substring(0, normalized.length() - 1).trim();
+        }
+        try {
+            double percentage = Double.parseDouble(normalized);
+            return Double.isFinite(percentage) && percentage > 0.0 ? percentage : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private record CommandOperation(String name, String argument) {
+        static CommandOperation parse(String value) {
+            String normalized = value == null ? "" : value.trim();
+            int split = normalized.indexOf(' ');
+            if (split < 0) {
+                return new CommandOperation(normalized.toLowerCase(Locale.ROOT), "");
+            }
+            return new CommandOperation(normalized.substring(0, split).toLowerCase(Locale.ROOT), normalized.substring(split + 1).trim());
+        }
     }
 
     private String handleSet(String option, boolean persist) {

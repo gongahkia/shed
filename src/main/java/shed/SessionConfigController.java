@@ -534,13 +534,18 @@ final class SessionConfigController {
         return persistUiZoom(zoom);
     }
 
+    String adjustUiZoom(int direction, double percentage) {
+        double zoom = UiZoom.adjust(editor.configManager.getUiZoom(), direction, percentage / 100.0);
+        return persistUiZoom(zoom);
+    }
+
     String resetUiZoom() {
         return persistUiZoom(UiZoom.DEFAULT);
     }
 
     private String persistUiZoom(double zoom) {
         try {
-            editor.configManager.setAndPersist("ui.zoom", String.format(java.util.Locale.ROOT, "%.1f", zoom));
+            editor.configManager.setAndPersist("ui.zoom", java.math.BigDecimal.valueOf(zoom).stripTrailingZeros().toPlainString());
         } catch (IOException error) {
             return "Unable to change UI zoom: " + error.getMessage();
         }

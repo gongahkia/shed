@@ -2881,6 +2881,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return paneBufferController.cycleWindowFocus();
     }
 
+    public String cycleWindowFocus(int direction) {
+        return paneBufferController.cycleWindowFocus(direction);
+    }
+
     public String resizeActiveWindow(double delta) {
         return paneBufferController.resizeActiveWindow(delta);
     }
@@ -3093,6 +3097,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     String adjustUiZoom(int direction) {
         return sessionConfigController.adjustUiZoom(direction);
+    }
+
+    String adjustUiZoom(int direction, double percentage) {
+        return sessionConfigController.adjustUiZoom(direction, percentage);
     }
 
     String resetUiZoom() {

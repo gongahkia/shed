@@ -66,7 +66,7 @@ final class MarkdownPreviewRenderer {
         Color safeBackground = background == null ? Color.WHITE : background;
         Color safeForeground = foreground == null ? Color.BLACK : foreground;
         String prepared = prepare(markdown == null ? "" : markdown, assets, safeForeground);
-        String body = restrictImageSources(RAW_HTML_POLICY.sanitize(HTML.render(PARSER.parse(prepared))), sourceFile);
+        String body = restrictImageSources(RAW_HTML_POLICY.sanitize(HTML.render(PARSER.parse(prepared))), sourceFile, assets);
         return "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + escapeHtml(safeTitle) + "</title><style>"
             + "body{margin:0;padding:22px 26px;font-family:'" + escapeCss(safeFont.getFamily()) + "';font-size:"
             + Math.max(8, safeFont.getSize()) + "pt;line-height:1.5;background:" + colorHex(safeBackground) + ";color:"
@@ -86,7 +86,7 @@ final class MarkdownPreviewRenderer {
         Font safeFont = font == null ? new Font(Font.DIALOG, Font.PLAIN, 13) : font;
         Color safeBackground = background == null ? Color.WHITE : background;
         Color safeForeground = foreground == null ? Color.BLACK : foreground;
-        String body = restrictImageSources(RAW_HTML_POLICY.sanitize(HTML.render(PARSER.parse(normalize(markdown == null ? "" : markdown)))), sourceFile);
+        String body = restrictImageSources(RAW_HTML_POLICY.sanitize(HTML.render(PARSER.parse(normalize(markdown == null ? "" : markdown)))), sourceFile, null);
         return "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + escapeHtml(safeTitle) + "</title><style>"
             + "body{margin:0;padding:12px;font-family:'" + escapeCss(safeFont.getFamily()) + "';font-size:"
             + Math.max(8, safeFont.getSize()) + "pt;line-height:1.45;background:" + colorHex(safeBackground) + ";color:"
@@ -257,7 +257,7 @@ final class MarkdownPreviewRenderer {
         }
     }
 
-    private static String restrictImageSources(String rendered, File sourceFile) {
+    private static String restrictImageSources(String rendered, File sourceFile, MarkdownPreviewAssets assets) {
         Matcher images = IMAGE_TAG.matcher(rendered);
         StringBuffer output = new StringBuffer();
         while (images.find()) {
@@ -267,9 +267,13 @@ final class MarkdownPreviewRenderer {
             String width = imageDimension(attribute(attributes, "width"));
             String height = imageDimension(attribute(attributes, "height"));
             String local = resolveLocalImage(source, sourceFile);
+            MarkdownPreviewAssets.RemoteImageResolution remote = local == null || assets == null ? null : assets.resolveRemoteImage(source);
+            if (local == null && remote != null && remote.isAvailable()) local = remote.uri();
+            String label = alt == null ? "image" : alt;
             String replacement = local == null
-                ? "<span class=\"blocked-image\">[image unavailable: " + escapeHtml(alt == null ? "image" : alt) + "]</span>"
-                : "<img src=\"" + escapeAttribute(local) + "\" alt=\"" + escapeAttribute(alt == null ? "" : alt) + "\""
+                ? "<span class=\"blocked-image\">[" + (remote != null && remote.isPending() ? "loading image: " : "image unavailable: ")
+                    + escapeHtml(label) + "]</span>"
+                : "<img src=\"" + escapeAttribute(local) + "\" alt=\"" + escapeAttribute(label) + "\""
                     + (width == null ? "" : " width=\"" + width + "\"") + (height == null ? "" : " height=\"" + height + "\"") + ">";
             images.appendReplacement(output, Matcher.quoteReplacement(replacement));
         }

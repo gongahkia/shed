@@ -1930,7 +1930,7 @@ final class SessionConfigController {
     }
 
 
-    void appendCommandLog(String entry) {
+    synchronized void appendCommandLog(String entry) {
         if (entry == null || entry.isBlank()) {
             return;
         }

@@ -132,8 +132,6 @@ Each action is unique by visible label and normalized command. The application r
 | Import Coverage Report | `:coverage open` | Open Tests, then use Import Coverage to choose a local coverage report. |
 | Debug | `:debug open` | Open the Debug tool panel. |
 | Toolchain Status | `:toolchain status` | Show selected local toolchains and advisory candidates. |
-| Large File Status | `:largefile status` | Show active large-file limits and status. |
-| Async Jobs | `:job list` | Show asynchronous jobs. |
 | Git Changes | `:git workbench` | Open the docked Git Changes workbench. |
 | Git Status | `:git status` | Show the active repository's Git status. |
 | Git Branches | `:git branches` | Show the active repository's branches. |

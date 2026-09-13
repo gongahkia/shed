@@ -4,4 +4,4 @@
 
 The report contains no source content and no network measurements. Run the same workspace and settings again to compare current local indexing inputs and output; duration and heap values are observed resource costs, not portability guarantees.
 
-In Shed, use `:perf benchmark` (or `:workspace index benchmark`) to start the same explicit cancellable local measurement. `:perf` shows whether a file-backed buffer or tree root is currently available and lists the benchmark limits; use `:jobs` and `:jobcancel <id>` to inspect or cancel it.
+In Shed, use `:perf benchmark` (or `:workspace index benchmark`) to start the same local measurement. `:perf` shows whether a file-backed buffer or tree root is currently available and lists the benchmark limits. A failed background measurement is recorded in the local command log.

@@ -152,6 +152,12 @@ public class CommandParsingTest {
         assertTrue(handler.getCommandNames().contains("discard"));
         assertFalse(handler.getCommandNames().contains("ls"));
         assertFalse(handler.getCommandNames().contains("peek"));
+        assertFalse(handler.getCommandNames().contains("job"));
+        assertFalse(handler.getCommandNames().contains("jobs"));
+        assertFalse(handler.getCommandNames().contains("jobcancel"));
+        assertFalse(handler.getCommandNames().contains("jobkill"));
+        assertFalse(handler.getCommandNames().contains("largefile"));
+        assertFalse(handler.getCommandNames().contains("lf"));
         List<String> actions = PaletteController.surfaceActionNames();
         assertTrue(actions.containsAll(List.of(
             "Language Services", "Open File", "Open Folder", "Toggle File Tree",
@@ -172,6 +178,8 @@ public class CommandParsingTest {
         assertFalse(actions.contains("Show All Open Buffers"));
         assertFalse(actions.contains("Peek Definition"));
         assertFalse(actions.contains("Peek Type Definition"));
+        assertFalse(actions.contains("Large File Status"));
+        assertFalse(actions.contains("Async Jobs"));
         assertEquals("workspace folders", PaletteController.surfaceActionCommand("Workspace Folders"));
         assertEquals("lsp codeaction", PaletteController.surfaceActionCommand("Code Actions"));
         assertEquals("snippet edit", PaletteController.surfaceActionCommand("Edit Snippets"));

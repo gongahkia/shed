@@ -57,9 +57,7 @@ public class HelpService {
                    "  :session ...   Session save/load/list\n" +
                    "  :workspace ... Workspace profiles or index status/controls\n" +
                    "  :clean         Remove Shed data files\n" +
-                   "  :jobs          Show async job list\n" +
                    "  :version       Show local version and support metadata\n" +
-                   "  :jobcancel id  Cancel async job\n" +
                    "  :drop cmd      Run async command with current file path\n" +
                    "  :task ...      Run/save project tasks with quickfix integration\n" +
                    "  :customeditor  List/reopen extension editors and the built-in binary Hex Editor\n" +

@@ -156,6 +156,29 @@ public class AsyncJobServiceTest {
     }
 
     @Test
+    void reportsOnlyFailedJobsToTheFailureListener() throws Exception {
+        AsyncJobService service = new AsyncJobService(20);
+        List<AsyncJobService.JobSnapshot> failures = java.util.Collections.synchronizedList(new ArrayList<>());
+        CountDownLatch failureLogged = new CountDownLatch(1);
+        CountDownLatch completed = new CountDownLatch(2);
+        service.setFailedJobListener(snapshot -> {
+            failures.add(snapshot);
+            failureLogged.countDown();
+        });
+
+        service.submit("succeeds", token -> "ok", (snapshot, result, error) -> completed.countDown());
+        service.submit("fails", token -> { throw new IllegalStateException("boom"); },
+            (snapshot, result, error) -> completed.countDown());
+
+        assertTrue(completed.await(2, TimeUnit.SECONDS));
+        assertTrue(failureLogged.await(2, TimeUnit.SECONDS));
+        assertEquals(1, failures.size());
+        assertEquals(AsyncJobService.Status.FAILED, failures.getFirst().getStatus());
+        assertEquals("fails", failures.getFirst().getDescription());
+        service.shutdownNow();
+    }
+
+    @Test
     void cancelReturnsFalseForUnknownOrCompletedJobs() throws Exception {
         AsyncJobService service = new AsyncJobService(20);
 

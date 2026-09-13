@@ -11,6 +11,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import javax.swing.SwingUtilities;
 
 public class AsyncJobService {
@@ -152,6 +153,7 @@ public class AsyncJobService {
     private final Map<Integer, JobRecord> jobs;
     private final int maxHistoryEntries;
     private final ApplicationErrorReporter errorReporter;
+    private volatile Consumer<JobSnapshot> failedJobListener;
 
     public AsyncJobService() {
         this(200, null);
@@ -176,10 +178,15 @@ public class AsyncJobService {
         this.jobs = new ConcurrentHashMap<>();
         this.maxHistoryEntries = Math.max(10, maxHistoryEntries);
         this.errorReporter = errorReporter;
+        this.failedJobListener = snapshot -> { };
     }
 
     static int workerCount() {
         return Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors()));
+    }
+
+    void setFailedJobListener(Consumer<JobSnapshot> listener) {
+        failedJobListener = listener == null ? snapshot -> { } : listener;
     }
 
     public <T> int submit(String description, JobTask<T> task, JobCompletion<T> completion) {
@@ -238,8 +245,9 @@ public class AsyncJobService {
             } finally {
                 record.finishedAtMillis = System.currentTimeMillis();
                 trimHistoryIfNeeded();
+                JobSnapshot snapshot = record.snapshot();
+                reportFailedJob(snapshot);
                 if (completion != null && completionDelivered.compareAndSet(false, true)) {
-                    JobSnapshot snapshot = record.snapshot();
                     T completedResult = result;
                     Exception completedError = error;
                     SwingUtilities.invokeLater(() -> completeOnEventDispatchThread(
@@ -257,6 +265,7 @@ public class AsyncJobService {
             record.errorMessage = "executor is shut down";
             record.finishedAtMillis = System.currentTimeMillis();
             trimHistoryIfNeeded();
+            reportFailedJob(record.snapshot());
             if (completion != null && completionDelivered.compareAndSet(false, true)) {
                 JobSnapshot snapshot = record.snapshot();
                 SwingUtilities.invokeLater(() -> completeOnEventDispatchThread(completion, snapshot, null,
@@ -335,6 +344,17 @@ public class AsyncJobService {
     private void reportUnexpected(Throwable failure, String context) {
         if (errorReporter != null) {
             errorReporter.report(failure, "async-jobs", context, "docs/THREADING.md#background-work");
+        }
+    }
+
+    private void reportFailedJob(JobSnapshot snapshot) {
+        if (snapshot == null || snapshot.getStatus() != Status.FAILED) {
+            return;
+        }
+        try {
+            failedJobListener.accept(snapshot);
+        } catch (RuntimeException error) {
+            reportUnexpected(error, "recording failed async job " + snapshot.getDescription());
         }
     }
 

@@ -311,6 +311,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commandHistoryIndex = -1;
         commandHistoryPrefix = "";
         commandLogTimeFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        asyncJobService.setFailedJobListener(this::recordFailedAsyncJob);
         lineNumberMode = configManager.getLineNumberMode();
         gitBranch = resolveGitBranch();
         substitutePreviewTags = new ArrayList<>();
@@ -1599,10 +1600,6 @@ public class Texteditor extends JFrame implements KeyListener {
         return jobQuickfixController.filterRangeWithCommand(startLine, endLine, command);
     }
 
-    public String showJobs() {
-        return jobQuickfixController.showJobs();
-    }
-
     public String showPerfReport() {
         return showPerfReport("");
     }
@@ -1626,11 +1623,6 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Usage: :perf [status|diagnostics|benchmark]";
     }
 
-    public String showLargeFileStatus() {
-        showScratchBuffer("[large file]", LargeFileMode.report(getCurrentBuffer()));
-        return "Showing large-file status";
-    }
-
     public String showBuildInfo() {
         showScratchBuffer("[build]", BuildInfo.current().render());
         return "Showing build information";
@@ -1641,7 +1633,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing config status";
     }
 
-    public String cancelJob(String jobIdArgument) {
+    String cancelJob(String jobIdArgument) {
         return jobQuickfixController.cancelJob(jobIdArgument);
     }
 
@@ -3403,6 +3395,21 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void appendCommandLog(String entry) {
         sessionConfigController.appendCommandLog(entry);
+    }
+
+    private void recordFailedAsyncJob(AsyncJobService.JobSnapshot snapshot) {
+        if (snapshot == null || snapshot.getStatus() != AsyncJobService.Status.FAILED) {
+            return;
+        }
+        String description = conciseLogText(snapshot.getDescription(), 160);
+        String detail = conciseLogText(snapshot.getErrorMessage(), 240);
+        appendCommandLog("[async failed #" + snapshot.getId() + "] " + description
+            + (detail.isBlank() ? "" : " — " + detail));
+    }
+
+    private static String conciseLogText(String value, int maximumLength) {
+        String normalized = value == null ? "" : value.replaceAll("[\\r\\n\\t]+", " ").trim();
+        return normalized.length() <= maximumLength ? normalized : normalized.substring(0, maximumLength) + "…";
     }
 
     void ensureStoreDirectory(File store) throws IOException {

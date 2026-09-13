@@ -72,8 +72,6 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:!<cmd>` | Run shell command as async job |
 | `:N,M!<cmd>` | Filter selected line range through shell command as async job |
 | `:drop <cmd>` | Run async command against current file path (`%` expands to quoted file path) |
-| `:job list`, `:jobs` | Show async jobs buffer |
-| `:jobcancel <id>`, `:jobkill <id>` | Cancel running async job |
 | `:toolchain status`, `:toolchain detect` | Show explicit local toolchain selections, supported runtime ids, and advisory candidates; does not select or run a candidate |
 | `:toolchain select <runtime> <absolute-executable>` | Persist one reviewed local executable for the active workspace |
 | `:toolchain clear <runtime>` | Remove one active-workspace toolchain selection |
@@ -180,7 +178,6 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:files` | Project file finder |
 | `:folder`, `:folders` | Folder chooser + file picker |
 | `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search; opens quickfix on completion |
-| `:largefile status`, `:largefile`, `:lf` | Show active [large-file mode](LARGE_FILE_SUPPORT.md), limits, and remediation |
 | `:project replace settings`, `:projectreplace settings` | Show persisted project-replace safety controls |
 | `:project replace`, `:projectreplace`, `:projectreplace ui` | Open the docked Project Replace review panel |
 | `:projectreplace text <subcommand>` | Run the legacy text workflow |

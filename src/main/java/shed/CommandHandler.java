@@ -133,13 +133,9 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleCommand("log"), "log", "commandlog");
         registerCommand((args, range, force) -> editor.handleSessionCommand(args), "session", "sessions");
         registerCommand((args, range, force) -> editor.handleWorkspaceProfileCommand(args), "workspace", "ws");
-        registerCommand((args, range, force) -> handleJob(args), "job");
-        registerCommand((args, range, force) -> handleJob("list"), "jobs");
         registerCommand((args, range, force) -> editor.showPerfReport(args), "perf");
-        registerCommand((args, range, force) -> handleLargeFile(args), "largefile", "lf");
         registerCommand((args, range, force) -> handleApp(args), "app");
         registerCommand((args, range, force) -> handleApp("about"), "version", "about", "buildinfo");
-        registerCommand((args, range, force) -> editor.cancelJob(args), "jobcancel", "jobkill");
         registerCommand((args, range, force) -> editor.runDropCommand(args), "drop");
         registerCommand((args, range, force) -> editor.handleTaskCommand(args), "task");
         registerCommand((args, range, force) -> editor.handleTestCommand(args), "test");
@@ -362,20 +358,6 @@ public class CommandHandler {
         return "log".equalsIgnoreCase(argument == null ? "" : argument.trim())
             ? editor.openCommandLogBuffer()
             : "Usage: :command log";
-    }
-
-    private String handleJob(String argument) {
-        String operation = argument == null ? "" : argument.trim();
-        return operation.isEmpty() || "list".equalsIgnoreCase(operation)
-            ? editor.showJobs()
-            : "Usage: :job list";
-    }
-
-    private String handleLargeFile(String argument) {
-        String operation = argument == null ? "" : argument.trim();
-        return operation.isEmpty() || "status".equalsIgnoreCase(operation)
-            ? editor.showLargeFileStatus()
-            : "Usage: :largefile status";
     }
 
     private String handleApp(String argument) {

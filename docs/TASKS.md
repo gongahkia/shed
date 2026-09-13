@@ -81,9 +81,9 @@ Shed rejects extension/provider task types, `dependsOn` object forms and default
 | `:task container <name> [input=value ...]` | Explicitly run a task through the project Dev Container after it has been started |
 | `:task container-dry-run <name> [input=value ...]` | Resolve and show the Dev Container task request without starting it |
 | `:task cmake [dry-run] <configure\|build\|test\|package\|workflow> <preset>` | Explicitly run one CMake configure, build, test, package, or workflow preset as direct argv |
-| `:task cancel <job-id>` | Cancel a running task; `:jobcancel <job-id>` also works |
+| `:task cancel <job-id>` | Cancel a running task |
 
-`:jobs` reports the asynchronous task state. Cancellation destroys the running process, produces a cancelled task result, and does not parse or present partial output as a completed run.
+The Tasks panel reports asynchronous task state. Cancellation destroys the running process, produces a cancelled task result, and does not parse or present partial output as a completed run.
 
 ## Conventional test and build fallbacks
 

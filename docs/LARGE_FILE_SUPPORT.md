@@ -2,7 +2,7 @@
 
 ## Current status
 
-Large-file mode is a local, read-only UTF-8 viewport path. Files at or below Shed's editable boundary use the versioned text model described in [editing performance](EDITING_PERFORMANCE.md). Use `:largefile` or `:lf` to show the active buffer's state, limits, and remediation.
+Large-file mode is a local, read-only UTF-8 viewport path. Files at or below Shed's editable boundary use the versioned text model described in [editing performance](EDITING_PERFORMANCE.md). Shed automatically reports when a buffer enters this mode or cannot be opened through it.
 
 ## Activation
 

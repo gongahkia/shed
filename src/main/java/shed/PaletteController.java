@@ -119,8 +119,6 @@ final class PaletteController {
         action("Import Coverage Report", "coverage open", "Open Tests, then use Import Coverage to choose a local coverage report."),
         action("Debug", "debug open", "Open the Debug tool panel."),
         action("Toolchain Status", "toolchain status", "Show selected local toolchains and advisory candidates."),
-        action("Large File Status", "largefile status", "Show active large-file limits and status."),
-        action("Async Jobs", "job list", "Show asynchronous jobs."),
         action("Git Changes", "git workbench", "Open the docked Git Changes workbench."),
         action("Git Status", "git status", "Show the active repository's Git status."),
         action("Git Branches", "git branches", "Show the active repository's branches."),
@@ -624,11 +622,6 @@ final class PaletteController {
             case "workspace":
             case "ws":
                 return "Save/load/list profiles; inspect or control persistent workspace indexing.";
-            case "jobs":
-                return "Show async job list.";
-            case "jobcancel":
-            case "jobkill":
-                return "Cancel async job by id.";
             case "drop":
                 return "Run async command against current file path.";
             case "task":

@@ -55,7 +55,7 @@ final class MarkdownController {
             editor.configManager::getNormalColor, editor.configManager::getEditorForeground,
             href -> editor.showMessage(openPreviewLink(buffer, href)),
             () -> editor.activateEditorPane(previewPane), editor.configManager::getMarkdownPreviewScrollSync,
-            sourcePane, editor);
+            editor.configManager::getMarkdownPreviewRemoteImages, sourcePane, editor);
         previewPane.setMarkdownPreviewComponent(preview);
         previews.put(buffer, new PreviewBinding(sourcePane, previewPane, preview));
         editor.renderWindowLayout();

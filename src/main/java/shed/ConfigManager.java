@@ -98,6 +98,7 @@ public class ConfigManager {
     private static final int DEFAULT_LIMELIGHT_PARAGRAPH_SPAN = 0;
     private static final boolean DEFAULT_MULTI_SELECTION_ENABLED = false;
     private static final boolean DEFAULT_MARKDOWN_PREVIEW_SCROLL_SYNC = true;
+    private static final boolean DEFAULT_MARKDOWN_PREVIEW_REMOTE_IMAGES = true;
     private static final boolean DEFAULT_LSP_SEMANTIC_TOKENS_INLINE = true;
     private static final boolean DEFAULT_LSP_INLAY_HINTS_INLINE = true;
     private static final boolean DEFAULT_LSP_COMPLETION_AUTO_SHOW = true;
@@ -292,6 +293,7 @@ public class ConfigManager {
         defineDefault("multi.selection.enabled", DEFAULT_MULTI_SELECTION_ENABLED);
         defineDefault("multi.selection.max.cursors", MultiSelectionPolicy.DEFAULT_MAX_CURSORS);
         defineDefault("markdown.preview.scroll.sync", DEFAULT_MARKDOWN_PREVIEW_SCROLL_SYNC);
+        defineDefault("markdown.preview.remote.images", DEFAULT_MARKDOWN_PREVIEW_REMOTE_IMAGES);
         LspFeatureSettings lspFeatures = LspFeatureSettings.defaults();
         defineDefault("lsp.completion.enabled", lspFeatures.completion());
         defineDefault("lsp.snippets.enabled", lspFeatures.snippets());
@@ -433,6 +435,7 @@ public class ConfigManager {
             case "multi.selection.enabled" -> "Enable experimental multi-selection editing";
             case "multi.selection.max.cursors" -> "Maximum total cursors for experimental multi-selection";
             case "markdown.preview.scroll.sync" -> "Synchronize Markdown preview position with its source cursor and scroll position";
+            case "markdown.preview.remote.images" -> "Load bounded HTTPS images after a Markdown preview is explicitly opened";
             case "lsp.completion.enabled" -> "Enable LSP completion requests";
             case "lsp.snippets.enabled" -> "Advertise LSP snippet-completion support";
             case "lsp.completion.auto.show" -> "Show completion suggestions while typing";
@@ -1064,6 +1067,10 @@ public class ConfigManager {
 
     public boolean getMarkdownPreviewScrollSync() {
         return getBoolean("markdown.preview.scroll.sync", DEFAULT_MARKDOWN_PREVIEW_SCROLL_SYNC);
+    }
+
+    public boolean getMarkdownPreviewRemoteImages() {
+        return getBoolean("markdown.preview.remote.images", DEFAULT_MARKDOWN_PREVIEW_REMOTE_IMAGES);
     }
     public int getTextWidth() {
         return getInt("textwidth", DEFAULT_TEXTWIDTH);

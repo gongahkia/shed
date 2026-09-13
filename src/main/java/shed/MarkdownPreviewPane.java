@@ -50,7 +50,7 @@ final class MarkdownPreviewPane extends JPanel {
 
     MarkdownPreviewPane(FileBuffer source, Supplier<Font> fontSupplier, Supplier<Color> backgroundSupplier,
                         Supplier<Color> foregroundSupplier, Consumer<String> linkHandler, Runnable focusHandler,
-                        BooleanSupplier scrollSyncEnabled, EditorPane sourcePane, KeyListener editorKeyListener) {
+                        BooleanSupplier scrollSyncEnabled, BooleanSupplier remoteImagesEnabled, EditorPane sourcePane, KeyListener editorKeyListener) {
         super(new BorderLayout());
         this.source = source;
         this.fontSupplier = fontSupplier;
@@ -60,7 +60,7 @@ final class MarkdownPreviewPane extends JPanel {
         this.focusHandler = focusHandler;
         this.scrollSyncEnabled = scrollSyncEnabled;
         this.sourcePane = sourcePane;
-        assets = new MarkdownPreviewAssets();
+        assets = new MarkdownPreviewAssets(remoteImagesEnabled, () -> SwingUtilities.invokeLater(this::scheduleRender));
         title = new JLabel("Markdown Preview — " + source.getDisplayName(), SwingConstants.LEADING);
         title.setBorder(BorderFactory.createEmptyBorder(7, 10, 7, 10));
         preview = new JEditorPane();

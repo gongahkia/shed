@@ -139,7 +139,6 @@ public class ConfigManager {
     private static final String SHED_CONFIG_NAME = "config.toml";
     private static final String PROJECT_CONFIG_NAME = ".shed.toml";
     private static final String SHED_SESSIONS_NAME = "sessions";
-    private static final String SHED_PLUGINS_NAME = "plugins";
 
     private static final Map<String, ThemePalette> THEMES = new LinkedHashMap<>();
     private static final Map<String, String> THEME_ALIASES = new HashMap<>();
@@ -1796,9 +1795,7 @@ public class ConfigManager {
         return shedDirectoryPath;
     }
 
-    public String getPluginsDirectoryPath() {
-        return Path.of(shedDirectoryPath).resolve(SHED_PLUGINS_NAME).toString();
-    }
+
 
     private String defaultSnippetsDirectoryPath() {
         return Path.of(shedDirectoryPath, "snippets").toString();

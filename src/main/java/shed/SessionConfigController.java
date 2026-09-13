@@ -81,11 +81,6 @@ final class SessionConfigController {
     }
 
 
-    public List<String> getThemeIdsForPlugins() {
-        return editor.configManager.getThemeIds();
-    }
-
-
     public Map<String, String> getActiveThemePaletteHex() {
         Map<String, String> palette = new LinkedHashMap<>();
         palette.put("theme", editor.configManager.getThemeId());
@@ -129,55 +124,6 @@ final class SessionConfigController {
         }
         editor.applyThemeColors();
         return "Theme set to " + appliedTheme;
-    }
-
-
-    public String applyThemeFromPlugin(String value, boolean persist) {
-        String appliedTheme = editor.configManager.setTheme(value);
-        if (appliedTheme == null) {
-            return "Unknown theme: " + value;
-        }
-        if (persist) {
-            try {
-                editor.configManager.setAndPersist("theme", appliedTheme);
-            } catch (IOException e) {
-                return "Error saving theme: " + e.getMessage();
-            }
-        }
-        editor.applyThemeColors();
-        return persist ? "Theme set and saved to " + appliedTheme : "Theme set to " + appliedTheme;
-    }
-
-
-    public String applyPaletteOverridesFromPlugin(Map<String, String> overrides, boolean persist) {
-        if (overrides == null || overrides.isEmpty()) {
-            return "No palette overrides";
-        }
-        int applied = 0;
-        for (Map.Entry<String, String> entry : overrides.entrySet()) {
-            String mappedKey = mapPaletteAliasToConfigKey(entry.getKey());
-            String value = entry.getValue() == null ? "" : entry.getValue().trim();
-            if (mappedKey == null || value.isEmpty()) {
-                continue;
-            }
-            if (!editor.HEX_COLOR_VALUE_PATTERN.matcher(value).matches()) {
-                continue;
-            }
-            editor.configManager.set(mappedKey, value);
-            applied++;
-        }
-        if (applied == 0) {
-            return "No valid palette keys/colors";
-        }
-        applyRuntimeConfigFromSettings();
-        if (persist) {
-            try {
-                editor.configManager.persistCurrentConfig();
-            } catch (IOException e) {
-                return "Applied " + applied + " palette key(s), but failed to save: " + e.getMessage();
-            }
-        }
-        return (persist ? "Applied and saved " : "Applied ") + applied + " palette key" + (applied == 1 ? "" : "s");
     }
 
 

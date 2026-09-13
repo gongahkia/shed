@@ -281,7 +281,7 @@ final class TypedSettings {
             case "tab.size" -> "integer 1..16";
             case "keymap.profile" -> "vim | plain | emacs";
             case "font.size", "terminal.font.size" -> "integer >= 1";
-            case "terminal.default.profile" -> "system | builtin:<id> | <extension-id>:<id>";
+            case "terminal.default.profile" -> "system | builtin:<id>";
             case "ui.font.size" -> "integer >= 0";
             case "ui.zoom" -> "number " + UiZoom.MINIMUM + ".." + UiZoom.MAXIMUM;
             case "line.numbers" -> "none | absolute | relative | relativeabsolute | hybrid";
@@ -502,7 +502,7 @@ final class TypedSettings {
                 && !(profile.regionMatches(true, 0, "builtin:", 0, "builtin:".length())
                     && profile.substring("builtin:".length()).matches("[A-Za-z0-9._-]+"))
                 && !profile.matches("[A-Za-z0-9._-]+:[A-Za-z0-9._-]+")) {
-                return key + " must be system, builtin:<id>, or an extension profile id";
+                return key + " must be system or a built-in profile id";
             }
         }
         if (("backup.directory".equals(key) || "project.replace.backup.directory".equals(key)

@@ -396,8 +396,7 @@ public class Texteditor extends JFrame implements KeyListener {
         registerManager = new RegisterManager();
         commandHandler = new CommandHandler(this);
         if (toolWindowHost != null) {
-            toolWindowHost.refreshExtensionViews();
-        }
+            }
 
         // Open command-line files and folders, or the landing page.
         if (!openStartupTargets(args)) {
@@ -2857,10 +2856,6 @@ public class Texteditor extends JFrame implements KeyListener {
         return sessionConfigController.getCurrentThemeName();
     }
 
-    public List<String> getThemeIdsForPlugins() {
-        return sessionConfigController.getThemeIdsForPlugins();
-    }
-
     public Map<String, String> getActiveThemePaletteHex() {
         return sessionConfigController.getActiveThemePaletteHex();
     }
@@ -2871,14 +2866,6 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String setThemeFromCommand(String value) {
         return sessionConfigController.setThemeFromCommand(value);
-    }
-
-    public String applyThemeFromPlugin(String value, boolean persist) {
-        return sessionConfigController.applyThemeFromPlugin(value, persist);
-    }
-
-    public String applyPaletteOverridesFromPlugin(Map<String, String> overrides, boolean persist) {
-        return sessionConfigController.applyPaletteOverridesFromPlugin(overrides, persist);
     }
 
     String mapPaletteAliasToConfigKey(String rawKey) {

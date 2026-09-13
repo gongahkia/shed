@@ -27,6 +27,7 @@ import java.awt.dnd.DropTarget;
 import java.awt.dnd.DropTargetAdapter;
 import java.awt.dnd.DropTargetDragEvent;
 import java.awt.dnd.DropTargetDropEvent;
+import java.awt.dnd.DropTargetEvent;
 import java.io.File;
 import java.io.InputStream;
 import java.util.*;
@@ -45,6 +46,7 @@ final class EditorUiController {
     private final Map<Object, Font> systemUiFonts;
     private final Map<?, ?> desktopTextRenderingHints;
     private final DefaultListModel<String> commandPathModel = new DefaultListModel<>();
+    private final Map<JTextArea, FileTreeDropPlacement> explorerDropPreviews = new IdentityHashMap<>();
     private JPopupMenu commandPathPopup;
     private JList<String> commandPathList;
     private boolean updatingCommandBar;
@@ -325,6 +327,7 @@ final class EditorUiController {
                 editor.paintLspInlayHintOverlay(g, this);
                 if (getLineWrap()) paintWrapIndicators(g, this);
                 paintColorPreviews(g, this);
+                paintExplorerFileDropPreview(g, this);
             }
         };
         textArea.addKeyListener(editor);
@@ -426,14 +429,19 @@ final class EditorUiController {
     private void installExplorerFileDropTarget(JTextArea textArea, EditorPane pane) {
         new DropTarget(textArea, DnDConstants.ACTION_COPY, new DropTargetAdapter() {
             @Override public void dragEnter(DropTargetDragEvent event) {
-                acceptExplorerFileDrag(event);
+                acceptExplorerFileDrag(event, textArea);
             }
 
             @Override public void dragOver(DropTargetDragEvent event) {
-                acceptExplorerFileDrag(event);
+                acceptExplorerFileDrag(event, textArea);
+            }
+
+            @Override public void dragExit(DropTargetEvent event) {
+                clearExplorerFileDropPreview(textArea);
             }
 
             @Override public void drop(DropTargetDropEvent event) {
+                clearExplorerFileDropPreview(textArea);
                 if (!event.isDataFlavorSupported(FileTreePanel.EXPLORER_FILE_FLAVOR)) {
                     event.rejectDrop();
                     return;
@@ -456,38 +464,86 @@ final class EditorUiController {
                 }
             }
 
-            private void acceptExplorerFileDrag(DropTargetDragEvent event) {
+            private void acceptExplorerFileDrag(DropTargetDragEvent event, JTextArea target) {
                 if (event.isDataFlavorSupported(FileTreePanel.EXPLORER_FILE_FLAVOR)) {
                     event.acceptDrag(DnDConstants.ACTION_COPY);
+                    showExplorerFileDropPreview(target, event.getLocation());
                 } else {
                     event.rejectDrag();
+                    clearExplorerFileDropPreview(target);
                 }
             }
         }, true);
     }
 
 
-    private enum FileTreeDropPlacement {
+    private void showExplorerFileDropPreview(JTextArea area, Point point) {
+        FileTreeDropPlacement placement = FileTreeDropPlacement.forPoint(point, area.getSize());
+        if (placement == explorerDropPreviews.put(area, placement)) return;
+        area.repaint();
+    }
+
+    private void clearExplorerFileDropPreview(JTextArea area) {
+        if (explorerDropPreviews.remove(area) != null) area.repaint();
+    }
+
+    private void paintExplorerFileDropPreview(Graphics graphics, JTextArea area) {
+        FileTreeDropPlacement placement = explorerDropPreviews.get(area);
+        if (placement == null || area.getWidth() <= 0 || area.getHeight() <= 0) return;
+        int inset = UiZoom.scale(8, editor.configManager.getUiZoom());
+        Rectangle region = placement.previewBounds(area.getSize());
+        Rectangle preview = new Rectangle(region.x + inset, region.y + inset,
+            Math.max(0, region.width - inset * 2), Math.max(0, region.height - inset * 2));
+        if (preview.isEmpty()) return;
+        Graphics2D overlay = (Graphics2D) graphics.create();
+        try {
+            Color accent = editor.configManager.getSelectionColor();
+            overlay.setComposite(AlphaComposite.SrcOver.derive(0.30f));
+            overlay.setColor(accent);
+            overlay.fill(preview);
+            overlay.setComposite(AlphaComposite.SrcOver);
+            overlay.setColor(editor.configManager.getCaretColor());
+            overlay.setStroke(new BasicStroke(Math.max(1f, UiZoom.scale(2, editor.configManager.getUiZoom()))));
+            overlay.drawRect(preview.x, preview.y, Math.max(0, preview.width - 1), Math.max(0, preview.height - 1));
+        } finally {
+            overlay.dispose();
+        }
+    }
+
+
+    static enum FileTreeDropPlacement {
         LEFT(WindowLayoutNode.Orientation.HORIZONTAL, true),
         RIGHT(WindowLayoutNode.Orientation.HORIZONTAL, false),
         TOP(WindowLayoutNode.Orientation.VERTICAL, true),
         BOTTOM(WindowLayoutNode.Orientation.VERTICAL, false);
 
-        private final WindowLayoutNode.Orientation orientation;
-        private final boolean newPaneFirst;
+        final WindowLayoutNode.Orientation orientation;
+        final boolean newPaneFirst;
 
         FileTreeDropPlacement(WindowLayoutNode.Orientation orientation, boolean newPaneFirst) {
             this.orientation = orientation;
             this.newPaneFirst = newPaneFirst;
         }
 
-        private static FileTreeDropPlacement forPoint(Point point, Dimension size) {
+        static FileTreeDropPlacement forPoint(Point point, Dimension size) {
             if (point == null || size == null || size.width <= 0 || size.height <= 0) {
                 return RIGHT;
             }
-            if (point.y < size.height / 4) return TOP;
-            if (point.y >= size.height * 3 / 4) return BOTTOM;
-            return point.x < size.width / 2 ? LEFT : RIGHT;
+            int horizontalEdge = Math.max(1, size.width / 4);
+            if (point.x < horizontalEdge) return LEFT;
+            if (point.x >= size.width - horizontalEdge) return RIGHT;
+            return point.y < size.height / 2 ? TOP : BOTTOM;
+        }
+
+        Rectangle previewBounds(Dimension size) {
+            int width = Math.max(0, size == null ? 0 : size.width);
+            int height = Math.max(0, size == null ? 0 : size.height);
+            return switch (this) {
+                case LEFT -> new Rectangle(0, 0, width / 2, height);
+                case RIGHT -> new Rectangle(width / 2, 0, width - width / 2, height);
+                case TOP -> new Rectangle(0, 0, width, height / 2);
+                case BOTTOM -> new Rectangle(0, height / 2, width, height - height / 2);
+            };
         }
     }
 

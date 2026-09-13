@@ -145,6 +145,7 @@ public class CommandParsingTest {
         assertTrue(handler.getCommandNames().contains("language-services"));
         assertTrue(handler.getCommandNames().contains("window"));
         assertTrue(handler.getCommandNames().contains("zoom"));
+        assertFalse(handler.getCommandNames().contains("ls"));
         List<String> actions = PaletteController.surfaceActionNames();
         assertTrue(actions.containsAll(List.of(
             "Language Services", "Open File", "Open Folder", "Toggle File Tree",

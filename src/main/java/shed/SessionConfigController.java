@@ -1457,20 +1457,6 @@ final class SessionConfigController {
         return "Showing recent files";
     }
 
-
-    void showBufferListDialog(String list) {
-        JTextArea textArea = new JTextArea(list);
-        textArea.setEditable(false);
-        Font font = editor.resolveInstalledFont(editor.configManager.getFontFamily(), UiZoom.scale(12, editor.configManager.getUiZoom()));
-        textArea.setFont(font == null ? new Font(Font.MONOSPACED, Font.PLAIN, UiZoom.scale(12, editor.configManager.getUiZoom())) : font);
-
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setPreferredSize(editor.editorUiController.fitPopupSize(editor, editor.editorUiController.scaleUiDimension(400, 200)));
-
-        JOptionPane.showMessageDialog(editor, scrollPane, "Buffer List", JOptionPane.INFORMATION_MESSAGE);
-    }
-
-
     void handleQuit(boolean force) {
         String message = requestQuit(force);
         if (!"Quitting".equals(message)) {

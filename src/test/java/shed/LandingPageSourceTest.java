@@ -80,7 +80,6 @@ public class LandingPageSourceTest {
             :help        view help
             :e <file>    open a file
             :recent      show recent files
-            :ls          list open buffers
 
             edit and save this local landing file to customize it.
             """);

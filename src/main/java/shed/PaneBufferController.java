@@ -441,8 +441,7 @@ final class PaneBufferController {
             + "swing modal editor\n\n"
             + ":help        view help\n"
             + ":e <file>    open a file\n"
-            + ":recent      show recent files\n"
-            + ":ls          list open buffers\n\n"
+            + ":recent      show recent files\n\n"
             + "edit and save this local landing file to customize it.\n";
     }
 
@@ -634,30 +633,6 @@ final class PaneBufferController {
         switchToBuffer(prevIndex);
         return "Buffer " + (editor.currentBufferIndex + 1) + " of " + editor.buffers.size();
     }
-
-
-    public String listBuffers() {
-        if (editor.buffers.isEmpty()) {
-            return "No buffers open";
-        }
-
-        StringBuilder list = new StringBuilder("Buffers:\n");
-        for (int i = 0; i < editor.buffers.size(); i++) {
-            FileBuffer buf = editor.buffers.get(i);
-            list.append(i + 1).append(": ").append(buf.getDisplayName());
-            if (buf.isModified()) {
-                list.append(" [+]");
-            }
-            if (i == editor.currentBufferIndex) {
-                list.append(" (current)");
-            }
-            list.append("\n");
-        }
-
-        editor.showBufferListDialog(list.toString());
-        return "";
-    }
-
 
     public String deleteBuffer(boolean force) {
         if (editor.buffers.isEmpty()) {

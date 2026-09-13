@@ -832,12 +832,17 @@ final class PaneBufferController {
 
 
     public String cycleWindowFocus() {
+        return cycleWindowFocus(1);
+    }
+
+
+    public String cycleWindowFocus(int direction) {
         if (visiblePaneCount() <= 1) {
             return "Only one window";
         }
         int nextIndex = editor.activePaneIndex;
         do {
-            nextIndex = (nextIndex + 1) % editor.editorPanes.size();
+            nextIndex = Math.floorMod(nextIndex + (direction < 0 ? -1 : 1), editor.editorPanes.size());
         } while (editor.editorPanes.get(nextIndex).isHiddenByFocusMode());
         editor.activateEditorPane(editor.editorPanes.get(nextIndex));
         editor.requestActivePaneFocus();

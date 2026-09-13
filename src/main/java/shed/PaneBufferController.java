@@ -758,6 +758,40 @@ final class PaneBufferController {
     }
 
 
+    String closeActiveBufferWithoutExiting(boolean force) {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null) {
+            return "No active buffer";
+        }
+        if (editor.buffers.size() > 1) {
+            return deleteBuffer(force);
+        }
+        if (DocumentLifecycle.needsDiscardConfirmation(buffer, force)) {
+            int result = editor.confirmDiscardChanges("Close the last buffer anyway?");
+            if (!DocumentLifecycle.discardConfirmed(result)) {
+                return "Buffer close cancelled";
+            }
+        }
+
+        if (editor.isTreeBuffer(buffer)) {
+            editor.treeLineTargets.remove(buffer);
+            if (buffer == editor.treeBuffer) {
+                editor.treeBuffer = null;
+            }
+            editor.treePane = null;
+        }
+        if (buffer == editor.quickfixBuffer) {
+            editor.quickfixBuffer = null;
+        }
+        editor.closeTerminalSession(buffer);
+        editor.buffers.remove(buffer);
+        editor.currentBufferIndex = 0;
+        editor.persistRecoverySnapshotsSafely();
+        openLandingPage();
+        return "Buffer closed";
+    }
+
+
     String closePane(EditorPane paneToClose) {
         if (paneToClose == null) {
             return "No active window";

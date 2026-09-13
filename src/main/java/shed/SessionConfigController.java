@@ -1510,10 +1510,6 @@ final class SessionConfigController {
         if (closeReturnableScratchBuffer()) {
             return "Returned from scratch buffer";
         }
-        if (!editor.canCloseActiveWindow()) {
-            return editor.closeActiveWindow();
-        }
-
         FileBuffer buffer = editor.getCurrentBuffer();
         if (DocumentLifecycle.needsDiscardConfirmation(buffer, force)) {
             int result = confirmDiscardChanges("File has unsaved changes. Close this window anyway?");
@@ -1521,7 +1517,7 @@ final class SessionConfigController {
                 return "Window close cancelled";
             }
         }
-        return editor.closeActiveWindow();
+        return editor.canCloseActiveWindow() ? editor.closeActiveWindow() : editor.closeActiveBufferWithoutExiting(true);
     }
 
 

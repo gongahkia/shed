@@ -216,7 +216,10 @@ final class FormatOnSaveController {
             } else if (postSavePane.getBuffer() != postSaveBuffer) {
                 editor.showMessage("File written; the original window now shows another buffer");
             } else {
-                editor.showMessage(editor.closePane(postSavePane));
+                String close = postSavePane == editor.getActivePane()
+                    ? editor.requestCloseActiveWindow(postSaveForce)
+                    : editor.closePane(postSavePane);
+                editor.showMessage(close);
             }
         } else {
             editor.showMessage(completed + " file(s) written");

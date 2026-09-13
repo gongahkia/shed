@@ -23,7 +23,7 @@ Each action is unique by visible label and normalized command. The application r
 | Save All Buffers | `:wa` | Write all modified file-backed buffers. |
 | Save and Close Active Window | `:wq` | Write the current buffer, then close its editor window. |
 | Save All and Quit | `:wqa` | Write all modified buffers and quit. |
-| Close Active Window | `:q` | Close the active editor window, prompting when needed. |
+| Close Active Window | `:q` | Close the active editor window, or its last buffer and show the landing page. |
 | Quit All | `:qa` | Quit all buffers, prompting when needed. |
 
 ## Splits and interface scale

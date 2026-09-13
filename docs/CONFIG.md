@@ -89,6 +89,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `multi.selection.enabled` | `false` | bool | Enable experimental multi-selection editing |
 | `multi.selection.max.cursors` | `16` | int | Maximum total cursors when enabled; `2..256` |
 | `markdown.preview.scroll.sync` | `true` | bool | Keep a Markdown preview aligned with its source cursor and source scrolling |
+| `markdown.preview.remote.images` | `true` | bool | Fetch bounded HTTPS images after explicitly opening a normal Markdown preview; `false` keeps it local-only |
 | `landing.welcome.enabled` | `true` | bool | Show the native welcome screen for Shed's untouched default landing source |
 | `landing.source` | `~/.shed/landing.md` | string | Local path, `file:` URI, or explicitly configured HTTPS URL |
 | `landing.remote.cache.path` | `~/.shed/landing.remote.md` | path | Local editable cache for an HTTPS source |
@@ -491,6 +492,7 @@ schema_version = 1
 "textwidth" = 88
 "ruler.column" = 88
 "markdown.preview.scroll.sync" = true
+"markdown.preview.remote.images" = true
 
 # Landing page
 "landing.welcome.enabled" = true

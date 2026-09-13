@@ -458,6 +458,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         if (folders.isEmpty() && files.isEmpty()) return false;
 
+        EditorPane contentPane = null;
         if (!folders.isEmpty()) {
             openLandingPage();
             File activeFolder = folders.getFirst();
@@ -469,8 +470,11 @@ public class Texteditor extends JFrame implements KeyListener {
             }
             String treeResult = showFileTree(activeFolder.getAbsolutePath());
             if (!"Tree pane opened".equals(treeResult)) showMessage(treeResult);
-            EditorPane contentPane = resolveTreeContentPaneForOpen();
-            if (contentPane != null) activateEditorPane(contentPane);
+            contentPane = resolveTreeContentPaneForOpen();
+        }
+
+        if (!files.isEmpty() && contentPane != null) {
+            activateEditorPane(contentPane);
         }
 
         for (File file : files) {

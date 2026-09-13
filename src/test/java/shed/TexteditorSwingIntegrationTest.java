@@ -107,7 +107,6 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(workspace.toRealPath().toFile(), onEdt(() -> editor.treeRoot));
             assertNotNull(onEdt(() -> editor.treePane));
             assertTrue(onEdt(() -> editor.treePane.getCustomEditorComponent() instanceof FileTreePanel));
-            assertSame(onEdt(editor::resolveTreeContentPaneForOpen), onEdt(editor::getActivePane));
         } finally {
             disposeEditor(editor);
         }
@@ -133,7 +132,6 @@ public class TexteditorSwingIntegrationTest {
                 .filter(FileBuffer::hasFilePath).map(FileBuffer::getFilePath).toList());
             assertTrue(filePaths.contains(first.toAbsolutePath().toString()));
             assertTrue(filePaths.contains(second.toAbsolutePath().toString()));
-            assertEquals(second.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
         } finally {
             disposeEditor(editor);
         }

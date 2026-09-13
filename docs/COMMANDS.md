@@ -63,7 +63,7 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:d`, `:delete` | Delete current line |
 | `:N,Md` | Delete explicit line range |
 | `:normal <keys>`, `:norm <keys>` | Replay normal-mode keys on current line or a range |
-| `:noh`, `:nohlsearch` | Clear search highlights |
+| `:search highlights clear`, `:noh`, `:nohlsearch` | Clear search highlights |
 
 ## Async Shell, Jobs, and Tasks
 
@@ -72,12 +72,12 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:!<cmd>` | Run shell command as async job |
 | `:N,M!<cmd>` | Filter selected line range through shell command as async job |
 | `:drop <cmd>` | Run async command against current file path (`%` expands to quoted file path) |
-| `:jobs` | Show async jobs buffer |
+| `:job list`, `:jobs` | Show async jobs buffer |
 | `:jobcancel <id>`, `:jobkill <id>` | Cancel running async job |
 | `:toolchain status`, `:toolchain detect` | Show explicit local toolchain selections, supported runtime ids, and advisory candidates; does not select or run a candidate |
 | `:toolchain select <runtime> <absolute-executable>` | Persist one reviewed local executable for the active workspace |
 | `:toolchain clear <runtime>` | Remove one active-workspace toolchain selection |
-| `:task`, `:task ui` | Open graphical Tasks/Jobs panel |
+| `:task open`, `:task`, `:task ui` | Open graphical Tasks/Jobs panel |
 | `:task text`, `:task text list` | Show legacy task scratch buffer |
 | `:task vscode` | Inspect strict runtime-only `.vscode/tasks.json` and imported `.code-workspace` task compatibility; accepted process and POSIX-shell tasks are session-only and still require explicit run |
 | `:task add <name> <command>` | Save task |
@@ -180,9 +180,9 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:files` | Project file finder |
 | `:folder`, `:folders` | Folder chooser + file picker |
 | `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search; opens quickfix on completion |
-| `:largefile`, `:lf` | Show active [large-file mode](LARGE_FILE_SUPPORT.md), limits, and remediation |
-| `:projectreplace settings` | Show persisted project-replace safety controls |
-| `:projectreplace`, `:projectreplace ui` | Open the docked Project Replace review panel |
+| `:largefile status`, `:largefile`, `:lf` | Show active [large-file mode](LARGE_FILE_SUPPORT.md), limits, and remediation |
+| `:project replace settings`, `:projectreplace settings` | Show persisted project-replace safety controls |
+| `:project replace`, `:projectreplace`, `:projectreplace ui` | Open the docked Project Replace review panel |
 | `:projectreplace text <subcommand>` | Run the legacy text workflow |
 | `:projectreplace enable`, `:projectreplace disable` | Persist the project-replace opt-in gate |
 | `:projectreplace preview /find/replacement/` | Build an in-memory literal replacement preview; no file is written |
@@ -194,13 +194,13 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:projectreplace preview-required on\|off`, `:projectreplace confirm on\|off`, `:projectreplace backup on\|off` | Persist preview, confirmation, or backup controls |
 | `:projectreplace scope workspace\|current-file` | Persist replacement preview scope |
 | `:palette`, `:commands` | Open the deduplicated command palette. Its complete action list is in [Command Palette](COMMAND_PALETTE.md); commands requiring arguments, force variants, and the palette opener itself remain in the command bar. |
-| `:undolist`, `:undotree` | Show undo state summary |
-| `:themes` | Show built-in themes |
-| `:zen` | Toggle Goyo layout with Limelight; restores Limelight's prior state when disabled |
-| `:goyo` | Toggle the distraction-free layout without changing Limelight; hides status/line numbers/minimap/tree/tool windows while retaining every pane and split |
-| `:limelight` | Toggle paragraph focus dimming; the current paragraph or selected text stays bright |
-| `:minimap` | Toggle minimap panel |
-| `:term`, `:terminal` | Open the configured default integrated terminal in a bottom split; terminal input owns focus, uses the system clipboard (`Cmd-C`/`Cmd-V` on macOS, `Ctrl-Shift-C`/`Ctrl-Shift-V` elsewhere), recognizes existing local `path:line[:column]` and HTTP(S) output links, and ignores zero-size resize events |
+| `:undo history`, `:undolist`, `:undotree` | Show undo state summary |
+| `:theme list`, `:themes` | Show built-in themes |
+| `:zen toggle`, `:zen` | Toggle Goyo layout with Limelight; restores Limelight's prior state when disabled |
+| `:goyo toggle`, `:goyo` | Toggle the distraction-free layout without changing Limelight; hides status/line numbers/minimap/tree/tool windows while retaining every pane and split |
+| `:limelight toggle`, `:limelight` | Toggle paragraph focus dimming; the current paragraph or selected text stays bright |
+| `:minimap toggle`, `:minimap` | Toggle minimap panel |
+| `:terminal open`, `:term`, `:terminal` | Open the configured default integrated terminal in a bottom split; terminal input owns focus, uses the system clipboard (`Cmd-C`/`Cmd-V` on macOS, `Ctrl-Shift-C`/`Ctrl-Shift-V` elsewhere), recognizes existing local `path:line[:column]` and HTTP(S) output links, and ignores zero-size resize events |
 
 ## Workspace Index Commands
 
@@ -271,12 +271,12 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | Command | Action |
 | :--- | :--- |
 | `:lsp <subcommand>` | Run explicit LSP subcommand |
-| `:definition` | LSP go-to-definition |
-| `:typedefinition`, `:typedef` | LSP go-to-type-definition |
-| `:implementation`, `:impl` | LSP go-to-implementation; multiple results open in quickfix |
+| `:lsp definition`, `:definition` | LSP go-to-definition |
+| `:lsp type-definition`, `:typedefinition`, `:typedef` | LSP go-to-type-definition |
+| `:lsp implementation`, `:implementation`, `:impl` | LSP go-to-implementation; multiple results open in quickfix |
 | `:highlights`, `:documenthighlights` | Highlight LSP symbol occurrences in the current document; cleared on edits, pane changes, or `clear` |
-| `:hover` | LSP hover |
-| `:references` | LSP references to quickfix |
+| `:lsp hover`, `:hover` | LSP hover |
+| `:lsp references`, `:references` | LSP references to quickfix |
 
 ### `:lsp` subcommands
 
@@ -306,8 +306,8 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:lsp workspacediagnostics`, `:lsp workspacediag` | Explicitly request bounded direct workspace diagnostics from active compatible servers and open local-file results in quickfix |
 | `:lsp folding`, `:lsp foldingranges` | List current-document LSP folding ranges without altering the Markdown-heading fold model |
 | `:lsp format` | Apply server formatting edits to the current document when supported |
-| `:format`, `:fmt` | Format with the current extension's selected formatter policy |
-| `:formatter`, `:formatpolicy` | Edit the current extension's formatter mode, direct command, args, and format-on-save policy |
+| `:format current`, `:format`, `:fmt` | Format with the current extension's selected formatter policy |
+| `:format policy`, `:formatter`, `:formatpolicy` | Edit the current extension's formatter mode, direct command, args, and format-on-save policy |
 | `:lsp references`, `:lsp refs` | Find references and open quickfix |
 | `:lsp rename <newName>` | Prepare rename preview |
 | `:lsp renameapply`, `:lsp rename!` | Apply pending rename edits |
@@ -328,7 +328,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 
 | Command | Action |
 | :--- | :--- |
-| `:symbols [query]`, `:sym [query]` | Asynchronous LSP document-symbol picker for the current file; falls back to a local Java AST declaration scan or lexical outlines when unavailable |
+| `:document symbols [query]`, `:symbols [query]`, `:sym [query]` | Asynchronous LSP document-symbol picker for the current file; falls back to a local Java AST declaration scan or lexical outlines when unavailable |
 | `:workspace symbols <query>`, `:workspace sym <query>` | Explicit asynchronous LSP workspace-symbol query; when no usable LSP result is available, searches ignored-filtered local files with bounded Java declaration parsing and lexical outlines. It never builds a background symbol index or resolves project types. |
 | `:45` | Go to line 45 (any numeric command) |
 
@@ -420,25 +420,25 @@ Portable-manifest format, safety boundary, and its distinction from private sess
 
 | Command | Action |
 | :--- | :--- |
-| `:toc` | Open markdown table-of-contents buffer |
-| `:outline` | Open markdown outline in split |
+| `:document toc`, `:toc` | Open markdown table-of-contents buffer |
+| `:document outline`, `:outline` | Open markdown outline in split |
 | `:markdown preview`, `:mdpreview` | Open a live native Markdown preview beside the source buffer |
 | `:markdown refresh` | Re-render the open Markdown preview |
 | `:markdown close` | Close the open Markdown preview |
-| `:toggle`, `:checkbox` | Toggle markdown checkbox under cursor |
-| `:table` | Insert default `3x2` markdown table |
+| `:markdown checkbox toggle`, `:toggle`, `:checkbox` | Toggle markdown checkbox under cursor |
+| `:markdown table insert`, `:table` | Insert default `3x2` markdown table |
 | `:table NxM` | Insert `NxM` table |
 | `:table align` | Align current markdown table |
 | `:table sort N` | Sort table by column `N` ascending |
 | `:table sort N desc` | Sort table by column `N` descending |
 | `:table insert-col` / `insertcol` / `addcol` | Insert table column after current column |
 | `:table delete-col` / `deletecol` / `delcol` | Delete current (or specified) table column |
-| `:link` | Insert markdown link template |
-| `:img`, `:image` | Insert markdown image template |
+| `:markdown link insert`, `:link` | Insert markdown link template |
+| `:markdown image insert`, `:img`, `:image` | Insert markdown image template |
 | `:conceal 0|1|2`, `:conceallevel 0|1|2` | Set markdown conceal level |
 | `:snippets`, `:snippet` | Show user, extension, and built-in snippets for the current language |
-| `:snippets open`, `:snippets edit` | Create if needed and open global user snippets |
-| `:bracketcolor`, `:bracketcolors` | Toggle bracket pair colorization |
+| `:snippet edit`, `:snippets open`, `:snippets edit` | Create if needed and open global user snippets |
+| `:bracket colors toggle`, `:bracketcolor`, `:bracketcolors` | Toggle bracket pair colorization |
 
 Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM, TeX math, local images, and Mermaid fences while escaping raw HTML and never fetching remote assets. See [Markdown Preview](MARKDOWN_PREVIEW.md).
 
@@ -446,12 +446,12 @@ Markdown preview is native, live, and side-by-side; it renders CommonMark + GFM,
 
 | Command | Action |
 | :--- | :--- |
-| `:registers`, `:reg` | Show register contents |
-| `:yankring`, `:pastepicker`, `:yr` | Yank/delete history picker |
-| `:marks` | Show marks for current buffer |
-| `:wc`, `:wordcount` | Show line/word/char count |
-| `:log`, `:commandlog` | Open command log file |
-| `:help [topic]`, `:h [topic]` | Open help buffer |
+| `:register list`, `:registers`, `:reg` | Show register contents |
+| `:yank ring`, `:yankring`, `:pastepicker`, `:yr` | Yank/delete history picker |
+| `:mark list`, `:marks` | Show marks for current buffer |
+| `:document wordcount`, `:wc`, `:wordcount` | Show line/word/char count |
+| `:command log`, `:log`, `:commandlog` | Open command log file |
+| `:help open`, `:help [topic]`, `:h [topic]` | Open help buffer |
 
 ## Plugin Management Commands
 

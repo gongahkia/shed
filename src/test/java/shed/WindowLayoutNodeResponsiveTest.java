@@ -70,6 +70,25 @@ public class WindowLayoutNodeResponsiveTest {
     }
 
     @Test
+    void preventsDividerDraggingFromCollapsingHorizontalOrVerticalPanes() {
+        WindowLayoutNode horizontal = WindowLayoutNode.split(WindowLayoutNode.Orientation.HORIZONTAL, 0.5,
+            WindowLayoutNode.leaf(pane()), WindowLayoutNode.leaf(pane()));
+        JSplitPane horizontalSplit = (JSplitPane) horizontal.render(null, 900, 600);
+        horizontalSplit.setSize(900, 600);
+        horizontalSplit.doLayout();
+        assertTrue(horizontalSplit.getMinimumDividerLocation() >= WindowLayoutNode.MINIMUM_LEAF_WIDTH);
+        assertTrue(horizontalSplit.getMaximumDividerLocation() <= 900 - WindowLayoutNode.MINIMUM_LEAF_WIDTH - horizontalSplit.getDividerSize());
+
+        WindowLayoutNode vertical = WindowLayoutNode.split(WindowLayoutNode.Orientation.VERTICAL, 0.5,
+            WindowLayoutNode.leaf(pane()), WindowLayoutNode.leaf(pane()));
+        JSplitPane verticalSplit = (JSplitPane) vertical.render(null, 900, 600);
+        verticalSplit.setSize(900, 600);
+        verticalSplit.doLayout();
+        assertTrue(verticalSplit.getMinimumDividerLocation() >= WindowLayoutNode.MINIMUM_LEAF_HEIGHT);
+        assertTrue(verticalSplit.getMaximumDividerLocation() <= 600 - WindowLayoutNode.MINIMUM_LEAF_HEIGHT - verticalSplit.getDividerSize());
+    }
+
+    @Test
     void paintsAThemeColoredDividerInsteadOfThePlatformTexture() {
         Color surface = new Color(0x242831);
         Color foreground = new Color(0xB9C3D4);
@@ -81,7 +100,7 @@ public class WindowLayoutNodeResponsiveTest {
         split.setDividerLocation(400);
         split.doLayout();
         Component divider = Arrays.stream(split.getComponents())
-            .filter(component -> component.getX() == 400 && component.getWidth() == split.getDividerSize())
+            .filter(component -> component.getWidth() == split.getDividerSize() && component.getHeight() == split.getHeight())
             .findFirst().orElseThrow();
         BufferedImage image = new BufferedImage(divider.getWidth(), divider.getHeight(), BufferedImage.TYPE_INT_ARGB);
         Graphics2D graphics = image.createGraphics();

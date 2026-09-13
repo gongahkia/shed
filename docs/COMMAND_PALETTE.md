@@ -56,9 +56,9 @@ Each action is unique by visible label and normalized command. The application r
 | Last Quickfix Result | `:quickfix last` | Move to the last quickfix result. |
 | Open Current Quickfix Result | `:quickfix current` | Open the selected quickfix result. |
 | Problems | `:problems` | Open the unified diagnostics and quickfix Problems panel. |
-| Show Diagnostics | `:diagnostics` | Show diagnostics for the active buffer. |
-| Next Diagnostic | `:dnext` | Move to the next diagnostic. |
-| Previous Diagnostic | `:dprev` | Move to the previous diagnostic. |
+| Show Diagnostics | `:diagnostic show` | Show diagnostics for the active buffer. |
+| Next Diagnostic | `:diagnostic next` | Move to the next diagnostic. |
+| Previous Diagnostic | `:diagnostic previous` | Move to the previous diagnostic. |
 
 ## Configuration and appearance
 

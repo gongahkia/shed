@@ -193,10 +193,11 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.lspDocumentHighlights(args), "highlights", "documenthighlights");
         registerCommand((args, range, force) -> editor.lspHover(), "hover");
         registerCommand((args, range, force) -> editor.lspReferences(), "references");
-        registerCommand((args, range, force) -> editor.showDiagnostics(), "diagnostics", "diag", "ldiag");
+        registerCommand((args, range, force) -> handleDiagnostic(args), "diagnostic");
+        registerCommand((args, range, force) -> handleDiagnostic("show"), "diagnostics", "diag", "ldiag");
         registerCommand((args, range, force) -> editor.handleProblemsCommand(args), "problems", "problem");
-        registerCommand((args, range, force) -> editor.diagnosticsNext(), "dnext", "dn");
-        registerCommand((args, range, force) -> editor.diagnosticsPrev(), "dprev", "dp");
+        registerCommand((args, range, force) -> handleDiagnostic("next"), "dnext", "dn");
+        registerCommand((args, range, force) -> handleDiagnostic("previous"), "dprev", "dp");
         registerCommand((args, range, force) -> editor.showSymbols(args), "symbols", "sym");
         registerCommand((args, range, force) -> editor.showRegisters(), "registers", "reg");
         registerCommand((args, range, force) -> editor.showYankRingPicker(), "yankring", "pastepicker", "yr");
@@ -335,6 +336,16 @@ public class CommandHandler {
             case "last" -> editor.quickfixLast();
             case "current" -> editor.quickfixCurrent(command.argument());
             default -> "Usage: :quickfix open|close|next|previous|first|last|current [index]";
+        };
+    }
+
+    private String handleDiagnostic(String argument) {
+        CommandOperation command = CommandOperation.parse(argument);
+        return switch (command.name()) {
+            case "show" -> editor.showDiagnostics();
+            case "next" -> editor.diagnosticsNext();
+            case "previous", "prev" -> editor.diagnosticsPrev();
+            default -> "Usage: :diagnostic show|next|previous";
         };
     }
 

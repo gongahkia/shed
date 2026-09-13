@@ -92,7 +92,7 @@ public class HelpService {
                    "  :git ...       Git status/diff/log/add/commit; workbench, conflicts, and history UI\n" +
                    "  :github ...    Local capability, consent, or consent-gated PR discovery\n" +
                    "  :update ...    Consent-gated signed update metadata controls\n" +
-                   "  :split/:vsplit Split the active window\n" +
+                   "  :s/:vs         Split below/right\n" +
                    "  Ctrl-w s/v/c   Split/vertical-split/close window\n" +
                    "  Ctrl-w h/j/k/l Move window focus\n" +
                    "  :registers     Show registers\n" +
@@ -186,9 +186,9 @@ public class HelpService {
             case "split":
             case "vsplit":
                 return "Help: windows\n\n"
-                    + ":split / :sp creates a horizontal split.\n"
-                    + ":vsplit / :vsp creates a vertical split.\n"
-                    + ":close closes the active split when more than one window exists.\n"
+                    + ":s / :split / :sp creates a horizontal split.\n"
+                    + ":vs / :vsplit / :vsp creates a vertical split.\n"
+                    + ":close closes the active split when more than one window exists; :close! discards unsaved changes.\n"
                     + "Ctrl-w s/v/c mirrors the split commands.\n"
                     + "Ctrl-w h/j/k/l changes window focus.\n"
                     + "Ctrl-w w cycles focus and Ctrl-w = equalizes split ratios.\n";

@@ -24,6 +24,7 @@ In the `:` prompt, paste with `Cmd`/`Ctrl` + `V` and use Left/Right to move the 
 | `:w`, `:write` | Write current buffer (or `:w <path>` to save as) |
 | `:q`, `:quit` | Close the active editor window, or close its last buffer and open the landing page (prompts on unsaved changes) |
 | `:q!` | Close the active editor window without the unsaved-changes prompt |
+| `:close!`, `:clo!` | Close the active window without the unsaved-changes prompt |
 | `:wq`, `:x` | Write, then close the active editor window |
 | `:e <file>`, `:edit <file>` | Open file in a buffer |
 | `:bn`, `:bnext` | Next buffer |
@@ -168,9 +169,9 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 
 | Command | Action |
 | :--- | :--- |
-| `:split`, `:sp` | Horizontal split (`Cmd+D`) |
-| `:vsplit`, `:vsp` | Vertical split (`Cmd+Shift+D`) |
-| `:close`, `:clo` | Close active window (`Cmd+W`) |
+| `:s`, `:split`, `:sp` | Horizontal split (`Cmd+D`); `:s/old/new/` remains substitution |
+| `:vs`, `:vsplit`, `:vsp` | Vertical split (`Cmd+Shift+D`) |
+| `:close`, `:clo` | Close active window (`Cmd+W`); add `!` to discard unsaved changes |
 | `:window`, `:win` `next\|left\|right\|up\|down\|equalize\|grow\|shrink` | Focus, equalize, or resize editor splits |
 | `:zoom`, `:uizoom` `in\|out\|reset` | Adjust UI zoom by 10% or restore it to 100% |
 | `:open [file\|folder]` | Native file chooser, or workspace-folder chooser that opens its tree |

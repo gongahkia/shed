@@ -169,9 +169,9 @@ public class CommandParsingTest {
         assertTrue(matcher.matchStrings("Remote Workspaces", actions, 0).contains("Remote Workspaces"));
         assertTrue(matcher.matchStrings("Dev Container", actions, 0).contains("Dev Container"));
         assertFalse(actions.contains("Show All Open Buffers"));
-        assertEquals("workspace ui", PaletteController.surfaceActionCommand("Workspace Folders"));
+        assertEquals("workspace folders", PaletteController.surfaceActionCommand("Workspace Folders"));
         assertEquals("lsp codeaction", PaletteController.surfaceActionCommand("Code Actions"));
-        assertEquals("snippets edit", PaletteController.surfaceActionCommand("Edit Snippets"));
+        assertEquals("snippet edit", PaletteController.surfaceActionCommand("Edit Snippets"));
         assertEquals("open file", PaletteController.surfaceActionCommand("Open File"));
         assertEquals("open folder", PaletteController.surfaceActionCommand("Open Folder"));
         assertEquals("tree", PaletteController.surfaceActionCommand("Toggle File Tree"));
@@ -194,6 +194,13 @@ public class CommandParsingTest {
         assertEquals("diagnostic next", PaletteController.surfaceActionCommand("Next Diagnostic"));
         assertEquals("diagnostic previous", PaletteController.surfaceActionCommand("Previous Diagnostic"));
         assertEquals("config reload", PaletteController.surfaceActionCommand("Reload Configuration"));
+        assertEquals("zen toggle", PaletteController.surfaceActionCommand("Toggle Zen Mode"));
+        assertEquals("goyo toggle", PaletteController.surfaceActionCommand("Toggle Goyo Mode"));
+        assertEquals("limelight toggle", PaletteController.surfaceActionCommand("Toggle Limelight"));
+        assertEquals("minimap toggle", PaletteController.surfaceActionCommand("Toggle Minimap"));
+        assertEquals("document symbols", PaletteController.surfaceActionCommand("Document Symbols"));
+        assertEquals("project replace", PaletteController.surfaceActionCommand("Project Replace"));
+        assertEquals("update status", PaletteController.surfaceActionCommand("Update Status"));
         assertEquals(actions.size(), new java.util.HashSet<>(actions).size());
         List<String> commands = PaletteController.surfaceActionCommands();
         assertEquals(commands.size(), new java.util.HashSet<>(commands).size());

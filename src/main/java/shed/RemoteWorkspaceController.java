@@ -10,6 +10,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /** Explicit remote-workspace operations. Connections are local mirrors unless a provider says otherwise. */
 final class RemoteWorkspaceController {
@@ -18,6 +24,13 @@ final class RemoteWorkspaceController {
     private final Texteditor editor;
     private final Map<String, Connection> connections = new LinkedHashMap<>();
     private final SshPortForwardService portForwards = new SshPortForwardService();
+    private final ScheduledExecutorService synchronizationScheduler = Executors.newSingleThreadScheduledExecutor(task -> {
+        Thread thread = new Thread(task, "shed-remote-sync");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final Map<String, AutomaticSync> automaticSynchronizations = new LinkedHashMap<>();
+    private final Set<String> synchronizing = new HashSet<>();
 
     RemoteWorkspaceController(Texteditor editor) {
         this.editor = editor;
@@ -35,8 +48,11 @@ final class RemoteWorkspaceController {
         String operation = tokens.getFirst().toLowerCase(Locale.ROOT);
         return switch (operation) {
             case "open", "connect" -> connect(tokens.size() == 2 ? tokens.get(1) : "");
+            case "reconnect" -> reconnect(tokens.size() == 2 ? tokens.get(1) : "");
+            case "bootstrap" -> bootstrap(tokens.size() == 2 ? tokens.get(1) : "");
             case "pull", "refresh" -> synchronize(tokens.size() == 2 ? tokens.get(1) : "", false);
             case "push" -> synchronize(tokens.size() == 2 ? tokens.get(1) : "", true);
+            case "sync" -> automaticSync(tokens);
             case "exec" -> execute(tokens);
             case "terminal", "term" -> openTerminal(tokens);
             case "forward" -> forward(tokens);
@@ -44,7 +60,7 @@ final class RemoteWorkspaceController {
             case "unuse", "deactivate" -> deactivate(tokens.size() == 2 ? tokens.get(1) : "");
             case "close", "disconnect" -> close(tokens.size() == 2 ? tokens.get(1) : "");
             case "providers" -> showProviders();
-            default -> "Usage: :remote [list|providers|open <uri>|pull <id>|push <id>|exec <id> <command...>|terminal <id> [command...]|use <id>|unuse <id>|forward <id> <local-port> <remote-host> <remote-port>|forward list|forward close <local-port>|close <id>]";
+            default -> "Usage: :remote [list|providers|open <uri>|reconnect <id>|bootstrap <ssh-uri>|pull <id>|push <id>|sync start <id> [seconds]|sync stop <id>|exec <id> <command...>|terminal <id> [command...]|use <id>|unuse <id>|forward <id> <local-port> <remote-host> <remote-port>|forward list|forward close <local-port>|close <id>]";
         };
     }
 
@@ -76,6 +92,7 @@ final class RemoteWorkspaceController {
             synchronized (connections) { prior = connections.put(result.id(), result); }
             editor.remoteWorkspaceTaskTargets.register(result.id(), result.workspace());
             if (prior != null) {
+                stopAutomaticSyncQuietly(prior.id());
                 portForwards.closeForConnection(prior.id());
                 editor.remoteWorkspaceSessions.deactivate(prior.id());
                 try { prior.workspace().close(); } catch (Exception ignored) { }
@@ -84,6 +101,89 @@ final class RemoteWorkspaceController {
             editor.showMessage("Remote workspace connected: " + result.id());
         });
         return "Remote connection requested (job " + job + ").";
+    }
+
+    private String reconnect(String id) {
+        Connection connection = connection(id);
+        if (connection == null) return "Remote workspace not connected: " + id;
+        return connect(connection.uri().toString());
+    }
+
+    private String bootstrap(String rawUri) {
+        URI uri;
+        try {
+            uri = URI.create(rawUri);
+        } catch (IllegalArgumentException error) {
+            return "SSH bootstrap URI is invalid";
+        }
+        if (!"ssh".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getPath() == null || !uri.getPath().startsWith("/")) {
+            return "Usage: :remote bootstrap ssh://[user@]host[:port]/absolute-workspace-path";
+        }
+        int job = editor.asyncJobService.submit("SSH bootstrap: " + uri, token -> {
+            BuiltInRemoteWorkspaceProviders.bootstrapSshWorkspace(uri);
+            return uri;
+        }, (snapshot, result, error) -> editor.showMessage(error == null ? "SSH workspace path is ready: " + uri
+            : "SSH bootstrap failed: " + detail(error.getMessage())));
+        return "SSH bootstrap requested (job " + job + ").";
+    }
+
+    private String automaticSync(List<String> tokens) {
+        if (tokens.size() >= 2 && ("list".equalsIgnoreCase(tokens.get(1)) || "status".equalsIgnoreCase(tokens.get(1)))) return showStatus();
+        if (tokens.size() >= 3 && "stop".equalsIgnoreCase(tokens.get(1))) return stopAutomaticSync(tokens.get(2));
+        if (tokens.size() < 3 || tokens.size() > 4 || !"start".equalsIgnoreCase(tokens.get(1))) {
+            return "Usage: :remote sync start <connection-id> [seconds]|sync stop <connection-id>|sync list";
+        }
+        Connection connection = connection(tokens.get(2));
+        if (connection == null) return "Remote workspace not connected: " + tokens.get(2);
+        int seconds = 30;
+        if (tokens.size() == 4) {
+            try {
+                seconds = Integer.parseInt(tokens.get(3));
+            } catch (NumberFormatException error) {
+                return "Remote sync interval must be between 5 and 3600 seconds";
+            }
+        }
+        if (seconds < 5 || seconds > 3600) return "Remote sync interval must be between 5 and 3600 seconds";
+        String id = connection.id();
+        stopAutomaticSync(id);
+        ScheduledFuture<?> future = synchronizationScheduler.scheduleWithFixedDelay(() -> synchronizeAutomatically(id), seconds, seconds, TimeUnit.SECONDS);
+        synchronized (automaticSynchronizations) {
+            automaticSynchronizations.put(id, new AutomaticSync(seconds, future));
+        }
+        editor.appendCommandLog("[remote sync] started " + id + " every " + seconds + "s");
+        return "Automatic remote pull started for " + id + " every " + seconds + " seconds";
+    }
+
+    private String stopAutomaticSync(String id) {
+        String normalized = normalizeId(id);
+        AutomaticSync automatic;
+        synchronized (automaticSynchronizations) {
+            automatic = automaticSynchronizations.remove(normalized);
+        }
+        if (automatic == null) return "Automatic remote sync is not active: " + id;
+        automatic.future().cancel(false);
+        synchronized (synchronizing) { synchronizing.remove(normalized); }
+        editor.appendCommandLog("[remote sync] stopped " + normalized);
+        return "Automatic remote sync stopped: " + normalized;
+    }
+
+    private void synchronizeAutomatically(String id) {
+        Connection connection = connection(id);
+        if (connection == null) {
+            stopAutomaticSync(id);
+            return;
+        }
+        synchronized (synchronizing) {
+            if (!synchronizing.add(id)) return;
+        }
+        try {
+            connection.workspace().synchronize();
+            editor.appendCommandLog("[remote sync] pulled " + id);
+        } catch (Exception error) {
+            editor.appendCommandLog("[remote sync failed] " + id + " — " + detail(error.getMessage()));
+        } finally {
+            synchronized (synchronizing) { synchronizing.remove(id); }
+        }
     }
 
     private String synchronize(String id, boolean push) {
@@ -104,6 +204,7 @@ final class RemoteWorkspaceController {
         Connection connection;
         synchronized (connections) { connection = connections.remove(normalizeId(id)); }
         if (connection == null) return "Remote workspace not connected: " + id;
+        stopAutomaticSyncQuietly(connection.id());
         if (editor.lspController != null) editor.lspController.stopServersForWorkspace(connection.workspace().localRoot());
         editor.remoteWorkspaceTaskTargets.unregister(connection.id());
         try {
@@ -251,6 +352,13 @@ final class RemoteWorkspaceController {
         for (RemoteWorkspaceSessionService.Connection session : sessions) {
             output.append(session.id()).append("  ").append(session.localRoot()).append("\n");
         }
+        output.append("\nAutomatic remote pull\n");
+        List<Map.Entry<String, AutomaticSync>> automatic;
+        synchronized (automaticSynchronizations) { automatic = List.copyOf(automaticSynchronizations.entrySet()); }
+        if (automatic.isEmpty()) output.append("No automatic remote pulls active.\n");
+        for (Map.Entry<String, AutomaticSync> entry : automatic) {
+            output.append(entry.getKey()).append("  every ").append(entry.getValue().seconds()).append(" seconds\n");
+        }
         List<SshPortForwardService.ForwardInfo> forwards = portForwards.list();
         output.append("\nSSH loopback forwards\n");
         if (forwards.isEmpty()) output.append("No SSH forwards active.\n");
@@ -258,7 +366,7 @@ final class RemoteWorkspaceController {
             output.append("127.0.0.1:").append(forward.localPort()).append(" -> ").append(forward.remoteHost()).append(":")
                 .append(forward.remotePort()).append("  [").append(forward.connectionId()).append("] ").append(forward.detail()).append("\n");
         }
-        output.append("\nConnections use a local working tree. Pull and push are explicit operations; remote URI passwords are rejected.\n");
+        output.append("\nConnections use a local working tree. Pull and push are explicit; automatic pull is opt-in with :remote sync start. Remote URI passwords are rejected.\n");
         editor.showScratchBuffer("[remote workspaces]", output.toString());
         return "Showing remote workspaces";
     }
@@ -273,6 +381,8 @@ final class RemoteWorkspaceController {
 
     void closeAll() {
         // application shutdown waits for every tracked forward; ordinary workspace close does not block the EDT.
+        synchronizationScheduler.shutdownNow();
+        synchronized (automaticSynchronizations) { automaticSynchronizations.clear(); }
         portForwards.close();
         List<Connection> values;
         synchronized (connections) {
@@ -369,6 +479,17 @@ final class RemoteWorkspaceController {
 
     private List<RemoteWorkspaceProvider> providers() {
         return BuiltInRemoteWorkspaceProviders.all();
+    }
+
+    private void stopAutomaticSyncQuietly(String id) {
+        String normalized = normalizeId(id);
+        AutomaticSync automatic;
+        synchronized (automaticSynchronizations) { automatic = automaticSynchronizations.remove(normalized); }
+        if (automatic != null) automatic.future().cancel(false);
+        synchronized (synchronizing) { synchronizing.remove(normalized); }
+    }
+
+    private record AutomaticSync(int seconds, ScheduledFuture<?> future) {
     }
 
     private Connection connection(String id) {

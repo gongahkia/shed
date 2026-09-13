@@ -820,7 +820,10 @@ final class EditorUiController {
             scroll.getHorizontalScrollBar().setBackground(colors.raised());
             scroll.getVerticalScrollBar().setBackground(colors.raised());
         }
-        if (component instanceof JSplitPane split) split.setBackground(colors.surface());
+        if (component instanceof JSplitPane split) {
+            split.setBackground(colors.surface());
+            split.setForeground(colors.border());
+        }
         if (component instanceof JTabbedPane tabs) {
             tabs.setBackground(colors.surface());
             tabs.setForeground(colors.foreground());

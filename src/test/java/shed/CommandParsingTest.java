@@ -147,6 +147,7 @@ public class CommandParsingTest {
         assertTrue(handler.getCommandNames().contains("zoom"));
         assertTrue(handler.getCommandNames().contains("s"));
         assertTrue(handler.getCommandNames().contains("vs"));
+        assertTrue(handler.getCommandNames().contains("discard"));
         assertFalse(handler.getCommandNames().contains("ls"));
         List<String> actions = PaletteController.surfaceActionNames();
         assertTrue(actions.containsAll(List.of(
@@ -174,7 +175,7 @@ public class CommandParsingTest {
         assertEquals("tree", PaletteController.surfaceActionCommand("Toggle File Tree"));
         assertEquals("s", PaletteController.surfaceActionCommand("Split Below"));
         assertEquals("vs", PaletteController.surfaceActionCommand("Split Right"));
-        assertEquals("bdelete!", PaletteController.surfaceActionCommand("Discard Current Buffer"));
+        assertEquals("discard current buffer", PaletteController.surfaceActionCommand("Discard Current Buffer"));
         assertEquals("q!", PaletteController.surfaceActionCommand("Close Active Window Without Saving"));
         assertEquals("qa!", PaletteController.surfaceActionCommand("Quit All Without Saving"));
         assertEquals("remote list", PaletteController.surfaceActionCommand("Remote Workspaces"));

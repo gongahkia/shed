@@ -576,18 +576,49 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, file);
         try {
             FileBuffer initial = onEdt(editor::getCurrentBuffer);
-            String split = onEdt(() -> editor.commandHandler.execute("vsplit"));
+            String split = onEdt(() -> editor.commandHandler.execute("vs"));
             assertEquals("Vertical split created", split);
             assertEquals(2, onEdt(() -> editor.editorPanes.size()));
             assertSame(initial, onEdt(editor::getCurrentBuffer));
             assertEquals("Window focus changed", onEdt(() -> editor.commandHandler.execute("window next")));
             assertEquals("Window resized", onEdt(() -> editor.commandHandler.execute("window grow")));
             assertEquals("Windows equalized", onEdt(() -> editor.commandHandler.execute("window equalize")));
+            assertEquals("Command not recognised: close!", onEdt(() -> editor.commandHandler.execute("close!")));
+            assertEquals(2, onEdt(() -> editor.editorPanes.size()));
 
             String close = onEdt(() -> editor.commandHandler.execute("close"));
             assertEquals("Window closed", close);
             assertEquals(1, onEdt(() -> editor.editorPanes.size()));
             assertSame(initial, onEdt(editor::getCurrentBuffer));
+            assertEquals("Horizontal split created", onEdt(() -> editor.commandHandler.execute("s")));
+            assertEquals(2, onEdt(() -> editor.editorPanes.size()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void discardCurrentBufferClosesTheActiveBufferWithoutSaving() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-discard-buffer");
+        Path first = tempDir.resolve("discard-first.txt");
+        Path second = tempDir.resolve("discard-second.txt");
+        Files.createDirectories(home);
+        Files.writeString(first, "first\n", StandardCharsets.UTF_8);
+        Files.writeString(second, "second\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, first);
+        try {
+            onEdt(() -> {
+                editor.openFile(second.toFile());
+                editor.writingArea.setText("unsaved\n");
+                return null;
+            });
+
+            assertEquals("Buffer deleted", onEdt(() -> editor.commandHandler.execute("discard current buffer")));
+            assertEquals(1, onEdt(() -> editor.buffers.size()));
+            assertEquals(first.getFileName().toString(), onEdt(() -> editor.getCurrentBuffer().getDisplayName()));
+            assertEquals("second\n", Files.readString(second, StandardCharsets.UTF_8));
         } finally {
             disposeEditor(editor);
         }

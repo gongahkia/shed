@@ -84,6 +84,9 @@ public class CommandHandler {
             if (resolvedCmd.isEmpty()) {
                 return "";
             }
+            if (force && ("close".equals(resolvedCmd) || "clo".equals(resolvedCmd))) {
+                return "Command not recognised: " + cmd + "!";
+            }
 
             CommandAction action = commandRegistry.get(resolvedCmd);
             if (action != null) {
@@ -121,6 +124,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.nextBuffer(), "bn", "bnext");
         registerCommand((args, range, force) -> editor.prevBuffer(), "bp", "bprev");
         registerCommand((args, range, force) -> editor.deleteBuffer(force), "bd", "bdelete");
+        registerCommand((args, range, force) -> handleDiscard(args), "discard");
         registerCommand((args, range, force) -> handleSet(args, force), "set");
         registerCommand((args, range, force) -> handleConfig(args, force), "settings", "config");
         registerCommand((args, range, force) -> handleKeymap(args), "keymap", "keymaps");
@@ -162,7 +166,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.showBufferFinder(), "buffers", "buf");
         registerCommand((args, range, force) -> editor.splitWindow(false), "split", "sp", "s");
         registerCommand((args, range, force) -> editor.splitWindow(true), "vsplit", "vsp", "vs");
-        registerCommand((args, range, force) -> force ? editor.requestCloseActiveWindow(true) : editor.closeActiveWindow(), "close", "clo");
+        registerCommand((args, range, force) -> editor.closeActiveWindow(), "close", "clo");
         registerCommand((args, range, force) -> handleWindow(args), "window", "win");
         registerCommand((args, range, force) -> handleZoom(args), "zoom", "uizoom");
         registerCommand((args, range, force) -> editor.showGrepFinder(args), "grep", "rg");
@@ -255,6 +259,16 @@ public class CommandHandler {
 
     private String handleWriteQuit(String targetPath, boolean force) {
         return editor.formatOnSaveController.requestCurrent(targetPath, true, force);
+    }
+
+    private String handleDiscard(String target) {
+        String selection = target == null ? "" : target.trim().toLowerCase(Locale.ROOT);
+        return switch (selection) {
+            case "", "buffer", "current", "current buffer" -> editor.deleteBuffer(true);
+            case "window", "current window" -> editor.requestCloseActiveWindow(true);
+            case "all" -> editor.quitAll(true);
+            default -> "Usage: :discard [current buffer|current window|all]";
+        };
     }
 
     private String handleEdit(String filename) {

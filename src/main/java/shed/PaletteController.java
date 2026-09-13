@@ -28,7 +28,7 @@ final class PaletteController {
         action("Switch to Next Open Buffer", "bn", "Switch to the next open buffer."),
         action("Switch to Previous Open Buffer", "bp", "Switch to the previous open buffer."),
         action("Close Current Buffer", "bdelete", "Close the current buffer, prompting when needed."),
-        action("Discard Current Buffer", "bdelete!", "Close the current buffer without saving its changes."),
+        action("Discard Current Buffer", "discard current buffer", "Close the current buffer without saving its changes."),
         action("Save Current Buffer", "write", "Write the current buffer."),
         action("Save All Buffers", "wall", "Write all modified file-backed buffers."),
         action("Save and Close Active Window", "wq", "Write the current buffer, then close its editor split."),

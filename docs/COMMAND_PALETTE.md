@@ -17,7 +17,7 @@ Each action is unique by visible label and normalized command. The application r
 | Switch to Next Open Buffer | `:bn` | Switch to the next open buffer. |
 | Switch to Previous Open Buffer | `:bp` | Switch to the previous open buffer. |
 | Close Current Buffer | `:bdelete` | Close the current buffer, prompting when needed. |
-| Discard Current Buffer | `:bdelete!` | Close the current buffer without saving its changes. |
+| Discard Current Buffer | `:discard current buffer` | Close the current buffer without saving its changes. |
 | Save Current Buffer | `:write` | Write the current buffer. |
 | Save All Buffers | `:wall` | Write all modified file-backed buffers. |
 | Save and Close Active Window | `:wq` | Write the current buffer, then close its editor window. |

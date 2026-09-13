@@ -69,7 +69,7 @@ final class PaletteController {
         action("Apply Suggested Config Repairs", "config heal", "Persist the reviewed deterministic configuration repairs."),
         action("Reload Configuration", "config reload", "Reload configuration from disk."),
         action("Keymap Inspector", "keymap inspector", "Inspect and edit validated keymap overlays."),
-        action("Themes", "theme list", "Show built-in themes."),
+        action("Themes", "theme list", "Browse and apply built-in themes with palette previews."),
         action("Toggle Zen Mode", "zen toggle", "Toggle the distraction-free Zen layout."),
         action("Toggle Goyo Mode", "goyo toggle", "Toggle the Goyo layout."),
         action("Toggle Limelight", "limelight toggle", "Toggle paragraph focus dimming."),

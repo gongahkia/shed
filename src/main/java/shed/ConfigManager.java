@@ -832,6 +832,11 @@ public class ConfigManager {
         return new ArrayList<>(THEMES.keySet());
     }
 
+    /** Ordered built-in theme data for visual selection surfaces. */
+    List<ThemePreview> getThemePreviews() {
+        return THEMES.values().stream().map(ThemePalette::preview).toList();
+    }
+
     public String getThemeListText() {
         StringBuilder builder = new StringBuilder();
         builder.append("Themes\n\n");
@@ -2250,5 +2255,23 @@ public class ConfigManager {
             this.accent = decodeColor(accent, Color.decode("#58A6FF"));
             this.stringAccent = decodeColor(stringAccent, Color.decode("#7EE787"));
         }
+
+        private ThemePreview preview() {
+            return new ThemePreview(id, displayName, normal, insert, command, visual, replace, foreground, accent, stringAccent);
+        }
     }
 }
+
+/** Immutable built-in theme colors used by the Theme Gallery. */
+record ThemePreview(
+    String id,
+    String displayName,
+    Color normal,
+    Color insert,
+    Color command,
+    Color visual,
+    Color replace,
+    Color foreground,
+    Color accent,
+    Color stringAccent
+) { }

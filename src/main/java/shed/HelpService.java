@@ -95,7 +95,7 @@ public class HelpService {
                    "  :registers     Show registers\n" +
                    "  :yankring      Pick from yank/delete history and paste\n" +
                    "  :marks         Show marks\n" +
-                   "  :themes        Show built-in themes\n" +
+                   "  :themes        Browse and apply built-in themes\n" +
                    "  :zen           Toggle Goyo layout with Limelight\n" +
                    "  :goyo          Toggle Goyo layout\n" +
                    "  :limelight     Toggle paragraph focus dimming\n" +

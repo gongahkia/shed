@@ -376,9 +376,10 @@ public class CommandHandler {
 
     private String handleTheme(String argument) {
         String operation = argument == null ? "" : argument.trim();
-        return operation.isEmpty() || "list".equalsIgnoreCase(operation)
-            ? editor.showThemes()
-            : "Usage: :theme list";
+        if (operation.isEmpty() || "list".equalsIgnoreCase(operation) || "gallery".equalsIgnoreCase(operation)) {
+            return editor.showThemes();
+        }
+        return editor.setThemeFromCommand(operation);
     }
 
     private String handleToggle(String argument, String feature, Supplier<String> toggle) {

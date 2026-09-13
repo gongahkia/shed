@@ -177,7 +177,7 @@ final class MarkdownPreviewAssets implements AutoCloseable {
             if (!hasOnlyPublicAddresses(uri.getHost())) throw new IOException("remote image host is not public");
             HttpRequest request = HttpRequest.newBuilder(uri)
                 .timeout(REMOTE_IMAGE_TIMEOUT)
-                .header("Accept", "image/avif,image/webp,image/png,image/jpeg,image/gif,image/svg+xml;q=0.9,*/*;q=0.1")
+                .header("Accept", "image/png,image/jpeg,image/gif,image/bmp,image/svg+xml;q=0.9,*/*;q=0.1")
                 .GET()
                 .build();
             HttpResponse<InputStream> response = remoteHttp.send(request, HttpResponse.BodyHandlers.ofInputStream());

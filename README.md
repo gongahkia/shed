@@ -50,14 +50,14 @@ Choose a published `shed-<version>.jar`, a bundled-runtime platform installer, o
 #### OSX
 
 1. Install a Java 21 runtime or JDK for macOS.
-2. From the directory containing the published JAR, run `java -jar shed-<version>.jar [file]`.
+2. From the directory containing the published JAR, run `java -jar shed-<version>.jar [path ...]`.
 3. See [install and troubleshooting](./docs/INSTALL.md) for the bundled-runtime macOS arm64 target.
 4. For additional reference, see the [JDK 21 installation guide](https://docs.oracle.com/en/java/javase/21/install/installation-guide.pdf).
 
 #### Windows
 
 1. Install a Java 21 runtime or JDK for Windows.
-2. From PowerShell in the JAR directory, run `java -jar shed-<version>.jar [file]`.
+2. From PowerShell in the JAR directory, run `java -jar shed-<version>.jar [path ...]`.
 3. See [install and troubleshooting](./docs/INSTALL.md) for the bundled-runtime Windows x64 target.
 
 <p align="center">
@@ -70,7 +70,7 @@ Choose a published `shed-<version>.jar`, a bundled-runtime platform installer, o
 2. From the directory containing the published JAR, run:
 
 ```console
-$ java -jar shed-<version>.jar [file]
+$ java -jar shed-<version>.jar [path ...]
 ```
 
 3. See [install and troubleshooting](./docs/INSTALL.md) for the bundled-runtime DEB target.
@@ -89,6 +89,17 @@ $ git clone https://github.com/gongahkia/shed && cd shed
 $ mvn -q -DskipTests package
 $ java -jar target/shed-2.0.0.jar
 ```
+
+For daily use from a source checkout, install the local launcher once. `~/.local/bin` must be on your `PATH`.
+
+```console
+$ make install
+$ shed .
+$ shed src/main/java/shed/Texteditor.java
+$ shed /absolute/path/to/project /absolute/path/to/file.java
+```
+
+`shed` accepts one or more paths. Existing directories become workspace folders and open their file tree; relative paths resolve from the terminal's current directory. During development, `make run .` opens the current folder and `make run path/to/file` opens a file.
 
 ### Native installation methods
 

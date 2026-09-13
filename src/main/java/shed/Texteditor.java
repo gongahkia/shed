@@ -414,15 +414,8 @@ public class Texteditor extends JFrame implements KeyListener {
             toolWindowHost.refreshExtensionViews();
         }
 
-        // Open file from command line or landing page
-        if (args.length > 0) {
-            try {
-                File file = new File(args[0]);
-                openFile(file);
-            } catch (Exception e) {
-                showMessage("Error opening file: " + e.getMessage());
-            }
-        } else {
+        // Open command-line files and folders, or the landing page.
+        if (!openStartupTargets(args)) {
             if (configManager.getSessionRestoreOnStart()) {
                 String restored = loadSession(configManager.getSessionAutoloadName(), true);
                 if (!restored.startsWith("Restored session")) {
@@ -448,6 +441,46 @@ public class Texteditor extends JFrame implements KeyListener {
         startRecoverySnapshotTimer();
         promptRecoveryRestoreIfAvailable();
         fileWatcherService.start();
+    }
+
+    private boolean openStartupTargets(String[] arguments) {
+        if (arguments == null || arguments.length == 0) return false;
+        List<File> folders = new ArrayList<>();
+        List<File> files = new ArrayList<>();
+        for (String argument : arguments) {
+            if (argument == null || argument.isBlank()) continue;
+            File target = new File(argument);
+            if (target.isDirectory()) {
+                folders.add(target);
+            } else {
+                files.add(target);
+            }
+        }
+        if (folders.isEmpty() && files.isEmpty()) return false;
+
+        if (!folders.isEmpty()) {
+            openLandingPage();
+            File activeFolder = folders.getFirst();
+            for (File folder : folders) {
+                String result = workspaceController.addDirectory(folder, folder.equals(activeFolder));
+                if (!result.startsWith("Added workspace folder:") && !result.startsWith("Workspace folder already added:")) {
+                    showMessage(result);
+                }
+            }
+            String treeResult = showFileTree(activeFolder.getAbsolutePath());
+            if (!"Tree pane opened".equals(treeResult)) showMessage(treeResult);
+            EditorPane contentPane = resolveTreeContentPaneForOpen();
+            if (contentPane != null) activateEditorPane(contentPane);
+        }
+
+        for (File file : files) {
+            try {
+                openFile(file);
+            } catch (Exception error) {
+                showMessage("Error opening file " + file.getPath() + ": " + error.getMessage());
+            }
+        }
+        return true;
     }
 
     // Initialize UI components

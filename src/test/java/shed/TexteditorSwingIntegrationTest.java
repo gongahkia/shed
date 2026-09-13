@@ -93,6 +93,53 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void startupFolderCreatesAnActiveWorkspaceAndExplorer() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-startup-folder");
+        Path workspace = tempDir.resolve("startup-workspace");
+        Files.createDirectories(home);
+        Files.createDirectories(workspace);
+        Files.writeString(workspace.resolve("note.txt"), "opened from workspace\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, workspace);
+        try {
+            assertEquals(workspace.toRealPath(), onEdt(() -> editor.workspaceController.activeRoot()));
+            assertEquals(workspace.toRealPath().toFile(), onEdt(() -> editor.treeRoot));
+            assertNotNull(onEdt(() -> editor.treePane));
+            assertTrue(onEdt(() -> editor.treePane.getCustomEditorComponent() instanceof FileTreePanel));
+            assertSame(onEdt(editor::resolveTreeContentPaneForOpen), onEdt(editor::getActivePane));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void startupAcceptsAFolderAndMultipleFiles() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-startup-multiple-targets");
+        Path workspace = tempDir.resolve("startup-multiple-workspace");
+        Path first = workspace.resolve("first.txt");
+        Path second = tempDir.resolve("second.txt");
+        Files.createDirectories(home);
+        Files.createDirectories(workspace);
+        Files.writeString(first, "first\n", StandardCharsets.UTF_8);
+        Files.writeString(second, "second\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, workspace, first, second);
+        try {
+            assertEquals(workspace.toRealPath(), onEdt(() -> editor.workspaceController.activeRoot()));
+            assertTrue(onEdt(() -> editor.treePane.getCustomEditorComponent() instanceof FileTreePanel));
+            List<String> filePaths = onEdt(() -> editor.buffers.stream()
+                .filter(FileBuffer::hasFilePath).map(FileBuffer::getFilePath).toList());
+            assertTrue(filePaths.contains(first.toAbsolutePath().toString()));
+            assertTrue(filePaths.contains(second.toAbsolutePath().toString()));
+            assertEquals(second.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void globalUiZoomShortcutUpdatesTheVisibleInterfaceAndPersistsTheSetting() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-ui-zoom-shortcut");
@@ -1774,12 +1821,13 @@ public class TexteditorSwingIntegrationTest {
             KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED));
     }
 
-    private static Texteditor createEditor(Path home, Path file) throws Exception {
+    private static Texteditor createEditor(Path home, Path... targets) throws Exception {
         String previousHome = System.getProperty("user.home");
         return onEdt(() -> {
             System.setProperty("user.home", home.toString());
             try {
-                return new Texteditor(new String[] {file.toString()});
+                String[] arguments = Arrays.stream(targets).map(Path::toString).toArray(String[]::new);
+                return new Texteditor(arguments);
             } finally {
                 if (previousHome == null) {
                     System.clearProperty("user.home");

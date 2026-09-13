@@ -85,8 +85,10 @@ The JAR needs a Java 21 runtime. Build from source with JDK 21:
 
 ```console
 $ mvn -B -q -DskipTests package
-$ java -jar target/shed-2.0.0.jar [file]
+$ java -jar target/shed-2.0.0.jar [path ...]
 ```
+
+For a source-checkout launcher, run `make install`; it writes `shed` to `~/.local/bin` and the JAR to `~/.local/lib/shed`. Ensure `~/.local/bin` is on `PATH`, then use `shed .` for the current folder or `shed <relative-or-absolute-path>...` for files and folders. `make run .` provides the same current-folder behavior without installation. Existing directories become workspace folders and open their file tree; relative paths resolve from the terminal's current directory.
 
 The native installers are the supported way to avoid a separate runtime. The source build requires the Maven/JDK toolchain and is not a replacement for public package signing.
 

@@ -173,12 +173,14 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(1.1, onEdt(() -> editor.configManager.getUiZoom()));
             assertTrue(Files.readString(home.resolve(".shed/config.toml")).contains("\"ui.zoom\" = 1.1"));
 
-            assertEquals("UI zoom: 120%", onEdt(() -> editor.commandHandler.execute("zoom in")));
+            assertEquals("UI zoom: 120%", onEdt(() -> editor.commandHandler.execute("zoom in default")));
             assertEquals(1.2, onEdt(() -> editor.configManager.getUiZoom()));
             assertEquals("UI zoom: 140%", onEdt(() -> editor.commandHandler.execute("zoom in 20")));
             assertEquals(1.4, onEdt(() -> editor.configManager.getUiZoom()));
             assertEquals("UI zoom: 120%", onEdt(() -> editor.commandHandler.execute("zoom out 20%")));
             assertEquals(1.2, onEdt(() -> editor.configManager.getUiZoom()));
+            assertEquals("UI zoom: 110%", onEdt(() -> editor.commandHandler.execute("zoom out default")));
+            assertEquals(1.1, onEdt(() -> editor.configManager.getUiZoom()));
 
             onEdt(() -> {
                 Object binding = editor.getRootPane().getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
@@ -1108,11 +1110,11 @@ public class TexteditorSwingIntegrationTest {
         try {
             onEdt(() -> {
                 editor.updateQuickfixEntries("test", List.of(new QuickfixService.Entry(target.toString(), 2, 3, "jump", "test")));
-                assertEquals("Quickfix opened", editor.commandHandler.execute("copen"));
+                assertEquals("Quickfix opened", editor.commandHandler.execute("quickfix open"));
                 return null;
             });
 
-            String result = onEdt(() -> editor.commandHandler.execute("cc 1"));
+            String result = onEdt(() -> editor.commandHandler.execute("quickfix current 1"));
             assertEquals("Quickfix 1/1", result);
             assertEquals(target.toFile().getAbsolutePath(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
             assertEquals(8, onEdt(() -> editor.writingArea.getCaretPosition()));

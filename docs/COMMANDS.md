@@ -175,7 +175,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:vs`, `:vsplit`, `:vsp` | Vertical split (`Cmd+Shift+D`) |
 | `:close`, `:clo` | Close active window (`Cmd+W`) |
 | `:window`, `:win` `next\|previous\|left\|right\|up\|down\|equalize\|grow [percent]\|shrink [percent]` | Focus, equalize, or resize editor splits; omitted resize percentage is 5% |
-| `:zoom`, `:uizoom` `in [percent]\|out [percent]\|reset` | Adjust UI zoom by 10%, or by a specified percentage, or restore it to 100% |
+| `:zoom`, `:uizoom` `in [default\|percent]\|out [default\|percent]\|reset` | Adjust UI zoom by the default 10%, or by a specified percentage; `reset` restores 100% |
 | `:open [file\|folder]` | Native file chooser, or workspace-folder chooser that opens its tree |
 | `:files` | Project file finder |
 | `:folder`, `:folders` | Folder chooser + file picker |
@@ -223,14 +223,14 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 
 | Command | Action |
 | :--- | :--- |
-| `:copen` | Open quickfix list |
-| `:cclose` | Close quickfix list |
-| `:cnext`, `:cn` | Next quickfix entry |
-| `:cprev`, `:cp` | Previous quickfix entry |
-| `:cfirst` | First quickfix entry |
-| `:clast` | Last quickfix entry |
-| `:cc` | Jump to current quickfix entry |
-| `:cc <index>` | Jump to one-based quickfix entry index |
+| `:quickfix open`, `:copen` | Open quickfix list |
+| `:quickfix close`, `:cclose` | Close quickfix list |
+| `:quickfix next`, `:cnext`, `:cn` | Next quickfix entry |
+| `:quickfix previous`, `:cprev`, `:cp` | Previous quickfix entry |
+| `:quickfix first`, `:cfirst` | First quickfix entry |
+| `:quickfix last`, `:clast` | Last quickfix entry |
+| `:quickfix current`, `:cc` | Jump to current quickfix entry |
+| `:quickfix current <index>`, `:cc <index>` | Jump to one-based quickfix entry index |
 | `:diagnostics`, `:diag`, `:ldiag` | Push current-buffer LSP diagnostics into quickfix |
 | `:problems`, `:problems ui` | Open the docked, detachable Problems view of live LSP diagnostics plus retained quickfix producers |
 | `:problems text` | Open the current aggregated Problems list as a scratch buffer |

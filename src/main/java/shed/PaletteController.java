@@ -24,10 +24,9 @@ final class PaletteController {
         action("Toggle File Tree", "tree", "Open or close the workspace file tree."),
         action("File Finder", "files", "Open the project file finder."),
         action("Recent Files", "recent", "Open the recently used files list."),
-        action("Buffer Picker", "buffers", "Open the buffer picker."),
+        action("Buffer Picker", "buffers", "Show every open buffer, filter the list, and switch to a selected buffer."),
         action("Switch to Next Open Buffer", "bn", "Switch to the next open buffer."),
         action("Switch to Previous Open Buffer", "bp", "Switch to the previous open buffer."),
-        action("Show All Open Buffers", "ls", "Show the current and modified state of every open buffer."),
         action("Close Current Buffer", "bd", "Close the current buffer, prompting when needed."),
         action("Save Current Buffer", "w", "Write the current buffer."),
         action("Save All Buffers", "wa", "Write all modified file-backed buffers."),
@@ -211,11 +210,8 @@ final class PaletteController {
 
 
     public String showBufferFinder() {
-        List<String> candidates = new ArrayList<>();
-        for (int i = 0; i < editor.buffers.size(); i++) {
-            candidates.add((i + 1) + ": " + editor.buffers.get(i).getDisplayName());
-        }
-        String selection = showPaletteDialog("Buffers", candidates, value -> "Switch to " + value);
+        List<String> candidates = bufferPickerCandidates(editor.buffers, editor.currentBufferIndex);
+        String selection = showPaletteDialog("Open Buffers", candidates, value -> "Switch to " + value);
         if (selection == null || selection.isEmpty()) {
             return "Buffer finder cancelled";
         }
@@ -229,6 +225,26 @@ final class PaletteController {
             }
         }
         return "Buffer finder cancelled";
+    }
+
+    static List<String> bufferPickerCandidates(List<FileBuffer> buffers, int currentBufferIndex) {
+        if (buffers == null || buffers.isEmpty()) {
+            return List.of();
+        }
+        List<String> candidates = new ArrayList<>(buffers.size());
+        for (int i = 0; i < buffers.size(); i++) {
+            FileBuffer buffer = buffers.get(i);
+            StringBuilder candidate = new StringBuilder().append(i + 1).append(": ")
+                .append(buffer == null ? "[Unavailable]" : buffer.getDisplayName());
+            if (buffer != null && buffer.isModified()) {
+                candidate.append(" [+]");
+            }
+            if (i == currentBufferIndex) {
+                candidate.append(" (current)");
+            }
+            candidates.add(candidate.toString());
+        }
+        return List.copyOf(candidates);
     }
 
 
@@ -584,11 +600,9 @@ final class PaletteController {
             case "bp":
             case "bprev":
                 return "Switch to previous buffer.";
-            case "ls":
-                return "List open buffers.";
             case "buffers":
             case "buf":
-                return "Open buffer picker.";
+                return "Show all open buffers, filter the list, and switch to a selected buffer.";
             case "bd":
             case "bdelete":
                 return "Delete current buffer.";

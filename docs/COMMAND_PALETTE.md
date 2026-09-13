@@ -10,7 +10,7 @@ Each action is unique by visible label and normalized command. The application r
 | :--- | :--- | :--- |
 | Open File | `:open file` | Choose and open a local file. |
 | Open Folder | `:open folder` | Choose a local folder, activate it as the workspace, and show its file tree. |
-| Toggle File Tree | `:tree` | Open or close the workspace file tree. |
+| Toggle File Tree | `:tree toggle` | Open or close the workspace file tree. |
 | File Finder | `:files` | Open the project file finder. |
 | Recent Files | `:recent` | Open the recently used files list. |
 | Buffer Picker | `:buffers` | Show every open buffer, filter the list, and switch to a selected buffer. |

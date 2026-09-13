@@ -149,7 +149,7 @@ final class TreeGitController {
 
     public String handleTreeCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
-        if (trimmed.isEmpty()) {
+        if (trimmed.isEmpty() || "toggle".equalsIgnoreCase(trimmed)) {
             return showFileTree("");
         }
 

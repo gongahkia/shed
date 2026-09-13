@@ -21,7 +21,7 @@ final class PaletteController {
     private static final List<PaletteAction> SURFACE_ACTIONS = actions(
         action("Open File", "open file", "Choose and open a local file."),
         action("Open Folder", "open folder", "Choose a local folder, activate it as the workspace, and show its file tree."),
-        action("Toggle File Tree", "tree", "Open or close the workspace file tree."),
+        action("Toggle File Tree", "tree toggle", "Open or close the workspace file tree."),
         action("File Finder", "files", "Open the project file finder."),
         action("Recent Files", "recent", "Open the recently used files list."),
         action("Buffer Picker", "buffers", "Show every open buffer, filter the list, and switch to a selected buffer."),

@@ -16,11 +16,11 @@ public class MultiSelectionEditServiceTest {
     Path tempDir;
 
     @Test
-    void defaultsKeepMultiSelectionDisabled() {
+    void defaultsEnableMultiSelection() {
         String previousHome = System.getProperty("user.home");
         System.setProperty("user.home", tempDir.resolve("home-multi-selection-default").toString());
         try {
-            assertEquals(new MultiSelectionPolicy(false, MultiSelectionPolicy.DEFAULT_MAX_CURSORS),
+            assertEquals(new MultiSelectionPolicy(true, MultiSelectionPolicy.DEFAULT_MAX_CURSORS),
                 new ConfigManager().getMultiSelectionPolicy());
         } finally {
             if (previousHome == null) {

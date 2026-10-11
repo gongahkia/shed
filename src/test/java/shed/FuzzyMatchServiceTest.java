@@ -66,6 +66,14 @@ class FuzzyMatchServiceTest {
     }
 
     @Test
+    void boundedResultsMatchFullSortIncludingScoreTies() {
+        List<String> candidates = java.util.stream.IntStream.range(0, 10_000)
+            .mapToObj(index -> "src/package/Item" + index + ".java").toList();
+        assertEquals(service.matchStrings("itm", candidates, 0).subList(0, 100),
+            service.matchStrings("itm", candidates, 100));
+    }
+
+    @Test
     void match_fuzzyFindsSubsequences() {
         List<String> candidates = Arrays.asList("bracketcolor", "buffers", "bnext");
         List<String> results = service.matchStrings("brc", candidates, 5);

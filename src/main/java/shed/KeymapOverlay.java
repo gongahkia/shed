@@ -148,7 +148,8 @@ final class KeymapOverlay {
                 fixed("Ctrl/Cmd-Shift-Z/Y", "Redo"), fixed("Ctrl/Cmd-PageDown", "Next buffer"),
                 fixed("Ctrl/Cmd-PageUp", "Previous buffer"),
                 fixed("Ctrl/Cmd-Shift-P", "Command palette"), fixed("Ctrl/Cmd-B", "Buffer picker"),
-                fixed("Cmd-D", "Horizontal split"), fixed("Cmd-Shift-D", "Vertical split"),
+                fixed("Ctrl/Cmd-D", "Add next matching selection"),
+                fixed("Alt-Up/Down", "Add cursor above/below"),
                 fixed("Ctrl/Cmd-W", "Close active split"), fixed("Ctrl/Cmd-Q", "Quit"),
                 fixed("F1", "Plain keymap help")
             );

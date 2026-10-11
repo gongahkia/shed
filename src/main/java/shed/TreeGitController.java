@@ -14,6 +14,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class TreeGitController {
+    private static final int FILE_FINDER_LIMIT = 200_000;
+    private static final long FILE_FINDER_CACHE_MILLIS = 3_000;
     private enum InteractiveGitView { BRANCHES, LOG }
 
     private final Texteditor editor;
@@ -21,6 +23,11 @@ final class TreeGitController {
     private File cachedGitWorkingDirectory;
     private boolean cachedGitRootResolved;
     private final ProjectFileScanner projectFileScanner;
+    private List<Path> cachedFinderRoots = List.of();
+    private Map<String, File> cachedFinderFiles = Map.of();
+    private long cachedFinderAt;
+    private int finderJobId = -1;
+    private long finderRequest;
     private FileBuffer interactiveGitBuffer;
     private File interactiveGitRoot;
     private InteractiveGitView interactiveGitView;
@@ -36,31 +43,74 @@ final class TreeGitController {
     }
 
     public String showFileFinder() {
+        List<Path> roots = editor.workspaceController.roots();
+        if (roots.isEmpty()) roots = List.of(inferredProjectRoot());
+        roots = roots.stream().map(path -> path.toAbsolutePath().normalize()).distinct().toList();
+        if (roots.equals(cachedFinderRoots) && System.currentTimeMillis() - cachedFinderAt < FILE_FINDER_CACHE_MILLIS) {
+            return openFinder(cachedFinderFiles);
+        }
+        if (finderJobId >= 0) editor.asyncJobService.cancel(finderJobId);
+        long request = ++finderRequest;
+        List<Path> scanRoots = roots;
+        finderJobId = editor.asyncJobService.submit("project files", token -> scanFinderFiles(scanRoots, token::isCancelled),
+            (snapshot, files, error) -> {
+                if (editor.closingDown || request != finderRequest) return;
+                finderJobId = -1;
+                if (snapshot.getStatus() == AsyncJobService.Status.CANCELLED) return;
+                if (error != null || files == null) {
+                    editor.showMessage("File finder scan failed: " + (error == null ? "unknown error" : error.getMessage()));
+                    return;
+                }
+                cachedFinderRoots = scanRoots;
+                cachedFinderFiles = files;
+                cachedFinderAt = System.currentTimeMillis();
+                editor.showMessage(openFinder(files));
+            });
+        return "Scanning project files…";
+    }
+
+    private Path inferredProjectRoot() {
         FileBuffer buf = editor.getCurrentBuffer();
         File baseDir = buf != null && buf.getFile() != null ? buf.getFile().getParentFile() : new File(".");
         if (baseDir == null) baseDir = new File(".");
-        // Walk up to find project root (has .git or is CWD)
-        File projectRoot = baseDir;
-        File probe = baseDir;
-        for (int i = 0; i < 20 && probe != null; i++) {
-            if (new File(probe, ".git").exists()) { projectRoot = probe; break; }
-            probe = probe.getParentFile();
+        for (File probe = baseDir; probe != null; probe = probe.getParentFile()) {
+            if (new File(probe, ".git").exists()) return probe.toPath();
         }
-        List<String> files = new ArrayList<>();
-        collectProjectFiles(projectRoot, projectRoot.getAbsolutePath(), files, 5000);
-        if (files.isEmpty()) {
-            return "No files found";
+        return baseDir.toPath();
+    }
+
+    private Map<String, File> scanFinderFiles(List<Path> roots, ProjectFileScanner.Cancellation cancellation) {
+        Map<String, File> files = new LinkedHashMap<>();
+        for (Path root : roots) {
+            List<String> relativeFiles = GitProjectFileListing.list(root, FILE_FINDER_LIMIT - files.size(), cancellation);
+            if (relativeFiles == null) {
+                ProjectFileScanner.ScanResult scan = projectFileScanner.scan(root, root, FILE_FINDER_LIMIT - files.size(), cancellation);
+                if (scan.cancelled()) return Map.of();
+                relativeFiles = scan.files();
+            }
+            if (cancellation.isCancelled()) return Map.of();
+            for (String relative : relativeFiles) {
+                String label = roots.size() == 1 ? relative : root.getFileName() + File.separator + relative;
+                if (files.containsKey(label)) label = root + File.separator + relative;
+                files.put(label, root.resolve(relative).toFile());
+            }
+            if (files.size() >= FILE_FINDER_LIMIT) break;
         }
-        Map<String, String> filesByCandidate = new LinkedHashMap<>();
-        for (String file : files) filesByCandidate.put(file, file);
-        String selected = editor.showPaletteDialog("Find File", new ArrayList<>(filesByCandidate.keySet()),
-            FileFinderIcons.renderer(editor, filesByCandidate));
+        return files;
+    }
+
+    private String openFinder(Map<String, File> files) {
+        if (files.isEmpty()) return "No files found";
+        Map<String, String> labels = new LinkedHashMap<>();
+        for (String label : files.keySet()) labels.put(label, files.get(label).getPath());
+        String selected = editor.showPaletteDialog("Find File", new ArrayList<>(files.keySet()),
+            FileFinderIcons.renderer(editor, labels));
         if (selected == null) return "File finder cancelled";
         try {
-            String relativePath = filesByCandidate.get(selected);
-            if (relativePath == null) return "File finder selection is unavailable";
-            editor.openFile(new File(projectRoot, relativePath));
-            return "Opened: " + relativePath;
+            File file = files.get(selected);
+            if (file == null) return "File finder selection is unavailable";
+            editor.openFile(file);
+            return "Opened: " + selected;
         } catch (IOException e) {
             return "Error opening file: " + e.getMessage();
         }

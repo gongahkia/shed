@@ -4,10 +4,13 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.text.BadLocationException;
 import java.awt.*;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.List;
@@ -175,11 +178,11 @@ final class InputController {
             editor.showMessage(editor.adjustUiZoom(uiZoomDirection));
             return;
         }
-        if (handlePaneShortcut(e)) {
+        KeymapProfile profile = editor.configManager.getKeymapProfile();
+        if (profile != KeymapProfile.PLAIN && handlePaneShortcut(e)) {
             editor.requestStatusBarRefresh();
             return;
         }
-        KeymapProfile profile = editor.configManager.getKeymapProfile();
         if (profile != KeymapProfile.EMACS) {
             emacsPrefix = EmacsKeymap.Prefix.NONE;
         }
@@ -313,8 +316,33 @@ final class InputController {
 
     private void handlePlainKeymap(KeyEvent event) {
         ensureNonModalEditing();
+        if (event.getKeyCode() == KeyEvent.VK_ESCAPE && !editor.extraSelections.isEmpty()) {
+            editor.clearExtraCursors();
+            event.consume();
+            return;
+        }
+        if (!editor.extraSelections.isEmpty() && editor.writingArea.isEditable()
+            && !event.isControlDown() && !event.isMetaDown() && !event.isAltDown()) {
+            if (event.getKeyCode() == KeyEvent.VK_BACK_SPACE || event.getKeyCode() == KeyEvent.VK_DELETE) {
+                if (editor.editActionController.applyPlainMultiCursorEdit("", event.getKeyCode() == KeyEvent.VK_BACK_SPACE,
+                    event.getKeyCode() == KeyEvent.VK_DELETE)) event.consume();
+                return;
+            }
+            if (event.getKeyCode() == KeyEvent.VK_ENTER || event.getKeyCode() == KeyEvent.VK_TAB) {
+                if (editor.editActionController.applyPlainMultiCursorEdit(event.getKeyCode() == KeyEvent.VK_ENTER ? "\n" : "\t",
+                    false, false)) event.consume();
+                return;
+            }
+        }
+        if (!editor.extraSelections.isEmpty() && handlePlainMultiSelectionClipboard(event)) return;
         PlainKeymap.Action action = PlainKeymap.actionFor(event);
         if (action == PlainKeymap.Action.NONE) {
+            if (!editor.extraSelections.isEmpty() && switch (event.getKeyCode()) {
+                case KeyEvent.VK_LEFT, KeyEvent.VK_RIGHT, KeyEvent.VK_UP, KeyEvent.VK_DOWN,
+                    KeyEvent.VK_HOME, KeyEvent.VK_END, KeyEvent.VK_PAGE_UP, KeyEvent.VK_PAGE_DOWN,
+                    KeyEvent.VK_BACK_SPACE, KeyEvent.VK_DELETE -> true;
+                default -> false;
+            }) editor.clearExtraCursors();
             return;
         }
         event.consume();
@@ -335,14 +363,60 @@ final class InputController {
             case REPLACE -> replacePlain();
             case GO_TO_LINE -> goToPlainLine();
             case UNDO -> {
+                editor.clearExtraCursors();
                 if (editor.writingArea.isEditable() && editor.undoManager.canUndo()) editor.undoManager.undo();
             }
             case REDO -> {
+                editor.clearExtraCursors();
                 if (editor.writingArea.isEditable() && editor.undoManager.canRedo()) editor.undoManager.redo();
             }
+            case NEXT_SELECTION -> editor.addCursorAtNextMatch();
+            case CURSOR_ABOVE -> editor.addCursorAbove();
+            case CURSOR_BELOW -> editor.addCursorBelow();
             case NONE -> { }
             default -> executePlainCommand(action);
         }
+    }
+
+    private boolean handlePlainMultiSelectionClipboard(KeyEvent event) {
+        if (!(event.isControlDown() || event.isMetaDown()) || event.isAltDown() || event.isShiftDown()
+            || event.isControlDown() && event.isMetaDown()) return false;
+        int key = event.getKeyCode();
+        if (key == KeyEvent.VK_V) {
+            if (!editor.writingArea.isEditable()) return false;
+            try {
+                Object value = Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
+                if (value instanceof String content && editor.editActionController.applyPlainMultiCursorEdit(content, false, false)) {
+                    event.consume();
+                    return true;
+                }
+            } catch (HeadlessException | IllegalStateException | java.awt.datatransfer.UnsupportedFlavorException | IOException ignored) { }
+            return false;
+        }
+        if (key != KeyEvent.VK_C && key != KeyEvent.VK_X) return false;
+        String text = editor.writingArea.getText();
+        List<MultiSelection> selections = new ArrayList<>(editor.extraSelections);
+        selections.add(new MultiSelection(editor.writingArea.getSelectionStart(), editor.writingArea.getSelectionEnd()));
+        selections.sort(Comparator.comparingInt(MultiSelection::start));
+        List<String> chunks = new ArrayList<>();
+        for (MultiSelection selection : selections) {
+            if (selection.end() > text.length()) {
+                editor.clearExtraCursors();
+                return false;
+            }
+            if (!selection.collapsed()) chunks.add(text.substring(selection.start(), selection.end()));
+        }
+        if (chunks.isEmpty()) return false;
+        try {
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(String.join("\n", chunks)), null);
+        } catch (HeadlessException | IllegalStateException ignored) {
+            return false;
+        }
+        if (key == KeyEvent.VK_X && editor.writingArea.isEditable()) {
+            editor.editActionController.applyPlainMultiCursorEdit("", false, false);
+        }
+        event.consume();
+        return true;
     }
 
     private void executePlainCommand(PlainKeymap.Action action) {
@@ -2873,6 +2947,16 @@ final class InputController {
 
 
     public void keyTyped(KeyEvent e) {
+        if (editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN) {
+            char typed = e.getKeyChar();
+            if (!editor.extraSelections.isEmpty() && editor.writingArea.isEditable()
+                && !e.isControlDown() && !e.isMetaDown() && !e.isAltDown()
+                && !Character.isISOControl(typed)
+                && editor.editActionController.applyPlainMultiCursorEdit(String.valueOf(typed), false, false)) {
+                e.consume();
+            }
+            return;
+        }
         if (!editor.configManager.getKeymapProfile().usesVimModeHandling()) {
             return;
         }

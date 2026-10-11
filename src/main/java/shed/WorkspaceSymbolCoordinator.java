@@ -9,6 +9,7 @@ final class WorkspaceSymbolCoordinator {
     private final Texteditor editor;
     private long activeRequest;
     private WorkspaceIndexService.CancellationSource activeCancellation;
+    private WorkspaceSymbolService symbolSearchService;
 
     WorkspaceSymbolCoordinator(Texteditor editor) {
         this.editor = editor;
@@ -34,10 +35,17 @@ final class WorkspaceSymbolCoordinator {
         boolean persistentIndexEnabled = editor.configManager.getWorkspaceIndexEnabled();
         int jobId = editor.asyncJobService.submit("local workspace symbols: " + query, token -> {
             token.onCancel(cancellation::cancel);
-            WorkspaceIndexService index = new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
-            return new WorkspaceSymbolService(index, editor.symbolService).search(persistentIndexEnabled, roots, query, cancellation);
+            return symbolSearchService().search(persistentIndexEnabled, roots, query, cancellation);
         }, (snapshot, result, error) -> complete(request, query, snapshot, result, error));
         return "Loading local workspace symbols (job " + jobId + ")";
+    }
+
+    private synchronized WorkspaceSymbolService symbolSearchService() {
+        if (symbolSearchService == null) {
+            WorkspaceIndexService index = new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
+            symbolSearchService = new WorkspaceSymbolService(index, editor.symbolService);
+        }
+        return symbolSearchService;
     }
 
     private void complete(long request, String query, AsyncJobService.JobSnapshot snapshot, WorkspaceSymbolService.SearchResult result,

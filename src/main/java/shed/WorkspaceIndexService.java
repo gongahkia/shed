@@ -22,11 +22,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 final class WorkspaceIndexService {
     static final int VERSION = 1;
+    private static final long RECENT_INDEX_MILLIS = 3_000;
 
     private final Path storageDirectory;
     private final IgnoreMatcher ignoreMatcher;
     private final IgnoreMatcher additionalIgnoreMatcher;
     private volatile Status status;
+    private volatile BuildResult recentBuild;
+    private volatile long recentBuildAt;
+    private volatile long recentBuildFileSize;
+    private volatile long recentBuildFileModifiedAt;
 
     WorkspaceIndexService(Path storageDirectory) {
         this(storageDirectory, new GitIgnoreMatcher(), IgnoreMatcher.NONE);
@@ -55,6 +60,7 @@ final class WorkspaceIndexService {
         Cancellation effectiveCancellation = cancellation == null ? Cancellation.NONE : cancellation;
         Observer effectiveObserver = observer == null ? Observer.NO_OP : observer;
         if (!enabled) {
+            recentBuild = null;
             Status disabled = Status.disabled();
             publish(disabled, effectiveObserver);
             return new BuildResult(null, disabled, null);
@@ -108,7 +114,9 @@ final class WorkspaceIndexService {
                         Path relative = root.relativize(normalized);
                         candidates.add(new Entry(relativePath(relative), attributes.size(), attributes.lastModifiedTime().toMillis()));
                     }
-                    publish(progress.status(State.BUILDING, activity), effectiveObserver);
+                    if ((progress.visited + progress.skipped + progress.outsideBoundary) % 256 == 0) {
+                        publish(progress.status(State.BUILDING, activity), effectiveObserver);
+                    }
                     return FileVisitResult.CONTINUE;
                 }
 
@@ -153,7 +161,14 @@ final class WorkspaceIndexService {
             }
             Status ready = progress.status(State.READY, persist ? "indexed" : "scanned");
             publish(ready, effectiveObserver);
-            return new BuildResult(index, ready, target);
+            BuildResult built = new BuildResult(index, ready, target);
+            if (persist) {
+                recentBuild = built;
+                recentBuildAt = System.currentTimeMillis();
+                recentBuildFileSize = Files.size(target);
+                recentBuildFileModifiedAt = Files.getLastModifiedTime(target).toMillis();
+            }
+            return built;
         } catch (IOException | SecurityException error) {
             Status failed = progress.status(State.FAILED, failureMessage(error));
             publish(failed, effectiveObserver);
@@ -164,6 +179,18 @@ final class WorkspaceIndexService {
     BuildResult recover(boolean enabled, Path workspaceRoot, Cancellation cancellation, Observer observer) {
         if (!enabled) {
             return build(false, workspaceRoot, cancellation, observer);
+        }
+        BuildResult cached = recentBuild;
+        if (cached != null && cached.index() != null && workspaceRoot != null
+            && !((cancellation == null ? Cancellation.NONE : cancellation).isCancelled())
+            && workspaceRoot.toAbsolutePath().normalize().toString().equals(cached.index().root())
+            && System.currentTimeMillis() - recentBuildAt < RECENT_INDEX_MILLIS
+            && persistedCacheUnchanged(cached.persistedPath())) {
+            Status reused = new Status(State.READY, cached.status().workspaceRoot(), cached.status().visited(),
+                cached.status().indexed(), cached.status().ignored(), cached.status().skipped(), cached.status().unreadable(),
+                cached.status().outsideBoundary(), cached.status().excludedDirectories(), "using recent in-memory index");
+            publish(reused, observer == null ? Observer.NO_OP : observer);
+            return new BuildResult(cached.index(), reused, cached.persistedPath());
         }
         WorkspaceIndex previous = null;
         String priorState = "missing";
@@ -187,6 +214,16 @@ final class WorkspaceIndexService {
         Observer effectiveObserver = observer == null ? Observer.NO_OP : observer;
         publish(recovered, effectiveObserver);
         return new BuildResult(rebuilt.index(), recovered, rebuilt.persistedPath());
+    }
+
+    private boolean persistedCacheUnchanged(Path path) {
+        if (path == null) return false;
+        try {
+            return Files.size(path) == recentBuildFileSize
+                && Files.getLastModifiedTime(path).toMillis() == recentBuildFileModifiedAt;
+        } catch (IOException | SecurityException error) {
+            return false;
+        }
     }
 
     Status status() {
@@ -435,9 +472,13 @@ final class WorkspaceIndexService {
     private static final class GitIgnoreMatcher implements IgnoreMatcher {
         @Override
         public boolean isIgnored(Path workspaceRoot, Path relativePath) throws IOException {
-            Process process = new ProcessBuilder("git", "-C", workspaceRoot.toString(), "check-ignore", "--no-index", "--quiet", "--stdin", "-z")
-                .redirectErrorStream(true)
-                .start();
+            Process process;
+            try {
+                process = new ProcessBuilder("git", "-C", workspaceRoot.toString(), "check-ignore", "--no-index", "--quiet", "--stdin", "-z")
+                    .redirectErrorStream(true).start();
+            } catch (IOException unavailable) {
+                return false;
+            }
             try (OutputStream input = process.getOutputStream()) {
                 input.write(relativePath(relativePath).getBytes(StandardCharsets.UTF_8));
                 input.write(0);
@@ -451,6 +492,7 @@ final class WorkspaceIndexService {
                 if (exitCode == 1) {
                     return false;
                 }
+                if (notGitRepository(output)) return false;
                 throw new IOException("git check-ignore failed: " + new String(output, StandardCharsets.UTF_8).trim());
             } catch (InterruptedException error) {
                 Thread.currentThread().interrupt();
@@ -459,8 +501,13 @@ final class WorkspaceIndexService {
         }
 
         Set<String> ignoredPaths(Path workspaceRoot, List<Entry> candidates, Cancellation cancellation) throws IOException {
-            Process process = new ProcessBuilder("git", "-C", workspaceRoot.toString(), "check-ignore", "--no-index", "-z", "--stdin")
-                .redirectErrorStream(true).start();
+            Process process;
+            try {
+                process = new ProcessBuilder("git", "-C", workspaceRoot.toString(), "check-ignore", "--no-index", "-z", "--stdin")
+                    .redirectErrorStream(true).start();
+            } catch (IOException unavailable) {
+                return Set.of();
+            }
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             Thread reader = Thread.startVirtualThread(() -> {
                 try (java.io.InputStream input = process.getInputStream()) {
@@ -485,6 +532,7 @@ final class WorkspaceIndexService {
                     return Set.of();
                 }
                 if (exitCode != 0) {
+                    if (notGitRepository(output.toByteArray())) return Set.of();
                     throw new IOException("git check-ignore failed: " + output.toString(StandardCharsets.UTF_8).trim());
                 }
                 Set<String> ignored = new LinkedHashSet<>();
@@ -499,6 +547,10 @@ final class WorkspaceIndexService {
                 Thread.currentThread().interrupt();
                 throw new IOException("git check-ignore interrupted", error);
             }
+        }
+
+        private static boolean notGitRepository(byte[] output) {
+            return new String(output, StandardCharsets.UTF_8).contains("not a git repository");
         }
     }
 }

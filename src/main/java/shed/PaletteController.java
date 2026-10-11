@@ -12,6 +12,7 @@ import java.util.*;
 import java.util.List;
 
 final class PaletteController {
+    private static final int PALETTE_RESULT_LIMIT = 200;
     private record PaletteAction(String label, String command, String description) { }
 
     /*
@@ -836,7 +837,9 @@ final class PaletteController {
             javax.swing.BorderFactory.createMatteBorder(0, 0, 1, 0, editor.configManager.getCaretColor()),
             javax.swing.BorderFactory.createEmptyBorder(6, 8, 6, 8)));
         DefaultListModel<String> model = new DefaultListModel<>();
-        for (String candidate : candidates) model.addElement(candidate);
+        for (int index = 0; index < Math.min(PALETTE_RESULT_LIMIT, candidates.size()); index++) {
+            model.addElement(candidates.get(index));
+        }
         JList<String> list = new JList<>(model);
         AccessibilitySupport.describe(list, title + " results", "Matching " + title.toLowerCase(Locale.ROOT) + " entries. Use Up and Down to select, Enter to open, or Escape to dismiss.");
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -879,17 +882,36 @@ final class PaletteController {
             previewArea.setText(preview == null ? "" : preview);
             previewArea.setCaretPosition(0);
         };
+        final long[] filterVersion = { 0 };
+        final SwingWorker<?, ?>[] activeFilter = { null };
+        javax.swing.Timer filterTimer = new javax.swing.Timer(75, event -> {
+            String query = filterField.getText();
+            long version = filterVersion[0];
+            activeFilter[0] = new SwingWorker<List<String>, Void>() {
+                @Override protected List<String> doInBackground() {
+                    return editor.fuzzyMatchService.matchStrings(query, candidates, PALETTE_RESULT_LIMIT);
+                }
+                @Override protected void done() {
+                    if (isCancelled() || version != filterVersion[0] || !dialog.isDisplayable()) return;
+                    try {
+                        model.clear();
+                        for (String match : get()) model.addElement(match);
+                        if (!model.isEmpty()) list.setSelectedIndex(0);
+                        syncPreview.run();
+                    } catch (Exception ignored) { }
+                }
+            };
+            activeFilter[0].execute();
+        });
+        filterTimer.setRepeats(false);
         filterField.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) { refilter(); }
             public void removeUpdate(DocumentEvent e) { refilter(); }
             public void changedUpdate(DocumentEvent e) { refilter(); }
             private void refilter() {
-                String query = filterField.getText();
-                model.clear();
-                if (query.isEmpty()) { for (String c2 : candidates) model.addElement(c2); }
-                else { for (String m : editor.fuzzyMatchService.matchStrings(query, candidates, 0)) model.addElement(m); }
-                if (!model.isEmpty()) list.setSelectedIndex(0);
-                syncPreview.run();
+                filterVersion[0]++;
+                if (activeFilter[0] != null) activeFilter[0].cancel(true);
+                filterTimer.restart();
             }
         });
         list.addListSelectionListener(e -> {
@@ -928,6 +950,8 @@ final class PaletteController {
         dialog.pack();
         dialog.setLocationRelativeTo(editor);
         dialog.setVisible(true);
+        filterTimer.stop();
+        if (activeFilter[0] != null) activeFilter[0].cancel(true);
         return selection[0];
     }
 

@@ -21,12 +21,13 @@ enum KeymapProfile {
 
     static KeymapProfile fromConfig(String value) {
         if (value == null) {
-            return VIM;
+            return PLAIN;
         }
         return switch (value.trim().toLowerCase(Locale.ROOT)) {
             case "plain" -> PLAIN;
             case "emacs" -> EMACS;
-            default -> VIM;
+            case "vim" -> VIM;
+            default -> PLAIN;
         };
     }
 

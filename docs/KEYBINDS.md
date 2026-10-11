@@ -6,7 +6,7 @@ Use `keybind.<scope>.<lhs>` in TOML or `:keymap` for a searchable GUI. In the Vi
 
 ### Plain profile
 
-Set `keymap.profile = "plain"` for non-modal editing. Plain bypasses Vim mode handling and `keybind.<mode>.*` remaps. Typing, arrows, Home/End, selection with Shift, clipboard shortcuts, and Select All use native text bindings. `Ctrl` applies on Linux/Windows and `Cmd` on macOS.
+The default `keymap.profile = "plain"` provides non-modal editing. Plain bypasses Vim mode handling and `keybind.<mode>.*` remaps. Typing, arrows, Home/End, selection with Shift, clipboard shortcuts, and Select All use native text bindings. `Ctrl` applies on Linux/Windows and `Cmd` on macOS.
 
 | Key-binds | Function |
 | :---: | :---: |
@@ -23,9 +23,11 @@ Set `keymap.profile = "plain"` for non-modal editing. Plain bypasses Vim mode ha
 | `Ctrl`/`Cmd` + `Shift` + `Z` or `Ctrl`/`Cmd` + `Y` | Redo |
 | `Ctrl`/`Cmd` + `Page Down` / `Ctrl`/`Cmd` + `Page Up` | Next / previous buffer |
 | `Ctrl`/`Cmd` + `Shift` + `P` | Command palette |
+| `Ctrl`/`Cmd` + `D` | Add next matching selection |
+| `Alt` + `Up` / `Alt` + `Down` | Add cursor above / below |
+| `Esc` | Clear extra selections |
 | `Ctrl`/`Cmd` + `B` | Buffer picker |
-| `Cmd` + `D` | Horizontal split |
-| `Cmd` + `Shift` + `D` | Vertical split |
+| Command palette: Split Below / Split Right | Split editor |
 | `Ctrl`/`Cmd` + `W` | Close active split |
 | `Ctrl`/`Cmd` + `Q` | Quit; prompt for unsaved changes |
 | `F1` | Plain-keymap help |
@@ -154,7 +156,7 @@ Prefix supported motions and operators with a positive count: `600j` moves down 
 
 #### Experimental multi-selection
 
-Enable ``multi.selection.enabled`` first. ``Ctrl+Shift+D`` adds the next matching selection, and ``Alt+J`` / ``Alt+K`` add a cursor below / above (``Shift`` reverses either direction). Insert text, ``Backspace``, and ``Delete`` apply to every active selection; ``Esc`` clears extras. The total includes the primary cursor and is capped by ``multi.selection.max.cursors``.
+Multi-selection is enabled by default; set ``multi.selection.enabled = false`` to disable it. In Vim mode, ``Ctrl+Shift+D`` adds the next matching selection, and ``Alt+J`` / ``Alt+K`` add a cursor below / above (``Shift`` reverses either direction). Insert text, ``Backspace``, and ``Delete`` apply to every active selection; ``Esc`` clears extras. The total includes the primary cursor and is capped by ``multi.selection.max.cursors``.
 
 ### `Insert` mode
 

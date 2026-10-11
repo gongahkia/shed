@@ -29,9 +29,9 @@ public class ProjectFileScannerTest {
         ProjectFileScanner.ScanResult full = scanner.scan(tempDir, tempDir, 10, ProjectFileScanner.Cancellation.NONE);
         ProjectFileScanner.ScanResult limited = scanner.scan(tempDir, tempDir, 2, ProjectFileScanner.Cancellation.NONE);
 
-        assertEquals(List.of("a.txt", "z.txt", "dir" + File.separator + "b.txt"), full.files());
+        assertEquals(List.of(".hidden.txt", "a.txt", "z.txt", "dir" + File.separator + "b.txt"), full.files());
         assertFalse(full.cancelled());
-        assertEquals(List.of("a.txt", "z.txt"), limited.files());
+        assertEquals(List.of(".hidden.txt", "a.txt"), limited.files());
     }
 
     @Test

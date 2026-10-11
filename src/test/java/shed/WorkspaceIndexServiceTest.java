@@ -131,6 +131,20 @@ public class WorkspaceIndexServiceTest {
         assertEquals(incomplete.index(), restarted.load(root));
     }
 
+    @Test
+    void recentIndexIsReusedForRepeatedProjectQueries() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("reused-workspace"));
+        write(root.resolve("one.txt"), "first");
+        WorkspaceIndexService service = new WorkspaceIndexService(tempDir.resolve("reused-index"), (workspace, path) -> false);
+        WorkspaceIndexService.BuildResult built = service.build(true, root, WorkspaceIndexService.Observer.NO_OP);
+
+        WorkspaceIndexService.BuildResult reused = service.recover(true, root, WorkspaceIndexService.Cancellation.NONE,
+            WorkspaceIndexService.Observer.NO_OP);
+
+        assertEquals("using recent in-memory index", reused.status().message());
+        assertTrue(built.index() == reused.index());
+    }
+
     private void initializeGit(Path root) throws Exception {
         Process process = new ProcessBuilder("git", "init", "--quiet", root.toString()).redirectErrorStream(true).start();
         int exitCode = process.waitFor();

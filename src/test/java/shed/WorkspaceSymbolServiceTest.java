@@ -52,4 +52,21 @@ class WorkspaceSymbolServiceTest {
         WorkspaceSymbolService.SearchResult cancelled = bounded.search(false, List.of(root), "large", cancellation);
         assertEquals(WorkspaceSymbolService.State.CANCELLED, cancelled.state());
     }
+
+    @Test
+    void repeatedSymbolQueriesReuseParsedFilesAndRefreshChangedFiles() throws Exception {
+        Path root = Files.createDirectory(temporaryDirectory.resolve("cached-symbols"));
+        Path file = root.resolve("Example.java");
+        Files.writeString(file, "class Example {\n  void before() {}\n}\n");
+        WorkspaceSymbolService service = new WorkspaceSymbolService(
+            new WorkspaceIndexService(temporaryDirectory.resolve("index-cache"), (workspace, path) -> false), new SymbolService());
+
+        assertEquals(1, service.search(false, List.of(root), "before", WorkspaceIndexService.Cancellation.NONE).filesRead());
+        assertEquals(0, service.search(false, List.of(root), "example", WorkspaceIndexService.Cancellation.NONE).filesRead());
+        Files.writeString(file, "class Example {\n  void afterChanged() {}\n}\n");
+        WorkspaceSymbolService.SearchResult changed = service.search(false, List.of(root), "afterChanged",
+            WorkspaceIndexService.Cancellation.NONE);
+        assertEquals(1, changed.filesRead());
+        assertFalse(changed.matches().isEmpty());
+    }
 }

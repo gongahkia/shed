@@ -1024,7 +1024,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return branchName;
     }
 
-    javax.swing.JWindow completionPopup;
+    javax.swing.JPanel completionPopup;
     javax.swing.JList<LspClient.CompletionItem> completionList;
     javax.swing.DefaultListModel<LspClient.CompletionItem> completionModel;
     javax.swing.JLabel completionSource;

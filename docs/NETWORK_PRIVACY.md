@@ -24,6 +24,7 @@ This is a source-level audit of Shed's app-owned outbound-capable paths. Shed ha
 | Docker Compose | Compose actions start only from explicit commands in a workspace with a local Compose file. | The user-installed Docker/Compose CLI owns daemon, registry, image, and network behavior. |
 | Notebook | Kernel discovery, selection, execution, and console actions are explicit. | User-installed Jupyter owns kernel/network behavior. |
 | Git remotes | Fetch, pull, and push occur only from explicit Git controls. | Git owns the remote protocol. |
+| Project file listing | Quick Open runs local `git ls-files` to list tracked and visible untracked files in a repository. | Git reads local index and ignore rules; Shed sends no workspace content. |
 | Debug adapter TCP | `DebugAdapterTransport` starts from an explicit configured debug session and accepts loopback targets only. | No remote adapter address is accepted. |
 | Browser links | Explicit actions delegate a link to the platform browser. | The browser owns resulting requests. |
 | User-controlled child processes | Terminals, tasks, configured language servers, formatters, Docker, and Dev Container commands can launch user-selected programs. | Those programs can have their own network behavior; Shed does not inspect or authorize their traffic. |

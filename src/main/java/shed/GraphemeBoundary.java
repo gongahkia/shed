@@ -12,6 +12,11 @@ final class GraphemeBoundary {
         if (target == 0) {
             return 0;
         }
+        if (isBoundary(text, target) && ascii(text.charAt(target - 1))
+            && (target == 1 || ascii(text.charAt(target - 2)))) {
+            return target >= 2 && text.charAt(target - 2) == '\r' && text.charAt(target - 1) == '\n'
+                ? target - 2 : target - 1;
+        }
         int boundary = 0;
         while (boundary < target) {
             int next = nextBoundary(text, boundary);
@@ -30,6 +35,11 @@ final class GraphemeBoundary {
         int target = clamp(text, offset);
         if (target >= text.length()) {
             return text.length();
+        }
+        if (isBoundary(text, target) && ascii(text.charAt(target))
+            && (target + 1 == text.length() || ascii(text.charAt(target + 1)))) {
+            return text.charAt(target) == '\r' && target + 1 < text.length() && text.charAt(target + 1) == '\n'
+                ? target + 2 : target + 1;
         }
         if (!isBoundary(text, target)) {
             return ceiling(text, target);
@@ -53,6 +63,10 @@ final class GraphemeBoundary {
         return boundary;
     }
 
+    private static boolean ascii(char value) {
+        return value < 128;
+    }
+
     static int ceiling(String text, int offset) {
         if (text == null || text.isEmpty()) {
             return 0;
@@ -70,6 +84,10 @@ final class GraphemeBoundary {
             return offset == 0;
         }
         int target = clamp(text, offset);
+        if (target == 0 || target == text.length()) return true;
+        if (ascii(text.charAt(target - 1)) && ascii(text.charAt(target))) {
+            return text.charAt(target - 1) != '\r' || text.charAt(target) != '\n';
+        }
         int boundary = 0;
         while (boundary < target) {
             boundary = nextBoundary(text, boundary);

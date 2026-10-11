@@ -25,27 +25,28 @@ final class MultiSelectionEditService {
                                                 boolean backward, boolean forward) {
         String text = area.getText();
         validate(text, selections);
-        record Resolved(MultiSelection selection, GraphemeEditRange.Range range) { }
+        record Resolved(GraphemeEditRange.Range range) { }
         List<Resolved> ordered = new ArrayList<>(selections.size());
-        for (MultiSelection selection : selections) ordered.add(new Resolved(selection, resolve(text, selection, backward, forward)));
-        ordered.sort(Comparator.comparingInt((Resolved value) -> value.range().start()).reversed());
+        for (MultiSelection selection : selections) ordered.add(new Resolved(resolve(text, selection, backward, forward)));
+        ordered.sort(Comparator.comparingInt((Resolved value) -> value.range().start()));
         for (int index = 1; index < ordered.size(); index++) {
-            if (ordered.get(index).range().end() > ordered.get(index - 1).range().start()) {
+            if (ordered.get(index - 1).range().end() > ordered.get(index).range().start()) {
                 throw new IllegalArgumentException("multi-selection edits overlap");
             }
         }
-        List<MultiSelection> updated = new ArrayList<>();
+        List<MultiSelection> updated = new ArrayList<>(ordered.size());
+        int adjustment = 0;
         for (Resolved edit : ordered) {
             GraphemeEditRange.Range range = edit.range();
             int delta = replacement.length() - (range.end() - range.start());
-            if (delta != 0 || !range.empty()) area.replaceRange(replacement, range.start(), range.end());
-            for (int index = 0; index < updated.size(); index++) {
-                MultiSelection later = updated.get(index);
-                updated.set(index, MultiSelection.caret(later.start() + delta));
-            }
-            updated.add(MultiSelection.caret(range.start() + replacement.length()));
+            updated.add(MultiSelection.caret(range.start() + replacement.length() + adjustment));
+            adjustment += delta;
         }
-        updated.sort(Comparator.comparingInt(MultiSelection::start));
+        for (int index = ordered.size() - 1; index >= 0; index--) {
+            GraphemeEditRange.Range range = ordered.get(index).range();
+            int delta = replacement.length() - (range.end() - range.start());
+            if (delta != 0 || !range.empty()) area.replaceRange(replacement, range.start(), range.end());
+        }
         return updated;
     }
 
@@ -68,7 +69,7 @@ final class MultiSelectionEditService {
 
     private static GraphemeEditRange.Range resolve(String text, MultiSelection selection, boolean backward, boolean forward) {
         if (!selection.collapsed()) {
-            return GraphemeEditRange.selection(text, selection.start(), selection.end());
+            return new GraphemeEditRange.Range(selection.start(), selection.end());
         }
         if (backward) {
             return GraphemeEditRange.previous(text, selection.start());
@@ -76,7 +77,6 @@ final class MultiSelectionEditService {
         if (forward) {
             return GraphemeEditRange.next(text, selection.start());
         }
-        int caret = GraphemeBoundary.floor(text, selection.start());
-        return new GraphemeEditRange.Range(caret, caret);
+        return new GraphemeEditRange.Range(selection.start(), selection.start());
     }
 }

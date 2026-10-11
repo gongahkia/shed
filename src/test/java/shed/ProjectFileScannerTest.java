@@ -22,6 +22,7 @@ public class ProjectFileScannerTest {
         write("a.txt");
         write("dir/b.txt");
         write(".hidden.txt");
+        write(".github/workflow.yml");
         write("node_modules/package.js");
         write("target/output.class");
         ProjectFileScanner scanner = new ProjectFileScanner();
@@ -29,7 +30,8 @@ public class ProjectFileScannerTest {
         ProjectFileScanner.ScanResult full = scanner.scan(tempDir, tempDir, 10, ProjectFileScanner.Cancellation.NONE);
         ProjectFileScanner.ScanResult limited = scanner.scan(tempDir, tempDir, 2, ProjectFileScanner.Cancellation.NONE);
 
-        assertEquals(List.of(".hidden.txt", "a.txt", "z.txt", "dir" + File.separator + "b.txt"), full.files());
+        assertEquals(List.of(".hidden.txt", "a.txt", "z.txt", ".github" + File.separator + "workflow.yml",
+            "dir" + File.separator + "b.txt"), full.files());
         assertFalse(full.cancelled());
         assertEquals(List.of(".hidden.txt", "a.txt"), limited.files());
     }

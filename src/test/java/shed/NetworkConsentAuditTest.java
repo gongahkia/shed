@@ -78,7 +78,7 @@ public class NetworkConsentAuditTest {
         assertEquals(Set.of(
             "BackgroundTaskProcess.java", "BuiltInRemoteWorkspaceProviders.java", "BuiltInScmContributions.java", "DebugAdapterTransport.java", "DevContainerController.java", "DevContainerRuntime.java", "ExternalFormatter.java",
             "DockerRuntime.java", "JobQuickfixController.java", "LanguageServerDetector.java", "LspClient.java", "NotebookController.java",
-            "NpmManagedLanguageInstaller.java", "PaletteController.java", "SshPortForwardService.java", "SyntaxUiController.java", "WorkspaceIndexService.java"
+            "NpmManagedLanguageInstaller.java", "PaletteController.java", "SshPortForwardService.java", "SyntaxUiController.java", "WorkspaceIndexService.java", "GitProjectFileListing.java"
         ), sourcesContaining("new ProcessBuilder("));
         assertEquals(Set.of("PtyTerminalPane.java"), sourcesContaining("PtyProcessBuilder"));
 

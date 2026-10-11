@@ -748,14 +748,14 @@ final class LspController {
                 if (parent == null) return "Document link source has no parent folder";
                 File target = new File(parent, uri.getPath() == null ? link.getTarget() : uri.getPath());
                 if (!target.isFile()) return "Linked file not found: " + target.getPath();
-                editor.openFile(target);
-                return "Opened document link: " + target.getName();
+                editor.openFileAsync(target);
+                return "Opening document link: " + target.getName();
             }
             if ("file".equalsIgnoreCase(scheme)) {
                 File target = Path.of(uri).toFile();
                 if (!target.isFile()) return "Linked file not found: " + target.getPath();
-                editor.openFile(target);
-                return "Opened document link: " + target.getName();
+                editor.openFileAsync(target);
+                return "Opening document link: " + target.getName();
             }
             if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme) && !"mailto".equalsIgnoreCase(scheme)) {
                 return "Unsupported document-link scheme: " + scheme;
@@ -1387,24 +1387,12 @@ final class LspController {
         if (targetPath == null || targetPath.isBlank()) {
             return "LSP " + label + " target has unsupported URI";
         }
-        try {
-            File targetFile = new File(targetPath);
-            if (!targetFile.exists()) {
-                return "LSP " + label + " target missing: " + targetPath;
-            }
-            editor.recordJumpPosition();
-            editor.openFile(targetFile);
-            String lineResult = editor.gotoLine(location.getLine() + 1);
-            if (lineResult.startsWith("Error") || lineResult.startsWith("Invalid")) {
-                return lineResult;
-            }
-            int lineStart = editor.writingArea.getLineStartOffset(Math.max(0, location.getLine()));
-            int target = Math.min(lineStart + Math.max(0, location.getCharacter()), editor.writingArea.getText().length());
-            editor.writingArea.setCaretPosition(target);
-            return "Opened " + label + " location";
-        } catch (Exception e) {
-            return "LSP " + label + " open failed: " + e.getMessage();
-        }
+        File targetFile = new File(targetPath);
+        if (!targetFile.exists()) return "LSP " + label + " target missing: " + targetPath;
+        editor.recordJumpPosition();
+        editor.openFileAtAsync(targetFile, location.getLine() + 1, location.getCharacter() + 1,
+            "Opened " + label + " location");
+        return "Opening " + label + " location";
     }
 
     WorkspaceEditApplyResult applyWorkspaceTextEdits(List<LspClient.TextEdit> edits) {
@@ -2428,6 +2416,7 @@ final class LspController {
     }
 
     void shutdown() {
+        workspaceSymbolCoordinator.close();
         if (lspChangeTimer != null) {
             lspChangeTimer.stop();
         }

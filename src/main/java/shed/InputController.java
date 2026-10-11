@@ -2667,7 +2667,8 @@ final class InputController {
             int lineHeight = editor.writingArea.getFontMetrics(editor.writingArea.getFont()).getHeight();
             double zoom = editor.configManager.getUiZoom();
             int height = Math.min(Math.max(max * lineHeight + UiZoom.scale(58, zoom), UiZoom.scale(150, zoom)), UiZoom.scale(340, zoom));
-            Dimension size = EditorUiController.constrainSize(new Dimension(UiZoom.scale(760, zoom), height), layer.getSize());
+            Dimension size = new Dimension(Math.max(1, Math.min(UiZoom.scale(760, zoom), layer.getWidth())),
+                Math.max(1, Math.min(height, layer.getHeight())));
             int x = Math.max(0, Math.min(caret.x, layer.getWidth() - size.width));
             int y = Math.max(0, Math.min(caret.y, layer.getHeight() - size.height));
             editor.completionPopup.setSize(size);

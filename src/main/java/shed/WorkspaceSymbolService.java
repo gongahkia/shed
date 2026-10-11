@@ -36,6 +36,10 @@ final class WorkspaceSymbolService {
         this(indexService, symbolService, DEFAULT_MAX_RESULTS, DEFAULT_MAX_FILE_BYTES);
     }
 
+    void close() {
+        indexService.close();
+    }
+
     WorkspaceSymbolService(WorkspaceIndexService indexService, SymbolService symbolService, int maxResults, long maxFileBytes) {
         this.indexService = Objects.requireNonNull(indexService, "indexService");
         this.symbolService = Objects.requireNonNull(symbolService, "symbolService");

@@ -15,6 +15,10 @@ final class WorkspaceSearchCoordinator {
         this.editor = editor;
     }
 
+    void close() {
+        if (indexService != null) indexService.close();
+    }
+
     String search(String argument) {
         String query = argument == null ? "" : argument.trim();
         if (!validQuery(query)) {
@@ -108,7 +112,7 @@ final class WorkspaceSearchCoordinator {
 
     private WorkspaceIndexService workspaceIndexService() {
         if (indexService == null) {
-            indexService = WorkspaceIndexService.withAdditionalIgnore(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"),
+            indexService = WorkspaceIndexService.withAdditionalIgnore(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index-search"),
                 editor.workspaceController.searchExclusionMatcher());
         }
         return indexService;

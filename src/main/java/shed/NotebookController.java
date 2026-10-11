@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /** Opens, saves, and explicitly executes local Jupyter notebooks. */
 final class NotebookController {
@@ -148,10 +149,14 @@ final class NotebookController {
         try {
             NotebookDocument document = NotebookDocument.parse(buffer.getContent())
                 .withKernelSpec(kernel.name(), kernel.displayName(), kernel.language());
-            write(buffer, document);
-            showIfAvailable(pane, buffer);
-            return "Notebook kernel selected and saved: " + kernel.name();
-        } catch (IOException | IllegalArgumentException | IllegalStateException error) {
+            writeAsync(buffer, document, saved -> {
+                if (saved) {
+                    showIfAvailable(pane, buffer);
+                    editor.showMessage("Notebook kernel selected and saved: " + kernel.name());
+                }
+            });
+            return "Saving notebook kernel: " + kernel.name();
+        } catch (IllegalArgumentException | IllegalStateException error) {
             return "Notebook kernel selection failed: " + concise(error);
         }
     }
@@ -195,31 +200,18 @@ final class NotebookController {
     }
 
     private void save(EditorPane pane, FileBuffer buffer, NotebookDocument document) {
-        try {
-            write(buffer, document);
-            editor.showMessage("Notebook saved");
-        } catch (IOException | IllegalStateException error) {
-            editor.showMessage("Notebook save failed: " + concise(error));
-        }
+        writeAsync(buffer, document, saved -> { if (saved) editor.showMessage("Notebook saved"); });
     }
 
     private void run(EditorPane pane, FileBuffer buffer, NotebookDocument document) {
-        try {
-            write(buffer, document);
-        } catch (IOException | IllegalStateException error) {
-            editor.showMessage("Notebook save failed: " + concise(error));
-            return;
-        }
-        runCurrent(pane, buffer, "");
+        writeAsync(buffer, document, saved -> { if (saved) editor.showMessage(runCurrent(pane, buffer, "")); });
     }
 
     private void runThrough(EditorPane pane, FileBuffer buffer, NotebookDocument document, int cellCount) {
-        try {
-            write(buffer, document);
-        } catch (IOException | IllegalStateException error) {
-            editor.showMessage("Notebook save failed: " + concise(error));
-            return;
-        }
+        writeAsync(buffer, document, saved -> { if (saved) executeThroughAfterSave(pane, buffer, document, cellCount); });
+    }
+
+    private void executeThroughAfterSave(EditorPane pane, FileBuffer buffer, NotebookDocument document, int cellCount) {
         if (!editor.ensureProjectTrustForFile(buffer.getFile())) {
             editor.showMessage("Notebook execution blocked: workspace is untrusted");
             return;
@@ -238,13 +230,12 @@ final class NotebookController {
                     editor.showMessage("Notebook cell execution failed: " + concise(error));
                     return;
                 }
-                try {
-                    write(buffer, executed);
-                    showIfAvailable(pane, buffer);
-                    editor.showMessage("Notebook executed through cell " + cellCount);
-                } catch (IOException | IllegalStateException writeError) {
-                    editor.showMessage("Notebook executed but could not save output: " + concise(writeError));
-                }
+                writeAsync(buffer, executed, saved -> {
+                    if (saved) {
+                        showIfAvailable(pane, buffer);
+                        editor.showMessage("Notebook executed through cell " + cellCount);
+                    }
+                });
             });
         editor.showMessage("Notebook cell execution started (job " + job + ", fresh " + (kernel.isBlank() ? "default" : kernel) + " kernel)");
     }
@@ -258,24 +249,31 @@ final class NotebookController {
             return "Jupyter kernel name is invalid";
         }
         Path source = buffer.getFile().toPath().toAbsolutePath().normalize();
-        int job = editor.asyncJobService.submit("Execute notebook " + source.getFileName(), token -> execute(source, selectedKernel, token),
-            (snapshot, output, error) -> {
+        int job = editor.asyncJobService.submit("Execute notebook " + source.getFileName(), token -> {
+            execute(source, selectedKernel, token);
+            try {
+                return new NotebookExecution(new FileBuffer(buffer.getFile(), editor.configManager), null);
+            } catch (IOException reloadError) {
+                return new NotebookExecution(null, reloadError);
+            }
+        }, (snapshot, result, error) -> {
                 if (error != null) {
                     editor.showMessage("Notebook execution failed: " + concise(error));
                     return;
                 }
-                try {
-                    editor.withSuppressedDocumentEvents(() -> {
-                        try { buffer.load(editor.configManager); } catch (IOException loadError) { throw new NotebookLoadException(loadError); }
-                    });
-                    showIfAvailable(pane, buffer);
-                    editor.showMessage("Notebook execution completed");
-                } catch (NotebookLoadException loadError) {
-                    editor.showMessage("Notebook completed but could not reload: " + concise(loadError.getCause()));
+                if (result == null || result.reloadError() != null) {
+                    editor.showMessage("Notebook completed but could not reload: "
+                        + concise(result == null ? new IOException("no reload result") : result.reloadError()));
+                    return;
                 }
+                editor.withSuppressedDocumentEvents(() -> buffer.adoptReloadedState(result.loaded()));
+                showIfAvailable(pane, buffer);
+                editor.showMessage("Notebook execution completed");
             });
         return "Notebook execution started (job " + job + (selectedKernel.isBlank() ? "" : ", kernel " + selectedKernel) + ")";
     }
+
+    private record NotebookExecution(FileBuffer loaded, IOException reloadError) { }
 
     static List<String> executeCommand(Path source, String kernel) {
         if (source == null) throw new IllegalArgumentException("notebook path is required");
@@ -360,11 +358,29 @@ final class NotebookController {
         }
     }
 
-    private void write(FileBuffer buffer, NotebookDocument document) throws IOException {
-        buffer.setContent(document.serialize(), true);
-        buffer.save();
-        editor.syncLspOpen(buffer);
-        editor.updateStatusBar();
+    private void writeAsync(FileBuffer buffer, NotebookDocument document, Consumer<Boolean> completion) {
+        try {
+            buffer.replaceContentUndoably(document.serialize());
+            FileBuffer.SaveSnapshot snapshot = buffer.captureSaveSnapshot(null);
+            editor.asyncJobService.submit("save notebook", token -> {
+                buffer.writeSaveSnapshot(snapshot);
+                return snapshot;
+            }, (job, written, error) -> {
+                if (editor.closingDown) return;
+                if (error != null || written == null || job.getStatus() != AsyncJobService.Status.SUCCEEDED) {
+                    editor.showMessage("Notebook save failed: " + concise(error == null ? new IOException(job.getErrorMessage()) : error));
+                    completion.accept(false);
+                    return;
+                }
+                buffer.completeSaveSnapshot(written);
+                editor.syncLspOpen(buffer);
+                editor.updateStatusBar();
+                completion.accept(true);
+            });
+        } catch (IOException | IllegalStateException error) {
+            editor.showMessage("Notebook save failed: " + concise(error));
+            completion.accept(false);
+        }
     }
 
     private static boolean isNotebook(FileBuffer buffer) {
@@ -397,7 +413,4 @@ final class NotebookController {
         return message == null || message.isBlank() ? error.getClass().getSimpleName() : message.replace('\n', ' ').replace('\r', ' ');
     }
 
-    private static final class NotebookLoadException extends RuntimeException {
-        private NotebookLoadException(IOException cause) { super(cause); }
-    }
 }

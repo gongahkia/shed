@@ -98,6 +98,7 @@ final class WorkspaceController {
         if (added) clearImportedManifest();
         if (activate) roots.activate(root);
         syncTreeRoot(roots.active(), activate);
+        if (added) editor.treeGitController.warmFinderIndex(root);
         return (added ? "Added workspace folder: " : "Workspace folder already added: ") + root;
     }
 
@@ -149,6 +150,7 @@ final class WorkspaceController {
         if (restored.isEmpty() && legacy != null) restored.add(legacy);
         Path active = serializedActive == null ? legacy : existingDirectory(serializedActive);
         roots.replace(restored, active);
+        for (Path root : roots.all()) editor.treeGitController.warmFinderIndex(root);
         if (roots.active() != null) {
             syncTreeRoot(roots.active(), false);
         } else if (legacyTreeRoot != null && legacyTreeRoot.exists()) {

@@ -19,18 +19,18 @@ import java.util.Map;
 final class RecoveryJournal {
     static final int VERSION = 1;
     static final int MAX_ENTRIES = 32;
-    static final int MAX_CONTENT_BYTES = 8 * 1024 * 1024;
+    static final int MAX_CONTENT_BYTES = 32 * 1024 * 1024;
     static final RetentionPolicy DEFAULT_RETENTION_POLICY = new RetentionPolicy(MAX_ENTRIES, MAX_CONTENT_BYTES);
     static final String FILE_NAME = "journal-v1.json";
 
     private RecoveryJournal() {
     }
 
-    static void write(Path directory, Workspace workspace, List<Entry> entries) throws IOException {
-        write(directory, workspace, entries, DEFAULT_RETENTION_POLICY);
+    static Journal write(Path directory, Workspace workspace, List<Entry> entries) throws IOException {
+        return write(directory, workspace, entries, DEFAULT_RETENTION_POLICY);
     }
 
-    static void write(Path directory, Workspace workspace, List<Entry> entries, RetentionPolicy policy) throws IOException {
+    static Journal write(Path directory, Workspace workspace, List<Entry> entries, RetentionPolicy policy) throws IOException {
         if (directory == null) {
             throw new IOException("recovery directory required");
         }
@@ -41,6 +41,7 @@ final class RecoveryJournal {
         envelope.put("payload", payload);
         envelope.put("integrity", "sha256:" + sha256(MiniJson.stringify(payload)));
         atomicWrite(directory.resolve(FILE_NAME), MiniJson.stringify(envelope));
+        return journal;
     }
 
     static Journal read(Path directory) throws IOException {

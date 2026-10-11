@@ -6,12 +6,18 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,18 +26,19 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-final class WorkspaceIndexService {
+final class WorkspaceIndexService implements AutoCloseable {
     static final int VERSION = 1;
-    private static final long RECENT_INDEX_MILLIS = 3_000;
 
     private final Path storageDirectory;
     private final IgnoreMatcher ignoreMatcher;
     private final IgnoreMatcher additionalIgnoreMatcher;
     private volatile Status status;
     private volatile BuildResult recentBuild;
-    private volatile long recentBuildAt;
     private volatile long recentBuildFileSize;
     private volatile long recentBuildFileModifiedAt;
+    private WatchService watcher;
+    private Path watchedRoot;
+    private final Map<WatchKey, Path> watchedDirectories = new HashMap<>();
 
     WorkspaceIndexService(Path storageDirectory) {
         this(storageDirectory, new GitIgnoreMatcher(), IgnoreMatcher.NONE);
@@ -56,11 +63,12 @@ final class WorkspaceIndexService {
         return build(enabled, workspaceRoot, Cancellation.NONE, observer);
     }
 
-    BuildResult build(boolean enabled, Path workspaceRoot, Cancellation cancellation, Observer observer) {
+    synchronized BuildResult build(boolean enabled, Path workspaceRoot, Cancellation cancellation, Observer observer) {
         Cancellation effectiveCancellation = cancellation == null ? Cancellation.NONE : cancellation;
         Observer effectiveObserver = observer == null ? Observer.NO_OP : observer;
         if (!enabled) {
             recentBuild = null;
+            close();
             Status disabled = Status.disabled();
             publish(disabled, effectiveObserver);
             return new BuildResult(null, disabled, null);
@@ -68,7 +76,7 @@ final class WorkspaceIndexService {
         return scanWorkspace(workspaceRoot, effectiveCancellation, effectiveObserver, true);
     }
 
-    BuildResult scan(Path workspaceRoot, Cancellation cancellation, Observer observer) {
+    synchronized BuildResult scan(Path workspaceRoot, Cancellation cancellation, Observer observer) {
         return scanWorkspace(workspaceRoot, cancellation == null ? Cancellation.NONE : cancellation,
             observer == null ? Observer.NO_OP : observer, false);
     }
@@ -88,6 +96,10 @@ final class WorkspaceIndexService {
                 public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
                     if (effectiveCancellation.isCancelled()) {
                         return FileVisitResult.TERMINATE;
+                    }
+                    if (directory.startsWith(storageDirectory)) {
+                        progress.excludedDirectories++;
+                        return FileVisitResult.SKIP_SUBTREE;
                     }
                     if (!directory.equals(root) && ".git".equals(directory.getFileName().toString())) {
                         progress.excludedDirectories++;
@@ -164,9 +176,9 @@ final class WorkspaceIndexService {
             BuildResult built = new BuildResult(index, ready, target);
             if (persist) {
                 recentBuild = built;
-                recentBuildAt = System.currentTimeMillis();
                 recentBuildFileSize = Files.size(target);
                 recentBuildFileModifiedAt = Files.getLastModifiedTime(target).toMillis();
+                installWatcher(root);
             }
             return built;
         } catch (IOException | SecurityException error) {
@@ -176,21 +188,40 @@ final class WorkspaceIndexService {
         }
     }
 
-    BuildResult recover(boolean enabled, Path workspaceRoot, Cancellation cancellation, Observer observer) {
+    synchronized BuildResult recover(boolean enabled, Path workspaceRoot, Cancellation cancellation, Observer observer) {
         if (!enabled) {
             return build(false, workspaceRoot, cancellation, observer);
         }
         BuildResult cached = recentBuild;
         if (cached != null && cached.index() != null && workspaceRoot != null
+            && workspaceRoot.toAbsolutePath().normalize().toString().equals(cached.index().root())
+            && !persistedCacheUnchanged(cached.persistedPath())) {
+            try {
+                WorkspaceIndex persisted = load(workspaceRoot);
+                if (persisted != null) {
+                    cached = new BuildResult(persisted, cached.status(), cached.persistedPath());
+                    recentBuild = cached;
+                    recentBuildFileSize = Files.size(cached.persistedPath());
+                    recentBuildFileModifiedAt = Files.getLastModifiedTime(cached.persistedPath()).toMillis();
+                }
+            } catch (IOException error) {
+                cached = null;
+            }
+        }
+        if (cached != null && cached.index() != null && workspaceRoot != null
             && !((cancellation == null ? Cancellation.NONE : cancellation).isCancelled())
             && workspaceRoot.toAbsolutePath().normalize().toString().equals(cached.index().root())
-            && System.currentTimeMillis() - recentBuildAt < RECENT_INDEX_MILLIS
             && persistedCacheUnchanged(cached.persistedPath())) {
+            BuildResult updated = refreshFromWatch(cached, cancellation == null ? Cancellation.NONE : cancellation);
+            if (updated == null) return build(true, workspaceRoot, cancellation, observer);
             Status reused = new Status(State.READY, cached.status().workspaceRoot(), cached.status().visited(),
-                cached.status().indexed(), cached.status().ignored(), cached.status().skipped(), cached.status().unreadable(),
-                cached.status().outsideBoundary(), cached.status().excludedDirectories(), "using recent in-memory index");
+                updated.index().entries().size(), cached.status().ignored(), cached.status().skipped(), cached.status().unreadable(),
+                cached.status().outsideBoundary(), cached.status().excludedDirectories(),
+                updated.index() == cached.index() ? "using in-memory index" : "incrementally updated index");
             publish(reused, observer == null ? Observer.NO_OP : observer);
-            return new BuildResult(cached.index(), reused, cached.persistedPath());
+            BuildResult result = new BuildResult(updated.index(), reused, cached.persistedPath());
+            recentBuild = result;
+            return result;
         }
         WorkspaceIndex previous = null;
         String priorState = "missing";
@@ -214,6 +245,89 @@ final class WorkspaceIndexService {
         Observer effectiveObserver = observer == null ? Observer.NO_OP : observer;
         publish(recovered, effectiveObserver);
         return new BuildResult(rebuilt.index(), recovered, rebuilt.persistedPath());
+    }
+
+    private BuildResult refreshFromWatch(BuildResult cached, Cancellation cancellation) {
+        if (watcher == null || watchedRoot == null || !watchedRoot.toString().equals(cached.index().root())) return null;
+        Map<String, Entry> entries = null;
+        WatchKey key;
+        try {
+            while ((key = watcher.poll()) != null) {
+                Path directory = watchedDirectories.get(key);
+                if (directory == null) return null;
+                for (WatchEvent<?> event : key.pollEvents()) {
+                    if (cancellation.isCancelled() || event.kind() == StandardWatchEventKinds.OVERFLOW) return null;
+                    if (!(event.context() instanceof Path name)) return null;
+                    Path file = directory.resolve(name).normalize();
+                    if (!file.startsWith(watchedRoot)) return null;
+                    Path relative = watchedRoot.relativize(file);
+                    if (relative.getNameCount() == 0 || ".gitignore".equals(name.toString())
+                        || ".git".equals(name.toString()) || Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS)) return null;
+                    String relativeName = relativePath(relative);
+                    if (entries == null) {
+                        entries = new LinkedHashMap<>();
+                        for (Entry entry : cached.index().entries()) entries.put(entry.relativePath(), entry);
+                    }
+                    if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE
+                        && entries.keySet().stream().anyMatch(path -> path.startsWith(relativeName + "/"))) return null;
+                    entries.remove(relativeName);
+                    if (Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
+                        && !ignoreMatcher.isIgnored(watchedRoot, relative)
+                        && !additionalIgnoreMatcher.isIgnored(watchedRoot, relative)) {
+                        BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                        entries.put(relativeName, new Entry(relativeName, attributes.size(), attributes.lastModifiedTime().toMillis()));
+                    }
+                }
+                if (!key.reset()) return null;
+            }
+            if (entries == null) return cached;
+            WorkspaceIndex updated = new WorkspaceIndex(cached.index().root(), new ArrayList<>(entries.values()));
+            Path path = cached.persistedPath();
+            AtomicFileWriter.write(path, MiniJson.stringify(updated.toMap()).getBytes(StandardCharsets.UTF_8));
+            recentBuildFileSize = Files.size(path);
+            recentBuildFileModifiedAt = Files.getLastModifiedTime(path).toMillis();
+            return new BuildResult(updated, cached.status(), path);
+        } catch (IOException | SecurityException error) {
+            return null;
+        }
+    }
+
+    private void installWatcher(Path root) {
+        close();
+        try {
+            WatchService newWatcher = root.getFileSystem().newWatchService();
+            try {
+                Files.walkFileTree(root, new SimpleFileVisitor<>() {
+                    @Override public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException {
+                        if (directory.startsWith(storageDirectory)) return FileVisitResult.SKIP_SUBTREE;
+                        if (!directory.equals(root) && ".git".equals(directory.getFileName().toString())) {
+                            return FileVisitResult.SKIP_SUBTREE;
+                        }
+                        WatchKey key = directory.register(newWatcher, StandardWatchEventKinds.ENTRY_CREATE,
+                            StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);
+                        watchedDirectories.put(key, directory);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+            } catch (IOException | RuntimeException error) {
+                newWatcher.close();
+                watchedDirectories.clear();
+                return;
+            }
+            watcher = newWatcher;
+            watchedRoot = root;
+        } catch (IOException | UnsupportedOperationException error) {
+            watchedDirectories.clear();
+        }
+    }
+
+    @Override public synchronized void close() {
+        if (watcher != null) {
+            try { watcher.close(); } catch (IOException ignored) { }
+        }
+        watcher = null;
+        watchedRoot = null;
+        watchedDirectories.clear();
     }
 
     private boolean persistedCacheUnchanged(Path path) {
@@ -479,20 +593,24 @@ final class WorkspaceIndexService {
             } catch (IOException unavailable) {
                 return false;
             }
+            IOException writeError = null;
             try (OutputStream input = process.getOutputStream()) {
                 input.write(relativePath(relativePath).getBytes(StandardCharsets.UTF_8));
                 input.write(0);
+            } catch (IOException error) {
+                writeError = error;
             }
             try {
                 int exitCode = process.waitFor();
                 byte[] output = process.getInputStream().readAllBytes();
+                if (notGitRepository(output)) return false;
+                if (writeError != null) throw writeError;
                 if (exitCode == 0) {
                     return true;
                 }
                 if (exitCode == 1) {
                     return false;
                 }
-                if (notGitRepository(output)) return false;
                 throw new IOException("git check-ignore failed: " + new String(output, StandardCharsets.UTF_8).trim());
             } catch (InterruptedException error) {
                 Thread.currentThread().interrupt();
@@ -515,6 +633,7 @@ final class WorkspaceIndexService {
                 } catch (IOException ignored) {
                 }
             });
+            IOException writeError = null;
             try (OutputStream input = process.getOutputStream()) {
                 for (Entry candidate : candidates) {
                     if (cancellation.isCancelled()) {
@@ -524,15 +643,18 @@ final class WorkspaceIndexService {
                     input.write(candidate.relativePath().getBytes(StandardCharsets.UTF_8));
                     input.write(0);
                 }
+            } catch (IOException error) {
+                writeError = error;
             }
             try {
                 int exitCode = process.waitFor();
                 reader.join();
+                if (notGitRepository(output.toByteArray())) return Set.of();
+                if (writeError != null) throw writeError;
                 if (exitCode == 1) {
                     return Set.of();
                 }
                 if (exitCode != 0) {
-                    if (notGitRepository(output.toByteArray())) return Set.of();
                     throw new IOException("git check-ignore failed: " + output.toString(StandardCharsets.UTF_8).trim());
                 }
                 Set<String> ignored = new LinkedHashSet<>();

@@ -171,6 +171,10 @@ final class PaletteController {
         this.workspaceReplaceCoordinator = new WorkspaceReplaceCoordinator(editor);
     }
 
+    void close() {
+        workspaceSearchCoordinator.close();
+    }
+
     public String showCommandPalette() {
         List<String> candidates = commandPaletteCandidates();
         String selected = showPaletteDialog("Command Palette", candidates);
@@ -347,14 +351,9 @@ final class PaletteController {
         if (selection == null || selection.isEmpty()) return "Workspace symbols cancelled";
         WorkspaceSymbolService.Match selected = candidates.get(selection);
         if (selected == null) return "Invalid workspace symbol selection";
-        try {
-            File file = new File(selected.filePath());
-            if (!file.isFile()) return "Workspace symbol file is no longer available: " + selected.relativePath();
-            editor.openFile(file);
-            return editor.gotoLine(selected.line());
-        } catch (IOException error) {
-            return "Could not open workspace symbol: " + error.getMessage();
-        }
+        File file = new File(selected.filePath());
+        if (!file.isFile()) return "Workspace symbol file is no longer available: " + selected.relativePath();
+        return editor.openFileAtAsync(file, selected.line(), 1, "Opened workspace symbol");
     }
 
 

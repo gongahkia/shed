@@ -20,3 +20,103 @@ jobs:
           cache: maven
       - name: Test and package portable JAR
         run: mvn -B -Djava.awt.headless=true clean package
+  swing-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Install virtual display
+        run: sudo apt-get update && sudo apt-get install -y xvfb openbox
+      - name: Run Swing integration tests with a display
+        run: |
+          xvfb-run -a -s "-screen 0 2560x1600x24" bash -c '
+            openbox >/tmp/shed-openbox.log 2>&1 &
+            sleep 1
+            mvn -B -Djava.awt.headless=false -Dtest=TexteditorSwingIntegrationTest test
+          '
+  package-linux:
+    needs: [java-desktop, swing-integration]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y fakeroot
+      - name: Build and verify Debian installer
+        run: bash scripts/package-linux.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shed-linux-x64
+          path: target/linux-package/dist/*
+          if-no-files-found: error
+  package-macos:
+    needs: [java-desktop, swing-integration]
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build and verify macOS installer
+        run: bash scripts/package-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shed-macos-arm64
+          path: target/macos-package/dist/*
+          if-no-files-found: error
+  package-windows:
+    needs: [java-desktop, swing-integration]
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build and verify Windows installer
+        shell: pwsh
+        run: ./scripts/package-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shed-windows-x64
+          path: target/windows-package/dist/*
+          if-no-files-found: error
+  release-verify:
+    needs: [package-linux, package-macos, package-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: shed-*
+          path: target/release-artifacts
+          merge-multiple: true
+      - name: Verify release artifacts
+        run: |
+          version=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
+          bash scripts/verify-release-artifacts.sh --artifacts target/release-artifacts --version "$version"
+          cd target/release-artifacts
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shed-release-verification
+          path: |
+            target/release-artifacts/SHA256SUMS
+            target/release-artifacts/RELEASE_VERIFICATION.txt
+          if-no-files-found: error

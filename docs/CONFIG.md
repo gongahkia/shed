@@ -211,14 +211,14 @@ Highlighting remains lexical, not a general compiler-parser or grammar platform:
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
 | `recovery.retention.max.entries` | `32` | int | Retained recovery entries; `1..32` |
-| `recovery.retention.max.content.bytes` | `8388608` | int | Retained UTF-8 recovery content bytes; `1..8388608` |
+| `recovery.retention.max.content.bytes` | `33554432` | int | Retained UTF-8 recovery content bytes; `1..33554432` |
 | `recovery.cleanup.on.clean.exit` | `true` | bool | Remove the journal only on a clean exit without deferred recovery |
 
 ## Backup Policy
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `backup.enabled` | `false` | bool | Opt in to local versioned backups |
+| `backup.enabled` | `true` | bool | Create local versioned backups while editing |
 | `backup.mode` | `idle` | enum | `idle` writes after 750 ms inactivity and flushes on exit; `save-only` writes before explicit saves |
 | `backup.directory` | `~/.shed/backups` | path | Directory for versioned backups; created on first backup |
 | `backup.retention.count` | `10` | int | Retained backups per source file; `1..100` |

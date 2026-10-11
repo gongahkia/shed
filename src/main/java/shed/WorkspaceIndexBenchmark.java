@@ -19,11 +19,16 @@ final class WorkspaceIndexBenchmark {
         long startedAtNanos = System.nanoTime();
         WorkspaceIndexService.BuildResult result = indexService.build(true, workspaceRoot, cancellation, WorkspaceIndexService.Observer.NO_OP);
         long elapsedNanos = System.nanoTime() - startedAtNanos;
+        long warmStartedAtNanos = System.nanoTime();
+        WorkspaceIndexService.BuildResult warm = result.index() == null ? result
+            : indexService.recover(true, workspaceRoot, cancellation, WorkspaceIndexService.Observer.NO_OP);
+        long warmQueryNanos = System.nanoTime() - warmStartedAtNanos;
         long cacheBytes = cacheBytes(result.persistedPath());
         long inputBytes = result.index() == null ? 0L : result.index().entries().stream().mapToLong(WorkspaceIndexService.Entry::size).sum();
         int outputFiles = result.index() == null ? 0 : result.index().entries().size();
         return new Report(result.status().workspaceRoot(), result.status().state(), elapsedNanos, heapBefore, usedHeapBytes(),
-            result.status().visited(), result.status().ignored(), inputBytes, outputFiles, cacheBytes, result.status().message());
+            result.status().visited(), result.status().ignored(), inputBytes, outputFiles, cacheBytes,
+            warmQueryNanos, warm.status().message(), result.status().message());
     }
 
     private static long usedHeapBytes() {
@@ -44,10 +49,10 @@ final class WorkspaceIndexBenchmark {
 
     record Report(String workspaceRoot, WorkspaceIndexService.State state, long durationNanos, long heapBeforeBytes,
                   long heapAfterBytes, long inputFiles, long ignoredFiles, long inputBytes, int outputFiles,
-                  long cacheBytes, String message) {
+                  long cacheBytes, long warmQueryNanos, String warmQueryMessage, String message) {
         Report {
             if (durationNanos < 0 || heapBeforeBytes < 0 || heapAfterBytes < 0 || inputFiles < 0 || ignoredFiles < 0
-                || inputBytes < 0 || outputFiles < 0 || cacheBytes < 0) {
+                || inputBytes < 0 || outputFiles < 0 || cacheBytes < 0 || warmQueryNanos < 0) {
                 throw new IllegalArgumentException("benchmark counters must be non-negative");
             }
         }
@@ -69,6 +74,8 @@ final class WorkspaceIndexBenchmark {
             values.put("inputBytes", inputBytes);
             values.put("outputFiles", outputFiles);
             values.put("cacheBytes", cacheBytes);
+            values.put("warmQueryNanos", warmQueryNanos);
+            values.put("warmQueryMessage", warmQueryMessage);
             values.put("message", message);
             return values;
         }

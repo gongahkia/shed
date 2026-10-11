@@ -381,8 +381,7 @@ final class TestController {
     String open(TestService.TestCase test) {
         if (test == null) return "Select a test";
         if (test.file() == null || !Files.isRegularFile(test.file())) return "Test source location unavailable";
-        try { editor.openFile(test.file().toFile()); return editor.gotoLine(test.line()); }
-        catch (Exception error) { return "Test source open failed: " + error.getMessage(); }
+        return editor.openFileAtAsync(test.file().toFile(), test.line(), 1, "Opened test source");
     }
 
     String importCoverage(Path root, Path report) {

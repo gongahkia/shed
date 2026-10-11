@@ -368,24 +368,9 @@ final class TerminalController {
             editor.showMessage("Terminal source link is no longer available: " + source.path());
             return;
         }
-        try {
-            editor.recordJumpPosition();
-            editor.openFile(source.path().toFile());
-            String result = editor.gotoLine(source.line());
-            if (result.startsWith("Error") || result.startsWith("Invalid")) {
-                editor.showMessage(result);
-                return;
-            }
-            int line = Math.min(source.line() - 1, Math.max(0, editor.writingArea.getLineCount() - 1));
-            int lineStart = editor.writingArea.getLineStartOffset(line);
-            int target = Math.min(lineStart + source.column() - 1, editor.writingArea.getText().length());
-            editor.writingArea.setCaretPosition(target);
-            editor.showMessage("Opened terminal source link: " + source.path().getFileName());
-        } catch (Exception error) {
-            String detail = error.getMessage();
-            editor.showMessage("Could not open terminal source link: "
-                + (detail == null || detail.isBlank() ? error.getClass().getSimpleName() : detail));
-        }
+        editor.recordJumpPosition();
+        editor.openFileAtAsync(source.path().toFile(), source.line(), source.column(),
+            "Opened terminal source link: " + source.path().getFileName());
     }
 
     private void openTerminalBrowserLink(TerminalLinkResolver.BrowserLink browser) {

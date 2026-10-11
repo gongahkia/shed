@@ -1612,11 +1612,8 @@ final class JobQuickfixController {
         }
 
         if (entry.getFilePath() != null && !entry.getFilePath().isBlank()) {
-            try {
-                editor.openFile(new File(entry.getFilePath()));
-            } catch (IOException e) {
-                return "Quickfix open failed: " + e.getMessage();
-            }
+            return editor.openFileAtAsync(new File(entry.getFilePath()), entry.getLine(), entry.getColumn(),
+                "Quickfix " + (editor.quickfixService.currentIndex() + 1) + "/" + editor.quickfixService.size());
         }
 
         String lineResult = editor.gotoLine(entry.getLine());

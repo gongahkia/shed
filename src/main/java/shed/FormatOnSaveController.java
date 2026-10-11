@@ -14,6 +14,7 @@ final class FormatOnSaveController {
     private record Request(FileBuffer buffer, String targetPath, String content, EditorPane pane) { }
     private record FormatResult(Request request, String uri, Integer version, String content, List<LspClient.TextEdit> edits) { }
     private record ExternalFormatResult(Request request, String content) { }
+    private record SaveOutcome(FileBuffer.SaveSnapshot snapshot, IOException backupError) { }
 
     private final Texteditor editor;
     private final ArrayDeque<Request> pending = new ArrayDeque<>();
@@ -164,7 +165,7 @@ final class FormatOnSaveController {
         String current = buffer == editor.getCurrentBuffer() ? editor.writingArea.getText() : buffer.getContent();
         if (!Objects.equals(result.request().content(), current)) { fail("Formatting before save became stale; file was not written"); return; }
         String formatted = result.content() == null ? "" : result.content();
-        editor.paneBufferController.withSuppressedDocumentEvents(() -> buffer.setContent(formatted, true));
+        editor.paneBufferController.withSuppressedDocumentEvents(() -> buffer.replaceContentUndoably(formatted));
         editor.syncLspChange(buffer);
         finishWrite(result.request());
     }
@@ -185,19 +186,58 @@ final class FormatOnSaveController {
             if (buffer == editor.getCurrentBuffer()) editor.persistCurrentBufferState();
             String previous = buffer.getContent();
             String updated = buffer == editor.getCurrentBuffer() ? editor.writingArea.getText() : buffer.getContent();
-            buffer.setContent(updated);
-            editor.backupBeforeSave(buffer);
-            if (request.targetPath() != null && !request.targetPath().isBlank()) buffer.saveAs(new File(request.targetPath()));
-            else buffer.save();
-            editor.notifyBufferSaved(buffer);
-            String reload = editor.reloadConfigIfSettingsBuffer(buffer, previous, updated);
-            completed++;
-            pending.removeFirst();
-            if (pending.isEmpty() && reload != null && !reload.isBlank()) editor.showMessage(reload);
-            startNext();
+            if (!Objects.equals(previous, updated)) {
+                fail("Save became stale while editing; retry after the current edit finishes");
+                return;
+            }
+            File requestedTarget = request.targetPath() == null || request.targetPath().isBlank()
+                ? null : new File(request.targetPath());
+            if (buffer.isLargeFile()) {
+                if (requestedTarget != null) throw new IOException("Large-file save as is unavailable");
+                editor.asyncJobService.submit("save file", token -> { buffer.save(); return null; },
+                    (job, ignored, error) -> completeWrite(request, previous, updated, null, null, job, error));
+                return;
+            }
+            FileBuffer.SaveSnapshot snapshot = buffer.captureSaveSnapshot(requestedTarget);
+            BackupPolicy backupPolicy = editor.configManager.getBackupPolicy();
+            FileBuffer.BackupSnapshot backup = backupPolicy.enabled()
+                && backupPolicy.mode() == BackupPolicy.BackupMode.SAVE_ONLY ? buffer.captureBackupSnapshot() : null;
+            editor.asyncJobService.submit("save file", token -> {
+                IOException backupError = null;
+                if (backup != null) {
+                    try { buffer.writeBackupSnapshot(backup); }
+                    catch (IOException error) { backupError = error; }
+                }
+                buffer.writeSaveSnapshot(snapshot);
+                return new SaveOutcome(snapshot, backupError);
+            }, (job, outcome, error) -> completeWrite(request, previous, updated, buffer, outcome, job, error));
         } catch (IOException error) {
             fail("Error saving file: " + error.getMessage());
         }
+    }
+
+    private void completeWrite(Request request, String previous, String updated, FileBuffer buffer,
+                               SaveOutcome outcome, AsyncJobService.JobSnapshot job, Exception error) {
+        if (!running || pending.peekFirst() != request) return;
+        if (job.getStatus() != AsyncJobService.Status.SUCCEEDED || error != null) {
+            fail("Error saving file: " + (error == null ? job.getErrorMessage() : error.getMessage()));
+            return;
+        }
+        if (outcome != null) {
+            buffer.completeSaveSnapshot(outcome.snapshot());
+            if (outcome.backupError() != null) {
+                editor.errorReporter.report(outcome.backupError(), "backup", "creating a local save-only backup", "docs/BACKUPS.md");
+            }
+        } else {
+            buffer = request.buffer();
+        }
+        if (!buffer.isModified()) editor.notifyBufferSaved(buffer);
+        String reload = !buffer.isModified() ? editor.reloadConfigIfSettingsBuffer(buffer, previous, updated) : null;
+        completed++;
+        pending.removeFirst();
+        if (pending.isEmpty() && reload != null && !reload.isBlank()) editor.showMessage(reload);
+        if (buffer.isModified()) editor.showMessage("File saved, but newer edits remain unsaved");
+        startNext();
     }
 
     private void fail(String message) {

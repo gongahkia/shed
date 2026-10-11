@@ -14,6 +14,8 @@ final class RecoveryController {
     private final RecoveryJournalScheduler recoveryJournalScheduler;
     private boolean recoveryJournalDeferred;
     private boolean recoveryJournalDiscardConfirmed;
+    private boolean recoveryJournalLoading;
+    private int lastWarnedDroppedEntries = -1;
     private Timer snapshotCaptureTimer;
 
     RecoveryController(Texteditor editor) {
@@ -23,8 +25,16 @@ final class RecoveryController {
                 if (snapshot.entries().isEmpty()) {
                     RecoveryJournal.clear(editor.recoveryStoreDir.toPath());
                 } else {
-                    RecoveryJournal.write(editor.recoveryStoreDir.toPath(), snapshot.workspace(), snapshot.entries(),
+                    RecoveryJournal.Journal journal = RecoveryJournal.write(editor.recoveryStoreDir.toPath(), snapshot.workspace(), snapshot.entries(),
                         editor.configManager.getRecoveryRetentionPolicy());
+                    int dropped = journal.retention().droppedEntries();
+                    if (dropped != lastWarnedDroppedEntries) {
+                        lastWarnedDroppedEntries = dropped;
+                        if (dropped > 0) {
+                            SwingUtilities.invokeLater(() -> editor.showMessage("Recovery warning: " + dropped
+                                + " unsaved buffer(s) exceed journal limits. Save them to disk or raise recovery retention limits."));
+                        }
+                    }
                 }
             },
             () -> RecoveryJournal.clear(editor.recoveryStoreDir.toPath()),
@@ -149,7 +159,6 @@ final class RecoveryController {
 
         if (result == 1) {
             if (!canReloadFromDisk(state)) {
-                buffer.refreshExternalTimestamp();
                 editor.showMessage("Cannot reload: " + externalStateDescription(state) + "; dirty buffer retained");
                 return;
             }
@@ -168,14 +177,20 @@ final class RecoveryController {
         }
         if (result == 2) {
             showExternalConflictPreview(buffer, state);
-            buffer.refreshExternalTimestamp();
             return;
         }
         if (result == 3) {
             saveConflictAs(buffer);
             return;
         }
-        buffer.refreshExternalTimestamp();
+        if (result == 0) {
+            try {
+                buffer.acceptExternalVersionForOverwrite();
+                editor.showMessage("Keeping your buffer; the next save will replace the reviewed disk version");
+            } catch (IOException error) {
+                editor.showMessage("Could not accept external version: " + error.getMessage());
+            }
+        }
     }
 
     private void saveConflictAs(FileBuffer buffer) {
@@ -190,7 +205,6 @@ final class RecoveryController {
         chooser.setDialogTitle("Save My Conflict Copy");
         editor.editorUiController.applyUiTheme(chooser);
         if (chooser.showSaveDialog(editor) != JFileChooser.APPROVE_OPTION) {
-            buffer.refreshExternalTimestamp();
             editor.showMessage("Save As cancelled; dirty buffer retained");
             return;
         }
@@ -199,14 +213,12 @@ final class RecoveryController {
         if (target.exists() && JOptionPane.showConfirmDialog(editor,
             "Replace the selected file?\n" + target.getAbsolutePath(), "Confirm Save As",
             JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) {
-            buffer.refreshExternalTimestamp();
             editor.showMessage("Save As cancelled; dirty buffer retained");
             return;
         }
         try {
             saveConflictAs(buffer, target);
         } catch (IOException error) {
-            buffer.refreshExternalTimestamp();
             editor.showMessage("Save As failed; dirty buffer retained: " + error.getMessage());
         }
     }
@@ -323,10 +335,11 @@ final class RecoveryController {
         if (!SwingUtilities.isEventDispatchThread()) {
             throw new IOException("recovery journal capture must run on the EDT");
         }
-        if (editor.recoveryStoreDir == null || recoveryJournalDeferred) {
+        if (editor.recoveryStoreDir == null || recoveryJournalDeferred || recoveryJournalLoading) {
             return;
         }
-        recoveryJournalScheduler.request(captureRecoveryJournalWorkspace(), captureRecoveryJournalEntries());
+        List<RecoveryInput> inputs = captureRecoveryJournalInputs();
+        recoveryJournalScheduler.requestLazy(captureRecoveryJournalWorkspace(), () -> captureRecoveryJournalEntries(inputs));
     }
 
     private RecoveryJournal.Workspace captureRecoveryJournalWorkspace() {
@@ -336,8 +349,8 @@ final class RecoveryController {
             active != null && active.hasFilePath() ? active.getFilePath() : null, caret);
     }
 
-    private List<RecoveryJournal.Entry> captureRecoveryJournalEntries() {
-        List<RecoveryJournal.Entry> entries = new ArrayList<>();
+    private List<RecoveryInput> captureRecoveryJournalInputs() {
+        List<RecoveryInput> inputs = new ArrayList<>();
         int scratchIndex = 1;
         for (FileBuffer buffer : editor.buffers) {
             if (buffer == null || !buffer.isModified() || buffer.isLargeFile() || buffer == editor.treeBuffer || buffer == editor.quickfixBuffer) {
@@ -346,11 +359,23 @@ final class RecoveryController {
             String snapshotId = buffer.hasFilePath()
                 ? "file-" + Integer.toHexString(buffer.getFilePath().hashCode())
                 : "scratch-" + (scratchIndex++);
-            entries.add(new RecoveryJournal.Entry(snapshotId, buffer.getDisplayName(),
-                buffer.hasFilePath() ? buffer.getFilePath() : null, buffer.getFullContent()));
+            inputs.add(new RecoveryInput(snapshotId, buffer.getDisplayName(),
+                buffer.hasFilePath() ? buffer.getFilePath() : null, buffer));
+        }
+        return inputs;
+    }
+
+    private List<RecoveryJournal.Entry> captureRecoveryJournalEntries(List<RecoveryInput> inputs) {
+        List<RecoveryJournal.Entry> entries = new ArrayList<>();
+        for (RecoveryInput input : inputs) {
+            if (input.buffer().isModified()) {
+                entries.add(new RecoveryJournal.Entry(input.id(), input.name(), input.path(), input.buffer().snapshotContent()));
+            }
         }
         return entries;
     }
+
+    private record RecoveryInput(String id, String name, String path, FileBuffer buffer) { }
 
 
     void clearRecoverySnapshots() {
@@ -393,14 +418,36 @@ final class RecoveryController {
         if (editor.recoveryStoreDir == null) {
             return;
         }
-        RecoveryJournal.Journal journal;
-        try {
-            journal = RecoveryJournal.read(editor.recoveryStoreDir.toPath());
-        } catch (IOException error) {
-            editor.showMessage("Recovery journal rejected: " + error.getMessage());
+        java.nio.file.Path directory = editor.recoveryStoreDir.toPath();
+        recoveryJournalLoading = true;
+        editor.asyncJobService.submit("read recovery journal", token -> RecoveryJournal.read(directory),
+            (job, journal, error) -> {
+                if (editor.closingDown || job.getStatus() == AsyncJobService.Status.CANCELLED) return;
+                try {
+                    if (error != null) {
+                        editor.showMessage("Recovery journal rejected: " + error.getMessage());
+                    } else {
+                        restoreRecoveryJournal(journal);
+                    }
+                } finally {
+                    recoveryJournalLoading = false;
+                    if (!recoveryJournalDeferred && hasModifiedRecoverableBuffer()) scheduleRecoverySnapshotCapture();
+                }
+            });
+    }
+
+    private void restoreRecoveryJournal(RecoveryJournal.Journal journal) {
+        if (editor.closingDown) {
             return;
         }
-        if (journal == null || journal.entries().isEmpty()) {
+        if (journal == null) {
+            return;
+        }
+        if (journal.retention().droppedEntries() > 0) {
+            editor.showMessage("Recovery warning: " + journal.retention().droppedEntries()
+                + " unsaved buffer(s) were too large to retain in the previous session.");
+        }
+        if (journal.entries().isEmpty()) {
             return;
         }
         RecoveryWorkspaceDialog.Result result = RecoveryWorkspaceDialog.showFor(editor, journal);

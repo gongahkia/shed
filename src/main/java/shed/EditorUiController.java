@@ -533,7 +533,7 @@ final class EditorUiController {
                     FileTreeDropPlacement placement = FileTreeDropPlacement.forPoint(event.getLocation(), visibleDropBounds(textArea));
                     String result = editor.openFileInSplit(file, pane, placement.orientation, placement.newPaneFirst);
                     editor.showMessage(result);
-                    event.dropComplete(result.startsWith("Opened in split:"));
+                    event.dropComplete(result.startsWith("Opened in split:") || result.startsWith("Opening in split:"));
                 } catch (Exception error) {
                     editor.showMessage("File drop failed: " + error.getMessage());
                     event.dropComplete(false);

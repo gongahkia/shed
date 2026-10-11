@@ -29,6 +29,8 @@ public class WorkspaceIndexBenchmarkTest {
         assertEquals(7, report.inputBytes());
         assertEquals(2, report.outputFiles());
         assertTrue(report.cacheBytes() > 0);
+        assertTrue(report.warmQueryNanos() >= 0);
+        assertEquals("using in-memory index", report.warmQueryMessage());
         assertTrue(report.format().contains("inputBytes=7\n"));
         assertTrue(report.format().contains("cacheBytes="));
     }

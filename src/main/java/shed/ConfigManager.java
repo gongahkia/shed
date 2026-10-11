@@ -79,7 +79,7 @@ public class ConfigManager {
     private static final int DEFAULT_RECOVERY_RETENTION_MAX_ENTRIES = RecoveryJournal.MAX_ENTRIES;
     private static final int DEFAULT_RECOVERY_RETENTION_MAX_CONTENT_BYTES = RecoveryJournal.MAX_CONTENT_BYTES;
     private static final boolean DEFAULT_RECOVERY_CLEANUP_ON_CLEAN_EXIT = true;
-    private static final boolean DEFAULT_BACKUP_ENABLED = false;
+    private static final boolean DEFAULT_BACKUP_ENABLED = true;
     private static final String DEFAULT_BACKUP_MODE = "idle";
     private static final int DEFAULT_BACKUP_RETENTION_COUNT = BackupPolicy.DEFAULT_RETENTION_COUNT;
     private static final int DEFAULT_UNDO_HISTORY_MAX_ENTRIES = UndoHistoryPolicy.DEFAULT_MAX_ENTRIES;

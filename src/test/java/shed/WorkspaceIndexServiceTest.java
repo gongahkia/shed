@@ -141,8 +141,70 @@ public class WorkspaceIndexServiceTest {
         WorkspaceIndexService.BuildResult reused = service.recover(true, root, WorkspaceIndexService.Cancellation.NONE,
             WorkspaceIndexService.Observer.NO_OP);
 
-        assertEquals("using recent in-memory index", reused.status().message());
+        assertEquals("using in-memory index", reused.status().message());
         assertTrue(built.index() == reused.index());
+    }
+
+    @Test
+    void fileChangesUpdateTheInMemoryIndexWithoutRescanningTheWorkspace() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("incremental-workspace"));
+        Path file = root.resolve("one.txt");
+        write(file, "first");
+        WorkspaceIndexService service = new WorkspaceIndexService(tempDir.resolve("incremental-index"), (workspace, path) -> false);
+        try {
+            service.build(true, root, WorkspaceIndexService.Observer.NO_OP);
+            Files.writeString(file, "second version");
+            WorkspaceIndexService.BuildResult updated = null;
+            for (int attempt = 0; attempt < 50; attempt++) {
+                updated = service.recover(true, root, WorkspaceIndexService.Cancellation.NONE, WorkspaceIndexService.Observer.NO_OP);
+                if (updated.index().entries().getFirst().size() == Files.size(file)) break;
+                Thread.sleep(10);
+            }
+            assertEquals("incrementally updated index", updated.status().message());
+            assertEquals(Files.size(file), updated.index().entries().getFirst().size());
+
+            Files.writeString(root.resolve("two.txt"), "new file");
+            for (int attempt = 0; attempt < 50; attempt++) {
+                updated = service.recover(true, root, WorkspaceIndexService.Cancellation.NONE, WorkspaceIndexService.Observer.NO_OP);
+                if (updated.index().entries().size() == 2) break;
+                Thread.sleep(10);
+            }
+            assertEquals(2, updated.index().entries().size());
+        } finally {
+            service.close();
+        }
+    }
+
+    @Test
+    void nonGitWorkspaceDoesNotFailWhenGitExitsBeforeReceivingLargeInput() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("non-git-workspace"));
+        for (int index = 0; index < 3_000; index++) {
+            write(root.resolve("document-with-long-name-" + index + ".txt"), "content");
+        }
+        WorkspaceIndexService service = new WorkspaceIndexService(tempDir.resolve("non-git-index"));
+        try {
+            WorkspaceIndexService.BuildResult result = service.build(true, root, WorkspaceIndexService.Observer.NO_OP);
+            assertEquals(WorkspaceIndexService.State.READY, result.status().state());
+            assertEquals(3_000, result.index().entries().size());
+        } finally {
+            service.close();
+        }
+    }
+
+    @Test
+    void indexStorageInsideWorkspaceIsExcludedFromItsOwnIndex() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("workspace-with-cache"));
+        write(root.resolve("source.txt"), "source");
+        WorkspaceIndexService service = new WorkspaceIndexService(root.resolve(".shed/index"), (workspace, path) -> false);
+        try {
+            WorkspaceIndexService.BuildResult built = service.build(true, root, WorkspaceIndexService.Observer.NO_OP);
+            assertEquals(List.of("source.txt"), built.index().entries().stream().map(WorkspaceIndexService.Entry::relativePath).toList());
+            WorkspaceIndexService.BuildResult reused = service.recover(true, root, WorkspaceIndexService.Cancellation.NONE,
+                WorkspaceIndexService.Observer.NO_OP);
+            assertEquals("using in-memory index", reused.status().message());
+        } finally {
+            service.close();
+        }
     }
 
     private void initializeGit(Path root) throws Exception {

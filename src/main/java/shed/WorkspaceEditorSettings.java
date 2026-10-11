@@ -144,7 +144,8 @@ final class WorkspaceEditorSettings {
             if (root == null) return false;
             Path relative;
             try {
-                relative = root.relativize(resource.toAbsolutePath().normalize());
+                Path normalized = resource.toAbsolutePath().normalize();
+                relative = root.relativize(normalized.startsWith(root) ? normalized : WorkspaceRootResolver.normalizedIdentity(normalized));
             } catch (IllegalArgumentException error) {
                 return false;
             }
@@ -159,7 +160,8 @@ final class WorkspaceEditorSettings {
             if (root == null) return false;
             Path relative;
             try {
-                relative = root.relativize(resource.toAbsolutePath().normalize());
+                Path normalized = resource.toAbsolutePath().normalize();
+                relative = root.relativize(normalized.startsWith(root) ? normalized : WorkspaceRootResolver.normalizedIdentity(normalized));
             } catch (IllegalArgumentException error) {
                 return false;
             }

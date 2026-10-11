@@ -43,8 +43,8 @@ class ToolchainServiceTest {
         Map<String, String> environment = service.environment(workspace);
         assertEquals(python.toRealPath(), new ToolchainService(temporaryDirectory.resolve("state"), Map.of("PATH", "/system/bin"))
             .report(workspace).selections().get(ToolchainService.Runtime.PYTHON));
-        assertEquals(python.getParent() + File.pathSeparator + node.getParent() + File.pathSeparator + "/system/bin", environment.get("PATH"));
-        assertEquals(workspace.resolve(".venv").toString(), environment.get("VIRTUAL_ENV"));
+        assertEquals(python.toRealPath().getParent() + File.pathSeparator + node.toRealPath().getParent() + File.pathSeparator + "/system/bin", environment.get("PATH"));
+        assertEquals(workspace.resolve(".venv").toRealPath().toString(), environment.get("VIRTUAL_ENV"));
         assertEquals("task-path", service.environment(workspace, Map.of("PATH", "task-path")).get("PATH"));
     }
 
@@ -65,7 +65,7 @@ class ToolchainServiceTest {
         service.select(workspace, ToolchainService.Runtime.JAVA, java.toString());
         service.select(workspace, ToolchainService.Runtime.parse("c++"), executable(temporaryDirectory.resolve("llvm/bin/clang++")).toString());
 
-        assertEquals(temporaryDirectory.resolve("jdk").toString(), service.environment(workspace).get("JAVA_HOME"));
+        assertEquals(temporaryDirectory.resolve("jdk").toRealPath().toString(), service.environment(workspace).get("JAVA_HOME"));
         assertEquals(ToolchainService.Runtime.CPP, ToolchainService.Runtime.parse("c++"));
     }
 

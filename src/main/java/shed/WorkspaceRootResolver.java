@@ -1,5 +1,7 @@
 package shed;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
@@ -17,8 +19,26 @@ final class WorkspaceRootResolver {
         } catch (RuntimeException error) {
             return null;
         }
-        return roots.stream().filter(root -> root != null).map(root -> root.toAbsolutePath().normalize())
-            .filter(normalized::startsWith).max(Comparator.comparingInt(Path::getNameCount)).orElse(null);
+        List<Path> normalizedRoots = roots.stream().filter(root -> root != null).map(root -> root.toAbsolutePath().normalize()).toList();
+        Path direct = normalizedRoots.stream().filter(normalized::startsWith)
+            .max(Comparator.comparingInt(Path::getNameCount)).orElse(null);
+        if (direct != null) return direct;
+        Path resolved = normalizedIdentity(normalized);
+        return normalizedRoots.stream().filter(root -> resolved.startsWith(normalizedIdentity(root)))
+            .max(Comparator.comparingInt(Path::getNameCount)).orElse(null);
+    }
+
+    /** Resolve aliases in an existing parent while retaining a file path that has not been created yet. */
+    static Path normalizedIdentity(Path path) {
+        Path normalized = path.toAbsolutePath().normalize();
+        Path existing = normalized;
+        while (existing != null && !Files.exists(existing)) existing = existing.getParent();
+        if (existing == null) return normalized;
+        try {
+            return existing.toRealPath().resolve(existing.relativize(normalized)).normalize();
+        } catch (IOException | SecurityException error) {
+            return normalized;
+        }
     }
 
     /**

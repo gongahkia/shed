@@ -46,7 +46,7 @@ class VsCodeTaskImporterTest {
         assertTrue(report.readable());
         assertEquals(java.util.List.of("vscode-run-app"), report.accepted());
         assertTrue(report.skipped().isEmpty());
-        assertEquals(java.util.List.of("python", source.toString(), "--label", "two words"), plan.processCommand());
+        assertEquals(java.util.List.of("python", source.toRealPath().toString(), "--label", "two words"), plan.processCommand());
         assertEquals(root.toFile().getCanonicalFile(), plan.workingDirectory());
         assertEquals("check", plan.environment().get("MODE"));
         assertEquals(TaskService.ShellPolicy.DIRECT, plan.task().shell());
@@ -173,7 +173,7 @@ class VsCodeTaskImporterTest {
         assertTrue(quoted.task().hasShellArguments());
         assertTrue(quoted.task().sessionOnly());
         assertEquals("-c", quoted.processCommand().get(1));
-        assertEquals("'printf' '%s' '" + source.toString().replace("'", "'\"'\"'") + "' 'two words' '$HOME'", quoted.expandedCommand());
+        assertEquals("'printf' '%s' '" + source.toRealPath().toString().replace("'", "'\"'\"'") + "' 'two words' '$HOME'", quoted.expandedCommand());
         assertEquals(List.of("sh", "-c", "'printf' '%s' '/srv/project/file'\"'\"'s value.py' 'two words' '$HOME'"), remote.command());
         assertEquals("printf raw && printf $HOME", raw.expandedCommand());
         assertEquals("-c", raw.processCommand().get(1));
@@ -240,7 +240,7 @@ class VsCodeTaskImporterTest {
 
         assertTrue(report.readable());
         assertEquals(manifest.toAbsolutePath().normalize(), report.source());
-        assertEquals(java.util.List.of("printf", "%s", source.toString()), plan.processCommand());
+        assertEquals(java.util.List.of("printf", "%s", source.toRealPath().toString()), plan.processCommand());
         assertFalse(Files.exists(root.resolve(".shedtasks")));
     }
 

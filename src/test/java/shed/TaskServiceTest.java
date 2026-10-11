@@ -211,7 +211,7 @@ public class TaskServiceTest {
         TaskService.TaskExecutionPlan plan = service.buildExecutionPlan(task, workspace.toFile(), source.toFile());
         RemoteCommandRequest remote = service.buildRemoteCommandRequest(plan, workspace, "/srv/project", source.toFile());
 
-        assertEquals(List.of("runner", source.toString(), "two words"), plan.processCommand());
+        assertEquals(List.of("runner", source.toRealPath().toString(), "two words"), plan.processCommand());
         assertEquals(List.of("runner", "/srv/project/file with spaces.py", "two words"), remote.command());
         assertEquals("/srv/project", remote.environment().get("ROOT"));
     }
@@ -233,7 +233,7 @@ public class TaskServiceTest {
         assertTrue(task.sessionOnly());
         assertEquals(TaskService.ShellPolicy.SHELL, task.shell());
         assertEquals("-c", plan.processCommand().get(1));
-        assertEquals("'printf' '%s' '" + source.toString().replace("'", "'\"'\"'") + "' 'two words' '$HOME'", plan.expandedCommand());
+        assertEquals("'printf' '%s' '" + source.toRealPath().toString().replace("'", "'\"'\"'") + "' 'two words' '$HOME'", plan.expandedCommand());
         assertEquals(List.of("sh", "-c", "'printf' '%s' '/srv/project/file'\"'\"'s value.py' 'two words' '$HOME'"), remote.command());
         assertThrows(IllegalArgumentException.class, () -> service.saveWorkspaceTasks(workspace.toFile(), Map.of("vscode-shell", task)));
     }
@@ -255,10 +255,10 @@ public class TaskServiceTest {
         TaskService.TaskExecutionPlan plan = service.buildExecutionPlan(task, workspace.toFile(), source.toFile());
         RemoteCommandRequest remote = service.buildRemoteCommandRequest(plan, mirror, "/srv/project", source.toFile());
 
-        assertEquals(List.of("runner", "project with spaces", workspace.toString(), "src", "Example.test", ".java",
-            source.getParent().toString(), "src"), plan.processCommand());
+        assertEquals(List.of("runner", "project with spaces", workspace.toRealPath().toString(), "src", "Example.test", ".java",
+            source.getParent().toRealPath().toString(), "src"), plan.processCommand());
         assertEquals(source.getParent().toFile().getCanonicalFile(), plan.workingDirectory());
-        assertEquals(workspace.toString(), plan.environment().get("ROOT"));
+        assertEquals(workspace.toRealPath().toString(), plan.environment().get("ROOT"));
         assertEquals(List.of("runner", "project with spaces", "/srv/project/project with spaces", "src", "Example.test", ".java",
             "/srv/project/project with spaces/src", "src"), remote.command());
         assertEquals("/srv/project/project with spaces", remote.environment().get("ROOT"));

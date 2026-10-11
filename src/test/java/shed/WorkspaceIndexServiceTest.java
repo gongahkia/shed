@@ -155,20 +155,22 @@ public class WorkspaceIndexServiceTest {
             service.build(true, root, WorkspaceIndexService.Observer.NO_OP);
             Files.writeString(file, "second version");
             WorkspaceIndexService.BuildResult updated = null;
-            for (int attempt = 0; attempt < 50; attempt++) {
+            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+            do {
                 updated = service.recover(true, root, WorkspaceIndexService.Cancellation.NONE, WorkspaceIndexService.Observer.NO_OP);
                 if (updated.index().entries().getFirst().size() == Files.size(file)) break;
-                Thread.sleep(10);
-            }
+                Thread.sleep(25);
+            } while (System.nanoTime() < deadline);
             assertEquals("incrementally updated index", updated.status().message());
             assertEquals(Files.size(file), updated.index().entries().getFirst().size());
 
             Files.writeString(root.resolve("two.txt"), "new file");
-            for (int attempt = 0; attempt < 50; attempt++) {
+            deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+            do {
                 updated = service.recover(true, root, WorkspaceIndexService.Cancellation.NONE, WorkspaceIndexService.Observer.NO_OP);
                 if (updated.index().entries().size() == 2) break;
-                Thread.sleep(10);
-            }
+                Thread.sleep(25);
+            } while (System.nanoTime() < deadline);
             assertEquals(2, updated.index().entries().size());
         } finally {
             service.close();

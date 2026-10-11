@@ -383,7 +383,7 @@ public class TaskService {
     RemoteCommandRequest buildRemoteCommandRequest(TaskExecutionPlan plan, Path connectionRoot, String executionRoot,
                                                    File activeFile) throws IOException {
         if (plan == null || connectionRoot == null) throw new IOException("remote task plan and connection root are required");
-        Path root = connectionRoot.toAbsolutePath().normalize();
+        Path root = connectionRoot.toRealPath();
         Path workingDirectory = plan.workingDirectory().toPath().toAbsolutePath().normalize();
         if (!workingDirectory.startsWith(root)) throw new IOException("task directory is outside the connected workspace");
         String relativeDirectory = root.relativize(workingDirectory).toString().replace(File.separatorChar, '/');

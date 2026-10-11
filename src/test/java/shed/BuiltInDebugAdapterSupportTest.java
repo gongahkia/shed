@@ -117,7 +117,7 @@ class BuiltInDebugAdapterSupportTest {
 
         DebugAdapterRegistry.Validation validation = BuiltInDebugAdapterSupport.effective(DebugAdapterRegistry.validate(Map.of()), workspace, toolchains);
 
-        assertEquals(selected.toString(), validation.registry().adapter(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY).command());
+        assertEquals(selected.toRealPath().toString(), validation.registry().adapter(BuiltInDebugAdapterSupport.PYTHON_DEBUGPY).command());
     }
 
     @Test

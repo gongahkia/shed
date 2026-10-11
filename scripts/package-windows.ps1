@@ -44,18 +44,23 @@ if (-not $javaVersionMatch.Success) { Fail 'could not resolve Java version' }
 $javaVersion = $javaVersionMatch.Groups[1].Value
 if ($javaVersion.Split('.')[0] -ne '21') { Fail "JDK 21 is required; found $javaVersion" }
 
-$mavenArgs = @('-B', '-q', '-Djava.awt.headless=true', 'clean', 'package')
+$env:JAVA_TOOL_OPTIONS = '-Djava.awt.headless=true'
+$mavenArgs = @('-B', '-q', 'clean', 'package')
 if (-not [string]::IsNullOrWhiteSpace($env:SHED_BUILD_COMMIT)) {
-    $mavenArgs += "-Dshed.build.commit=$env:SHED_BUILD_COMMIT"
+    $env:MAVEN_OPTS = (($env:MAVEN_OPTS, "-Dshed.build.commit=$env:SHED_BUILD_COMMIT") |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join ' '
 }
 Invoke-Native $maven $mavenArgs
 Invoke-Native $maven @('-B', '-q', 'artifact:check-buildplan')
 
-$versionOutput = Invoke-Native $maven @('-q', '-DforceStdout', 'help:evaluate', '-Dexpression=project.version')
-$version = (($versionOutput | Select-Object -Last 1) | Out-String).Trim()
+$pom = [xml](Get-Content -LiteralPath (Join-Path $repoRoot 'pom.xml') -Raw)
+$namespaces = [System.Xml.XmlNamespaceManager]::new($pom.NameTable)
+$namespaces.AddNamespace('m', 'http://maven.apache.org/POM/4.0.0')
+$versionNode = $pom.SelectSingleNode('/m:project/m:version', $namespaces)
+$timestampNode = $pom.SelectSingleNode('/m:project/m:properties/m:project.build.outputTimestamp', $namespaces)
+$version = if ($null -eq $versionNode) { '' } else { $versionNode.InnerText.Trim() }
 if ([string]::IsNullOrWhiteSpace($version)) { Fail 'could not resolve project version' }
-$timestampOutput = Invoke-Native $maven @('-q', '-DforceStdout', 'help:evaluate', '-Dexpression=project.build.outputTimestamp')
-$outputTimestamp = (($timestampOutput | Select-Object -Last 1) | Out-String).Trim()
+$outputTimestamp = if ($null -eq $timestampNode) { '' } else { $timestampNode.InnerText.Trim() }
 if ([string]::IsNullOrWhiteSpace($outputTimestamp)) { Fail 'could not resolve Maven output timestamp' }
 
 $appName = 'Shed'

@@ -101,7 +101,7 @@ final class WorkspaceManifest {
         if (roots == null || roots.isEmpty()) throw new IOException("At least one workspace folder is required");
         if (roots.size() > MAX_FOLDERS) throw new IOException("Workspace has too many folders");
 
-        Path base = manifest.getParent();
+        Path base = manifest.getParent().toRealPath();
         Set<Path> unique = new LinkedHashSet<>();
         for (Path root : roots) {
             if (root == null || !Files.isDirectory(root)) throw new IOException("Workspace folder is not an existing directory: " + root);

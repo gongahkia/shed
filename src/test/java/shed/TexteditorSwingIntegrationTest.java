@@ -107,6 +107,46 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void repeatedCompletionUpdatesReuseOneOverlayInsideTheEditor() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-completion-overlay");
+        Path file = tempDir.resolve("completion-overlay.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "sasdadd sas\nsasdadd sas", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                for (int i = 0; i < 5; i++) {
+                    editor.writingArea.setCaretPosition(i % 2 == 0 ? 11 : editor.writingArea.getDocument().getLength());
+                    editor.showInlineCompletion();
+                    assertTrue(editor.isCompletionPopupVisible());
+                    assertSame(editor.getLayeredPane(), editor.completionPopup.getParent());
+                    assertTrue(editor.completionPopup.getX() >= 0);
+                    assertTrue(editor.completionPopup.getY() >= 0);
+                    assertTrue(editor.completionPopup.getX() + editor.completionPopup.getWidth()
+                        <= editor.getLayeredPane().getWidth());
+                    assertTrue(editor.completionPopup.getY() + editor.completionPopup.getHeight()
+                        <= editor.getLayeredPane().getHeight());
+                    editor.writingArea.replaceSelection("d");
+                    editor.showInlineCompletion();
+                    assertTrue(editor.isCompletionPopupVisible());
+                    editor.writingArea.getDocument().remove(editor.writingArea.getCaretPosition() - 1, 1);
+                    editor.showInlineCompletion();
+                    assertTrue(editor.isCompletionPopupVisible());
+                    editor.dismissCompletionPopup();
+                }
+                assertFalse(editor.isCompletionPopupVisible());
+                assertEquals(1, Arrays.stream(editor.getLayeredPane().getComponents())
+                    .filter(component -> component == editor.completionPopup).count());
+                return null;
+            });
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void startupFolderCreatesAnActiveWorkspaceAndExplorer() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-startup-folder");

@@ -2658,16 +2658,19 @@ final class InputController {
             updateCompletionDocumentation();
             Rectangle2D caretRect = editor.writingArea.modelToView2D(editor.writingArea.getCaretPosition());
             if (caretRect == null || !editor.writingArea.isShowing()) return;
-            Point location = editor.writingArea.getLocationOnScreen();
-            int px = location.x + (int) caretRect.getX();
-            int py = location.y + (int) (caretRect.getY() + caretRect.getHeight());
+            JLayeredPane layer = editor.getLayeredPane();
+            Point caret = SwingUtilities.convertPoint(editor.writingArea,
+                (int) caretRect.getX(), (int) (caretRect.getY() + caretRect.getHeight()), layer);
             int lineHeight = editor.writingArea.getFontMetrics(editor.writingArea.getFont()).getHeight();
             double zoom = editor.configManager.getUiZoom();
             int height = Math.min(Math.max(max * lineHeight + UiZoom.scale(58, zoom), UiZoom.scale(150, zoom)), UiZoom.scale(340, zoom));
-            Dimension size = editor.editorUiController.fitPopupSize(editor.writingArea, new Dimension(UiZoom.scale(760, zoom), height));
+            Dimension size = EditorUiController.constrainSize(new Dimension(UiZoom.scale(760, zoom), height), layer.getSize());
+            int x = Math.max(0, Math.min(caret.x, layer.getWidth() - size.width));
+            int y = Math.max(0, Math.min(caret.y, layer.getHeight() - size.height));
             editor.completionPopup.setSize(size);
-            editor.completionPopup.setLocation(editor.editorUiController.fitPopupLocation(editor.writingArea, new Point(px, py), size));
+            editor.completionPopup.setLocation(x, y);
             editor.completionPopup.setVisible(true);
+            layer.moveToFront(editor.completionPopup);
         } catch (Exception ignored) {
             dismissCompletionPopup();
         }
@@ -2689,6 +2692,7 @@ final class InputController {
         });
         editor.completionDocumentation = new JTextArea();
         editor.completionDocumentation.setEditable(false);
+        editor.completionDocumentation.setFocusable(false);
         editor.completionDocumentation.setLineWrap(true);
         editor.completionDocumentation.setWrapStyleWord(true);
         editor.completionDocumentation.setBackground(editor.configManager.getCommandBarBackground());
@@ -2708,9 +2712,10 @@ final class InputController {
         split.setResizeWeight(0.48);
         split.setDividerLocation(UiZoom.scale(360, zoom));
         split.setBorder(BorderFactory.createLineBorder(editor.configManager.getCaretColor()));
-        editor.completionPopup = new JWindow(editor);
-        editor.completionPopup.add(split);
-        editor.completionPopup.setFocusableWindowState(false);
+        editor.completionPopup = new JPanel(new BorderLayout());
+        editor.completionPopup.add(split, BorderLayout.CENTER);
+        editor.completionPopup.setVisible(false);
+        editor.getLayeredPane().add(editor.completionPopup, JLayeredPane.POPUP_LAYER);
     }
 
     private void updateCompletionDocumentation() {

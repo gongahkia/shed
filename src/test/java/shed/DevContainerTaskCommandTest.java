@@ -17,7 +17,7 @@ class DevContainerTaskCommandTest {
             new RemoteCommandRequest(List.of("cargo", "test"), "", Map.of("CI", "true")),
             TaskService.ShellPolicy.DIRECT);
 
-        assertEquals(List.of("devcontainer", "exec", "--workspace-folder", "/host/project",
+        assertEquals(List.of("devcontainer", "exec", "--workspace-folder", Path.of("/host/project").toString(),
             "--remote-env", "CI=true", "cargo", "test"), command);
     }
 
@@ -28,7 +28,7 @@ class DevContainerTaskCommandTest {
             new RemoteCommandRequest(List.of("sh", "-lc", "npm test"), "packages/web", Map.of()),
             TaskService.ShellPolicy.LOGIN);
 
-        assertEquals(List.of("devcontainer", "exec", "--workspace-folder", "/host/project", "/bin/sh", "-lc",
+        assertEquals(List.of("devcontainer", "exec", "--workspace-folder", Path.of("/host/project").toString(), "/bin/sh", "-lc",
             "cd -- '/workspaces/project/packages/web' && exec 'sh' '-lc' 'npm test'"), command);
     }
 
@@ -39,7 +39,7 @@ class DevContainerTaskCommandTest {
             new RemoteCommandRequest(List.of("sh", "-c", "'printf' '%s' 'two words'"), "packages/web", Map.of()),
             TaskService.ShellPolicy.SHELL);
 
-        assertEquals(List.of("devcontainer", "exec", "--workspace-folder", "/host/project", "/bin/sh", "-c",
+        assertEquals(List.of("devcontainer", "exec", "--workspace-folder", Path.of("/host/project").toString(), "/bin/sh", "-c",
             "cd -- '/workspaces/project/packages/web' && exec 'sh' '-c' ''\"'\"'printf'\"'\"' '\"'\"'%s'\"'\"' '\"'\"'two words'\"'\"''"), command);
     }
 

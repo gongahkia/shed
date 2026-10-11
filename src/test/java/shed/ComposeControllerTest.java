@@ -24,7 +24,7 @@ class ComposeControllerTest {
 
     @Test
     void buildsDirectDockerComposeInvocationForOneLocalFile() {
-        assertEquals(List.of("docker", "compose", "-f", "/project/compose.yaml", "exec", "-T", "web", "pytest"),
+        assertEquals(List.of("docker", "compose", "-f", Path.of("/project/compose.yaml").toAbsolutePath().normalize().toString(), "exec", "-T", "web", "pytest"),
             ComposeController.invocation(Path.of("/project/compose.yaml"), List.of("exec", "-T", "web", "pytest")));
     }
 }

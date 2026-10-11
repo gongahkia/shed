@@ -17,8 +17,8 @@ class CommandPathCompletionTest {
         Files.createDirectories(tempDir.resolve("docs"));
         Files.writeString(tempDir.resolve("docs/guide.md"), "fixture\n");
 
-        assertEquals(List.of(":tree docs/"), CommandPathCompletion.suggestions(":tree do", tempDir.toFile()));
-        assertEquals(List.of(":edit docs/guide.md"), CommandPathCompletion.suggestions(":edit docs/g", tempDir.toFile()));
+        assertEquals(List.of(":tree docs" + java.io.File.separator), CommandPathCompletion.suggestions(":tree do", tempDir.toFile()));
+        assertEquals(List.of(":edit docs" + java.io.File.separator + "guide.md"), CommandPathCompletion.suggestions(":edit docs/g", tempDir.toFile()));
     }
 
     @Test

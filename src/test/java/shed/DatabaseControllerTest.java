@@ -22,7 +22,7 @@ class DatabaseControllerTest {
 
     @Test
     void buildsDirectSqliteQueryAgainstAnExplicitDatabaseFile() {
-        assertEquals(List.of("sqlite3", "-batch", "-bail", "/project/app.db", "select name from sqlite_master"),
+        assertEquals(List.of("sqlite3", "-batch", "-bail", Path.of("/project/app.db").toAbsolutePath().normalize().toString(), "select name from sqlite_master"),
             DatabaseController.sqliteQueryCommand(Path.of("/project/app.db"), "select name from sqlite_master"));
     }
 

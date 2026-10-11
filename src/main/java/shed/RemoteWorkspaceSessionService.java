@@ -76,8 +76,9 @@ final class RemoteWorkspaceSessionService {
         private Path mapTerminalSource(RemoteLspEndpoint endpoint, Path startDirectory, String sourcePath) {
             if (sourcePath == null || sourcePath.isBlank() || sourcePath.indexOf('\0') >= 0) return null;
             try {
+                if (sourcePath.startsWith("/")) return endpoint.localPathForRemotePath(sourcePath);
                 Path reported = Path.of(sourcePath);
-                if (reported.isAbsolute()) return endpoint.localPathForRemotePath(reported.normalize().toString());
+                if (reported.isAbsolute()) return null;
                 Path candidate = startDirectory.resolve(reported).normalize();
                 return candidate.startsWith(localRoot) ? candidate : null;
             } catch (IllegalArgumentException error) {

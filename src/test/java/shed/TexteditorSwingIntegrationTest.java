@@ -1319,13 +1319,14 @@ public class TexteditorSwingIntegrationTest {
 
         Texteditor editor = createEditor(home, file);
         try {
-            String result = onEdt(() -> editor.commandHandler.execute("term"));
-            assertEquals("Terminal opened", result);
-            assertEquals(1, onEdt(() -> editor.ptyTerminalPanes.size()));
-            assertNotNull(onEdt(() -> editor.getActivePane().getTerminalPane()));
-            assertTrue(onEdt(() -> editor.getActivePane().getComponent() == editor.getActivePane().getTerminalPane().getComponent()));
-
-            FileBuffer terminalBuffer = onEdt(editor::getCurrentBuffer);
+            FileBuffer terminalBuffer = onEdt(() -> {
+                assertEquals("Terminal opened", editor.commandHandler.execute("term"));
+                assertEquals(1, editor.ptyTerminalPanes.size());
+                EditorPane terminalPane = editor.getActivePane();
+                assertNotNull(terminalPane.getTerminalPane());
+                assertSame(terminalPane.getTerminalPane().getComponent(), terminalPane.getComponent());
+                return terminalPane.getBuffer();
+            });
             onEdt(() -> {
                 editor.closeExitedTerminal(terminalBuffer);
                 return null;

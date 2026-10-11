@@ -69,8 +69,10 @@ final class RemoteLspEndpoint {
     TerminalLinkResolver.SourcePathMapper terminalSourcePathMapper() {
         return (sourcePath, ignoredWorkingDirectory) -> {
             try {
+                if (sourcePath.startsWith("/")) return localPathForRemotePath(sourcePath);
                 Path raw = Path.of(sourcePath);
-                String remotePath = raw.isAbsolute() ? raw.normalize().toString() : remoteRoot + "/" + raw.normalize();
+                if (raw.isAbsolute()) return null;
+                String remotePath = remoteRoot + "/" + sourcePath;
                 return localPathForRemotePath(remotePath);
             } catch (IllegalArgumentException error) {
                 return null;

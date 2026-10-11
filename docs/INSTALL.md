@@ -1,6 +1,6 @@
 # Install and troubleshoot Shed
 
-This document covers the artifacts produced by the current release workflow. It does not claim support for unbuilt formats or architectures.
+This document covers the artifacts produced by the platform packaging scripts and the portable Java archive.
 
 | Target | Artifact | Runtime policy | Verification |
 | :--- | :--- | :--- | :--- |
@@ -9,7 +9,7 @@ This document covers the artifacts produced by the current release workflow. It 
 | Debian-family Linux x64 | `Shed-<version>-linux-x64.deb` | Bundled Java 21 runtime | `sha256sum -c Shed-<version>-linux-x64.deb.sha256` |
 | Java archive | `shed-<version>.jar` | Install a Java 21 runtime separately | Inspect the release source and CI artifact provenance |
 
-The installer workflow validates each package's bundled runtime and main JAR before upload. Its current platform boundary is limited to the three installer rows above. RPM, Linux arm64, macOS x64, and Windows arm64 installers are not produced.
+Each platform packaging script validates its bundled runtime and main JAR. CI builds and tests the portable JAR on Linux, Windows, and macOS. RPM, Linux arm64, macOS x64, and Windows arm64 installers are not produced.
 
 ## Verify before installation
 
@@ -25,7 +25,7 @@ PS> $expected = (Get-Content .\Shed-<version>-windows-x64.msi.sha256).Split()[0]
 PS> (Get-FileHash -Algorithm SHA256 .\Shed-<version>-windows-x64.msi).Hash.ToLower() -eq $expected
 ```
 
-The CI aggregate `SHA256SUMS` covers the three native installers in fixed platform order:
+If a release provides an aggregate `SHA256SUMS` file, verify it with:
 
 ```console
 $ sha256sum -c SHA256SUMS

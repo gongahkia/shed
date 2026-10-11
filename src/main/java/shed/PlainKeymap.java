@@ -15,6 +15,8 @@ final class PlainKeymap {
         FIND_PREVIOUS(null),
         REPLACE(null),
         GO_TO_LINE(null),
+        SYMBOLS(null),
+        WORKSPACE_SYMBOLS(null),
         UNDO(null),
         REDO(null),
         NEXT_SELECTION(null),
@@ -73,6 +75,7 @@ final class PlainKeymap {
             case KeyEvent.VK_F -> shift ? Action.NONE : Action.FIND;
             case KeyEvent.VK_H -> shift ? Action.NONE : Action.REPLACE;
             case KeyEvent.VK_G -> shift ? Action.NONE : Action.GO_TO_LINE;
+            case KeyEvent.VK_R -> shift ? Action.WORKSPACE_SYMBOLS : Action.SYMBOLS;
             case KeyEvent.VK_Z -> shift ? Action.REDO : Action.UNDO;
             case KeyEvent.VK_D -> shift ? Action.NONE : Action.NEXT_SELECTION;
             case KeyEvent.VK_Y -> shift ? Action.NONE : Action.REDO;

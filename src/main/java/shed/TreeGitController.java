@@ -46,11 +46,12 @@ final class TreeGitController {
         List<Path> roots = editor.workspaceController.roots();
         if (roots.isEmpty()) roots = List.of(inferredProjectRoot());
         roots = roots.stream().map(path -> path.toAbsolutePath().normalize()).distinct().toList();
+        if (finderJobId >= 0) editor.asyncJobService.cancel(finderJobId);
+        finderJobId = -1;
+        long request = ++finderRequest;
         if (roots.equals(cachedFinderRoots) && System.currentTimeMillis() - cachedFinderAt < FILE_FINDER_CACHE_MILLIS) {
             return openFinder(cachedFinderFiles);
         }
-        if (finderJobId >= 0) editor.asyncJobService.cancel(finderJobId);
-        long request = ++finderRequest;
         List<Path> scanRoots = roots;
         finderJobId = editor.asyncJobService.submit("project files", token -> scanFinderFiles(scanRoots, token::isCancelled),
             (snapshot, files, error) -> {

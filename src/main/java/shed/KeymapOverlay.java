@@ -145,6 +145,7 @@ final class KeymapOverlay {
                 fixed("Ctrl/Cmd-Shift-S", "Save As"), fixed("Ctrl/Cmd-F", "Find"),
                 fixed("F3/Shift-F3", "Next/previous match"), fixed("Ctrl/Cmd-H", "Replace all"),
                 fixed("Ctrl/Cmd-G", "Go to line"), fixed("Ctrl/Cmd-Z", "Undo"),
+                fixed("Ctrl/Cmd-R", "Document symbols"), fixed("Ctrl/Cmd-Shift-R", "Workspace symbols"),
                 fixed("Ctrl/Cmd-Shift-Z/Y", "Redo"), fixed("Ctrl/Cmd-PageDown", "Next buffer"),
                 fixed("Ctrl/Cmd-PageUp", "Previous buffer"),
                 fixed("Ctrl/Cmd-Shift-P", "Command palette"), fixed("Ctrl/Cmd-B", "Buffer picker"),

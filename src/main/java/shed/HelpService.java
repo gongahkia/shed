@@ -156,6 +156,7 @@ public class HelpService {
                     + "Ctrl/Cmd-F       Find; F3 / Shift-F3 repeat forward/backward\n"
                     + "Ctrl/Cmd-H       Replace all literal matches\n"
                     + "Ctrl/Cmd-G       Go to line\n"
+                    + "Ctrl/Cmd-R       Document symbols; Shift-R searches workspace symbols\n"
                     + "Ctrl/Cmd-Z       Undo; Ctrl/Cmd-Shift-Z or Ctrl/Cmd-Y redo\n"
                     + "Ctrl/Cmd-PageDown/Up Next/previous buffer\n"
                     + "Ctrl/Cmd-Shift-P Command palette\n"

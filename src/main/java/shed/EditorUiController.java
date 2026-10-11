@@ -390,6 +390,10 @@ final class EditorUiController {
                 if (paneRef[0] != null) {
                     activateEditorPane(paneRef[0]);
                 }
+                if (editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN
+                    && !e.isAltDown() && !e.isControlDown() && !e.isMetaDown()) {
+                    editor.clearExtraCursors();
+                }
             }
 
             @Override

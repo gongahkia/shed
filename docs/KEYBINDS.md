@@ -19,6 +19,8 @@ The default `keymap.profile = "plain"` provides non-modal editing. Plain bypasse
 | `F3` / `Shift` + `F3` | Next / previous match |
 | `Ctrl`/`Cmd` + `H` | Replace all literal matches |
 | `Ctrl`/`Cmd` + `G` | Go to line |
+| `Ctrl`/`Cmd` + `R` | Document symbols |
+| `Ctrl`/`Cmd` + `Shift` + `R` | Search workspace symbols |
 | `Ctrl`/`Cmd` + `Z` | Undo |
 | `Ctrl`/`Cmd` + `Shift` + `Z` or `Ctrl`/`Cmd` + `Y` | Redo |
 | `Ctrl`/`Cmd` + `Page Down` / `Ctrl`/`Cmd` + `Page Up` | Next / previous buffer |

@@ -369,6 +369,12 @@ final class InputController {
             case FIND_PREVIOUS -> repeatPlainSearch(false);
             case REPLACE -> replacePlain();
             case GO_TO_LINE -> goToPlainLine();
+            case SYMBOLS -> editor.showMessage(editor.showSymbols(""));
+            case WORKSPACE_SYMBOLS -> {
+                String selected = editor.writingArea.getSelectedText();
+                String query = JOptionPane.showInputDialog(editor, "Workspace symbols", selected == null ? "" : selected);
+                if (query != null && !query.isBlank()) editor.showMessage(editor.showWorkspaceSymbols(query));
+            }
             case UNDO -> {
                 editor.clearExtraCursors();
                 if (editor.writingArea.isEditable() && editor.undoManager.canUndo()) editor.undoManager.undo();

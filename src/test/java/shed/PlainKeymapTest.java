@@ -33,6 +33,9 @@ class PlainKeymapTest {
         assertEquals(PlainKeymap.Action.FIND_PREVIOUS, action(KeyEvent.VK_F3, InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.REPLACE, action(KeyEvent.VK_H, InputEvent.META_DOWN_MASK));
         assertEquals(PlainKeymap.Action.GO_TO_LINE, action(KeyEvent.VK_G, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.SYMBOLS, action(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.WORKSPACE_SYMBOLS,
+            action(KeyEvent.VK_R, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.UNDO, action(KeyEvent.VK_Z, InputEvent.META_DOWN_MASK));
         assertEquals(PlainKeymap.Action.REDO, action(KeyEvent.VK_Z, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.REDO, action(KeyEvent.VK_Y, InputEvent.CTRL_DOWN_MASK));

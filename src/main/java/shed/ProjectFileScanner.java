@@ -38,14 +38,14 @@ final class ProjectFileScanner {
                 }
                 String name = child.getFileName().toString();
                 if (Files.isSymbolicLink(child)) continue;
-                boolean directory = Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS);
-                if (excluded(name, directory)) continue;
+                boolean childDirectory = Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS);
+                if (excluded(name, childDirectory)) continue;
                 if (Files.isRegularFile(child, LinkOption.NOFOLLOW_LINKS)) {
                     files.add(relativePath(workspaceRoot, child));
                     if (files.size() >= effectiveLimit) {
                         break;
                     }
-                } else if (directory) {
+                } else if (childDirectory) {
                     directories.addLast(child);
                 }
             }
@@ -67,8 +67,10 @@ final class ProjectFileScanner {
     }
 
     private static boolean excluded(String name, boolean directory) {
-        return name.equals(".DS_Store") || directory && (name.startsWith(".") || name.equals("node_modules")
-            || name.equals("target") || name.equals("build") || name.equals("__pycache__"));
+        return name.equals(".DS_Store") || directory && (name.equals(".git") || name.equals(".hg")
+            || name.equals(".svn") || name.equals(".venv") || name.equals(".gradle") || name.equals(".idea")
+            || name.equals("node_modules") || name.equals("target") || name.equals("build")
+            || name.equals("__pycache__"));
     }
 
     private static String relativePath(Path root, Path child) {

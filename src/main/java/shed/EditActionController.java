@@ -1051,6 +1051,16 @@ final class EditActionController {
         }
     }
 
+    boolean movePlainCursors(int keyCode) {
+        if (!hasActiveExtraCursors()) return false;
+        MultiSelection primary = new MultiSelection(editor.writingArea.getSelectionStart(), editor.writingArea.getSelectionEnd());
+        MultiSelectionMotionService.Result moved = MultiSelectionMotionService.move(
+            editor.writingArea, primary, editor.extraSelections, keyCode);
+        editor.writingArea.setCaretPosition(moved.primary().start());
+        replaceExtraSelections(moved.extras());
+        return true;
+    }
+
 
     void applyMultiCursorBackspace() {
         if (!hasActiveExtraCursors()) return;

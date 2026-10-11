@@ -21,7 +21,7 @@ public class WorkspaceIndexComparisonTest {
         WorkspaceIndexComparison.Report report = new WorkspaceIndexComparison(service).inspect(false, root);
 
         assertTrue(report.format().contains("Current search source: ad-hoc project scan\n"));
-        assertTrue(report.format().contains("Persistent-index preference: disabled (default)\n"));
+        assertTrue(report.format().contains("Persistent-index preference: disabled\n"));
         assertTrue(report.format().contains("Index status: absent (no persisted index)\n"));
         assertTrue(report.format().contains("Build cost: not measured; run :workspace index benchmark explicitly\n"));
         assertFalse(Files.exists(tempDir.resolve("index-store")));
@@ -39,7 +39,7 @@ public class WorkspaceIndexComparisonTest {
         WorkspaceIndexComparison.Report report = new WorkspaceIndexComparison(service).inspect(true, root);
 
         assertTrue(report.format().contains("Current search source: persistent workspace index\n"));
-        assertTrue(report.format().contains("Persistent-index preference: enabled\n"));
+        assertTrue(report.format().contains("Persistent-index preference: enabled (default)\n"));
         assertTrue(report.format().contains("Index status: ready (persisted index is available)\n"));
         assertTrue(report.format().contains("Index entries: 2\n"));
         assertTrue(report.format().contains("Cache cost: " + cacheBytes + " bytes\n"));

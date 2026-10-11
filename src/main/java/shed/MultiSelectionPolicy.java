@@ -1,7 +1,7 @@
 package shed;
 
 record MultiSelectionPolicy(boolean enabled, int maxCursors) {
-    static final int DEFAULT_MAX_CURSORS = 16;
+    static final int DEFAULT_MAX_CURSORS = 256;
     static final int MIN_MAX_CURSORS = 2;
     static final int MAX_MAX_CURSORS = 256;
 

@@ -26,6 +26,7 @@ The default `keymap.profile = "plain"` provides non-modal editing. Plain bypasse
 | `Ctrl`/`Cmd` + `D` | Add next matching selection |
 | `Alt` + `Up` / `Alt` + `Down` | Add cursor above / below |
 | `Esc` | Clear extra selections |
+| Arrow keys with extra selections | Move all active cursors |
 | `Ctrl`/`Cmd` + `B` | Buffer picker |
 | Command palette: Split Below / Split Right | Split editor |
 | `Ctrl`/`Cmd` + `W` | Close active split |
@@ -154,7 +155,7 @@ Prefix supported motions and operators with a positive count: `600j` moves down 
 | :---: | :---: |
 | `.` | Repeat last command |
 
-#### Experimental multi-selection
+#### Vim multi-selection
 
 Multi-selection is enabled by default; set ``multi.selection.enabled = false`` to disable it. In Vim mode, ``Ctrl+Shift+D`` adds the next matching selection, and ``Alt+J`` / ``Alt+K`` add a cursor below / above (``Shift`` reverses either direction). Insert text, ``Backspace``, and ``Delete`` apply to every active selection; ``Esc`` clears extras. The total includes the primary cursor and is capped by ``multi.selection.max.cursors``.
 

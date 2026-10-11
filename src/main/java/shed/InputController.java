@@ -321,6 +321,13 @@ final class InputController {
             event.consume();
             return;
         }
+        if (!editor.extraSelections.isEmpty() && !event.isControlDown() && !event.isMetaDown()
+            && !event.isAltDown() && !event.isShiftDown()
+            && (event.getKeyCode() == KeyEvent.VK_LEFT || event.getKeyCode() == KeyEvent.VK_RIGHT
+                || event.getKeyCode() == KeyEvent.VK_UP || event.getKeyCode() == KeyEvent.VK_DOWN)) {
+            if (editor.editActionController.movePlainCursors(event.getKeyCode())) event.consume();
+            return;
+        }
         if (!editor.extraSelections.isEmpty() && editor.writingArea.isEditable()
             && !event.isControlDown() && !event.isMetaDown() && !event.isAltDown()) {
             if (event.getKeyCode() == KeyEvent.VK_BACK_SPACE || event.getKeyCode() == KeyEvent.VK_DELETE) {

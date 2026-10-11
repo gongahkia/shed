@@ -94,4 +94,18 @@ public class MultiSelectionEditServiceTest {
         while (undo.canRedo()) undo.redo();
         assertEquals("e\u0301|X|👩‍💻|X", area.getText());
     }
+
+    @Test
+    void editsFullDefaultCursorCountInOnePass() {
+        JTextArea area = new JTextArea("abcd".repeat(MultiSelectionPolicy.DEFAULT_MAX_CURSORS));
+        List<MultiSelection> selections = java.util.stream.IntStream.range(0, MultiSelectionPolicy.DEFAULT_MAX_CURSORS)
+            .mapToObj(index -> MultiSelection.caret(index * 4)).toList();
+
+        List<MultiSelection> updated = MultiSelectionEditService.insert(area, selections, "X");
+
+        assertEquals(MultiSelectionPolicy.DEFAULT_MAX_CURSORS, updated.size());
+        assertEquals("Xabcd".repeat(MultiSelectionPolicy.DEFAULT_MAX_CURSORS), area.getText());
+        assertEquals(MultiSelection.caret(1), updated.getFirst());
+        assertEquals(MultiSelection.caret(area.getText().length() - 4), updated.getLast());
+    }
 }

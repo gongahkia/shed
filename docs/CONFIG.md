@@ -87,7 +87,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `limelight.coefficient` | `0.5` | double | Dim strength for non-focused paragraphs; `0.0..1.0` |
 | `limelight.paragraph.span` | `0` | int | Adjacent paragraphs retained at full brightness |
 | `multi.selection.enabled` | `true` | bool | Enable multi-selection editing |
-| `multi.selection.max.cursors` | `16` | int | Maximum total cursors when enabled; `2..256` |
+| `multi.selection.max.cursors` | `256` | int | Maximum total cursors when enabled; `2..256` |
 | `markdown.preview.scroll.sync` | `true` | bool | Keep a Markdown preview aligned with its source cursor and source scrolling |
 | `markdown.preview.remote.images` | `true` | bool | Fetch bounded HTTPS images after explicitly opening a normal Markdown preview; `false` keeps it local-only |
 | `landing.welcome.enabled` | `true` | bool | Show the native welcome screen for Shed's untouched default landing source |

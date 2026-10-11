@@ -41,7 +41,7 @@ JAVA_VERSION="$("$JAVA_BIN" -version 2>&1 | awk -F'"' '/version/ {print $2; exit
 JAVA_FEATURE="${JAVA_VERSION%%.*}"
 [[ "$JAVA_FEATURE" == "21" ]] || fail "JDK 21 is required; found $JAVA_VERSION"
 
-MAVEN_ARGS=(-B -q clean package)
+MAVEN_ARGS=(-B -q -Djava.awt.headless=true clean package)
 if [[ -n "${SHED_BUILD_COMMIT:-}" ]]; then
   MAVEN_ARGS+=("-Dshed.build.commit=$SHED_BUILD_COMMIT")
 fi
@@ -68,7 +68,9 @@ DIST_DIR="$PACKAGE_ROOT/dist"
 mkdir -p "$INPUT_DIR" "$APP_IMAGE_DIR" "$DIST_DIR"
 cp "$JAR_PATH" "$INPUT_DIR/$JAR_NAME"
 
-MODULES="$("$JDEPS" --multi-release 21 --ignore-missing-deps --print-module-deps "$JAR_PATH")"
+MODULES="$("$JDEPS" --multi-release 21 --ignore-missing-deps --print-module-deps "$JAR_PATH" \
+  | awk '/^[a-z][A-Za-z0-9_.]*(,[a-z][A-Za-z0-9_.]*)*$/ {modules=$0} END {print modules}')"
+[[ -n "$MODULES" ]] || fail "runtime module analysis did not return a module list"
 [[ "$MODULES" == *"java.desktop"* ]] || fail "runtime module analysis did not include java.desktop"
 printf '%s\n' "$MODULES" > "$PACKAGE_ROOT/runtime-modules.txt"
 "$JLINK" --add-modules "$MODULES" --output "$RUNTIME_DIR" --strip-debug --no-header-files --no-man-pages --compress=zip-6
@@ -88,6 +90,7 @@ INFO_PLIST="$APP_BUNDLE/Contents/Info.plist"
 plutil -lint "$INFO_PLIST" >/dev/null
 [[ "$(plutil -extract CFBundleIdentifier raw "$INFO_PLIST")" == "dev.shed.app" ]] || fail "unexpected bundle identifier"
 [[ "$(plutil -extract CFBundleShortVersionString raw "$INFO_PLIST")" == "$VERSION" ]] || fail "unexpected bundle version"
+codesign --force --deep --sign - "$APP_BUNDLE" || fail "ad-hoc app signing failed"
 codesign --verify --deep --strict "$APP_BUNDLE" || fail "app code-signature verification failed"
 SIGNING="$(codesign -dvv "$APP_BUNDLE" 2>&1 | awk -F= '/^Signature=/ {print tolower($2); exit}')"
 [[ -n "$SIGNING" ]] || fail "could not determine app signature state"

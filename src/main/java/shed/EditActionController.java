@@ -706,8 +706,8 @@ final class EditActionController {
                 file = new File(baseDir, path);
             }
             if (file.exists() && file.isFile()) {
-                editor.openFile(file);
-                return "Opened " + file.getName();
+                editor.openFileAsync(file);
+                return "Opening " + file.getName();
             }
             return "File not found: " + path;
         } catch (Exception e) {

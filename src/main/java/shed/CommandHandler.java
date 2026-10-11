@@ -270,12 +270,8 @@ public class CommandHandler {
         if (filename == null || filename.isEmpty()) {
             return "Error: :e requires filename argument";
         }
-        try {
-            editor.openFile(new File(filename));
-            return "Opened: " + filename;
-        } catch (IOException e) {
-            return "Error opening file: " + e.getMessage();
-        }
+        editor.openFileAsync(new File(filename));
+        return "Opening: " + filename;
     }
 
     private String handleOpen(String target) {

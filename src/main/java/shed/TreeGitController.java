@@ -15,7 +15,6 @@ import java.util.regex.Pattern;
 
 final class TreeGitController {
     private static final int FILE_FINDER_LIMIT = 200_000;
-    private static final long FILE_FINDER_CACHE_MILLIS = 3_000;
     private enum InteractiveGitView { BRANCHES, LOG }
 
     private final Texteditor editor;
@@ -23,9 +22,7 @@ final class TreeGitController {
     private File cachedGitWorkingDirectory;
     private boolean cachedGitRootResolved;
     private final ProjectFileScanner projectFileScanner;
-    private List<Path> cachedFinderRoots = List.of();
-    private Map<String, File> cachedFinderFiles = Map.of();
-    private long cachedFinderAt;
+    private final Map<Path, WorkspaceIndexService> finderIndexes = new java.util.concurrent.ConcurrentHashMap<>();
     private int finderJobId = -1;
     private long finderRequest;
     private FileBuffer interactiveGitBuffer;
@@ -42,6 +39,18 @@ final class TreeGitController {
         this.interactiveGitView = null;
     }
 
+    void warmFinderIndex(Path root) {
+        if (root == null || !editor.configManager.getWorkspaceIndexEnabled() || editor.asyncJobService == null) return;
+        Path normalized = root.toAbsolutePath().normalize();
+        editor.asyncJobService.submit("index project files", token -> {
+            WorkspaceIndexService index = finderIndexes.computeIfAbsent(normalized,
+                ignored -> new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index")));
+            return index.recover(true, normalized, token::isCancelled, WorkspaceIndexService.Observer.NO_OP);
+        }, (job, result, error) -> {
+            if (error != null && !editor.closingDown) editor.showMessage("Project index failed: " + error.getMessage());
+        });
+    }
+
     public String showFileFinder() {
         List<Path> roots = editor.workspaceController.roots();
         if (roots.isEmpty()) roots = List.of(inferredProjectRoot());
@@ -49,11 +58,9 @@ final class TreeGitController {
         if (finderJobId >= 0) editor.asyncJobService.cancel(finderJobId);
         finderJobId = -1;
         long request = ++finderRequest;
-        if (roots.equals(cachedFinderRoots) && System.currentTimeMillis() - cachedFinderAt < FILE_FINDER_CACHE_MILLIS) {
-            return openFinder(cachedFinderFiles);
-        }
         List<Path> scanRoots = roots;
-        finderJobId = editor.asyncJobService.submit("project files", token -> scanFinderFiles(scanRoots, token::isCancelled),
+        boolean useIndex = editor.configManager.getWorkspaceIndexEnabled();
+        finderJobId = editor.asyncJobService.submit("project files", token -> scanFinderFiles(scanRoots, useIndex, token::isCancelled),
             (snapshot, files, error) -> {
                 if (editor.closingDown || request != finderRequest) return;
                 finderJobId = -1;
@@ -62,9 +69,6 @@ final class TreeGitController {
                     editor.showMessage("File finder scan failed: " + (error == null ? "unknown error" : error.getMessage()));
                     return;
                 }
-                cachedFinderRoots = scanRoots;
-                cachedFinderFiles = files;
-                cachedFinderAt = System.currentTimeMillis();
                 editor.showMessage(openFinder(files));
             });
         return "Scanning project files…";
@@ -80,10 +84,21 @@ final class TreeGitController {
         return baseDir.toPath();
     }
 
-    private Map<String, File> scanFinderFiles(List<Path> roots, ProjectFileScanner.Cancellation cancellation) {
+    private Map<String, File> scanFinderFiles(List<Path> roots, boolean useIndex, ProjectFileScanner.Cancellation cancellation) {
         Map<String, File> files = new LinkedHashMap<>();
         for (Path root : roots) {
-            List<String> relativeFiles = GitProjectFileListing.list(root, FILE_FINDER_LIMIT - files.size(), cancellation);
+            List<String> relativeFiles = null;
+            if (useIndex) {
+                WorkspaceIndexService index = finderIndexes.computeIfAbsent(root,
+                    ignored -> new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index")));
+                WorkspaceIndexService.BuildResult result = index.recover(true, root, cancellation::isCancelled,
+                    WorkspaceIndexService.Observer.NO_OP);
+                if (result.index() != null && result.status().state() == WorkspaceIndexService.State.READY) {
+                    relativeFiles = result.index().entries().stream().limit(FILE_FINDER_LIMIT - files.size())
+                        .map(WorkspaceIndexService.Entry::relativePath).toList();
+                }
+            }
+            if (relativeFiles == null) relativeFiles = GitProjectFileListing.list(root, FILE_FINDER_LIMIT - files.size(), cancellation);
             if (relativeFiles == null) {
                 ProjectFileScanner.ScanResult scan = projectFileScanner.scan(root, root, FILE_FINDER_LIMIT - files.size(), cancellation);
                 if (scan.cancelled()) return Map.of();
@@ -100,6 +115,11 @@ final class TreeGitController {
         return files;
     }
 
+    void closeFinderIndexes() {
+        finderIndexes.values().forEach(WorkspaceIndexService::close);
+        finderIndexes.clear();
+    }
+
     private String openFinder(Map<String, File> files) {
         if (files.isEmpty()) return "No files found";
         Map<String, String> labels = new LinkedHashMap<>();
@@ -107,14 +127,10 @@ final class TreeGitController {
         String selected = editor.showPaletteDialog("Find File", new ArrayList<>(files.keySet()),
             FileFinderIcons.renderer(editor, labels));
         if (selected == null) return "File finder cancelled";
-        try {
-            File file = files.get(selected);
-            if (file == null) return "File finder selection is unavailable";
-            editor.openFile(file);
-            return "Opened: " + selected;
-        } catch (IOException e) {
-            return "Error opening file: " + e.getMessage();
-        }
+        File file = files.get(selected);
+        if (file == null) return "File finder selection is unavailable";
+        editor.openFileAsync(file);
+        return "Opening: " + selected;
     }
 
 
@@ -160,12 +176,8 @@ final class TreeGitController {
             return "Not a file: " + selection.getPath();
         }
 
-        try {
-            editor.openFile(selection);
-            return "Opened: " + selection.getAbsolutePath();
-        } catch (IOException e) {
-            return "Error opening file: " + e.getMessage();
-        }
+        editor.openFileAsync(selection);
+        return "Opening: " + selection.getAbsolutePath();
     }
 
 
@@ -1112,12 +1124,11 @@ final class TreeGitController {
             String currentDigest = workbenchDigest(target);
             if (!Objects.equals(diff.sourceDigest(), currentDigest)) return "Diff navigation stale: file changed; refresh the diff.";
         }
-        try {
-            editor.openFile(target.toFile());
-            return hunk == null ? "Opened " + target : editor.gotoLine(hunk.targetLine());
-        } catch (IOException e) {
-            return "Diff navigation unavailable: " + e.getMessage();
+        if (hunk == null) {
+            editor.openFileAsync(target.toFile());
+            return "Opening " + target;
         }
+        return editor.openFileAtAsync(target.toFile(), hunk.targetLine(), 1, "Opened Git diff hunk");
     }
 
     private Path workbenchPath(GitChangesWorkbenchModel.Snapshot snapshot, GitChangesWorkbenchModel.Change change) {

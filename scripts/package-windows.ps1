@@ -44,7 +44,7 @@ if (-not $javaVersionMatch.Success) { Fail 'could not resolve Java version' }
 $javaVersion = $javaVersionMatch.Groups[1].Value
 if ($javaVersion.Split('.')[0] -ne '21') { Fail "JDK 21 is required; found $javaVersion" }
 
-$mavenArgs = @('-B', '-q', 'clean', 'package')
+$mavenArgs = @('-B', '-q', '-Djava.awt.headless=true', 'clean', 'package')
 if (-not [string]::IsNullOrWhiteSpace($env:SHED_BUILD_COMMIT)) {
     $mavenArgs += "-Dshed.build.commit=$env:SHED_BUILD_COMMIT"
 }

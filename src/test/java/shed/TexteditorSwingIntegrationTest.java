@@ -65,6 +65,84 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void ordinarySavePreservesUndoHistory() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-save-undo");
+        Path file = tempDir.resolve("save-undo.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "original");
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertTrue(onEdt(() -> {
+                editor.writingArea.setCaretPosition(editor.writingArea.getDocument().getLength());
+                editor.writingArea.replaceSelection(" edited");
+                return editor.getCurrentBuffer().getUndoManager().canUndo();
+            }));
+            assertEquals("Saving…", onEdt(() -> editor.commandHandler.execute("w")));
+            assertTrue(awaitBufferSaved(editor, file, "original edited"));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getUndoManager().canUndo()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void asynchronousOpenInstallsTheLoadedBuffer() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-async-open");
+        Path file = tempDir.resolve("async-open.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "loaded\n".repeat(20_000));
+        Texteditor editor = createEmptyEditor(home);
+        try {
+            onEdt(() -> { editor.openFileAsync(file.toFile()); return null; });
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            boolean opened = false;
+            while (System.nanoTime() < deadline) {
+                opened = onEdt(() -> file.toAbsolutePath().toString().equals(editor.getCurrentBuffer().getFilePath()));
+                if (opened) break;
+                Thread.sleep(20);
+            }
+            assertTrue(opened);
+            assertEquals("loaded\n".repeat(20_000), onEdt(() -> editor.writingArea.getText()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void notebookPanelSaveWritesOnBackgroundJob() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-notebook-save");
+        Path file = tempDir.resolve("notebook-save.ipynb");
+        Files.createDirectories(home);
+        NotebookDocument notebook = NotebookDocument.empty().withCells(List.of(
+            new NotebookDocument.Cell("code", "before", java.util.Map.of())));
+        Files.writeString(file, notebook.serialize());
+        Texteditor editor = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                NotebookPanel panel = (NotebookPanel) editor.getActivePane().getAlternateComponent();
+                descendants(panel, javax.swing.JTextArea.class).getFirst().setText("after");
+                descendants(panel, javax.swing.JButton.class).stream()
+                    .filter(button -> "Save".equals(button.getText())).findFirst().orElseThrow().doClick();
+                return null;
+            });
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            boolean saved = false;
+            while (System.nanoTime() < deadline) {
+                saved = "after".equals(NotebookDocument.parse(Files.readString(file)).cells().getFirst().source())
+                    && !onEdt(() -> editor.getCurrentBuffer().isModified());
+                if (saved) break;
+                Thread.sleep(20);
+            }
+            assertTrue(saved);
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void defaultStartupShowsNativeWelcomeAndOpeningAFileReplacesIt() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-native-welcome");
@@ -571,6 +649,7 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, file);
         try {
             onEdt(() -> {
+                enableVim(editor);
                 press(editor, '6');
                 press(editor, '0');
                 press(editor, '0');
@@ -595,6 +674,7 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, file);
         try {
             onEdt(() -> {
+                enableVim(editor);
                 press(editor, 'q');
                 press(editor, 'a');
                 press(editor, 'i');
@@ -637,6 +717,7 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, file);
         try {
             onEdt(() -> {
+                enableVim(editor);
                 press(editor, 'q');
                 press(editor, 'a');
                 press(editor, 'j');
@@ -671,23 +752,37 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, file);
         try {
             FileBuffer initial = onEdt(editor::getCurrentBuffer);
+            EditorPane originalPane = onEdt(editor::getActivePane);
             String split = onEdt(() -> editor.commandHandler.execute("vs"));
             assertEquals("Vertical split created", split);
             assertEquals(2, onEdt(() -> editor.editorPanes.size()));
             assertSame(initial, onEdt(editor::getCurrentBuffer));
-            EditorPane second = onEdt(editor::getActivePane);
-            assertEquals("Window focus changed", onEdt(() -> editor.commandHandler.execute("window next")));
-            assertEquals("Window focus changed", onEdt(() -> editor.commandHandler.execute("window previous")));
-            assertSame(second, onEdt(editor::getActivePane));
-            assertEquals("Window resized", onEdt(() -> editor.commandHandler.execute("window grow 20")));
+            EditorPane second = onEdt(() -> editor.editorPanes.stream().filter(pane -> pane != originalPane).findFirst().orElseThrow());
+            onEdt(() -> {
+                editor.activateEditorPane(second);
+                assertEquals("Window focus changed", editor.commandHandler.execute("window next"));
+                assertEquals("Window focus changed", editor.commandHandler.execute("window previous"));
+                assertSame(second, editor.getActivePane());
+                return null;
+            });
+            assertEquals("Window resized", onEdt(() -> {
+                editor.activateEditorPane(second);
+                return editor.commandHandler.execute("window grow 20");
+            }));
             assertEquals(0.3, onEdt(() -> editor.windowLayoutRoot.getRatio()));
-            assertEquals("Window resized", onEdt(() -> editor.commandHandler.execute("window shrink 20%")));
+            assertEquals("Window resized", onEdt(() -> {
+                editor.activateEditorPane(second);
+                return editor.commandHandler.execute("window shrink 20%");
+            }));
             assertEquals(0.5, onEdt(() -> editor.windowLayoutRoot.getRatio()));
             assertEquals("Windows equalized", onEdt(() -> editor.commandHandler.execute("window equalize")));
             assertEquals("Command not recognised: close!", onEdt(() -> editor.commandHandler.execute("close!")));
             assertEquals(2, onEdt(() -> editor.editorPanes.size()));
 
-            String close = onEdt(() -> editor.commandHandler.execute("close"));
+            String close = onEdt(() -> {
+                editor.activateEditorPane(second);
+                return editor.commandHandler.execute("close");
+            });
             assertEquals("Window closed", close);
             assertEquals(1, onEdt(() -> editor.editorPanes.size()));
             assertSame(initial, onEdt(editor::getCurrentBuffer));
@@ -745,6 +840,7 @@ public class TexteditorSwingIntegrationTest {
                 return editor.commandHandler.execute("wq");
             });
             assertEquals("Saving…", writeQuit);
+            assertTrue(awaitBufferSaved(editor, file, "after\n"));
             assertEquals("after\n", Files.readString(file, StandardCharsets.UTF_8));
             assertEquals(1, onEdt(() -> editor.editorPanes.size()));
             assertEquals("[landing]", onEdt(() -> editor.getCurrentBuffer().getDisplayName()));
@@ -803,7 +899,8 @@ public class TexteditorSwingIntegrationTest {
             String result = onEdt(() -> editor.openFileInSplit(dropped.toFile(), targetPane,
                 WindowLayoutNode.Orientation.HORIZONTAL, false));
 
-            assertEquals("Opened in split: " + dropped.toAbsolutePath(), result);
+            assertEquals("Opening in split: " + dropped.toAbsolutePath(), result);
+            assertTrue(awaitCurrentFile(editor, dropped));
             assertEquals(3, onEdt(() -> editor.editorPanes.size()));
             assertEquals(source.toAbsolutePath().toString(), onEdt(() -> targetPane.getBuffer().getFilePath()));
             assertEquals(dropped.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
@@ -1203,7 +1300,8 @@ public class TexteditorSwingIntegrationTest {
             });
 
             String result = onEdt(() -> editor.commandHandler.execute("quickfix current 1"));
-            assertEquals("Quickfix 1/1", result);
+            assertEquals("Opening: target.txt", result);
+            assertTrue(awaitCurrentFile(editor, target));
             assertEquals(target.toFile().getAbsolutePath(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
             assertEquals(8, onEdt(() -> editor.writingArea.getCaretPosition()));
         } finally {
@@ -1254,7 +1352,7 @@ public class TexteditorSwingIntegrationTest {
             assertEquals("Terminal opened", onEdt(() -> editor.commandHandler.execute("term")));
             EditorPane terminalEditorPane = onEdt(editor::getActivePane);
             PtyTerminalPane terminalPane = onEdt(terminalEditorPane::getTerminalPane);
-            FileBuffer terminalBuffer = onEdt(editor::getCurrentBuffer);
+            FileBuffer terminalBuffer = onEdt(terminalEditorPane::getBuffer);
 
             onEdt(() -> {
                 editor.activateEditorPane(editorPane);
@@ -1973,6 +2071,15 @@ public class TexteditorSwingIntegrationTest {
         return false;
     }
 
+    private static boolean awaitCurrentFile(Texteditor editor, Path file) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            if (onEdt(() -> file.toAbsolutePath().toString().equals(editor.getCurrentBuffer().getFilePath()))) return true;
+            Thread.sleep(20);
+        }
+        return false;
+    }
+
     private static void initializeGit(Path root) throws Exception {
         Process process = new ProcessBuilder("git", "init", "--quiet", root.toString()).start();
         assertEquals(0, process.waitFor());
@@ -1986,6 +2093,11 @@ public class TexteditorSwingIntegrationTest {
     private static void pressEscape(Texteditor editor) {
         editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0L, 0,
             KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED));
+    }
+
+    private static void enableVim(Texteditor editor) {
+        editor.configManager.set("keymap.profile", "vim");
+        editor.setMode(EditorMode.NORMAL);
     }
 
     private static Texteditor createEditor(Path home, Path... targets) throws Exception {

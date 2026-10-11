@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -18,7 +19,7 @@ final class RecoveryJournalScheduler {
     private final Clearer clearer;
     private final Observer observer;
     private ScheduledFuture<?> pendingTask;
-    private Snapshot latestSnapshot;
+    private Capture latestCapture;
     private long generation;
     private boolean closed;
 
@@ -39,18 +40,23 @@ final class RecoveryJournalScheduler {
     }
 
     void request(RecoveryJournal.Workspace workspace, List<RecoveryJournal.Entry> entries) {
-        Snapshot snapshot = new Snapshot(workspace, entries == null ? List.of() : List.copyOf(entries));
+        List<RecoveryJournal.Entry> copied = entries == null ? List.of() : List.copyOf(entries);
+        requestLazy(workspace, () -> copied);
+    }
+
+    void requestLazy(RecoveryJournal.Workspace workspace, Supplier<List<RecoveryJournal.Entry>> entries) {
+        Capture capture = new Capture(workspace, Objects.requireNonNull(entries, "entries"));
         synchronized (lock) {
             if (closed) {
                 return;
             }
             generation++;
-            latestSnapshot = snapshot;
+            latestCapture = capture;
             if (pendingTask != null) {
                 pendingTask.cancel(false);
             }
             long scheduledGeneration = generation;
-            pendingTask = executor.schedule(() -> write(scheduledGeneration, snapshot), debounceMillis, TimeUnit.MILLISECONDS);
+            pendingTask = executor.schedule(() -> write(scheduledGeneration, capture), debounceMillis, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -60,7 +66,7 @@ final class RecoveryJournalScheduler {
                 return;
             }
             generation++;
-            latestSnapshot = null;
+            latestCapture = null;
             if (pendingTask != null) {
                 pendingTask.cancel(false);
                 pendingTask = null;
@@ -74,7 +80,7 @@ final class RecoveryJournalScheduler {
     }
 
     void close(ShutdownMode mode) {
-        Snapshot finalSnapshot;
+        Capture finalCapture;
         synchronized (lock) {
             if (closed) {
                 return;
@@ -85,7 +91,7 @@ final class RecoveryJournalScheduler {
                 pendingTask.cancel(true);
                 pendingTask = null;
             }
-            finalSnapshot = latestSnapshot;
+            finalCapture = latestCapture;
         }
         executor.shutdownNow();
         try {
@@ -95,8 +101,8 @@ final class RecoveryJournalScheduler {
             }
             if (mode == ShutdownMode.CLEAR) {
                 clearer.clear();
-            } else if (mode == ShutdownMode.FLUSH && finalSnapshot != null) {
-                writer.write(finalSnapshot);
+            } else if (mode == ShutdownMode.FLUSH && finalCapture != null) {
+                writer.write(finalCapture.snapshot());
             }
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
@@ -106,7 +112,7 @@ final class RecoveryJournalScheduler {
         }
     }
 
-    private void write(long scheduledGeneration, Snapshot snapshot) {
+    private void write(long scheduledGeneration, Capture capture) {
         synchronized (lock) {
             if (closed || scheduledGeneration != generation) {
                 return;
@@ -115,10 +121,11 @@ final class RecoveryJournalScheduler {
         }
         long startedAtNanos = System.nanoTime();
         try {
+            Snapshot snapshot = capture.snapshot();
             writer.write(snapshot);
             synchronized (lock) {
-                if (snapshot.equals(latestSnapshot)) {
-                    latestSnapshot = null;
+                if (capture == latestCapture) {
+                    latestCapture = null;
                 }
             }
             observer.onWrite(startedAtNanos, snapshot);
@@ -169,6 +176,12 @@ final class RecoveryJournalScheduler {
         Snapshot {
             workspace = workspace == null ? new RecoveryJournal.Workspace("", null, 0) : workspace;
             entries = List.copyOf(entries == null ? List.of() : entries);
+        }
+    }
+
+    private record Capture(RecoveryJournal.Workspace workspace, Supplier<List<RecoveryJournal.Entry>> entries) {
+        Snapshot snapshot() {
+            return new Snapshot(workspace, entries.get());
         }
     }
 }

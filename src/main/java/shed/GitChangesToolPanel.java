@@ -176,8 +176,8 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     private void open() {
         GitChangesWorkbenchModel.Change change = selected(); File root = root();
         if (change == null || root == null) { message("Select a changed file."); return; }
-        try { editor.openFile(root.toPath().resolve(change.path()).toFile()); message("Opened " + change.path()); }
-        catch (IOException error) { message("Open failed: " + error.getMessage()); }
+        editor.openFileAsync(root.toPath().resolve(change.path()).toFile(),
+            error -> message(error == null ? "Opened " + change.path() : "Open failed: " + error.getMessage()));
     }
 
     private void stage() { runForSelection("Stage", (root, change) -> editor.treeGitController.runGitAdd(root, change.path())); }

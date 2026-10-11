@@ -45,6 +45,30 @@ public class RecoveryJournalSchedulerTest {
     }
 
     @Test
+    void lazySnapshotCopiesContentOnWorkerAfterDebounce() throws Exception {
+        AtomicBoolean capturedOnEdt = new AtomicBoolean(true);
+        AtomicReference<String> content = new AtomicReference<>("first");
+        AtomicReference<String> saved = new AtomicReference<>();
+        CountDownLatch completed = new CountDownLatch(1);
+        RecoveryJournalScheduler scheduler = new RecoveryJournalScheduler(Duration.ofMillis(50), snapshot -> {
+            saved.set(snapshot.entries().getFirst().content());
+            completed.countDown();
+        }, () -> { }, RecoveryJournalScheduler.Observer.NO_OP);
+        try {
+            SwingUtilities.invokeAndWait(() -> scheduler.requestLazy(new RecoveryJournal.Workspace("/work", null, 0), () -> {
+                capturedOnEdt.set(SwingUtilities.isEventDispatchThread());
+                return List.of(entry(content.get()));
+            }));
+            content.set("latest");
+            assertTrue(completed.await(2, TimeUnit.SECONDS));
+            assertFalse(capturedOnEdt.get());
+            assertEquals("latest", saved.get());
+        } finally {
+            scheduler.closeAndClear();
+        }
+    }
+
+    @Test
     void clearCancelsPendingWrite() throws Exception {
         AtomicInteger writes = new AtomicInteger();
         CountDownLatch cleared = new CountDownLatch(1);

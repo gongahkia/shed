@@ -68,11 +68,7 @@ final class ProblemsController {
     String open(ProblemsService.Problem problem) {
         if (problem == null) return "No problem selected";
         if (!problem.filePath().isBlank()) {
-            try {
-                editor.openFile(new File(problem.filePath()));
-            } catch (Exception error) {
-                return "Problem open failed: " + error.getMessage();
-            }
+            return editor.openFileAtAsync(new File(problem.filePath()), problem.line(), problem.column(), "Opened problem");
         }
         String lineResult = editor.gotoLine(problem.line());
         if (lineResult.startsWith("Error") || lineResult.startsWith("Invalid")) return lineResult;

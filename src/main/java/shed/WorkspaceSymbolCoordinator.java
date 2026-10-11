@@ -15,6 +15,11 @@ final class WorkspaceSymbolCoordinator {
         this.editor = editor;
     }
 
+    void close() {
+        cancel();
+        if (symbolSearchService != null) symbolSearchService.close();
+    }
+
     void cancel() {
         activeRequest++;
         if (activeCancellation != null) activeCancellation.cancel();

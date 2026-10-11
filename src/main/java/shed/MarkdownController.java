@@ -133,15 +133,15 @@ final class MarkdownController {
                 File parent = source.getFile() == null ? new File(".") : source.getFile().getParentFile();
                 File target = new File(parent == null ? new File(".") : parent, path);
                 if (!target.isFile()) return "Linked file not found: " + path;
-                editor.openFile(target);
-                return "Opened: " + target.getName();
+                editor.openFileAsync(target);
+                return "Opening: " + target.getName();
             }
             if (scheme.equalsIgnoreCase("file")) {
                 activatePreviewSource(source);
                 File target = new File(uri);
                 if (!target.isFile()) return "Linked file not found: " + target.getPath();
-                editor.openFile(target);
-                return "Opened: " + target.getName();
+                editor.openFileAsync(target);
+                return "Opening: " + target.getName();
             }
             if (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https") && !scheme.equalsIgnoreCase("mailto")) {
                 return "Unsupported Markdown link";
@@ -697,12 +697,8 @@ final class MarkdownController {
         File base = buf != null && buf.getFile() != null ? buf.getFile().getParentFile() : new File(".");
         File target = new File(base, url);
         if (target.exists()) {
-            try {
-                editor.openFile(target);
-                return "Opened: " + target.getName();
-            } catch (IOException e) {
-                return "Error opening file: " + e.getMessage();
-            }
+            editor.openFileAsync(target);
+            return "Opening: " + target.getName();
         }
         return "File not found: " + url;
     }

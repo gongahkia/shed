@@ -13,7 +13,6 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -42,7 +41,7 @@ public class FileBuffer {
 
     private File file;
     private String scratchName;
-    private boolean modified;
+    private volatile boolean modified;
     private String encodingName;
     private int lineCount;
     private final BoundedUndoManager undoManager;
@@ -64,6 +63,7 @@ public class FileBuffer {
     private long fileSizeBytes;
     private ConfigManager configManager;
     private ExternalFileStamp externalFileStamp;
+    private byte[] savedDiskDigest;
 
     // Constructor for existing file
     public FileBuffer(File file) throws IOException {
@@ -122,6 +122,7 @@ public class FileBuffer {
         this.lastKnownModifiedTime = 0L;
         this.fileSizeBytes = 0L;
         this.externalFileStamp = observeExternalFile();
+        this.savedDiskDigest = null;
         setDocumentText("", false);
         this.savedContent = "";
     }
@@ -186,6 +187,27 @@ public class FileBuffer {
         updateLineCount();
         this.savedContent = getFullContent();
         this.externalFileStamp = observeExternalFile();
+        this.savedDiskDigest = digest(bytes);
+    }
+
+    void adoptReloadedState(FileBuffer loaded) {
+        if (loaded == null || file == null || !file.equals(loaded.file)) {
+            throw new IllegalArgumentException("Reloaded buffer must refer to the same file");
+        }
+        this.encodingName = loaded.encodingName;
+        this.lineEnding = loaded.lineEnding;
+        this.largeFile = loaded.largeFile;
+        this.largeFileTail = loaded.largeFileTail;
+        this.largeFileStore = loaded.largeFileStore;
+        this.largeFileError = loaded.largeFileError;
+        this.showingPreviewOnly = loaded.showingPreviewOnly;
+        this.fileSizeBytes = loaded.fileSizeBytes;
+        this.lastKnownModifiedTime = loaded.lastKnownModifiedTime;
+        this.backupFile = loaded.backupFile;
+        setDocumentText(loaded.getContent(), false);
+        this.savedContent = loaded.savedContent;
+        this.externalFileStamp = loaded.externalFileStamp;
+        this.savedDiskDigest = loaded.savedDiskDigest;
     }
 
     private void loadLargeFile(Path source, long sourceBytes, LargeFilePolicy policy) {
@@ -218,6 +240,7 @@ public class FileBuffer {
         updateLineCount();
         this.savedContent = "";
         this.externalFileStamp = observeExternalFile();
+        this.savedDiskDigest = null;
     }
 
     private LargeFilePolicy resolveLargeFilePolicy(ConfigManager configManager) {
@@ -304,16 +327,18 @@ public class FileBuffer {
             throw new IOException("Scratch buffer has no file path; use :w <file>");
         }
         if (largeFile) {
+            if (!modified) return;
             if (largeFileStore == null) {
                 throw new IOException("Large-file source is unavailable");
             }
             Path target = file.toPath();
-            AtomicFileWriter.writeStream(target, largeFileStore::writeTo);
+            AtomicFileWriter.writeStream(target, largeFileStore::writeTo, this::requireUnchangedSource);
             this.modified = false;
             this.savedContent = "";
             this.lastKnownModifiedTime = Files.getLastModifiedTime(target).toMillis();
             this.fileSizeBytes = Files.size(target);
             this.externalFileStamp = observeExternalFile();
+            this.savedDiskDigest = null;
             return;
         }
 
@@ -327,7 +352,7 @@ public class FileBuffer {
         }
 
         Path target = file.toPath();
-        AtomicFileWriter.write(target, bytes);
+        AtomicFileWriter.write(target, bytes, this::requireUnchangedSource);
 
         this.modified = false;
         this.savedContent = textToWrite;
@@ -335,6 +360,7 @@ public class FileBuffer {
         this.fileSizeBytes = bytes.length;
         this.fileType = FileType.detect(file, textToWrite);
         this.externalFileStamp = observeExternalFile();
+        this.savedDiskDigest = digest(bytes);
     }
 
     // Save to a different file
@@ -350,11 +376,15 @@ public class FileBuffer {
         boolean previousScratch = this.scratch;
         File previousBackupFile = this.backupFile;
         FileType previousFileType = this.fileType;
+        ExternalFileStamp previousExternalFileStamp = this.externalFileStamp;
+        byte[] previousSavedDiskDigest = this.savedDiskDigest;
         this.file = newFile;
         this.scratch = false;
         this.scratchName = newFile == null ? "[No Name]" : newFile.getName();
         this.backupFile = null;
         this.fileType = FileType.detect(newFile, getFullContent());
+        this.externalFileStamp = observeExternalFile();
+        this.savedDiskDigest = null;
         try {
             save();
         } catch (IOException error) {
@@ -363,20 +393,104 @@ public class FileBuffer {
             this.scratch = previousScratch;
             this.backupFile = previousBackupFile;
             this.fileType = previousFileType;
+            this.externalFileStamp = previousExternalFileStamp;
+            this.savedDiskDigest = previousSavedDiskDigest;
             throw error;
         }
     }
 
+    SaveSnapshot captureSaveSnapshot(File requestedTarget) throws IOException {
+        if (largeFile) throw new IOException("Large-file asynchronous save is unavailable");
+        File target = requestedTarget == null ? file : requestedTarget;
+        if (scratch && requestedTarget == null || target == null) {
+            throw new IOException("Scratch buffer has no file path; use :w <file>");
+        }
+        String content = getFullContent();
+        ExternalFileStamp expected = requestedTarget == null ? externalFileStamp : observeExternalFile(target);
+        return new SaveSnapshot(target, requestedTarget != null, content, encodingName, lineEnding,
+            expected, requestedTarget == null ? savedDiskDigest : null);
+    }
+
+    void writeSaveSnapshot(SaveSnapshot snapshot) throws IOException {
+        if (snapshot == null) throw new IOException("Save snapshot is required");
+        byte[] bytes = encode(applyLineEndings(snapshot.content, snapshot.lineEnding), snapshot.encodingName);
+        AtomicFileWriter.write(snapshot.target.toPath(), bytes, () -> {
+            ExternalFileStamp actual = observeExternalFile(snapshot.target);
+            if (!actual.equals(snapshot.expectedStamp)) {
+                throw new IOException("File changed on disk: " + snapshot.target
+                    + ". Reload or save to a different path to keep both versions.");
+            }
+            requireMatchingDigest(snapshot.target, snapshot.expectedDigest);
+        });
+        snapshot.bytes = bytes;
+        snapshot.writtenDigest = digest(bytes);
+    }
+
+    void completeSaveSnapshot(SaveSnapshot snapshot) {
+        if (snapshot.saveAs) {
+            this.file = snapshot.target;
+            this.scratch = false;
+            this.scratchName = snapshot.target.getName();
+            this.backupFile = null;
+        }
+        this.savedContent = snapshot.content;
+        this.modified = !snapshot.content.equals(getContent());
+        this.lastKnownModifiedTime = snapshot.target.lastModified();
+        this.fileSizeBytes = snapshot.bytes.length;
+        this.fileType = FileType.detect(snapshot.target, snapshot.content);
+        this.externalFileStamp = observeExternalFile();
+        this.savedDiskDigest = snapshot.writtenDigest == null ? digest(snapshot.bytes) : snapshot.writtenDigest.clone();
+    }
+
+    static final class SaveSnapshot {
+        private final File target;
+        private final boolean saveAs;
+        private final String content;
+        private volatile byte[] bytes;
+        private final String encodingName;
+        private final String lineEnding;
+        private final ExternalFileStamp expectedStamp;
+        private final byte[] expectedDigest;
+        private volatile byte[] writtenDigest;
+
+        private SaveSnapshot(File target, boolean saveAs, String content, String encodingName, String lineEnding,
+                             ExternalFileStamp expectedStamp, byte[] expectedDigest) {
+            this.target = target;
+            this.saveAs = saveAs;
+            this.content = content;
+            this.encodingName = encodingName;
+            this.lineEnding = lineEnding;
+            this.expectedStamp = expectedStamp;
+            this.expectedDigest = expectedDigest == null ? null : expectedDigest.clone();
+        }
+    }
+
     private byte[] encode(String content) throws IOException {
+        return encode(content, encodingName);
+    }
+
+    private static byte[] encode(String content, String encodingName) throws IOException {
         try {
             Charset charset = Charset.forName(encodingName);
-            return content.getBytes(charset);
+            ByteBuffer encoded = charset.newEncoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .encode(CharBuffer.wrap(content));
+            byte[] bytes = new byte[encoded.remaining()];
+            encoded.get(bytes);
+            return bytes;
+        } catch (CharacterCodingException error) {
+            throw new IOException("Content contains characters that cannot be encoded as " + encodingName, error);
         } catch (UnsupportedCharsetException e) {
             throw new IOException("Unsupported encoding: " + encodingName, e);
         }
     }
 
     private String applyLineEndings(String text) {
+        return applyLineEndings(text, lineEnding);
+    }
+
+    private static String applyLineEndings(String text, String lineEnding) {
         if ("\r\n".equals(lineEnding)) {
             return text.replace("\n", "\r\n");
         }
@@ -403,12 +517,43 @@ public class FileBuffer {
         }
     }
 
+    void replaceContentUndoably(String content) {
+        if (largeFile) throw new IllegalStateException("Large-file editing is unavailable");
+        String value = content == null ? "" : content;
+        if (value.equals(getContent())) return;
+        undoManager.beginCompoundEdit();
+        try {
+            document.remove(0, document.getLength());
+            document.insertString(0, value, null);
+        } catch (BadLocationException error) {
+            throw new IllegalStateException("Unable to update buffer document", error);
+        } finally {
+            undoManager.endCompoundEdit();
+        }
+        textSnapshot = VersionedTextSnapshot.of(value);
+        modified = true;
+        fileType = FileType.detect(file, value);
+        updateLineCount();
+    }
+
     public String getContent() {
         try {
             return document.getText(0, document.getLength());
         } catch (BadLocationException e) {
             return "";
         }
+    }
+
+    String snapshotContent() {
+        String[] value = new String[1];
+        document.render(() -> {
+            try {
+                value[0] = document.getText(0, document.getLength());
+            } catch (BadLocationException error) {
+                throw new IllegalStateException("Unable to capture buffer content", error);
+            }
+        });
+        return value[0];
     }
 
     public String getSavedContent() {
@@ -613,6 +758,21 @@ public class FileBuffer {
         }
     }
 
+    void acceptExternalVersionForOverwrite() throws IOException {
+        if (file == null) throw new IOException("No file is associated with this buffer");
+        ExternalFileStamp accepted = observeExternalFile();
+        if (accepted.kind() == ExternalFileKind.UNSUPPORTED) {
+            throw new IOException("The external target cannot be saved as a regular file");
+        }
+        byte[] acceptedDigest = accepted.kind() == ExternalFileKind.REGULAR ? digest(file.toPath()) : null;
+        if (!accepted.equals(observeExternalFile())) {
+            throw new IOException("The external file changed again; review it before saving");
+        }
+        externalFileStamp = accepted;
+        savedDiskDigest = acceptedDigest;
+        if (accepted.kind() == ExternalFileKind.REGULAR) lastKnownModifiedTime = file.lastModified();
+    }
+
     public ExternalFileState getExternalFileState() {
         ExternalFileStamp current = observeExternalFile();
         if (externalFileStamp == null || current.kind() == ExternalFileKind.REGULAR && externalFileStamp.kind() == ExternalFileKind.REGULAR
@@ -636,6 +796,44 @@ public class FileBuffer {
         };
     }
 
+    private void requireUnchangedSource() throws IOException {
+        ExternalFileState state = getExternalFileState();
+        if (state != ExternalFileState.UNCHANGED) {
+            throw new IOException("File changed on disk (" + state + "): " + file
+                + ". Reload or save to a different path to keep both versions.");
+        }
+        requireMatchingDigest(file, savedDiskDigest);
+    }
+
+    private static void requireMatchingDigest(File target, byte[] expected) throws IOException {
+        if (expected != null && !MessageDigest.isEqual(expected, digest(target.toPath()))) {
+            throw new IOException("File content changed on disk despite unchanged metadata: " + target
+                + ". Reload or save to a different path to keep both versions.");
+        }
+    }
+
+    private static byte[] digest(byte[] bytes) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(bytes);
+        } catch (NoSuchAlgorithmException error) {
+            throw new IllegalStateException("SHA-256 is unavailable", error);
+        }
+    }
+
+    private static byte[] digest(Path path) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (java.io.InputStream input = Files.newInputStream(path)) {
+                byte[] chunk = new byte[8192];
+                int length;
+                while ((length = input.read(chunk)) != -1) digest.update(chunk, 0, length);
+            }
+            return digest.digest();
+        } catch (NoSuchAlgorithmException error) {
+            throw new IOException("SHA-256 is unavailable", error);
+        }
+    }
+
     private boolean sameIdentity(ExternalFileStamp current, ExternalFileStamp previous) {
         if (current.fileKey() != null && previous.fileKey() != null && !current.fileKey().equals(previous.fileKey())) {
             return false;
@@ -644,20 +842,26 @@ public class FileBuffer {
     }
 
     private ExternalFileStamp observeExternalFile() {
-        if (file == null) {
-            return new ExternalFileStamp(ExternalFileKind.MISSING, null, null, null, 0L);
+        return observeExternalFile(file);
+    }
+
+    private static ExternalFileStamp observeExternalFile(File targetFile) {
+        if (targetFile == null) {
+            return new ExternalFileStamp(ExternalFileKind.MISSING, null, null, null, 0L, null);
         }
         try {
-            BasicFileAttributes attributes = Files.readAttributes(file.toPath(), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-            if (!attributes.isRegularFile() || attributes.isSymbolicLink()) {
-                return new ExternalFileStamp(ExternalFileKind.UNSUPPORTED, null, null, null, 0L);
+            Path path = targetFile.toPath();
+            Path linkTarget = Files.isSymbolicLink(path) ? Files.readSymbolicLink(path) : null;
+            BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class);
+            if (!attributes.isRegularFile()) {
+                return new ExternalFileStamp(ExternalFileKind.UNSUPPORTED, null, null, null, 0L, linkTarget);
             }
             return new ExternalFileStamp(ExternalFileKind.REGULAR, attributes.fileKey(), attributes.creationTime(),
-                attributes.lastModifiedTime(), attributes.size());
+                attributes.lastModifiedTime(), attributes.size(), linkTarget);
         } catch (java.nio.file.NoSuchFileException error) {
-            return new ExternalFileStamp(ExternalFileKind.MISSING, null, null, null, 0L);
+            return new ExternalFileStamp(ExternalFileKind.MISSING, null, null, null, 0L, null);
         } catch (IOException | SecurityException error) {
-            return new ExternalFileStamp(ExternalFileKind.UNSUPPORTED, null, null, null, 0L);
+            return new ExternalFileStamp(ExternalFileKind.UNSUPPORTED, null, null, null, 0L, null);
         }
     }
 
@@ -892,7 +1096,8 @@ public class FileBuffer {
         UNSUPPORTED
     }
 
-    private record ExternalFileStamp(ExternalFileKind kind, Object fileKey, FileTime creationTime, FileTime modifiedTime, long size) {
+    private record ExternalFileStamp(ExternalFileKind kind, Object fileKey, FileTime creationTime,
+                                     FileTime modifiedTime, long size, Path linkTarget) {
     }
 
     private static class DecodedContent {

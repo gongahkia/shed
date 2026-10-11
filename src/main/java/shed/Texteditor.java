@@ -2682,6 +2682,41 @@ public class Texteditor extends JFrame implements KeyListener {
         paneBufferController.openFile(file);
     }
 
+    public void openFileAsync(File file) {
+        paneBufferController.openFileAsync(file);
+    }
+
+    public void openFileAsync(File file, java.util.function.Consumer<IOException> completion) {
+        paneBufferController.openFileAsync(file, completion);
+    }
+
+    String openFileAtAsync(File file, int line, int column, String successMessage) {
+        if (file == null) return "File path is unavailable";
+        openFileAsync(file, error -> {
+            if (error != null) return;
+            FileBuffer active = getCurrentBuffer();
+            if (active == null || active.getFile() == null
+                || !active.getFile().getAbsoluteFile().equals(file.getAbsoluteFile())) {
+                showMessage("File opened in another window; select it to navigate to line " + line);
+                return;
+            }
+            String result = gotoLine(line);
+            if (result.startsWith("Error") || result.startsWith("Invalid")) {
+                showMessage(result);
+                return;
+            }
+            try {
+                int lineIndex = Math.min(Math.max(0, line - 1), Math.max(0, writingArea.getLineCount() - 1));
+                int lineStart = writingArea.getLineStartOffset(lineIndex);
+                writingArea.setCaretPosition(Math.min(lineStart + Math.max(0, column - 1), writingArea.getText().length()));
+                showMessage(successMessage);
+            } catch (javax.swing.text.BadLocationException errorAtPosition) {
+                showMessage("File opened, but its requested position is unavailable");
+            }
+        });
+        return "Opening: " + file.getName();
+    }
+
     // Buffer management methods (called by CommandHandler)
     public FileBuffer getCurrentBuffer() {
         return paneBufferController.getCurrentBuffer();
@@ -3301,6 +3336,12 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         if (asyncJobService != null) {
             asyncJobService.shutdownNow();
+        }
+        if (treeGitController != null) {
+            treeGitController.closeFinderIndexes();
+        }
+        if (paletteController != null) {
+            paletteController.close();
         }
         if (debugSessionController != null) {
             debugSessionController.shutdown();

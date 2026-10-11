@@ -42,7 +42,7 @@ JAVA_VERSION="$("$JAVA_BIN" -version 2>&1 | awk -F'"' '/version/ {print $2; exit
 JAVA_FEATURE="${JAVA_VERSION%%.*}"
 [[ "$JAVA_FEATURE" == "21" ]] || fail "JDK 21 is required; found $JAVA_VERSION"
 
-MAVEN_ARGS=(-B -q clean package)
+MAVEN_ARGS=(-B -q -Djava.awt.headless=true clean package)
 if [[ -n "${SHED_BUILD_COMMIT:-}" ]]; then
   MAVEN_ARGS+=("-Dshed.build.commit=$SHED_BUILD_COMMIT")
 fi
@@ -70,7 +70,9 @@ DIST_DIR="$PACKAGE_ROOT/dist"
 mkdir -p "$INPUT_DIR" "$APP_IMAGE_DIR" "$DIST_DIR"
 cp "$JAR_PATH" "$INPUT_DIR/$JAR_NAME"
 
-MODULES="$("$JDEPS" --multi-release 21 --ignore-missing-deps --print-module-deps "$JAR_PATH")"
+MODULES="$("$JDEPS" --multi-release 21 --ignore-missing-deps --print-module-deps "$JAR_PATH" \
+  | awk '/^[a-z][A-Za-z0-9_.]*(,[a-z][A-Za-z0-9_.]*)*$/ {modules=$0} END {print modules}')"
+[[ -n "$MODULES" ]] || fail "runtime module analysis did not return a module list"
 [[ "$MODULES" == *"java.desktop"* ]] || fail "runtime module analysis did not include java.desktop"
 printf '%s\n' "$MODULES" > "$PACKAGE_ROOT/runtime-modules.txt"
 "$JLINK" --add-modules "$MODULES" --output "$RUNTIME_DIR" --strip-debug --no-header-files --no-man-pages --compress=zip-6
@@ -91,7 +93,7 @@ RUNTIME_VERSION="$("$RUNTIME_JAVA" -version 2>&1 | awk -F'"' '/version/ {print $
 [[ "${RUNTIME_VERSION%%.*}" == "21" ]] || fail "bundled runtime is not Java 21"
 jar tf "$APP_JAR" | grep -Fx 'assets/logo/shed.png' >/dev/null || fail "bundled application logo is missing"
 
-"$JPACKAGE" --type deb --dest "$DIST_DIR" --name "$APP_NAME" --app-version "$VERSION" --app-image "$APP_DIRECTORY" \
+"$JPACKAGE" --type deb --temp "$PACKAGE_ROOT/deb-build" --dest "$DIST_DIR" --name "$APP_NAME" --app-version "$VERSION" --app-image "$APP_DIRECTORY" \
   --linux-package-name "$PACKAGE_NAME" --linux-app-release 1
 GENERATED_DEB="$(find "$DIST_DIR" -maxdepth 1 -type f -name '*.deb' -print -quit)"
 [[ -n "$GENERATED_DEB" ]] || fail "jpackage did not produce a DEB"

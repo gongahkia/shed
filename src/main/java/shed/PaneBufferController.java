@@ -20,6 +20,8 @@ final class PaneBufferController {
     private FileBuffer pendingDiffGutterBuffer;
     private int diffGutterJobId = -1;
     private long diffGutterGeneration;
+    private long openRequestSequence;
+    private final Map<EditorPane, Long> openRequests = new WeakHashMap<>();
     private File landingFile;
 
     PaneBufferController(Texteditor editor) {
@@ -357,11 +359,7 @@ final class PaneBufferController {
 
         if (result == JFileChooser.APPROVE_OPTION) {
             File file = fileChooser.getSelectedFile();
-            try {
-                openFile(file);
-            } catch (Exception e) {
-                editor.showMessage("Error opening file: " + e.getMessage());
-            }
+            openFileAsync(file);
         }
     }
 
@@ -481,6 +479,8 @@ final class PaneBufferController {
 
 
     public void openFile(File file) throws IOException {
+        EditorPane activePane = editor.getActivePane();
+        if (activePane != null) openRequests.put(activePane, ++openRequestSequence);
         persistCurrentBufferState();
         String projectConfigMessage = applyProjectConfigurationForFile(file);
 
@@ -501,13 +501,56 @@ final class PaneBufferController {
             buffer = new FileBuffer(file.getAbsolutePath(), editor.configManager);
         }
 
-        if (shouldReplaceSingleLandingBuffer()) {
+        installLoadedBuffer(file, buffer, projectConfigMessage, editor.getActivePane());
+    }
+
+    void openFileAsync(File file) {
+        openFileAsync(file, null);
+    }
+
+    void openFileAsync(File file, java.util.function.Consumer<IOException> completion) {
+        persistCurrentBufferState();
+        EditorPane targetPane = editor.getActivePane();
+        long request = ++openRequestSequence;
+        if (targetPane != null) openRequests.put(targetPane, request);
+        String projectConfigMessage = applyProjectConfigurationForFile(file);
+        FileBuffer existing = findBufferByPath(file);
+        if (existing != null) {
+            loadBufferIntoEditor(existing);
+            editor.showAlternateSurfaceIfAvailable(editor.getActivePane(), existing);
+            if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) editor.showMessage(projectConfigMessage);
+            if (completion != null) completion.accept(null);
+            return;
+        }
+        editor.asyncJobService.submit("open file", token -> file.exists()
+            ? new FileBuffer(file, editor.configManager)
+            : new FileBuffer(file.getAbsolutePath(), editor.configManager), (job, loaded, error) -> {
+                if (editor.closingDown || job.getStatus() == AsyncJobService.Status.CANCELLED) return;
+                if (targetPane != null && !java.util.Objects.equals(openRequests.get(targetPane), request)) return;
+                if (error != null || loaded == null) {
+                    IOException failure = error instanceof IOException io ? io
+                        : new IOException(error == null ? "unknown error" : error.getMessage(), error);
+                    editor.showMessage("Error opening file: " + failure.getMessage());
+                    if (completion != null) completion.accept(failure);
+                    return;
+                }
+                EditorPane pane = targetPane != null && editor.editorPanes.contains(targetPane)
+                    ? targetPane : editor.getActivePane();
+                installLoadedBuffer(file, loaded, projectConfigMessage, pane);
+                if (completion != null) completion.accept(null);
+            });
+    }
+
+    private void installLoadedBuffer(File file, FileBuffer buffer, String projectConfigMessage, EditorPane pane) {
+        FileBuffer alreadyOpen = findBufferByPath(file);
+        if (alreadyOpen != null) buffer = alreadyOpen;
+        if (alreadyOpen == null && shouldReplaceSingleLandingBuffer()) {
             editor.buffers.set(0, buffer);
-        } else {
+        } else if (alreadyOpen == null) {
             editor.buffers.add(buffer);
         }
-        loadBufferIntoEditor(buffer);
-        editor.showAlternateSurfaceIfAvailable(editor.getActivePane(), buffer);
+        loadBufferIntoPane(pane, buffer, 0);
+        editor.showAlternateSurfaceIfAvailable(pane, buffer);
         editor.addToRecentFiles(file.getAbsolutePath());
         editor.registerFileWatch(buffer);
         editor.refreshGitGutter();
@@ -529,44 +572,49 @@ final class PaneBufferController {
             return "No editor window available for the drop";
         }
 
-        try {
-            persistCurrentBufferState();
-            applyProjectConfigurationForFile(file);
-            FileBuffer targetBuffer = findBufferByPath(file);
-            boolean newBuffer = targetBuffer == null;
-            if (newBuffer) {
-                targetBuffer = new FileBuffer(file, editor.configManager);
-                if (shouldReplaceSingleLandingBuffer()) {
-                    editor.buffers.set(0, targetBuffer);
-                } else {
-                    editor.buffers.add(targetBuffer);
+        persistCurrentBufferState();
+        applyProjectConfigurationForFile(file);
+        FileBuffer existing = findBufferByPath(file);
+        if (existing != null) return finishSplitOpen(file, targetPane, orientation, newPaneFirst, existing);
+        editor.asyncJobService.submit("open file in split", token -> new FileBuffer(file, editor.configManager),
+            (job, loaded, error) -> {
+                if (editor.closingDown || job.getStatus() == AsyncJobService.Status.CANCELLED) return;
+                if (error != null || loaded == null) {
+                    editor.showMessage("Error opening file in split: " + (error == null ? "unknown error" : error.getMessage()));
+                    return;
                 }
-            }
+                editor.showMessage(finishSplitOpen(file, targetPane, orientation, newPaneFirst, loaded));
+            });
+        return "Opening in split: " + file.getAbsolutePath();
+    }
 
-            EditorPane newPane = editor.createEditorPane(editor.getSize());
-            editor.editorPanes.add(newPane);
-            if (editor.windowLayoutRoot == null) {
-                editor.windowLayoutRoot = WindowLayoutNode.leaf(targetPane);
-            }
-            if (!editor.windowLayoutRoot.splitLeaf(targetPane, newPane, orientation, newPaneFirst, 0.5)) {
-                editor.editorPanes.remove(newPane);
-                return "Unable to split the target window";
-            }
-
-            loadBufferIntoPane(newPane, targetBuffer, 0);
-            editor.renderWindowLayout();
-            editor.activateEditorPane(newPane);
-            editor.showAlternateSurfaceIfAvailable(newPane, targetBuffer);
-            newPane.getTextArea().requestFocusInWindow();
-            editor.addToRecentFiles(file.getAbsolutePath());
-            if (newBuffer) {
-                editor.registerFileWatch(targetBuffer);
-                editor.refreshGitGutter();
-            }
-            return "Opened in split: " + file.getAbsolutePath();
-        } catch (IOException error) {
-            return "Error opening file: " + error.getMessage();
+    private String finishSplitOpen(File file, EditorPane targetPane, WindowLayoutNode.Orientation orientation,
+                                   boolean newPaneFirst, FileBuffer loaded) {
+        if (!editor.editorPanes.contains(targetPane)) return "Target editor window was closed before the file opened";
+        FileBuffer existing = findBufferByPath(file);
+        FileBuffer targetBuffer = existing == null ? loaded : existing;
+        EditorPane newPane = editor.createEditorPane(editor.getSize());
+        editor.editorPanes.add(newPane);
+        if (editor.windowLayoutRoot == null) editor.windowLayoutRoot = WindowLayoutNode.leaf(targetPane);
+        if (!editor.windowLayoutRoot.splitLeaf(targetPane, newPane, orientation, newPaneFirst, 0.5)) {
+            editor.editorPanes.remove(newPane);
+            return "Unable to split the target window";
         }
+        if (existing == null) {
+            if (shouldReplaceSingleLandingBuffer()) editor.buffers.set(0, targetBuffer);
+            else editor.buffers.add(targetBuffer);
+        }
+        loadBufferIntoPane(newPane, targetBuffer, 0);
+        editor.renderWindowLayout();
+        editor.activateEditorPane(newPane);
+        editor.showAlternateSurfaceIfAvailable(newPane, targetBuffer);
+        newPane.getTextArea().requestFocusInWindow();
+        editor.addToRecentFiles(file.getAbsolutePath());
+        if (existing == null) {
+            editor.registerFileWatch(targetBuffer);
+            editor.refreshGitGutter();
+        }
+        return "Opened in split: " + file.getAbsolutePath();
     }
 
 

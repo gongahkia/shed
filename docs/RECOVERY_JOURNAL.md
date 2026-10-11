@@ -31,7 +31,7 @@ The outer envelope has `payload` and `integrity`. `integrity` is `sha256:` follo
 }
 ```
 
-`version=1` is required. Each entry is a complete buffer payload; Shed never writes a partial document to satisfy retention. Entries are retained in editor-buffer order. Defaults retain up to 32 entries and 8 MiB of UTF-8 content; `recovery.retention.max.entries` and `recovery.retention.max.content.bytes` can lower either bound, never raise the hard maximum. `droppedEntries` makes bounded retention explicit.
+`version=1` is required. Each entry is a complete buffer payload; Shed never writes a partial document to satisfy retention. Entries are retained in editor-buffer order. Defaults retain up to 32 entries and 32 MiB of UTF-8 content; `recovery.retention.max.entries` and `recovery.retention.max.content.bytes` can lower either bound, never raise the hard maximum. Shed warns when an entry is dropped, and local backups are enabled by default. `droppedEntries` also records the loss in the journal.
 
 ## Read and write semantics
 

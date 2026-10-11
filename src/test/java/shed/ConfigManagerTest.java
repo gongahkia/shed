@@ -82,7 +82,7 @@ public class ConfigManagerTest {
         assertTrue(config.getWorkspaceIndexEnabled());
         assertTrue(config.getGitAutoRefreshEnabled());
         assertEquals(1500, config.getGitAutoRefreshIntervalMs());
-        assertFalse(config.getBackupPolicy().enabled());
+        assertTrue(config.getBackupPolicy().enabled());
         assertEquals(BackupPolicy.BackupMode.IDLE, config.getBackupPolicy().mode());
         assertEquals("default", config.getSessionAutoloadName());
         assertEquals(15000, config.getProcessTimeoutMs());

@@ -508,8 +508,8 @@ final class SessionConfigController {
         File settingsFile = new File(editor.configManager.getConfigPath());
         try {
             ensureSettingsFileSeeded(settingsFile);
-            editor.openFile(settingsFile);
-            return "Opened settings: " + settingsFile.getAbsolutePath();
+            editor.openFileAsync(settingsFile);
+            return "Opening settings: " + settingsFile.getAbsolutePath();
         } catch (IOException e) {
             return "Error opening settings: " + e.getMessage();
         }
@@ -527,8 +527,8 @@ final class SessionConfigController {
                     StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
             }
             editor.snippetService.loadFromConfig(editor.configManager);
-            editor.openFile(snippets.toFile());
-            return "Opened snippets: " + snippets;
+            editor.openFileAsync(snippets.toFile());
+            return "Opening snippets: " + snippets;
         } catch (IOException error) {
             return "Error opening snippets: " + error.getMessage();
         }
@@ -543,8 +543,8 @@ final class SessionConfigController {
                     new byte[0],
                     StandardOpenOption.CREATE);
             }
-            editor.openFile(editor.commandLogStore);
-            return "Opened command log: " + editor.commandLogStore.getAbsolutePath();
+            editor.openFileAsync(editor.commandLogStore);
+            return "Opening command log: " + editor.commandLogStore.getAbsolutePath();
         } catch (IOException e) {
             return "Error opening command log: " + e.getMessage();
         }

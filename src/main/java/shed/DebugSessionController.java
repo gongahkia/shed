@@ -333,20 +333,10 @@ final class DebugSessionController {
     String openFrameSourceForPanel(DebugInspection.Frame frame) {
         Path source = DebugFrameLocation.sourcePath(frame);
         if (source == null) return "The selected debug frame has no local source file.";
-        try {
-            editor.recordJumpPosition();
-            editor.openFile(source.toFile());
-            String result = editor.gotoLine(DebugFrameLocation.line(frame));
-            if (result.startsWith("Error") || result.startsWith("Invalid")) return result;
-            int lineIndex = Math.max(0, DebugFrameLocation.line(frame) - 1);
-            int lineStart = editor.writingArea.getLineStartOffset(lineIndex);
-            int target = Math.min(lineStart + DebugFrameLocation.column(frame) - 1, editor.writingArea.getText().length());
-            editor.writingArea.setCaretPosition(target);
-            return "Opened debug frame source.";
-        } catch (Exception error) {
-            String detail = error.getMessage();
-            return "Could not open debug frame source: " + (detail == null || detail.isBlank() ? error.getClass().getSimpleName() : detail);
-        }
+        editor.recordJumpPosition();
+        editor.openFileAtAsync(source.toFile(), DebugFrameLocation.line(frame), DebugFrameLocation.column(frame),
+            "Opened debug frame source.");
+        return "Opening debug frame source.";
     }
 
     private String configurations() {

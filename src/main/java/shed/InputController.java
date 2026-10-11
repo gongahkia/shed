@@ -8,6 +8,7 @@ import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.List;
 
@@ -317,7 +318,146 @@ final class InputController {
             return;
         }
         event.consume();
-        editor.commandHandler.execute(action.exCommand());
+        switch (action) {
+            case NEW -> editor.sessionConfigController.openScratchBuffer("[No Name]", "", false);
+            case SAVE -> {
+                FileBuffer buffer = editor.getCurrentBuffer();
+                if (buffer != null && !buffer.hasFilePath()) {
+                    savePlainAs();
+                } else {
+                    executePlainCommand(action);
+                }
+            }
+            case SAVE_AS -> savePlainAs();
+            case FIND -> findPlain();
+            case FIND_NEXT -> repeatPlainSearch(true);
+            case FIND_PREVIOUS -> repeatPlainSearch(false);
+            case REPLACE -> replacePlain();
+            case GO_TO_LINE -> goToPlainLine();
+            case UNDO -> {
+                if (editor.writingArea.isEditable() && editor.undoManager.canUndo()) editor.undoManager.undo();
+            }
+            case REDO -> {
+                if (editor.writingArea.isEditable() && editor.undoManager.canRedo()) editor.undoManager.redo();
+            }
+            case NONE -> { }
+            default -> executePlainCommand(action);
+        }
+    }
+
+    private void executePlainCommand(PlainKeymap.Action action) {
+        String result = editor.commandHandler.execute(action.exCommand());
+        if (result != null && !result.isEmpty()) editor.showMessage(result);
+    }
+
+    private void savePlainAs() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null) return;
+        if (buffer.isLargeFile()) {
+            editor.showMessage("Save As is unavailable for large files");
+            return;
+        }
+        JFileChooser chooser = new JFileChooser();
+        File current = buffer.getFile();
+        if (current != null) chooser.setSelectedFile(current);
+        editor.editorUiController.applyUiTheme(chooser);
+        if (chooser.showSaveDialog(editor) != JFileChooser.APPROVE_OPTION) return;
+        File target = chooser.getSelectedFile().getAbsoluteFile();
+        if (Files.exists(target.toPath()) && (current == null
+            || !target.toPath().toAbsolutePath().normalize().equals(current.toPath().toAbsolutePath().normalize()))) {
+            int answer = JOptionPane.showConfirmDialog(editor, "Replace existing file?\n" + target,
+                "Save As", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (answer != JOptionPane.YES_OPTION) return;
+        }
+        if (editor.getCurrentBuffer() != buffer) {
+            editor.showMessage("Save As cancelled: active document changed");
+            return;
+        }
+        editor.showMessage(editor.formatOnSaveController.requestCurrent(target.getPath(), false, false));
+    }
+
+    private void findPlain() {
+        String selected = editor.writingArea.getSelectedText();
+        String previous = editor.searchManager.getSearchPattern();
+        String initial = selected != null && !selected.contains("\n") ? selected : previous == null ? "" : previous;
+        String pattern = JOptionPane.showInputDialog(editor, "Find", initial);
+        if (pattern != null && !pattern.isEmpty()) searchPlainLiteral(pattern, true);
+    }
+
+    private void repeatPlainSearch(boolean forward) {
+        String pattern = editor.searchManager.getSearchPattern();
+        if (pattern == null || pattern.isEmpty()) {
+            findPlain();
+            return;
+        }
+        if (forward) {
+            int caret = editor.writingArea.getCaretPosition();
+            editor.writingArea.setCaretPosition(Math.min(editor.writingArea.getDocument().getLength(), caret + 1));
+        }
+        searchPlainLiteral(pattern, forward);
+    }
+
+    private void searchPlainLiteral(String pattern, boolean forward) {
+        editor.recordJumpPosition();
+        String result = editor.searchManager.searchLiteral(pattern, forward);
+        if (!editor.configManager.getHighlightSearch()) editor.searchManager.clearHighlights();
+        editor.showMessage(result);
+    }
+
+    private void replacePlain() {
+        if (!editor.writingArea.isEditable()) {
+            editor.showMessage("Replace is unavailable in a read-only buffer");
+            return;
+        }
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null) return;
+        JTextField find = new JTextField(24);
+        JTextField replacement = new JTextField(24);
+        String selected = editor.writingArea.getSelectedText();
+        if (selected != null && !selected.contains("\n")) find.setText(selected);
+        JPanel fields = new JPanel(new GridLayout(2, 2, 6, 6));
+        fields.add(new JLabel("Find:"));
+        fields.add(find);
+        fields.add(new JLabel("Replace with:"));
+        fields.add(replacement);
+        if (JOptionPane.showConfirmDialog(editor, fields, "Replace All", JOptionPane.OK_CANCEL_OPTION)
+            != JOptionPane.OK_OPTION || find.getText().isEmpty()) return;
+        if (editor.getCurrentBuffer() != buffer) {
+            editor.showMessage("Replace cancelled: active document changed");
+            return;
+        }
+        SubstituteService.Result result = editor.substituteService.replaceLiteral(
+            editor.writingArea.getText(), find.getText(), replacement.getText(), true);
+        if (result.getMatchCount() == 0) {
+            editor.showMessage("Pattern not found: " + find.getText());
+            return;
+        }
+        try {
+            BoundedUndoManager history = (BoundedUndoManager) buffer.getUndoManager();
+            history.beginCompoundEdit();
+            try {
+                buffer.getDocument().replace(0, editor.writingArea.getDocument().getLength(),
+                    result.getUpdatedText(), null);
+            } finally {
+                history.endCompoundEdit();
+            }
+            editor.writingArea.setCaretPosition(result.getFirstMatchOffset());
+            editor.searchManager.clearHighlights();
+            editor.showMessage("Replaced " + result.getMatchCount() + " occurrence"
+                + (result.getMatchCount() == 1 ? "" : "s"));
+        } catch (BadLocationException error) {
+            editor.showMessage("Replace failed: " + error.getMessage());
+        }
+    }
+
+    private void goToPlainLine() {
+        String value = JOptionPane.showInputDialog(editor, "Go to line");
+        if (value == null || value.isBlank()) return;
+        try {
+            editor.showMessage(editor.gotoLine(Integer.parseInt(value.trim())));
+        } catch (NumberFormatException error) {
+            editor.showMessage("Invalid line number: " + value);
+        }
     }
 
     private void handleEmacsKeymap(KeyEvent event) {

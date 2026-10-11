@@ -84,6 +84,27 @@ public class BoundedUndoManagerTest {
         assertFalse(manager.canRedo());
     }
 
+    @Test
+    void replacementOfWholeDocumentIsOneUndoStep() throws Exception {
+        PlainDocument document = new PlainDocument();
+        BoundedUndoManager manager = new BoundedUndoManager(new UndoHistoryPolicy(10, 1024));
+        document.insertString(0, "cat cat", null);
+        document.addUndoableEditListener(manager);
+
+        manager.beginCompoundEdit();
+        try {
+            document.replace(0, document.getLength(), "dog dog", null);
+        } finally {
+            manager.endCompoundEdit();
+        }
+
+        assertEquals(1, manager.retainedEditCount());
+        manager.undo();
+        assertEquals("cat cat", document.getText(0, document.getLength()));
+        manager.redo();
+        assertEquals("dog dog", document.getText(0, document.getLength()));
+    }
+
     private void append(PlainDocument document, String text) throws Exception {
         document.insertString(document.getLength(), text, null);
     }

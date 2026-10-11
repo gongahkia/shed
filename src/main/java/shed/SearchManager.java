@@ -40,9 +40,17 @@ public class SearchManager {
     public String searchBackward(String pattern) { return search(pattern, false); }
 
     public String search(String pattern, boolean forward) {
+        return search(pattern, forward, containsRegexMeta(pattern));
+    }
+
+    public String searchLiteral(String pattern, boolean forward) {
+        return search(pattern, forward, false);
+    }
+
+    private String search(String pattern, boolean forward, boolean regex) {
         if (pattern == null || pattern.isEmpty()) return "Error: Empty search pattern";
         this.searchPattern = pattern;
-        this.useRegex = containsRegexMeta(pattern);
+        this.useRegex = regex;
         rebuildMatches();
         if (matchPositions.isEmpty()) {
             clearHighlights();
@@ -82,6 +90,7 @@ public class SearchManager {
     public String getSearchPattern() { return searchPattern; }
 
     private static boolean containsRegexMeta(String pattern) {
+        if (pattern == null) return false;
         // only treat as regex if it has unambiguous regex constructs (not just '.' or '$')
         for (int i = 0; i < pattern.length(); i++) {
             char c = pattern.charAt(i);

@@ -19,7 +19,7 @@ public class ShellCommandTest {
     void fallsBackToLinuxBashWhenShellEnvironmentIsUnsupported() {
         assertEquals(
             java.util.List.of("/bin/bash", "-lc", "echo ok"),
-            ShellCommand.forCommand("echo ok", Map.of("SHELL", "/usr/bin/fish"), "/bin/bash"::equals)
+            ShellCommand.forCommand("echo ok", Map.of("SHELL", "/usr/bin/fish"), "/bin/bash"::equals, false)
         );
     }
 
@@ -39,7 +39,7 @@ public class ShellCommandTest {
     void fallsBackToPosixShellWhenOnlyShExists() {
         assertEquals(
             java.util.List.of("/bin/sh", "-c", "echo ok"),
-            ShellCommand.forCommand("echo ok", Map.of(), "/bin/sh"::equals)
+            ShellCommand.forCommand("echo ok", Map.of(), "/bin/sh"::equals, false)
         );
     }
 
@@ -47,7 +47,7 @@ public class ShellCommandTest {
     void keepsPathLookupFallbackWhenNoKnownShellPathExists() {
         assertEquals(
             java.util.List.of("sh", "-c", "echo ok"),
-            ShellCommand.forCommand("echo ok", Map.of(), path -> false)
+            ShellCommand.forCommand("echo ok", Map.of(), path -> false, false)
         );
     }
 

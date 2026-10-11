@@ -59,7 +59,7 @@ class ToolchainServiceTest {
     @Test
     void exportsJavaHomeAndAcceptsCPlusPlusAsAnAlias(@TempDir Path temporaryDirectory) throws Exception {
         Path workspace = temporaryDirectory.resolve("workspace");
-        Path java = executable(temporaryDirectory.resolve("jdk/bin/java"));
+        Path java = executable(temporaryDirectory.resolve("jdk/bin/" + (File.separatorChar == '\\' ? "java.exe" : "java")));
         ToolchainService service = new ToolchainService(temporaryDirectory.resolve("state"), Map.of("PATH", "/system/bin"));
 
         service.select(workspace, ToolchainService.Runtime.JAVA, java.toString());
@@ -73,7 +73,11 @@ class ToolchainServiceTest {
     void selectsAndDiscoversTheFourteenAdditionalRuntimeBackedLanguages(@TempDir Path temporaryDirectory) throws Exception {
         Path workspace = temporaryDirectory.resolve("workspace");
         Path bin = temporaryDirectory.resolve("runtimes/bin");
-        for (String executable : java.util.List.of("bash", "dotnet", "pwsh", "php", "rustc", "kotlin", "lua", "nasm", "ruby", "dart", "swift", "R", "groovy", "perl")) {
+        java.util.List<String> executables = File.separatorChar == '\\'
+            ? java.util.List.of("bash.exe", "dotnet.exe", "pwsh.exe", "php.exe", "rustc.exe", "kotlin.bat", "lua.exe",
+                "nasm.exe", "ruby.exe", "dart.exe", "swift.exe", "R.exe", "groovy.bat", "perl.exe")
+            : java.util.List.of("bash", "dotnet", "pwsh", "php", "rustc", "kotlin", "lua", "nasm", "ruby", "dart", "swift", "R", "groovy", "perl");
+        for (String executable : executables) {
             executable(bin.resolve(executable));
         }
         ToolchainService service = new ToolchainService(temporaryDirectory.resolve("state"), Map.of("PATH", bin.toString()));
@@ -83,8 +87,9 @@ class ToolchainServiceTest {
         assertEquals(ToolchainService.Runtime.POWERSHELL, ToolchainService.Runtime.parse("pwsh"));
         assertEquals(ToolchainService.Runtime.ASSEMBLY, ToolchainService.Runtime.parse("asm"));
         assertEquals(14L, service.report(workspace).candidates().stream().map(ToolchainService.Candidate::runtime).distinct().count());
-        service.select(workspace, ToolchainService.Runtime.GROOVY, bin.resolve("groovy").toString());
-        assertEquals(bin.resolve("groovy").toRealPath(), service.report(workspace).selections().get(ToolchainService.Runtime.GROOVY));
+        Path groovy = bin.resolve(File.separatorChar == '\\' ? "groovy.bat" : "groovy");
+        service.select(workspace, ToolchainService.Runtime.GROOVY, groovy.toString());
+        assertEquals(groovy.toRealPath(), service.report(workspace).selections().get(ToolchainService.Runtime.GROOVY));
     }
 
     private static Path executable(Path path) throws Exception {

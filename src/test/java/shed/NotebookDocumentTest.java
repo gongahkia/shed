@@ -53,10 +53,10 @@ class NotebookDocumentTest {
 
     @Test
     void buildsOnlyValidatedDirectArgvJupyterExecutionCommands() {
-        assertEquals(List.of("jupyter", "nbconvert", "--to", "notebook", "--execute", "--inplace", "/project/demo.ipynb"),
+        assertEquals(List.of("jupyter", "nbconvert", "--to", "notebook", "--execute", "--inplace", Path.of("/project/demo.ipynb").toAbsolutePath().normalize().toString()),
             NotebookController.executeCommand(Path.of("/project/demo.ipynb"), ""));
         assertEquals(List.of("jupyter", "nbconvert", "--to", "notebook", "--execute", "--inplace",
-            "--ExecutePreprocessor.kernel_name=python3", "/project/demo.ipynb"),
+            "--ExecutePreprocessor.kernel_name=python3", Path.of("/project/demo.ipynb").toAbsolutePath().normalize().toString()),
             NotebookController.executeCommand(Path.of("/project/demo.ipynb"), "python3"));
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
             () -> NotebookController.executeCommand(Path.of("/project/demo.ipynb"), "python3; bad"));

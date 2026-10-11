@@ -141,7 +141,7 @@ public class TaskServiceTest {
         assertEquals(scripts.toFile().getCanonicalFile(), plan.workingDirectory());
         assertEquals("check", plan.environment().get("MODE"));
         RemoteCommandRequest remote = service.buildRemoteCommandRequest(plan, project, project.toString(), source.toFile());
-        assertEquals(List.of("echo", project.relativize(source).toString()), remote.command());
+        assertEquals(List.of("echo", project.relativize(source).toString().replace('\\', '/')), remote.command());
         assertEquals("scripts", remote.relativeWorkingDirectory());
         assertEquals("check", remote.environment().get("MODE"));
     }
@@ -172,7 +172,7 @@ public class TaskServiceTest {
 
         RemoteCommandRequest request = service.buildRemoteCommandRequest(plan, project, project.toString(), null);
 
-        assertEquals(List.of("sh", "-lc", "echo " + project), request.command());
+        assertEquals(List.of("sh", "-lc", "echo " + project.toString().replace('\\', '/')), request.command());
         assertEquals("", request.relativeWorkingDirectory());
         assertThrows(IOException.class, () -> service.buildRemoteCommandRequest(plan, tempDir.resolve("other"), project.toString(), null));
     }
@@ -232,7 +232,8 @@ public class TaskServiceTest {
 
         assertTrue(task.sessionOnly());
         assertEquals(TaskService.ShellPolicy.SHELL, task.shell());
-        assertEquals("-c", plan.processCommand().get(1));
+        if (java.io.File.separatorChar != '\\') assertEquals("-c", plan.processCommand().get(1));
+        assertEquals(plan.expandedCommand(), plan.processCommand().getLast());
         assertEquals("'printf' '%s' '" + source.toRealPath().toString().replace("'", "'\"'\"'") + "' 'two words' '$HOME'", plan.expandedCommand());
         assertEquals(List.of("sh", "-c", "'printf' '%s' '/srv/project/file'\"'\"'s value.py' 'two words' '$HOME'"), remote.command());
         assertThrows(IllegalArgumentException.class, () -> service.saveWorkspaceTasks(workspace.toFile(), Map.of("vscode-shell", task)));

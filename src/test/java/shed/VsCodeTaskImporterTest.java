@@ -56,6 +56,7 @@ class VsCodeTaskImporterTest {
 
     @Test
     void importsPosixShellTasksButRejectsParallelDependenciesProblemMatchersAndUnsupportedVariables() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeFalse(java.io.File.separatorChar == '\\', "POSIX shell fixture");
         Path root = Files.createDirectories(temporaryDirectory.resolve("workspace"));
         Path tasks = Files.createDirectories(root.resolve(".vscode")).resolve("tasks.json");
         Files.writeString(tasks, """
@@ -151,6 +152,7 @@ class VsCodeTaskImporterTest {
 
     @Test
     void importsShellArgumentsWithExpansionBeforeStrongPosixQuotingLocallyAndRemotely() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeFalse(java.io.File.separatorChar == '\\', "POSIX shell fixture");
         Path root = Files.createDirectories(temporaryDirectory.resolve("workspace's name"));
         Path source = Files.writeString(root.resolve("file's value.py"), "print('ok')\n");
         Path tasks = Files.createDirectories(root.resolve(".vscode")).resolve("tasks.json");

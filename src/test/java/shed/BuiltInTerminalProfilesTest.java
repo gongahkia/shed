@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 class BuiltInTerminalProfilesTest {
     @Test
     void detectsExecutablePosixProfilesWithoutStartingThem() {
+        org.junit.jupiter.api.Assumptions.assumeFalse(File.separatorChar == '\\', "POSIX path fixture");
         String path = "/tools" + File.pathSeparator + "/other";
         List<BuiltInTerminalProfiles.Profile> profiles = BuiltInTerminalProfiles.detect(Map.of(
             "SHELL", "/custom/zsh",

@@ -27,7 +27,7 @@ class RemoteTestExecutionTest {
         RemoteTestExecution.Result result = RemoteTestExecution.execute(plan);
 
         assertEquals(0, result.result().exitCode);
-        assertEquals(root.resolve("src/test/java/DemoTest.java") + ":7: failed", result.result().stdout);
+        assertEquals(root + "/src/test/java/DemoTest.java:7: failed", result.result().stdout);
         assertEquals(2, result.command().reports().size());
         assertTrue(Files.isRegularFile(result.command().reports().getFirst()));
         assertTrue(Files.isDirectory(result.command().reports().get(1)));

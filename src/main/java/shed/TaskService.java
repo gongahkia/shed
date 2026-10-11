@@ -1088,8 +1088,8 @@ public class TaskService {
                     fileWorkspaceFolder(workspace, activeFile);
                     yield remotePath(executionRoot, connectionRoot.relativize(workspacePath));
                 }
-                case "relativeFile" -> relativeFilePath(workspace, activeFile);
-                case "relativeFileDirname" -> relativeFileDirectory(workspace, activeFile);
+                case "relativeFile" -> relativeFilePath(workspace, activeFile).replace('\\', '/');
+                case "relativeFileDirname" -> relativeFileDirectory(workspace, activeFile).replace('\\', '/');
                 case "fileBasename" -> activeFileName(activeFile);
                 case "fileBasenameNoExtension" -> activeFileBasenameWithoutExtension(activeFile);
                 case "fileExtname" -> activeFileExtension(activeFile);

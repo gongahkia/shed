@@ -28,8 +28,8 @@ class RemoteWorkspaceSessionServiceTest {
 
         TerminalLinkResolver.SourcePathMapper mapper = connection.sourcePathMapper(Path.of("/mirror/nested/src"));
         assertNotNull(mapper);
-        assertEquals(Path.of("/mirror/nested/src/Main.java"), mapper.map("Main.java", Path.of("/ignored")));
-        assertEquals(Path.of("/mirror/nested/src/Main.java"), mapper.map("/srv/project/nested/src/Main.java", Path.of("/ignored")));
+        assertEquals(Path.of("/mirror/nested/src/Main.java").toAbsolutePath().normalize(), mapper.map("Main.java", Path.of("/ignored")));
+        assertEquals(Path.of("/mirror/nested/src/Main.java").toAbsolutePath().normalize(), mapper.map("/srv/project/nested/src/Main.java", Path.of("/ignored")));
     }
 
     @Test

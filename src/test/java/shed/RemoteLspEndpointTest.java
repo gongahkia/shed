@@ -17,6 +17,10 @@ class RemoteLspEndpointTest {
         assertEquals("file:///srv/project/src/main.py", endpoint.uriFor(Path.of("/local/mirror/src/main.py")));
         assertEquals(Path.of("/local/mirror/src/main.py").toAbsolutePath().normalize(), endpoint.localPathFor("file:///srv/project/src/main.py"));
         assertEquals(Path.of("/local/mirror/src/main.py").toAbsolutePath().normalize(), endpoint.localPathForRemotePath("/srv/project/src/main.py"));
+        assertEquals(Path.of("/local/mirror/src/main.py").toAbsolutePath().normalize(),
+            endpoint.terminalSourcePathMapper().map("/srv/project/src/main.py", Path.of("/ignored")));
+        assertEquals(Path.of("/local/mirror/src/main.py").toAbsolutePath().normalize(),
+            endpoint.terminalSourcePathMapper().map("src/main.py", Path.of("/ignored")));
         assertNull(endpoint.uriFor(Path.of("/outside/main.py")));
         assertNull(endpoint.localPathFor("file:///etc/passwd"));
         assertNull(endpoint.localPathForRemotePath("/srv/project/../secrets.py"));

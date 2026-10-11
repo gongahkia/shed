@@ -2,15 +2,15 @@
 
 ## Supported combinations
 
-Shed supports the following Java 21 desktop combinations. Each was tested by the CI matrix in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+Shed supports the following Java 21 desktop combinations. The [CI matrix](../.github/workflows/ci.yml) builds and tests the portable JAR on each OS.
 
-| OS family | CPU architecture | Verified Java distribution | Last CI environment |
+| OS family | CPU architecture | CI Java distribution | CI runner |
 | --- | --- | --- | --- |
-| Ubuntu Linux | x64 | Eclipse Temurin JDK 21 | `ubuntu-latest` (`ubuntu-24.04`) |
-| Windows | x64 | Eclipse Temurin JDK 21 | `windows-latest` (`windows-2025-vs2026`) |
-| macOS | arm64 | Eclipse Temurin JDK 21 | `macos-latest` (`macos-26-arm64`) |
+| Ubuntu Linux | x64 | Eclipse Temurin JDK 21 | `ubuntu-latest` |
+| Windows | x64 | Eclipse Temurin JDK 21 | `windows-latest` |
+| macOS | arm64 | Eclipse Temurin JDK 21 | `macos-latest` |
 
-The current CI run verifies tests, packaging, manifest metadata, and the bundled font on each listed environment. Runner labels are rolling images, so the exact image is recorded here as verification evidence rather than a permanent OS-version guarantee.
+The CI job runs Maven tests and packages the portable JAR on each listed environment. Native DMG, MSI, and DEB installers use the separate platform packaging scripts. Runner labels are rolling images.
 
 ## Java requirements
 
@@ -38,4 +38,4 @@ $ jar tf target/shed-2.0.0.jar
 
 The first two commands must report Java 21. The Maven command runs the test suite and creates `target/shed-2.0.0.jar`; the final command must list `META-INF/MANIFEST.MF` and `assets/logo/shed.png`.
 
-To compare against the hosted verification, inspect the latest `Shed CI/CD on push` run in the repository Actions tab. It exposes one result each for Ubuntu, Windows, and macOS.
+To compare against hosted verification after the workflow runs, inspect the latest `Shed CI` run in the repository Actions tab. It exposes one result each for Ubuntu, Windows, and macOS.

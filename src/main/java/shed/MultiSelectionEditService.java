@@ -23,15 +23,22 @@ final class MultiSelectionEditService {
 
     private static List<MultiSelection> replace(JTextArea area, List<MultiSelection> selections, String replacement,
                                                 boolean backward, boolean forward) {
-        validate(area.getText(), selections);
-        List<MultiSelection> ordered = new ArrayList<>(selections);
-        ordered.sort(Comparator.comparingInt(MultiSelection::start).reversed().thenComparing(Comparator.comparingInt(MultiSelection::end).reversed()));
+        String text = area.getText();
+        validate(text, selections);
+        record Resolved(MultiSelection selection, GraphemeEditRange.Range range) { }
+        List<Resolved> ordered = new ArrayList<>(selections.size());
+        for (MultiSelection selection : selections) ordered.add(new Resolved(selection, resolve(text, selection, backward, forward)));
+        ordered.sort(Comparator.comparingInt((Resolved value) -> value.range().start()).reversed());
+        for (int index = 1; index < ordered.size(); index++) {
+            if (ordered.get(index).range().end() > ordered.get(index - 1).range().start()) {
+                throw new IllegalArgumentException("multi-selection edits overlap");
+            }
+        }
         List<MultiSelection> updated = new ArrayList<>();
-        for (MultiSelection selection : ordered) {
-            String text = area.getText();
-            GraphemeEditRange.Range range = resolve(text, selection, backward, forward);
+        for (Resolved edit : ordered) {
+            GraphemeEditRange.Range range = edit.range();
             int delta = replacement.length() - (range.end() - range.start());
-            area.replaceRange(replacement, range.start(), range.end());
+            if (delta != 0 || !range.empty()) area.replaceRange(replacement, range.start(), range.end());
             for (int index = 0; index < updated.size(); index++) {
                 MultiSelection later = updated.get(index);
                 updated.set(index, MultiSelection.caret(later.start() + delta));

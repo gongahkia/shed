@@ -1021,6 +1021,36 @@ final class EditActionController {
         replaceExtraSelections(MultiSelectionEditService.insert(editor.writingArea, editor.extraSelections, String.valueOf(c)));
     }
 
+    boolean applyPlainMultiCursorEdit(String replacement, boolean backward, boolean forward) {
+        if (!hasActiveExtraCursors()) return false;
+        int start = editor.writingArea.getSelectionStart();
+        int end = editor.writingArea.getSelectionEnd();
+        MultiSelection primary = new MultiSelection(start, end);
+        List<MultiSelection> all = new ArrayList<>(editor.extraSelections);
+        all.add(primary);
+        int primaryIndex = (int) editor.extraSelections.stream().filter(selection -> selection.start() < primary.start()).count();
+        try {
+            BoundedUndoManager history = (BoundedUndoManager) editor.undoManager;
+            history.beginCompoundEdit();
+            List<MultiSelection> updated;
+            try {
+                updated = backward ? MultiSelectionEditService.backspace(editor.writingArea, all)
+                    : forward ? MultiSelectionEditService.delete(editor.writingArea, all)
+                    : MultiSelectionEditService.insert(editor.writingArea, all, replacement);
+            } finally {
+                history.endCompoundEdit();
+            }
+            editor.writingArea.setCaretPosition(updated.get(primaryIndex).start());
+            updated.remove(primaryIndex);
+            replaceExtraSelections(updated);
+            editor.markModified();
+            return true;
+        } catch (IllegalArgumentException error) {
+            clearExtraCursors();
+            return false;
+        }
+    }
+
 
     void applyMultiCursorBackspace() {
         if (!hasActiveExtraCursors()) return;

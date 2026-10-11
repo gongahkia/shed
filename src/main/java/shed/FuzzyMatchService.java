@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.PriorityQueue;
 
 public class FuzzyMatchService {
 
@@ -58,6 +59,30 @@ public class FuzzyMatchService {
 
     public List<Match> match(String query, List<String> candidates, int maxResults) {
         if (query == null || candidates == null) return Collections.emptyList();
+        if (maxResults > 0) {
+            record Ranked(Match match, int index) { }
+            PriorityQueue<Ranked> best = new PriorityQueue<>((left, right) -> {
+                int byScore = Integer.compare(left.match().score, right.match().score);
+                return byScore != 0 ? byScore : Integer.compare(right.index(), left.index());
+            });
+            for (int index = 0; index < candidates.size(); index++) {
+                String candidate = candidates.get(index);
+                int candidateScore = score(query, candidate);
+                if (candidateScore <= 0) continue;
+                Ranked ranked = new Ranked(new Match(candidate, candidateScore), index);
+                if (best.size() < maxResults) best.add(ranked);
+                else if (best.comparator().compare(ranked, best.peek()) > 0) {
+                    best.remove();
+                    best.add(ranked);
+                }
+            }
+            List<Ranked> ranked = new ArrayList<>(best);
+            ranked.sort((left, right) -> {
+                int byScore = Integer.compare(right.match().score, left.match().score);
+                return byScore != 0 ? byScore : Integer.compare(left.index(), right.index());
+            });
+            return ranked.stream().map(Ranked::match).toList();
+        }
         List<Match> matches = new ArrayList<>();
         for (String candidate : candidates) {
             int s = score(query, candidate);

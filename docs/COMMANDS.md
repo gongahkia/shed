@@ -169,8 +169,8 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 
 | Command | Action |
 | :--- | :--- |
-| `:s`, `:split`, `:sp` | Horizontal split (`Cmd+D`); `:s/old/new/` remains substitution |
-| `:vs`, `:vsplit`, `:vsp` | Vertical split (`Cmd+Shift+D`) |
+| `:s`, `:split`, `:sp` | Horizontal split (`Cmd+D` in Vim/Emacs); `:s/old/new/` remains substitution |
+| `:vs`, `:vsplit`, `:vsp` | Vertical split (`Cmd+Shift+D` in Vim/Emacs) |
 | `:close`, `:clo` | Close active window (`Cmd+W`) |
 | `:window`, `:win` `next\|previous\|left\|right\|up\|down\|equalize\|grow [percent]\|shrink [percent]` | Focus, equalize, or resize editor splits; omitted resize percentage is 5% |
 | `:zoom`, `:uizoom` `in [default\|percent]\|out [default\|percent]\|reset` | Adjust UI zoom by the default 10%, or by a specified percentage; `reset` restores 100% |

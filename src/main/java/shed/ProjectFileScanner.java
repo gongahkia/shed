@@ -3,6 +3,7 @@ package shed;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -36,15 +37,15 @@ final class ProjectFileScanner {
                     return new ScanResult(List.copyOf(files), true, scannedDirectories);
                 }
                 String name = child.getFileName().toString();
-                if (excluded(name)) {
-                    continue;
-                }
-                if (Files.isRegularFile(child)) {
+                if (Files.isSymbolicLink(child)) continue;
+                boolean directory = Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS);
+                if (excluded(name, directory)) continue;
+                if (Files.isRegularFile(child, LinkOption.NOFOLLOW_LINKS)) {
                     files.add(relativePath(workspaceRoot, child));
                     if (files.size() >= effectiveLimit) {
                         break;
                     }
-                } else if (Files.isDirectory(child)) {
+                } else if (directory) {
                     directories.addLast(child);
                 }
             }
@@ -65,9 +66,9 @@ final class ProjectFileScanner {
         }
     }
 
-    private static boolean excluded(String name) {
-        return name.startsWith(".") || name.equals("node_modules") || name.equals("target") || name.equals("build")
-            || name.equals("__pycache__") || name.equals(".git");
+    private static boolean excluded(String name, boolean directory) {
+        return name.equals(".DS_Store") || directory && (name.startsWith(".") || name.equals("node_modules")
+            || name.equals("target") || name.equals("build") || name.equals("__pycache__"));
     }
 
     private static String relativePath(Path root, Path child) {

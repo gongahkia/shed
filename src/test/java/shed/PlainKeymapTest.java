@@ -17,6 +17,10 @@ class PlainKeymapTest {
         assertEquals(PlainKeymap.Action.FIND_FILE, action(KeyEvent.VK_P, InputEvent.META_DOWN_MASK));
         assertEquals(PlainKeymap.Action.COMMANDS, action(KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.BUFFERS, action(KeyEvent.VK_B, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.NEXT_SELECTION, action(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.NEXT_SELECTION, action(KeyEvent.VK_D, InputEvent.META_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.CURSOR_ABOVE, action(KeyEvent.VK_UP, InputEvent.ALT_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.CURSOR_BELOW, action(KeyEvent.VK_DOWN, InputEvent.ALT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.CLOSE, action(KeyEvent.VK_W, InputEvent.META_DOWN_MASK));
         assertEquals(PlainKeymap.Action.QUIT, action(KeyEvent.VK_Q, InputEvent.CTRL_DOWN_MASK));
         assertEquals(PlainKeymap.Action.HELP, action(KeyEvent.VK_F1, 0));

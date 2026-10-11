@@ -61,7 +61,7 @@ public class ConfigManager {
     private static final int DEFAULT_TERMINAL_FONT_SIZE = 14;
     private static final String DEFAULT_TERMINAL_DEFAULT_PROFILE = "system";
     private static final int DEFAULT_TAB_SIZE = 4;
-    private static final KeymapProfile DEFAULT_KEYMAP_PROFILE = KeymapProfile.VIM;
+    private static final KeymapProfile DEFAULT_KEYMAP_PROFILE = KeymapProfile.PLAIN;
     private static final LineNumberMode DEFAULT_LINE_NUMBER_MODE = LineNumberMode.ABSOLUTE;
     private static final boolean DEFAULT_SHOW_CURRENT_LINE = true;
     private static final boolean DEFAULT_EXPAND_TAB = true;
@@ -72,7 +72,7 @@ public class ConfigManager {
     private static final String DEFAULT_SESSION_AUTOLOAD = "default";
     private static final boolean DEFAULT_TERMINAL_SESSION_RESTORE = false;
     private static final boolean DEFAULT_TERMINAL_SHELL_INTEGRATION = true;
-    private static final boolean DEFAULT_WORKSPACE_INDEX_ENABLED = false;
+    private static final boolean DEFAULT_WORKSPACE_INDEX_ENABLED = true;
     private static final long DEFAULT_LARGE_FILE_THRESHOLD_MB = 25L;
     private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 500000;
     private static final int DEFAULT_LARGE_FILE_PREVIEW_LINES = 1000;
@@ -96,7 +96,7 @@ public class ConfigManager {
     private static final int DEFAULT_MINIMAP_WIDTH = 84;
     private static final double DEFAULT_LIMELIGHT_COEFFICIENT = 0.5;
     private static final int DEFAULT_LIMELIGHT_PARAGRAPH_SPAN = 0;
-    private static final boolean DEFAULT_MULTI_SELECTION_ENABLED = false;
+    private static final boolean DEFAULT_MULTI_SELECTION_ENABLED = true;
     private static final boolean DEFAULT_MARKDOWN_PREVIEW_SCROLL_SYNC = true;
     private static final boolean DEFAULT_MARKDOWN_PREVIEW_REMOTE_IMAGES = true;
     private static final boolean DEFAULT_LSP_SEMANTIC_TOKENS_INLINE = true;
@@ -472,8 +472,8 @@ public class ConfigManager {
             case "minimap.width" -> "Minimap width in pixels";
             case "limelight.coefficient" -> "Background blend strength for unfocused paragraphs";
             case "limelight.paragraph.span" -> "Adjacent paragraphs retained at full brightness";
-            case "multi.selection.enabled" -> "Enable experimental multi-selection editing";
-            case "multi.selection.max.cursors" -> "Maximum total cursors for experimental multi-selection";
+            case "multi.selection.enabled" -> "Enable multi-selection editing";
+            case "multi.selection.max.cursors" -> "Maximum total cursors for multi-selection";
             case "markdown.preview.scroll.sync" -> "Synchronize Markdown preview position with its source cursor and scroll position";
             case "markdown.preview.remote.images" -> "Load bounded HTTPS images after a Markdown preview is explicitly opened";
             case "lsp.completion.enabled" -> "Enable LSP completion requests";

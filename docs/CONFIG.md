@@ -86,7 +86,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `minimap.width` | `84` | int | Minimap width in pixels; minimum `40` |
 | `limelight.coefficient` | `0.5` | double | Dim strength for non-focused paragraphs; `0.0..1.0` |
 | `limelight.paragraph.span` | `0` | int | Adjacent paragraphs retained at full brightness |
-| `multi.selection.enabled` | `false` | bool | Enable experimental multi-selection editing |
+| `multi.selection.enabled` | `true` | bool | Enable multi-selection editing |
 | `multi.selection.max.cursors` | `16` | int | Maximum total cursors when enabled; `2..256` |
 | `markdown.preview.scroll.sync` | `true` | bool | Keep a Markdown preview aligned with its source cursor and source scrolling |
 | `markdown.preview.remote.images` | `true` | bool | Fetch bounded HTTPS images after explicitly opening a normal Markdown preview; `false` keeps it local-only |
@@ -112,7 +112,7 @@ An `https://` `landing.source` is an explicit global opt-in to fetch that URL wh
 | `session.dir` | `~/.shed/sessions` | path | Session storage directory |
 | `terminal.session.restore` | `false` | bool | Persist terminal pane cwd and restore a fresh interactive shell; never stores or replays commands, scrollback, shell arguments, or process state |
 | `terminal.shell.integration` | `true` | bool | Enable generated, per-terminal Bash/Zsh/Fish command and cwd hooks; affects newly opened terminals only |
-| `workspace.index.enabled` | `false` | bool | Enable persisted Git-ignore-aware workspace indexing |
+| `workspace.index.enabled` | `true` | bool | Enable persisted Git-ignore-aware workspace indexing |
 | `large.file.threshold.mb` | `25` | int | Selects read-only large-file mode above this MiB value; effective minimum `1` |
 | `large.file.line.threshold` | `500000` | int | Selects read-only large-file mode above this logical-line count; effective minimum `1000` |
 | `large.file.preview.lines` | `1000` | int | Initial large-file preview lines; effective minimum `50` |
@@ -360,7 +360,7 @@ When a native executable regular file exists directly in `build/`, `target/debug
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `keymap.profile` | `vim` | string | `vim`, non-modal `plain`, or chorded `emacs`; non-Vim profiles bypass `keybind.<mode>.*` |
+| `keymap.profile` | `plain` | string | non-modal `plain`, modal `vim`, or chorded `emacs`; non-Vim profiles bypass `keybind.<mode>.*` |
 
 ## Focus and Command UI Keys
 

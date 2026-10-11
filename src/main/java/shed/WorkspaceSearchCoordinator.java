@@ -9,6 +9,7 @@ import javax.swing.SwingUtilities;
 final class WorkspaceSearchCoordinator {
     private final Texteditor editor;
     private long activeRequest;
+    private WorkspaceIndexService indexService;
 
     WorkspaceSearchCoordinator(Texteditor editor) {
         this.editor = editor;
@@ -106,8 +107,11 @@ final class WorkspaceSearchCoordinator {
     }
 
     private WorkspaceIndexService workspaceIndexService() {
-        return WorkspaceIndexService.withAdditionalIgnore(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"),
-            editor.workspaceController.searchExclusionMatcher());
+        if (indexService == null) {
+            indexService = WorkspaceIndexService.withAdditionalIgnore(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"),
+                editor.workspaceController.searchExclusionMatcher());
+        }
+        return indexService;
     }
 
     private static List<QuickfixService.Entry> entries(List<WorkspaceTextSearchService.Match> matches) {

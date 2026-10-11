@@ -134,8 +134,8 @@ public class HelpService {
             case "keymap":
             case "keymaps":
                 return "Help: keymaps\n\n"
-                    + "keymap.profile=vim is the default modal profile.\n"
-                    + "keymap.profile=plain provides non-modal native text input.\n"
+                    + "keymap.profile=plain is the default non-modal profile.\n"
+                    + "keymap.profile=vim provides modal Vim editing.\n"
                     + "keymap.profile=emacs provides Emacs navigation and Ctrl-X chords.\n"
                     + "Use :help plain or :help emacs for profile bindings.\n"
                     + ":keymap opens a searchable GUI with effective bindings and conflicts.\n"
@@ -146,7 +146,7 @@ public class HelpService {
                     + "Plain and Emacs fixed bindings bypass Vim overlays.\n";
             case "plain":
                 return "Help: Plain keymap\n\n"
-                    + "Set keymap.profile=plain in config.toml or with :set keymap.profile=plain.\n"
+                    + "Plain is the default profile; set keymap.profile=plain to restore it.\n"
                     + "Text input, arrows, selection, clipboard, and Select All use native text bindings.\n"
                     + "Ctrl/Cmd-N       New document\n"
                     + "Ctrl/Cmd-O       Open file dialog\n"
@@ -159,6 +159,8 @@ public class HelpService {
                     + "Ctrl/Cmd-Z       Undo; Ctrl/Cmd-Shift-Z or Ctrl/Cmd-Y redo\n"
                     + "Ctrl/Cmd-PageDown/Up Next/previous buffer\n"
                     + "Ctrl/Cmd-Shift-P Command palette\n"
+                    + "Ctrl/Cmd-D       Add next matching selection\n"
+                    + "Alt-Up/Down     Add cursor above/below; Esc clears extras\n"
                     + "Ctrl/Cmd-B       Buffer picker\n"
                     + "Ctrl/Cmd-W       Close active split\n"
                     + "Ctrl/Cmd-Q       Quit (prompts for unsaved changes)\n"

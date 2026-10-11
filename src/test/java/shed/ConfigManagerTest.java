@@ -59,7 +59,7 @@ public class ConfigManagerTest {
         assertEquals("Monospaced", config.getTerminalFontFamily());
         assertEquals(14, config.getTerminalFontSize());
         assertEquals("system", config.getTerminalDefaultProfile());
-        assertEquals(KeymapProfile.VIM, config.getKeymapProfile());
+        assertEquals(KeymapProfile.PLAIN, config.getKeymapProfile());
         assertEquals(LineNumberMode.ABSOLUTE, config.getLineNumberMode());
         assertTrue(config.getHighlightSearch());
         assertFalse(config.getEditorScrollbarsVisible());
@@ -79,7 +79,7 @@ public class ConfigManagerTest {
             .filter(setting -> setting.key().equals("terminal.default.profile")).findFirst().orElseThrow();
         assertEquals("system | builtin:<id>", terminalProfile.allowedValues());
         assertEquals("Live: used when the next default terminal opens", terminalProfile.applyBehavior());
-        assertFalse(config.getWorkspaceIndexEnabled());
+        assertTrue(config.getWorkspaceIndexEnabled());
         assertTrue(config.getGitAutoRefreshEnabled());
         assertEquals(1500, config.getGitAutoRefreshIntervalMs());
         assertFalse(config.getBackupPolicy().enabled());
@@ -87,7 +87,7 @@ public class ConfigManagerTest {
         assertEquals("default", config.getSessionAutoloadName());
         assertEquals(15000, config.getProcessTimeoutMs());
         assertEquals(UndoHistoryPolicy.defaults(), config.getUndoHistoryPolicy());
-        assertEquals(new MultiSelectionPolicy(false, MultiSelectionPolicy.DEFAULT_MAX_CURSORS), config.getMultiSelectionPolicy());
+        assertEquals(new MultiSelectionPolicy(true, MultiSelectionPolicy.DEFAULT_MAX_CURSORS), config.getMultiSelectionPolicy());
         assertFalse(config.hasConfigLoadFailure());
         assertTrue(config.getConfigLoadReport().startsWith("Configuration not found: "));
     }

@@ -8,8 +8,11 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 /** Bounded, lexical workspace-symbol fallback for files without an LSP result. */
@@ -21,6 +24,13 @@ final class WorkspaceSymbolService {
     private final SymbolService symbolService;
     private final int maxResults;
     private final long maxFileBytes;
+    private final Map<Path, CachedSymbols> symbolCache = Collections.synchronizedMap(new LinkedHashMap<>(256, 0.75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<Path, CachedSymbols> eldest) {
+            return size() > 10_000;
+        }
+    });
+
+    private record CachedSymbols(long size, long modifiedAtMillis, List<SymbolService.Symbol> symbols) { }
 
     WorkspaceSymbolService(WorkspaceIndexService indexService, SymbolService symbolService) {
         this(indexService, symbolService, DEFAULT_MAX_RESULTS, DEFAULT_MAX_FILE_BYTES);
@@ -69,23 +79,29 @@ final class WorkspaceSymbolService {
                 if (matches.size() >= maxResults) {
                     return complete(matches, true, indexedFiles, filesRead, skippedFiles);
                 }
-                if (entry.size() > maxFileBytes) {
-                    skippedFiles++;
-                    continue;
-                }
                 Path file = normalizedRoot.resolve(entry.relativePath()).normalize();
-                if (!file.startsWith(normalizedRoot) || !readableRegularFile(file)) {
+                BasicFileAttributes attributes = file.startsWith(normalizedRoot) ? attributes(file) : null;
+                if (attributes == null || attributes.size() > maxFileBytes) {
                     skippedFiles++;
                     continue;
                 }
                 FileType detectedType = FileType.detect(file.toFile(), "");
                 if (detectedType == FileType.TEXT) continue;
                 try {
-                    String text = Files.readString(file, StandardCharsets.UTF_8);
-                    filesRead++;
-                    FileType type = detectedType == FileType.UNKNOWN ? FileType.detect(file.toFile(), text) : detectedType;
-                    if (type == FileType.UNKNOWN || type == FileType.TEXT) continue;
-                    for (SymbolService.Symbol symbol : symbolService.collectSymbols(text, type)) {
+                    CachedSymbols cached = symbolCache.get(file);
+                    List<SymbolService.Symbol> symbols;
+                    if (cached != null && cached.size() == attributes.size()
+                        && cached.modifiedAtMillis() == attributes.lastModifiedTime().toMillis()) {
+                        symbols = cached.symbols();
+                    } else {
+                        String text = Files.readString(file, StandardCharsets.UTF_8);
+                        filesRead++;
+                        FileType type = detectedType == FileType.UNKNOWN ? FileType.detect(file.toFile(), text) : detectedType;
+                        symbols = type == FileType.UNKNOWN || type == FileType.TEXT ? List.of()
+                            : List.copyOf(symbolService.collectSymbols(text, type));
+                        symbolCache.put(file, new CachedSymbols(attributes.size(), attributes.lastModifiedTime().toMillis(), symbols));
+                    }
+                    for (SymbolService.Symbol symbol : symbols) {
                         if (effectiveCancellation.isCancelled()) {
                             return new SearchResult(State.CANCELLED, matches, false, indexedFiles, filesRead, skippedFiles, "symbol search cancelled");
                         }
@@ -114,12 +130,12 @@ final class WorkspaceSymbolService {
         return values.toLowerCase(Locale.ROOT).contains(needle);
     }
 
-    private static boolean readableRegularFile(Path file) {
+    private static BasicFileAttributes attributes(Path file) {
         try {
             BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-            return attributes.isRegularFile() && !attributes.isSymbolicLink();
+            return attributes.isRegularFile() && !attributes.isSymbolicLink() ? attributes : null;
         } catch (IOException | SecurityException error) {
-            return false;
+            return null;
         }
     }
 

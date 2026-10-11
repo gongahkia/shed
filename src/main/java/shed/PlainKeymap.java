@@ -17,6 +17,9 @@ final class PlainKeymap {
         GO_TO_LINE(null),
         UNDO(null),
         REDO(null),
+        NEXT_SELECTION(null),
+        CURSOR_ABOVE(null),
+        CURSOR_BELOW(null),
         NEXT_BUFFER("bn"),
         PREVIOUS_BUFFER("bp"),
         COMMANDS("palette"),
@@ -43,8 +46,16 @@ final class PlainKeymap {
         if (event == null) {
             return Action.NONE;
         }
-        if (event.isAltDown() || (event.isControlDown() && event.isMetaDown())) {
+        if (event.isControlDown() && event.isMetaDown()) {
             return Action.NONE;
+        }
+        if (event.isAltDown()) {
+            if (event.isControlDown() || event.isMetaDown() || event.isShiftDown()) return Action.NONE;
+            return switch (event.getKeyCode()) {
+                case KeyEvent.VK_UP -> Action.CURSOR_ABOVE;
+                case KeyEvent.VK_DOWN -> Action.CURSOR_BELOW;
+                default -> Action.NONE;
+            };
         }
         if (!event.isControlDown() && !event.isMetaDown()) {
             return switch (event.getKeyCode()) {
@@ -63,6 +74,7 @@ final class PlainKeymap {
             case KeyEvent.VK_H -> shift ? Action.NONE : Action.REPLACE;
             case KeyEvent.VK_G -> shift ? Action.NONE : Action.GO_TO_LINE;
             case KeyEvent.VK_Z -> shift ? Action.REDO : Action.UNDO;
+            case KeyEvent.VK_D -> shift ? Action.NONE : Action.NEXT_SELECTION;
             case KeyEvent.VK_Y -> shift ? Action.NONE : Action.REDO;
             case KeyEvent.VK_PAGE_DOWN -> shift ? Action.NONE : Action.NEXT_BUFFER;
             case KeyEvent.VK_PAGE_UP -> shift ? Action.NONE : Action.PREVIOUS_BUFFER;

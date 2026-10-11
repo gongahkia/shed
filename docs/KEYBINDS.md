@@ -6,17 +6,28 @@ Use `keybind.<scope>.<lhs>` in TOML or `:keymap` for a searchable GUI. In the Vi
 
 ### Plain profile
 
-Set `keymap.profile = "plain"` for non-modal editing. Plain bypasses Vim mode handling and `keybind.<mode>.*` remaps; standard Swing text, selection, clipboard, undo, and redo bindings remain active.
+Set `keymap.profile = "plain"` for non-modal editing. Plain bypasses Vim mode handling and `keybind.<mode>.*` remaps. Typing, arrows, Home/End, selection with Shift, clipboard shortcuts, and Select All use native text bindings. `Ctrl` applies on Linux/Windows and `Cmd` on macOS.
 
 | Key-binds | Function |
 | :---: | :---: |
-| `Ctrl`/`Cmd` + `S` | Save current file |
-| `Ctrl`/`Cmd` + `O` or `P` | Find file |
+| `Ctrl`/`Cmd` + `N` | New untitled document |
+| `Ctrl`/`Cmd` + `O` | Open file dialog |
+| `Ctrl`/`Cmd` + `P` | Quick open file |
+| `Ctrl`/`Cmd` + `S` | Save; prompt for a path on an untitled document |
+| `Ctrl`/`Cmd` + `Shift` + `S` | Save As |
+| `Ctrl`/`Cmd` + `F` | Find text |
+| `F3` / `Shift` + `F3` | Next / previous match |
+| `Ctrl`/`Cmd` + `H` | Replace all literal matches |
+| `Ctrl`/`Cmd` + `G` | Go to line |
+| `Ctrl`/`Cmd` + `Z` | Undo |
+| `Ctrl`/`Cmd` + `Shift` + `Z` or `Ctrl`/`Cmd` + `Y` | Redo |
+| `Ctrl`/`Cmd` + `Page Down` / `Ctrl`/`Cmd` + `Page Up` | Next / previous buffer |
 | `Ctrl`/`Cmd` + `Shift` + `P` | Command palette |
 | `Ctrl`/`Cmd` + `B` | Buffer picker |
 | `Cmd` + `D` | Horizontal split |
 | `Cmd` + `Shift` + `D` | Vertical split |
 | `Ctrl`/`Cmd` + `W` | Close active split |
+| `Ctrl`/`Cmd` + `Q` | Quit; prompt for unsaved changes |
 | `F1` | Plain-keymap help |
 
 ### Emacs profile

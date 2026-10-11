@@ -10,18 +10,40 @@ import org.junit.jupiter.api.Test;
 class PlainKeymapTest {
     @Test
     void mapsFixedMenuShortcutsAndHelp() {
+        assertEquals(PlainKeymap.Action.NEW, action(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK));
         assertEquals(PlainKeymap.Action.SAVE, action(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.SAVE_AS, action(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.OPEN, action(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK));
         assertEquals(PlainKeymap.Action.FIND_FILE, action(KeyEvent.VK_P, InputEvent.META_DOWN_MASK));
         assertEquals(PlainKeymap.Action.COMMANDS, action(KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.BUFFERS, action(KeyEvent.VK_B, InputEvent.CTRL_DOWN_MASK));
         assertEquals(PlainKeymap.Action.CLOSE, action(KeyEvent.VK_W, InputEvent.META_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.QUIT, action(KeyEvent.VK_Q, InputEvent.CTRL_DOWN_MASK));
         assertEquals(PlainKeymap.Action.HELP, action(KeyEvent.VK_F1, 0));
+    }
+
+    @Test
+    void mapsConventionalEditingAndSearchShortcuts() {
+        assertEquals(PlainKeymap.Action.FIND, action(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.FIND_NEXT, action(KeyEvent.VK_F3, 0));
+        assertEquals(PlainKeymap.Action.FIND_PREVIOUS, action(KeyEvent.VK_F3, InputEvent.SHIFT_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.REPLACE, action(KeyEvent.VK_H, InputEvent.META_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.GO_TO_LINE, action(KeyEvent.VK_G, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.UNDO, action(KeyEvent.VK_Z, InputEvent.META_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.REDO, action(KeyEvent.VK_Z, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.REDO, action(KeyEvent.VK_Y, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.NEXT_BUFFER, action(KeyEvent.VK_PAGE_DOWN, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.PREVIOUS_BUFFER, action(KeyEvent.VK_PAGE_UP, InputEvent.CTRL_DOWN_MASK));
     }
 
     @Test
     void leavesNormalTextAndVimEscapeUnmapped() {
         assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_I, 0));
         assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_ESCAPE, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_S, InputEvent.ALT_DOWN_MASK | InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK | InputEvent.META_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_F1, InputEvent.SHIFT_DOWN_MASK));
     }
 
     @Test

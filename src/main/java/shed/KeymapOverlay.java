@@ -140,10 +140,17 @@ final class KeymapOverlay {
     private static List<Binding> profileBindings(KeymapProfile profile) {
         if (profile == KeymapProfile.PLAIN) {
             return List.of(
-                fixed("Ctrl/Cmd-S", "Save current file"), fixed("Ctrl/Cmd-O/P", "Find file"),
+                fixed("Ctrl/Cmd-N", "New document"), fixed("Ctrl/Cmd-O", "Open file dialog"),
+                fixed("Ctrl/Cmd-P", "Quick open file"), fixed("Ctrl/Cmd-S", "Save"),
+                fixed("Ctrl/Cmd-Shift-S", "Save As"), fixed("Ctrl/Cmd-F", "Find"),
+                fixed("F3/Shift-F3", "Next/previous match"), fixed("Ctrl/Cmd-H", "Replace all"),
+                fixed("Ctrl/Cmd-G", "Go to line"), fixed("Ctrl/Cmd-Z", "Undo"),
+                fixed("Ctrl/Cmd-Shift-Z/Y", "Redo"), fixed("Ctrl/Cmd-PageDown", "Next buffer"),
+                fixed("Ctrl/Cmd-PageUp", "Previous buffer"),
                 fixed("Ctrl/Cmd-Shift-P", "Command palette"), fixed("Ctrl/Cmd-B", "Buffer picker"),
                 fixed("Cmd-D", "Horizontal split"), fixed("Cmd-Shift-D", "Vertical split"),
-                fixed("Ctrl/Cmd-W", "Close active split"), fixed("F1", "Plain keymap help")
+                fixed("Ctrl/Cmd-W", "Close active split"), fixed("Ctrl/Cmd-Q", "Quit"),
+                fixed("F1", "Plain keymap help")
             );
         }
         if (profile == KeymapProfile.EMACS) {

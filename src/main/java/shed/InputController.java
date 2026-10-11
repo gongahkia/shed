@@ -394,13 +394,17 @@ final class InputController {
     private boolean handlePlainMultiSelectionClipboard(KeyEvent event) {
         if (!(event.isControlDown() || event.isMetaDown()) || event.isAltDown() || event.isShiftDown()
             || event.isControlDown() && event.isMetaDown()) return false;
-        int key = event.getKeyCode();
+        if (!performPlainMultiSelectionClipboard(event.getKeyCode())) return false;
+        event.consume();
+        return true;
+    }
+
+    boolean performPlainMultiSelectionClipboard(int key) {
         if (key == KeyEvent.VK_V) {
             if (!editor.writingArea.isEditable()) return false;
             try {
                 Object value = Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
                 if (value instanceof String content && editor.editActionController.applyPlainMultiCursorEdit(content, false, false)) {
-                    event.consume();
                     return true;
                 }
             } catch (HeadlessException | IllegalStateException | java.awt.datatransfer.UnsupportedFlavorException | IOException ignored) { }
@@ -428,7 +432,6 @@ final class InputController {
         if (key == KeyEvent.VK_X && editor.writingArea.isEditable()) {
             editor.editActionController.applyPlainMultiCursorEdit("", false, false);
         }
-        event.consume();
         return true;
     }
 

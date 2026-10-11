@@ -30,6 +30,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Callable;
 import javax.swing.SwingUtilities;
+import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
 import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -144,6 +146,61 @@ public class TexteditorSwingIntegrationTest {
         } finally {
             disposeEditor(editor);
         }
+    }
+
+    @Test
+    void editorContextMenuOffersEditingActionsAndRespectsReadOnlyBuffers() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-editor-context-menu");
+        Path file = tempDir.resolve("editor-context-menu.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "hello world", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                editor.writingArea.select(0, 5);
+                JPopupMenu menu = editor.writingArea.getComponentPopupMenu();
+                assertNotNull(menu);
+                menu.show(editor.writingArea, 5, 5);
+                JMenuItem cut = contextItem(menu, "Cut");
+                JMenuItem copy = contextItem(menu, "Copy");
+                JMenuItem paste = contextItem(menu, "Paste");
+                assertTrue(cut.isEnabled());
+                assertTrue(copy.isEnabled());
+                copy.doClick();
+                cut.doClick();
+                assertEquals(" world", editor.writingArea.getText());
+
+                menu.setVisible(false);
+                editor.writingArea.setCaretPosition(0);
+                menu.show(editor.writingArea, 5, 5);
+                assertTrue(paste.isEnabled());
+                paste.doClick();
+                assertEquals("hello world", editor.writingArea.getText());
+
+                menu.setVisible(false);
+                editor.writingArea.setEditable(false);
+                editor.writingArea.select(0, 5);
+                menu.show(editor.writingArea, 5, 5);
+                assertFalse(cut.isEnabled());
+                assertTrue(copy.isEnabled());
+                assertFalse(paste.isEnabled());
+                assertFalse(contextItem(menu, "Undo").isEnabled());
+                assertFalse(contextItem(menu, "Redo").isEnabled());
+                menu.setVisible(false);
+                return null;
+            });
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    private static JMenuItem contextItem(JPopupMenu menu, String label) {
+        for (Component component : menu.getComponents()) {
+            if (component instanceof JMenuItem item && label.equals(item.getText())) return item;
+        }
+        throw new AssertionError("Missing context menu item: " + label);
     }
 
     @Test

@@ -5,6 +5,8 @@ import javax.swing.plaf.ColorUIResource;
 import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 import javax.swing.plaf.FontUIResource;
 import javax.swing.table.JTableHeader;
 import javax.swing.text.JTextComponent;
@@ -20,6 +22,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.awt.geom.Rectangle2D;
+import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
@@ -339,6 +342,7 @@ final class EditorUiController {
         textArea.setEditable(false);
         textArea.setSelectionColor(editor.configManager.getSelectionColor());
         textArea.setSelectedTextColor(editor.configManager.getSelectionTextColor());
+        installEditorContextMenu(textArea);
 
         LineNumberPanel paneLineNumberPanel = new LineNumberPanel(textArea);
         paneLineNumberPanel.setMode(editor.lineNumberMode);
@@ -390,7 +394,7 @@ final class EditorUiController {
                 if (paneRef[0] != null) {
                     activateEditorPane(paneRef[0]);
                 }
-                if (editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN
+                if (SwingUtilities.isLeftMouseButton(e) && editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN
                     && !e.isAltDown() && !e.isControlDown() && !e.isMetaDown()) {
                     editor.clearExtraCursors();
                 }
@@ -398,6 +402,7 @@ final class EditorUiController {
 
             @Override
             public void mouseClicked(java.awt.event.MouseEvent event) {
+                if (!SwingUtilities.isLeftMouseButton(event)) return;
                 String result = editor.openGitLogSelectionAtCaret();
                 if (!result.isEmpty()) {
                     editor.showMessage(result);
@@ -426,6 +431,74 @@ final class EditorUiController {
             }
         });
         return pane;
+    }
+
+
+    private void installEditorContextMenu(JTextArea textArea) {
+        JPopupMenu menu = new JPopupMenu();
+        JMenuItem undo = editorContextItem(menu, "Undo", () -> {
+            editor.clearExtraCursors();
+            if (textArea.isEditable() && editor.undoManager.canUndo()) editor.undoManager.undo();
+        });
+        JMenuItem redo = editorContextItem(menu, "Redo", () -> {
+            editor.clearExtraCursors();
+            if (textArea.isEditable() && editor.undoManager.canRedo()) editor.undoManager.redo();
+        });
+        menu.addSeparator();
+        JMenuItem cut = editorContextItem(menu, "Cut", () -> runEditorContextClipboard(textArea, KeyEvent.VK_X));
+        JMenuItem copy = editorContextItem(menu, "Copy", () -> runEditorContextClipboard(textArea, KeyEvent.VK_C));
+        JMenuItem paste = editorContextItem(menu, "Paste", () -> runEditorContextClipboard(textArea, KeyEvent.VK_V));
+        menu.addSeparator();
+        JMenuItem selectAll = editorContextItem(menu, "Select All", () -> {
+            editor.clearExtraCursors();
+            textArea.selectAll();
+        });
+        menu.addPopupMenuListener(new PopupMenuListener() {
+            @Override public void popupMenuWillBecomeVisible(PopupMenuEvent event) {
+                EditorPane pane = editor.editorPanes.stream().filter(candidate -> candidate.getTextArea() == textArea)
+                    .findFirst().orElse(null);
+                if (pane != null) activateEditorPane(pane);
+                boolean editable = textArea.isEditable();
+                boolean selected = textArea.getSelectionStart() != textArea.getSelectionEnd()
+                    || editor.extraSelections.stream().anyMatch(selection -> !selection.collapsed());
+                undo.setEnabled(editable && editor.undoManager.canUndo());
+                redo.setEnabled(editable && editor.undoManager.canRedo());
+                cut.setEnabled(editable && selected);
+                copy.setEnabled(selected);
+                paste.setEnabled(editable && clipboardContainsText());
+                selectAll.setEnabled(textArea.getDocument().getLength() > 0);
+                applyUiTheme(menu);
+            }
+            @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent event) { }
+            @Override public void popupMenuCanceled(PopupMenuEvent event) { }
+        });
+        textArea.setComponentPopupMenu(menu);
+    }
+
+    private static JMenuItem editorContextItem(JPopupMenu menu, String label, Runnable action) {
+        JMenuItem item = new JMenuItem(label);
+        item.addActionListener(event -> action.run());
+        menu.add(item);
+        return item;
+    }
+
+    private void runEditorContextClipboard(JTextArea textArea, int key) {
+        if (editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN && !editor.extraSelections.isEmpty()
+            && editor.inputController.performPlainMultiSelectionClipboard(key)) return;
+        switch (key) {
+            case KeyEvent.VK_X -> { if (textArea.isEditable()) textArea.cut(); }
+            case KeyEvent.VK_C -> textArea.copy();
+            case KeyEvent.VK_V -> { if (textArea.isEditable()) textArea.paste(); }
+            default -> { }
+        }
+    }
+
+    private static boolean clipboardContainsText() {
+        try {
+            return Toolkit.getDefaultToolkit().getSystemClipboard().isDataFlavorAvailable(DataFlavor.stringFlavor);
+        } catch (HeadlessException | IllegalStateException ignored) {
+            return false;
+        }
     }
 
 

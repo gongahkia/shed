@@ -273,17 +273,32 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
-    void startupMaximizesTheEditorWindow() throws Exception {
+    void startupRestoresThePreviousWindowSizeAndPosition() throws Exception {
         assumeSwingAvailable();
-        Path home = tempDir.resolve("home-maximized-startup");
+        Path home = tempDir.resolve("home-window-placement");
         Files.createDirectories(home);
 
         Texteditor editor = createEmptyEditor(home);
+        Rectangle saved;
         try {
-            assertEquals(javax.swing.JFrame.MAXIMIZED_BOTH,
+            assertEquals(javax.swing.JFrame.NORMAL,
                 onEdt(() -> editor.getExtendedState() & javax.swing.JFrame.MAXIMIZED_BOTH));
+            saved = onEdt(() -> {
+                Rectangle current = editor.getBounds();
+                Rectangle next = new Rectangle(current.x + 8, current.y + 8,
+                    Math.max(400, current.width - 16), Math.max(300, current.height - 16));
+                editor.setBounds(next);
+                editor.windowPlacementStore.save(editor);
+                return next;
+            });
         } finally {
             disposeEditor(editor);
+        }
+        Texteditor restored = createEmptyEditor(home);
+        try {
+            assertEquals(saved, onEdt(restored::getBounds));
+        } finally {
+            disposeEditor(restored);
         }
     }
 
@@ -302,6 +317,9 @@ public class TexteditorSwingIntegrationTest {
                     editor.writingArea.setCaretPosition(i % 2 == 0 ? 11 : editor.writingArea.getDocument().getLength());
                     editor.showInlineCompletion();
                     assertTrue(editor.isCompletionPopupVisible());
+                    assertTrue(editor.completionPopup.getWidth() <= UiZoom.scale(360, editor.configManager.getUiZoom()));
+                    assertTrue(editor.completionList.isFocusable());
+                    assertEquals("Completion suggestions", editor.completionList.getAccessibleContext().getAccessibleName());
                     assertSame(editor.getLayeredPane(), editor.completionPopup.getParent());
                     assertTrue(editor.completionPopup.getX() >= 0);
                     assertTrue(editor.completionPopup.getY() >= 0);
@@ -656,7 +674,13 @@ public class TexteditorSwingIntegrationTest {
                     .map(SettingsEditorDialog.class::cast).filter(Window::isDisplayable).findFirst().orElseThrow();
             });
             SettingsEditorDialog shown = dialog;
-            assertEquals(UiZoom.scale(1040, 1.5), onEdt(() -> shown.getContentPane().getPreferredSize().width));
+            Rectangle usableScreen = onEdt(() -> shown.getGraphicsConfiguration().getBounds());
+            Insets screenInsets = onEdt(() -> java.awt.Toolkit.getDefaultToolkit().getScreenInsets(shown.getGraphicsConfiguration()));
+            Insets dialogInsets = onEdt(shown::getInsets);
+            int availableWidth = usableScreen.width - screenInsets.left - screenInsets.right - 48
+                - dialogInsets.left - dialogInsets.right;
+            assertEquals(Math.min(UiZoom.scale(1040, 1.5), availableWidth),
+                onEdt(() -> shown.getContentPane().getPreferredSize().width));
             List<javax.swing.JTextField> fields = onEdt(() -> descendants(shown, javax.swing.JTextField.class));
             assertFalse(fields.isEmpty());
             assertTrue(fields.stream().allMatch(field -> field.getFont().getSize() >= UiZoom.scale(12, 1.5)));
@@ -666,7 +690,8 @@ public class TexteditorSwingIntegrationTest {
                 editor.sessionConfigController.applyRuntimeConfigFromSettings();
                 return null;
             });
-            assertEquals(UiZoom.scale(1040, 1.6), onEdt(() -> shown.getContentPane().getPreferredSize().width));
+            assertEquals(Math.min(UiZoom.scale(1040, 1.6), availableWidth),
+                onEdt(() -> shown.getContentPane().getPreferredSize().width));
             assertEquals(onEdt(() -> editor.resolveUiFont().getSize()), onEdt(() -> editor.statusBar.getFont().getSize()));
 
             onEdt(() -> {

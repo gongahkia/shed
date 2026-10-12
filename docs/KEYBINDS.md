@@ -39,6 +39,8 @@ The default `keymap.profile = "plain"` provides non-modal editing. Plain bypasse
 
 The inline Find and Replace bars accept Enter for the next match, Shift+Enter for the previous match, and Escape to close. Replace All shows the number of matches before applying the edit. The editor shows file position as a percentage in the status bar and opens at its previously saved window size and position.
 
+When a completion popup is open, press `F6` to focus its suggestion list for screen reader navigation. Use the arrow keys to choose a suggestion, Enter to insert it, or Escape to close the popup.
+
 ### Emacs profile
 
 Set `keymap.profile = "emacs"` for fixed Emacs bindings. Emacs bypasses Vim mode handling and `keybind.<mode>.*` remaps. `C-x` accepts exactly one following key; unsupported chords and `C-g` cancel harmlessly.

@@ -1651,9 +1651,9 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Usage: :perf [status|diagnostics|benchmark]";
     }
 
-    public String showBuildInfo() {
-        showScratchBuffer("[build]", BuildInfo.current().render());
-        return "Showing build information";
+    public String showAbout() {
+        ShedAboutDialog.showFor(this);
+        return "Showing About Shed";
     }
 
     public String showConfigLoadStatus() {

@@ -72,6 +72,22 @@ public final class BuildInfo {
         return version;
     }
 
+    String commit() {
+        return commit;
+    }
+
+    String buildJava() {
+        return buildJava;
+    }
+
+    String runtimeJavaDescription() {
+        return join(runtimeJava, runtimeVendor, " ");
+    }
+
+    String operatingSystemDescription() {
+        return osDescription();
+    }
+
     private static Attributes manifestAttributes() {
         try {
             CodeSource source = BuildInfo.class.getProtectionDomain().getCodeSource();

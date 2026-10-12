@@ -529,12 +529,18 @@ final class SyntaxUiController {
 
     private SyntaxResult highlightSnapshot(SyntaxRequest request, AsyncJobService.JobToken token) {
         long started = System.nanoTime();
+        if (token.isCancelled()) return null;
         List<SyntaxSpan> spans = new ArrayList<>();
         GrammarHighlightService grammar = new GrammarHighlightService();
         List<GrammarHighlightService.Token> tokens;
+        int scanEnd = request.virtualized()
+            ? request.text().lineEndOffset(request.text().positionAt(request.visibleEnd()).line())
+            : request.text().length();
+        String source = request.text().substring(0, scanEnd);
         tokens = request.virtualized()
-            ? grammar.highlightViewport(request.text().text(), request.fileType(), request.visibleStart(), request.visibleEnd())
-            : grammar.highlightSnapshot(request.text().text(), request.fileType());
+            ? grammar.highlightViewport(source, request.fileType(), request.visibleStart(), request.visibleEnd(), token::isCancelled)
+            : grammar.highlightSnapshot(source, request.fileType(), token::isCancelled);
+        if (token.isCancelled()) return null;
         for (GrammarHighlightService.Token value : tokens) {
             if (token.isCancelled()) return null;
             Color color = request.colors().get(value.scope());
@@ -545,7 +551,7 @@ final class SyntaxUiController {
                 request.virtualized() ? request.visibleEnd() : request.text().length()) : List.of();
         if (editor.perfService != null) {
             editor.perfService.recordDuration("syntax.highlight", started,
-                "chars=" + request.text().length() + " lines=" + request.text().lineCount());
+                "scanChars=" + source.length() + " totalChars=" + request.text().length());
         }
         return new SyntaxResult(request, List.copyOf(spans), trailingWhitespace);
     }

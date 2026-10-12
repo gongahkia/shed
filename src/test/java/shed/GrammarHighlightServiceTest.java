@@ -1,6 +1,7 @@
 package shed;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
@@ -104,6 +105,17 @@ class GrammarHighlightServiceTest {
         List<GrammarHighlightService.Token> tokens = new GrammarHighlightService().highlightViewport(text, FileType.JAVA, start, end);
 
         assertTrue(has(tokens, text, "still comment", GrammarHighlightService.Scope.COMMENT));
+    }
+
+    @Test
+    void visiblePrefixProducesTheSameTokensAndCanCancelStaleWork() {
+        String visible = "/* open\nstill comment\n*/\nclass Demo {}";
+        String text = visible + "\nclass Later {}\n".repeat(1_000);
+        GrammarHighlightService grammar = new GrammarHighlightService();
+
+        assertEquals(grammar.highlightViewport(text, FileType.JAVA, 0, visible.length()),
+            grammar.highlightViewport(visible, FileType.JAVA, 0, visible.length()));
+        assertTrue(grammar.highlightViewport(text, FileType.JAVA, 0, visible.length(), () -> true).isEmpty());
     }
 
     private List<GrammarHighlightService.Token> highlight(String name, String text) throws Exception {

@@ -578,9 +578,15 @@ final class PaneBufferController {
             if (completion != null) completion.accept(null);
             return;
         }
-        editor.asyncJobService.submit("open file", token -> file.exists()
-            ? new FileBuffer(file, editor.configManager)
-            : new FileBuffer(file.getAbsolutePath(), editor.configManager), (job, loaded, error) -> {
+        editor.asyncJobService.submit("open file", token -> {
+            long started = System.nanoTime();
+            try {
+                return file.exists() ? new FileBuffer(file, editor.configManager)
+                    : new FileBuffer(file.getAbsolutePath(), editor.configManager);
+            } finally {
+                editor.perfService.recordDuration("file.open.load", started, "bytes=" + file.length());
+            }
+        }, (job, loaded, error) -> {
                 if (editor.closingDown || job.getStatus() == AsyncJobService.Status.CANCELLED) return;
                 if (targetPane != null && !java.util.Objects.equals(openRequests.get(targetPane), request)) return;
                 if (error != null || loaded == null) {
@@ -592,7 +598,10 @@ final class PaneBufferController {
                 }
                 EditorPane pane = targetPane != null && editor.editorPanes.contains(targetPane)
                     ? targetPane : editor.getActivePane();
+                long installStarted = System.nanoTime();
                 installLoadedBuffer(file, loaded, projectConfigMessage, pane);
+                editor.perfService.recordDuration("file.open.install", installStarted,
+                    "chars=" + loaded.textSnapshot().length());
                 if (completion != null) completion.accept(null);
             });
     }

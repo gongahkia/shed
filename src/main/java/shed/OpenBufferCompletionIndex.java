@@ -3,7 +3,6 @@ package shed;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,23 +18,21 @@ final class OpenBufferCompletionIndex {
     private final Map<Object, Snapshot> snapshots = new HashMap<>();
 
     Map<String, WordStats> build(String text) {
-        Map<String, WordStats> words = new LinkedHashMap<>();
+        Map<String, WordStats> words = new HashMap<>();
         if (text == null || text.isEmpty()) return words;
-        StringBuilder word = new StringBuilder();
-        int offset = 0;
+        int start = -1;
         for (int index = 0; index <= text.length(); index++) {
             if ((index & 2047) == 0 && Thread.currentThread().isInterrupted()) return Map.of();
             char character = index < text.length() ? text.charAt(index) : '\0';
             if (isWordCharacter(character)) {
-                if (word.isEmpty()) offset = index;
-                word.append(character);
-            } else if (!word.isEmpty()) {
-                if (isIdentifierStart(word.charAt(0))) {
-                    String value = word.toString();
+                if (start < 0) start = index;
+            } else if (start >= 0) {
+                if (isIdentifierStart(text.charAt(start))) {
+                    String value = text.substring(start, index);
                     WordStats previous = words.get(value);
-                    words.put(value, previous == null ? new WordStats(1, offset) : previous.next(offset));
+                    words.put(value, previous == null ? new WordStats(1, start) : previous.next(start));
                 }
-                word.setLength(0);
+                start = -1;
             }
         }
         return words;

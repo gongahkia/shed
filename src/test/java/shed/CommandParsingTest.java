@@ -167,7 +167,7 @@ public class CommandParsingTest {
         assertTrue(actions.containsAll(List.of(
             "Language Services", "Open File", "Open Folder", "Toggle File Tree",
             "Save Current Buffer", "Split Below", "Focus Next Split", "Focus Previous Split", "Zoom In", "Zoom Out",
-            "Configuration Status", "Go to Definition", "Toolchain Status", "Docker Containers", "Update Status"
+            "Configuration Status", "Performance Diagnostics", "Go to Definition", "Toolchain Status", "Docker Containers", "Update Status"
         )));
         List<String> candidates = PaletteController.commandPaletteCandidates();
         assertEquals(actions, candidates);
@@ -217,6 +217,7 @@ public class CommandParsingTest {
         assertEquals("diagnostic next", PaletteController.surfaceActionCommand("Next Diagnostic"));
         assertEquals("diagnostic previous", PaletteController.surfaceActionCommand("Previous Diagnostic"));
         assertEquals("config reload", PaletteController.surfaceActionCommand("Reload Configuration"));
+        assertEquals("perf", PaletteController.surfaceActionCommand("Performance Diagnostics"));
         assertEquals("zen toggle", PaletteController.surfaceActionCommand("Toggle Zen Mode"));
         assertEquals("goyo toggle", PaletteController.surfaceActionCommand("Toggle Goyo Mode"));
         assertEquals("limelight toggle", PaletteController.surfaceActionCommand("Toggle Limelight"));

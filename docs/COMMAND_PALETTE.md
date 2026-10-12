@@ -78,6 +78,7 @@ Each action is unique by visible label and normalized command. The application r
 | Undo History | `:undo history` | Show the undo history summary. |
 | Clear Search Highlights | `:search highlights clear` | Clear active search highlights. |
 | Command Log | `:command log` | Open the command log buffer. |
+| Performance Diagnostics | `:perf` | Show local editing, startup, and language-server timings. |
 | Show Help | `:help open` | Open the built-in help buffer. |
 | About Shed | `:about` | Show Shed version and local runtime details. |
 

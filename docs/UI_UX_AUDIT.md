@@ -36,4 +36,10 @@ This review covers Shed's welcome screen, editor, settings, command palette, com
 
 Automated checks cover all built-in theme contrast values, the folder shortcut, window geometry, live replacement and undo, menu presence, scrollbar defaults, and repeated completion popup updates. Rendered Swing captures were checked for the welcome, editor, settings, inline find, and compact completion states. The local `:perf` view now includes `completion.input-to-paint`; actual latency remains workload and machine dependent.
 
+The full suite ran 926 tests with nine failures. All nine also fail on the original `613c75a5` revision on this machine; they concern remote or container task routing, debug setup, and `/var` versus `/private/var` paths. The original revision ran 919 tests with ten failures, including a dialog zoom assertion that assumed a wider screen than this machine has. The revised zoom check respects the existing screen-size clamp. Focused tests for the changed UI paths pass.
+
 This is a local desktop UI. The design choices align with [Apple's macOS guidance on menus, shortcuts, and resizable windows](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos/) and use [WCAG's 4.5:1 normal-text contrast threshold](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html) as a legibility target.
+
+## Verdict
+
+The seven reviewed UI issues are addressed in the Swing app. The remaining full-suite failures reproduce on the original revision and are outside this UI work.

@@ -69,6 +69,10 @@ final class SettingsEditorDialog extends JDialog {
         super(editor, "Settings", false);
         this.editor = editor;
         theme = DialogTheme.from(editor.configManager);
+        settings.addPropertyChangeListener("font", event -> {
+            laidOutDetailWidth = -1;
+            SwingUtilities.invokeLater(this::updateDetailWidths);
+        });
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));
@@ -369,13 +373,15 @@ final class SettingsEditorDialog extends JDialog {
         if (component instanceof JLabel label) label.setForeground(
             Boolean.TRUE.equals(label.getClientProperty("shed.setting.description")) ? theme.muted() : theme.foreground());
         if (component instanceof JButton button) {
-            if (Boolean.TRUE.equals(button.getClientProperty("shed.setting.combo.arrow"))) button.setUI(new BasicButtonUI());
+            boolean comboArrow = Boolean.TRUE.equals(button.getClientProperty("shed.setting.combo.arrow"));
+            if (comboArrow) button.setUI(new BasicButtonUI());
             button.setOpaque(true);
             button.setContentAreaFilled(true);
             button.setBackground(theme.raised());
             button.setForeground(theme.foreground());
-            button.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(theme.border()),
-                BorderFactory.createEmptyBorder(uiPixels(4), uiPixels(9), uiPixels(4), uiPixels(9))));
+            button.setBorder(comboArrow ? BorderFactory.createLineBorder(theme.border())
+                : BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(theme.border()),
+                    BorderFactory.createEmptyBorder(uiPixels(4), uiPixels(9), uiPixels(4), uiPixels(9))));
         }
         if (component instanceof JTextField field) {
             field.setOpaque(true);
@@ -394,10 +400,24 @@ final class SettingsEditorDialog extends JDialog {
         if (component instanceof JComboBox<?> combo) {
             combo.setUI(new BasicComboBoxUI() {
                 @Override protected JButton createArrowButton() {
-                    JButton arrow = new JButton("▾");
+                    JButton arrow = new JButton() {
+                        @Override protected void paintComponent(java.awt.Graphics graphics) {
+                            super.paintComponent(graphics);
+                            java.awt.Graphics2D brush = (java.awt.Graphics2D) graphics.create();
+                            try {
+                                brush.setColor(getForeground());
+                                int x = getWidth() / 2;
+                                int y = getHeight() / 2;
+                                brush.drawLine(x - 4, y - 2, x, y + 2);
+                                brush.drawLine(x, y + 2, x + 4, y - 2);
+                            } finally {
+                                brush.dispose();
+                            }
+                        }
+                    };
                     arrow.putClientProperty("shed.setting.combo.arrow", Boolean.TRUE);
                     arrow.setFocusable(false);
-                    arrow.setMargin(new Insets(0, uiPixels(8), 0, uiPixels(8)));
+                    arrow.setPreferredSize(new Dimension(uiPixels(24), uiPixels(24)));
                     return arrow;
                 }
             });

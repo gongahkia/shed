@@ -240,6 +240,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     Texteditor(String[] args, ApplicationErrorReporter errorReporter) {
+        long startupStartedAt = System.nanoTime();
         this.errorReporter = errorReporter == null ? new ApplicationErrorReporter() : errorReporter;
         // Initialize managers
         configManager = new ConfigManager();
@@ -304,7 +305,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commandLogTimeFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         asyncJobService.setFailedJobListener(this::recordFailedAsyncJob);
         lineNumberMode = configManager.getLineNumberMode();
-        gitBranch = resolveGitBranch();
+        gitBranch = "";
         substitutePreviewTags = new ArrayList<>();
         currentLinePainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getCurrentLineHighlightColor());
         substitutePreviewPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSubstitutePreviewColor());
@@ -417,6 +418,13 @@ public class Texteditor extends JFrame implements KeyListener {
         updateStatusBar();
 
         this.setVisible(true);
+        perfService.recordDuration("startup.window-visible", startupStartedAt, "constructor to visible");
+        asyncJobService.submit("Startup Git branch", token -> resolveGitBranch(), (job, branch, error) -> {
+            if (!closingDown && error == null && branch != null && gitBranch.isEmpty()) {
+                gitBranch = branch;
+                requestStatusBarRefresh();
+            }
+        });
         if (configManager.hasConfigLoadFailure() || configManager.hasConfigRepairs()) {
             showPlainScratchBuffer("[config recovery]", configManager.getConfigLoadReport());
         }
@@ -537,6 +545,7 @@ public class Texteditor extends JFrame implements KeyListener {
     // Key event handling
     @Override
     public void keyPressed(KeyEvent e) {
+        editorUiController.noteEditorKey(e);
         inputController.keyPressed(e);
     }
 
@@ -2594,8 +2603,8 @@ public class Texteditor extends JFrame implements KeyListener {
         paneBufferController.handleDocumentChange(event);
     }
 
-    void scheduleCompletionAfterDocumentChange(DocumentEvent event) {
-        inputController.onDocumentChanged(event);
+    void scheduleCompletionAfterDocumentChange(DocumentEvent event, FileBuffer.DocumentTextChange change) {
+        inputController.onDocumentChanged(event, change);
     }
 
     void scheduleOpenBufferCompletionIndex() {

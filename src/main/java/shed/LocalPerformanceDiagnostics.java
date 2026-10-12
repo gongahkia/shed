@@ -27,6 +27,8 @@ final class LocalPerformanceDiagnostics {
             .append(benchmarkReady ? " for the current workspace\n" : "; open a file-backed buffer or tree root\n");
         report.append("\nRecorded timings:\n").append(perf.report());
         report.append("\nBenchmark limits:\n");
+        report.append("  edit.input-to-paint measures a key press through Swing paint completion, not display scanout.\n");
+        report.append("  Timing p95 uses the latest 256 samples in each metric group.\n");
         report.append("  Measures one fresh local persistent-index build. It can create or replace the local index cache.\n");
         report.append("  Timings and heap observations vary by JDK, storage, workspace, CPU load, and OS caches; they are not portability guarantees.\n\n");
         report.append("Controls:\n");

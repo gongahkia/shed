@@ -37,10 +37,13 @@ final class LspController {
     private int workspaceSymbolQueryGeneration;
     private int codeActionJobId = -1;
     private long codeActionGeneration;
+    private final Map<LspServerKey, Integer> automaticLaunchJobs = new HashMap<>();
+    private final Set<LspServerKey> failedAutomaticLaunches = new HashSet<>();
 
     private record CodeActionRequest(FileBuffer buffer, LspClient client, String uri, Integer version, int caretOffset,
                                      int line, int column, List<LspClient.Diagnostic> diagnostics, int requestedIndex, long generation) { }
     private record CodeActionResult(CodeActionRequest request, List<LspClient.CodeAction> actions) { }
+    private record AutomaticLspStart(LspClient client, RemoteLspEndpoint endpoint) { }
 
     LspController(Texteditor editor) {
         this.editor = editor;
@@ -2130,13 +2133,25 @@ final class LspController {
 
 
     String currentCompletionPrefix() {
-        String text = editor.writingArea.getText();
-        int caret = Math.min(editor.writingArea.getCaretPosition(), text.length());
-        int start = caret;
-        while (start > 0 && editor.isWordCharacter(text.charAt(start - 1))) {
-            start--;
+        int caret = Math.min(editor.writingArea.getCaretPosition(), editor.writingArea.getDocument().getLength());
+        int end = caret;
+        StringBuilder prefix = new StringBuilder();
+        try {
+            while (end > 0) {
+                int start = Math.max(0, end - 256);
+                String nearby = editor.writingArea.getDocument().getText(start, end - start);
+                int wordStart = nearby.length();
+                while (wordStart > 0 && editor.isWordCharacter(nearby.charAt(wordStart - 1))) {
+                    wordStart--;
+                }
+                prefix.insert(0, nearby.substring(wordStart));
+                if (wordStart > 0) break;
+                end = start;
+            }
+            return prefix.toString();
+        } catch (BadLocationException ignored) {
+            return "";
         }
-        return text.substring(start, caret);
     }
 
 
@@ -2148,7 +2163,15 @@ final class LspController {
 
         java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
         StringBuilder word = new StringBuilder();
-        String text = editor.writingArea.getText();
+        int caret = editor.writingArea.getCaretPosition();
+        int start = Math.max(0, caret - 8192);
+        int end = Math.min(editor.writingArea.getDocument().getLength(), caret + 8192);
+        String text;
+        try {
+            text = editor.writingArea.getDocument().getText(start, end - start);
+        } catch (BadLocationException ignored) {
+            return matches;
+        }
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             if (editor.isWordCharacter(c)) {
@@ -2218,6 +2241,7 @@ final class LspController {
     }
 
     private int stopServersForExtension(String extension) {
+        cancelAutomaticLaunches(key -> key.extension().equalsIgnoreCase(extension));
         List<LspServerKey> keys = new ArrayList<>();
         for (LspServerKey key : editor.lspClients.keySet()) {
             if (key.extension().equalsIgnoreCase(extension)) {
@@ -2235,6 +2259,7 @@ final class LspController {
     void stopServersForWorkspace(Path workspace) {
         Path root = workspace == null ? null : workspace.toAbsolutePath().normalize();
         if (root == null) return;
+        cancelAutomaticLaunches(key -> key.workspaceRoot() != null && key.workspaceRoot().startsWith(root));
         List<LspServerKey> keys = new ArrayList<>();
         for (LspServerKey key : editor.lspClients.keySet()) {
             Path serverRoot = key.workspaceRoot();
@@ -2290,6 +2315,7 @@ final class LspController {
             editor.lspErrors.remove(key);
             return existing;
         }
+        if (automaticLaunchJobs.containsKey(key)) return null;
         if (existing != null) {
             existing.stop();
             editor.lspClients.remove(key);
@@ -2350,12 +2376,162 @@ final class LspController {
     }
 
 
+    private void startLspAutomatically(FileBuffer buffer) {
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile() || editor.closingDown) return;
+        String extension = bufferExtension(buffer);
+        if (extension.isEmpty()) return;
+        Path root;
+        try {
+            root = workspaceRootPath(buffer);
+        } catch (IOException error) {
+            editor.lspErrors.put(new LspServerKey(extension, null), error.getMessage());
+            return;
+        }
+        LspServerKey key = new LspServerKey(extension, root);
+        LspClient stale = editor.lspClients.get(key);
+        if (stale != null && !stale.isAlive()) {
+            for (FileBuffer open : editor.buffers) {
+                if (open == null || !open.hasFilePath() || !extension.equals(bufferExtension(open))) continue;
+                try {
+                    if (!root.equals(workspaceRootPath(open))) continue;
+                    String uri = bufferUri(open);
+                    editor.lspDocumentVersions.remove(uri);
+                    documentSyncStates.remove(uri);
+                } catch (IOException ignored) { }
+            }
+            editor.lspClients.remove(key);
+            remoteLspEndpoints.remove(key);
+            stopLspLater(stale);
+        }
+        if (automaticLaunchJobs.containsKey(key) || failedAutomaticLaunches.contains(key)) return;
+
+        String command = editor.configManager.getLspCommand(extension);
+        boolean userConfigured = command != null && !command.isBlank();
+        String[] args;
+        try {
+            args = editor.configManager.getLspArgs(extension);
+        } catch (IllegalArgumentException error) {
+            editor.lspErrors.put(key, error.getMessage());
+            failedAutomaticLaunches.add(key);
+            return;
+        }
+        if (!userConfigured) {
+            String[] builtin = builtinLspCommand(extension);
+            if (builtin == null || builtin.length == 0) {
+                editor.lspErrors.put(key, "no server configured for ." + extension);
+                failedAutomaticLaunches.add(key);
+                return;
+            }
+            command = builtin[0];
+            args = Arrays.copyOfRange(builtin, 1, builtin.length);
+        }
+        String resolvedCommand = command;
+        String[] resolvedArgs = args == null ? new String[0] : args.clone();
+        List<String> invocation = new ArrayList<>();
+        invocation.add(resolvedCommand);
+        Collections.addAll(invocation, resolvedArgs);
+        List<String> commandLine = List.copyOf(invocation);
+        LspFeatureSettings features = editor.configManager.getLspFeatureSettings();
+        boolean remoteWorkspace = editor.remoteWorkspaceController != null
+            && editor.remoteWorkspaceController.remoteLanguageServerUri(root) != null;
+        boolean devContainer = !remoteWorkspace && editor.devContainerController != null
+            && editor.devContainerController.hasConfiguration(root);
+        boolean remoteEnabled = editor.configManager.getRemoteLspEnabled() && (remoteWorkspace || devContainer);
+        if (remoteEnabled && !userConfigured) {
+            editor.lspErrors.put(key, "remote LSP requires an explicit global lsp." + extension + ".command configured for the remote environment");
+            failedAutomaticLaunches.add(key);
+            return;
+        }
+
+        editor.lspErrors.put(key, "language server is starting");
+        long launchStartedAt = System.nanoTime();
+        int jobId = editor.asyncJobService.submit("Start language server ." + extension, token -> {
+            RemoteLspEndpoint endpoint = null;
+            if (remoteEnabled) {
+                endpoint = remoteWorkspace
+                    ? editor.remoteWorkspaceController.languageServerEndpoint(root, commandLine)
+                    : editor.devContainerController.languageServerEndpoint(root, commandLine);
+                if (endpoint == null) throw new IOException("the selected remote workspace does not support remote language servers");
+            }
+            LspClient client = endpoint == null
+                ? new LspClient(resolvedCommand, resolvedArgs, root, features, editor.toolchainService.environment(root))
+                : new LspClient(endpoint.command(), root, endpoint.rootUri(), features);
+            if (token.isCancelled()) {
+                client.stop();
+                return null;
+            }
+            return new AutomaticLspStart(client, endpoint);
+        }, (job, started, error) -> {
+            if (editor.perfService != null && job.getStatus() == AsyncJobService.Status.SUCCEEDED) {
+                editor.perfService.recordDuration("lsp.startup", launchStartedAt, "." + extension);
+            }
+            Integer activeJob = automaticLaunchJobs.get(key);
+            if (activeJob == null || activeJob != job.getId() || editor.closingDown) {
+                if (started != null) stopLspLater(started.client());
+                return;
+            }
+            automaticLaunchJobs.remove(key);
+            if (error != null || started == null || job.getStatus() != AsyncJobService.Status.SUCCEEDED) {
+                failedAutomaticLaunches.add(key);
+                String reason = error == null ? null : error.getMessage();
+                editor.lspErrors.put(key, reason == null || reason.isBlank() ? "language server failed to start" : reason);
+                return;
+            }
+            if (editor.lspClients.containsKey(key)) {
+                stopLspLater(started.client());
+                editor.lspErrors.remove(key);
+                return;
+            }
+            List<FileBuffer> matchingBuffers = new ArrayList<>();
+            for (FileBuffer open : editor.buffers) {
+                if (open == null || !open.hasFilePath() || open.isLargeFile()
+                    || !extension.equals(bufferExtension(open))) continue;
+                try {
+                    if (root.equals(workspaceRootPath(open))) matchingBuffers.add(open);
+                } catch (IOException ignored) { }
+            }
+            if (matchingBuffers.isEmpty()) {
+                stopLspLater(started.client());
+                editor.lspErrors.remove(key);
+                return;
+            }
+            LspClient client = started.client();
+            client.setWorkspaceEditHandler(this::applyWorkspaceEditFromServer);
+            client.setDiagnosticsChangedHandler(() -> SwingUtilities.invokeLater(() -> {
+                scheduleDiagnosticRefresh();
+                editor.problemsController.diagnosticsChanged();
+            }));
+            editor.lspClients.put(key, client);
+            if (started.endpoint() == null) remoteLspEndpoints.remove(key);
+            else remoteLspEndpoints.put(key, started.endpoint());
+            editor.lspErrors.remove(key);
+            for (FileBuffer open : matchingBuffers) syncLspOpen(open);
+            editor.requestStatusBarRefresh();
+        });
+        automaticLaunchJobs.put(key, jobId);
+    }
+
+    private void cancelAutomaticLaunches(java.util.function.Predicate<LspServerKey> matches) {
+        failedAutomaticLaunches.removeIf(matches);
+        for (LspServerKey key : new ArrayList<>(automaticLaunchJobs.keySet())) {
+            if (!matches.test(key)) continue;
+            Integer jobId = automaticLaunchJobs.remove(key);
+            if (jobId != null) editor.asyncJobService.cancel(jobId);
+        }
+    }
+
+    private static void stopLspLater(LspClient client) {
+        Thread.ofVirtual().name("shed-stale-lsp").start(client::stop);
+    }
+
+
     void syncLspOpen(FileBuffer buffer) {
         if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
             return;
         }
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) {
+        LspClient client = existingLspClient(buffer);
+        if (client == null || !client.isAlive()) {
+            startLspAutomatically(buffer);
             return;
         }
         String uri = bufferUri(buffer);
@@ -2416,6 +2592,7 @@ final class LspController {
     }
 
     void shutdown() {
+        cancelAutomaticLaunches(key -> true);
         workspaceSymbolCoordinator.close();
         if (lspChangeTimer != null) {
             lspChangeTimer.stop();
@@ -2437,8 +2614,9 @@ final class LspController {
         if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
             return;
         }
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) {
+        LspClient client = existingLspClient(buffer);
+        if (client == null || !client.isAlive()) {
+            startLspAutomatically(buffer);
             return;
         }
         syncLspOpen(buffer);

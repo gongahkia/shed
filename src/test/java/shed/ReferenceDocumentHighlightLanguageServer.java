@@ -22,16 +22,19 @@ public final class ReferenceDocumentHighlightLanguageServer {
             String method = MiniJson.asString(request.get("method"));
             if (method == null) continue;
             switch (method) {
-                case "initialize" -> respond(System.out, request.get("id"), Map.of(
-                    "capabilities", Map.of("documentHighlightProvider", Boolean.TRUE,
-                        "codeLensProvider", Map.of("resolveProvider", Boolean.TRUE),
-                        "selectionRangeProvider", Boolean.TRUE,
-                        "documentLinkProvider", Map.of("resolveProvider", Boolean.TRUE),
-                        "colorProvider", Boolean.TRUE,
-                        "diagnosticProvider", Map.of("interFileDependencies", Boolean.FALSE, "workspaceDiagnostics", Boolean.TRUE),
-                        "foldingRangeProvider", Boolean.TRUE,
-                        "executeCommandProvider", Map.of("commands", List.of("test.run")))
-                ));
+                case "initialize" -> {
+                    if (List.of(arguments).contains("--slow-init")) Thread.sleep(1500L);
+                    respond(System.out, request.get("id"), Map.of(
+                        "capabilities", Map.of("documentHighlightProvider", Boolean.TRUE,
+                            "codeLensProvider", Map.of("resolveProvider", Boolean.TRUE),
+                            "selectionRangeProvider", Boolean.TRUE,
+                            "documentLinkProvider", Map.of("resolveProvider", Boolean.TRUE),
+                            "colorProvider", Boolean.TRUE,
+                            "diagnosticProvider", Map.of("interFileDependencies", Boolean.FALSE, "workspaceDiagnostics", Boolean.TRUE),
+                            "foldingRangeProvider", Boolean.TRUE,
+                            "executeCommandProvider", Map.of("commands", List.of("test.run")))
+                    ));
+                }
                 case "textDocument/documentHighlight" -> respond(System.out, request.get("id"), highlights(request));
                 case "textDocument/codeLens" -> respond(System.out, request.get("id"), List.of(Map.of(
                     "range", Map.of("start", Map.of("line", 4, "character", 2), "end", Map.of("line", 4, "character", 8)),

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.awt.Component;
 import java.awt.Color;
@@ -105,6 +106,70 @@ public class TexteditorSwingIntegrationTest {
             }
             assertTrue(opened);
             assertEquals("loaded\n".repeat(20_000), onEdt(() -> editor.writingArea.getText()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void openingAFileDoesNotWaitForLanguageServerInitialization() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-async-lsp");
+        Path file = tempDir.resolve("AsyncLsp.java");
+        Path secondFile = tempDir.resolve("AnotherLsp.java");
+        Files.createDirectories(home);
+        Files.writeString(file, "class AsyncLsp {}\n", StandardCharsets.UTF_8);
+        Files.writeString(secondFile, "class AnotherLsp {}\n", StandardCharsets.UTF_8);
+        Path javaExecutablePath = Path.of(System.getProperty("java.home"), "bin",
+            System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win") ? "java.exe" : "java");
+        assumeTrue(Files.isExecutable(javaExecutablePath));
+        Texteditor editor = createEmptyEditor(home);
+        try {
+            long openMillis = onEdt(() -> {
+                editor.configManager.set("lsp.java.command", javaExecutablePath.toString());
+                String classPath = System.getProperty("java.class.path").replace("\"", "\\\"");
+                editor.configManager.set("lsp.java.args", "-cp \"" + classPath + "\" "
+                    + ReferenceDocumentHighlightLanguageServer.class.getName() + " --slow-init");
+                long started = System.nanoTime();
+                editor.openFile(file.toFile());
+                editor.openFile(secondFile.toFile());
+                return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            });
+            assertTrue(openMillis < 1200L, "file open waited for LSP initialization: " + openMillis + "ms");
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(6);
+            boolean connected = false;
+            while (System.nanoTime() < deadline) {
+                connected = onEdt(() -> editor.existingLspClient(editor.getCurrentBuffer()) != null
+                    && editor.lspDocumentVersions.containsKey(file.toUri().toString())
+                    && editor.lspDocumentVersions.containsKey(secondFile.toUri().toString()));
+                if (connected) break;
+                Thread.sleep(20L);
+            }
+            assertTrue(connected, "language server did not finish its background startup");
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void perfReportsEditorInputThroughSwingPaint() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-edit-paint-perf");
+        Path file = tempDir.resolve("paint-perf.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "before\n", StandardCharsets.UTF_8);
+        Texteditor editor = createEditor(home, file);
+        try {
+            String report = onEdt(() -> {
+                editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED,
+                    System.currentTimeMillis(), 0, KeyEvent.VK_X, 'x'));
+                editor.writingArea.replaceSelection("x");
+                editor.writingArea.paintImmediately(editor.writingArea.getVisibleRect());
+                return editor.perfService.report();
+            });
+            assertTrue(report.contains("edit.input-to-document"), report);
+            assertTrue(report.contains("edit.input-to-paint"), report);
+            assertTrue(report.contains(" p95="), report);
         } finally {
             disposeEditor(editor);
         }

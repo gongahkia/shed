@@ -66,8 +66,11 @@ final class InputController {
         this.macroIndentAfterNewline = null;
     }
 
-    void onDocumentChanged(DocumentEvent event) {
-        scheduleOpenBufferWordIndex();
+    void onDocumentChanged(DocumentEvent event, FileBuffer.DocumentTextChange change) {
+        FileBuffer changedBuffer = editor.getCurrentBuffer();
+        if (changedBuffer == null || !openBufferCompletionIndex.applyChange(changedBuffer, change)) {
+            scheduleOpenBufferWordIndex();
+        }
         if (!editor.configManager.getLspCompletionAutoShow() || editor.editorState.mode != EditorMode.INSERT) {
             cancelQuickSuggestion();
             return;
@@ -91,7 +94,7 @@ final class InputController {
 
     void scheduleOpenBufferWordIndex() {
         FileBuffer buffer = editor.getCurrentBuffer();
-        if (buffer == null || buffer.isLargeFile()) return;
+        if (buffer == null || buffer.isLargeFile() || openBufferCompletionIndex.hasSnapshot(buffer, buffer.textSnapshot())) return;
         pendingWordIndexBuffer = buffer;
         if (wordIndexTimer == null) {
             wordIndexTimer = new javax.swing.Timer(140, event -> rebuildOpenBufferWordIndex());
@@ -105,7 +108,8 @@ final class InputController {
     private void rebuildOpenBufferWordIndex() {
         FileBuffer buffer = pendingWordIndexBuffer;
         pendingWordIndexBuffer = null;
-        if (buffer == null || buffer != editor.getCurrentBuffer() || buffer.isLargeFile()) return;
+        if (buffer == null || buffer != editor.getCurrentBuffer() || buffer.isLargeFile()
+            || openBufferCompletionIndex.hasSnapshot(buffer, buffer.textSnapshot())) return;
         submitOpenBufferWordIndex(buffer, buffer.textSnapshot());
     }
 
@@ -121,14 +125,14 @@ final class InputController {
                 if (snapshot == null || snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED || error != null
                     || generation != wordIndexGeneration || words == null || !editor.buffers.contains(buffer)
                     || buffer.textSnapshot() != text) return;
-                openBufferCompletionIndex.update(buffer, words);
+                openBufferCompletionIndex.update(buffer, text, words);
             });
     }
 
     private void scheduleMissingOpenBufferWordIndex() {
         if (wordIndexJobId >= 0) return;
         for (FileBuffer buffer : editor.buffers) {
-            if (buffer.isLargeFile() || openBufferCompletionIndex.hasSnapshot(buffer)) continue;
+            if (buffer.isLargeFile() || openBufferCompletionIndex.hasSnapshot(buffer, buffer.textSnapshot())) continue;
             submitOpenBufferWordIndex(buffer, buffer.textSnapshot());
             return;
         }
@@ -2529,6 +2533,10 @@ final class InputController {
             int documentVersion = editor.lspDocumentVersions.getOrDefault(uri, 0);
             CompletionRequestState.Snapshot request = completionRequestState.begin(uri, documentVersion, caretOffset, prefix);
             activeCompletionRequest = request;
+            List<LspClient.CompletionItem> local = mergeCompletionItems(snippets, localCompletionItems(prefix));
+            if (!completionRanker.rank(prefix, local, editor.configManager.getLspCompletionFuzzyMatching(), 12).isEmpty()) {
+                showCompletionPopup(local, prefix, "Local suggestions; language server loading");
+            }
             completionJobId = editor.asyncJobService.submit("LSP completion", token -> client.completion(uri, line, column, triggerKind, triggerCharacter),
                 (snapshot, items, error) -> completeInlineCompletion(request, snapshot, items, error));
         } catch (BadLocationException ignored) {
@@ -2793,7 +2801,7 @@ final class InputController {
             editor.writingArea.getCaretPosition(), 12, editor.fuzzyMatchService)) {
             items.add(new LspClient.CompletionItem(candidate.word(), "open buffer", 1));
         }
-        if (current != null && !openBufferCompletionIndex.hasSnapshot(current)) {
+        if (current != null && !openBufferCompletionIndex.hasSnapshot(current, current.textSnapshot())) {
             for (String completion : editor.collectBufferCompletions(prefix)) {
                 items.add(new LspClient.CompletionItem(completion, "current buffer", 1));
             }

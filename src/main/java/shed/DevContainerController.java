@@ -59,7 +59,7 @@ final class DevContainerController {
                 + "\nDev Container actions are explicit and require an installed devcontainer CLI.\n"
                 + "\n:container build\n:container up\n:container lifecycle\n:container stop\n:container down\n:container connect\n:container disconnect\n:container exec <command...>\n:container terminal [command...]\n"
                 + "\nConfiguration:\n\n" + text;
-            editor.showScratchBuffer("[dev container]", output);
+            ShedInformationDialog.showFor(editor, "Dev Container", output);
             return "Showing Dev Container configuration";
         } catch (IOException error) {
             return "Could not read Dev Container configuration: " + concise(error);

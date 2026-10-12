@@ -366,7 +366,7 @@ final class RemoteWorkspaceController {
                 .append(forward.remotePort()).append("  [").append(forward.connectionId()).append("] ").append(forward.detail()).append("\n");
         }
         output.append("\nConnections use a local working tree. Pull and push are explicit; automatic pull is opt-in with :remote sync start. Remote URI passwords are rejected.\n");
-        editor.showScratchBuffer("[remote workspaces]", output.toString());
+        ShedInformationDialog.showFor(editor, "Remote Workspaces", output.toString());
         return "Showing remote workspaces";
     }
 

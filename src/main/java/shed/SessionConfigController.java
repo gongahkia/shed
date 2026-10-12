@@ -665,7 +665,7 @@ final class SessionConfigController {
 
     private String showWorkspaceIndexComparison(Path workspaceRoot) {
         WorkspaceIndexComparison.Report report = workspaceIndexComparison().inspect(editor.configManager.getWorkspaceIndexEnabled(), workspaceRoot);
-        showScratchBuffer("[workspace index]", report.format());
+        ShedInformationDialog.showFor(editor, "Workspace Index Status", report.format());
         return "Showing workspace index comparison";
     }
 
@@ -1525,7 +1525,7 @@ final class SessionConfigController {
         sb.append("Can redo: ").append(um.canRedo()).append("\n\n");
         sb.append("  u     = undo one step\n");
         sb.append("  Ctrl+r = redo one step\n");
-        showScratchBuffer("[Undo History]", sb.toString());
+        ShedInformationDialog.showFor(editor, "Undo History", sb.toString());
         return "Showing undo history";
     }
 

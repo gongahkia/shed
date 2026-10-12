@@ -325,25 +325,15 @@ final class MarkdownController {
     public String showTableOfContents() {
         FileBuffer buf = editor.getCurrentBuffer();
         if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        String[] lines = getCurrentLines();
-        String toc = editor.markdownService.generateToc(lines);
-        FileBuffer tocBuffer = FileBuffer.createScratch("[TOC]", toc);
-        editor.buffers.add(tocBuffer);
-        editor.loadBufferIntoEditor(tocBuffer);
-        return "Table of contents";
+        MarkdownOutlineDialog.showFor(editor, buf, getCurrentLines());
+        return "Table of contents opened";
     }
 
 
     public String showOutline() {
         FileBuffer buf = editor.getCurrentBuffer();
         if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        String[] lines = getCurrentLines();
-        String toc = editor.markdownService.generateToc(lines);
-        // Open in a split
-        String splitResult = editor.splitWindow(true);
-        FileBuffer tocBuffer = FileBuffer.createScratch("[Outline]", toc);
-        editor.buffers.add(tocBuffer);
-        editor.loadBufferIntoEditor(tocBuffer);
+        MarkdownOutlineDialog.showFor(editor, buf, getCurrentLines());
         return "Outline opened";
     }
 

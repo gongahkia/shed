@@ -137,7 +137,7 @@ final class UpdateController {
         String report = "Update status\n\nConsent: " + consent.detail() + "\nMetadata endpoint: " + endpoint + "\nPublic key: " + key
             + "\nLast trusted metadata: " + trusted + "\nLast check: " + lastCheck
             + "\nInstaller handling: manual browser handoff only; Shed never replaces its running files.";
-        editor.showScratchBuffer("[update status]", report);
+        ShedInformationDialog.showFor(editor, "Update Status", report);
         return "Showing update status";
     }
 

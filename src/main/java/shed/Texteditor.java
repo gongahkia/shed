@@ -244,9 +244,11 @@ public class Texteditor extends JFrame implements KeyListener {
 
     Texteditor(String[] args, ApplicationErrorReporter errorReporter) {
         long startupStartedAt = System.nanoTime();
+        StartupProfile startupProfile = new StartupProfile();
         this.errorReporter = errorReporter == null ? new ApplicationErrorReporter() : errorReporter;
         // Initialize managers
         configManager = new ConfigManager();
+        startupProfile.mark("configuration");
         toolchainService = new ToolchainService(Path.of(configManager.getSessionDirectory(), "toolchains"));
         devContainerSessions = new DevContainerSessionService();
         scmController = new ScmController(this);
@@ -378,8 +380,10 @@ public class Texteditor extends JFrame implements KeyListener {
         bracketColorEnabled = false;
         whichKeyHintsEnabled = true;
         focusModeController = new FocusModeController(this);
+        startupProfile.mark("services");
         loadRecentFiles();
         loadTrustedProjectRoots();
+        startupProfile.mark("local state");
         lastMessage = "";
 
         syntaxUiController = new SyntaxUiController(this);
@@ -391,12 +395,14 @@ public class Texteditor extends JFrame implements KeyListener {
         recoveryController = new RecoveryController(this);
         searchReplaceController = new SearchReplaceController(this);
         perfService = new PerfService();
+        startupProfile.mark("controllers");
 
         // Initialize UI
-        initializeUI();
+        editorUiController.initializeUI(startupProfile);
         // Set initial mode before any status rendering hooks
         setMode(configManager.getKeymapProfile().usesVimModeHandling() ? EditorMode.NORMAL : EditorMode.INSERT);
         applyThemeColors();
+        startupProfile.mark("theme and mode");
 
         // Initialize managers that depend on UI
         clipboardManager = new ClipboardManager();
@@ -418,11 +424,14 @@ public class Texteditor extends JFrame implements KeyListener {
                 openEmptyBuffer();
             }
         }
+        startupProfile.mark("open startup content");
 
         updateStatusBar();
+        startupProfile.mark("status bar");
 
         this.setVisible(true);
         perfService.recordDuration("startup.window-visible", startupStartedAt, "constructor to visible");
+        startupProfile.printAfterVisible();
         asyncJobService.submit("Startup Git branch", token -> resolveGitBranch(), (job, branch, error) -> {
             if (!closingDown && error == null && branch != null && gitBranch.isEmpty()) {
                 gitBranch = branch;

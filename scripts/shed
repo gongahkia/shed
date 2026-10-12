@@ -18,4 +18,16 @@ if [ -z "$jar" ] || [ ! -r "$jar" ]; then
     exit 1
 fi
 
-exec "${JAVA:-java}" -jar "$jar" "$@"
+toolchain="$launcher_dir/resolve-toolchain.sh"
+if [ ! -x "$toolchain" ]; then
+    toolchain="$launcher_dir/../lib/shed/resolve-toolchain.sh"
+fi
+if [ ! -x "$toolchain" ]; then
+    echo "shed: Java resolver is missing; run 'make install' again." >&2
+    exit 1
+fi
+java=$("$toolchain" java) || exit 1
+if [ "${SHED_STARTUP_PROFILE:-0}" = 1 ]; then
+    exec "$java" -Dshed.startup.profile=true -jar "$jar" "$@"
+fi
+exec "$java" -jar "$jar" "$@"

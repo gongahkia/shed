@@ -347,7 +347,7 @@ public class CommandHandler {
     private String handleApp(String argument) {
         String operation = argument == null ? "" : argument.trim();
         return operation.isEmpty() || "about".equalsIgnoreCase(operation)
-            ? editor.showBuildInfo()
+            ? editor.showAbout()
             : "Usage: :app about";
     }
 

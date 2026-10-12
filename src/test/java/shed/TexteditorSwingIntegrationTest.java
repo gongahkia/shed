@@ -1607,10 +1607,15 @@ public class TexteditorSwingIntegrationTest {
 
         Texteditor editor = createEditor(home, file);
         try {
+            FileBuffer source = onEdt(editor::getCurrentBuffer);
             assertEquals("Showing remote workspaces", onEdt(() -> editor.commandHandler.execute("remote forward list")));
-            String output = onEdt(() -> editor.getCurrentBuffer().getContent());
+            ShedInformationDialog page = onEdt(() -> Arrays.stream(editor.getOwnedWindows())
+                .filter(window -> window instanceof ShedInformationDialog && "Remote Workspaces".equals(((ShedInformationDialog) window).getTitle()))
+                .map(window -> (ShedInformationDialog) window).findFirst().orElseThrow());
+            String output = onEdt(() -> descendants(page, javax.swing.JEditorPane.class).getFirst().getText());
             assertTrue(output.contains("SSH loopback forwards"));
             assertTrue(output.contains("No SSH forwards active."));
+            assertSame(source, onEdt(editor::getCurrentBuffer));
         } finally {
             disposeEditor(editor);
         }
@@ -2268,12 +2273,20 @@ public class TexteditorSwingIntegrationTest {
 
         Texteditor editor = createEditor(home, file);
         try {
+            FileBuffer source = onEdt(editor::getCurrentBuffer);
             String result = onEdt(() -> editor.commandHandler.execute("workspace index enable"));
 
             assertEquals("Persistent workspace indexing enabled", result);
             assertTrue(onEdt(() -> editor.configManager.getWorkspaceIndexEnabled()));
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("Current search source: persistent workspace index"));
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("Persistent-index preference: enabled"));
+            ShedInformationDialog page = onEdt(() -> Arrays.stream(editor.getOwnedWindows())
+                .filter(window -> window instanceof ShedInformationDialog && "Workspace Index Status".equals(((ShedInformationDialog) window).getTitle()))
+                .map(window -> (ShedInformationDialog) window).findFirst().orElseThrow());
+            String output = onEdt(() -> descendants(page, javax.swing.JEditorPane.class).getFirst().getText());
+            assertTrue(output.contains("Current search source"));
+            assertTrue(output.contains("persistent workspace index"));
+            assertTrue(output.contains("Persistent-index preference"));
+            assertTrue(output.contains("enabled"));
+            assertSame(source, onEdt(editor::getCurrentBuffer));
             assertFalse(Files.exists(home.resolve(".shed/workspace-index")));
         } finally {
             disposeEditor(editor);

@@ -69,6 +69,27 @@ public class PtyTerminalPaneSettingsTest {
     }
 
     @Test
+    void keepsNibAnsiBackgroundColorsWhileMakingForegroundsReadable() {
+        System.setProperty("user.home", tempDir.resolve("home-terminal-nib").toString());
+        ConfigManager configManager = new ConfigManager();
+        PtyTerminalPane.ShedTerminalSettingsProvider settings = new PtyTerminalPane.ShedTerminalSettingsProvider(configManager,
+            new Font("Monospaced", Font.PLAIN, 14));
+
+        for (String theme : new String[] {"nib-dark", "nib-light"}) {
+            assertEquals(theme, configManager.setTheme(theme));
+            settings.refresh(configManager, new Font("Monospaced", Font.PLAIN, 14));
+            java.awt.Color[] expected = configManager.getThemeAnsiColors();
+            for (int index = 0; index < expected.length; index++) {
+                Color actual = settings.getTerminalColorPalette().getBackground(TerminalColor.index(index));
+                assertEquals(expected[index].getRed(), actual.getRed(), theme + " ANSI background " + index);
+                assertEquals(expected[index].getGreen(), actual.getGreen(), theme + " ANSI background " + index);
+                assertEquals(expected[index].getBlue(), actual.getBlue(), theme + " ANSI background " + index);
+            }
+            assertReadableAnsiPalette(settings);
+        }
+    }
+
+    @Test
     void refreshAdoptsTheCurrentThemeForAnExistingTerminalSession() {
         System.setProperty("user.home", tempDir.resolve("home-terminal-refresh").toString());
         ConfigManager configManager = new ConfigManager();

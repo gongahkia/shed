@@ -278,13 +278,17 @@ final class PtyTerminalPane implements AutoCloseable {
 
     private static final class ShedTerminalColorPalette extends ColorPalette {
         private final com.jediterm.core.Color[] colors;
+        private final com.jediterm.core.Color[] foregroundColors;
 
         private ShedTerminalColorPalette(ConfigManager configManager) {
             Color[] themeAnsi = configManager == null ? null : configManager.getThemeAnsiColors();
             if (themeAnsi != null) {
+                Color bg = configManager.getNormalColor();
                 this.colors = new com.jediterm.core.Color[themeAnsi.length];
+                this.foregroundColors = new com.jediterm.core.Color[themeAnsi.length];
                 for (int index = 0; index < themeAnsi.length; index++) {
                     this.colors[index] = toCoreColor(themeAnsi[index]);
+                    this.foregroundColors[index] = toCoreColor(readableColor(themeAnsi[index], bg));
                 }
                 return;
             }
@@ -314,6 +318,7 @@ final class PtyTerminalPane implements AutoCloseable {
                 toCoreColor(readableColor(brighten(function), bg)),
                 toCoreColor(readableColor(Color.WHITE, bg))
             };
+            this.foregroundColors = colors;
         }
 
         @Override
@@ -328,7 +333,7 @@ final class PtyTerminalPane implements AutoCloseable {
 
         private com.jediterm.core.Color colorForIndex(int index, boolean foreground) {
             if (index >= 0 && index < colors.length) {
-                return colors[index];
+                return foreground ? foregroundColors[index] : colors[index];
             }
             TerminalColor terminalColor = TerminalColor.index(index);
             return foreground

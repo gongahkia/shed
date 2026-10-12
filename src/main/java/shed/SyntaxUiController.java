@@ -458,6 +458,7 @@ final class SyntaxUiController {
 
     void applyThemeColors() {
         editor.editorUiController.applyUiTheme();
+        if (editor.inlineFindBar != null) editor.inlineFindBar.refreshAppearance();
         Color editorForeground = editor.configManager.getEditorForeground();
         Color caretColor = editor.configManager.getCaretColor();
         Color selectionColor = editor.configManager.getSelectionColor();
@@ -473,6 +474,10 @@ final class SyntaxUiController {
 
         editor.statusBar.setBackground(editor.configManager.getStatusBarBackground());
         editor.statusBar.setForeground(editor.configManager.getStatusBarForeground());
+        if (editor.positionCue != null) {
+            editor.positionCue.setBackground(editor.configManager.getStatusBarBackground());
+            editor.positionCue.setForeground(editor.configManager.getStatusBarForeground());
+        }
         editor.commandBar.setBackground(editor.configManager.getCommandBarBackground());
         editor.commandBar.setForeground(editor.configManager.getCommandBarForeground());
 

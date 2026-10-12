@@ -78,7 +78,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `list` | `false` | bool | Whitespace visualization |
 | `ruler.column` | `0` | int | Draw vertical ruler at column (`0` disables) |
 | `scrolloff` | `0` | int | Keep cursor context while scrolling |
-| `editor.scrollbars.visible` | `false` | bool | Show horizontal and vertical scrollbars in editor windows |
+| `editor.scrollbars.visible` | `true` | bool | Show horizontal and vertical scrollbars in editor windows |
 | `textwidth` | `0` | int | Paragraph formatting width (`0` disables) |
 | `auto.pairs` | `true` | bool | Auto-pair brackets/quotes |
 | `zen.mode.width` | `80` | int | Goyo content width in columns |

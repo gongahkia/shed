@@ -14,6 +14,7 @@ class PlainKeymapTest {
         assertEquals(PlainKeymap.Action.SAVE, action(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK));
         assertEquals(PlainKeymap.Action.SAVE_AS, action(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.OPEN, action(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.OPEN_FOLDER, action(KeyEvent.VK_O, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.FIND_FILE, action(KeyEvent.VK_P, InputEvent.META_DOWN_MASK));
         assertEquals(PlainKeymap.Action.COMMANDS, action(KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.BUFFERS, action(KeyEvent.VK_B, InputEvent.CTRL_DOWN_MASK));
@@ -31,8 +32,11 @@ class PlainKeymapTest {
         assertEquals(PlainKeymap.Action.FIND, action(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK));
         assertEquals(PlainKeymap.Action.FIND_NEXT, action(KeyEvent.VK_F3, 0));
         assertEquals(PlainKeymap.Action.FIND_PREVIOUS, action(KeyEvent.VK_F3, InputEvent.SHIFT_DOWN_MASK));
-        assertEquals(PlainKeymap.Action.REPLACE, action(KeyEvent.VK_H, InputEvent.META_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.REPLACE, action(KeyEvent.VK_F, InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_H, InputEvent.META_DOWN_MASK));
         assertEquals(PlainKeymap.Action.GO_TO_LINE, action(KeyEvent.VK_G, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.FIND_NEXT, action(KeyEvent.VK_G, InputEvent.META_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.FIND_PREVIOUS, action(KeyEvent.VK_G, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.SYMBOLS, action(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK));
         assertEquals(PlainKeymap.Action.WORKSPACE_SYMBOLS,
             action(KeyEvent.VK_R, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
@@ -49,7 +53,7 @@ class PlainKeymapTest {
         assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_ESCAPE, InputEvent.CTRL_DOWN_MASK));
         assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_S, InputEvent.ALT_DOWN_MASK | InputEvent.CTRL_DOWN_MASK));
         assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK | InputEvent.META_DOWN_MASK));
-        assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.OPEN_FOLDER, action(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.NONE, action(KeyEvent.VK_F1, InputEvent.SHIFT_DOWN_MASK));
     }
 
@@ -59,6 +63,20 @@ class PlainKeymapTest {
         assertEquals(true, InputController.isCommandPaletteShortcut(keyEvent(KeyEvent.VK_P, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)));
         assertEquals(false, InputController.isCommandPaletteShortcut(keyEvent(KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK)));
         assertEquals(false, InputController.isCommandPaletteShortcut(keyEvent(KeyEvent.VK_P, InputEvent.ALT_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)));
+    }
+
+    @Test
+    void openFolderShortcutIsAvailableIndependentlyOfKeymap() {
+        assertEquals(true, InputController.isOpenFolderShortcut(keyEvent(KeyEvent.VK_O, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)));
+        assertEquals(true, InputController.isOpenFolderShortcut(keyEvent(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)));
+        assertEquals(false, InputController.isOpenFolderShortcut(keyEvent(KeyEvent.VK_O, InputEvent.META_DOWN_MASK)));
+    }
+
+    @Test
+    void settingsShortcutIsAvailableIndependentlyOfKeymap() {
+        assertEquals(true, InputController.isSettingsShortcut(keyEvent(KeyEvent.VK_COMMA, InputEvent.META_DOWN_MASK)));
+        assertEquals(true, InputController.isSettingsShortcut(keyEvent(KeyEvent.VK_COMMA, InputEvent.CTRL_DOWN_MASK)));
+        assertEquals(false, InputController.isSettingsShortcut(keyEvent(KeyEvent.VK_COMMA, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)));
     }
 
     @Test

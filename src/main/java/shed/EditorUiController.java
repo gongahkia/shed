@@ -122,12 +122,15 @@ final class EditorUiController {
         editor.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setApplicationIcon();
         applyUiFont();
+        editor.setJMenuBar(ShedMenuBar.create(editor));
+        applyUiFont(editor.getJMenuBar());
         installDialogUiScaling();
         installUiZoomShortcuts();
 
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        editor.setSize(screenSize);
-        editor.setExtendedState(editor.getExtendedState() | JFrame.MAXIMIZED_BOTH);
+        editor.windowPlacementStore = new WindowPlacementStore(
+            java.nio.file.Path.of(editor.configManager.getShedDirectoryPath(), "window-placement.properties"));
+        editor.windowPlacementStore.restore(editor);
         editor.setLayout(new BorderLayout(5, 5));
         editor.editorHostPanel = new JPanel(new BorderLayout());
         editor.editorHostPanel.addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -152,6 +155,9 @@ final class EditorUiController {
         editor.statusBar.setBackground(editor.configManager.getStatusBarBackground());
         editor.statusBar.setOpaque(true);
         editor.statusBar.setForeground(editor.configManager.getStatusBarForeground());
+        editor.positionCue = new JLabel("100%");
+        editor.positionCue.setOpaque(true);
+        AccessibilitySupport.describe(editor.positionCue, "File position", "Visible position in the active file.");
 
         editor.commandBar = new JTextField();
         editor.commandBar.setBackground(editor.configManager.getCommandBarBackground());
@@ -165,7 +171,10 @@ final class EditorUiController {
         initializeCommandPrompt();
 
         editor.footerPanel = new JPanel(new BorderLayout());
-        editor.footerPanel.add(editor.statusBar, BorderLayout.NORTH);
+        JPanel statusRow = new JPanel(new BorderLayout());
+        statusRow.add(editor.statusBar, BorderLayout.CENTER);
+        statusRow.add(editor.positionCue, BorderLayout.EAST);
+        editor.footerPanel.add(statusRow, BorderLayout.NORTH);
         editor.footerPanel.add(editor.commandBar, BorderLayout.SOUTH);
         applyFooterUiMetrics();
 
@@ -177,6 +186,7 @@ final class EditorUiController {
         editor.editorToolSplit.setBorder(BorderFactory.createEmptyBorder());
         // Add components
         editor.add(editor.editorToolSplit, BorderLayout.CENTER);
+        editor.add(editor.inlineFindBar, BorderLayout.NORTH);
         editor.add(editor.footerPanel, BorderLayout.SOUTH);
 
         // Window close handler
@@ -481,6 +491,7 @@ final class EditorUiController {
             if (!event.getValueIsAdjusting()) {
                 editor.handleLargeFileScroll(pane);
                 editor.scheduleSyntaxHighlighting();
+                if (pane == editor.getActivePane()) updatePositionCue();
             }
         });
         paneScrollPane.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -710,6 +721,7 @@ final class EditorUiController {
         editor.lineNumberPanel = pane.getLineNumberPanel();
         editor.editorScrollPane = pane.getScrollPane();
         editor.searchManager = pane.getSearchManager();
+        if (editor.inlineFindBar != null) editor.inlineFindBar.onBufferChanged();
     }
 
 
@@ -936,7 +948,8 @@ final class EditorUiController {
         Color surface = editor.configManager.getNormalColor();
         Color foreground = editor.configManager.getEditorForeground();
         return new UiThemeColors(surface, blend(surface, foreground, 0.07), editor.configManager.getCommandBarBackground(),
-            blend(surface, foreground, 0.18), foreground, blend(foreground, surface, 0.42), editor.configManager.getCaretColor(),
+            blend(surface, foreground, 0.18), foreground,
+            AccessibilitySupport.readableText(blend(foreground, surface, 0.42), surface), editor.configManager.getCaretColor(),
             editor.configManager.getSelectionColor(), editor.configManager.getSelectionTextColor());
     }
 
@@ -1165,6 +1178,11 @@ final class EditorUiController {
         int commandVerticalPadding = UiZoom.scale(4, zoom);
         Font font = resolveUiFont();
         editor.statusBar.setFont(font);
+        if (editor.positionCue != null) {
+            editor.positionCue.setFont(font);
+            editor.positionCue.setBorder(BorderFactory.createEmptyBorder(statusVerticalPadding,
+                UiZoom.scale(10, zoom), statusVerticalPadding, UiZoom.scale(10, zoom)));
+        }
         editor.commandBar.setFont(font);
         editor.statusBar.setBorder(BorderFactory.createEmptyBorder(statusVerticalPadding, UiZoom.scale(10, zoom), statusVerticalPadding, UiZoom.scale(10, zoom)));
         editor.commandBar.setBorder(BorderFactory.createEmptyBorder(commandVerticalPadding, UiZoom.scale(10, zoom), commandVerticalPadding, UiZoom.scale(10, zoom)));
@@ -1364,6 +1382,7 @@ final class EditorUiController {
         if (!statusText.equals(editor.statusBar.getText())) {
             editor.statusBar.setText(statusText);
         }
+        updatePositionCue();
 
         String inlinePeek = inlinePeekMessage(buffer);
         if ((editor.editorState.mode == EditorMode.COMMAND || editor.editorState.mode == EditorMode.SEARCH) && !editor.editorState.commandBuffer.isEmpty()) {
@@ -1390,6 +1409,16 @@ final class EditorUiController {
             statusRefreshTimer.setRepeats(false);
         }
         statusRefreshTimer.restart();
+    }
+
+    private void updatePositionCue() {
+        if (editor.positionCue == null || editor.getActivePane() == null) return;
+        JScrollBar bar = editor.getActivePane().getScrollPane().getVerticalScrollBar();
+        int scrollable = Math.max(0, bar.getMaximum() - bar.getVisibleAmount() - bar.getMinimum());
+        int percent = scrollable == 0 ? 100 : (int) Math.round(100.0 *
+            (bar.getValue() - bar.getMinimum()) / scrollable);
+        String label = Math.max(0, Math.min(100, percent)) + "%";
+        if (!label.equals(editor.positionCue.getText())) editor.positionCue.setText(label);
     }
 
     private String languageDisplayName(FileBuffer buffer) {

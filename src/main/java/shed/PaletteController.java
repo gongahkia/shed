@@ -178,7 +178,8 @@ final class PaletteController {
 
     public String showCommandPalette() {
         List<String> candidates = commandPaletteCandidates();
-        String selected = showPaletteDialog("Command Palette", candidates);
+        String selected = showPaletteDialog("Command Palette", candidates,
+            this::describeCommandPaletteCandidate, commandPaletteRenderer());
         if (selected == null || selected.isEmpty()) return "Command palette cancelled";
         PaletteAction action = surfaceAction(selected);
         return action == null ? "Command palette selection unavailable" : editor.commandHandler.execute(action.command());
@@ -938,14 +939,14 @@ final class PaletteController {
         dialog.add(header, BorderLayout.NORTH);
         JScrollPane sp = new JScrollPane(list) {
             @Override public Dimension getPreferredSize() {
-                return editor.editorUiController.scaleUiDimension(600, 320);
+                return editor.editorUiController.scaleUiDimension(previewProvider == null ? 600 : 520, 320);
             }
         };
         sp.setBorder(null);
         dialog.add(sp, BorderLayout.CENTER);
         if (previewProvider != null) dialog.add(previewArea, BorderLayout.EAST);
         syncPreview.run();
-        Dimension targetSize = previewProvider == null ? new Dimension(620, 400) : new Dimension(720, 420);
+        Dimension targetSize = previewProvider == null ? new Dimension(620, 400) : new Dimension(860, 420);
         editor.editorUiController.prepareDialog(dialog, targetSize.width, targetSize.height);
         dialog.pack();
         dialog.setLocationRelativeTo(editor);
@@ -953,6 +954,44 @@ final class PaletteController {
         filterTimer.stop();
         if (activeFilter[0] != null) activeFilter[0].cancel(true);
         return selection[0];
+    }
+
+    private ListCellRenderer<? super String> commandPaletteRenderer() {
+        return (list, value, index, selected, focused) -> {
+            JPanel row = new JPanel(new BorderLayout(12, 0));
+            row.setBorder(BorderFactory.createEmptyBorder(5, 9, 5, 9));
+            row.setBackground(selected ? list.getSelectionBackground() : list.getBackground());
+            JLabel name = new JLabel(value);
+            name.setFont(list.getFont());
+            name.setForeground(selected ? list.getSelectionForeground() : list.getForeground());
+            row.add(name, BorderLayout.CENTER);
+            String shortcut = commandPaletteShortcut(value);
+            if (!shortcut.isEmpty()) {
+                JLabel keys = new JLabel(shortcut);
+                keys.setFont(list.getFont());
+                keys.setForeground(name.getForeground());
+                row.add(keys, BorderLayout.EAST);
+            }
+            return row;
+        };
+    }
+
+    static String commandPaletteShortcut(String label) {
+        boolean mac = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac");
+        String mod = mac ? "⌘" : "Ctrl+";
+        String shift = mac ? "⇧" : "Shift+";
+        return switch (label == null ? "" : label) {
+            case "Open File" -> mod + "O";
+            case "Open Folder" -> shift + mod + "O";
+            case "File Finder" -> mod + "P";
+            case "Buffer Picker" -> mod + "B";
+            case "Save Current Buffer" -> mod + "S";
+            case "Close Current Buffer" -> mod + "W";
+            case "Quit All" -> mod + "Q";
+            case "Settings" -> mod + ",";
+            case "Show Help" -> "F1";
+            default -> "";
+        };
     }
 
 

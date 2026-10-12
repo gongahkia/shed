@@ -9,6 +9,7 @@ final class PlainKeymap {
         SAVE("w"),
         SAVE_AS(null),
         OPEN("open file"),
+        OPEN_FOLDER("open folder"),
         FIND_FILE("files"),
         FIND(null),
         FIND_NEXT(null),
@@ -52,6 +53,8 @@ final class PlainKeymap {
             return Action.NONE;
         }
         if (event.isAltDown()) {
+            if (event.isMetaDown() && !event.isControlDown() && !event.isShiftDown()
+                && event.getKeyCode() == KeyEvent.VK_F) return Action.REPLACE;
             if (event.isControlDown() || event.isMetaDown() || event.isShiftDown()) return Action.NONE;
             return switch (event.getKeyCode()) {
                 case KeyEvent.VK_UP -> Action.CURSOR_ABOVE;
@@ -70,11 +73,12 @@ final class PlainKeymap {
         return switch (event.getKeyCode()) {
             case KeyEvent.VK_N -> shift ? Action.NONE : Action.NEW;
             case KeyEvent.VK_S -> shift ? Action.SAVE_AS : Action.SAVE;
-            case KeyEvent.VK_O -> shift ? Action.NONE : Action.OPEN;
+            case KeyEvent.VK_O -> shift ? Action.OPEN_FOLDER : Action.OPEN;
             case KeyEvent.VK_P -> shift ? Action.COMMANDS : Action.FIND_FILE;
             case KeyEvent.VK_F -> shift ? Action.NONE : Action.FIND;
-            case KeyEvent.VK_H -> shift ? Action.NONE : Action.REPLACE;
-            case KeyEvent.VK_G -> shift ? Action.NONE : Action.GO_TO_LINE;
+            case KeyEvent.VK_H -> shift || event.isMetaDown() ? Action.NONE : Action.REPLACE;
+            case KeyEvent.VK_G -> event.isMetaDown() ? (shift ? Action.FIND_PREVIOUS : Action.FIND_NEXT)
+                : shift ? Action.NONE : Action.GO_TO_LINE;
             case KeyEvent.VK_R -> shift ? Action.WORKSPACE_SYMBOLS : Action.SYMBOLS;
             case KeyEvent.VK_Z -> shift ? Action.REDO : Action.UNDO;
             case KeyEvent.VK_D -> shift ? Action.NONE : Action.NEXT_SELECTION;

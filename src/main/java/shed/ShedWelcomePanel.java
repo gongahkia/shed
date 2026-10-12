@@ -398,7 +398,7 @@ final class ShedWelcomePanel extends JPanel {
         surface = editor.configManager.getNormalColor();
         brandSurface = shade(surface, 0.18);
         foreground = editor.configManager.getEditorForeground();
-        mutedForeground = blend(foreground, surface, 0.44);
+        mutedForeground = AccessibilitySupport.readableText(blend(foreground, surface, 0.44), surface);
         accent = editor.configManager.getCaretColor();
         keyBackground = blend(editor.configManager.getCommandBarBackground(), Color.BLACK, 0.20);
     }

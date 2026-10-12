@@ -62,7 +62,7 @@ public class ConfigManagerTest {
         assertEquals(KeymapProfile.PLAIN, config.getKeymapProfile());
         assertEquals(LineNumberMode.ABSOLUTE, config.getLineNumberMode());
         assertTrue(config.getHighlightSearch());
-        assertFalse(config.getEditorScrollbarsVisible());
+        assertTrue(config.getEditorScrollbarsVisible());
         assertFalse(config.getSessionRestoreOnStart());
         assertFalse(config.getTerminalSessionRestoreEnabled());
         assertTrue(config.getMarkdownPreviewScrollSync());
@@ -90,6 +90,19 @@ public class ConfigManagerTest {
         assertEquals(new MultiSelectionPolicy(true, MultiSelectionPolicy.DEFAULT_MAX_CURSORS), config.getMultiSelectionPolicy());
         assertFalse(config.hasConfigLoadFailure());
         assertTrue(config.getConfigLoadReport().startsWith("Configuration not found: "));
+    }
+
+    @Test
+    void builtInThemesKeepDerivedSelectionAndLineNumberTextReadable() {
+        System.setProperty("user.home", tempDir.resolve("theme-contrast").toString());
+        ConfigManager config = new ConfigManager();
+        for (String theme : config.getThemeIds()) {
+            config.setTheme(theme);
+            assertTrue(AccessibilitySupport.meetsTextContrast(config.getSelectionTextColor(), config.getSelectionColor()),
+                theme + " selection text");
+            assertTrue(AccessibilitySupport.meetsTextContrast(config.getLineNumberForeground(), config.getLineNumberBackground()),
+                theme + " line numbers");
+        }
     }
 
     @Test

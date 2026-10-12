@@ -32,5 +32,8 @@ class AccessibilitySupportTest {
     void calculatesWcagTextContrast() {
         assertTrue(AccessibilitySupport.meetsTextContrast(Color.WHITE, Color.BLACK));
         assertFalse(AccessibilitySupport.meetsTextContrast(new Color(120, 120, 120), new Color(100, 100, 100)));
+        Color adjusted = AccessibilitySupport.readableText(new Color(120, 120, 120), new Color(100, 100, 100));
+        assertTrue(AccessibilitySupport.meetsTextContrast(adjusted, new Color(100, 100, 100)));
+        assertEquals(Color.WHITE, AccessibilitySupport.readableText(Color.WHITE, Color.BLACK));
     }
 }

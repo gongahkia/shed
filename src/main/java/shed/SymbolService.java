@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.function.BooleanSupplier;
 
 public class SymbolService {
     private final JavaStructuralService javaStructuralService;
@@ -80,52 +81,62 @@ public class SymbolService {
     }
 
     public List<Symbol> collectSymbols(String text, FileType fileType) {
+        return collectSymbols(text, fileType, () -> false);
+    }
+
+    List<Symbol> collectSymbols(String text, FileType fileType, BooleanSupplier cancelled) {
         if (text == null || text.isEmpty()) {
             return Collections.emptyList();
         }
+        if (cancelled.getAsBoolean()) return Collections.emptyList();
         if (fileType == FileType.JAVA) {
             JavaStructuralService.Result result = javaStructuralService.collectSymbols(text);
             if (result.parserAvailable()) return result.symbols();
         }
-        String[] lines = text.split("\\n", -1);
         if (fileType == FileType.MARKDOWN) {
-            return collectMarkdownSymbols(lines);
+            return collectMarkdownSymbols(text, cancelled);
         }
-        return collectCodeSymbols(lines, fileType);
+        return collectCodeSymbols(text, fileType, cancelled);
     }
 
-    private List<Symbol> collectMarkdownSymbols(String[] lines) {
+    private List<Symbol> collectMarkdownSymbols(String text, BooleanSupplier cancelled) {
         List<Symbol> symbols = new ArrayList<>();
-        for (int i = 0; i < lines.length; i++) {
-            Matcher matcher = MARKDOWN_HEADING.matcher(lines[i]);
+        for (int lineNumber = 1, offset = 0; offset <= text.length(); lineNumber++) {
+            if ((lineNumber & 127) == 1 && cancelled.getAsBoolean()) return List.of();
+            int end = text.indexOf('\n', offset);
+            if (end < 0) end = text.length();
+            Matcher matcher = MARKDOWN_HEADING.matcher(text.substring(offset, end));
             if (!matcher.matches()) {
+                if (end == text.length()) break;
+                offset = end + 1;
                 continue;
             }
             int level = matcher.group(1).length();
             String name = matcher.group(2).trim();
             if (!name.isEmpty()) {
-                symbols.add(new Symbol(name, "heading", i + 1, level));
+                symbols.add(new Symbol(name, "heading", lineNumber, level));
             }
+            if (end == text.length()) break;
+            offset = end + 1;
         }
         return symbols;
     }
 
-    private List<Symbol> collectCodeSymbols(String[] lines, FileType fileType) {
+    private List<Symbol> collectCodeSymbols(String text, FileType fileType, BooleanSupplier cancelled) {
         List<Symbol> symbols = new ArrayList<>();
         int braceDepth = 0;
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
-            String trimmed = line == null ? "" : line.trim();
-            if (trimmed.isEmpty() || trimmed.startsWith("//") || trimmed.startsWith("#")) {
-                braceDepth += netBraceDelta(trimmed);
-                continue;
-            }
-
-            if (tryAddSymbol(symbols, i + 1, line, braceDepth, fileType)) {
-                braceDepth += netBraceDelta(trimmed);
-                continue;
+        for (int lineNumber = 1, offset = 0; offset <= text.length(); lineNumber++) {
+            if ((lineNumber & 127) == 1 && cancelled.getAsBoolean()) return List.of();
+            int end = text.indexOf('\n', offset);
+            if (end < 0) end = text.length();
+            String line = text.substring(offset, end);
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty() && !trimmed.startsWith("//") && !trimmed.startsWith("#")) {
+                tryAddSymbol(symbols, lineNumber, line, braceDepth, fileType);
             }
             braceDepth += netBraceDelta(trimmed);
+            if (end == text.length()) break;
+            offset = end + 1;
         }
         return symbols;
     }

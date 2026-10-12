@@ -55,6 +55,7 @@ final class EditorUiController {
     private Timer statusRefreshTimer;
     private long pendingInputNanos;
     private long pendingPaintNanos;
+    private long pendingDocumentNanos;
     private JTextArea pendingPaintArea;
 
     EditorUiController(Texteditor editor) {
@@ -74,21 +75,46 @@ final class EditorUiController {
             // Swing may coalesce several edits into one repaint. Measure the
             // latest edit so an old, unpainted edit cannot inflate the sample.
             pendingPaintNanos = pendingInputNanos;
+            pendingDocumentNanos = now;
             pendingPaintArea = editor.writingArea;
             if (editor.perfService != null) {
                 editor.perfService.recordDuration("edit.input-to-document", pendingInputNanos, "Swing EDT");
+                long inputToDocument = now - pendingInputNanos;
+                if (inputToDocument >= 16_000_000L) {
+                    editor.perfService.recordSlowEdit("document", inputToDocument, inputToDocument, 0L, 0L,
+                        editor.writingArea.getDocument().getLength(), activeJobDescriptions());
+                }
             }
         }
         pendingInputNanos = 0L;
     }
 
-    private void editorPainted(JTextArea area) {
+    private void editorPainted(JTextArea area, long paintStartedAt) {
         if (pendingPaintNanos == 0L || pendingPaintArea != area) return;
         if (editor.perfService != null) {
-            editor.perfService.recordDuration("edit.input-to-paint", pendingPaintNanos, "Swing paint complete");
+            long paintedAt = System.nanoTime();
+            long total = Math.max(0L, paintedAt - pendingPaintNanos);
+            long inputToDocument = Math.max(0L, pendingDocumentNanos - pendingPaintNanos);
+            long documentToPaintStart = Math.max(0L, paintStartedAt - pendingDocumentNanos);
+            long paint = Math.max(0L, paintedAt - paintStartedAt);
+            editor.perfService.recordNanos("edit.input-to-paint", total, "Swing paint complete");
+            editor.perfService.recordNanos("edit.document-to-paint-start", documentToPaintStart, "EDT work and repaint wait");
+            editor.perfService.recordNanos("edit.paint-duration", paint, "Swing editor paint");
+            if (total >= 16_000_000L) {
+                editor.perfService.recordSlowEdit("paint", total, inputToDocument, documentToPaintStart, paint,
+                    area.getDocument().getLength(), activeJobDescriptions());
+            }
         }
         pendingPaintNanos = 0L;
+        pendingDocumentNanos = 0L;
         pendingPaintArea = null;
+    }
+
+    private String activeJobDescriptions() {
+        return editor.asyncJobService.list().stream()
+            .filter(job -> job.getStatus() == AsyncJobService.Status.RUNNING)
+            .limit(4).map(AsyncJobService.JobSnapshot::getDescription)
+            .reduce((left, right) -> left + ", " + right).orElse("none");
     }
 
     void initializeUI() {
@@ -305,6 +331,7 @@ final class EditorUiController {
         JTextArea textArea = new JTextArea() {
             @Override
             protected void paintComponent(Graphics g) {
+                long paintStartedAt = System.nanoTime();
                 if (g instanceof Graphics2D graphics) {
                     applyEditorTextRenderingHints(graphics);
                 }
@@ -360,7 +387,7 @@ final class EditorUiController {
                 if (getLineWrap()) paintWrapIndicators(g, this);
                 paintColorPreviews(g, this);
                 paintExplorerFileDropPreview(g, this);
-                editorPainted(this);
+                editorPainted(this, paintStartedAt);
             }
         };
         textArea.addKeyListener(editor);

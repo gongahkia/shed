@@ -14,6 +14,7 @@ public class LocalPerformanceDiagnosticsTest {
     void overviewLabelsLocalScopeToolStatusAndBenchmarkLimits() {
         PerfService perf = new PerfService();
         perf.recordDuration("open", System.nanoTime(), "buffer=test.txt");
+        perf.recordSlowEdit("paint", 20_000_000L, 1_000_000L, 17_000_000L, 2_000_000L, 10_000, "Symbol cache");
 
         String report = LocalPerformanceDiagnostics.overview(new DiagnosticLog(tempDir.resolve("missing.jsonl")), perf, false);
 
@@ -24,6 +25,10 @@ public class LocalPerformanceDiagnosticsTest {
         assertTrue(report.contains("Timings and heap observations vary"));
         assertTrue(report.contains("edit.input-to-paint measures a key press through Swing paint completion"));
         assertTrue(report.contains("Timing p95 uses the latest 256 samples"));
+        assertTrue(report.contains("Slow edits (at least 16ms"));
+        assertTrue(report.contains("phase=paint"));
+        assertTrue(report.contains("document-to-paint-start=17000us"));
+        assertTrue(report.contains("active-jobs-at-paint=Symbol cache"));
         assertTrue(report.contains(":perf benchmark"));
     }
 

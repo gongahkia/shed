@@ -1636,13 +1636,13 @@ public class Texteditor extends JFrame implements KeyListener {
         String action = argument == null ? "" : argument.trim().toLowerCase(java.util.Locale.ROOT);
         if (action.isEmpty() || "status".equals(action)) {
             PerfService service = perfService == null ? new PerfService() : perfService;
-            showScratchBuffer("[perf]", LocalPerformanceDiagnostics.overview(
+            ShedInformationDialog.showFor(this, "Performance Diagnostics", LocalPerformanceDiagnostics.overview(
                 new DiagnosticLog(errorReporter.getLogPath()), service, sessionConfigController.canBenchmarkWorkspaceIndex()
             ));
             return "Showing local performance diagnostics";
         }
         if ("diagnostics".equals(action) || "log".equals(action)) {
-            showScratchBuffer("[diagnostics]", LocalPerformanceDiagnostics.diagnostics(new DiagnosticLog(errorReporter.getLogPath())));
+            ShedInformationDialog.showFor(this, "Local Diagnostic Log", LocalPerformanceDiagnostics.diagnostics(new DiagnosticLog(errorReporter.getLogPath())));
             return "Showing local diagnostic log";
         }
         if ("benchmark".equals(action)) {
@@ -1657,7 +1657,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String showConfigLoadStatus() {
-        showPlainScratchBuffer("[config status]", configManager.getConfigLoadReport());
+        ShedInformationDialog.showFor(this, "Configuration Status", configManager.getConfigLoadReport());
         return "Showing config status";
     }
 

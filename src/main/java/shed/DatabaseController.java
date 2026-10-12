@@ -195,7 +195,7 @@ final class DatabaseController {
         output.append(":database mysql query \"select 1\"\n:database mysql tables\n:database mysql terminal\n\n");
         output.append("MySQL uses the installed mysql client's option/login configuration, which Shed does not inspect.\n");
         output.append("Shed does not store credentials or connection strings. Prefer a libpq password/service file over PGPASSWORD.\n");
-        editor.showScratchBuffer("[database]", output.toString());
+        ShedInformationDialog.showFor(editor, "Database Status", output.toString());
         return "Showing database CLI status";
     }
 

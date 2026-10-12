@@ -566,7 +566,7 @@ final class LspController {
             if (hoverText == null || hoverText.isBlank()) {
                 return "No hover information";
             }
-            editor.showScratchBuffer("[lsp hover]", hoverText.strip() + "\n");
+            ShedInformationDialog.showFor(editor, "Hover Information", hoverText.strip() + "\n");
             return "Showing hover";
         } catch (BadLocationException e) {
             return "LSP hover failed: " + e.getMessage();
@@ -1197,7 +1197,7 @@ final class LspController {
 
     private void prepareCodeActionPreview(LspClient.CodeAction action) {
         editor.pendingLspCodeAction = action;
-        editor.showScratchBuffer("[lsp code action preview]", buildWorkspaceEditPreview(action.getTitle(), action.getOperations(), new WorkspaceEditApplyResult())
+        ShedInformationDialog.showFor(editor, "Code Action Preview", buildWorkspaceEditPreview(action.getTitle(), action.getOperations(), new WorkspaceEditApplyResult())
             + "\nRun :lsp codeaction apply to confirm, or choose another action to replace this preview.\n");
         editor.showMessage("Prepared code action preview. Run :lsp codeaction apply to confirm.");
     }
@@ -1413,7 +1413,7 @@ final class LspController {
 
 
     LspClient.WorkspaceEditResponse applyWorkspaceEditFromServer(String label, List<LspClient.WorkspaceEditOperation> operations) {
-        editor.showScratchBuffer("[lsp workspace edit review]", buildWorkspaceEditPreview(label, operations, new WorkspaceEditApplyResult())
+        ShedInformationDialog.showFor(editor, "Workspace Edit Review", buildWorkspaceEditPreview(label, operations, new WorkspaceEditApplyResult())
             + "\nServer-originated workspace edits require review and were not applied.\n");
         return new LspClient.WorkspaceEditResponse(false, "workspace edit requires user review");
     }

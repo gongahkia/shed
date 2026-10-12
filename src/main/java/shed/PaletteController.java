@@ -1012,7 +1012,7 @@ final class PaletteController {
         if (lines.isEmpty()) {
             return "No registers populated";
         }
-        editor.showScratchBuffer("[registers]", String.join("\n", lines));
+        ShedInformationDialog.showFor(editor, "Registers", String.join("\n", lines));
         return "Showing registers";
     }
 
@@ -1026,7 +1026,7 @@ final class PaletteController {
         for (java.util.Map.Entry<Character, Integer> entry : buffer.getMarks().entrySet()) {
             lines.add(entry.getKey() + " " + describeOffset(entry.getValue()));
         }
-        editor.showScratchBuffer("[marks]", String.join("\n", lines));
+        ShedInformationDialog.showFor(editor, "Marks", String.join("\n", lines));
         return "Showing marks";
     }
 

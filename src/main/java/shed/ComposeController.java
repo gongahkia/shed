@@ -89,7 +89,7 @@ final class ComposeController {
             .append(":compose up [service...]\n:compose build [service...]\n:compose ps\n:compose logs [service...]\n")
             .append(":compose exec <service> <command...>\n:compose terminal <service> [command...]\n")
             .append(":compose redeploy <service>\n:compose down\n");
-        editor.showScratchBuffer("[docker compose]", output.toString());
+        ShedInformationDialog.showFor(editor, "Compose Status", output.toString());
         return configuration == null ? "No Compose configuration" : "Showing Compose configuration";
     }
 

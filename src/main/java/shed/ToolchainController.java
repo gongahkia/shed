@@ -66,7 +66,7 @@ final class ToolchainController {
             }
         }
         lines.add("Select with: :toolchain select <runtime> <absolute-executable>");
-        editor.showScratchBuffer("[toolchains]", String.join("\n", lines) + "\n");
+        ShedInformationDialog.showFor(editor, "Toolchain Status", String.join("\n", lines) + "\n");
         return "Showing local toolchains";
     }
 

@@ -1198,7 +1198,7 @@ final class TreeGitController {
         if (body.isEmpty()) {
             body = "(clean working tree)";
         }
-        editor.showScratchBuffer("[git status]", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n");
+        ShedInformationDialog.showFor(editor, "Git Status", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n");
         return "Showing git status";
     }
 
@@ -1368,7 +1368,15 @@ final class TreeGitController {
         if (body.isEmpty()) {
             body = "(no branches)";
         }
-        showInteractiveGitBuffer("[git branch]", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n", gitRoot, InteractiveGitView.BRANCHES);
+        GitBranchesDialog.showFor(editor, gitRoot.getAbsolutePath(), body,
+            branch -> {
+                String switched = runGitSwitch(gitRoot, branch);
+                if ("Switch complete".equals(switched)) {
+                    editor.gitBranch = resolveBranchName(gitRoot);
+                    refreshGitGutter();
+                }
+                return switched;
+            }, () -> showGitBranches(gitRoot));
         return "Showing git branches";
     }
 

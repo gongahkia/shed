@@ -46,7 +46,7 @@ public class ConfigManager {
     private DebugAdapterRegistry.Validation debugConfiguration;
 
     // Default configuration values
-    private static final String DEFAULT_THEME = "one-dark-pro";
+    private static final String DEFAULT_THEME = "nib-dark";
     private static final String DEFAULT_COLOR_NORMAL = "#282C34";
     private static final String DEFAULT_COLOR_INSERT = "#2C323C";
     private static final String DEFAULT_COLOR_COMMAND = "#3A3F4B";
@@ -145,6 +145,13 @@ public class ConfigManager {
     private static final Map<String, String> THEME_ALIASES = new HashMap<>();
 
     static {
+        // Nib palette roles from https://github.com/gongahkia/nib (MIT).
+        registerTheme("nib-dark", "Nib Dark",
+            "#181A19", "#20231F", "#272A25", "#2D302B", "#3A272D", "#DDDCD2", "#83A8BB", "#6FA8A0");
+        registerTheme("nib-light", "Nib Light",
+            "#F2F1EC", "#E7E8E4", "#FAFAF7", "#DDE1E0", "#ECD5D0", "#182A38", "#285D7C", "#17666A");
+        THEMES.get("nib-dark").setOverrides(nibOverrides(false));
+        THEMES.get("nib-light").setOverrides(nibOverrides(true));
         // ordered by requested popularity ranking style
         registerTheme("one-dark-pro", "One Dark Pro",
             "#282C34", "#2C323C", "#3A3F4B", "#313A46", "#4B2F3A", "#ABB2BF", "#61AFEF", "#98C379");
@@ -861,7 +868,7 @@ public class ConfigManager {
 
     public String getThemeDisplayName() {
         ThemePalette theme = activeTheme();
-        return theme == null ? "One Dark Pro" : theme.displayName;
+        return theme == null ? "Nib Dark" : theme.displayName;
     }
 
     public String setTheme(String requestedTheme) {
@@ -2201,9 +2208,33 @@ public class ConfigManager {
     private Color getUiColor(String key, Color fallback) {
         String value = config.get(key);
         if (value == null || value.isBlank()) {
-            return fallback;
+            return activeTheme().overrides.getOrDefault(key, fallback);
         }
         return decodeColor(value, fallback);
+    }
+
+    private static Map<String, Color> nibOverrides(boolean light) {
+        String[] roles = light ? new String[] {
+            "#244D68", "#AFC9C3", "#172A38", "#E7E8E4", "#182A38", "#FAFAF7", "#182A38",
+            "#E7E8E4", "#59656A", "#182A38", "#E4E7E4", "#DEC06C",
+            "#173B59", "#17666A", "#59656A", "#536126", "#1F668E", "#77560F", "#684873", "#77560F"
+        } : new String[] {
+            "#C9BE83", "#3A5550", "#E5E2D8", "#20231F", "#DDDCD2", "#272A25", "#DDDCD2",
+            "#20231F", "#969C97", "#DDDCD2", "#222620", "#55502F",
+            "#7795A7", "#6FA8A0", "#969C97", "#A3AE72", "#95B7C8", "#C5A667", "#AF97B7", "#C5A667"
+        };
+        String[] keys = {
+            "ui.caret", "ui.selection", "ui.selection.text", "ui.status.background", "ui.status.foreground",
+            "ui.command.background", "ui.command.foreground", "ui.linenumber.background", "ui.linenumber.foreground",
+            "ui.linenumber.active", "ui.currentline", "ui.substitute.preview", "ui.syntax.keyword", "ui.syntax.string",
+            "ui.syntax.comment", "ui.syntax.type", "ui.syntax.function", "ui.syntax.constant", "ui.syntax.annotation",
+            "ui.syntax.number"
+        };
+        Map<String, Color> overrides = new HashMap<>();
+        for (int index = 0; index < keys.length; index++) {
+            overrides.put(keys[index], Color.decode(roles[index]));
+        }
+        return Map.copyOf(overrides);
     }
 
     private ThemePalette activeTheme() {
@@ -2284,6 +2315,7 @@ public class ConfigManager {
         private final Color foreground;
         private final Color accent;
         private final Color stringAccent;
+        private Map<String, Color> overrides = Map.of();
 
         private ThemePalette(
             String id,
@@ -2307,6 +2339,10 @@ public class ConfigManager {
             this.foreground = decodeColor(foreground, Color.decode("#E6EDF3"));
             this.accent = decodeColor(accent, Color.decode("#58A6FF"));
             this.stringAccent = decodeColor(stringAccent, Color.decode("#7EE787"));
+        }
+
+        private void setOverrides(Map<String, Color> overrides) {
+            this.overrides = Map.copyOf(overrides);
         }
 
         private ThemePreview preview() {

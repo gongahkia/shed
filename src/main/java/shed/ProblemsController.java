@@ -57,10 +57,12 @@ final class ProblemsController {
         if (!filter.isEmpty() && !"ui".equals(filter) && !"all".equals(filter) && !isSeverityFilter(filter)) {
             return "Usage: :problems [ui|text|all|errors|warnings|info|hints|other]";
         }
-        if (editor.toolWindowHost != null) editor.showToolWindow(ToolWindowHost.Tab.PROBLEMS);
+        editor.showToolWindow(ToolWindowHost.Tab.PROBLEMS);
         if (!filter.isEmpty() && !"ui".equals(filter) && editor.toolWindowHost != null) {
             ProblemsToolPanel panel = editor.toolWindowHost.problemsPanel();
             if (panel != null) panel.selectFilter(filter);
+        } else if (!filter.isEmpty() && !"ui".equals(filter) && editor.stagedStartupPending) {
+            editor.pendingStartupProblemsFilter = filter;
         }
         return "Problems panel opened";
     }

@@ -143,6 +143,10 @@ public class Texteditor extends JFrame implements KeyListener {
     boolean suppressDocumentEvents;
     boolean suppressNextTypedChar;
     boolean closingDown;
+    final Font stagedStartupFont;
+    boolean stagedStartupPending;
+    ToolWindowHost.Tab pendingStartupToolTab;
+    String pendingStartupProblemsFilter;
     List<String> recentFiles;
     File recentFilesStore;
     File commandLogStore;
@@ -248,6 +252,8 @@ public class Texteditor extends JFrame implements KeyListener {
         this.errorReporter = errorReporter == null ? new ApplicationErrorReporter() : errorReporter;
         // Initialize managers
         configManager = new ConfigManager();
+        stagedStartupFont = StagedStartupFont.forConfiguration(configManager);
+        stagedStartupPending = stagedStartupFont != null;
         startupProfile.mark("configuration");
         toolchainService = new ToolchainService(Path.of(configManager.getSessionDirectory(), "toolchains"));
         devContainerSessions = new DevContainerSessionService();
@@ -428,10 +434,29 @@ public class Texteditor extends JFrame implements KeyListener {
 
         updateStatusBar();
         startupProfile.mark("status bar");
+        editorUiController.prepareStagedWindow();
 
         this.setVisible(true);
         perfService.recordDuration("startup.window-visible", startupStartedAt, "constructor to visible");
         startupProfile.printAfterVisible();
+        if (stagedStartupPending) {
+            perfService.recordDuration("startup.editor-usable", startupStartedAt, "initial editor buffer visible");
+            Thread.ofPlatform().daemon(true).name("shed-startup-fonts").start(() -> {
+                try {
+                    StagedStartupFont.loadSystemFonts();
+                } catch (RuntimeException error) {
+                    errorReporter.report(error, "startup", "loading system fonts", "docs/EDITING_PERFORMANCE.md");
+                } finally {
+                    SwingUtilities.invokeLater(() -> {
+                        if (closingDown || !isDisplayable()) return;
+                        editorUiController.finishStagedStartup();
+                        perfService.recordDuration("startup.full-ui-ready", startupStartedAt, "menu and footer attached");
+                        startupProfile.printFullUiReady();
+                        promptRecoveryRestoreIfAvailable();
+                    });
+                }
+            });
+        }
         asyncJobService.submit("Startup Git branch", token -> resolveGitBranch(), (job, branch, error) -> {
             if (!closingDown && error == null && branch != null && gitBranch.isEmpty()) {
                 gitBranch = branch;
@@ -446,7 +471,7 @@ public class Texteditor extends JFrame implements KeyListener {
         externalChangeTimer = new Timer(2000, e -> checkForExternalChanges());
         externalChangeTimer.start();
         startRecoverySnapshotTimer();
-        promptRecoveryRestoreIfAvailable();
+        if (!stagedStartupPending) promptRecoveryRestoreIfAvailable();
         fileWatcherService.start();
     }
 
@@ -546,11 +571,14 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     void hideToolWindow() {
+        pendingStartupToolTab = null;
+        pendingStartupProblemsFilter = null;
         editorUiController.hideToolWindow();
     }
 
     void showToolWindow(ToolWindowHost.Tab tab) {
         if (toolWindowHost != null) toolWindowHost.showTab(tab);
+        else if (stagedStartupPending) pendingStartupToolTab = tab;
     }
 
     Font resolveEditorFont() {

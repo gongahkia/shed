@@ -29,4 +29,10 @@ final class StartupProfile {
         System.err.printf("  %-25s %7d ms%n", "JVM launch to visible",
             visibleAtEpochMillis - ManagementFactory.getRuntimeMXBean().getStartTime());
     }
+
+    void printFullUiReady() {
+        if (!enabled) return;
+        System.err.printf("  %-25s %7d ms%n", "JVM launch to full UI",
+            System.currentTimeMillis() - ManagementFactory.getRuntimeMXBean().getStartTime());
+    }
 }

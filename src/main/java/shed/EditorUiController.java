@@ -128,11 +128,15 @@ final class EditorUiController {
         editor.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setApplicationIcon();
         profile.mark("UI application icon");
-        applyUiFontWithProfile(profile);
-        editor.setJMenuBar(ShedMenuBar.create(editor));
-        profile.mark("UI menu");
-        applyUiFont(editor.getJMenuBar());
-        profile.mark("UI menu font");
+        if (editor.stagedStartupPending) {
+            profile.mark("UI font staging");
+        } else {
+            applyUiFontWithProfile(profile);
+            editor.setJMenuBar(ShedMenuBar.create(editor));
+            profile.mark("UI menu");
+            applyUiFont(editor.getJMenuBar());
+            profile.mark("UI menu font");
+        }
         installDialogUiScaling();
         installUiZoomShortcuts();
 
@@ -189,19 +193,20 @@ final class EditorUiController {
         statusRow.add(editor.positionCue, BorderLayout.EAST);
         editor.footerPanel.add(statusRow, BorderLayout.NORTH);
         editor.footerPanel.add(editor.commandBar, BorderLayout.SOUTH);
-        applyFooterUiMetrics();
+        if (!editor.stagedStartupPending) applyFooterUiMetrics();
 
-        editor.toolWindowHost = new ToolWindowHost(editor);
+        if (!editor.stagedStartupPending) editor.toolWindowHost = new ToolWindowHost(editor);
         profile.mark("UI tool window host");
-        editor.toolWindowHost.setVisible(false);
-        editor.editorToolSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, editor.editorHostPanel, editor.toolWindowHost);
+        if (editor.toolWindowHost != null) editor.toolWindowHost.setVisible(false);
+        editor.editorToolSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, editor.editorHostPanel,
+            editor.toolWindowHost == null ? new JPanel() : editor.toolWindowHost);
         editor.editorToolSplit.setResizeWeight(1.0);
         editor.editorToolSplit.setDividerSize(0);
         editor.editorToolSplit.setBorder(BorderFactory.createEmptyBorder());
         // Add components
         editor.add(editor.editorToolSplit, BorderLayout.CENTER);
         editor.add(editor.inlineFindBar, BorderLayout.NORTH);
-        editor.add(editor.footerPanel, BorderLayout.SOUTH);
+        if (!editor.stagedStartupPending) editor.add(editor.footerPanel, BorderLayout.SOUTH);
 
         // Window close handler
         editor.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -828,6 +833,10 @@ final class EditorUiController {
 
     Font resolveEditorFont() {
         int fontSize = UiZoom.scale(editor.configManager.getFontSize(), editor.configManager.getUiZoom());
+        if (editor.stagedStartupPending && editor.stagedStartupFont != null
+            && "Monospaced".equalsIgnoreCase(editor.configManager.getFontFamily())) {
+            return editor.stagedStartupFont.deriveFont((float) fontSize);
+        }
         String configuredFamily = editor.configManager.getFontFamily();
         Font configuredFont = resolveInstalledFont(configuredFamily, fontSize);
         return configuredFont != null ? configuredFont : new Font(Font.MONOSPACED, Font.PLAIN, fontSize);
@@ -891,6 +900,56 @@ final class EditorUiController {
 
     void applyUiFont() {
         applyUiFontWithProfile(null);
+    }
+
+    private void applyStagedFontRecursively(Component component) {
+        Font existing = component.getFont();
+        if (existing != null) {
+            Font temporary = editor.stagedStartupFont.deriveFont(existing.getStyle(), (float) existing.getSize());
+            component.setFont(new FontUIResource(temporary));
+        }
+        if (component instanceof Container container) {
+            for (Component child : container.getComponents()) applyStagedFontRecursively(child);
+        }
+    }
+
+    void prepareStagedWindow() {
+        if (editor.stagedStartupPending) applyStagedFontRecursively(editor.getRootPane());
+    }
+
+    void finishStagedStartup() {
+        if (!editor.stagedStartupPending) return;
+        boolean editorHadFocus = editor.writingArea != null && editor.writingArea.isFocusOwner();
+        editor.stagedStartupPending = false;
+        editor.setJMenuBar(ShedMenuBar.create(editor));
+        editor.add(editor.footerPanel, BorderLayout.SOUTH);
+        applyUiFont();
+        editor.toolWindowHost = new ToolWindowHost(editor);
+        editor.toolWindowHost.setVisible(false);
+        editor.editorToolSplit.setBottomComponent(editor.toolWindowHost);
+        editor.editorToolSplit.setDividerSize(0);
+        editor.editorToolSplit.setDividerLocation(1.0);
+        Font editorFont = resolveEditorFont();
+        for (EditorPane pane : editor.editorPanes) {
+            JTextArea area = pane.getTextArea();
+            area.setFont(editorFont);
+            pane.getScrollPane().getVerticalScrollBar().setUnitIncrement(
+                Math.max(16, area.getFontMetrics(editorFont).getHeight()));
+        }
+        editor.applyThemeColors();
+        editor.revalidate();
+        editor.repaint();
+        if (editor.pendingStartupToolTab != null) {
+            ToolWindowHost.Tab tab = editor.pendingStartupToolTab;
+            editor.pendingStartupToolTab = null;
+            editor.toolWindowHost.showTab(tab);
+            if (tab == ToolWindowHost.Tab.PROBLEMS && editor.pendingStartupProblemsFilter != null) {
+                ProblemsToolPanel panel = editor.toolWindowHost.problemsPanel();
+                if (panel != null) panel.selectFilter(editor.pendingStartupProblemsFilter);
+            }
+        }
+        editor.pendingStartupProblemsFilter = null;
+        if (editorHadFocus) editor.writingArea.requestFocusInWindow();
     }
 
     private void applyUiFontWithProfile(StartupProfile profile) {

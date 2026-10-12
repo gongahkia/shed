@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import java.util.function.BooleanSupplier;
 
 public class SymbolService {
+    static final int MAX_STRUCTURAL_JAVA_CHARS = 750_000;
     private final JavaStructuralService javaStructuralService;
 
     public static final class Symbol {
@@ -89,7 +90,7 @@ public class SymbolService {
             return Collections.emptyList();
         }
         if (cancelled.getAsBoolean()) return Collections.emptyList();
-        if (fileType == FileType.JAVA) {
+        if (fileType == FileType.JAVA && text.length() <= MAX_STRUCTURAL_JAVA_CHARS) {
             JavaStructuralService.Result result = javaStructuralService.collectSymbols(text);
             if (result.parserAvailable()) return result.symbols();
         }
@@ -245,20 +246,27 @@ public class SymbolService {
             return false;
         }
         if (fileType == FileType.JAVASCRIPT || fileType == FileType.TYPESCRIPT) {
-            Matcher classLike = CLASS_LIKE.matcher(value);
-            if (classLike.find()) {
-                symbols.add(new Symbol(classLike.group(2), "class", lineNumber, Math.max(1, braceDepth + 1)));
-                return true;
+            if (value.contains("class") || value.contains("interface") || value.contains("enum")
+                || value.contains("record") || value.contains("struct") || value.contains("trait")) {
+                Matcher classLike = CLASS_LIKE.matcher(value);
+                if (classLike.find()) {
+                    symbols.add(new Symbol(classLike.group(2), "class", lineNumber, Math.max(1, braceDepth + 1)));
+                    return true;
+                }
             }
-            Matcher jsFunction = JS_FUNCTION.matcher(value);
-            if (jsFunction.find()) {
-                symbols.add(new Symbol(jsFunction.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
-                return true;
+            if (value.contains("function")) {
+                Matcher jsFunction = JS_FUNCTION.matcher(value);
+                if (jsFunction.find()) {
+                    symbols.add(new Symbol(jsFunction.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
+                    return true;
+                }
             }
-            Matcher jsArrow = JS_ARROW.matcher(value);
-            if (jsArrow.find()) {
-                symbols.add(new Symbol(jsArrow.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
-                return true;
+            if (value.contains("=>")) {
+                Matcher jsArrow = JS_ARROW.matcher(value);
+                if (jsArrow.find()) {
+                    symbols.add(new Symbol(jsArrow.group(1), "function", lineNumber, Math.max(1, braceDepth + 1)));
+                    return true;
+                }
             }
             return false;
         }

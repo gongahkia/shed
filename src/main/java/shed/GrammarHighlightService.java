@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 
 /** Incremental, stateful lexical grammars for Shed's built-in file types. */
 final class GrammarHighlightService {
@@ -38,13 +39,19 @@ final class GrammarHighlightService {
 
     /** Lexes an immutable background snapshot without sharing an editor cache across threads. */
     List<Token> highlightSnapshot(String text, FileType fileType) {
+        return highlightSnapshot(text, fileType, () -> false);
+    }
+
+    List<Token> highlightSnapshot(String text, FileType fileType, BooleanSupplier cancelled) {
         if (text == null || text.isEmpty()) return List.of();
         FileType type = fileType == null ? FileType.TEXT : fileType;
         List<Token> tokens = new ArrayList<>();
         if (type != FileType.HTML && type != FileType.MARKDOWN) {
             State state = State.normal();
             int lineStart = 0;
+            int line = 0;
             while (lineStart <= text.length()) {
+                if ((line++ & 127) == 0 && cancelled.getAsBoolean()) return List.of();
                 int lineEnd = text.indexOf('\n', lineStart);
                 if (lineEnd < 0) lineEnd = text.length();
                 state = code(text, lineStart, lineEnd, type, state.mode, tokens).withEmbedded(state.embedded, state.marker);
@@ -56,7 +63,9 @@ final class GrammarHighlightService {
         List<Token> lineTokens = new ArrayList<>(8);
         State state = State.normal();
         int lineStart = 0;
+        int line = 0;
         while (lineStart <= text.length()) {
+            if ((line++ & 127) == 0 && cancelled.getAsBoolean()) return List.of();
             int lineEnd = text.indexOf('\n', lineStart);
             if (lineEnd < 0) lineEnd = text.length();
             lineTokens.clear();
@@ -74,9 +83,14 @@ final class GrammarHighlightService {
      * files while retaining correct multiline comment and string state.
      */
     List<Token> highlightViewport(String text, FileType fileType, int visibleStart, int visibleEnd) {
+        return highlightViewport(text, fileType, visibleStart, visibleEnd, () -> false);
+    }
+
+    List<Token> highlightViewport(String text, FileType fileType, int visibleStart, int visibleEnd,
+                                  BooleanSupplier cancelled) {
         if (text == null || text.isEmpty()) return List.of();
         FileType type = fileType == null ? FileType.TEXT : fileType;
-        if (type == FileType.HTML || type == FileType.MARKDOWN) return highlightSnapshot(text, type);
+        if (type == FileType.HTML || type == FileType.MARKDOWN) return highlightSnapshot(text, type, cancelled);
         int start = Math.max(0, Math.min(visibleStart, text.length()));
         int end = Math.max(start, Math.min(visibleEnd, text.length()));
         int firstLine = text.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
@@ -84,7 +98,9 @@ final class GrammarHighlightService {
         if (lastLine < 0) lastLine = text.length();
         State state = State.normal();
         int lineStart = 0;
+        int line = 0;
         while (lineStart < firstLine) {
+            if ((line++ & 127) == 0 && cancelled.getAsBoolean()) return List.of();
             int lineEnd = text.indexOf('\n', lineStart);
             if (lineEnd < 0) lineEnd = text.length();
             state = code(text, lineStart, lineEnd, type, state.mode, null).withEmbedded(state.embedded, state.marker);
@@ -92,6 +108,7 @@ final class GrammarHighlightService {
         }
         List<Token> tokens = new ArrayList<>();
         while (lineStart <= lastLine) {
+            if ((line++ & 127) == 0 && cancelled.getAsBoolean()) return List.of();
             int lineEnd = text.indexOf('\n', lineStart);
             if (lineEnd < 0 || lineEnd > lastLine) lineEnd = lastLine;
             state = code(text, lineStart, lineEnd, type, state.mode, tokens).withEmbedded(state.embedded, state.marker);

@@ -2462,9 +2462,6 @@ final class LspController {
             }
             return new AutomaticLspStart(client, endpoint);
         }, (job, started, error) -> {
-            if (editor.perfService != null && job.getStatus() == AsyncJobService.Status.SUCCEEDED) {
-                editor.perfService.recordDuration("lsp.startup", launchStartedAt, "." + extension);
-            }
             Integer activeJob = automaticLaunchJobs.get(key);
             if (activeJob == null || activeJob != job.getId() || editor.closingDown) {
                 if (started != null) stopLspLater(started.client());
@@ -2472,6 +2469,9 @@ final class LspController {
             }
             automaticLaunchJobs.remove(key);
             if (error != null || started == null || job.getStatus() != AsyncJobService.Status.SUCCEEDED) {
+                if (editor.perfService != null && job.getStatus() == AsyncJobService.Status.FAILED) {
+                    editor.perfService.recordDuration("lsp.startup.failed", launchStartedAt, "." + extension);
+                }
                 failedAutomaticLaunches.add(key);
                 String reason = error == null ? null : error.getMessage();
                 editor.lspErrors.put(key, reason == null || reason.isBlank() ? "language server failed to start" : reason);
@@ -2502,6 +2502,9 @@ final class LspController {
                 editor.problemsController.diagnosticsChanged();
             }));
             editor.lspClients.put(key, client);
+            if (editor.perfService != null) {
+                editor.perfService.recordDuration("lsp.startup", launchStartedAt, "." + extension);
+            }
             if (started.endpoint() == null) remoteLspEndpoints.remove(key);
             else remoteLspEndpoints.put(key, started.endpoint());
             editor.lspErrors.remove(key);

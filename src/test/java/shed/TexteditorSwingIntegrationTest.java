@@ -134,7 +134,10 @@ public class TexteditorSwingIntegrationTest {
         try {
             assertFalse(started.loadedInsideConstructor());
             assertTrue(awaitCurrentFile(started.editor(), file));
-            assertTrue(onEdt(() -> started.editor().perfService.report().contains("startup.files-installed")));
+            String timings = onEdt(() -> started.editor().perfService.report());
+            assertTrue(timings.contains("startup.files-installed"), timings);
+            assertTrue(timings.contains("file.open.load"), timings);
+            assertTrue(timings.contains("file.open.install"), timings);
         } finally {
             disposeEditor(started.editor());
         }
@@ -175,6 +178,7 @@ public class TexteditorSwingIntegrationTest {
                 Thread.sleep(20L);
             }
             assertTrue(connected, "language server did not finish its background startup");
+            assertTrue(onEdt(() -> editor.perfService.report().contains("lsp.startup")));
         } finally {
             disposeEditor(editor);
         }

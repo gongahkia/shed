@@ -50,6 +50,27 @@ public class SymbolServiceTest {
     }
 
     @Test
+    void largeJavaFileKeepsAUsefulOutlineWithoutFullStructuralParsing() {
+        SymbolService service = new SymbolService();
+        String code = "public class Large {\n  public void run() {}\n"
+            + "  // padding\n".repeat(SymbolService.MAX_STRUCTURAL_JAVA_CHARS / 12)
+            + "}\n";
+        assertTrue(code.length() > SymbolService.MAX_STRUCTURAL_JAVA_CHARS);
+
+        List<SymbolService.Symbol> symbols = service.collectSymbols(code, FileType.JAVA);
+        assertEquals(List.of("Large", "run"), symbols.stream().map(SymbolService.Symbol::getName).toList());
+    }
+
+    @Test
+    void javascriptOutlineRecognizesClassesFunctionsAndArrows() {
+        SymbolService service = new SymbolService();
+        String code = "class Application {}\nfunction launch() {}\nconst close = () => {};\n";
+
+        assertEquals(List.of("Application", "launch", "close"),
+            service.collectSymbols(code, FileType.JAVASCRIPT).stream().map(SymbolService.Symbol::getName).toList());
+    }
+
+    @Test
     void collectsLocalGoRustAndCppSymbolsWithoutTreatingControlsAsFunctions() {
         SymbolService service = new SymbolService();
 

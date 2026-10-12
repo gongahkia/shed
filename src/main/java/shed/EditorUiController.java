@@ -120,12 +120,19 @@ final class EditorUiController {
     }
 
     void initializeUI() {
+        initializeUI(new StartupProfile());
+    }
+
+    void initializeUI(StartupProfile profile) {
         editor.setTitle("Shed " + editor.VERSION);
         editor.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setApplicationIcon();
-        applyUiFont();
+        profile.mark("UI application icon");
+        applyUiFontWithProfile(profile);
         editor.setJMenuBar(ShedMenuBar.create(editor));
+        profile.mark("UI menu");
         applyUiFont(editor.getJMenuBar());
+        profile.mark("UI menu font");
         installDialogUiScaling();
         installUiZoomShortcuts();
 
@@ -133,6 +140,7 @@ final class EditorUiController {
         editor.windowPlacementStore = new WindowPlacementStore(
             java.nio.file.Path.of(editor.configManager.getShedDirectoryPath(), "window-placement.properties"));
         editor.windowPlacementStore.restore(editor);
+        profile.mark("UI window placement");
         editor.setLayout(new BorderLayout(5, 5));
         editor.editorHostPanel = new JPanel(new BorderLayout());
         editor.editorHostPanel.addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -146,11 +154,13 @@ final class EditorUiController {
         };
 
         EditorPane initialPane = createEditorPane(screenSize);
+        profile.mark("UI editor pane");
         editor.editorPanes.add(initialPane);
         editor.activePaneIndex = 0;
         bindActivePane(initialPane);
         editor.windowLayoutRoot = WindowLayoutNode.leaf(initialPane);
         renderWindowLayout();
+        profile.mark("UI layout");
 
         // Create footer
         editor.statusBar = new JLabel();
@@ -171,6 +181,7 @@ final class EditorUiController {
         editor.commandBar.setEditable(false);
         editor.commandBar.setFocusable(false);
         initializeCommandPrompt();
+        profile.mark("UI footer input");
 
         editor.footerPanel = new JPanel(new BorderLayout());
         JPanel statusRow = new JPanel(new BorderLayout());
@@ -181,6 +192,7 @@ final class EditorUiController {
         applyFooterUiMetrics();
 
         editor.toolWindowHost = new ToolWindowHost(editor);
+        profile.mark("UI tool window host");
         editor.toolWindowHost.setVisible(false);
         editor.editorToolSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, editor.editorHostPanel, editor.toolWindowHost);
         editor.editorToolSplit.setResizeWeight(1.0);
@@ -198,6 +210,7 @@ final class EditorUiController {
                 editor.handleQuit(false);
             }
         });
+        profile.mark("UI remainder");
     }
 
     private void initializeCommandPrompt() {
@@ -877,11 +890,23 @@ final class EditorUiController {
     }
 
     void applyUiFont() {
+        applyUiFontWithProfile(null);
+    }
+
+    private void applyUiFontWithProfile(StartupProfile profile) {
+        boolean first = true;
         for (Map.Entry<Object, Font> entry : systemUiFonts.entrySet()) {
             UIManager.put(entry.getKey(), new FontUIResource(configuredUiFont(entry.getValue())));
+            if (first) {
+                if (profile != null) profile.mark("UI first font value");
+                first = false;
+            }
         }
+        if (profile != null) profile.mark("UI font values");
         SwingUtilities.updateComponentTreeUI(editor);
+        if (profile != null) profile.mark("UI font tree refresh");
         applyFooterUiMetrics();
+        if (profile != null) profile.mark("UI font footer");
         for (Window window : Window.getWindows()) {
             if (window != editor && window.isDisplayable() && (!(window instanceof JDialog dialog)
                 || !Boolean.TRUE.equals(dialog.getRootPane().getClientProperty(DIALOG_UI_MANAGED_PROPERTY)))) {
@@ -889,6 +914,7 @@ final class EditorUiController {
                 if (window instanceof JDialog dialog) applyDialogSize(dialog);
             }
         }
+        if (profile != null) profile.mark("UI font other windows");
     }
 
     /** Applies the selected Shed palette to every standard Swing surface. */

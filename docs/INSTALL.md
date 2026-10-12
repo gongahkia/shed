@@ -88,6 +88,8 @@ $ mvn -B -q -DskipTests package
 $ java -jar target/shed-2.0.0.jar [path ...]
 ```
 
+`make run` and the `shed` launcher look for Java 21 through `JAVA`, `JAVA_HOME`, the system Java command, macOS `java_home`, and `~/.local/share/shed-tools/jdk-21`. Make targets use Maven from `MVN`, `PATH`, or `~/.local/share/shed-tools/maven/bin/mvn`. An explicit `JAVA` or `JAVA_HOME` must point to Java 21. The user-local locations are optional; install JDK 21 and Maven normally if you prefer.
+
 For a source-checkout launcher, run `make install`; it writes `shed` to `~/.local/bin` and the JAR to `~/.local/lib/shed`. Ensure `~/.local/bin` is on `PATH`, then use `shed .` for the current folder or `shed <relative-or-absolute-path>...` for files and folders. `make run .` provides the same current-folder behavior without installation. Existing directories become workspace folders and open their file tree; relative paths resolve from the terminal's current directory.
 
 The native installers are the supported way to avoid a separate runtime. The source build requires the Maven/JDK toolchain and is not a replacement for public package signing.

@@ -79,7 +79,7 @@ final class PaletteController {
         action("Clear Search Highlights", "search highlights clear", "Clear active search highlights."),
         action("Command Log", "command log", "Open the command log buffer."),
         action("Performance Diagnostics", "perf", "Show local editing, startup, and language-server timings."),
-        action("Show Help", "help open", "Open the built-in help buffer."),
+        action("Show Help", "help open", "Open the searchable Help window."),
         action("About Shed", "about", "Show Shed version and local runtime details."),
 
         action("Format Current Buffer", "format current", "Format the active buffer with its selected formatter."),

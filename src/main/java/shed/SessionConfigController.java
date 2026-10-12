@@ -1362,13 +1362,7 @@ final class SessionConfigController {
 
 
     public void showHelp(String topic) {
-        String normalized = topic == null ? "" : topic.trim().toLowerCase(Locale.ROOT);
-        if (normalized.equals("settings") || normalized.equals("config")) {
-            showTypedSettingsReference();
-            return;
-        }
-        String helpText = getHelpText(topic);
-        openScratchBuffer(topic == null || topic.isEmpty() ? "[help]" : "[help " + topic + "]", helpText, true);
+        ShedHelpDialog.showFor(editor, topic);
     }
 
 

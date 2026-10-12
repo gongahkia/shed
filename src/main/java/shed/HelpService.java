@@ -38,7 +38,7 @@ public class HelpService {
                    "PLAIN PROFILE\n" +
                    "  keymap.profile=plain keeps native text input active and bypasses Vim modes.\n" +
                    "  keymap.profile=emacs enables fixed Emacs chords without Vim modes.\n" +
-                   "  F1 or :help plain/:help emacs lists fixed shortcuts.\n\n" +
+                   "  F1 opens Help; :help plain/:help emacs shows profile shortcuts.\n\n" +
                    "COMMANDS\n" +
                    "  :w [file]      Write current buffer\n" +
                    "  :q / :q!       Close active editor window\n" +
@@ -103,7 +103,7 @@ public class HelpService {
                    "  :config heal   Persist reviewed deterministic config repairs\n" +
                    "  :config status Show config load/recovery details\n" +
                    "  :config reference Open generated typed settings reference\n" +
-                   "  :help settings  Open generated typed settings reference\n" +
+                   "  :help settings  Open the settings help page and reference link\n" +
                    "  :normal keys   Replay normal keys\n" +
                    "  :!cmd          Run shell command (async)\n" +
                    "  :set nu        Enable line numbers\n" +
@@ -127,7 +127,7 @@ public class HelpService {
                    "  \"keybind.<mode>.<lhs>\" = \"<rhs>\"\n" +
                    "  modes: normal/insert/visual/visual_line/replace/command/search/global\n" +
                    "  tokens: <esc> <enter> <tab> <space> <bs> <del> <up>/<down>/<left>/<right> <c-x>\n\n" +
-                   "note: this is a help buffer. use :q to return.\n";
+                   "F1 opens the searchable Help window.\n";
         }
 
         switch (normalizedTopic) {
@@ -166,7 +166,7 @@ public class HelpService {
                     + "Ctrl/Cmd-B       Buffer picker\n"
                     + "Ctrl/Cmd-W       Close active split\n"
                     + "Ctrl/Cmd-Q       Quit (prompts for unsaved changes)\n"
-                    + "F1               This help\n\n"
+                    + "F1               Open Help\n\n"
                     + "Plain bypasses Vim mode handling and keybind.<mode> remaps.\n";
             case "emacs":
                 return "Help: Emacs keymap\n\n"
@@ -179,7 +179,7 @@ public class HelpService {
                     + "C-x b/k             Buffers or kill current buffer\n"
                     + "M-x                 Command palette\n"
                     + "C-g                 Cancel a pending C-x chord\n"
-                    + "C-h or F1           This help\n\n"
+                    + "C-h or F1           Open Help\n\n"
                     + "C-x accepts one next key; unsupported chords are ignored. Emacs bypasses Vim mode handling and keybind.<mode> remaps.\n";
             case "windows":
             case "split":
@@ -372,7 +372,7 @@ public class HelpService {
             default:
                 return "Shed help: " + topic + "\n\n"
                     + "No dedicated topic entry exists yet for this help topic.\n"
-                    + "Use :help for the full command reference.\n";
+                    + "Use :help reference for the full command reference.\n";
         }
     }
 }

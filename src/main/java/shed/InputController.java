@@ -179,6 +179,12 @@ final class InputController {
 
     public void keyPressed(KeyEvent e) {
         if (e != null && e.getComponent() == editor.writingArea) lastKeyPressNanos = System.nanoTime();
+        if (e != null && isCompletionPopupVisible() && e.getKeyCode() == KeyEvent.VK_F6
+            && !e.isAltDown() && !e.isControlDown() && !e.isMetaDown()) {
+            editor.completionList.requestFocusInWindow();
+            e.consume();
+            return;
+        }
         if (isSettingsShortcut(e)) {
             e.consume();
             editor.showMessage(editor.showSettingsInspector());
@@ -2697,7 +2703,7 @@ final class InputController {
         editor.completionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         editor.completionList.setFocusable(true);
         AccessibilitySupport.describe(editor.completionList, "Completion suggestions",
-            "Use Up and Down to choose a suggestion, Enter to insert it, or Escape to close the list.");
+            "Press F6 in the editor to focus this list. Use Up and Down to choose a suggestion, Enter to insert it, or Escape to close the list.");
         editor.completionList.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke("ENTER"), "shed.completion.accept");
         editor.completionList.getActionMap().put("shed.completion.accept", new AbstractAction() {
             @Override public void actionPerformed(java.awt.event.ActionEvent event) { completionPopupAccept(); }
@@ -2768,7 +2774,9 @@ final class InputController {
         String detail = selected.getDetail();
         editor.completionDocumentation.setText(documentation.isBlank() ? detail
             : detail.isBlank() ? documentation : detail + "\n\n" + documentation);
-        setCompletionDocumentationVisible(!editor.completionDocumentation.getText().isBlank());
+        boolean meaningfulDetail = !detail.isBlank() && !"open buffer".equals(detail)
+            && !"current buffer".equals(detail);
+        setCompletionDocumentationVisible(!documentation.isBlank() || meaningfulDetail);
         editor.completionDocumentation.setCaretPosition(0);
         resolveCompletionDocumentation(selected);
     }
@@ -2778,7 +2786,8 @@ final class InputController {
             || completionDocumentationScroll.isVisible() == visible) return;
         completionDocumentationScroll.setVisible(visible);
         completionSplit.setDividerSize(visible ? UiZoom.scale(6, editor.configManager.getUiZoom()) : 0);
-        completionSplit.setDividerLocation(visible ? UiZoom.scale(360, editor.configManager.getUiZoom()) : 1.0);
+        if (visible) completionSplit.setDividerLocation(UiZoom.scale(360, editor.configManager.getUiZoom()));
+        else completionSplit.setDividerLocation(1.0);
         completionSplit.revalidate();
     }
 

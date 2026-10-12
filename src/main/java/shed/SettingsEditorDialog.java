@@ -26,14 +26,15 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextField;
-import javax.swing.JTextArea;
 import javax.swing.ListSelectionModel;
 import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
-import javax.swing.plaf.basic.BasicArrowButton;
+import javax.swing.plaf.basic.BasicHTML;
 import javax.swing.plaf.basic.BasicComboBoxUI;
+import javax.swing.plaf.basic.BasicButtonUI;
+import javax.swing.text.View;
 import javax.swing.border.TitledBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -58,6 +59,7 @@ final class SettingsEditorDialog extends JDialog {
     private final JPanel settings = new SettingsList();
     private JScrollPane settingsScroll;
     private final Timer searchRefresh = new Timer(120, event -> { resetScroll(); refresh(); });
+    private int laidOutDetailWidth = -1;
     private DialogTheme theme;
     private boolean refreshing;
 
@@ -115,12 +117,18 @@ final class SettingsEditorDialog extends JDialog {
         AccessibilitySupport.describe(categories, "Settings categories", "Select a category of typed Shed settings.");
         JScrollPane left = new JScrollPane(categories);
         left.setBorder(titledBorder("Categories"));
+        left.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        left.setPreferredSize(new Dimension(uiPixels(180), uiPixels(400)));
         JScrollPane right = new JScrollPane(settings);
         settingsScroll = right;
         right.setBorder(titledBorder("Settings"));
         right.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        right.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentResized(java.awt.event.ComponentEvent event) { updateDetailWidths(); }
+        });
         javax.swing.JSplitPane split = new javax.swing.JSplitPane(javax.swing.JSplitPane.HORIZONTAL_SPLIT, left, right);
-        split.setResizeWeight(0.19);
+        split.setResizeWeight(0.0);
+        split.setDividerLocation(uiPixels(180));
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(split, BorderLayout.CENTER);
         return panel;
@@ -161,6 +169,7 @@ final class SettingsEditorDialog extends JDialog {
         refreshing = true;
         try {
             settings.removeAll();
+            laidOutDetailWidth = -1;
             theme = DialogTheme.from(editor.configManager);
             String category = categories.getSelectedValue();
             List<TypedSettings.Descriptor> descriptors = editor.configManager.searchTypedSettings(search.getText());
@@ -186,6 +195,7 @@ final class SettingsEditorDialog extends JDialog {
             settings.revalidate();
             settings.repaint();
             if (settingsScroll != null) SwingUtilities.invokeLater(() -> {
+                updateDetailWidths();
                 int max = Math.max(0, settings.getPreferredSize().height - settingsScroll.getViewport().getHeight());
                 settingsScroll.getViewport().setViewPosition(new java.awt.Point(0, Math.min(scrollY, max)));
                 if (focusedKey != null) {
@@ -213,6 +223,29 @@ final class SettingsEditorDialog extends JDialog {
         return null;
     }
 
+    private void updateDetailWidths() {
+        if (settingsScroll == null) return;
+        int width = settingsScroll.getViewport().getWidth() - uiPixels(28);
+        if (width <= 0 || width == laidOutDetailWidth) return;
+        laidOutDetailWidth = width;
+        for (Component row : settings.getComponents()) {
+            if (!(row instanceof JPanel panel)) continue;
+            for (Component child : panel.getComponents()) {
+                if (!(child instanceof JLabel detail)
+                    || !Boolean.TRUE.equals(detail.getClientProperty("shed.setting.description"))) continue;
+                detail.setPreferredSize(null);
+                View html = (View) detail.getClientProperty(BasicHTML.propertyKey);
+                if (html == null) continue;
+                html.setSize(width, 0);
+                int height = (int) Math.ceil(html.getPreferredSpan(View.Y_AXIS));
+                detail.setPreferredSize(new Dimension(width, Math.max(height + 2,
+                    detail.getFontMetrics(detail.getFont()).getHeight())));
+            }
+        }
+        settings.revalidate();
+        settings.repaint();
+    }
+
     private void addDescriptor(TypedSettings.Descriptor descriptor, int row) {
         JPanel panel = new JPanel(new BorderLayout(0, uiPixels(4)));
         panel.setOpaque(true);
@@ -230,15 +263,13 @@ final class SettingsEditorDialog extends JDialog {
         top.add(name, BorderLayout.NORTH);
         top.add(input, BorderLayout.CENTER);
         panel.add(top, BorderLayout.NORTH);
-        JTextArea detail = new JTextArea(descriptor.description() + "  Default: " + descriptor.defaultValue()
-            + "  " + descriptor.allowedValues() + "  " + descriptor.applyBehavior());
-        detail.setEditable(false);
-        detail.setFocusable(false);
-        detail.setLineWrap(true);
-        detail.setWrapStyleWord(true);
+        String detailText = descriptor.description() + "  Default: " + descriptor.defaultValue()
+            + "  " + descriptor.allowedValues() + "  " + descriptor.applyBehavior();
+        JLabel detail = new JLabel("<html>" + escape(detailText) + "</html>");
+        detail.putClientProperty("shed.setting.description", Boolean.TRUE);
+        AccessibilitySupport.describe(detail, descriptor.key() + " description", detailText);
+        detail.setVerticalAlignment(SwingConstants.TOP);
         detail.setOpaque(false);
-        detail.setRows(2);
-        detail.setColumns(24);
         panel.add(detail, BorderLayout.CENTER);
         GridBagConstraints target = constraints(0, row);
         target.weightx = 1;
@@ -256,13 +287,6 @@ final class SettingsEditorDialog extends JDialog {
         String[] choices = choices(descriptor.allowedValues());
         if (choices != null) {
             JComboBox<String> combo = new JComboBox<>(choices);
-            combo.setUI(new BasicComboBoxUI() {
-                @Override protected JButton createArrowButton() {
-                    return new BasicArrowButton(SwingConstants.SOUTH, theme.raised(), theme.border(),
-                        theme.foreground(), theme.border());
-                }
-            });
-            combo.setBorder(BorderFactory.createLineBorder(theme.border()));
             combo.setPreferredSize(new Dimension(uiPixels(220), combo.getPreferredSize().height));
             combo.setEditable(false);
             combo.setRenderer((list, value, index, selected, focused) -> {
@@ -342,8 +366,10 @@ final class SettingsEditorDialog extends JDialog {
             panel.setBackground(theme.surface());
             panel.setForeground(theme.foreground());
         }
-        if (component instanceof JLabel label) label.setForeground(theme.foreground());
+        if (component instanceof JLabel label) label.setForeground(
+            Boolean.TRUE.equals(label.getClientProperty("shed.setting.description")) ? theme.muted() : theme.foreground());
         if (component instanceof JButton button) {
+            if (Boolean.TRUE.equals(button.getClientProperty("shed.setting.combo.arrow"))) button.setUI(new BasicButtonUI());
             button.setOpaque(true);
             button.setContentAreaFilled(true);
             button.setBackground(theme.raised());
@@ -360,18 +386,25 @@ final class SettingsEditorDialog extends JDialog {
             field.setSelectedTextColor(theme.selectionText());
             field.setBorder(BorderFactory.createLineBorder(theme.border()));
         }
-        if (component instanceof JTextArea area) {
-            area.setForeground(theme.muted());
-        }
         if (component instanceof JCheckBox box) {
             box.setOpaque(true);
             box.setBackground(theme.surface());
             box.setForeground(theme.foreground());
         }
         if (component instanceof JComboBox<?> combo) {
+            combo.setUI(new BasicComboBoxUI() {
+                @Override protected JButton createArrowButton() {
+                    JButton arrow = new JButton("▾");
+                    arrow.putClientProperty("shed.setting.combo.arrow", Boolean.TRUE);
+                    arrow.setFocusable(false);
+                    arrow.setMargin(new Insets(0, uiPixels(8), 0, uiPixels(8)));
+                    return arrow;
+                }
+            });
             combo.setOpaque(true);
             combo.setBackground(theme.field());
             combo.setForeground(theme.foreground());
+            combo.setBorder(BorderFactory.createLineBorder(theme.border()));
         }
         if (component instanceof JList<?> list) {
             list.setBackground(theme.raised());
@@ -400,6 +433,11 @@ final class SettingsEditorDialog extends JDialog {
         return new Color((int) Math.round(first.getRed() * (1.0 - ratio) + second.getRed() * ratio),
             (int) Math.round(first.getGreen() * (1.0 - ratio) + second.getGreen() * ratio),
             (int) Math.round(first.getBlue() * (1.0 - ratio) + second.getBlue() * ratio));
+    }
+
+    private static String escape(String value) {
+        return (value == null ? "" : value).replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace("\n", "<br>");
     }
 
     private static final class SettingsList extends JPanel implements Scrollable {

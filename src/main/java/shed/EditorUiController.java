@@ -8,6 +8,8 @@ import javax.swing.event.DocumentListener;
 import javax.swing.event.PopupMenuEvent;
 import javax.swing.event.PopupMenuListener;
 import javax.swing.plaf.FontUIResource;
+import javax.swing.plaf.basic.BasicMenuBarUI;
+import javax.swing.plaf.basic.BasicMenuUI;
 import javax.swing.table.JTableHeader;
 import javax.swing.text.JTextComponent;
 import javax.swing.text.BadLocationException;
@@ -954,6 +956,13 @@ final class EditorUiController {
     }
 
     private void applyUiThemeRecursively(Component component, UiThemeColors colors) {
+        if (component instanceof JMenuBar menuBar) {
+            if (useEmbeddedMacMenuStyle()) menuBar.setUI(new BasicMenuBarUI());
+            menuBar.setOpaque(true);
+            menuBar.setBackground(colors.surface());
+            menuBar.setForeground(colors.foreground());
+        }
+        if (component instanceof JMenu menu && useEmbeddedMacMenuStyle()) menu.setUI(new BasicMenuUI());
         if (component instanceof JPanel panel) {
             panel.setBackground(colors.surface());
             panel.setForeground(colors.foreground());
@@ -1020,6 +1029,11 @@ final class EditorUiController {
         if (component instanceof Container container) {
             for (Component child : container.getComponents()) applyUiThemeRecursively(child, colors);
         }
+    }
+
+    private static boolean useEmbeddedMacMenuStyle() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")
+            && !Boolean.getBoolean("apple.laf.useScreenMenuBar");
     }
 
     private static void putUiColor(Color color, String... keys) {
@@ -1413,6 +1427,11 @@ final class EditorUiController {
 
     private void updatePositionCue() {
         if (editor.positionCue == null || editor.getActivePane() == null) return;
+        FileBuffer buffer = editor.getCurrentBuffer();
+        boolean show = buffer != null && (editor.paneBufferController == null
+            || !editor.paneBufferController.isNativeWelcomeBuffer(buffer));
+        editor.positionCue.setVisible(show);
+        if (!show) return;
         JScrollBar bar = editor.getActivePane().getScrollPane().getVerticalScrollBar();
         int scrollable = Math.max(0, bar.getMaximum() - bar.getVisibleAmount() - bar.getMinimum());
         int percent = scrollable == 0 ? 100 : (int) Math.round(100.0 *

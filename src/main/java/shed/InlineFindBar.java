@@ -146,7 +146,23 @@ final class InlineFindBar extends JPanel {
             field.setSelectionColor(editor.configManager.getSelectionColor());
             field.setSelectedTextColor(editor.configManager.getSelectionTextColor());
         }
+        styleButtons(this);
         repaint();
+    }
+
+    private void styleButtons(java.awt.Container parent) {
+        for (java.awt.Component child : parent.getComponents()) {
+            if (child instanceof JButton button) {
+                button.setOpaque(true);
+                button.setContentAreaFilled(true);
+                button.setBackground(editor.configManager.getStatusBarBackground());
+                button.setForeground(editor.configManager.getCommandBarForeground());
+                button.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(editor.configManager.getSelectionColor()),
+                    BorderFactory.createEmptyBorder(4, 9, 4, 9)));
+            }
+            if (child instanceof java.awt.Container nested) styleButtons(nested);
+        }
     }
 
     private void showMode(Mode nextMode, String initial) {

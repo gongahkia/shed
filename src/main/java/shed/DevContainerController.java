@@ -48,7 +48,10 @@ final class DevContainerController {
 
     private String showConfiguration() {
         Path configuration = configuration();
-        if (configuration == null) return "No .devcontainer/devcontainer.json in the active workspace";
+        if (configuration == null) {
+            ShedInformationDialog.showFor(editor, "Dev Container", "No .devcontainer/devcontainer.json in the active workspace.");
+            return "Showing Dev Container configuration";
+        }
         try {
             String text = Files.readString(configuration, StandardCharsets.UTF_8);
             DevContainerSessionService.Connection connection = sessions == null ? null : sessions.connectionFor(workspace());

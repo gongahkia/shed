@@ -43,6 +43,64 @@ public class TexteditorSwingIntegrationTest {
     Path tempDir;
 
     @Test
+    void paletteInformationAndMarkdownOutlineOpenWindowsWithoutReplacingTheDocument() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-information-pages");
+        Files.createDirectories(home);
+        Path markdown = tempDir.resolve("outline.md");
+        Files.writeString(markdown, "# First\nSome text\n## Second\n", StandardCharsets.UTF_8);
+        Texteditor editor = createEditor(home, markdown);
+        try {
+            FileBuffer source = onEdt(editor::getCurrentBuffer);
+            int bufferCount = onEdt(() -> editor.buffers.size());
+            onEdt(() -> {
+                editor.showPerfReport();
+                editor.showConfigLoadStatus();
+                editor.showTableOfContents();
+                return null;
+            });
+            assertSame(source, onEdt(editor::getCurrentBuffer));
+            assertEquals(bufferCount, onEdt(() -> editor.buffers.size()));
+            assertTrue(onEdt(() -> Arrays.stream(editor.getOwnedWindows())
+                .anyMatch(window -> window instanceof ShedInformationDialog dialog && dialog.isDisplayable())));
+            assertTrue(onEdt(() -> Arrays.stream(editor.getOwnedWindows())
+                .anyMatch(window -> window instanceof MarkdownOutlineDialog dialog && dialog.isDisplayable())));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void gitStatusAndBranchesOpenWindowsWithoutReplacingTheDocument() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-git-pages");
+        Path repository = tempDir.resolve("git-pages");
+        Files.createDirectories(home);
+        Files.createDirectories(repository);
+        initializeGit(repository);
+        Path file = repository.resolve("notes.txt");
+        Files.writeString(file, "notes\n", StandardCharsets.UTF_8);
+        Texteditor editor = createEditor(home, file);
+        try {
+            FileBuffer source = onEdt(editor::getCurrentBuffer);
+            int bufferCount = onEdt(() -> editor.buffers.size());
+            onEdt(() -> {
+                editor.handleGitCommand("status");
+                editor.handleGitCommand("branches");
+                return null;
+            });
+            assertSame(source, onEdt(editor::getCurrentBuffer));
+            assertEquals(bufferCount, onEdt(() -> editor.buffers.size()));
+            assertTrue(onEdt(() -> Arrays.stream(editor.getOwnedWindows())
+                .anyMatch(window -> window instanceof ShedInformationDialog dialog && dialog.isDisplayable())));
+            assertTrue(onEdt(() -> Arrays.stream(editor.getOwnedWindows())
+                .anyMatch(window -> window instanceof GitBranchesDialog dialog && dialog.isDisplayable())));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void stagedStartupKeepsTypingWhenFullUiAppears() throws Exception {
         assumeSwingAvailable();
         assumeTrue(System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac"));

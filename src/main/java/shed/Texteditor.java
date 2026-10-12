@@ -1638,7 +1638,7 @@ public class Texteditor extends JFrame implements KeyListener {
             PerfService service = perfService == null ? new PerfService() : perfService;
             ShedInformationDialog.showFor(this, "Performance Diagnostics", LocalPerformanceDiagnostics.overview(
                 new DiagnosticLog(errorReporter.getLogPath()), service, sessionConfigController.canBenchmarkWorkspaceIndex()
-            ));
+            ), "Run workspace benchmark", () -> showMessage(showPerfReport("benchmark")));
             return "Showing local performance diagnostics";
         }
         if ("diagnostics".equals(action) || "log".equals(action)) {

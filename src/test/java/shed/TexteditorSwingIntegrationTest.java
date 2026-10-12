@@ -33,6 +33,7 @@ import java.util.concurrent.Callable;
 import javax.swing.SwingUtilities;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
+import javax.swing.JTextArea;
 import javax.swing.UIManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,6 +41,53 @@ import org.junit.jupiter.api.io.TempDir;
 public class TexteditorSwingIntegrationTest {
     @TempDir
     Path tempDir;
+
+    @Test
+    void stagedStartupKeepsTypingWhenFullUiAppears() throws Exception {
+        assumeSwingAvailable();
+        assumeTrue(System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac"));
+        assumeTrue(Files.isReadable(Path.of("/System/Library/Fonts/SFNSMono.ttf")));
+        Path home = tempDir.resolve("home-staged-startup");
+        Files.createDirectories(home);
+
+        Texteditor editor = createEmptyEditor(home);
+        try {
+            assumeTrue(editor.stagedStartupFont != null);
+            JTextArea area = onEdt(() -> editor.writingArea);
+            FileBuffer buffer = onEdt(editor::getCurrentBuffer);
+            assertTrue(onEdt(area::isEditable));
+            boolean fontsStillLoading = onEdt(() -> editor.stagedStartupPending);
+            if (fontsStillLoading) {
+                assertTrue(onEdt(() -> editor.getJMenuBar() == null));
+                assertTrue(onEdt(() -> editor.footerPanel.getParent() == null));
+                assertTrue(onEdt(() -> editor.toolWindowHost == null));
+            }
+            long inputStartedAt = System.nanoTime();
+            onEdt(() -> { area.replaceSelection("typed during startup"); return null; });
+            if (fontsStillLoading) {
+                assertTrue(System.nanoTime() - inputStartedAt < TimeUnit.SECONDS.toNanos(2),
+                    "the editor event thread waited for system fonts");
+            }
+            onEdt(() -> { editor.showToolWindow(ToolWindowHost.Tab.PROBLEMS); return null; });
+
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+            while (onEdt(() -> editor.stagedStartupPending) && System.nanoTime() < deadline) {
+                Thread.sleep(40);
+            }
+
+            assertFalse(onEdt(() -> editor.stagedStartupPending), "full UI did not attach");
+            assertSame(area, onEdt(() -> editor.writingArea));
+            assertSame(buffer, onEdt(editor::getCurrentBuffer));
+            assertEquals("typed during startup", onEdt(area::getText));
+            assertEquals("Monospaced", onEdt(() -> area.getFont().getName()));
+            assertNotNull(onEdt(editor::getJMenuBar));
+            assertSame(editor.getContentPane(), onEdt(() -> editor.footerPanel.getParent()));
+            assertNotNull(onEdt(() -> editor.toolWindowHost));
+            assertTrue(onEdt(() -> editor.toolWindowHost.isSelected(ToolWindowHost.Tab.PROBLEMS)));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
 
     @Test
     void openEditWriteRoundTrip() throws Exception {

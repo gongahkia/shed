@@ -87,7 +87,9 @@ final class FocusModeController {
             editor.treePane.setHiddenByFocusMode(false);
         }
         if (editor.toolWindowHost != null) {
-            editor.toolWindowHost.restoreAfterFocusMode(toolWindowVisibleBeforeGoyo);
+            if (editor.toolWindowHost != null) {
+                editor.toolWindowHost.restoreAfterFocusMode(toolWindowVisibleBeforeGoyo);
+            }
         }
         if (minimapVisibleBeforeGoyo && editor.activeMinimapPanel == null) {
             EditorPane previous = editor.getActivePane();

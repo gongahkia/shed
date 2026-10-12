@@ -135,7 +135,6 @@ public class ConfigManager {
     private static final String DEFAULT_UPDATES_METADATA_PUBLIC_KEY = "";
     private static final int DEFAULT_UPDATES_CHECK_TIMEOUT_MS = 5000;
     private static final boolean DEFAULT_DEBUG_OPEN_SOURCE_ON_STOP = true;
-    private static final int DEFAULT_LANDING_REMOTE_TIMEOUT_MS = 5000;
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "config.toml";
     private static final String PROJECT_CONFIG_NAME = ".shed.toml";
@@ -143,6 +142,14 @@ public class ConfigManager {
 
     private static final Map<String, ThemePalette> THEMES = new LinkedHashMap<>();
     private static final Map<String, String> THEME_ALIASES = new HashMap<>();
+    private static final String[] NIB_DARK_ANSI = {
+        "#232622", "#C1777D", "#98A56C", "#B89A60", "#779BAF", "#A88FAF", "#669D97", "#B9BDB6",
+        "#7C8580", "#D48A90", "#AEBB79", "#CDAE6C", "#8AAFC2", "#BBA0C1", "#76AEA7", "#DDDCD2"
+    };
+    private static final String[] NIB_LIGHT_ANSI = {
+        "#1D2B36", "#8D3342", "#526126", "#76540B", "#285D7C", "#70446F", "#17666A", "#4F5960",
+        "#5C686E", "#A22F42", "#62721F", "#8A5B00", "#176594", "#82487B", "#006E74", "#303F49"
+    };
 
     static {
         // Nib palette roles from https://github.com/gongahkia/nib (MIT).
@@ -150,6 +157,7 @@ public class ConfigManager {
             "#181A19", "#20231F", "#272A25", "#2D302B", "#3A272D", "#DDDCD2", "#83A8BB", "#6FA8A0");
         registerTheme("nib-light", "Nib Light",
             "#F2F1EC", "#E7E8E4", "#FAFAF7", "#DDE1E0", "#ECD5D0", "#182A38", "#285D7C", "#17666A");
+        THEME_ALIASES.put("nib", "nib-dark");
         THEMES.get("nib-dark").setOverrides(nibOverrides(false));
         THEMES.get("nib-light").setOverrides(nibOverrides(true));
         // ordered by requested popularity ranking style
@@ -308,10 +316,6 @@ public class ConfigManager {
         defineDefault("terminal.session.restore", DEFAULT_TERMINAL_SESSION_RESTORE);
         defineDefault("terminal.shell.integration", DEFAULT_TERMINAL_SHELL_INTEGRATION);
         defineDefault("snippets.directory", defaultSnippetsDirectoryPath());
-        defineDefault("landing.welcome.enabled", true);
-        defineDefault("landing.source", defaultLandingSourcePath());
-        defineDefault("landing.remote.cache.path", defaultLandingRemoteCachePath());
-        defineDefault("landing.remote.timeout.ms", DEFAULT_LANDING_REMOTE_TIMEOUT_MS);
         defineDefault("workspace.index.enabled", DEFAULT_WORKSPACE_INDEX_ENABLED);
         defineDefault("large.file.threshold.mb", DEFAULT_LARGE_FILE_THRESHOLD_MB);
         defineDefault("large.file.line.threshold", DEFAULT_LARGE_FILE_LINE_THRESHOLD);
@@ -450,10 +454,6 @@ public class ConfigManager {
             case "session.dir" -> "Directory for saved sessions";
             case "terminal.session.restore" -> "Persist terminal panel working directories and restore fresh shells";
             case "snippets.directory" -> "Directory containing VS Code-compatible JSON snippet files";
-            case "landing.welcome.enabled" -> "Show the native welcome screen for an untouched default landing source";
-            case "landing.source" -> "Local path, file URI, or explicitly configured HTTPS landing-page source";
-            case "landing.remote.cache.path" -> "Local file used to cache an HTTPS landing-page source";
-            case "landing.remote.timeout.ms" -> "HTTPS landing-page connection and request timeout";
             case "workspace.index.enabled" -> "Enable persisted Git-ignore-aware workspace indexing";
             case "large.file.threshold.mb" -> "Large-file size threshold in megabytes";
             case "large.file.line.threshold" -> "Large-file line-count threshold";
@@ -766,6 +766,44 @@ public class ConfigManager {
         return getUiColor("ui.foreground", activeTheme().foreground);
     }
 
+    Color getRaisedSurfaceColor() {
+        ThemePalette theme = activeTheme();
+        return theme.overrides.getOrDefault("theme.surface.elevated", blend(theme.normal, theme.foreground, 0.07));
+    }
+
+    Color getFloatingSurfaceColor() {
+        ThemePalette theme = activeTheme();
+        return theme.overrides.getOrDefault("theme.surface.floating", getCommandBarBackground());
+    }
+
+    Color getSubtleBorderColor() {
+        ThemePalette theme = activeTheme();
+        return theme.overrides.getOrDefault("theme.border.subtle", blend(theme.normal, theme.foreground, 0.18));
+    }
+
+    Color getMutedForegroundColor() {
+        ThemePalette theme = activeTheme();
+        return theme.overrides.getOrDefault("theme.foreground.muted",
+            AccessibilitySupport.readableText(blend(theme.foreground, theme.normal, 0.42), theme.normal));
+    }
+
+    Color getFocusColor() {
+        ThemePalette theme = activeTheme();
+        return theme.overrides.getOrDefault("theme.focus", getCaretColor());
+    }
+
+    Color[] getThemeAnsiColors() {
+        String[] source = switch (getThemeId()) {
+            case "nib-dark" -> NIB_DARK_ANSI;
+            case "nib-light" -> NIB_LIGHT_ANSI;
+            default -> null;
+        };
+        if (source == null) return null;
+        Color[] colors = new Color[source.length];
+        for (int index = 0; index < source.length; index++) colors[index] = Color.decode(source[index]);
+        return colors;
+    }
+
     public Color getCaretColor() {
         return getUiColor("ui.caret", activeTheme().accent);
     }
@@ -779,7 +817,8 @@ public class ConfigManager {
         if (config.containsKey("ui.selection.text")) {
             return getUiColor("ui.selection.text", activeTheme().foreground);
         }
-        return AccessibilitySupport.readableText(activeTheme().foreground, getSelectionColor());
+        return getUiColor("ui.selection.text",
+            AccessibilitySupport.readableText(activeTheme().foreground, getSelectionColor()));
     }
 
     public Color getStatusBarBackground() {
@@ -810,7 +849,8 @@ public class ConfigManager {
         if (config.containsKey("ui.linenumber.foreground")) {
             return getUiColor("ui.linenumber.foreground", theme.foreground);
         }
-        return AccessibilitySupport.readableText(blend(theme.foreground, theme.normal, 0.40), getLineNumberBackground());
+        return getUiColor("ui.linenumber.foreground",
+            AccessibilitySupport.readableText(blend(theme.foreground, theme.normal, 0.40), getLineNumberBackground()));
     }
 
     public Color getLineNumberActiveForeground() {
@@ -820,6 +860,14 @@ public class ConfigManager {
     public Color getCurrentLineHighlightColor() {
         ThemePalette theme = activeTheme();
         return getUiColor("ui.currentline", blend(theme.normal, theme.foreground, 0.14));
+    }
+
+    public Color getSearchHighlightColor() {
+        return getUiColor("ui.search.background", new Color(0x5B8C2A));
+    }
+
+    public Color getCurrentSearchHighlightColor() {
+        return getUiColor("ui.search.current.background", new Color(0xE07A5F));
     }
 
     public Color getSubstitutePreviewColor() {
@@ -1014,24 +1062,6 @@ public class ConfigManager {
             return defaultSessionDirectoryPath();
         }
         return configured.trim();
-    }
-
-    public String getLandingSource() {
-        String configured = getString("landing.source", defaultLandingSourcePath());
-        return configured == null || configured.isBlank() ? defaultLandingSourcePath() : configured.trim();
-    }
-
-    public boolean getLandingWelcomeEnabled() {
-        return getBoolean("landing.welcome.enabled", true);
-    }
-
-    public String getLandingRemoteCachePath() {
-        String configured = getString("landing.remote.cache.path", defaultLandingRemoteCachePath());
-        return configured == null || configured.isBlank() ? defaultLandingRemoteCachePath() : configured.trim();
-    }
-
-    public int getLandingRemoteTimeoutMs() {
-        return getInt("landing.remote.timeout.ms", DEFAULT_LANDING_REMOTE_TIMEOUT_MS);
     }
 
     public boolean getTerminalSessionRestoreEnabled() {
@@ -1911,14 +1941,6 @@ public class ConfigManager {
         return Path.of(shedDirectoryPath).resolve(SHED_SESSIONS_NAME).toString();
     }
 
-    private String defaultLandingSourcePath() {
-        return Path.of(shedDirectoryPath).resolve("landing.md").toString();
-    }
-
-    private String defaultLandingRemoteCachePath() {
-        return Path.of(shedDirectoryPath).resolve("landing.remote.md").toString();
-    }
-
     private void restoreProjectOverrides() {
         for (Map.Entry<String, String> entry : projectPreviousValues.entrySet()) {
             String key = entry.getKey();
@@ -2234,6 +2256,15 @@ public class ConfigManager {
         for (int index = 0; index < keys.length; index++) {
             overrides.put(keys[index], Color.decode(roles[index]));
         }
+        overrides.put("theme.surface.elevated", Color.decode(light ? "#E7E8E4" : "#20231F"));
+        overrides.put("theme.surface.floating", Color.decode(light ? "#FAFAF7" : "#272A25"));
+        overrides.put("theme.border.subtle", Color.decode(light ? "#AAA18D" : "#424A44"));
+        overrides.put("theme.foreground.muted", Color.decode(light ? "#59656A" : "#969C97"));
+        overrides.put("theme.focus", Color.decode(light ? "#315D78" : "#82A6B6"));
+        // Swing's highlight painter keeps the editor foreground, so use Nib's
+        // match and search surfaces that remain readable with that foreground.
+        overrides.put("ui.search.background", Color.decode(light ? "#CAD7B4" : "#394835"));
+        overrides.put("ui.search.current.background", Color.decode(light ? "#DEC06C" : "#55502F"));
         return Map.copyOf(overrides);
     }
 

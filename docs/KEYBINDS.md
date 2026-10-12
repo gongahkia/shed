@@ -209,7 +209,7 @@ Multi-selection is enabled by default; set ``multi.selection.enabled = false`` t
 | Key-binds | Function |
 | :---: | :---: |
 | `:w` | Save changes to file |
-| `:q` | Close the active editor window, or its last buffer and show the landing page (prompts if unsaved changes) |
+| `:q` | Close the active editor window, or its last buffer and show an empty buffer (prompts if unsaved changes) |
 | `:q!` | Close the active editor window without the unsaved-changes prompt |
 | `:wq` or `:x` | Save and close the active editor window |
 | `:e filename` | Edit file (add to buffers) |

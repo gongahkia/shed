@@ -1,6 +1,6 @@
 # Desktop UI and UX audit
 
-This review covers Shed's welcome screen, editor, settings, command palette, completion popup, menus, and window layout. It applies the typography, surfaces, motion, icons, and performance checks from the `make-interfaces-feel-better` skill to the existing Swing UI. The editor's typing path remains free of decorative animation.
+This review covers Shed's editor, settings, command palette, completion popup, menus, and window layout. It applies the typography, surfaces, motion, icons, and performance checks from the `make-interfaces-feel-better` skill to the existing Swing UI. The editor's typing path remains free of decorative animation.
 
 ## Coverage
 
@@ -34,7 +34,7 @@ This review covers Shed's welcome screen, editor, settings, command palette, com
 
 ## Verification
 
-Automated checks cover all built-in theme contrast values, the folder shortcut, window geometry, live replacement and undo, menu presence, scrollbar defaults, and repeated completion popup updates. Rendered Swing captures were checked for the welcome, editor, settings, inline find, and compact completion states. The local `:perf` view now includes `completion.input-to-paint`; actual latency remains workload and machine dependent.
+Automated checks cover all built-in theme contrast values, the folder shortcut, window geometry, live replacement and undo, menu presence, scrollbar defaults, and repeated completion popup updates. Rendered Swing captures were checked for the editor, settings, inline find, and compact completion states. The local `:perf` view now includes `completion.input-to-paint`; actual latency remains workload and machine dependent.
 
 The full suite ran 926 tests with nine failures. All nine also fail on the original `613c75a5` revision on this machine; they concern remote or container task routing, debug setup, and `/var` versus `/private/var` paths. The original revision ran 919 tests with ten failures, including a dialog zoom assertion that assumed a wider screen than this machine has. The revised zoom check respects the existing screen-size clamp. Focused tests for the changed UI paths pass.
 

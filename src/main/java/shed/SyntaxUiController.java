@@ -483,11 +483,12 @@ final class SyntaxUiController {
 
         for (EditorPane pane : editor.editorPanes) {
             JTextArea area = pane.getTextArea();
+            pane.getSearchManager().setHighlightColors(editor.configManager.getSearchHighlightColor(),
+                editor.configManager.getCurrentSearchHighlightColor());
             area.setForeground(editorForeground);
             area.setCaretColor(caretColor);
             area.setSelectionColor(selectionColor);
             area.setSelectedTextColor(selectionTextColor);
-            if (pane.getAlternateComponent() instanceof ShedWelcomePanel welcome) welcome.refreshAppearance();
             if (pane.getAlternateComponent() instanceof FileTreePanel explorer) explorer.refreshAppearance();
         }
 

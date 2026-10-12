@@ -17,8 +17,8 @@ public class SearchManager {
     private final List<Integer> matchLengths; // parallel to matchPositions for variable-length regex matches
     private int currentMatchIndex;
     private final JTextComponent textArea;
-    private final Highlighter.HighlightPainter painter;
-    private final Highlighter.HighlightPainter currentPainter;
+    private Highlighter.HighlightPainter painter;
+    private Highlighter.HighlightPainter currentPainter;
     private final List<Object> searchHighlightTags;
     private boolean useRegex;
 
@@ -35,6 +35,12 @@ public class SearchManager {
 
     public void setUseRegex(boolean useRegex) { this.useRegex = useRegex; }
     public boolean isUseRegex() { return useRegex; }
+
+    public void setHighlightColors(Color match, Color current) {
+        this.painter = new DefaultHighlighter.DefaultHighlightPainter(match);
+        this.currentPainter = new DefaultHighlighter.DefaultHighlightPainter(current);
+        if (currentMatchIndex >= 0) paintHighlights();
+    }
 
     public String searchForward(String pattern) { return search(pattern, true); }
     public String searchBackward(String pattern) { return search(pattern, false); }
@@ -167,6 +173,12 @@ public class SearchManager {
 
     private void jumpToMatch(int index) {
         if (index < 0 || index >= matchPositions.size()) return;
+        paintHighlights();
+        textArea.setCaretPosition(matchPositions.get(index));
+        textArea.getCaret().setVisible(true);
+    }
+
+    private void paintHighlights() {
         clearHighlights();
         Highlighter highlighter = textArea.getHighlighter();
         String text = textArea.getText();
@@ -174,11 +186,9 @@ public class SearchManager {
             int start = matchPositions.get(i);
             int end = Math.min(start + matchLength(i), text.length());
             try {
-                Object tag = highlighter.addHighlight(start, end, i == index ? currentPainter : painter);
+                Object tag = highlighter.addHighlight(start, end, i == currentMatchIndex ? currentPainter : painter);
                 searchHighlightTags.add(tag);
             } catch (BadLocationException ignored) {}
         }
-        textArea.setCaretPosition(matchPositions.get(index));
-        textArea.getCaret().setVisible(true);
     }
 }

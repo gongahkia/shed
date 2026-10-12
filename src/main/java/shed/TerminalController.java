@@ -422,7 +422,7 @@ final class TerminalController {
             editor.buffers.remove(buffer);
             FileBuffer replacement = editor.buffers.isEmpty() ? null : editor.buffers.get(0);
             if (replacement == null) {
-                editor.openLandingPage();
+                editor.openEmptyBuffer();
             } else {
                 editor.loadBufferIntoPane(pane, replacement, 0);
             }

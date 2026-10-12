@@ -507,7 +507,7 @@ final class RecoveryController {
                 if (existing == null) {
                     FileBuffer buffer = file.exists() ? new FileBuffer(file, editor.configManager)
                         : new FileBuffer(file.getAbsolutePath(), editor.configManager);
-                    if (editor.shouldReplaceSingleLandingBuffer()) {
+                    if (editor.shouldReplaceSingleUntitledBuffer()) {
                         editor.buffers.set(0, buffer);
                     } else {
                         editor.buffers.add(buffer);
@@ -523,7 +523,7 @@ final class RecoveryController {
             String scratchName = entry.name().isBlank() ? "[Recovered Scratch]" : "[Recovered] " + entry.name();
             FileBuffer scratch = FileBuffer.createScratch(scratchName, restoredContent);
             scratch.setModified(true);
-            if (editor.shouldReplaceSingleLandingBuffer()) {
+            if (editor.shouldReplaceSingleUntitledBuffer()) {
                 editor.buffers.set(0, scratch);
             } else {
                 editor.buffers.add(scratch);

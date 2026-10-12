@@ -196,6 +196,11 @@ class LineNumberPanel extends JPanel {
     }
 
     static DiffMarkers diffMarkers(String savedContent, String currentContent) {
+        return diffMarkers(savedContent, currentContent, () -> false);
+    }
+
+    static DiffMarkers diffMarkers(String savedContent, String currentContent,
+                                   java.util.function.BooleanSupplier cancelled) {
         Set<Integer> added = new HashSet<>();
         Set<Integer> modified = new HashSet<>();
         Set<Integer> deletedAfter = new HashSet<>();
@@ -205,6 +210,7 @@ class LineNumberPanel extends JPanel {
         int line = 0;
         int lastCurrentLine = -1;
         while (savedOffset <= savedContent.length() || currentOffset <= currentContent.length()) {
+            if ((line & 1023) == 0 && cancelled.getAsBoolean()) return new DiffMarkers(Set.of(), Set.of(), Set.of());
             int savedEnd = savedContent.indexOf('\n', savedOffset);
             int currentEnd = currentContent.indexOf('\n', currentOffset);
             boolean hasSaved = savedOffset <= savedContent.length();

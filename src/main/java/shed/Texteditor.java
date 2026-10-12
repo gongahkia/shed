@@ -402,7 +402,7 @@ public class Texteditor extends JFrame implements KeyListener {
             }
 
         // Open command-line files and folders, or the landing page.
-        if (!openStartupTargets(args)) {
+        if (!openStartupTargets(args, startupStartedAt)) {
             if (configManager.getSessionRestoreOnStart()) {
                 String restored = loadSession(configManager.getSessionAutoloadName(), true);
                 if (!restored.startsWith("Restored session")) {
@@ -437,7 +437,7 @@ public class Texteditor extends JFrame implements KeyListener {
         fileWatcherService.start();
     }
 
-    private boolean openStartupTargets(String[] arguments) {
+    private boolean openStartupTargets(String[] arguments, long startupStartedAt) {
         if (arguments == null || arguments.length == 0) return false;
         List<File> folders = new ArrayList<>();
         List<File> files = new ArrayList<>();
@@ -471,14 +471,32 @@ public class Texteditor extends JFrame implements KeyListener {
             activateEditorPane(contentPane);
         }
 
-        for (File file : files) {
-            try {
-                openFile(file);
-            } catch (Exception error) {
-                showMessage("Error opening file " + file.getPath() + ": " + error.getMessage());
-            }
+        if (!files.isEmpty()) {
+            if (folders.isEmpty()) openLandingPage();
+            List<File> startupFiles = List.copyOf(files);
+            EditorPane startupPane = contentPane == null ? getActivePane() : contentPane;
+            SwingUtilities.invokeLater(() -> openStartupFilesAsync(startupFiles, 0, startupStartedAt, startupPane, true));
         }
         return true;
+    }
+
+    private void openStartupFilesAsync(List<File> files, int index, long startedAt, EditorPane pane, boolean allLoaded) {
+        if (closingDown || index >= files.size()) return;
+        if (pane != null && editorPanes.contains(pane)) activateEditorPane(pane);
+        File file = files.get(index);
+        openFileAsync(file, error -> {
+            if (closingDown) return;
+            if (error != null) showMessage("Error opening file " + file.getPath() + ": " + error.getMessage());
+            if (index + 1 == files.size()) {
+                if (pane != null && editorPanes.contains(pane)) activateEditorPane(pane);
+                if (allLoaded && error == null) {
+                    perfService.recordDuration("startup.files-installed", startedAt, "files=" + files.size());
+                }
+            } else {
+                boolean completed = allLoaded && error == null;
+                SwingUtilities.invokeLater(() -> openStartupFilesAsync(files, index + 1, startedAt, pane, completed));
+            }
+        });
     }
 
     // Initialize UI components
@@ -2342,6 +2360,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public void notifyBufferSaved(FileBuffer buffer) {
+        if (buffer == getCurrentBuffer()) paneBufferController.refreshDiffGutterForActiveBuffer(buffer);
         lspController.notifyBufferSaved(buffer);
         if (buffer == getCurrentBuffer()) markdownController.refreshPreviewForBuffer(buffer);
         persistRecoverySnapshotsSafely();
@@ -2671,6 +2690,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void scheduleDiffGutter(FileBuffer buffer) {
         paneBufferController.scheduleDiffGutter(buffer);
+    }
+
+    void scheduleDiffGutter(FileBuffer buffer, FileBuffer.DocumentTextChange change) {
+        paneBufferController.scheduleDiffGutter(buffer, change);
     }
 
     // Show message in status bar

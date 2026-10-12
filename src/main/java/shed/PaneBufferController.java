@@ -13,6 +13,7 @@ import java.util.List;
 final class PaneBufferController {
     private static final int BACKUP_IDLE_DEBOUNCE_MS = 750;
     private static final int DIFF_GUTTER_DEBOUNCE_MS = 120;
+    private static final int LARGE_DIFF_GUTTER_DEBOUNCE_MS = 750;
     private final Texteditor editor;
     private final LandingPageRemoteTransport landingPageRemoteTransport;
     private final Map<FileBuffer, Timer> backupTimers = new IdentityHashMap<>();
@@ -20,6 +21,8 @@ final class PaneBufferController {
     private FileBuffer pendingDiffGutterBuffer;
     private int diffGutterJobId = -1;
     private long diffGutterGeneration;
+    private FileBuffer diffGutterBuffer;
+    private IncrementalDiffGutter incrementalDiffGutter;
     private long openRequestSequence;
     private final Map<EditorPane, Long> openRequests = new WeakHashMap<>();
     private File landingFile;
@@ -131,6 +134,7 @@ final class PaneBufferController {
             editor.updateCurrentLineHighlight();
             editor.applySyntaxHighlighting();
             editor.refreshLineNumberPanel();
+            refreshDiffGutterForActiveBuffer(buffer);
             editor.syncLspOpen(buffer);
             SwingUtilities.invokeLater(() -> {
                 if (pane != editor.getActivePane() || pane.getBuffer() != buffer) return;
@@ -178,7 +182,7 @@ final class PaneBufferController {
             scheduleIdleBackup(buffer);
             editor.recordChangePosition();
             syncLspChange(buffer, event, textChange);
-            editor.scheduleDiffGutter(buffer);
+            editor.scheduleDiffGutter(buffer, textChange);
             editor.requestStatusBarRefresh();
             editor.scheduleRecoverySnapshotCapture();
         }
@@ -312,16 +316,47 @@ final class PaneBufferController {
     void updateDiffGutter(FileBuffer buffer) {
         if (editor.lineNumberPanel == null || buffer == null || buffer.isLargeFile()) return;
         VersionedTextSnapshot text = buffer.textSnapshot();
+        if (buffer == diffGutterBuffer && incrementalDiffGutter != null
+            && incrementalDiffGutter.matches(text, buffer.getSavedContent())) return;
         DiffGutterRequest request = new DiffGutterRequest(buffer, text, buffer.getSavedContent(), ++diffGutterGeneration);
         if (diffGutterJobId >= 0) editor.asyncJobService.cancel(diffGutterJobId);
         diffGutterJobId = editor.asyncJobService.submit("Diff gutter", token -> {
             long started = System.nanoTime();
-            LineNumberPanel.DiffMarkers markers = LineNumberPanel.diffMarkers(request.savedContent(), request.text().text());
+            LineNumberPanel.DiffMarkers markers = LineNumberPanel.diffMarkers(
+                request.savedContent(), request.text().text(), token::isCancelled);
+            if (token.isCancelled()) return null;
+            VersionedTextSnapshot saved = VersionedTextSnapshot.of(request.savedContent());
             if (editor.perfService != null) {
                 editor.perfService.recordDuration("diff.gutter", started, request.buffer().getDisplayName());
             }
-            return new DiffGutterResult(request, markers);
+            return new DiffGutterResult(request, saved, markers);
         }, (snapshot, result, error) -> applyDiffGutter(snapshot, result, error));
+    }
+
+    void refreshDiffGutterForActiveBuffer(FileBuffer buffer) {
+        if (editor.lineNumberPanel == null || buffer == null) return;
+        if (buffer == diffGutterBuffer && incrementalDiffGutter != null
+            && incrementalDiffGutter.matches(buffer.textSnapshot(), buffer.getSavedContent())) {
+            editor.lineNumberPanel.updateDiffMarkers(incrementalDiffGutter.markers());
+            return;
+        }
+        if (diffGutterTimer != null) diffGutterTimer.stop();
+        pendingDiffGutterBuffer = null;
+        if (diffGutterJobId >= 0) editor.asyncJobService.cancel(diffGutterJobId);
+        diffGutterJobId = -1;
+        diffGutterGeneration++;
+        diffGutterBuffer = null;
+        incrementalDiffGutter = null;
+        LineNumberPanel.DiffMarkers empty = new LineNumberPanel.DiffMarkers(Set.of(), Set.of(), Set.of());
+        editor.lineNumberPanel.updateDiffMarkers(empty);
+        if (buffer.isLargeFile()) return;
+        if (!buffer.isModified()) {
+            VersionedTextSnapshot text = buffer.textSnapshot();
+            diffGutterBuffer = buffer;
+            incrementalDiffGutter = new IncrementalDiffGutter(buffer.getSavedContent(), text, text, empty);
+        } else {
+            scheduleDiffGutter(buffer);
+        }
     }
 
     private void applyDiffGutter(AsyncJobService.JobSnapshot job, DiffGutterResult result, Exception error) {
@@ -329,11 +364,28 @@ final class PaneBufferController {
         diffGutterJobId = -1;
         DiffGutterRequest request = result.request();
         if (request.generation() != diffGutterGeneration || request.buffer() != editor.getCurrentBuffer()
-            || request.buffer().textSnapshot() != request.text() || editor.lineNumberPanel == null) return;
+            || request.buffer().textSnapshot() != request.text() || editor.lineNumberPanel == null
+            || request.buffer().getSavedContent() != request.savedContent()) return;
+        diffGutterBuffer = request.buffer();
+        incrementalDiffGutter = new IncrementalDiffGutter(request.savedContent(), result.saved(), request.text(), result.markers());
         editor.lineNumberPanel.updateDiffMarkers(result.markers());
     }
 
     void scheduleDiffGutter(FileBuffer buffer) {
+        scheduleDiffGutter(buffer, null);
+    }
+
+    void scheduleDiffGutter(FileBuffer buffer, FileBuffer.DocumentTextChange change) {
+        if (buffer == diffGutterBuffer && incrementalDiffGutter != null) {
+            long started = System.nanoTime();
+            if (incrementalDiffGutter.apply(change, buffer.getSavedContent())) {
+                if (diffGutterTimer != null) diffGutterTimer.stop();
+                pendingDiffGutterBuffer = null;
+                editor.lineNumberPanel.updateDiffMarkers(incrementalDiffGutter.markers());
+                editor.perfService.recordDuration("diff.gutter.incremental", started, buffer.getDisplayName());
+                return;
+            }
+        }
         pendingDiffGutterBuffer = buffer;
         if (diffGutterTimer == null) {
             diffGutterTimer = new Timer(DIFF_GUTTER_DEBOUNCE_MS, event -> {
@@ -345,11 +397,14 @@ final class PaneBufferController {
             });
             diffGutterTimer.setRepeats(false);
         }
+        diffGutterTimer.setInitialDelay(buffer != null && buffer.textSnapshot().length() > 750_000
+            ? LARGE_DIFF_GUTTER_DEBOUNCE_MS : DIFF_GUTTER_DEBOUNCE_MS);
         diffGutterTimer.restart();
     }
 
     private record DiffGutterRequest(FileBuffer buffer, VersionedTextSnapshot text, String savedContent, long generation) { }
-    private record DiffGutterResult(DiffGutterRequest request, LineNumberPanel.DiffMarkers markers) { }
+    private record DiffGutterResult(DiffGutterRequest request, VersionedTextSnapshot saved,
+                                    LineNumberPanel.DiffMarkers markers) { }
 
 
     void openFileChooser() {

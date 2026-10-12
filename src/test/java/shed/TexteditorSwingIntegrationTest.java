@@ -112,6 +112,35 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void commandLineFileLoadsAfterTheWindowIsShown() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-startup-file");
+        Path file = tempDir.resolve("startup-file.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "startup content\n".repeat(10_000), StandardCharsets.UTF_8);
+        String previousHome = System.getProperty("user.home");
+        record StartedEditor(Texteditor editor, boolean loadedInsideConstructor) { }
+        StartedEditor started = onEdt(() -> {
+            System.setProperty("user.home", home.toString());
+            try {
+                Texteditor editor = new Texteditor(new String[] { file.toString() });
+                FileBuffer current = editor.getCurrentBuffer();
+                return new StartedEditor(editor, current != null && file.toString().equals(current.getFilePath()));
+            } finally {
+                if (previousHome == null) System.clearProperty("user.home");
+                else System.setProperty("user.home", previousHome);
+            }
+        });
+        try {
+            assertFalse(started.loadedInsideConstructor());
+            assertTrue(awaitCurrentFile(started.editor(), file));
+            assertTrue(onEdt(() -> started.editor().perfService.report().contains("startup.files-installed")));
+        } finally {
+            disposeEditor(started.editor());
+        }
+    }
+
+    @Test
     void openingAFileDoesNotWaitForLanguageServerInitialization() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-async-lsp");
@@ -169,6 +198,9 @@ public class TexteditorSwingIntegrationTest {
             });
             assertTrue(report.contains("edit.input-to-document"), report);
             assertTrue(report.contains("edit.input-to-paint"), report);
+            assertTrue(report.contains("edit.document-to-paint-start"), report);
+            assertTrue(report.contains("edit.paint-duration"), report);
+            assertTrue(report.contains("diff.gutter.incremental"), report);
             assertTrue(report.contains(" p95="), report);
         } finally {
             disposeEditor(editor);
@@ -2138,7 +2170,7 @@ public class TexteditorSwingIntegrationTest {
     }
 
     private static boolean awaitCurrentFile(Texteditor editor, Path file) throws Exception {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline) {
             if (onEdt(() -> file.toAbsolutePath().toString().equals(editor.getCurrentBuffer().getFilePath()))) return true;
             Thread.sleep(20);
@@ -2168,7 +2200,7 @@ public class TexteditorSwingIntegrationTest {
 
     private static Texteditor createEditor(Path home, Path... targets) throws Exception {
         String previousHome = System.getProperty("user.home");
-        return onEdt(() -> {
+        Texteditor editor = onEdt(() -> {
             System.setProperty("user.home", home.toString());
             try {
                 String[] arguments = Arrays.stream(targets).map(Path::toString).toArray(String[]::new);
@@ -2181,6 +2213,10 @@ public class TexteditorSwingIntegrationTest {
                 }
             }
         });
+        Path lastFile = Arrays.stream(targets).filter(path -> !Files.isDirectory(path))
+            .reduce((ignored, next) -> next).orElse(null);
+        if (lastFile != null) assertTrue(awaitCurrentFile(editor, lastFile), "startup file did not finish loading");
+        return editor;
     }
 
     private static Texteditor createEmptyEditor(Path home) throws Exception {

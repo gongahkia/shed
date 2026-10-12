@@ -17,6 +17,7 @@ final class SyntaxUiController {
     static final int MAX_FULL_SYNTAX_LINES = 20_000;
     private static final int VIRTUAL_SYNTAX_CONTEXT_LINES = 120;
     private static final int EDIT_IDLE_DEBOUNCE_MS = 120;
+    private static final int LARGE_SYMBOL_IDLE_DEBOUNCE_MS = 1_200;
     private static final int GIT_BLAME_DEBOUNCE_MS = 90;
     private static final int GIT_BLAME_CACHE_LIMIT = 256;
     private final Texteditor editor;
@@ -25,11 +26,16 @@ final class SyntaxUiController {
     private Timer symbolRefreshTimer;
     private Timer gitBlameTimer;
     private FileBuffer cachedSymbolBuffer;
+    private VersionedTextSnapshot cachedSymbolText;
     private List<SymbolService.Symbol> cachedSymbols = List.of();
     private int syntaxJobId = -1;
     private long syntaxGeneration;
     private int symbolJobId = -1;
     private long symbolGeneration;
+    private FileBuffer pendingSymbolBuffer;
+    private VersionedTextSnapshot pendingSymbolText;
+    private FileBuffer runningSymbolBuffer;
+    private VersionedTextSnapshot runningSymbolText;
     private int bracketJobId = -1;
     private long bracketGeneration;
     private final Highlighter.HighlightPainter trailingWhitespacePainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x80FF4444, true));
@@ -205,7 +211,7 @@ final class SyntaxUiController {
     String findCurrentBreadcrumb() {
         try {
             FileBuffer buffer = editor.getCurrentBuffer();
-            if (buffer == null || cachedSymbolBuffer != buffer) {
+            if (buffer == null || cachedSymbolBuffer != buffer || cachedSymbolText != buffer.textSnapshot()) {
                 scheduleSymbolRefresh();
                 return null;
             }
@@ -243,33 +249,52 @@ final class SyntaxUiController {
     }
 
     void scheduleSymbolRefresh() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        VersionedTextSnapshot text = buffer == null ? null : buffer.textSnapshot();
+        if (buffer == cachedSymbolBuffer && text == cachedSymbolText) return;
+        if (symbolJobId >= 0 && buffer == runningSymbolBuffer && text == runningSymbolText) return;
+        if (symbolRefreshTimer != null && symbolRefreshTimer.isRunning()
+            && buffer == pendingSymbolBuffer && text == pendingSymbolText) return;
+        pendingSymbolBuffer = buffer;
+        pendingSymbolText = text;
         if (symbolRefreshTimer == null) {
             symbolRefreshTimer = new Timer(EDIT_IDLE_DEBOUNCE_MS, event -> refreshSymbolCache());
             symbolRefreshTimer.setRepeats(false);
         }
+        symbolRefreshTimer.setInitialDelay(text != null && text.length() > MAX_FULL_SYNTAX_CHARS
+            ? LARGE_SYMBOL_IDLE_DEBOUNCE_MS : EDIT_IDLE_DEBOUNCE_MS);
         symbolRefreshTimer.restart();
     }
 
     private void refreshSymbolCache() {
+        pendingSymbolBuffer = null;
+        pendingSymbolText = null;
         FileBuffer buffer = editor.getCurrentBuffer();
         if (buffer == null) {
             cachedSymbolBuffer = null;
+            cachedSymbolText = null;
             cachedSymbols = List.of();
             editor.requestStatusBarRefresh();
             return;
         }
         if (buffer.isLargeFile()) {
             cachedSymbolBuffer = buffer;
+            cachedSymbolText = buffer.textSnapshot();
             cachedSymbols = List.of();
             editor.requestStatusBarRefresh();
             return;
         }
         VersionedTextSnapshot text = buffer.textSnapshot();
+        if (buffer == cachedSymbolBuffer && text == cachedSymbolText) return;
+        if (symbolJobId >= 0 && buffer == runningSymbolBuffer && text == runningSymbolText) return;
         SymbolRequest request = new SymbolRequest(buffer, text, buffer.getFileType(), ++symbolGeneration);
         if (symbolJobId >= 0) editor.asyncJobService.cancel(symbolJobId);
+        runningSymbolBuffer = buffer;
+        runningSymbolText = text;
         symbolJobId = editor.asyncJobService.submit("Symbol cache", token -> {
             long started = System.nanoTime();
-            List<SymbolService.Symbol> symbols = List.copyOf(editor.symbolService.collectSymbols(request.text().text(), request.fileType()));
+            List<SymbolService.Symbol> symbols = List.copyOf(editor.symbolService.collectSymbols(
+                request.text().text(), request.fileType(), token::isCancelled));
             if (editor.perfService != null) {
                 editor.perfService.recordDuration("symbol.cache", started,
                     "chars=" + request.text().length() + " lines=" + request.text().lineCount());
@@ -279,12 +304,17 @@ final class SyntaxUiController {
     }
 
     private void applySymbolCache(AsyncJobService.JobSnapshot job, SymbolResult result, Exception error) {
+        if (job != null && job.getId() == symbolJobId) {
+            symbolJobId = -1;
+            runningSymbolBuffer = null;
+            runningSymbolText = null;
+        }
         if (job == null || job.getStatus() != AsyncJobService.Status.SUCCEEDED || result == null || error != null) return;
-        symbolJobId = -1;
         SymbolRequest request = result.request();
         if (request.generation() != symbolGeneration || request.buffer() != editor.getCurrentBuffer()
             || request.buffer().textSnapshot() != request.text()) return;
         cachedSymbolBuffer = request.buffer();
+        cachedSymbolText = request.text();
         cachedSymbols = result.symbols();
         editor.requestStatusBarRefresh();
     }

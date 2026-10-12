@@ -2,6 +2,7 @@ package shed;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Arrays;
 
 final class PerfService {
     private final Map<String, Metric> metrics = new LinkedHashMap<>();
@@ -14,6 +15,7 @@ final class PerfService {
         metric.maxNanos = Math.max(metric.maxNanos, elapsed);
         metric.lastNanos = elapsed;
         metric.lastDetail = detail == null ? "" : detail;
+        metric.recent[(int) ((metric.count - 1) % metric.recent.length)] = elapsed;
     }
 
     synchronized String report() {
@@ -30,6 +32,7 @@ final class PerfService {
                 .append(" count=").append(metric.count)
                 .append(" last=").append(metric.lastNanos / 1000L).append("us")
                 .append(" avg=").append(avgMicros).append("us")
+                .append(" p95=").append(metric.p95Nanos() / 1000L).append("us")
                 .append(" max=").append(metric.maxNanos / 1000L).append("us");
             if (metric.lastDetail != null && !metric.lastDetail.isBlank()) {
                 sb.append(" ").append(metric.lastDetail);
@@ -57,5 +60,14 @@ final class PerfService {
         long maxNanos;
         long lastNanos;
         String lastDetail;
+        final long[] recent = new long[256];
+
+        long p95Nanos() {
+            int size = (int) Math.min(count, recent.length);
+            if (size == 0) return 0L;
+            long[] sorted = Arrays.copyOf(recent, size);
+            Arrays.sort(sorted);
+            return sorted[Math.max(0, (int) Math.ceil(size * 0.95d) - 1)];
+        }
     }
 }

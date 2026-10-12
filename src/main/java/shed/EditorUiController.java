@@ -53,10 +53,42 @@ final class EditorUiController {
     private boolean updatingCommandBar;
     private boolean dialogUiScalingListenerInstalled;
     private Timer statusRefreshTimer;
+    private long pendingInputNanos;
+    private long pendingPaintNanos;
+    private JTextArea pendingPaintArea;
 
     EditorUiController(Texteditor editor) {
         this.editor = editor;
         this.systemUiFonts = captureSystemUiFonts();
+    }
+
+    void noteEditorKey(KeyEvent event) {
+        if (event != null && event.getComponent() == editor.writingArea) {
+            pendingInputNanos = System.nanoTime();
+        }
+    }
+
+    void noteEditorDocumentChange() {
+        long now = System.nanoTime();
+        if (pendingInputNanos != 0L && now - pendingInputNanos <= 2_000_000_000L) {
+            // Swing may coalesce several edits into one repaint. Measure the
+            // latest edit so an old, unpainted edit cannot inflate the sample.
+            pendingPaintNanos = pendingInputNanos;
+            pendingPaintArea = editor.writingArea;
+            if (editor.perfService != null) {
+                editor.perfService.recordDuration("edit.input-to-document", pendingInputNanos, "Swing EDT");
+            }
+        }
+        pendingInputNanos = 0L;
+    }
+
+    private void editorPainted(JTextArea area) {
+        if (pendingPaintNanos == 0L || pendingPaintArea != area) return;
+        if (editor.perfService != null) {
+            editor.perfService.recordDuration("edit.input-to-paint", pendingPaintNanos, "Swing paint complete");
+        }
+        pendingPaintNanos = 0L;
+        pendingPaintArea = null;
     }
 
     void initializeUI() {
@@ -297,14 +329,13 @@ final class EditorUiController {
                     Rectangle clip = g.getClipBounds();
                     int startY = clip != null ? clip.y : 0;
                     int endY = clip != null ? clip.y + clip.height : getHeight();
-                    String text = getText();
                     try {
                         int startLine = getLineOfOffset(viewToModel2D(new Point(0, startY)));
                         int endLine = Math.min(getLineCount() - 1, getLineOfOffset(viewToModel2D(new Point(0, endY))));
                         for (int line = startLine; line <= endLine; line++) {
                             int ls = getLineStartOffset(line);
                             int le = getLineEndOffset(line);
-                            String lineText = text.substring(ls, Math.min(le, text.length()));
+                            String lineText = getDocument().getText(ls, Math.max(0, le - ls));
                             int indent = 0;
                             for (int j = 0; j < lineText.length() && (lineText.charAt(j) == ' ' || lineText.charAt(j) == '\t'); j++) {
                                 indent += lineText.charAt(j) == '\t' ? tabSize : 1;
@@ -329,6 +360,7 @@ final class EditorUiController {
                 if (getLineWrap()) paintWrapIndicators(g, this);
                 paintColorPreviews(g, this);
                 paintExplorerFileDropPreview(g, this);
+                editorPainted(this);
             }
         };
         textArea.addKeyListener(editor);

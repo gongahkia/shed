@@ -603,6 +603,7 @@ public class LspClient {
     private final Map<String, List<Diagnostic>> diagnostics;
     private final Map<String, String> pullDiagnosticResultIds;
     private final Set<Integer> staleRequestIds;
+    private final Object requestLock = new Object();
     private final LspFeatureSettings featureSettings;
     private WorkspaceEditHandler workspaceEditHandler;
     private Runnable diagnosticsChangedHandler;
@@ -1872,20 +1873,25 @@ public class LspClient {
         return sendRequest(method, params, timeoutMs);
     }
 
-    private synchronized Map<String, Object> sendRequest(String method, Object params, long timeoutMs) {
-        int id = nextRequestId();
-        Map<String, Object> request = new LinkedHashMap<>();
-        request.put("jsonrpc", "2.0");
-        request.put("id", id);
-        request.put("method", method);
-        request.put("params", params);
-        writeMessage(request);
-        Map<String, Object> response = waitForResponse(id, timeoutMs);
-        if (response == null) {
-            markRequestStale(id);
-            sendCancelRequest(id);
+    private Map<String, Object> sendRequest(String method, Object params, long timeoutMs) {
+        // Only one request may consume the shared response queue at a time. Keep
+        // that wait off the write lock so didChange can be sent while a server
+        // is still computing an earlier completion response.
+        synchronized (requestLock) {
+            int id = nextRequestId();
+            Map<String, Object> request = new LinkedHashMap<>();
+            request.put("jsonrpc", "2.0");
+            request.put("id", id);
+            request.put("method", method);
+            request.put("params", params);
+            writeMessage(request);
+            Map<String, Object> response = waitForResponse(id, timeoutMs);
+            if (response == null) {
+                markRequestStale(id);
+                sendCancelRequest(id);
+            }
+            return response;
         }
-        return response;
     }
 
     private void sendNotification(String method, Object params) {

@@ -8,13 +8,15 @@ import java.util.List;
 import java.util.Map;
 
 final class OpenBufferCompletionIndex {
+    private static final int MAX_INCREMENTAL_SPAN = 64 * 1024;
     record Candidate(String word, int score) { }
 
     record WordStats(int count, int lastOffset) {
         WordStats next(int offset) { return new WordStats(count + 1, offset); }
     }
 
-    private final Map<Object, Map<String, WordStats>> snapshots = new HashMap<>();
+    private record Snapshot(VersionedTextSnapshot text, Map<String, WordStats> words) { }
+    private final Map<Object, Snapshot> snapshots = new HashMap<>();
 
     Map<String, WordStats> build(String text) {
         Map<String, WordStats> words = new LinkedHashMap<>();
@@ -36,17 +38,75 @@ final class OpenBufferCompletionIndex {
                 word.setLength(0);
             }
         }
-        return Map.copyOf(words);
+        return words;
     }
 
     void update(Object buffer, Map<String, WordStats> snapshot) {
+        update(buffer, null, snapshot);
+    }
+
+    void update(Object buffer, VersionedTextSnapshot text, Map<String, WordStats> snapshot) {
         if (buffer == null || snapshot == null) return;
-        snapshots.put(buffer, snapshot);
+        // The completed background build hands ownership of this map to the EDT.
+        snapshots.put(buffer, new Snapshot(text, snapshot));
     }
 
     void remove(Object buffer) { snapshots.remove(buffer); }
 
     boolean hasSnapshot(Object buffer) { return snapshots.containsKey(buffer); }
+
+    boolean hasSnapshot(Object buffer, VersionedTextSnapshot text) {
+        Snapshot snapshot = snapshots.get(buffer);
+        return snapshot != null && snapshot.text() == text;
+    }
+
+    /** Updates only the lines touched by an edit; large replacements use a background rebuild. */
+    boolean applyChange(Object buffer, FileBuffer.DocumentTextChange change) {
+        Snapshot snapshot = snapshots.get(buffer);
+        if (snapshot == null || change == null || !change.incremental() || snapshot.text() != change.before()) return false;
+        VersionedTextSnapshot before = change.before();
+        VersionedTextSnapshot after = change.after();
+        int oldStart = before.lineStartOffset(before.positionAt(change.offset()).line());
+        int oldEnd = before.lineEndOffset(before.positionAt(change.offset() + change.removedLength()).line());
+        int newStart = after.lineStartOffset(after.positionAt(change.offset()).line());
+        int newEnd = after.lineEndOffset(after.positionAt(change.offset() + change.insertedText().length()).line());
+        if (oldEnd - oldStart > MAX_INCREMENTAL_SPAN || newEnd - newStart > MAX_INCREMENTAL_SPAN) return false;
+        Map<String, WordStats> oldWords = wordsIn(before.substring(oldStart, oldEnd - oldStart), oldStart);
+        Map<String, WordStats> newWords = wordsIn(after.substring(newStart, newEnd - newStart), newStart);
+        Map<String, WordStats> words = snapshot.words();
+        for (Map.Entry<String, WordStats> entry : oldWords.entrySet()) {
+            WordStats existing = words.get(entry.getKey());
+            if (existing == null) continue;
+            int remaining = existing.count() - entry.getValue().count();
+            if (remaining <= 0) words.remove(entry.getKey());
+            else words.put(entry.getKey(), new WordStats(remaining, existing.lastOffset()));
+        }
+        for (Map.Entry<String, WordStats> entry : newWords.entrySet()) {
+            words.merge(entry.getKey(), entry.getValue(), (old, added) ->
+                new WordStats(old.count() + added.count(), Math.max(old.lastOffset(), added.lastOffset())));
+        }
+        snapshots.put(buffer, new Snapshot(after, words));
+        return true;
+    }
+
+    private static Map<String, WordStats> wordsIn(String text, int baseOffset) {
+        Map<String, WordStats> words = new HashMap<>();
+        int start = -1;
+        for (int index = 0; index <= text.length(); index++) {
+            char character = index < text.length() ? text.charAt(index) : '\0';
+            if (isWordCharacter(character)) {
+                if (start < 0) start = index;
+            } else if (start >= 0) {
+                if (isIdentifierStart(text.charAt(start))) {
+                    String word = text.substring(start, index);
+                    int offset = baseOffset + start;
+                    words.merge(word, new WordStats(1, offset), (old, ignored) -> old.next(offset));
+                }
+                start = -1;
+            }
+        }
+        return words;
+    }
 
     List<Candidate> complete(List<?> openBuffers, Object currentBuffer, String prefix, int caret, int maxResults,
                              FuzzyMatchService fuzzyMatchService) {
@@ -54,8 +114,11 @@ final class OpenBufferCompletionIndex {
         snapshots.keySet().removeIf(buffer -> !openBuffers.contains(buffer));
         Map<String, Integer> scores = new HashMap<>();
         for (Object buffer : openBuffers) {
-            Map<String, WordStats> words = snapshots.get(buffer);
-            if (words == null) continue;
+            Snapshot snapshot = snapshots.get(buffer);
+            if (snapshot == null) continue;
+            if (buffer instanceof FileBuffer fileBuffer && snapshot.text() != null
+                && fileBuffer.textSnapshot() != snapshot.text()) continue;
+            Map<String, WordStats> words = snapshot.words();
             boolean current = buffer == currentBuffer;
             for (Map.Entry<String, WordStats> entry : words.entrySet()) {
                 String word = entry.getKey();

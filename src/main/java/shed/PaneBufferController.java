@@ -35,10 +35,11 @@ final class PaneBufferController {
             FileBuffer buffer = getCurrentBuffer();
             FileBuffer.DocumentTextChange textChange = buffer != null && event != null && event.getDocument() == buffer.getDocument()
                 ? buffer.applyDocumentChange(event) : null;
+            editor.editorUiController.noteEditorDocumentChange();
             markModified(event, textChange);
             editor.updateCurrentLineHighlight();
             editor.scheduleSyntaxHighlighting();
-            editor.scheduleCompletionAfterDocumentChange(event);
+            editor.scheduleCompletionAfterDocumentChange(event, textChange);
             try {
                 int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
                 editor.lineNumberPanel.repaintLines(line);

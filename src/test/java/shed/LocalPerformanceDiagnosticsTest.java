@@ -22,6 +22,8 @@ public class LocalPerformanceDiagnosticsTest {
         assertTrue(report.contains("Diagnostic log: missing; 0 structured entries"));
         assertTrue(report.contains("Workspace-index benchmark: unavailable; open a file-backed buffer or tree root"));
         assertTrue(report.contains("Timings and heap observations vary"));
+        assertTrue(report.contains("edit.input-to-paint measures a key press through Swing paint completion"));
+        assertTrue(report.contains("Timing p95 uses the latest 256 samples"));
         assertTrue(report.contains(":perf benchmark"));
     }
 

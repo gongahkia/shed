@@ -23,7 +23,7 @@ final class StartupProfile {
         mark("setVisible");
         long visibleAtEpochMillis = System.currentTimeMillis();
         double constructorMillis = (System.nanoTime() - startedAt) / 1_000_000.0;
-        System.err.println("Shed startup (warm JAR launch; Swing window visible)");
+        System.err.println("Shed startup (prebuilt JAR; Swing window visible)");
         for (String phase : phases) System.err.println(phase);
         System.err.printf("  %-25s %7.1f ms%n", "constructor total", constructorMillis);
         System.err.printf("  %-25s %7d ms%n", "JVM launch to visible",

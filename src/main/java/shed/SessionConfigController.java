@@ -686,7 +686,7 @@ final class SessionConfigController {
                 } else if (error != null) {
                     editor.showMessage("Workspace index benchmark failed: " + error.getMessage());
                 } else if (report != null) {
-                    showScratchBuffer("[workspace index benchmark]", report.format());
+                    ShedInformationDialog.showFor(editor, "Workspace Index Benchmark", report.format());
                     editor.showMessage("Workspace index benchmark completed");
                 }
             });

@@ -1354,7 +1354,7 @@ final class TreeGitController {
         if (body.isEmpty()) {
             body = "(no commits)";
         }
-        showInteractiveGitBuffer("[git log]", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n", gitRoot, InteractiveGitView.LOG);
+        ShedInformationDialog.showFor(editor, "Git Graph", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n");
         return "Showing git log";
     }
 

@@ -1198,7 +1198,8 @@ final class LspController {
     private void prepareCodeActionPreview(LspClient.CodeAction action) {
         editor.pendingLspCodeAction = action;
         ShedInformationDialog.showFor(editor, "Code Action Preview", buildWorkspaceEditPreview(action.getTitle(), action.getOperations(), new WorkspaceEditApplyResult())
-            + "\nRun :lsp codeaction apply to confirm, or choose another action to replace this preview.\n");
+            + "\nReview the edits before applying this code action.\n", "Apply code action",
+            () -> editor.showMessage(lspCodeActionApply()));
         editor.showMessage("Prepared code action preview. Run :lsp codeaction apply to confirm.");
     }
 

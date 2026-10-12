@@ -1010,7 +1010,8 @@ final class PaletteController {
     public String showRegisters() {
         List<String> lines = editor.registerManager.getDisplayLines();
         if (lines.isEmpty()) {
-            return "No registers populated";
+            ShedInformationDialog.showFor(editor, "Registers", "No registers populated yet.");
+            return "Showing registers";
         }
         ShedInformationDialog.showFor(editor, "Registers", String.join("\n", lines));
         return "Showing registers";
@@ -1020,7 +1021,8 @@ final class PaletteController {
     public String showMarks() {
         FileBuffer buffer = editor.getCurrentBuffer();
         if (buffer == null || buffer.getMarks().isEmpty()) {
-            return "No marks set";
+            ShedInformationDialog.showFor(editor, "Marks", "No marks set in the current buffer.");
+            return "Showing marks";
         }
         List<String> lines = new ArrayList<>();
         for (java.util.Map.Entry<Character, Integer> entry : buffer.getMarks().entrySet()) {

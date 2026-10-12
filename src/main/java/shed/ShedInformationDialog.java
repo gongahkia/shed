@@ -20,26 +20,32 @@ final class ShedInformationDialog extends JDialog {
     private final Texteditor editor;
     private final String pageTitle;
     private final JEditorPane content = new JEditorPane();
+    private final JButton primary = new JButton();
+    private Runnable primaryAction;
     private String source;
     private String appearance;
 
     static void showFor(Texteditor editor, String title, String report) {
+        showFor(editor, title, report, null, null);
+    }
+
+    static void showFor(Texteditor editor, String title, String report, String actionLabel, Runnable action) {
         if (!SwingUtilities.isEventDispatchThread()) {
-            SwingUtilities.invokeLater(() -> showFor(editor, title, report));
+            SwingUtilities.invokeLater(() -> showFor(editor, title, report, actionLabel, action));
             return;
         }
         for (Window window : editor.getOwnedWindows()) {
             if (window instanceof ShedInformationDialog dialog && dialog.isDisplayable() && dialog.pageTitle.equals(title)) {
-                dialog.setReport(report);
+                dialog.setReport(report, actionLabel, action);
                 dialog.setVisible(true);
                 dialog.toFront();
                 return;
             }
         }
-        new ShedInformationDialog(editor, title, report).setVisible(true);
+        new ShedInformationDialog(editor, title, report, actionLabel, action).setVisible(true);
     }
 
-    private ShedInformationDialog(Texteditor editor, String title, String report) {
+    private ShedInformationDialog(Texteditor editor, String title, String report, String actionLabel, Runnable action) {
         super(editor, title, false);
         this.editor = editor;
         this.pageTitle = title;
@@ -56,7 +62,7 @@ final class ShedInformationDialog extends JDialog {
         add(scroll, BorderLayout.CENTER);
         add(actions(), BorderLayout.SOUTH);
         editor.editorUiController.prepareDialog(this, 760, 570);
-        setReport(report);
+        setReport(report, actionLabel, action);
         pack();
         setLocationRelativeTo(editor);
         addWindowFocusListener(new java.awt.event.WindowAdapter() {
@@ -85,15 +91,24 @@ final class ShedInformationDialog extends JDialog {
             copy.setText("Copied");
         });
         panel.add(copy, BorderLayout.WEST);
+        JPanel right = new JPanel();
+        primary.addActionListener(event -> {
+            if (primaryAction != null) primaryAction.run();
+        });
+        right.add(primary);
         JButton close = new JButton("Close");
         close.addActionListener(event -> dispose());
-        panel.add(close, BorderLayout.EAST);
+        right.add(close);
+        panel.add(right, BorderLayout.EAST);
         getRootPane().setDefaultButton(close);
         return panel;
     }
 
-    private void setReport(String report) {
+    private void setReport(String report, String actionLabel, Runnable action) {
         source = report == null ? "" : report;
+        primaryAction = action;
+        primary.setText(actionLabel == null ? "" : actionLabel);
+        primary.setVisible(actionLabel != null && action != null);
         render();
     }
 

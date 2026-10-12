@@ -116,6 +116,9 @@ public class Texteditor extends JFrame implements KeyListener {
     InputController inputController;
     PaletteController paletteController;
     EditorUiController editorUiController;
+    InlineFindBar inlineFindBar;
+    WindowPlacementStore windowPlacementStore;
+    JLabel positionCue;
     WorkspaceController workspaceController;
     RecoveryController recoveryController;
     SearchReplaceController searchReplaceController;
@@ -384,6 +387,7 @@ public class Texteditor extends JFrame implements KeyListener {
         inputController = new InputController(this);
         paletteController = new PaletteController(this);
         editorUiController = new EditorUiController(this);
+        inlineFindBar = new InlineFindBar(this);
         recoveryController = new RecoveryController(this);
         searchReplaceController = new SearchReplaceController(this);
         perfService = new PerfService();
@@ -3345,6 +3349,7 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
         closingDown = true;
+        if (windowPlacementStore != null) windowPlacementStore.save(this);
         disposeMarkdownPreviews();
         if (recoverySnapshotTimer != null) {
             recoverySnapshotTimer.stop();
@@ -3401,6 +3406,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Main method
     public static void main(String[] args) {
+        System.setProperty("apple.laf.useScreenMenuBar", "true");
         ApplicationErrorReporter reporter = new ApplicationErrorReporter();
         reporter.install();
         SwingUtilities.invokeLater(() -> new Texteditor(args, reporter));

@@ -12,13 +12,15 @@ The default `keymap.profile = "plain"` provides non-modal editing. Plain bypasse
 | :---: | :---: |
 | `Ctrl`/`Cmd` + `N` | New untitled document |
 | `Ctrl`/`Cmd` + `O` | Open file dialog |
+| `Ctrl`/`Cmd` + `Shift` + `O` | Open folder dialog (all keymap profiles) |
+| `Ctrl`/`Cmd` + `,` | Open settings (all keymap profiles) |
 | `Ctrl`/`Cmd` + `P` | Quick open file |
 | `Ctrl`/`Cmd` + `S` | Save; prompt for a path on an untitled document |
 | `Ctrl`/`Cmd` + `Shift` + `S` | Save As |
-| `Ctrl`/`Cmd` + `F` | Find text |
-| `F3` / `Shift` + `F3` | Next / previous match |
-| `Ctrl`/`Cmd` + `H` | Replace all literal matches |
-| `Ctrl`/`Cmd` + `G` | Go to line |
+| `Ctrl`/`Cmd` + `F` | Open inline Find bar; shows live match count |
+| `F3` / `Shift` + `F3` | Next / previous match; on macOS also `Cmd` + `G` / `Cmd` + `Shift` + `G` |
+| `Ctrl` + `H` (Linux/Windows), `Cmd` + `Alt` + `F` (macOS) | Open inline Replace bar with preview and match count |
+| `Ctrl` + `G` (Linux/Windows) | Open inline Go to Line bar |
 | `Ctrl`/`Cmd` + `R` | Document symbols |
 | `Ctrl`/`Cmd` + `Shift` + `R` | Search workspace symbols |
 | `Ctrl`/`Cmd` + `Z` | Undo |
@@ -34,6 +36,8 @@ The default `keymap.profile = "plain"` provides non-modal editing. Plain bypasse
 | `Ctrl`/`Cmd` + `W` | Close active split |
 | `Ctrl`/`Cmd` + `Q` | Quit; prompt for unsaved changes |
 | `F1` | Plain-keymap help |
+
+The inline Find and Replace bars accept Enter for the next match, Shift+Enter for the previous match, and Escape to close. Replace All shows the number of matches before applying the edit. The editor shows file position as a percentage in the status bar and opens at its previously saved window size and position.
 
 ### Emacs profile
 

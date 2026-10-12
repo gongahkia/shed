@@ -43,6 +43,7 @@ final class PaneBufferController {
             editor.updateCurrentLineHighlight();
             editor.scheduleSyntaxHighlighting();
             editor.scheduleCompletionAfterDocumentChange(event, textChange);
+            if (editor.inlineFindBar != null) editor.inlineFindBar.onDocumentChanged();
             try {
                 int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
                 editor.lineNumberPanel.repaintLines(line);

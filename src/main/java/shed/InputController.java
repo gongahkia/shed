@@ -39,6 +39,10 @@ final class InputController {
     private EmacsKeymap.Prefix emacsPrefix;
     private Character macroAutoPairAfterText;
     private String macroIndentAfterNewline;
+    private long lastKeyPressNanos;
+    private long completionInputNanos;
+    private JSplitPane completionSplit;
+    private JScrollPane completionDocumentationScroll;
 
     InputController(Texteditor editor) {
         this.editor = editor;
@@ -75,6 +79,9 @@ final class InputController {
             cancelQuickSuggestion();
             return;
         }
+        long now = System.nanoTime();
+        completionInputNanos = lastKeyPressNanos > 0 && now - lastKeyPressNanos < 2_000_000_000L
+            ? lastKeyPressNanos : now;
         Character insertedCharacter = insertedCharacter(event);
         FileBuffer buffer = editor.getCurrentBuffer();
         LspClient client = editor.existingLspClient(buffer);
@@ -171,6 +178,17 @@ final class InputController {
     }
 
     public void keyPressed(KeyEvent e) {
+        if (e != null && e.getComponent() == editor.writingArea) lastKeyPressNanos = System.nanoTime();
+        if (isSettingsShortcut(e)) {
+            e.consume();
+            editor.showMessage(editor.showSettingsInspector());
+            return;
+        }
+        if (isOpenFolderShortcut(e)) {
+            e.consume();
+            editor.showMessage(editor.openFolder());
+            return;
+        }
         if (isUiZoomResetShortcut(e)) {
             e.consume();
             editor.showMessage(editor.resetUiZoom());
@@ -234,6 +252,16 @@ final class InputController {
     static boolean isCommandPaletteShortcut(KeyEvent event) {
         return event != null && event.getKeyCode() == KeyEvent.VK_P && event.isShiftDown()
             && (event.isControlDown() || event.isMetaDown()) && !event.isAltDown();
+    }
+
+    static boolean isOpenFolderShortcut(KeyEvent event) {
+        return event != null && event.getKeyCode() == KeyEvent.VK_O && event.isShiftDown()
+            && (event.isControlDown() ^ event.isMetaDown()) && !event.isAltDown();
+    }
+
+    static boolean isSettingsShortcut(KeyEvent event) {
+        return event != null && event.getKeyCode() == KeyEvent.VK_COMMA && !event.isShiftDown()
+            && (event.isControlDown() ^ event.isMetaDown()) && !event.isAltDown();
     }
 
     static int uiZoomDirection(KeyEvent event) {
@@ -357,6 +385,10 @@ final class InputController {
             return;
         }
         event.consume();
+        performMenuAction(action);
+    }
+
+    void performMenuAction(PlainKeymap.Action action) {
         switch (action) {
             case NEW -> editor.sessionConfigController.openScratchBuffer("[No Name]", "", false);
             case SAVE -> {
@@ -473,12 +505,16 @@ final class InputController {
     private void findPlain() {
         String selected = editor.writingArea.getSelectedText();
         String previous = editor.searchManager.getSearchPattern();
-        String initial = selected != null && !selected.contains("\n") ? selected : previous == null ? "" : previous;
-        String pattern = JOptionPane.showInputDialog(editor, "Find", initial);
-        if (pattern != null && !pattern.isEmpty()) searchPlainLiteral(pattern, true);
+        String initial = selected != null && !selected.contains("\n") ? selected
+            : previous == null ? editor.inlineFindBar.queryText() : previous;
+        editor.inlineFindBar.showFind(initial);
     }
 
     private void repeatPlainSearch(boolean forward) {
+        if (editor.inlineFindBar.hasSearchQuery()) {
+            editor.inlineFindBar.navigate(forward);
+            return;
+        }
         String pattern = editor.searchManager.getSearchPattern();
         if (pattern == null || pattern.isEmpty()) {
             findPlain();
@@ -503,55 +539,13 @@ final class InputController {
             editor.showMessage("Replace is unavailable in a read-only buffer");
             return;
         }
-        FileBuffer buffer = editor.getCurrentBuffer();
-        if (buffer == null) return;
-        JTextField find = new JTextField(24);
-        JTextField replacement = new JTextField(24);
         String selected = editor.writingArea.getSelectedText();
-        if (selected != null && !selected.contains("\n")) find.setText(selected);
-        JPanel fields = new JPanel(new GridLayout(2, 2, 6, 6));
-        fields.add(new JLabel("Find:"));
-        fields.add(find);
-        fields.add(new JLabel("Replace with:"));
-        fields.add(replacement);
-        if (JOptionPane.showConfirmDialog(editor, fields, "Replace All", JOptionPane.OK_CANCEL_OPTION)
-            != JOptionPane.OK_OPTION || find.getText().isEmpty()) return;
-        if (editor.getCurrentBuffer() != buffer) {
-            editor.showMessage("Replace cancelled: active document changed");
-            return;
-        }
-        SubstituteService.Result result = editor.substituteService.replaceLiteral(
-            editor.writingArea.getText(), find.getText(), replacement.getText(), true);
-        if (result.getMatchCount() == 0) {
-            editor.showMessage("Pattern not found: " + find.getText());
-            return;
-        }
-        try {
-            BoundedUndoManager history = (BoundedUndoManager) buffer.getUndoManager();
-            history.beginCompoundEdit();
-            try {
-                buffer.getDocument().replace(0, editor.writingArea.getDocument().getLength(),
-                    result.getUpdatedText(), null);
-            } finally {
-                history.endCompoundEdit();
-            }
-            editor.writingArea.setCaretPosition(result.getFirstMatchOffset());
-            editor.searchManager.clearHighlights();
-            editor.showMessage("Replaced " + result.getMatchCount() + " occurrence"
-                + (result.getMatchCount() == 1 ? "" : "s"));
-        } catch (BadLocationException error) {
-            editor.showMessage("Replace failed: " + error.getMessage());
-        }
+        editor.inlineFindBar.showReplace(selected != null && !selected.contains("\n")
+            ? selected : editor.inlineFindBar.queryText());
     }
 
     private void goToPlainLine() {
-        String value = JOptionPane.showInputDialog(editor, "Go to line");
-        if (value == null || value.isBlank()) return;
-        try {
-            editor.showMessage(editor.gotoLine(Integer.parseInt(value.trim())));
-        } catch (NumberFormatException error) {
-            editor.showMessage("Invalid line number: " + value);
-        }
+        editor.inlineFindBar.showGoToLine();
     }
 
     private void handleEmacsKeymap(KeyEvent event) {
@@ -2508,6 +2502,11 @@ final class InputController {
     }
 
     private void showInlineCompletion(LspClient.CompletionTriggerKind triggerKind, Character triggerCharacter, boolean explicit) {
+        if (explicit) {
+            long now = System.nanoTime();
+            completionInputNanos = lastKeyPressNanos > 0 && now - lastKeyPressNanos < 2_000_000_000L
+                ? lastKeyPressNanos : now;
+        }
         cancelCompletionJob();
         completionRequestState.invalidate();
         activeCompletionRequest = null;
@@ -2546,6 +2545,7 @@ final class InputController {
 
 
     void dismissCompletionPopup() {
+        completionInputNanos = 0L;
         cancelQuickSuggestion();
         cancelCompletionJob();
         cancelCompletionResolve();
@@ -2674,8 +2674,10 @@ final class InputController {
                 (int) caretRect.getX(), (int) (caretRect.getY() + caretRect.getHeight()), layer);
             int lineHeight = editor.writingArea.getFontMetrics(editor.writingArea.getFont()).getHeight();
             double zoom = editor.configManager.getUiZoom();
-            int height = Math.min(Math.max(max * lineHeight + UiZoom.scale(58, zoom), UiZoom.scale(150, zoom)), UiZoom.scale(340, zoom));
-            Dimension size = new Dimension(Math.max(1, Math.min(UiZoom.scale(760, zoom), layer.getWidth())),
+            boolean hasDocumentation = completionDocumentationScroll != null && completionDocumentationScroll.isVisible();
+            int height = Math.min(Math.max(max * lineHeight + UiZoom.scale(48, zoom), UiZoom.scale(120, zoom)),
+                UiZoom.scale(hasDocumentation ? 340 : 300, zoom));
+            Dimension size = new Dimension(Math.max(1, Math.min(UiZoom.scale(hasDocumentation ? 760 : 360, zoom), layer.getWidth())),
                 Math.max(1, Math.min(height, layer.getHeight())));
             int x = Math.max(0, Math.min(caret.x, layer.getWidth() - size.width));
             int y = Math.max(0, Math.min(caret.y, layer.getHeight() - size.height));
@@ -2693,7 +2695,20 @@ final class InputController {
         editor.completionModel = new DefaultListModel<>();
         editor.completionList = new JList<>(editor.completionModel);
         editor.completionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        editor.completionList.setFocusable(false);
+        editor.completionList.setFocusable(true);
+        AccessibilitySupport.describe(editor.completionList, "Completion suggestions",
+            "Use Up and Down to choose a suggestion, Enter to insert it, or Escape to close the list.");
+        editor.completionList.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke("ENTER"), "shed.completion.accept");
+        editor.completionList.getActionMap().put("shed.completion.accept", new AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) { completionPopupAccept(); }
+        });
+        editor.completionList.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke("ESCAPE"), "shed.completion.close");
+        editor.completionList.getActionMap().put("shed.completion.close", new AbstractAction() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent event) {
+                dismissCompletionPopup();
+                editor.requestActivePaneFocus();
+            }
+        });
         editor.completionList.setFont(editor.writingArea.getFont().deriveFont((float) editor.writingArea.getFont().getSize()));
         editor.completionList.setBackground(editor.configManager.getCommandBarBackground());
         editor.completionList.setForeground(editor.configManager.getCommandBarForeground());
@@ -2703,6 +2718,7 @@ final class InputController {
             if (!event.getValueIsAdjusting()) updateCompletionDocumentation();
         });
         editor.completionDocumentation = new JTextArea();
+        AccessibilitySupport.describe(editor.completionDocumentation, "Completion details", "Details for the selected completion suggestion.");
         editor.completionDocumentation.setEditable(false);
         editor.completionDocumentation.setFocusable(false);
         editor.completionDocumentation.setLineWrap(true);
@@ -2715,17 +2731,27 @@ final class InputController {
         editor.completionSource.setFont(editor.writingArea.getFont().deriveFont(Math.max(10f, editor.writingArea.getFont().getSize2D() - 2f)));
         editor.completionSource.setForeground(editor.configManager.getStatusBarForeground());
         JScrollPane listScroll = new JScrollPane(editor.completionList);
-        JScrollPane documentationScroll = new JScrollPane(editor.completionDocumentation);
+        completionDocumentationScroll = new JScrollPane(editor.completionDocumentation);
         JPanel listPanel = new JPanel(new BorderLayout());
         listPanel.setBackground(editor.configManager.getCommandBarBackground());
         listPanel.add(editor.completionSource, BorderLayout.NORTH);
         listPanel.add(listScroll, BorderLayout.CENTER);
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listPanel, documentationScroll);
-        split.setResizeWeight(0.48);
-        split.setDividerLocation(UiZoom.scale(360, zoom));
-        split.setBorder(BorderFactory.createLineBorder(editor.configManager.getCaretColor()));
-        editor.completionPopup = new JPanel(new BorderLayout());
-        editor.completionPopup.add(split, BorderLayout.CENTER);
+        completionSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, listPanel, completionDocumentationScroll);
+        completionSplit.setResizeWeight(0.48);
+        completionSplit.setDividerLocation(UiZoom.scale(360, zoom));
+        completionSplit.setBorder(BorderFactory.createLineBorder(editor.configManager.getCaretColor()));
+        editor.completionPopup = new JPanel(new BorderLayout()) {
+            @Override protected void paintChildren(Graphics graphics) {
+                super.paintChildren(graphics);
+                if (completionInputNanos > 0 && editor.perfService != null) {
+                    editor.perfService.recordDuration("completion.input-to-paint", completionInputNanos,
+                        "first suggestion paint");
+                    completionInputNanos = 0L;
+                }
+            }
+        };
+        AccessibilitySupport.describe(editor.completionPopup, "Completion popup", "Suggestions and optional documentation for the editor.");
+        editor.completionPopup.add(completionSplit, BorderLayout.CENTER);
         editor.completionPopup.setVisible(false);
         editor.getLayeredPane().add(editor.completionPopup, JLayeredPane.POPUP_LAYER);
     }
@@ -2735,14 +2761,25 @@ final class InputController {
         LspClient.CompletionItem selected = editor.completionList.getSelectedValue();
         if (selected == null) {
             editor.completionDocumentation.setText("");
+            setCompletionDocumentationVisible(false);
             return;
         }
         String documentation = selected.getDocumentation();
         String detail = selected.getDetail();
         editor.completionDocumentation.setText(documentation.isBlank() ? detail
             : detail.isBlank() ? documentation : detail + "\n\n" + documentation);
+        setCompletionDocumentationVisible(!editor.completionDocumentation.getText().isBlank());
         editor.completionDocumentation.setCaretPosition(0);
         resolveCompletionDocumentation(selected);
+    }
+
+    private void setCompletionDocumentationVisible(boolean visible) {
+        if (completionDocumentationScroll == null || completionSplit == null
+            || completionDocumentationScroll.isVisible() == visible) return;
+        completionDocumentationScroll.setVisible(visible);
+        completionSplit.setDividerSize(visible ? UiZoom.scale(6, editor.configManager.getUiZoom()) : 0);
+        completionSplit.setDividerLocation(visible ? UiZoom.scale(360, editor.configManager.getUiZoom()) : 1.0);
+        completionSplit.revalidate();
     }
 
     private void resolveCompletionDocumentation(LspClient.CompletionItem item) {

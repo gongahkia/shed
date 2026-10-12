@@ -961,20 +961,90 @@ public class TexteditorSwingIntegrationTest {
 
         Texteditor editor = createEditor(home, file);
         try {
-            assertEquals(javax.swing.JScrollPane.VERTICAL_SCROLLBAR_NEVER,
-                onEdt(() -> editor.getActivePane().getScrollPane().getVerticalScrollBarPolicy()));
-            assertEquals(javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_NEVER,
-                onEdt(() -> editor.getActivePane().getScrollPane().getHorizontalScrollBarPolicy()));
-
-            onEdt(() -> {
-                editor.configManager.set("editor.scrollbars.visible", "true");
-                editor.sessionConfigController.applyRuntimeConfigFromSettings();
-                return null;
-            });
             assertEquals(javax.swing.JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 onEdt(() -> editor.getActivePane().getScrollPane().getVerticalScrollBarPolicy()));
             assertEquals(javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED,
                 onEdt(() -> editor.getActivePane().getScrollPane().getHorizontalScrollBarPolicy()));
+
+            onEdt(() -> {
+                editor.configManager.set("editor.scrollbars.visible", "false");
+                editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                return null;
+            });
+            assertEquals(javax.swing.JScrollPane.VERTICAL_SCROLLBAR_NEVER,
+                onEdt(() -> editor.getActivePane().getScrollPane().getVerticalScrollBarPolicy()));
+            assertEquals(javax.swing.JScrollPane.HORIZONTAL_SCROLLBAR_NEVER,
+                onEdt(() -> editor.getActivePane().getScrollPane().getHorizontalScrollBarPolicy()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void inlineReplaceShowsLiveCountAndCanUndoAllMatches() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-inline-replace");
+        Path file = tempDir.resolve("inline-replace.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "alpha beta alpha\n", StandardCharsets.UTF_8);
+        Texteditor editor = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                editor.inlineFindBar.showReplace("alpha");
+                List<javax.swing.JTextField> fields = descendants(editor.inlineFindBar, javax.swing.JTextField.class);
+                fields.get(1).setText("gamma");
+                return null;
+            });
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            boolean counted = false;
+            while (System.nanoTime() < deadline) {
+                counted = onEdt(() -> descendants(editor.inlineFindBar, javax.swing.JLabel.class).stream()
+                    .anyMatch(label -> label.getText().contains("2 matches")
+                        && label.getText().contains("alpha → gamma")));
+                if (counted) break;
+                Thread.sleep(20);
+            }
+            assertTrue(counted, "inline replacement preview did not arrive");
+            onEdt(() -> {
+                descendants(editor.inlineFindBar, javax.swing.JButton.class).stream()
+                    .filter(button -> button.getText().startsWith("Replace All"))
+                    .findFirst().orElseThrow().doClick();
+                return null;
+            });
+            deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            boolean replaced = false;
+            while (System.nanoTime() < deadline) {
+                replaced = onEdt(() -> "gamma beta gamma\n".equals(editor.getCurrentBuffer().getContent()));
+                if (replaced) break;
+                Thread.sleep(20);
+            }
+            assertTrue(replaced, "replace all did not update the active buffer");
+            onEdt(() -> { editor.getCurrentBuffer().getUndoManager().undo(); return null; });
+            assertEquals("alpha beta alpha\n", onEdt(() -> editor.getCurrentBuffer().getContent()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void desktopMenusAndPositionCueAreVisible() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-menus");
+        Path file = tempDir.resolve("menus.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "line\n".repeat(250), StandardCharsets.UTF_8);
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertEquals(List.of("File", "Edit", "View", "Navigate", "Help"), onEdt(() -> {
+                List<String> names = new ArrayList<>();
+                for (int index = 0; index < editor.getJMenuBar().getMenuCount(); index++) {
+                    names.add(editor.getJMenuBar().getMenu(index).getText());
+                }
+                return names;
+            }));
+            assertTrue(onEdt(() -> editor.positionCue.getText().matches("\\d+%")));
+            assertEquals(javax.swing.JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                onEdt(() -> editor.getActivePane().getScrollPane().getVerticalScrollBarPolicy()));
         } finally {
             disposeEditor(editor);
         }

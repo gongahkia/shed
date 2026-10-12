@@ -89,7 +89,7 @@ public class ConfigManager {
     private static final boolean DEFAULT_SHELL_COMMAND_ENABLED = true;
     private static final int DEFAULT_SHELL_COMMAND_MAX_LENGTH = 4096;
     private static final int DEFAULT_SCROLLOFF = 0;
-    private static final boolean DEFAULT_EDITOR_SCROLLBARS_VISIBLE = false;
+    private static final boolean DEFAULT_EDITOR_SCROLLBARS_VISIBLE = true;
     private static final boolean DEFAULT_AUTO_PAIRS = true;
     private static final int DEFAULT_TEXTWIDTH = 0;
     private static final boolean DEFAULT_MINIMAP = false;
@@ -769,7 +769,10 @@ public class ConfigManager {
     }
 
     public Color getSelectionTextColor() {
-        return getUiColor("ui.selection.text", activeTheme().foreground);
+        if (config.containsKey("ui.selection.text")) {
+            return getUiColor("ui.selection.text", activeTheme().foreground);
+        }
+        return AccessibilitySupport.readableText(activeTheme().foreground, getSelectionColor());
     }
 
     public Color getStatusBarBackground() {
@@ -797,7 +800,10 @@ public class ConfigManager {
 
     public Color getLineNumberForeground() {
         ThemePalette theme = activeTheme();
-        return getUiColor("ui.linenumber.foreground", blend(theme.foreground, theme.normal, 0.40));
+        if (config.containsKey("ui.linenumber.foreground")) {
+            return getUiColor("ui.linenumber.foreground", theme.foreground);
+        }
+        return AccessibilitySupport.readableText(blend(theme.foreground, theme.normal, 0.40), getLineNumberBackground());
     }
 
     public Color getLineNumberActiveForeground() {

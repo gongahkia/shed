@@ -1557,7 +1557,7 @@ final class JobQuickfixController {
             }
         }
         if (replacement == null) {
-            editor.openLandingPage();
+            editor.openEmptyBuffer();
             replacement = editor.getCurrentBuffer();
         }
         for (EditorPane pane : editor.editorPanes) {

@@ -624,7 +624,7 @@ final class TreeGitController {
             FileBuffer existing = editor.findBufferByPath(file);
             FileBuffer targetBuffer = existing != null ? existing : new FileBuffer(file, editor.configManager);
             if (existing == null) {
-                if (editor.shouldReplaceSingleLandingBuffer()) {
+                if (editor.shouldReplaceSingleUntitledBuffer()) {
                     editor.buffers.set(0, targetBuffer);
                 } else {
                     editor.buffers.add(targetBuffer);

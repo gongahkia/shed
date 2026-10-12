@@ -15,7 +15,6 @@ final class PaneBufferController {
     private static final int DIFF_GUTTER_DEBOUNCE_MS = 120;
     private static final int LARGE_DIFF_GUTTER_DEBOUNCE_MS = 750;
     private final Texteditor editor;
-    private final LandingPageRemoteTransport landingPageRemoteTransport;
     private final Map<FileBuffer, Timer> backupTimers = new IdentityHashMap<>();
     private Timer diffGutterTimer;
     private FileBuffer pendingDiffGutterBuffer;
@@ -25,12 +24,9 @@ final class PaneBufferController {
     private IncrementalDiffGutter incrementalDiffGutter;
     private long openRequestSequence;
     private final Map<EditorPane, Long> openRequests = new WeakHashMap<>();
-    private File landingFile;
 
     PaneBufferController(Texteditor editor) {
         this.editor = editor;
-        this.landingPageRemoteTransport = new LandingPageRemoteTransport();
-        this.landingFile = null;
     }
 
     void handleDocumentChange(DocumentEvent event) {
@@ -421,117 +417,13 @@ final class PaneBufferController {
     }
 
 
-    void openLandingPage() {
-        try {
-            LandingPageSource.StartupTarget target = LandingPageSource.resolveStartupTarget(editor.configManager, defaultLandingContent());
-            if (target.showNativeWelcome()) {
-                openNativeWelcomePage();
-                return;
-            }
-            LandingPageSource.Resolved source = target.source();
-            File file = LandingPageSource.ensureLocalFile(source, source.isRemote() ? remoteLandingPlaceholder(source) : defaultLandingContent());
-            landingFile = file.getAbsoluteFile();
-            FileBuffer landing = findBufferByPath(landingFile);
-            if (landing == null) {
-                landing = new FileBuffer(landingFile, editor.configManager);
-                if (editor.buffers.isEmpty()) {
-                    editor.buffers.add(landing);
-                } else {
-                    editor.buffers.set(0, landing);
-                }
-            }
-            loadBufferIntoEditor(landing);
-            editor.registerFileWatch(landing);
-            if (source.isRemote()) refreshRemoteLanding(source, landing);
-        } catch (IOException error) {
-            landingFile = null;
-            FileBuffer fallback = FileBuffer.createScratch("[landing unavailable]", "Landing page unavailable: " + error.getMessage() + "\n");
-            if (editor.buffers.isEmpty()) {
-                editor.buffers.add(fallback);
-            } else {
-                editor.buffers.set(0, fallback);
-            }
-            loadBufferIntoEditor(fallback);
-            editor.showMessage("Landing page unavailable: " + error.getMessage());
-        }
-    }
-
-    private void openNativeWelcomePage() {
-        landingFile = null;
-        FileBuffer welcome = editor.buffers.stream()
-            .filter(this::isNativeWelcomeBuffer)
-            .findFirst()
-            .orElseGet(() -> FileBuffer.createScratch("[landing]", ""));
-        if (!editor.buffers.contains(welcome)) {
-            if (editor.buffers.isEmpty()) {
-                editor.buffers.add(welcome);
-            } else {
-                editor.buffers.set(0, welcome);
-            }
-        }
-        loadBufferIntoEditor(welcome);
-        EditorPane pane = editor.getActivePane();
-        if (pane == null) {
-            return;
-        }
-        ShedWelcomePanel panel = new ShedWelcomePanel(editor);
-        pane.setAlternateComponent(panel);
-        panel.addFocusListener(new java.awt.event.FocusAdapter() {
-            @Override public void focusGained(java.awt.event.FocusEvent event) {
-                editor.activateEditorPane(pane);
-            }
-        });
-        panel.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mousePressed(java.awt.event.MouseEvent event) {
-                editor.activateEditorPane(pane);
-            }
-        });
-        editor.renderWindowLayout();
-        SwingUtilities.invokeLater(panel::requestFocusInWindow);
-    }
-
-    private String defaultLandingContent() {
-        return "shed " + editor.VERSION + "\n"
-            + "swing modal editor\n\n"
-            + ":help        view help\n"
-            + ":e <file>    open a file\n"
-            + ":recent      show recent files\n\n"
-            + "edit and save this local landing file to customize it.\n";
-    }
-
-    private String remoteLandingPlaceholder(LandingPageSource.Resolved source) {
-        return "Loading remote landing page from " + source.remoteUri() + "...\n";
-    }
-
-    private void refreshRemoteLanding(LandingPageSource.Resolved source, FileBuffer landing) {
-        editor.asyncJobService.submit("Refresh landing page", token -> landingPageRemoteTransport.fetch(
-            source.remoteUri(), editor.configManager.getLandingRemoteTimeoutMs(), token), (job, content, error) -> {
-            if (error != null || content == null) {
-                editor.showMessage("Remote landing refresh failed: " + (error == null ? job.getErrorMessage() : error.getMessage()));
-                return;
-            }
-            if (landing.isModified()) {
-                editor.showMessage("Remote landing refresh skipped: local edits are unsaved");
-                return;
-            }
-            try {
-                AtomicFileWriter.write(landing.getFile().toPath(), content);
-                editor.suppressDocumentEvents = true;
-                try {
-                    landing.load(editor.configManager);
-                } finally {
-                    editor.suppressDocumentEvents = false;
-                }
-                if (editor.getCurrentBuffer() == landing) {
-                    editor.applySyntaxHighlighting();
-                    editor.refreshLineNumberPanel();
-                    editor.updateStatusBar();
-                }
-                editor.showMessage("Remote landing refreshed: " + source.remoteUri());
-            } catch (IOException writeError) {
-                editor.showMessage("Remote landing cache update failed: " + writeError.getMessage());
-            }
-        });
+    void openEmptyBuffer() {
+        FileBuffer empty = new FileBuffer((String) null, editor.configManager);
+        if (editor.buffers.isEmpty()) editor.buffers.add(empty);
+        else if (shouldReplaceSingleUntitledBuffer()) empty = editor.buffers.get(0);
+        else editor.buffers.add(empty);
+        loadBufferIntoEditor(empty);
+        editor.writingArea.requestFocusInWindow();
     }
 
 
@@ -610,7 +502,7 @@ final class PaneBufferController {
     private void installLoadedBuffer(File file, FileBuffer buffer, String projectConfigMessage, EditorPane pane) {
         FileBuffer alreadyOpen = findBufferByPath(file);
         if (alreadyOpen != null) buffer = alreadyOpen;
-        if (alreadyOpen == null && shouldReplaceSingleLandingBuffer()) {
+        if (alreadyOpen == null && shouldReplaceSingleUntitledBuffer()) {
             editor.buffers.set(0, buffer);
         } else if (alreadyOpen == null) {
             editor.buffers.add(buffer);
@@ -667,7 +559,7 @@ final class PaneBufferController {
             return "Unable to split the target window";
         }
         if (existing == null) {
-            if (shouldReplaceSingleLandingBuffer()) editor.buffers.set(0, targetBuffer);
+            if (shouldReplaceSingleUntitledBuffer()) editor.buffers.set(0, targetBuffer);
             else editor.buffers.add(targetBuffer);
         }
         loadBufferIntoPane(newPane, targetBuffer, 0);
@@ -781,7 +673,7 @@ final class PaneBufferController {
         editor.buffers.remove(buffer);
         editor.persistRecoverySnapshotsSafely();
         if (editor.buffers.isEmpty()) {
-            openLandingPage();
+            openEmptyBuffer();
             return "Buffer deleted";
         }
         FileBuffer replacement = editor.buffers.get(Math.min(editor.currentBufferIndex, editor.buffers.size() - 1));
@@ -873,7 +765,7 @@ final class PaneBufferController {
         editor.buffers.remove(buffer);
         editor.currentBufferIndex = 0;
         editor.persistRecoverySnapshotsSafely();
-        openLandingPage();
+        openEmptyBuffer();
         return "Buffer closed";
     }
 
@@ -1095,17 +987,13 @@ final class PaneBufferController {
     }
 
 
-    boolean shouldReplaceSingleLandingBuffer() {
+    boolean shouldReplaceSingleUntitledBuffer() {
         if (editor.buffers.size() != 1) {
             return false;
         }
         FileBuffer current = editor.buffers.get(0);
-        if (current.isScratch()) return isNativeWelcomeBuffer(current) && !current.isModified();
-        return landingFile != null && current.hasFilePath() && landingFile.equals(current.getFile().getAbsoluteFile()) && !current.isModified();
-    }
-
-    boolean isNativeWelcomeBuffer(FileBuffer buffer) {
-        return buffer != null && buffer.isScratch() && "[landing]".equals(buffer.getDisplayName());
+        return !current.isScratch() && !current.hasFilePath() && !current.isModified()
+            && current.getContent().isEmpty();
     }
 
 }

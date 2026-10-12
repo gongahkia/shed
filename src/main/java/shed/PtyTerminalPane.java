@@ -280,6 +280,14 @@ final class PtyTerminalPane implements AutoCloseable {
         private final com.jediterm.core.Color[] colors;
 
         private ShedTerminalColorPalette(ConfigManager configManager) {
+            Color[] themeAnsi = configManager == null ? null : configManager.getThemeAnsiColors();
+            if (themeAnsi != null) {
+                this.colors = new com.jediterm.core.Color[themeAnsi.length];
+                for (int index = 0; index < themeAnsi.length; index++) {
+                    this.colors[index] = toCoreColor(themeAnsi[index]);
+                }
+                return;
+            }
             Color bg = configManager == null ? Color.BLACK : configManager.getNormalColor();
             Color fg = readableColor(configManager == null ? Color.WHITE : configManager.getEditorForeground(), bg);
             Color accent = configManager == null ? new Color(97, 175, 239) : configManager.getCaretColor();

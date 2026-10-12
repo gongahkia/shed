@@ -37,6 +37,13 @@
           <include>logo/shed.png</include>
         </includes>
       </resource>
+      <resource>
+        <directory>docs</directory>
+        <targetPath>META-INF/licenses</targetPath>
+        <includes>
+          <include>NIB_THEME_LICENSE.txt</include>
+        </includes>
+      </resource>
     </resources>
     <plugins>
       <plugin>

@@ -72,6 +72,7 @@ final class ShedHelpDialog extends JDialog {
     private final JScrollPane articleScroll = new JScrollPane(article);
     private final JLabel resultCount = new JLabel();
     private Topic selected;
+    private String renderedAppearance;
 
     static void showFor(Texteditor editor, String topic) {
         if (!SwingUtilities.isEventDispatchThread()) {
@@ -103,6 +104,11 @@ final class ShedHelpDialog extends JDialog {
         editor.editorUiController.prepareDialog(this, 1040, 720);
         pack();
         setLocationRelativeTo(editor);
+        addWindowFocusListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowGainedFocus(java.awt.event.WindowEvent event) {
+                if (!appearanceKey().equals(renderedAppearance)) render();
+            }
+        });
         installSearchShortcut();
     }
 
@@ -241,6 +247,13 @@ final class ShedHelpDialog extends JDialog {
         };
         article.setText(page(selected.title(), selected.summary(), content));
         article.setCaretPosition(0);
+        renderedAppearance = appearanceKey();
+    }
+
+    private String appearanceKey() {
+        return editor.configManager.getThemeId() + ":" + editor.configManager.getEditorForeground().getRGB()
+            + ":" + editor.configManager.getNormalColor().getRGB() + ":" + editor.configManager.getUiZoom()
+            + ":" + editor.configManager.getUiFontFamily() + ":" + editor.configManager.getUiFontSize();
     }
 
     private String referenceContent(Topic topic) {
@@ -329,12 +342,15 @@ final class ShedHelpDialog extends JDialog {
         Color foreground = editor.configManager.getEditorForeground();
         Color background = editor.configManager.getNormalColor();
         Color accent = AccessibilitySupport.readableText(editor.configManager.getCaretColor(), background);
-        String font = editor.configManager.getUiFontFamily().replace("'", "");
-        int size = Math.max(12, editor.configManager.getUiFontSize());
+        String configuredFont = editor.configManager.getUiFontFamily();
+        String font = configuredFont == null || configuredFont.isBlank() ? Font.SANS_SERIF : configuredFont.replace("'", "");
+        int size = UiZoom.scale(Math.max(12, editor.configManager.getUiFontSize()), editor.configManager.getUiZoom());
+        int titleSize = UiZoom.scale(22, editor.configManager.getUiZoom());
+        int headingSize = UiZoom.scale(15, editor.configManager.getUiZoom());
         return "<html><head><style type='text/css'>"
             + "body { font-family:'" + escape(font) + "'; font-size:" + size + "pt; color:" + hex(foreground)
             + "; background:" + hex(background) + "; margin:22px 30px 36px 30px; }"
-            + "h1 { font-size:22pt; margin-bottom:6px; } h2 { font-size:15pt; margin-top:24px; }"
+            + "h1 { font-size:" + titleSize + "pt; margin-bottom:6px; } h2 { font-size:" + headingSize + "pt; margin-top:24px; }"
             + "p, li, td { line-height:1.3; } td { border-bottom:1px solid " + hex(blend(background, foreground, 0.18)) + "; }"
             + "a { color:" + hex(accent) + "; } code { font-family:monospace; font-size:" + size + "pt; }"
             + "</style></head><body><h1>" + escape(title) + "</h1><p>" + escape(summary) + "</p>"
@@ -342,6 +358,7 @@ final class ShedHelpDialog extends JDialog {
     }
 
     private String mark(String source) {
+        if (source == null) return "";
         String query = search.getText().trim();
         if (query.isEmpty()) return escape(source);
         String needle = query.split("\\s+", 2)[0];

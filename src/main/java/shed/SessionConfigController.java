@@ -441,9 +441,7 @@ final class SessionConfigController {
         }
         editor.applyUiFont();
         for (EditorPane pane : editor.editorPanes) {
-            if (pane.getAlternateComponent() instanceof ShedWelcomePanel welcome) {
-                welcome.refreshScale();
-            } else if (pane.getAlternateComponent() instanceof FileTreePanel explorer) {
+            if (pane.getAlternateComponent() instanceof FileTreePanel explorer) {
                 explorer.refreshAppearance();
             }
         }
@@ -795,7 +793,7 @@ final class SessionConfigController {
             if (restoreLegacySession(payload)) {
                 return "Restored legacy session: " + sessionFile.getAbsolutePath();
             }
-            editor.openLandingPage();
+            editor.openEmptyBuffer();
             return "Session loaded (no existing files)";
         } catch (IOException e) {
             return "Session load failed: " + e.getMessage();
@@ -1620,7 +1618,7 @@ final class SessionConfigController {
         int returnIndex = editor.buffers.indexOf(state.returnBuffer);
         if (returnIndex < 0) {
             if (editor.buffers.isEmpty()) {
-                editor.openLandingPage();
+                editor.openEmptyBuffer();
                 return true;
             }
             returnIndex = 0;

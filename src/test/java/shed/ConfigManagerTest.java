@@ -67,10 +67,6 @@ public class ConfigManagerTest {
         assertFalse(config.getTerminalSessionRestoreEnabled());
         assertTrue(config.getMarkdownPreviewScrollSync());
         assertTrue(config.getDebugOpenSourceOnStop());
-        assertTrue(config.getLandingWelcomeEnabled());
-        assertEquals(home.resolve(".shed/landing.md").toString(), config.getLandingSource());
-        assertEquals(home.resolve(".shed/landing.remote.md").toString(), config.getLandingRemoteCachePath());
-        assertEquals(5000, config.getLandingRemoteTimeoutMs());
         TypedSettings.Descriptor terminalRestore = config.typedSettingDescriptors().stream()
             .filter(setting -> setting.key().equals("terminal.session.restore")).findFirst().orElseThrow();
         assertEquals("Terminal", terminalRestore.category());
@@ -134,7 +130,7 @@ public class ConfigManagerTest {
 
         assertFalse(config.hasConfigLoadFailure());
         assertEquals(4, config.getTabSize());
-        assertEquals("one-dark-pro", config.getThemeId());
+        assertEquals("nib-dark", config.getThemeId());
     }
 
     @Test
@@ -165,27 +161,6 @@ public class ConfigManagerTest {
         assertTrue(config.getBackupPolicy().enabled());
         assertEquals(BackupPolicy.BackupMode.SAVE_ONLY, config.getBackupPolicy().mode());
         assertEquals("backup.mode must be idle or save-only", config.validateSettingValue("backup.mode", "always"));
-    }
-
-    @Test
-    void configuresLandingSource() {
-        Path home = tempDir.resolve("home-landing");
-        System.setProperty("user.home", home.toString());
-        ConfigManager config = new ConfigManager();
-
-        config.set("landing.source", "notes/start.md");
-        config.set("landing.welcome.enabled", "false");
-        config.set("landing.remote.cache.path", "cache/remote.md");
-        config.set("landing.remote.timeout.ms", "6000");
-
-        assertEquals("notes/start.md", config.getLandingSource());
-        assertFalse(config.getLandingWelcomeEnabled());
-        assertEquals("cache/remote.md", config.getLandingRemoteCachePath());
-        assertEquals(6000, config.getLandingRemoteTimeoutMs());
-        assertEquals("landing.remote.timeout.ms must be between 1000 and 30000",
-            config.validateSettingValue("landing.remote.timeout.ms", "999"));
-        assertFalse(config.isProjectConfigKeyAllowed("landing.source"));
-        assertFalse(config.isProjectConfigKeyAllowed("landing.welcome.enabled"));
     }
 
     @Test
@@ -1071,7 +1046,7 @@ public class ConfigManagerTest {
 
         String cleared = config.applyProjectConfigForFile(fileB);
         assertTrue(cleared.contains("Project config cleared"));
-        assertEquals("one-dark-pro", config.getThemeId());
+        assertEquals("nib-dark", config.getThemeId());
         assertNull(config.getActiveProjectConfigPath());
     }
 
@@ -1216,6 +1191,6 @@ public class ConfigManagerTest {
 
         config.set("project.config.enabled", "false");
         assertTrue(config.applyProjectConfigForFile(file).contains("Project config disabled"));
-        assertEquals("one-dark-pro", config.getThemeId());
+        assertEquals("nib-dark", config.getThemeId());
     }
 }

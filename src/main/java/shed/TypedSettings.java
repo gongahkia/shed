@@ -209,9 +209,6 @@ final class TypedSettings {
         if (key.startsWith("ui.")) {
             return "Interface";
         }
-        if (key.startsWith("landing.")) {
-            return "Interface";
-        }
         if (key.startsWith("markdown.preview.")) {
             return "Markdown Preview";
         }
@@ -299,9 +296,6 @@ final class TypedSettings {
             case "undo.history.max.entries" -> "integer 1.." + UndoHistoryPolicy.MAX_ENTRIES;
             case "undo.history.max.bytes" -> "integer 1.." + UndoHistoryPolicy.MAX_BYTES;
             case "session.dir" -> "string path";
-            case "landing.source" -> "local path, file URI, or HTTPS URL";
-            case "landing.remote.cache.path" -> "string path";
-            case "landing.remote.timeout.ms" -> "integer 1000..30000";
             case "lsp.completion.delay.ms" -> "integer 0..1000";
             case "updates.metadata.url" -> "HTTPS URL or empty";
             case "updates.metadata.public.key" -> "base64 Ed25519 key or empty";
@@ -332,9 +326,6 @@ final class TypedSettings {
         }
         if (key.startsWith("ui.font.") || key.equals("ui.zoom")) {
             return "Live: applies to the application UI";
-        }
-        if (key.startsWith("landing.")) {
-            return "Live: used when the landing page next opens";
         }
         if (key.startsWith("markdown.preview.")) {
             return "Live: applies to open Markdown previews";
@@ -439,7 +430,7 @@ final class TypedSettings {
             if ("ui.font.size".equals(key) && number < 0) {
                 return key + " must be non-negative";
             }
-            if (("updates.check.timeout.ms".equals(key) || "landing.remote.timeout.ms".equals(key))
+            if ("updates.check.timeout.ms".equals(key)
                 && (number < 1000 || number > 30000)) {
                 return key + " must be between 1000 and 30000";
             }
@@ -505,8 +496,7 @@ final class TypedSettings {
                 return key + " must be system or a built-in profile id";
             }
         }
-        if (("backup.directory".equals(key) || "project.replace.backup.directory".equals(key)
-            || "landing.source".equals(key) || "landing.remote.cache.path".equals(key))
+        if (("backup.directory".equals(key) || "project.replace.backup.directory".equals(key))
             && value instanceof String && ((String) value).isBlank()) {
             return key + " must be a non-empty path";
         }

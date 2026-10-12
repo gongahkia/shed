@@ -64,7 +64,7 @@ final class PaletteController {
         action("Next Diagnostic", "diagnostic next", "Move to the next diagnostic."),
         action("Previous Diagnostic", "diagnostic previous", "Move to the previous diagnostic."),
 
-        action("Settings", "settings", "Open the Settings inspector, including font, landing-buffer, and Markdown-preview settings."),
+        action("Settings", "settings", "Open the Settings inspector, including font and Markdown-preview settings."),
         action("Open Settings TOML", "settings file", "Open the persisted settings.toml buffer."),
         action("Configuration Status", "config status", "Show configuration loading and recovery details."),
         action("Apply Suggested Config Repairs", "config heal", "Persist the reviewed deterministic configuration repairs."),

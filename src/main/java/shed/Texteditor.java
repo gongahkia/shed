@@ -405,17 +405,17 @@ public class Texteditor extends JFrame implements KeyListener {
         if (toolWindowHost != null) {
             }
 
-        // Open command-line files and folders, or the landing page.
+        // Open command-line files and folders, or an empty editable buffer.
         if (!openStartupTargets(args, startupStartedAt)) {
             if (configManager.getSessionRestoreOnStart()) {
                 String restored = loadSession(configManager.getSessionAutoloadName(), true);
                 if (!restored.startsWith("Restored session")) {
-                    openLandingPage();
+                    openEmptyBuffer();
                 } else {
                     showMessage(restored);
                 }
             } else {
-                openLandingPage();
+                openEmptyBuffer();
             }
         }
 
@@ -458,7 +458,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
         EditorPane contentPane = null;
         if (!folders.isEmpty()) {
-            openLandingPage();
+            openEmptyBuffer();
             File activeFolder = folders.getFirst();
             for (File folder : folders) {
                 String result = workspaceController.addDirectory(folder, folder.equals(activeFolder));
@@ -476,7 +476,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         if (!files.isEmpty()) {
-            if (folders.isEmpty()) openLandingPage();
+            if (folders.isEmpty()) openEmptyBuffer();
             List<File> startupFiles = List.copyOf(files);
             EditorPane startupPane = contentPane == null ? getActivePane() : contentPane;
             SwingUtilities.invokeLater(() -> openStartupFilesAsync(startupFiles, 0, startupStartedAt, startupPane, true));
@@ -2710,8 +2710,8 @@ public class Texteditor extends JFrame implements KeyListener {
         paneBufferController.openFileChooser();
     }
 
-    void openLandingPage() {
-        paneBufferController.openLandingPage();
+    void openEmptyBuffer() {
+        paneBufferController.openEmptyBuffer();
     }
 
     public void openFile(File file) throws IOException {
@@ -2871,8 +2871,8 @@ public class Texteditor extends JFrame implements KeyListener {
         return paneBufferController.findBufferByPath(file);
     }
 
-    boolean shouldReplaceSingleLandingBuffer() {
-        return paneBufferController.shouldReplaceSingleLandingBuffer();
+    boolean shouldReplaceSingleUntitledBuffer() {
+        return paneBufferController.shouldReplaceSingleUntitledBuffer();
     }
 
     // Search methods

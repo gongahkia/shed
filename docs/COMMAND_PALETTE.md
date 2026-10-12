@@ -22,7 +22,7 @@ Each action is unique by visible label and normalized command. The application r
 | Save All Buffers | `:wall` | Write all modified file-backed buffers. |
 | Save and Close Active Window | `:wq` | Write the current buffer, then close its editor window. |
 | Save All and Quit | `:wqa` | Write all modified buffers and quit. |
-| Close Active Window | `:q` | Close the active editor window, or its last buffer and show the landing page. |
+| Close Active Window | `:q` | Close the active editor window, or its last buffer and show an empty buffer. |
 | Close Active Window Without Saving | `:q!` | Close the active editor window without saving its changes. |
 | Quit All | `:qa` | Quit all buffers, prompting when needed. |
 | Quit All Without Saving | `:qa!` | Quit Shed without saving modified buffers. |
@@ -64,7 +64,7 @@ Each action is unique by visible label and normalized command. The application r
 
 | Action | Command | Purpose |
 | :--- | :--- | :--- |
-| Settings | `:settings` | Open the Settings inspector, including font, landing-buffer, and Markdown-preview settings. |
+| Settings | `:settings` | Open the Settings inspector, including font and Markdown-preview settings. |
 | Open Settings TOML | `:settings file` | Open the persisted settings.toml buffer. |
 | Configuration Status | `:config status` | Show configuration loading and recovery details. |
 | Apply Suggested Config Repairs | `:config heal` | Persist the reviewed deterministic configuration repairs. |

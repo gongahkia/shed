@@ -59,7 +59,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `theme` | `one-dark-pro` | string | Built-in theme id |
+| `theme` | `nib-dark` | string | Built-in theme id; `nib-light` is the matching light palette |
 | `font.family` | `Monospaced` | string | Buffer font family; must resolve uniquely to a Java-installed family |
 | `font.size` | `16` | int | Buffer font size |
 | `ui.font.family` | empty | string | UI font family; empty retains the system UI font, otherwise must resolve uniquely to a Java-installed family |
@@ -90,18 +90,9 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `multi.selection.max.cursors` | `256` | int | Maximum total cursors when enabled; `2..256` |
 | `markdown.preview.scroll.sync` | `true` | bool | Keep a Markdown preview aligned with its source cursor and source scrolling |
 | `markdown.preview.remote.images` | `true` | bool | Fetch bounded HTTPS images after explicitly opening a normal Markdown preview; `false` keeps it local-only |
-| `landing.welcome.enabled` | `true` | bool | Show the native welcome screen for Shed's untouched default landing source |
-| `landing.source` | `~/.shed/landing.md` | string | Local path, `file:` URI, or explicitly configured HTTPS URL |
-| `landing.remote.cache.path` | `~/.shed/landing.remote.md` | path | Local editable cache for an HTTPS source |
-| `landing.remote.timeout.ms` | `5000` | int | HTTPS source timeout; `1000..30000` |
+## Startup Buffer
 
-## Landing Page
-
-At startup without a file argument or restored session, Shed shows a native, non-editable welcome screen by default. It uses the bundled Shed logo, the active theme, and working keyboard/click actions for the command palette, opening files or folders, finding files, buffer switching, and help. Opening a folder activates it as the workspace and shows its tree. The welcome screen is an ephemeral `[landing]` buffer: opening a file replaces it instead of creating `~/.shed/landing.md`. Its content grows with `ui.zoom` only while it fits the available pane; once it reaches that limit, its text and layout remain at the largest fitting size.
-
-`landing.welcome.enabled = false` restores the legacy editable landing buffer. Shed also preserves an existing default `~/.shed/landing.md` when its content differs from the old generated starter text, so a prior customization is not replaced. Any non-default `landing.source` remains an editable local buffer; relative paths resolve from the user home directory and `file:` URIs are local paths.
-
-An `https://` `landing.source` is an explicit global opt-in to fetch that URL when the landing page opens. Shed uses HTTPS only, never follows redirects, limits the response to 1 MiB, and caches it in `landing.remote.cache.path`; edits save to that local cache and are never uploaded. Project `.shed.toml` cannot override landing settings.
+At startup without a file argument or restored session, Shed opens an empty, editable `[No Name]` buffer. Opening a file replaces that buffer while it remains untouched. Opening a folder shows its file tree beside the empty buffer.
 
 ## Session, File, and Shell Limits
 
@@ -463,7 +454,7 @@ Configured font families are validated against the Java runtime's installed fami
 
 ## Built-in Themes
 
-`one-dark-pro`, `dracula`, `material-theme`, `night-owl`, `ayu-mirage`, `monokai-pro`, `tokyo-night`, `nord`, `gruvbox-dark`, `shades-of-purple`, `palenight`, `catppuccin-mocha`, `github-dark`, `rose-pine`, `synthwave-84`, `cobalt2`, `andromeda`, `everforest-dark`, `kanagawa`, `poimandres`, `solarized-dark`, `noctis`, `oxocarbon-dark`, `vesper`, `sonokai`, `doom-one`, `horizon`, `papercolor-dark`, `xcode-dark`, `dimmed-monokai`, `fleet-dark`, `nightfox`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `github-light`, `github-dark-dimmed`, `solarized-light`, `gruvbox-light`, `one-light`, `ayu-light`, `ayu-dark`, `material-lighter`, `material-ocean`, `tokyo-night-storm`, `tokyo-night-light`, `duskfox`, `carbonfox`, `dawnfox`, `vscode-dark-modern`, `vscode-light-modern`, `jetbrains-darcula`.
+`nib-dark`, `nib-light`, `one-dark-pro`, `dracula`, `material-theme`, `night-owl`, `ayu-mirage`, `monokai-pro`, `tokyo-night`, `nord`, `gruvbox-dark`, `shades-of-purple`, `palenight`, `catppuccin-mocha`, `github-dark`, `rose-pine`, `synthwave-84`, `cobalt2`, `andromeda`, `everforest-dark`, `kanagawa`, `poimandres`, `solarized-dark`, `noctis`, `oxocarbon-dark`, `vesper`, `sonokai`, `doom-one`, `horizon`, `papercolor-dark`, `xcode-dark`, `dimmed-monokai`, `fleet-dark`, `nightfox`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `github-light`, `github-dark-dimmed`, `solarized-light`, `gruvbox-light`, `one-light`, `ayu-light`, `ayu-dark`, `material-lighter`, `material-ocean`, `tokyo-night-storm`, `tokyo-night-light`, `duskfox`, `carbonfox`, `dawnfox`, `vscode-dark-modern`, `vscode-light-modern`, `jetbrains-darcula`.
 
 The Theme Gallery's **Apply and Save** button changes the palette and writes the complete current configuration to disk.
 
@@ -495,12 +486,6 @@ schema_version = 1
 "ruler.column" = 88
 "markdown.preview.scroll.sync" = true
 "markdown.preview.remote.images" = true
-
-# Landing page
-"landing.welcome.enabled" = true
-"landing.source" = "~/.shed/landing.md"
-# "landing.source" = "https://example.com/start.md"
-# "landing.remote.cache.path" = "~/.shed/landing.remote.md"
 
 # Session + safety
 "session.restore.on.start" = true

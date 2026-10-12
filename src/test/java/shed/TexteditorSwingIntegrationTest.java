@@ -244,7 +244,7 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
-    void defaultStartupShowsNativeWelcomeAndOpeningAFileReplacesIt() throws Exception {
+    void defaultStartupOpensEmptyBufferAndOpeningAFileReplacesIt() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-native-welcome");
         Path file = tempDir.resolve("welcome-target.txt");
@@ -253,9 +253,11 @@ public class TexteditorSwingIntegrationTest {
 
         Texteditor editor = createEmptyEditor(home);
         try {
-            assertTrue(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
+            assertSame(onEdt(() -> editor.getActivePane().getScrollPane()), onEdt(() -> editor.getActivePane().getComponent()));
             assertSame(onEdt(() -> editor.getActivePane().getComponent()), onEdt(() -> editor.renderedLayoutComponent));
-            assertEquals("[landing]", onEdt(() -> editor.getCurrentBuffer().getDisplayName()));
+            assertEquals("[No Name]", onEdt(() -> editor.getCurrentBuffer().getDisplayName()));
+            assertEquals("", onEdt(() -> editor.getCurrentBuffer().getContent()));
+            assertFalse(onEdt(() -> editor.getCurrentBuffer().isScratch()));
             assertFalse(Files.exists(home.resolve(".shed/landing.md")));
 
             onEdt(() -> {
@@ -264,9 +266,40 @@ public class TexteditorSwingIntegrationTest {
             });
 
             assertEquals(file.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
-            assertFalse(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
             assertSame(onEdt(() -> editor.getActivePane().getScrollPane()), onEdt(() -> editor.renderedLayoutComponent));
             assertEquals(1, onEdt(() -> editor.buffers.size()));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void helpOpensSearchableWindowWithoutReplacingTheEditorBuffer() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-help-window");
+        Files.createDirectories(home);
+        Texteditor editor = createEmptyEditor(home);
+        try {
+            onEdt(() -> {
+                editor.showHelp("lsp");
+                return null;
+            });
+            ShedHelpDialog help = onEdt(() -> java.util.Arrays.stream(editor.getOwnedWindows())
+                .filter(window -> window instanceof ShedHelpDialog)
+                .map(window -> (ShedHelpDialog) window).findFirst().orElseThrow());
+            assertTrue(onEdt(help::isVisible));
+            assertTrue(onEdt(() -> descendants(help, javax.swing.JEditorPane.class).getFirst().getText()
+                .contains("Language services")));
+            assertEquals("[No Name]", onEdt(() -> editor.getCurrentBuffer().getDisplayName()));
+            assertEquals(1, onEdt(() -> editor.buffers.size()));
+
+            onEdt(() -> {
+                descendants(help, javax.swing.JTextField.class).getFirst().setText("docker");
+                return null;
+            });
+            assertTrue(onEdt(() -> descendants(help, javax.swing.JList.class).getFirst().getModel().getSize() > 0));
+            assertTrue(onEdt(() -> descendants(help, javax.swing.JEditorPane.class).getFirst().getText()
+                .contains("Docker")));
         } finally {
             disposeEditor(editor);
         }
@@ -493,7 +526,7 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
-    void customizedLegacyDefaultLandingRemainsAnEditableBuffer() throws Exception {
+    void legacyLandingFileDoesNotReplaceEmptyStartupBuffer() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-custom-landing");
         Path landing = home.resolve(".shed/landing.md");
@@ -502,9 +535,9 @@ public class TexteditorSwingIntegrationTest {
 
         Texteditor editor = createEmptyEditor(home);
         try {
-            assertFalse(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
-            assertEquals(landing.toAbsolutePath().toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
-            assertEquals("# My start page\n", onEdt(() -> editor.getCurrentBuffer().getContent()));
+            assertEquals("[No Name]", onEdt(() -> editor.getCurrentBuffer().getDisplayName()));
+            assertEquals("", onEdt(() -> editor.getCurrentBuffer().getContent()));
+            assertEquals("# My start page\n", Files.readString(landing));
         } finally {
             disposeEditor(editor);
         }
@@ -589,7 +622,7 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
-    void welcomeAndExplorerRefreshWhenTheThemeChanges() throws Exception {
+    void editorAndExplorerRefreshWhenTheThemeChanges() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-themed-start-surfaces");
         Path workspace = tempDir.resolve("themed-workspace");
@@ -599,12 +632,12 @@ public class TexteditorSwingIntegrationTest {
 
         Texteditor editor = createEmptyEditor(home);
         try {
-            ShedWelcomePanel welcome = onEdt(() -> (ShedWelcomePanel) editor.getActivePane().getComponent());
+            javax.swing.JTextArea area = onEdt(() -> editor.getActivePane().getTextArea());
             assertEquals("Tree pane opened", onEdt(() -> editor.showFileTree(workspace.toString())));
             FileTreePanel explorer = onEdt(() -> (FileTreePanel) editor.treePane.getComponent());
 
             assertEquals("Theme set to dracula", onEdt(() -> editor.setThemeFromCommand("dracula")));
-            assertEquals(editor.configManager.getNormalColor(), onEdt(welcome::getBackground));
+            assertEquals(onEdt(() -> editor.getModeBackground(editor.editorState.mode)), onEdt(area::getBackground));
             assertEquals(editor.configManager.getNormalColor(), onEdt(explorer::getBackground));
             assertTrue(onEdt(() -> descendants(explorer, javax.swing.JTree.class).stream()
                 .allMatch(tree -> editor.configManager.getNormalColor().equals(tree.getBackground()))));
@@ -711,7 +744,7 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
-    void configuredLandingSourceRemainsAnEditableBuffer() throws Exception {
+    void configuredLandingSourceDoesNotCreateAStartupFile() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-configured-landing");
         Path config = home.resolve(".shed/config.toml");
@@ -724,9 +757,9 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEmptyEditor(home);
         try {
             Path landing = home.resolve("pages/start.md").toAbsolutePath();
-            assertFalse(onEdt(() -> editor.getActivePane().getComponent() instanceof ShedWelcomePanel));
-            assertEquals(landing.toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
-            assertTrue(Files.exists(landing));
+            assertEquals("[No Name]", onEdt(() -> editor.getCurrentBuffer().getDisplayName()));
+            assertEquals("", onEdt(() -> editor.getCurrentBuffer().getContent()));
+            assertFalse(Files.exists(landing));
         } finally {
             disposeEditor(editor);
         }
@@ -969,7 +1002,7 @@ public class TexteditorSwingIntegrationTest {
             assertTrue(awaitBufferSaved(editor, file, "after\n"));
             assertEquals("after\n", Files.readString(file, StandardCharsets.UTF_8));
             assertEquals(1, onEdt(() -> editor.editorPanes.size()));
-            assertEquals("[landing]", onEdt(() -> editor.getCurrentBuffer().getDisplayName()));
+            assertEquals("[No Name]", onEdt(() -> editor.getCurrentBuffer().getDisplayName()));
             assertTrue(onEdt(editor::isDisplayable));
         } finally {
             disposeEditor(editor);

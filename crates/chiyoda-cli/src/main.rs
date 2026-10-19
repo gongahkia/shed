@@ -9,6 +9,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod spaces;
+
 #[derive(Debug, Parser)]
 #[command(
     name = "chiyoda",
@@ -23,7 +25,12 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Parse and validate a scenario without executing it.
-    Check { source: PathBuf },
+    Check {
+        source: PathBuf,
+        /// Also check radius-clear geometric journeys independently of routing.
+        #[arg(long)]
+        geometry: bool,
+    },
     /// Compile a scenario to canonical, versioned JSON IR.
     Compile {
         source: PathBuf,
@@ -55,14 +62,26 @@ enum Command {
         #[arg(short, long)]
         output: PathBuf,
     },
+    /// Generate rule-constrained WFC geometry and its provenance in a new directory.
+    GenerateSpace(spaces::GenerateArgs),
+    /// Print an editable, complete JSON space config and module catalog.
+    SpaceRules {
+        #[arg(long, value_enum, default_value = "concourse")]
+        preset: spaces::PresetArg,
+    },
+    /// Evaluate seeded WFC spaces and authored fixtures, retaining every case.
+    Evaluate(spaces::EvaluateArgs),
     /// Reconstruct and summarize a current run bundle.
     Replay { bundle: PathBuf },
 }
 
 fn main() -> Result<()> {
     match Cli::parse().command {
-        Command::Check { source } => {
+        Command::Check { source, geometry } => {
             let scenario = read_scenario(&source)?;
+            if geometry {
+                spaces::check_geometry(&scenario)?;
+            }
             println!("valid: {}", scenario.name);
         }
         Command::Compile { source, output } => {
@@ -124,6 +143,9 @@ fn main() -> Result<()> {
             write_text(&output, &source)?;
             println!("generated: {} ({})", output.display(), scenario.name);
         }
+        Command::GenerateSpace(args) => spaces::generate(&args)?,
+        Command::SpaceRules { preset } => spaces::print_config(preset)?,
+        Command::Evaluate(args) => spaces::evaluate(&args)?,
         Command::Replay {
             bundle: bundle_path,
         } => {

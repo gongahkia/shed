@@ -353,6 +353,46 @@ fn changed_inputs_are_incompatible_even_when_the_candidate_passes() {
     assert!(!rejected.exists());
 }
 
+fn check_frozen_threshold_override(
+    directory: &Directory,
+    evaluation: &Path,
+    suite: &BenchmarkSuite,
+) {
+    let thresholds = directory.path("thresholds.json");
+    write(
+        &thresholds,
+        &json!({"min_evacuated_fraction": 1.0, "max_clearance_time_s": 90.0}),
+    );
+    let with_limits = directory.path("with-limits.json");
+    success(&[
+        "benchmark",
+        "freeze",
+        "--evaluation",
+        text(evaluation),
+        "--name",
+        "completion",
+        "--thresholds",
+        text(&thresholds),
+        "-o",
+        text(&with_limits),
+    ]);
+    let limited: BenchmarkSuite = read(&with_limits);
+    assert_eq!(limited.cases[0].source, suite.cases[0].source);
+    assert!(
+        limited.cases[0]
+            .evaluation
+            .thresholds
+            .min_evacuated_fraction
+            .unwrap()
+            .total_cmp(&1.0)
+            .is_eq()
+    );
+    assert_ne!(
+        limited.input_hash(&limited.cases[0]),
+        suite.input_hash(&suite.cases[0])
+    );
+}
+
 #[test]
 fn generated_evaluations_freeze_with_provenance_and_source_verification() {
     let directory = Directory::new();
@@ -392,6 +432,7 @@ fn generated_evaluations_freeze_with_provenance_and_source_verification() {
         fs::read_to_string(output.join("case-0000/scenario.chy")).unwrap(),
         suite.cases[0].source
     );
+    check_frozen_threshold_override(&directory, &evaluation, &suite);
     let mut scenario = chiyoda_core::parse(&suite.cases[0].source).unwrap();
     scenario.seed = scenario.seed.wrapping_add(1);
     fs::write(&source_path, chiyoda_core::format_scenario(&scenario)).unwrap();
@@ -457,4 +498,39 @@ fn negative_fixtures_are_reported_without_fake_telemetry_or_replay_links() {
         read::<Value>(&output.join("comparison.json"))["unchanged"],
         1
     );
+}
+
+#[test]
+fn malformed_case_sources_keep_failure_evidence_and_do_not_skip_later_cases() {
+    let directory = Directory::new();
+    let mut suite = small_suite();
+    let mut malformed = suite.cases[0].clone();
+    malformed.id = "../invalid | case".into();
+    malformed.source = "this is not Chiyoda source".into();
+    suite.cases.insert(0, malformed);
+    let path = directory.path("malformed.json");
+    write(&path, &suite);
+    let output = directory.path("run");
+    assert!(
+        !cli(&[
+            "benchmark",
+            "run",
+            "--suite",
+            text(&path),
+            "-o",
+            text(&output)
+        ])
+        .status
+        .success()
+    );
+    let report: BenchmarkReport = read(&output.join("report.json"));
+    report.verify().unwrap();
+    assert_eq!((report.passed, report.failed), (1, 1));
+    assert_eq!(
+        fs::read_to_string(output.join("case-0000/scenario.chy")).unwrap(),
+        suite.cases[0].source
+    );
+    assert!(!output.join("case-0000/run.json").exists());
+    assert!(output.join("case-0001/run.json").exists());
+    assert!(!directory.path("invalid | case").exists());
 }

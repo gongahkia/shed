@@ -97,7 +97,7 @@ impl Default for SpaceConfig {
             connector_kinds: vec![ConnectorKind::Stair, ConnectorKind::Lift],
             perturbations: true,
             require_connected: true,
-            max_attempts: 32,
+            max_attempts: 64,
             max_backtracks: 10_000,
             max_decisions: 100_000,
             modules: vec![],

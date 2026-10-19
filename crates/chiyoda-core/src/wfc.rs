@@ -462,6 +462,72 @@ fn invalid(message: impl Into<String>) -> SolveError {
 mod tests {
     use super::*;
 
+    #[test]
+    fn tiny_waves_agree_with_exhaustive_independent_constraint_enumeration() {
+        let mut random = Random::new(512);
+        for seed in 0..128 {
+            let tiles: Vec<_> = (0..4)
+                .map(|id| Tile {
+                    id: id.to_string(),
+                    weight: u32::try_from(random.below(20) + 1).unwrap(),
+                    sockets: std::array::from_fn(|_| random.below(2).to_string()),
+                })
+                .collect();
+            let forbidden_neighbors = (0..4)
+                .map(|_| ForbiddenNeighbor {
+                    tile: random.below(4).to_string(),
+                    direction: Direction::ALL[usize::try_from(random.below(4)).unwrap()],
+                    neighbor: random.below(4).to_string(),
+                })
+                .collect();
+            let rules = RuleSet {
+                tiles,
+                forbidden_neighbors,
+            };
+            let mut valid = Vec::new();
+            for encoded in 0_usize..256 {
+                let cells = [encoded % 4, encoded / 4 % 4, encoded / 16 % 4, encoded / 64];
+                let compatible = [
+                    (0, 1, Direction::East),
+                    (0, 2, Direction::South),
+                    (1, 3, Direction::South),
+                    (2, 3, Direction::East),
+                ]
+                .iter()
+                .all(|&(a, b, direction)| {
+                    let left = &rules.tiles[cells[a]];
+                    let right = &rules.tiles[cells[b]];
+                    left.sockets[direction.index()] == right.sockets[direction.opposite().index()]
+                        && !rules.forbidden_neighbors.iter().any(|rule| {
+                            (rule.tile == left.id
+                                && rule.neighbor == right.id
+                                && rule.direction == direction)
+                                || (rule.tile == right.id
+                                    && rule.neighbor == left.id
+                                    && rule.direction == direction.opposite())
+                        })
+                });
+                if compatible {
+                    valid.push(cells.map(|id| id.to_string()).to_vec());
+                }
+            }
+            match solve(
+                &rules,
+                &SolveOptions {
+                    width: 2,
+                    height: 2,
+                    seed,
+                    ..SolveOptions::default()
+                },
+                &[],
+            ) {
+                Ok(solution) => assert!(valid.contains(&solution.cells), "seed {seed}"),
+                Err(SolveError::Contradiction(_)) => assert!(valid.is_empty(), "seed {seed}"),
+                Err(error) => panic!("tiny search unexpectedly failed: {error}"),
+            }
+        }
+    }
+
     fn cycle_rules(size: usize) -> RuleSet {
         let tiles: Vec<_> = (0..size)
             .map(|i| Tile {

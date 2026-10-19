@@ -110,7 +110,7 @@ The bottleneck preset also needs a solid module and an east-west corridor.
 
 The default config uses a 5 by 4 grid, two floors, 6 m tiles, 2 m passages,
 four agents per floor, 0.3 m agent radii, 1.2 m/s walking speed, a 90 s
-duration, and a 0.2 s timestep. `connector_kinds` defaults to `["stair",
+duration, a 0.2 s timestep, and up to 64 generation attempts. `connector_kinds` defaults to `["stair",
 "lift"]`; a nonempty list of distinct `stair`, `ramp`, `escalator`, and `lift`
 values cycles across the two directed downward connectors per level.
 

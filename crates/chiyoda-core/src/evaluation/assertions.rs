@@ -273,6 +273,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_corrupted_trace_fails_speed_and_segment_assertions() {
+        let scenario = crate::parse("scenario \"corrupt\"\nseed 1\nduration 1s\ntimestep 1s\nsurface floor at (0m, 0m, 0m) size (10m, 10m)\nobstacle wall on floor at (4m, 3m, 0m) size (2m, 4m)\nexit out on floor at (9m, 5m, 0m) width 1m\nagents person count 1 on floor at (1m, 5m, 0m) to out speed 1m/s radius 0.3m height 1.7m\n").unwrap();
+        let mut bundle = crate::run(
+            &scenario,
+            crate::RunOptions {
+                trace_every_steps: 1,
+            },
+        )
+        .unwrap();
+        // Both endpoints are clear; the impossible one-second jump crosses
+        // the obstacle in between them.
+        bundle.trace[1].agents[0].x_m = 9.0;
+        bundle.trace[1].agents[0].y_m = 5.0;
+        let mut report = CaseReport::new(
+            "corrupted".into(),
+            None,
+            super::super::ExpectedReachability::Reachable,
+        );
+        check(&bundle, &Thresholds::default(), &mut report);
+        assert!(
+            report
+                .failures
+                .iter()
+                .any(|failure| failure.check == "walking_speed_bound")
+        );
+        assert!(
+            report
+                .failures
+                .iter()
+                .any(|failure| failure.check == "static_segment_clearance")
+        );
+    }
+
+    #[test]
     fn analytic_segment_check_catches_an_obstacle_between_clear_endpoints() {
         let obstacle = Obstacle {
             id: "wall".into(),

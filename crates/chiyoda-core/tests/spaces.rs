@@ -195,9 +195,14 @@ fn multi_floor_geometry_supports_all_connector_classes_and_large_spawn_grids() {
 fn connectivity_repairs_scale_to_larger_multi_floor_layouts() {
     // These previously exhausted every attempt by repeatedly rediscovering
     // isolated rooms. Repairs must retain their targets across attempts.
-    for (seed, width, height, floors) in
-        [(69, 5, 4, 2), (76, 5, 4, 2), (0, 8, 6, 3), (0, 16, 16, 4)]
-    {
+    for (seed, width, height, floors) in [
+        (69, 5, 4, 2),
+        (76, 5, 4, 2),
+        (0, 8, 6, 3),
+        (0, 16, 16, 4),
+        (25, 16, 16, 4),
+        (31, 16, 16, 4),
+    ] {
         let config = SpaceConfig {
             width,
             height,
@@ -246,4 +251,18 @@ fn configuration_rejects_unsafe_dimensions_unknown_fields_and_invalid_weights() 
     config.modules = config.catalog();
     config.modules[0].weight = 0;
     assert!(config.validate().is_err());
+}
+
+#[test]
+fn generator_v2_reference_source_has_a_stable_fingerprint() {
+    let generated = spaces::generate(73, &SpaceConfig::default()).unwrap();
+    assert_eq!(spaces::GENERATOR_VERSION, "2");
+    assert_eq!(
+        generated.manifest.source_sha256,
+        "d18a73717ecc78f5833c684c56e8c6d760b96e89124275513b4260b942ad74b0"
+    );
+    assert_eq!(
+        generated.manifest.scenario_hash,
+        "12f310e892790341b1b594c96c287e1641af9dab47413b8a10a87b8076da4a19"
+    );
 }

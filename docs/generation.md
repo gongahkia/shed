@@ -237,3 +237,6 @@ Malformed source does not count as a successful expected rejection.
 The JSON equivalent is a `fixtures` entry with `name`, literal `.chy` `source`,
 and `expected: "reachable"` or `"unreachable"`. Fixture source text is embedded
 in the saved config so later file edits cannot change an archived experiment.
+
+To hold selected layouts fixed while comparing runtime revisions, use
+[benchmark profiles, evaluation freezing, and baseline comparisons](benchmarks.md).

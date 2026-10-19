@@ -1,0 +1,4 @@
+{
+  "min_evacuated_fraction": 1.0,
+  "max_clearance_time_s": 90.0
+}

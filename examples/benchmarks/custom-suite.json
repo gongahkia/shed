@@ -1,0 +1,24 @@
+{
+  "benchmark_version": "1",
+  "name": "custom-walking",
+  "diagnostics": {"window_s": 5.0, "max_travel_m": 0.1},
+  "cases": [
+    {
+      "id": "custom-walk",
+      "description": "One pedestrian walks eight meters to an unconstrained exit.",
+      "source": "scenario \"custom walk\"\nseed 73\nduration 12s\ntimestep 100ms\nsurface floor at (0m, 0m, 0m) size (10m, 10m)\nexit out on floor at (9m, 5m, 0m) width 1m\nagents person count 1 on floor at (1m, 5m, 0m) to out speed 1.2m/s radius 0.3m height 1.7m\n",
+      "expected": "reachable",
+      "evaluation": {
+        "verify_replay": true,
+        "thresholds": {
+          "min_evacuated_fraction": 1.0,
+          "max_clearance_time_s": 10.0,
+          "max_queue_wait_agent_seconds": 0.0,
+          "max_avoidance_fallback_steps": 0,
+          "max_disc_overlap_m": 0.0,
+          "max_swept_disc_overlap_m": 0.0
+        }
+      }
+    }
+  ]
+}

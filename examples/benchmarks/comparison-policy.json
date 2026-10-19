@@ -1,0 +1,7 @@
+{
+  "default_tolerance": {"absolute": 0.0, "relative": 0.0},
+  "metrics": {
+    "clearance_time_s": {"absolute": 0.2, "relative": 0.02},
+    "queue_wait_agent_seconds": {"absolute": 0.5, "relative": 0.05}
+  }
+}

@@ -5,6 +5,7 @@
 
 mod avoidance;
 pub mod bundle;
+pub mod evaluation;
 pub mod formatter;
 pub mod generator;
 pub mod model;

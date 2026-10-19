@@ -1,0 +1,8 @@
+scenario "obstacle-detour"
+seed 1
+duration 25s
+timestep 0.2s
+surface floor at (0m, 0m, 0m) size (10m, 10m)
+obstacle island on floor at (4m, 3m, 0m) size (2m, 4m)
+exit out on floor at (9m, 5m, 0m) width 1m
+agents person count 1 on floor at (1m, 5m, 0m) to out speed 1m/s radius 0.3m height 1.7m

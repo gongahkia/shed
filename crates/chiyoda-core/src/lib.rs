@@ -11,6 +11,7 @@ pub mod model;
 pub mod parser;
 pub mod runtime;
 pub mod validate;
+pub mod wfc;
 
 pub use bundle::{
     AgentState, InformationDeliveryMetrics, InformationInterventionKind, MovementMetrics,

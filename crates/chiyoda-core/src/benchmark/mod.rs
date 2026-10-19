@@ -1,6 +1,7 @@
 //! Fixed-input regression benchmarks. These contracts test the reference
 //! runtime; their limits are not empirical pedestrian-model calibration.
 
+pub mod comparison;
 pub mod diagnostics;
 pub mod profiles;
 
@@ -316,6 +317,9 @@ impl BenchmarkReport {
                 ));
             }
             result.diagnosis.validate().map_err(invalid)?;
+            if let Some(metrics) = &result.evaluation.metrics {
+                validate_metrics(metrics)?;
+            }
         }
         let passed = self
             .cases
@@ -327,6 +331,51 @@ impl BenchmarkReport {
         }
         Ok(())
     }
+}
+
+fn validate_metrics(metrics: &crate::bundle::RunMetrics) -> Result<(), BenchmarkError> {
+    for metric in comparison::Metric::ALL {
+        comparison::metric_value(metrics, metric)?;
+    }
+    let finite = |value: f64| value.is_finite() && value >= 0.0;
+    if [
+        metrics.clearance_time_s,
+        metrics.last_exit_time_s,
+        metrics.mean_exit_time_s,
+    ]
+    .into_iter()
+    .flatten()
+    .any(|value| !finite(value))
+    {
+        return Err(invalid("timing metrics must be finite and nonnegative"));
+    }
+    if let Some(queue) = &metrics.queue_metrics {
+        let mut resources = vec![&queue.lift, &queue.connector, &queue.gate, &queue.exit];
+        if let Some(by_resource) = &queue.by_resource {
+            resources.extend(
+                by_resource
+                    .lifts
+                    .values()
+                    .chain(by_resource.connectors.values())
+                    .chain(by_resource.gates.values())
+                    .chain(by_resource.exits.values()),
+            );
+        }
+        if resources.iter().any(|queue| {
+            !finite(queue.cumulative_wait_agent_seconds)
+                || queue.ever_queued_agents > metrics.total_agents
+                || queue.peak_waiting_agents > metrics.total_agents
+        }) {
+            return Err(invalid("invalid queue telemetry"));
+        }
+    }
+    if metrics.movement_metrics.as_ref().is_some_and(|movement| {
+        !finite(movement.cumulative_local_clearance_adjustment_m)
+            || !finite(movement.maximum_local_clearance_adjustment_m)
+    }) {
+        return Err(invalid("invalid movement adjustment telemetry"));
+    }
+    Ok(())
 }
 
 #[derive(Debug, thiserror::Error)]

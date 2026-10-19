@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod benchmarks;
 mod spaces;
 
 #[derive(Debug, Parser)]
@@ -71,6 +72,8 @@ enum Command {
     },
     /// Evaluate seeded WFC spaces and authored fixtures, retaining every case.
     Evaluate(spaces::EvaluateArgs),
+    /// Run fixed benchmark profiles, freeze cases, and compare saved baselines.
+    Benchmark(benchmarks::BenchmarkArgs),
     /// Reconstruct and summarize a current run bundle.
     Replay { bundle: PathBuf },
 }
@@ -146,6 +149,7 @@ fn main() -> Result<()> {
         Command::GenerateSpace(args) => spaces::generate(&args)?,
         Command::SpaceRules { preset } => spaces::print_config(preset)?,
         Command::Evaluate(args) => spaces::evaluate(&args)?,
+        Command::Benchmark(args) => benchmarks::execute(&args)?,
         Command::Replay {
             bundle: bundle_path,
         } => {

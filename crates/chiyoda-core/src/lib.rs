@@ -9,6 +9,7 @@ pub mod formatter;
 pub mod generator;
 pub mod model;
 pub mod parser;
+pub mod reachability;
 pub mod runtime;
 pub mod validate;
 pub mod wfc;

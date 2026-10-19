@@ -16,12 +16,12 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub use catalog::{Module, ModuleKind, modules_for};
 pub use layout::FloorLayout;
 
-pub const GENERATOR_VERSION: &str = "1";
+pub const GENERATOR_VERSION: &str = "2";
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -278,7 +278,7 @@ pub struct GeneratedSpace {
 pub enum SpaceGenerationError {
     #[error("invalid space-generation config: {0}")]
     InvalidConfig(String),
-    #[error("space generation exhausted its attempts: {attempts:?}")]
+    #[error("space generation exhausted {} attempts", .attempts.len())]
     Exhausted { attempts: Vec<GenerationAttempt> },
 }
 
@@ -290,6 +290,7 @@ pub fn generate(seed: u64, config: &SpaceConfig) -> Result<GeneratedSpace, Space
     let rules = config.rules(&catalog);
     let mut random = wfc::Random::new(seed);
     let mut attempts = Vec::new();
+    let mut repair_targets = vec![BTreeSet::new(); config.floors as usize];
     for attempt in 1..=config.max_attempts {
         let mut record = GenerationAttempt {
             attempt,
@@ -299,17 +300,30 @@ pub fn generate(seed: u64, config: &SpaceConfig) -> Result<GeneratedSpace, Space
         let mut floors = Vec::new();
         for floor in 0..config.floors {
             let floor_seed = random.next();
-            match layout::generate_floor(config, &catalog, &rules, floor, floor_seed) {
+            match layout::generate_floor(
+                config,
+                &catalog,
+                &rules,
+                floor,
+                floor_seed,
+                &repair_targets[floor as usize],
+            ) {
                 Ok(layout) => {
                     record.floor_searches.push(FloorSearch {
                         floor,
                         seed: floor_seed,
                         stats: layout.solution.stats.clone(),
                     });
-                    if config.require_connected && !layout::is_connected(&layout, &catalog) {
+                    let disconnected =
+                        layout::disconnected_cells(&layout, &catalog, layout::spawn(config));
+                    if config.require_connected && !disconnected.is_empty() {
+                        let isolated_count = disconnected.len();
+                        repair_targets[floor as usize].extend(disconnected);
                         record.rejection = Some(Rejection {
                             kind: RejectionKind::DisconnectedLayout,
-                            detail: format!("floor {floor} contains isolated walkable modules"),
+                            detail: format!(
+                                "floor {floor} contains {isolated_count} isolated walkable modules; reserve connecting paths next attempt"
+                            ),
                         });
                         break;
                     }
@@ -340,38 +354,9 @@ pub fn generate(seed: u64, config: &SpaceConfig) -> Result<GeneratedSpace, Space
             continue;
         }
         match finish(seed, config, &catalog, &floors) {
-            Ok((source, scenario, reachability)) => {
+            Ok(finished) => {
                 attempts.push(record);
-                let mut tile_counts = catalog
-                    .iter()
-                    .map(|module| (module.id.clone(), 0))
-                    .collect::<BTreeMap<_, _>>();
-                for floor in &floors {
-                    for id in &floor.solution.cells {
-                        *tile_counts.get_mut(id).expect("solved tile exists") += 1;
-                    }
-                }
-                let manifest = GenerationManifest {
-                    generator_version: GENERATOR_VERSION.into(),
-                    solver_version: wfc::SOLVER_VERSION.into(),
-                    runtime_version: crate::RUNTIME_VERSION.into(),
-                    seed,
-                    config: config.clone(),
-                    config_hash: canonical_hash(config),
-                    catalog: catalog.clone(),
-                    rules_hash: canonical_hash(&rules),
-                    source_sha256: format!("{:x}", Sha256::digest(source.as_bytes())),
-                    scenario_hash: canonical_hash(&CanonicalScenario::from(scenario.clone())),
-                    attempts,
-                    floors,
-                    tile_counts,
-                    reachability,
-                };
-                return Ok(GeneratedSpace {
-                    source,
-                    scenario,
-                    manifest,
-                });
+                return Ok(assemble(seed, config, &catalog, floors, attempts, finished));
             }
             Err(rejection) => {
                 record.rejection = Some(rejection);
@@ -380,6 +365,47 @@ pub fn generate(seed: u64, config: &SpaceConfig) -> Result<GeneratedSpace, Space
         }
     }
     Err(SpaceGenerationError::Exhausted { attempts })
+}
+
+fn assemble(
+    seed: u64,
+    config: &SpaceConfig,
+    catalog: &[Module],
+    floors: Vec<FloorLayout>,
+    attempts: Vec<GenerationAttempt>,
+    finished: (String, Scenario, ReachabilityReport),
+) -> GeneratedSpace {
+    let (source, scenario, reachability) = finished;
+    let mut tile_counts = catalog
+        .iter()
+        .map(|module| (module.id.clone(), 0))
+        .collect::<BTreeMap<_, _>>();
+    for floor in &floors {
+        for id in &floor.solution.cells {
+            *tile_counts.get_mut(id).expect("solved tile exists") += 1;
+        }
+    }
+    let manifest = GenerationManifest {
+        generator_version: GENERATOR_VERSION.into(),
+        solver_version: wfc::SOLVER_VERSION.into(),
+        runtime_version: crate::RUNTIME_VERSION.into(),
+        seed,
+        config: config.clone(),
+        config_hash: canonical_hash(config),
+        catalog: catalog.to_vec(),
+        rules_hash: canonical_hash(&config.rules(catalog)),
+        source_sha256: format!("{:x}", Sha256::digest(source.as_bytes())),
+        scenario_hash: canonical_hash(&CanonicalScenario::from(scenario.clone())),
+        attempts,
+        floors,
+        tile_counts,
+        reachability,
+    };
+    GeneratedSpace {
+        source,
+        scenario,
+        manifest,
+    }
 }
 
 fn finish(

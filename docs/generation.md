@@ -125,7 +125,11 @@ generation does not infer them from widths or a real facility.
 The solver performs weighted minimum-entropy choices, adjacency propagation,
 and chronological backtracking. `max_backtracks` and `max_decisions` bound each
 floor's search. `max_attempts` bounds whole-space attempts, including rejection
-of disconnected floor layouts or invalid geometry. Contradiction and budget
+of disconnected floor layouts or invalid geometry. After a disconnected layout, generator
+version 2 retains the isolated cells as repair targets and reserves connecting
+paths in subsequent attempts. WFC still chooses modules and additional
+connections under all local rules and pins. Noncritical scaffold cells may be
+kiosks because their bypass geometry connects their openings. Contradiction and budget
 exhaustion are different recorded outcomes.
 
 `require_connected` defaults to true: every nonsolid module on each floor must

@@ -10,6 +10,7 @@ pub struct FloorLayout {
     pub floor: u32,
     pub seed: u64,
     pub reserved: Vec<CellConstraint>,
+    pub repair_targets: Vec<(u32, u32)>,
     pub solution: Solution,
 }
 
@@ -29,6 +30,7 @@ pub(super) fn generate_floor(
     rules: &RuleSet,
     floor: u32,
     seed: u64,
+    repair_targets: &BTreeSet<(u32, u32)>,
 ) -> Result<FloorLayout, SolveError> {
     let mut random = Random::new(seed ^ 0x53ca_ff01_d000_0001);
     let root = spawn(config);
@@ -39,6 +41,7 @@ pub(super) fn generate_floor(
         targets.extend(exits(config));
     }
     halls.extend(targets.iter().copied());
+    targets.extend(repair_targets.iter().copied());
     let choke = (config.width / 2, config.height / 2);
     for target in targets {
         if config.preset == Preset::Bottleneck && target.0 > choke.0 {
@@ -58,7 +61,7 @@ pub(super) fn generate_floor(
                 let kind_allowed = if halls.contains(&(x, y)) {
                     module.kind == ModuleKind::Hall
                 } else {
-                    matches!(module.kind, ModuleKind::Hall | ModuleKind::Corridor)
+                    module.kind != ModuleKind::Solid
                 };
                 kind_allowed
                     && openings
@@ -103,6 +106,7 @@ pub(super) fn generate_floor(
         floor,
         seed,
         reserved,
+        repair_targets: repair_targets.iter().copied().collect(),
         solution,
     })
 }
@@ -186,7 +190,11 @@ fn walk(
     }
 }
 
-pub(super) fn is_connected(layout: &FloorLayout, catalog: &[Module]) -> bool {
+pub(super) fn disconnected_cells(
+    layout: &FloorLayout,
+    catalog: &[Module],
+    root: (u32, u32),
+) -> Vec<(u32, u32)> {
     let modules: Vec<_> = layout
         .solution
         .cells
@@ -198,12 +206,7 @@ pub(super) fn is_connected(layout: &FloorLayout, catalog: &[Module]) -> bool {
                 .expect("solved tile exists")
         })
         .collect();
-    let Some(start) = modules
-        .iter()
-        .position(|module| module.kind != ModuleKind::Solid)
-    else {
-        return false;
-    };
+    let start = (root.1 * layout.solution.width + root.0) as usize;
     let width = layout.solution.width as usize;
     let height = layout.solution.height as usize;
     let mut visited = BTreeSet::from([start]);
@@ -226,9 +229,15 @@ pub(super) fn is_connected(layout: &FloorLayout, catalog: &[Module]) -> bool {
             }
         }
     }
-    visited.len()
-        == modules
-            .iter()
-            .filter(|module| module.kind != ModuleKind::Solid)
-            .count()
+    modules
+        .iter()
+        .enumerate()
+        .filter(|(index, module)| module.kind != ModuleKind::Solid && !visited.contains(index))
+        .map(|(index, _)| {
+            (
+                u32::try_from(index % width).expect("bounded width"),
+                u32::try_from(index / width).expect("bounded height"),
+            )
+        })
+        .collect()
 }

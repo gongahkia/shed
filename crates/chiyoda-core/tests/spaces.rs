@@ -192,6 +192,34 @@ fn multi_floor_geometry_supports_all_connector_classes_and_large_spawn_grids() {
 }
 
 #[test]
+fn connectivity_repairs_scale_to_larger_multi_floor_layouts() {
+    // These previously exhausted every attempt by repeatedly rediscovering
+    // isolated rooms. Repairs must retain their targets across attempts.
+    for (seed, width, height, floors) in
+        [(69, 5, 4, 2), (76, 5, 4, 2), (0, 8, 6, 3), (0, 16, 16, 4)]
+    {
+        let config = SpaceConfig {
+            width,
+            height,
+            floors,
+            agents_per_floor: 1,
+            ..SpaceConfig::default()
+        };
+        let generated = spaces::generate(seed, &config)
+            .unwrap_or_else(|error| panic!("{width}x{height}x{floors}, seed {seed}: {error}"));
+        assert!(generated.manifest.reachability.is_reachable());
+        assert!(
+            generated
+                .manifest
+                .floors
+                .iter()
+                .any(|floor| !floor.repair_targets.is_empty())
+        );
+        assert!(generated.manifest.attempts.len() <= config.max_attempts as usize);
+    }
+}
+
+#[test]
 fn configuration_rejects_unsafe_dimensions_unknown_fields_and_invalid_weights() {
     assert!(serde_json::from_str::<SpaceConfig>(r#"{"widht": 8}"#).is_err());
     for config in [

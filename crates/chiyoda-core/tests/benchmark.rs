@@ -218,4 +218,87 @@ fn expected_unreachable_cases_have_no_simulation_metrics_or_replay_requirement()
     let comparison = comparison::compare(&report, &report, &ComparisonPolicy::default()).unwrap();
     assert!(comparison.is_success());
     assert!(comparison.cases[0].metrics.is_empty());
+    let markdown = benchmark::rendering::comparison_markdown(
+        &comparison,
+        &report,
+        std::path::Path::new("baseline"),
+        std::path::Path::new("current"),
+    );
+    assert!(!markdown.contains("chiyoda-replay"));
+}
+
+#[test]
+fn evaluation_freezing_preserves_exact_sources_and_rejects_missing_or_edited_cases() {
+    use chiyoda_core::evaluation::{self, SuiteConfig, SuiteReport};
+    let mut config = SuiteConfig {
+        seeds: vec![73],
+        ..SuiteConfig::default()
+    };
+    config.generation.width = 4;
+    config.generation.height = 4;
+    config.generation.floors = 1;
+    config.generation.agents_per_floor = 1;
+    config.generation.duration_s = 0.2;
+    let evaluation = evaluation::evaluate_seed(73, &config.generation, &config.evaluation);
+    let source = evaluation.source.unwrap();
+    let report = SuiteReport::from_cases(config, vec![evaluation.report]).unwrap();
+    let sources = vec![source.clone()];
+    let frozen = benchmark::freeze::from_evaluation(&report, &sources, "frozen").unwrap();
+    assert_eq!(frozen.cases[0].source, source);
+    assert_eq!(frozen.cases[0].evaluation, report.config.evaluation);
+    assert_eq!(
+        frozen.origin.unwrap().report_hash,
+        chiyoda_core::bundle::canonical_hash(&report)
+    );
+    assert!(benchmark::freeze::from_evaluation(&report, &[], "frozen").is_err());
+    assert!(
+        benchmark::freeze::from_evaluation(
+            &report,
+            &[source
+                .replace("duration 200ms", "duration 1s")
+                .replace("duration 0.2s", "duration 1s")],
+            "frozen"
+        )
+        .is_err()
+    );
+    let mut corrupt = report;
+    corrupt.passed += 1;
+    assert!(benchmark::freeze::from_evaluation(&corrupt, &sources, "frozen").is_err());
+}
+
+#[test]
+fn reports_show_deltas_failures_and_allow_cross_runtime_comparison() {
+    let baseline = simple_report();
+    let mut current = baseline.clone();
+    current.runtime_version = "next-runtime".into();
+    current.label = Some("candidate | <test>".into());
+    current.report_hash.clear();
+    current.report_hash = chiyoda_core::bundle::canonical_hash(&current);
+    assert!(
+        comparison::compare(&baseline, &current, &ComparisonPolicy::default())
+            .unwrap()
+            .is_success()
+    );
+    let markdown = benchmark::rendering::run_markdown(&current).unwrap();
+    assert!(markdown.contains("candidate \\| &lt;test&gt;"));
+    assert!(markdown.contains("chiyoda-replay './case-0000/run.json' --paused"));
+    assert!(markdown.contains("1/2") || markdown.contains("2/2"));
+    current.cases[0]
+        .evaluation
+        .metrics
+        .as_mut()
+        .unwrap()
+        .clearance_time_s = Some(10.0);
+    let current = reseal(current);
+    let comparison =
+        comparison::compare(&baseline, &current, &ComparisonPolicy::default()).unwrap();
+    let markdown = benchmark::rendering::comparison_markdown(
+        &comparison,
+        &current,
+        std::path::Path::new("base path"),
+        std::path::Path::new("current path"),
+    );
+    assert!(markdown.contains("clearance_time_s"));
+    assert!(markdown.contains("REGRESSED"));
+    assert!(markdown.contains("base%20path/case-0000/scenario.chy"));
 }

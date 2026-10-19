@@ -3,7 +3,9 @@
 
 pub mod comparison;
 pub mod diagnostics;
+pub mod freeze;
 pub mod profiles;
+pub mod rendering;
 
 use crate::{
     RunBundle,
@@ -57,9 +59,20 @@ pub struct BenchmarkCase {
 pub struct BenchmarkSuite {
     pub benchmark_version: String,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<EvaluationOrigin>,
     #[serde(default)]
     pub diagnostics: DiagnosticOptions,
     pub cases: Vec<BenchmarkCase>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvaluationOrigin {
+    pub evaluation_version: String,
+    pub runtime_version: String,
+    /// Canonical JSON hash of the original evaluation summary.
+    pub report_hash: String,
 }
 
 impl BenchmarkSuite {

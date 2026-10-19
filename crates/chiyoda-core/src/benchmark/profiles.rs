@@ -84,6 +84,7 @@ pub fn suite(name: &str) -> Result<BenchmarkSuite, BenchmarkError> {
     let suite = BenchmarkSuite {
         benchmark_version: BENCHMARK_VERSION.into(),
         name: name.into(),
+        origin: None,
         diagnostics: super::diagnostics::DiagnosticOptions::default(),
         cases,
     };

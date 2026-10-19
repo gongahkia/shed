@@ -1,0 +1,9 @@
+scenario "benchmark-counterflow"
+seed 1
+duration 35s
+timestep 0.2s
+surface floor at (0m, 0m, 0m) size (24m, 6m)
+exit east on floor at (23m, 3m, 0m) width 2m
+exit west on floor at (1m, 3m, 0m) width 2m
+agents eastbound count 2 on floor at (3m, 2.2m, 0m) to east speed 1.2m/s radius 0.25m height 1.7m
+agents westbound count 2 on floor at (20m, 3.3m, 0m) to west speed 1.2m/s radius 0.25m height 1.7m

@@ -1,0 +1,7 @@
+scenario "benchmark-free-walk"
+seed 1
+duration 12s
+timestep 0.2s
+surface floor at (0m, 0m, 0m) size (12m, 6m)
+exit out on floor at (11m, 3m, 0m) width 1m
+agents person count 1 on floor at (1m, 3m, 0m) to out speed 1.2m/s radius 0.3m height 1.7m

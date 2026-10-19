@@ -1,0 +1,13 @@
+scenario "benchmark-crossing"
+seed 1
+duration 25s
+timestep 0.2s
+surface floor at (0m, 0m, 0m) size (12m, 12m)
+exit east on floor at (11m, 5.6m, 0m) width 1m
+exit west on floor at (1m, 6.4m, 0m) width 1m
+exit south on floor at (5.6m, 11m, 0m) width 1m
+exit north on floor at (6.4m, 1m, 0m) width 1m
+agents eastbound count 1 on floor at (1m, 5.6m, 0m) to east speed 1.2m/s radius 0.25m height 1.7m
+agents westbound count 1 on floor at (11m, 6.4m, 0m) to west speed 1.2m/s radius 0.25m height 1.7m release 1s
+agents southbound count 1 on floor at (5.6m, 1m, 0m) to south speed 1.2m/s radius 0.25m height 1.7m release 3s
+agents northbound count 1 on floor at (6.4m, 11m, 0m) to north speed 1.2m/s radius 0.25m height 1.7m release 2s

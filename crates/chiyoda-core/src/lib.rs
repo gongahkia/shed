@@ -4,6 +4,7 @@
 //! so a compatible installation can reproduce a run bundle.
 
 mod avoidance;
+pub mod benchmark;
 pub mod bundle;
 pub mod evaluation;
 pub mod formatter;

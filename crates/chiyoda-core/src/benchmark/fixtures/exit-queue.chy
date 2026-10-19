@@ -1,0 +1,8 @@
+scenario "benchmark-exit-queue"
+seed 1
+duration 45s
+timestep 0.2s
+surface floor at (0m, 0m, 0m) size (12m, 6m)
+exit out on floor at (11m, 3m, 0m) width 2m capacity 0.5/s
+queue-grid standing exit out on floor from (9m, 3m, 0m) to (5m, 3m, 0m) width 2m lanes 2 slots 4
+agents people count 4 on floor at (1m, 4m, 0m) to out speed 1.2m/s radius 0.3m height 1.7m

@@ -1,0 +1,9 @@
+scenario "benchmark-queue-grid"
+seed 1
+duration 80s
+timestep 0.2s
+surface floor at (0m, 0m, 0m) size (16m, 8m)
+exit out on floor at (15m, 3m, 0m) width 2m
+gate fare on floor at (11m, 3m, 0m) width 2m capacity 0.5/s to out
+queue-grid standing gate fare on floor from (10m, 3m, 0m) to (4m, 3m, 0m) width 2m lanes 2 slots 6
+agents people count 6 on floor at (1m, 5m, 0m) to out speed 1.2m/s radius 0.3m height 1.7m

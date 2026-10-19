@@ -1,0 +1,11 @@
+scenario "benchmark-connector-closure"
+seed 1
+duration 40s
+timestep 0.2s
+surface upper at (0m, 0m, 3m) size (16m, 8m)
+surface lower at (0m, 0m, 0m) size (16m, 8m)
+exit out on lower at (15m, 4m, 0m) width 2m
+stair quick from upper at (5m, 4m, 3m) to lower at (10m, 4m, 0m) width 2m capacity 1/s
+stair detour from upper at (10m, 4m, 3m) to lower at (5m, 4m, 0m) width 2m capacity 1/s
+connector-state closure connector quick closed time 1s
+agents people count 2 on upper at (1m, 3m, 3m) to out speed 1.2m/s radius 0.3m height 1.7m

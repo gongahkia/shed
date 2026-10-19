@@ -2,6 +2,8 @@
 
 use crate::{ParseError, Scenario, parse, validate};
 
+pub mod spaces;
+
 /// Generate a small multi-level transit scenario from a stable seed.
 ///
 /// The generated source is a structural example, not a facility model.

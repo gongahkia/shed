@@ -20,6 +20,7 @@ use std::{
 };
 
 mod knowledge;
+mod motion_guard;
 mod static_domain;
 mod walk_visibility;
 
@@ -404,6 +405,77 @@ struct OnSurfaceMovement<'a> {
 }
 
 #[derive(Debug)]
+struct SurfaceTarget {
+    target: Point3,
+    next_connector: Option<usize>,
+    final_gate: Option<String>,
+    reached_waypoint: Option<(String, f64)>,
+    service_resource: Option<PortalResource>,
+    queue_slot: Option<(PortalResource, QueueSlotAssignment, bool)>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MotionProposal {
+    end: Point3,
+    planned: Point3,
+    goal: Option<(Point3, f64)>,
+    constraint_fallback: bool,
+}
+
+#[derive(Debug)]
+struct SurfaceStep {
+    target: SurfaceTarget,
+    proposal: MotionProposal,
+    limited: bool,
+}
+
+fn plan_surface_steps(
+    scenario: &Scenario,
+    agents: &[Agent],
+    queues: &PhysicalQueueSnapshot,
+    snapshot: &mut LocalMotionSnapshot,
+    spatial: &SpatialIndex,
+    elapsed_s: f64,
+) -> Vec<Option<SurfaceStep>> {
+    agents
+        .iter()
+        .enumerate()
+        .map(|(index, agent)| {
+            if !matches!(agent.motion, Motion::OnSurface) || agent.waiting_for_route {
+                return None;
+            }
+            let target = selected_surface_target(scenario, agent, index, queues);
+            let proposal = plan_movement(
+                agent,
+                index,
+                OnSurfaceMovement {
+                    target: target.target,
+                    surface: surface_for(scenario, &agent.surface),
+                    obstacles: &scenario.obstacles,
+                    target_requires_local_clearance: target.reached_waypoint.is_some()
+                        || target.queue_slot.is_some(),
+                },
+                elapsed_s,
+                snapshot,
+                spatial,
+            );
+            snapshot.commit_queue_grid_velocity(
+                index,
+                Vec2 {
+                    x: (proposal.end.x_m - agent.position.x_m) / elapsed_s,
+                    y: (proposal.end.y_m - agent.position.y_m) / elapsed_s,
+                },
+            );
+            Some(SurfaceStep {
+                target,
+                proposal,
+                limited: false,
+            })
+        })
+        .collect()
+}
+
+#[derive(Debug)]
 struct LocalMotionSnapshot {
     agents: Vec<Option<AvoidanceAgent>>,
     /// A same-step velocity published only by an earlier member of an
@@ -573,6 +645,7 @@ struct MovementTelemetry {
     adjusted_agents: HashSet<String>,
     adjustment_steps: u64,
     constraint_fallback_steps: u64,
+    guard_steps: u64,
     disc_overlap_agents: HashSet<String>,
     disc_overlap_pair_steps: u64,
     maximum_disc_overlap_m: f64,
@@ -693,6 +766,7 @@ impl MovementTelemetry {
 
     fn metrics(&self) -> MovementMetrics {
         MovementMetrics {
+            swept_motion_guard_steps: Some(self.guard_steps),
             agents_with_local_clearance_adjustments: u32::try_from(self.adjusted_agents.len())
                 .expect("agent count fits u32"),
             local_clearance_adjustment_steps: self.adjustment_steps,
@@ -1815,16 +1889,16 @@ pub fn run(scenario: &Scenario, options: RunOptions) -> Result<RunBundle, RunErr
         ),
         (
             "local_motion".to_owned(),
-            "snapshot-orca-f64-horizon-2.5s-fifo-grid-predecessor-velocity-handoff-0.42"
+            "snapshot-orca-f64-static-domain-right-hand-cruising-preference-swept-guard-0.45"
                 .to_owned(),
         ),
         (
             "portal_landing".to_owned(),
-            "authored-lanes-clear-or-retain-transit-0.42".to_owned(),
+            "authored-lanes-and-complete-surface-motion-envelope-clear-or-retain-transit-0.45".to_owned(),
         ),
         (
             "queue_geometry".to_owned(),
-            "authored-fifo-line-capacity-denial-or-serpentine-grid-preallocated-slots-fifo-priority-predecessor-velocity-handoff-physical-entry-reserve-lift-capacity-or-service-token-0.42"
+            "authored-fifo-standing-slots-physical-entry-stationary-holds-immediate-conflict-safe-priority-service-reservations-0.45"
                 .to_owned(),
         ),
         (
@@ -1833,7 +1907,7 @@ pub fn run(scenario: &Scenario, options: RunOptions) -> Result<RunBundle, RunErr
         ),
         (
             "release_admission".to_owned(),
-            "scheduled-eligibility-then-dynamic-spawn-disc-clearance-0.42".to_owned(),
+            "scheduled-eligibility-then-strict-dynamic-spawn-disc-clearance-0.45".to_owned(),
         ),
         (
             "on_surface_clearance_audit".to_owned(),
@@ -3048,6 +3122,16 @@ fn integrate(
         let token = resources.exit_tokens.entry(exit.id.clone()).or_default();
         *token = (*token + capacity_per_s * step_elapsed_s).min(capacity_per_s.max(1.0));
     }
+    let mut surface_steps = plan_surface_steps(
+        scenario,
+        agents,
+        &physical_queue_snapshot,
+        &mut local_motion_snapshot,
+        &local_motion_spatial_index,
+        step_elapsed_s,
+    );
+    motion_guard::limit(agents, &mut surface_steps, &local_motion_spatial_index);
+    let motion_envelopes = motion_guard::envelopes(agents, &surface_steps);
     for (index, agent) in agents.iter_mut().enumerate() {
         let current_surface_id = agent.surface.clone();
         let agent_radius_m = agent.radius_m;
@@ -3100,6 +3184,20 @@ fn integrate(
                         )
                         .unwrap_or(planned_arrival)
                     };
+                    if !landing_position_is_clear(
+                        agent_radius_m,
+                        resolved_arrival,
+                        landing_surface,
+                        &scenario.obstacles,
+                        &spatial_index,
+                    ) || !motion_guard::landing_is_clear(
+                        &motion_envelopes,
+                        &landing_surface.id,
+                        resolved_arrival,
+                        agent_radius_m,
+                    ) {
+                        continue;
+                    }
                     if scenario.connectors[*connector_index].is_lift() {
                         let load = lift_loads.entry(*connector_index).or_default();
                         *load = load.saturating_sub(1);
@@ -3145,107 +3243,40 @@ fn integrate(
                 if agent.waiting_for_route {
                     continue;
                 }
-                let (mut target, next_connector, final_gate, reached_waypoint, service_resource) =
-                    if let Some(&connector_index) = agent.route.get(agent.route_cursor) {
-                        let connector = &scenario.connectors[connector_index];
-                        (
-                            connector_portal_position(scenario, connector, true, &agent.id),
-                            Some(connector_index),
-                            None,
-                            None,
-                            Some(PortalResource::Connector {
-                                id: connector.id().to_owned(),
-                            }),
-                        )
-                    } else {
-                        let target =
-                            agent_target(scenario, agent).expect("validated journey target exists");
-                        if target.is_exit {
-                            let gate = agent
-                                .final_gate
-                                .as_deref()
-                                .filter(|gate_id| !agent.passed_gates.contains(*gate_id))
-                                .and_then(|gate_id| {
-                                    scenario.gates.iter().find(|gate| gate.id == gate_id)
-                                });
-                            if let Some(gate) = gate {
-                                (
-                                    portal_position(
-                                        scenario.portal_lanes_for_gate(&gate.id),
-                                        gate.at,
-                                        gate.width_m,
-                                        &agent.id,
-                                    ),
-                                    None,
-                                    Some(gate.id.clone()),
-                                    None,
-                                    Some(PortalResource::Gate {
-                                        id: gate.id.clone(),
-                                    }),
-                                )
-                            } else {
-                                let exit = scenario
-                                    .exits
-                                    .iter()
-                                    .find(|exit| exit.id == target.id)
-                                    .expect("validated final exit exists");
-                                (
-                                    portal_position(
-                                        scenario.portal_lanes_for_exit(&exit.id),
-                                        exit.at,
-                                        exit.width_m,
-                                        &agent.id,
-                                    ),
-                                    None,
-                                    None,
-                                    None,
-                                    Some(PortalResource::Exit {
-                                        id: exit.id.clone(),
-                                    }),
-                                )
-                            }
-                        } else {
-                            (
-                                target.at,
-                                None,
-                                None,
-                                Some((target.id, target.dwell_s)),
-                                None,
-                            )
-                        }
-                    };
-                let queue_slot = agent.queue_membership.as_ref().map(|membership| {
-                    debug_assert_eq!(Some(&membership.resource), service_resource.as_ref());
-                    let footprint = scenario
-                        .queue_footprint_for_resource(&membership.resource)
-                        .expect("validated queue membership has an authored footprint");
-                    let assignment = physical_queue_snapshot
-                        .assignment(index)
-                        .expect("queued agent has a snapshot assignment");
-                    target = footprint.position(assignment.rank);
-                    (membership.resource.clone(), assignment, membership.entered)
-                });
-                let surface = scenario
-                    .surfaces
-                    .iter()
-                    .find(|surface| surface.id == agent.surface)
-                    .expect("validated surface exists");
-                let reached = move_toward(
-                    agent,
-                    index,
-                    OnSurfaceMovement {
-                        target,
-                        surface,
-                        obstacles: &scenario.obstacles,
-                        target_requires_local_clearance: reached_waypoint.is_some()
-                            || queue_slot.is_some(),
-                    },
-                    step_elapsed_s,
-                    &local_motion_snapshot,
-                    &local_motion_spatial_index,
-                    movement_telemetry,
-                );
-                local_motion_snapshot.commit_queue_grid_velocity(index, agent.velocity);
+                let Some(step) = surface_steps[index].take() else {
+                    continue;
+                };
+                let SurfaceTarget {
+                    next_connector,
+                    final_gate,
+                    reached_waypoint,
+                    service_resource,
+                    queue_slot,
+                    ..
+                } = step.target;
+                let previous_position = agent.position;
+                agent.position = step.proposal.end;
+                agent.velocity = Vec2 {
+                    x: (agent.position.x_m - previous_position.x_m) / step_elapsed_s,
+                    y: (agent.position.y_m - previous_position.y_m) / step_elapsed_s,
+                };
+                movement_telemetry.record(&agent.id, step.proposal.planned, agent.position);
+                if step.limited {
+                    movement_telemetry.guard_steps += 1;
+                    events.push(RunEvent {
+                        time_s,
+                        kind: "local_motion_limited_for_clearance".into(),
+                        subject: agent.id.clone(),
+                        detail: "proposed segment shortened to retain swept disc clearance".into(),
+                    });
+                }
+                let reached = LocalMovementOutcome {
+                    reached: step
+                        .proposal
+                        .goal
+                        .is_some_and(|(point, radius)| agent.position.distance(point) <= radius),
+                    constraint_fallback: step.proposal.constraint_fallback,
+                };
                 if reached.constraint_fallback {
                     movement_telemetry.record_constraint_fallback();
                     events.push(RunEvent {
@@ -3645,6 +3676,99 @@ fn portal_lane_index(lanes: &PortalLanes, agent_id: &str) -> u32 {
     u32::try_from(hash % u64::from(lanes.count)).expect("remainder fits the lane count")
 }
 
+fn selected_surface_target(
+    scenario: &Scenario,
+    agent: &Agent,
+    index: usize,
+    physical_queue_snapshot: &PhysicalQueueSnapshot,
+) -> SurfaceTarget {
+    let (mut target, next_connector, final_gate, reached_waypoint, service_resource) =
+        if let Some(&connector_index) = agent.route.get(agent.route_cursor) {
+            let connector = &scenario.connectors[connector_index];
+            (
+                connector_portal_position(scenario, connector, true, &agent.id),
+                Some(connector_index),
+                None,
+                None,
+                Some(PortalResource::Connector {
+                    id: connector.id().to_owned(),
+                }),
+            )
+        } else {
+            let target = agent_target(scenario, agent).expect("validated journey target exists");
+            if target.is_exit {
+                let gate = agent
+                    .final_gate
+                    .as_deref()
+                    .filter(|gate_id| !agent.passed_gates.contains(*gate_id))
+                    .and_then(|gate_id| scenario.gates.iter().find(|gate| gate.id == gate_id));
+                if let Some(gate) = gate {
+                    (
+                        portal_position(
+                            scenario.portal_lanes_for_gate(&gate.id),
+                            gate.at,
+                            gate.width_m,
+                            &agent.id,
+                        ),
+                        None,
+                        Some(gate.id.clone()),
+                        None,
+                        Some(PortalResource::Gate {
+                            id: gate.id.clone(),
+                        }),
+                    )
+                } else {
+                    let exit = scenario
+                        .exits
+                        .iter()
+                        .find(|exit| exit.id == target.id)
+                        .expect("validated final exit exists");
+                    (
+                        portal_position(
+                            scenario.portal_lanes_for_exit(&exit.id),
+                            exit.at,
+                            exit.width_m,
+                            &agent.id,
+                        ),
+                        None,
+                        None,
+                        None,
+                        Some(PortalResource::Exit {
+                            id: exit.id.clone(),
+                        }),
+                    )
+                }
+            } else {
+                (
+                    target.at,
+                    None,
+                    None,
+                    Some((target.id, target.dwell_s)),
+                    None,
+                )
+            }
+        };
+    let queue_slot = agent.queue_membership.as_ref().map(|membership| {
+        debug_assert_eq!(Some(&membership.resource), service_resource.as_ref());
+        let footprint = scenario
+            .queue_footprint_for_resource(&membership.resource)
+            .expect("validated queue membership has an authored footprint");
+        let assignment = physical_queue_snapshot
+            .assignment(index)
+            .expect("queued agent has a snapshot assignment");
+        target = footprint.position(assignment.rank);
+        (membership.resource.clone(), assignment, membership.entered)
+    });
+    SurfaceTarget {
+        target,
+        next_connector,
+        final_gate,
+        reached_waypoint,
+        service_resource,
+        queue_slot,
+    }
+}
+
 fn record_waypoint_arrival(
     agent: &mut Agent,
     waypoint_id: String,
@@ -3902,15 +4026,14 @@ struct LocalMovementOutcome {
     constraint_fallback: bool,
 }
 
-fn move_toward(
-    agent: &mut Agent,
+fn plan_movement(
+    agent: &Agent,
     runtime_index: usize,
     movement: OnSurfaceMovement<'_>,
     timestep_s: f64,
     local_motion_snapshot: &LocalMotionSnapshot,
     local_motion_spatial_index: &SpatialIndex,
-    movement_telemetry: &mut MovementTelemetry,
-) -> LocalMovementOutcome {
+) -> MotionProposal {
     let Some(path) = shortest_walk_path_on_surface(
         movement.surface,
         movement.obstacles,
@@ -3918,8 +4041,10 @@ fn move_toward(
         movement.target,
         agent.radius_m,
     ) else {
-        return LocalMovementOutcome {
-            reached: false,
+        return MotionProposal {
+            end: agent.position,
+            planned: agent.position,
+            goal: None,
             constraint_fallback: false,
         };
     };
@@ -3994,11 +4119,6 @@ fn move_toward(
         movement.obstacles,
         agent.radius_m,
     );
-    agent.velocity = Vec2 {
-        x: (next.x_m - agent.position.x_m) / timestep_s,
-        y: (next.y_m - agent.position.y_m) / timestep_s,
-    };
-    movement_telemetry.record(&agent.id, planned_next, next);
     // Waypoints require an exact center-point arrival. Connector, gate, and
     // exit targets represent zero-geometry service points, so an agent is
     // ready for their abstract service rule once its clearance disc contacts
@@ -4010,10 +4130,10 @@ fn move_toward(
     } else {
         agent.radius_m + NAVIGATION_EPSILON_M
     };
-    let reached = path.len() <= 2 && next.distance(waypoint) <= target_reach_m;
-    agent.position = next;
-    LocalMovementOutcome {
-        reached,
+    MotionProposal {
+        end: next,
+        planned: planned_next,
+        goal: (path.len() <= 2).then_some((waypoint, target_reach_m)),
         constraint_fallback: decision.constraint_fallback,
     }
 }
@@ -4147,7 +4267,7 @@ fn local_position_is_clear_on_surface(
             let (_, other, other_radius_m) = spatial_index.positions[candidate]
                 .as_ref()
                 .expect("spatial cell only retains occupied agent indices");
-            point.distance(*other) + NAVIGATION_EPSILON_M >= radius_m + other_radius_m
+            point.distance(*other) >= radius_m + other_radius_m + motion_guard::CLEARANCE_M
         })
 }
 

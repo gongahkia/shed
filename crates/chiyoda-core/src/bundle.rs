@@ -170,6 +170,10 @@ pub struct SweptOnSurfaceClearanceMetrics {
 /// physical-model calibration data.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MovementMetrics {
+    /// Individual proposed steps shortened by the synchronized swept-disc
+    /// guard. Absent before runtime contract 0.45.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swept_motion_guard_steps: Option<u64>,
     /// Distinct agents whose planned on-surface or connector-arrival position
     /// was adjusted or deferred by the local-motion layer at least once.
     pub agents_with_local_clearance_adjustments: u32,

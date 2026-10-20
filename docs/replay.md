@@ -48,6 +48,12 @@ permits display after hash verification alone and emits a warning. The CLI also
 rejects an unknown initial surface and an empty trace. It requires an available
 Linux display server.
 
+For locally aware groups, `run.json` also retains each agent's familiar exits
+and learned availability with its time and source. `resource_observed` and
+information events explain changes. The viewer displays the resulting movement;
+inspect the saved trace for the knowledge state itself. These fields are
+included in full reconstruction; see [local knowledge](knowledge.md).
+
 ## Controls
 
 - Space toggles playback.

@@ -151,6 +151,13 @@ fall within the duration. Release is eligibility: the runtime can defer actual
 admission until a spawn disc is clear. Waypoints can hold an agent for their
 authored dwell before its next journey stage.
 
+Optional `knowledge` enables local availability awareness and exit familiarity:
+`{"observation_radius_m": 3, "known_exits": ["out"]}`. The radius is finite
+and nonnegative. Familiar exits must be unique declared candidates; omitting
+`known_exits` starts with all candidates familiar, while `[]` starts with none.
+Omitting the whole object retains global physical-state awareness. See
+[local knowledge](knowledge.md) for observation, learning, routing, and replay.
+
 ## Portals and queues
 
 Resource references use one lowercase tag, for example
@@ -202,7 +209,7 @@ movement, queue behavior, and the model's geometry and calibration boundaries.
 The custom DSL, `.chy` input, parser, formatter implementation, and `compile`
 command have been removed. The `format` command now normalizes JSON. Existing
 scenario arrays, units, intervention rules, and movement behavior are retained.
-Runtime and bundle contracts are now 0.43, WFC generation version is 3, and
+Runtime and bundle contracts are now 0.44, WFC generation version is 3, and
 evaluation and benchmark report versions are 2. New scenario and bundle hashes
 reflect their new metadata and packaging; they are not expected to equal old
 artifact hashes.

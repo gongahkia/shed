@@ -23,13 +23,18 @@ links. `report.json` holds complete distributions, comparisons, input hashes,
 and case reports. `observations.csv` has one row per requested case. Empty
 numeric cells mean unavailable observations, never zero.
 
-The template compares fixed-density populations under an exit closure, with
-and without an official announcement. A second example compares an uncorrected
-rumor with prompt and delayed staff corrections:
+The template compares fixed-density populations with 6 m local observation
+under an exit closure, with and without an official announcement. A second
+example compares an uncorrected rumor with prompt and delayed staff corrections:
 
 ```console
 cargo run --release --locked -p chiyoda -- study run --config examples/studies/communication.json -o out/communication-study
 ```
+
+`examples/studies/local-awareness.json` compares prompt and delayed closure
+announcements against silence under both global and local awareness. See
+[local knowledge](knowledge.md) for the paired authored scenarios and the
+limits of the perception model.
 
 The template and run destinations must be new. A malformed configuration is
 rejected before the run directory is created. `study check` validates the
@@ -137,6 +142,14 @@ Optional `release_interval_s` releases one person per interval on each floor,
 starting at zero. All policies share these positions, IDs, and release times.
 The final release must fit within the configured duration.
 
+Optional `knowledge` applies the same local-awareness configuration to every
+person in that load: `{"observation_radius_m": 3}` starts with all declared
+exit candidates familiar, and an optional `known_exits` list restricts that
+initial familiarity to `primary`, `alternative`, or neither. The radius must
+be finite and nonnegative; familiar exits must be unique. Omission retains
+global physical-state awareness. Knowledge is part of the controlled population
+input, held constant across policies and recorded in every evaluated scenario.
+
 ### Operations and communication
 
 `operations` contains common `exit_states`, `gate_states`, `connector_states`,
@@ -162,11 +175,13 @@ Keep `sampling_key` the same for equivalent interventions when comparing their
 timing or trust. This shares the deterministic per-agent trust draw. Policy
 labels never change the scenario seed, agent IDs, or random draws.
 
-Physical availability and communication follow the existing runtime semantics.
-Physical closures can already trigger route changes without a message. An
-announcement about an already known closure may have no movement effect;
-delivery and acceptance telemetry makes that outcome inspectable. False
-availability claims and their corrections can change perceived routes.
+With global awareness, physical closures trigger route changes without a
+message. With local knowledge, a person learns a remote closure through
+observation, contact, or accepted information. An early announcement can
+prevent a wasted trip; an announcement about an already known closure may have
+no movement effect. Delivery and acceptance telemetry and the saved knowledge
+trace make those outcomes inspectable. False availability claims and their
+corrections can change perceived routes, but never open a physical resource.
 Information is delivered once at its scheduled simulation step to eligible
 agents. An announcement at time zero can precede agent admission and reach
 nobody; the rumor example starts at 0.2 s. Delivery and acceptance counts should

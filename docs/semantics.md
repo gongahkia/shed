@@ -1,7 +1,7 @@
-# Executable semantics 0.43
+# Executable semantics 0.44
 
 The Rust `chiyoda-core` runtime executes [JSON scenario schema 1](scenarios.md)
-under runtime contract 0.43. This document is normative where it describes public
+under runtime contract 0.44. This document is normative where it describes public
 behavior;
 the source and conformance tests make that behavior executable.
 
@@ -22,7 +22,9 @@ order breaks ties within one event kind.
    in `(previous step time, t]`. The final step is shortened when necessary so
    that `t` is exactly the authored duration. `connector_states`, `exit_states`,
    and `gate_states`
-   alter physical availability and immediately recompute every on-surface route.
+   alter physical availability and immediately recompute on-surface routes for
+   globally aware groups. Locally aware groups retain their knowledge until
+   observation or accepted information updates it.
    `connector_capacity_states`, `exit_capacity_states`, and
    `gate_capacity_states` alter only the effective service rate and emit an
    event; route selection does not forecast queues. State events at `0s` are
@@ -40,7 +42,9 @@ order breaks ties within one event kind.
    the declared trust probability. An accepted gate belief excludes only that
    gate from a selected final-exit plan. A qualifying countermeasure sets the
    corrected connector, exit, or gate belief to its current physical state and
-   recomputes a route. Physical closures are excluded regardless of belief. If the active
+   recomputes a route. Globally aware routing excludes physical closures regardless
+   of belief; locally aware routing uses remembered availability. Physical
+   service always enforces closures. If the active
    constraints leave no route, an on-surface agent waits in the traceable
    `waiting_for_route` state until a later state or information event produces
    one. The route cost includes obstacle-aware Euclidean walking from the
@@ -77,6 +81,13 @@ order breaks ties within one event kind.
    `agent_release_deferred_for_clearance` event, and is retried at later steps;
    `agent_released` records the actual admission time. Admitted agents then
    enter the on-surface snapshot before selecting any on-surface velocity.
+   Locally aware occupants, including those dwelling at a waypoint, observe
+   same-surface portals in range and clear line of sight after admission and
+   before queue assignment and movement. Observation updates familiarity and
+   availability, overriding conflicting information before route selection.
+   Initial active agents also observe before the initial trace. Contact with
+   an assigned portal reveals physical state even at zero observation range.
+   See [local knowledge](knowledge.md) for the complete optional contract.
    The visibility-graph path supplies each agent's preferred Euler velocity.
    For every same-surface candidate whose current separation is at most the
    sum of their radii plus both authored speed bounds over the fixed 2.5 s
@@ -171,7 +182,7 @@ cell order.
 
 ## What this does not mean
 
-The `0.43` local-motion law, nominal routing cost and alternative-exit
+The `0.44` local-motion law, nominal routing cost and alternative-exit
 selection, scheduled-release and service-capacity semantics, operational-state
 transitions, escalator walking-rider assumption, and seeded information
 acceptance law are reference semantics, not calibrated behavioral claims. A
@@ -311,3 +322,8 @@ Runtime contract 0.43 changes scenario packaging to JSON schema 1 while
 preserving the 0.42 movement rules. Legacy `language_version` envelopes are
 retained only when deserializing archived bundles, so their hashes stay
 verifiable. They are rejected as current scenario inputs.
+
+Runtime contract 0.44 adds opt-in local availability knowledge, exit familiarity,
+and source-attributed knowledge snapshots. Omitted knowledge retains the
+previous movement and routing behavior. Earlier bundle contracts, including
+0.43, remain hash-verifiable archives rather than current reconstructed runs.

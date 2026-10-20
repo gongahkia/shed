@@ -3270,29 +3270,13 @@ fn integrate(
                                 agent.final_gate = planned.final_gate;
                                 agent.route = planned.plan.connector_indices;
                                 agent.route_cursor = 0;
-                                events.push(RunEvent {
+                                record_waypoint_arrival(
+                                    agent,
+                                    waypoint_id,
+                                    dwell_s,
                                     time_s,
-                                    kind: "waypoint_reached".to_owned(),
-                                    subject: agent.id.clone(),
-                                    detail: waypoint_id,
-                                });
-                                if dwell_s > 0.0 {
-                                    agent.motion = Motion::WaitingAtWaypoint {
-                                        until_s: time_s + dwell_s,
-                                        waypoint_id: agent
-                                            .via
-                                            .get(agent.via_cursor.saturating_sub(1))
-                                            .expect("reached waypoint remains in journey")
-                                            .clone(),
-                                    };
-                                    agent.velocity = Vec2::ZERO;
-                                    events.push(RunEvent {
-                                        time_s,
-                                        kind: "waypoint_wait_started".to_owned(),
-                                        subject: agent.id.clone(),
-                                        detail: format!("{dwell_s}s"),
-                                    });
-                                }
+                                    events,
+                                );
                             } else {
                                 agent.waiting_for_route = true;
                                 events.push(RunEvent {
@@ -3302,6 +3286,15 @@ fn integrate(
                                     detail: "waypoint reached but destination is unavailable"
                                         .to_owned(),
                                 });
+                                if agent.knowledge.is_some() {
+                                    record_waypoint_arrival(
+                                        agent,
+                                        waypoint_id,
+                                        dwell_s,
+                                        time_s,
+                                        events,
+                                    );
+                                }
                             }
                         } else if let Some(gate_id) = final_gate {
                             if resources.closed_gates.contains(&gate_id) {
@@ -3632,6 +3625,34 @@ fn portal_lane_index(lanes: &PortalLanes, agent_id: &str) -> u32 {
             (state ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
         });
     u32::try_from(hash % u64::from(lanes.count)).expect("remainder fits the lane count")
+}
+
+fn record_waypoint_arrival(
+    agent: &mut Agent,
+    waypoint_id: String,
+    dwell_s: f64,
+    time_s: f64,
+    events: &mut Vec<RunEvent>,
+) {
+    events.push(RunEvent {
+        time_s,
+        kind: "waypoint_reached".into(),
+        subject: agent.id.clone(),
+        detail: waypoint_id.clone(),
+    });
+    if dwell_s > 0.0 {
+        agent.motion = Motion::WaitingAtWaypoint {
+            until_s: time_s + dwell_s,
+            waypoint_id,
+        };
+        agent.velocity = Vec2::ZERO;
+        events.push(RunEvent {
+            time_s,
+            kind: "waypoint_wait_started".into(),
+            subject: agent.id.clone(),
+            detail: format!("{dwell_s}s"),
+        });
+    }
 }
 
 fn resource_is_open(resources: &RuntimeResources, resource: &PortalResource) -> bool {

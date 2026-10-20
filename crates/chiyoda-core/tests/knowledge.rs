@@ -539,3 +539,117 @@ fn contact_with_a_lane_notices_a_reopening_and_keeps_physical_service_closed_unt
                 && event.time_s >= 15.0)
     );
 }
+
+#[test]
+fn discovering_a_goal_during_a_waypoint_dwell_preserves_the_authored_hold() {
+    let mut scenario = hall(0.0);
+    scenario.agents[0].knowledge.as_mut().unwrap().known_exits = Some(vec![]);
+    scenario.agents[0].via.push("search-point".into());
+    scenario.waypoints = serde_json::from_value(json!([{
+        "id": "search-point", "surface": "floor", "at": {"x_m": 2, "y_m": 3, "z_m": 0}, "dwell_s": 5
+    }]))
+    .unwrap();
+    scenario
+        .messages
+        .push(notice("fallback", true, 2.0, true, 1.0));
+    let bundle = simulate(&scenario);
+    assert_eq!(bundle.metrics.evacuated_by_exit.get("fallback"), Some(&1));
+    let reached = bundle
+        .events
+        .iter()
+        .find(|event| event.kind == "waypoint_reached")
+        .unwrap()
+        .time_s;
+    assert!(
+        bundle
+            .trace
+            .iter()
+            .filter(|frame| frame.time_s > reached && frame.time_s < reached + 5.0)
+            .all(|frame| frame.agents[0].state == chiyoda_core::AgentState::WaitingAtWaypoint)
+    );
+    assert_eq!(
+        bundle.metrics.information_delivery["notice"].accepted_agents,
+        1
+    );
+}
+
+#[test]
+fn queue_service_cannot_be_reserved_through_an_unseen_physical_closure() {
+    let mut scenario = hall(0.0);
+    scenario.agents[0].alternative_destinations.clear();
+    scenario.exits[0].capacity_per_s = Some(1.0);
+    scenario.queue_footprints = serde_json::from_value(json!([{
+        "id": "queue", "resource": {"exit": {"id": "primary"}}, "surface": "floor",
+        "head": {"x_m": 5, "y_m": 3, "z_m": 0}, "tail": {"x_m": 3, "y_m": 3, "z_m": 0},
+        "slots": 2, "width_m": 1.5, "lanes": 2
+    }]))
+    .unwrap();
+    scenario.exit_states = vec![
+        ExitStateChange {
+            id: "close".into(),
+            exit: "primary".into(),
+            open: false,
+            at_s: 2.0,
+        },
+        ExitStateChange {
+            id: "open".into(),
+            exit: "primary".into(),
+            open: true,
+            at_s: 10.0,
+        },
+    ];
+    let bundle = simulate(&scenario);
+    assert_eq!(bundle.metrics.evacuated_agents, 1);
+    assert!(
+        bundle
+            .events
+            .iter()
+            .any(|event| event.kind == "queue_slot_preallocated" && event.time_s < 2.0)
+    );
+    assert!(
+        bundle
+            .events
+            .iter()
+            .any(|event| event.kind == "queue_service_reserved" && event.time_s >= 10.0)
+    );
+    assert!(
+        !bundle
+            .events
+            .iter()
+            .any(|event| event.kind == "queue_service_reserved" && event.time_s < 10.0)
+    );
+}
+
+#[test]
+fn global_and_local_awareness_can_share_one_space_without_leaking_closure_events() {
+    let mut scenario = hall(0.0);
+    let mut global = scenario.agents[0].clone();
+    global.id = "global".into();
+    global.at.y_m = 5.0;
+    global.knowledge = None;
+    scenario.agents.push(global);
+    scenario.exit_states.push(ExitStateChange {
+        id: "close".into(),
+        exit: "primary".into(),
+        open: false,
+        at_s: 2.0,
+    });
+    let bundle = simulate(&scenario);
+    assert!(
+        bundle
+            .events
+            .iter()
+            .any(|event| event.kind == "route_recomputed"
+                && event.subject == "global:0"
+                && (event.time_s - 2.0).abs() < 1e-9)
+    );
+    assert!(
+        !bundle
+            .events
+            .iter()
+            .any(|event| event.kind == "route_recomputed"
+                && event.subject == "person:0"
+                && (event.time_s - 2.0).abs() < 1e-9)
+    );
+    assert_eq!(bundle.metrics.evacuated_agents, 2);
+}

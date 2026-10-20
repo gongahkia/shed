@@ -89,6 +89,9 @@ struct Cli {
     /// Start paused; space toggles playback and arrow keys advance frames.
     #[arg(long)]
     paused: bool,
+    /// Start at an exact recorded integration step, for a diagnostic replay moment.
+    #[arg(long, requires = "bundle", conflicts_with_all = ["watch", "export_gif"])]
+    at_step: Option<u64>,
     /// Initial authored surface to display. Tab cycles declared surfaces.
     #[arg(long)]
     surface: Option<String>,
@@ -423,6 +426,7 @@ fn replay_bundle(bundle_path: &Path, cli: &Cli, sprite_atlas: Option<&SpriteAtla
         return Ok(());
     }
     validate_playback_timing(&bundle.trace, cli.speed)?;
+    let initial_frame = replay_start_index(&bundle.trace, cli.at_step)?;
     replay(
         Some(bundle),
         cli.paused,
@@ -432,6 +436,7 @@ fn replay_bundle(bundle_path: &Path, cli: &Cli, sprite_atlas: Option<&SpriteAtla
         &cli.snapshot_dir,
         None,
         sprite_atlas,
+        initial_frame,
     )
 }
 
@@ -445,7 +450,18 @@ fn replay_watch(source_path: PathBuf, cli: &Cli, sprite_atlas: Option<&SpriteAtl
         &cli.snapshot_dir,
         Some(WatchController::new(source_path, cli.trace_every)),
         sprite_atlas,
+        0,
     )
+}
+
+fn replay_start_index(trace: &[TraceFrame], step: Option<u64>) -> Result<usize> {
+    let Some(step) = step else {
+        return Ok(0);
+    };
+    trace
+        .iter()
+        .position(|frame| frame.step == step)
+        .with_context(|| format!("integration step {step} is not present in the recorded trace"))
 }
 
 fn load_bundle(
@@ -486,6 +502,7 @@ fn replay(
     snapshot_dir: &Path,
     mut watch: Option<WatchController>,
     sprite_atlas: Option<&SpriteAtlas>,
+    initial_frame: usize,
 ) -> Result<()> {
     let mut window = Window::new(
         "Chiyoda replay — loading",
@@ -495,7 +512,7 @@ fn replay(
     )?;
     window.set_target_fps(30);
     let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
-    let mut index = 0usize;
+    let mut index = initial_frame;
     let mut last_advance = Instant::now();
     let mut view_mode = ViewMode::Surface;
     let mut snapshot_number = 0_u64;
@@ -2969,6 +2986,36 @@ mod tests {
         assert_eq!(surface_index(&surfaces, None).unwrap(), 0);
         assert_eq!(surface_index(&surfaces, Some("platform")).unwrap(), 1);
         assert!(surface_index(&surfaces, Some("roof")).is_err());
+    }
+
+    #[test]
+    fn diagnostic_replay_seeks_an_exact_recorded_step_and_rejects_missing_steps() {
+        let trace: Vec<_> = [0, 3, 6]
+            .into_iter()
+            .map(|step| TraceFrame {
+                step,
+                time_s: 0.0,
+                agents: Vec::new(),
+            })
+            .collect();
+        assert_eq!(replay_start_index(&trace, None).unwrap(), 0);
+        assert_eq!(replay_start_index(&trace, Some(3)).unwrap(), 1);
+        assert!(replay_start_index(&trace, Some(4)).is_err());
+        assert!(replay_start_index(&trace, Some(9)).is_err());
+        assert!(
+            Cli::try_parse_from(["chiyoda-replay", "run.json", "--paused", "--at-step", "3"])
+                .is_ok()
+        );
+        assert!(
+            Cli::try_parse_from([
+                "chiyoda-replay",
+                "--watch",
+                "scenario.json",
+                "--at-step",
+                "3"
+            ])
+            .is_err()
+        );
     }
 
     #[test]

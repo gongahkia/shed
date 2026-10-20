@@ -244,6 +244,8 @@ per case. Counts are never silently capped. The generator still supports
 existing limits. Large cases can produce substantial traces: the CLI streams
 cases instead of accumulating complete traces for the whole study. Replay
 verification temporarily reconstructs a second bundle for the current case.
+Run cost also depends on wall geometry and crowd interactions. These bounds
+limit the experiment size, not its wall-clock duration.
 
 Simulation movement rules and existing evaluation/benchmark commands are
 unchanged. Changes to study placement, service scaling, comparison, or sampling

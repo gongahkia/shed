@@ -12,6 +12,7 @@ pub fn markdown(report: &JourneyReport) -> Result<String, String> {
     out.push_str("Observed state time uses the preceding integration boundary. Its exclusive components cover the whole run, including departure wait and time after evacuation. Moving time can include slow or stationary movement. Low-progress spans overlap that budget and must not be added to it.\n\n");
     writeln!(out, "Walked distance: {:.3} m across all people; service wait: {:.3} agent s; low-progress spans: {:.3} agent s affecting {} people.\n", summary.walking_distance_m, summary.service_wait_agent_s, summary.low_progress_span_agent_s, summary.low_progress_agents).unwrap();
     out.push_str("The static reference uses obstacle-aware centre-to-centre routes, every resource open, all candidate exits familiar, authored waypoints/dwell and mobility restrictions, and nominal connector traversal. It ignores service queues, releases, closures, messages, and other people. It is a planning reference, not a predicted or guaranteed completion time.\n\n");
+    findings(report, &mut out);
     people(report, &mut out);
     hotspots(report, &mut out);
     resources(report, &mut out);
@@ -24,6 +25,47 @@ pub fn markdown(report: &JourneyReport) -> Result<String, String> {
     )
     .unwrap();
     Ok(out)
+}
+
+fn findings(report: &JourneyReport, out: &mut String) {
+    out.push_str("## Observations to explain the outcome\n\n");
+    if let Some(resource) = report
+        .resources
+        .iter()
+        .filter(|resource| resource.wait_agent_s > 0.0)
+        .max_by(|left, right| left.wait_agent_s.total_cmp(&right.wait_agent_s))
+    {
+        writeln!(out, "The largest recorded service wait is at {} {}: {:.3} agent s, a peak of {} waiting people, and {} people with queue-entry exposure.\n", escaped(&resource.kind), escaped(&resource.resource), resource.wait_agent_s, resource.peak_waiting_agents, resource.agents.len()).unwrap();
+    } else {
+        out.push_str("No modeled service-capacity wait was recorded. Physical crowd delay can still appear within moving exposure.\n\n");
+    }
+    if let Some(cell) = report.hotspots.first() {
+        writeln!(out, "The largest low-progress concentration is on {} around cell centre ({:.3}, {:.3}) m: {:.3} agent s involving {}. Inspect recorded steps {}–{}. This locates observed low travel without assigning its cause.\n", escaped(&cell.surface), cell.x_m, cell.y_m, cell.low_progress_agent_s, cell.agents.iter().map(|id| escaped(id)).collect::<Vec<_>>().join(", "), cell.start_step, cell.end_step).unwrap();
+        replay(out, cell.start_step, &cell.surface);
+    }
+    let information = report
+        .agents
+        .iter()
+        .flat_map(|person| &person.decisions)
+        .filter(|decision| {
+            matches!(
+                decision.event.kind.as_str(),
+                "message_received" | "countermeasure_received"
+            )
+        })
+        .count();
+    let replanning = report
+        .agents
+        .iter()
+        .flat_map(|person| &person.decisions)
+        .filter(|decision| decision.event.kind == "route_recomputed")
+        .count();
+    writeln!(out, "Recorded information deliveries: {information}; route recomputations: {replanning}. The timelines retain acceptance and selected-route details for inspection; delivery and replanning counts alone do not establish a policy effect.\n").unwrap();
+    for control in &report.isolated_controls {
+        if let Some(difference) = control.crowded_minus_isolated_elapsed_s {
+            writeln!(out, "For {}, crowded elapsed journey time minus its completed isolated control is {difference:+.3} s. This compares the complete recorded counterfactual, including any changed admission, information exposure, or routes.\n", escaped(&control.agent)).unwrap();
+        }
+    }
 }
 
 fn people(report: &JourneyReport, out: &mut String) {

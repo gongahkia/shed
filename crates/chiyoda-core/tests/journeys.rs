@@ -139,6 +139,9 @@ fn low_progress_hotspots_partition_spans_and_preserve_people_and_replay_steps() 
         .map(|cell| cell.low_progress_agent_s)
         .sum();
     assert!((sum - report.summary().low_progress_span_agent_s).abs() < 1e-7);
+    let markdown = journeys::rendering::markdown(&report).unwrap();
+    assert!(markdown.contains("largest low-progress concentration"));
+    assert!(markdown.contains(&report.hotspots[0].start_step.to_string()));
     assert!(
         report
             .hotspots
@@ -339,6 +342,11 @@ fn paired_completed_controls_report_elapsed_differences_with_their_sample_popula
     };
     let analysis = journeys::analyze_with_controls(&bundle, &options).unwrap();
     let control = &analysis.report.isolated_controls[0];
+    assert!(
+        journeys::rendering::markdown(&analysis.report)
+            .unwrap()
+            .contains("complete recorded counterfactual")
+    );
     assert_eq!(control.status, journeys::ControlStatus::Completed);
     assert!(control.crowded_minus_isolated_elapsed_s.unwrap().abs() < 1e-8);
     assert_eq!(analysis.report.summary().control_pairs_completed, 1);

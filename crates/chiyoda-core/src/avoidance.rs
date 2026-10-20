@@ -214,7 +214,7 @@ pub(crate) fn choose_velocity_in_domain(
         .iter()
         .enumerate()
         .filter(|(index, neighbour)| {
-            *index != own_index && !queue_grid_right_of_way(own, neighbour)
+            *index != own_index && !queue_grid_right_of_way(own, neighbour, timestep_s)
         })
         .collect();
     neighbours.sort_unstable_by(|(_, left), (_, right)| left.id.cmp(&right.id));
@@ -231,6 +231,14 @@ pub(crate) fn choose_velocity_in_domain(
             .map(|(_, neighbour)| orca_line(own, neighbour, time_horizon_s, timestep_s)),
     );
 
+    let preferred_velocity = passing_preference(
+        agents,
+        own_index,
+        preferred_velocity,
+        max_speed_mps,
+        time_horizon_s,
+        timestep_s,
+    );
     let preferred_velocity = clamp_to_circle(preferred_velocity, max_speed_mps);
     match solve_linear_program(&lines, max_speed_mps, preferred_velocity) {
         Ok(velocity) => AvoidanceDecision {
@@ -253,6 +261,47 @@ pub(crate) fn choose_velocity_in_domain(
             },
             constraint_fallback: true,
         },
+    }
+}
+
+/// A fixed right-hand preference breaks perfectly opposing stop symmetries.
+/// Only cruising motion on a predicted conflict receives the small bias;
+/// slowing into an exact target and explicitly granted FIFO priority retain
+/// their original preference. The constraints and swept guard still decide
+/// whether any such movement is possible.
+fn passing_preference(
+    agents: &[AvoidanceAgent],
+    own_index: usize,
+    preferred: Vec2,
+    speed: f64,
+    horizon: f64,
+    timestep_s: f64,
+) -> Vec2 {
+    if speed <= EPSILON || preferred.length_squared() < (speed * 0.999).powi(2) {
+        return preferred;
+    }
+    let own = &agents[own_index];
+    let conflict = agents.iter().enumerate().any(|(index, other)| {
+        if index == own_index || queue_grid_right_of_way(own, other, timestep_s) {
+            return false;
+        }
+        let position = other.position - own.position;
+        let closing = preferred - other.velocity;
+        let magnitude = closing.length_squared();
+        if magnitude <= EPSILON * EPSILON {
+            return false;
+        }
+        let time = position.dot(closing) / magnitude;
+        let clearance = own.radius_m + other.radius_m;
+        time > 0.0
+            && time < horizon
+            && (position - closing * time).length_squared() < clearance * clearance
+    });
+    if conflict {
+        let forward = preferred.normalized().expect("nonzero cruising preference");
+        preferred - forward.perpendicular() * (0.05 * speed)
+    } else {
+        preferred
     }
 }
 
@@ -325,16 +374,24 @@ fn queue_grid_responsibility(own: &AvoidanceAgent, neighbour: &AvoidanceAgent) -
     }
 }
 
-fn queue_grid_right_of_way(own: &AvoidanceAgent, neighbour: &AvoidanceAgent) -> bool {
+fn queue_grid_right_of_way(
+    own: &AvoidanceAgent,
+    neighbour: &AvoidanceAgent,
+    timestep_s: f64,
+) -> bool {
     // An earlier grid ticket chooses against all unrelated neighbours as
     // usual, but does not yield to a later ticket for the same authored grid.
     // The later ticket receives the full inside-obstacle correction above.
-    matches!(
-        (&own.queue_priority, &neighbour.queue_priority),
-        (Some(own_priority), Some(neighbour_priority))
-            if own_priority.resource == neighbour_priority.resource
-                && own_priority.ticket < neighbour_priority.ticket
-    )
+    let immediate_reach = own.radius_m
+        + neighbour.radius_m
+        + (own.max_speed_mps + neighbour.max_speed_mps) * timestep_s;
+    (own.position - neighbour.position).length_squared() > immediate_reach * immediate_reach
+        && matches!(
+            (&own.queue_priority, &neighbour.queue_priority),
+            (Some(own_priority), Some(neighbour_priority))
+                if own_priority.resource == neighbour_priority.resource
+                    && own_priority.ticket < neighbour_priority.ticket
+        )
 }
 
 fn clamp_to_circle(vector: Vec2, radius: f64) -> Vec2 {
@@ -596,7 +653,7 @@ mod tests {
     }
 
     #[test]
-    fn earlier_grid_ticket_keeps_right_of_way_over_later_ticket() {
+    fn earlier_grid_ticket_still_respects_an_immediate_physical_conflict() {
         let mut leader = agent("leader", 0.0, 0.0, 0.0, 0.0);
         leader.queue_priority = Some(QueueAvoidancePriority {
             resource: "gate:fare_gate".to_owned(),
@@ -614,7 +671,7 @@ mod tests {
 
         assert!(!leader_velocity.constraint_fallback);
         assert!(!follower_velocity.constraint_fallback);
-        assert!((leader_velocity.velocity.x - 1.0).abs() < 1e-9);
+        assert!(leader_velocity.velocity.x < 0.0);
         assert!(follower_velocity.velocity.x > 0.0);
     }
 

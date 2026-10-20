@@ -1,0 +1,86 @@
+{
+  "schema_version": "1",
+  "scenario": {
+    "name": "wall-counterflow",
+    "seed": 1,
+    "duration_s": 30,
+    "timestep_s": 0.2,
+    "surfaces": [
+      {
+        "id": "floor",
+        "origin": {
+          "x_m": 0,
+          "y_m": 0,
+          "z_m": 0
+        },
+        "width_m": 10,
+        "depth_m": 4
+      }
+    ],
+    "obstacles": [
+      {
+        "id": "wall",
+        "surface": "floor",
+        "at": {
+          "x_m": 0,
+          "y_m": 0,
+          "z_m": 0
+        },
+        "width_m": 10,
+        "depth_m": 1
+      }
+    ],
+    "agents": [
+      {
+        "id": "left",
+        "count": 1,
+        "surface": "floor",
+        "at": {
+          "x_m": 1,
+          "y_m": 1.31,
+          "z_m": 0
+        },
+        "destination": "out-left",
+        "speed_mps": 1,
+        "radius_m": 0.3,
+        "height_m": 1.7
+      },
+      {
+        "id": "right",
+        "count": 1,
+        "surface": "floor",
+        "at": {
+          "x_m": 9,
+          "y_m": 1.31,
+          "z_m": 0
+        },
+        "destination": "out-right",
+        "speed_mps": 1,
+        "radius_m": 0.3,
+        "height_m": 1.7
+      }
+    ],
+    "exits": [
+      {
+        "id": "out-left",
+        "surface": "floor",
+        "at": {
+          "x_m": 9,
+          "y_m": 1.31,
+          "z_m": 0
+        },
+        "width_m": 1
+      },
+      {
+        "id": "out-right",
+        "surface": "floor",
+        "at": {
+          "x_m": 1,
+          "y_m": 1.31,
+          "z_m": 0
+        },
+        "width_m": 1
+      }
+    ]
+  }
+}

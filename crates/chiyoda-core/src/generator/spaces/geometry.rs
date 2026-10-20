@@ -66,6 +66,7 @@ pub(super) fn build(
     let inset = config.tile_size_m * 0.04 + config.agent_radius_m + 0.001;
     for floor in 0..config.floors {
         scenario.agents.push(AgentGroup {
+            knowledge: None,
             id: format!("arrivals_{floor}"),
             count: config.agents_per_floor,
             surface: format!("floor_{floor}"),

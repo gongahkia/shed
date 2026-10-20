@@ -487,6 +487,21 @@ impl Connector {
     }
 }
 
+/// Opt-in local knowledge of resource availability. Geometry and route costs
+/// remain known; this is not a visual mapping or crowd-perception model.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgentKnowledge {
+    /// Portal-centre observation range on the occupied surface, with walls
+    /// blocking sight. Direct physical contact always reveals a closure.
+    pub observation_radius_m: f64,
+    /// Omission starts with every declared exit candidate familiar. An explicit
+    /// list (including empty) restricts familiarity until observation or an
+    /// accepted exit claim introduces another declared candidate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub known_exits: Option<Vec<String>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AgentGroup {
@@ -524,6 +539,9 @@ pub struct AgentGroup {
     /// route constraint, not an inferred mobility or accessibility profile.
     #[serde(default)]
     pub excluded_connector_kinds: Vec<ConnectorKind>,
+    /// Absence preserves global physical-state awareness.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub knowledge: Option<AgentKnowledge>,
 }
 
 impl AgentGroup {

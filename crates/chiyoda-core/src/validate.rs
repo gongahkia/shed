@@ -722,6 +722,25 @@ pub fn validate(scenario: &Scenario) -> Result<(), Vec<ValidationError>> {
                 ));
             }
         }
+        if let Some(knowledge) = &group.knowledge {
+            check_nonnegative(
+                &format!("{path}.knowledge.observation_radius_m"),
+                knowledge.observation_radius_m,
+                &mut errors,
+            );
+            if let Some(known_exits) = &knowledge.known_exits {
+                let mut known = HashSet::new();
+                for (index, exit) in known_exits.iter().enumerate() {
+                    let field = format!("{path}.knowledge.known_exits[{index}]");
+                    if !destinations.contains(exit.as_str()) {
+                        errors.push(issue(&field, "must name a declared exit candidate"));
+                    }
+                    if !known.insert(exit) {
+                        errors.push(issue(&field, "duplicate familiar exit"));
+                    }
+                }
+            }
+        }
         for (waypoint_index, waypoint) in group.via.iter().enumerate() {
             if !waypoint_ids.contains(waypoint.as_str()) {
                 errors.push(issue(

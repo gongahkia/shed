@@ -17,6 +17,8 @@ use std::{
     fmt,
 };
 
+mod walk_visibility;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RunOptions {
     /// Write one trace frame after this many integration steps.
@@ -2413,6 +2415,16 @@ fn shortest_walk_path_on_surface(
         }
     }
 
+    walk_visibility::with_cache(surface, &obstacles, nodes.len() - 2, |cache| {
+        shortest_walk_path_in_graph(&nodes, &obstacles, cache)
+    })
+}
+
+fn shortest_walk_path_in_graph(
+    nodes: &[Point3],
+    obstacles: &[InflatedObstacle],
+    mut visibility: Option<&mut [u8]>,
+) -> Option<Vec<Point3>> {
     let mut distances = vec![None; nodes.len()];
     let mut previous = vec![None; nodes.len()];
     let mut settled = vec![false; nodes.len()];
@@ -2424,10 +2436,27 @@ fn shortest_walk_path_on_surface(
         settled[current] = true;
         let duration = distances[current].expect("selected nodes have a distance");
         for next in 0..nodes.len() {
-            if settled[next]
-                || next == current
-                || !segment_is_clear(nodes[current], nodes[next], &obstacles)
-            {
+            if settled[next] || next == current {
+                continue;
+            }
+            let clear = if current >= 2 && next >= 2 {
+                if let Some(cache) = &mut visibility {
+                    let entry = &mut cache[(current - 2) * (nodes.len() - 2) + next - 2];
+                    if *entry == 0 {
+                        *entry = if segment_is_clear(nodes[current], nodes[next], obstacles) {
+                            1
+                        } else {
+                            2
+                        };
+                    }
+                    *entry == 1
+                } else {
+                    segment_is_clear(nodes[current], nodes[next], obstacles)
+                }
+            } else {
+                segment_is_clear(nodes[current], nodes[next], obstacles)
+            };
+            if !clear {
                 continue;
             }
             let candidate = duration + nodes[current].distance(nodes[next]);
@@ -2438,7 +2467,7 @@ fn shortest_walk_path_on_surface(
         }
     }
     distances[1]?;
-    let mut path = vec![target];
+    let mut path = vec![nodes[1]];
     let mut cursor = 1;
     while cursor != 0 {
         cursor = previous[cursor]?;

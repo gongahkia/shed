@@ -160,15 +160,21 @@ struct Line {
     direction: Vec2,
 }
 
+/// A hard static constraint `normal.dot(velocity) >= minimum`. The normal is
+/// unit length. Agent constraints may be relaxed; these bounds may not.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct VelocityConstraint {
+    pub(crate) normal: Vec2,
+    pub(crate) minimum: f64,
+}
+
 /// Select the closest speed-bounded velocity satisfying the applicable ORCA
 /// half-planes induced by `agents`. The caller must supply a same-surface
 /// snapshot and a valid `own_index` into that snapshot. A later grid ticket's
 /// constraint is deliberately absent from an earlier ticket's program.
 ///
-/// The selector solves the small two-dimensional convex program by evaluating
-/// the preference's projection on every feasible boundary feature (interior,
-/// line, circle, and line intersections). This makes the tie rule explicit
-/// and avoids dependence on an unordered or randomized numerical solver.
+/// The selector uses a deterministic two-dimensional linear program over
+/// line and speed-circle boundaries, with stable neighbour order.
 #[must_use]
 pub(crate) fn choose_velocity(
     agents: &[AvoidanceAgent],
@@ -177,6 +183,26 @@ pub(crate) fn choose_velocity(
     max_speed_mps: f64,
     time_horizon_s: f64,
     timestep_s: f64,
+) -> AvoidanceDecision {
+    choose_velocity_in_domain(
+        agents,
+        own_index,
+        preferred_velocity,
+        max_speed_mps,
+        time_horizon_s,
+        timestep_s,
+        &[],
+    )
+}
+
+pub(crate) fn choose_velocity_in_domain(
+    agents: &[AvoidanceAgent],
+    own_index: usize,
+    preferred_velocity: Vec2,
+    max_speed_mps: f64,
+    time_horizon_s: f64,
+    timestep_s: f64,
+    domain: &[VelocityConstraint],
 ) -> AvoidanceDecision {
     debug_assert!(own_index < agents.len());
     debug_assert!(max_speed_mps.is_finite() && max_speed_mps >= 0.0);
@@ -192,10 +218,18 @@ pub(crate) fn choose_velocity(
         })
         .collect();
     neighbours.sort_unstable_by(|(_, left), (_, right)| left.id.cmp(&right.id));
-    let lines: Vec<_> = neighbours
-        .into_iter()
-        .map(|(_, neighbour)| orca_line(own, neighbour, time_horizon_s, timestep_s))
+    let mut lines: Vec<_> = domain
+        .iter()
+        .map(|bound| Line {
+            point: bound.normal * bound.minimum,
+            direction: -bound.normal.perpendicular(),
+        })
         .collect();
+    lines.extend(
+        neighbours
+            .into_iter()
+            .map(|(_, neighbour)| orca_line(own, neighbour, time_horizon_s, timestep_s)),
+    );
 
     let preferred_velocity = clamp_to_circle(preferred_velocity, max_speed_mps);
     match solve_linear_program(&lines, max_speed_mps, preferred_velocity) {
@@ -204,12 +238,19 @@ pub(crate) fn choose_velocity(
             constraint_fallback: false,
         },
         Err((failed_line, partial_velocity)) => AvoidanceDecision {
-            velocity: solve_relaxed_linear_program(
-                &lines,
-                max_speed_mps,
-                failed_line,
-                partial_velocity,
-            ),
+            // Static domains contain a stop. Retain that feasible fallback if
+            // numerical error prevents solving the hard prefix itself.
+            velocity: if failed_line < domain.len() {
+                Vec2::ZERO
+            } else {
+                solve_relaxed_linear_program(
+                    &lines,
+                    max_speed_mps,
+                    failed_line,
+                    partial_velocity,
+                    domain.len(),
+                )
+            },
             constraint_fallback: true,
         },
     }
@@ -227,50 +268,44 @@ fn orca_line(
     let combined_radius = own.radius_m + neighbour.radius_m;
     let combined_radius_squared = combined_radius * combined_radius;
 
-    let (normal, projected_relative_velocity, inside_velocity_obstacle) =
-        if distance_squared > combined_radius_squared {
-            let cutoff_center = relative_position / time_horizon_s;
-            let from_cutoff_center = relative_velocity - cutoff_center;
-            let from_cutoff_center_squared = from_cutoff_center.length_squared();
-            let dot = from_cutoff_center.dot(relative_position);
-            if dot < 0.0 && dot * dot > combined_radius_squared * from_cutoff_center_squared {
-                let normal = from_cutoff_center
-                    .normalized()
-                    .unwrap_or_else(|| pair_direction(&own.id, &neighbour.id));
-                let cutoff_radius = combined_radius / time_horizon_s;
-                (
-                    normal,
-                    cutoff_center + normal * cutoff_radius,
-                    from_cutoff_center_squared < cutoff_radius * cutoff_radius,
-                )
-            } else {
-                let tangent_leg = (distance_squared - combined_radius_squared).sqrt();
-                let side = relative_position.cross(from_cutoff_center).signum();
-                let shadow_direction = (relative_position * (tangent_leg * side)
-                    + relative_position.perpendicular() * combined_radius)
-                    / distance_squared;
-                let normal = shadow_direction.perpendicular();
-                (
-                    normal,
-                    relative_velocity.project_onto_unit(shadow_direction),
-                    relative_velocity.cross(shadow_direction) >= 0.0,
-                )
-            }
-        } else {
-            let cutoff_center = relative_position / timestep_s;
-            let cutoff_radius = combined_radius / timestep_s;
-            let from_cutoff_center = relative_velocity - cutoff_center;
+    let (normal, projected_relative_velocity) = if distance_squared > combined_radius_squared {
+        let cutoff_center = relative_position / time_horizon_s;
+        let from_cutoff_center = relative_velocity - cutoff_center;
+        let from_cutoff_center_squared = from_cutoff_center.length_squared();
+        let dot = from_cutoff_center.dot(relative_position);
+        if dot < 0.0 && dot * dot > combined_radius_squared * from_cutoff_center_squared {
             let normal = from_cutoff_center
                 .normalized()
                 .unwrap_or_else(|| pair_direction(&own.id, &neighbour.id));
-            (normal, cutoff_center + normal * cutoff_radius, true)
-        };
+            let cutoff_radius = combined_radius / time_horizon_s;
+            (normal, cutoff_center + normal * cutoff_radius)
+        } else {
+            let tangent_leg = (distance_squared - combined_radius_squared).sqrt();
+            let side = relative_position.cross(from_cutoff_center).signum();
+            let shadow_direction = (relative_position * (tangent_leg * side)
+                + relative_position.perpendicular() * combined_radius)
+                / distance_squared;
+            let normal = shadow_direction.perpendicular();
+            (
+                normal,
+                relative_velocity.project_onto_unit(shadow_direction),
+            )
+        }
+    } else {
+        let cutoff_center = relative_position / timestep_s;
+        let cutoff_radius = combined_radius / timestep_s;
+        let from_cutoff_center = relative_velocity - cutoff_center;
+        let normal = from_cutoff_center
+            .normalized()
+            .unwrap_or_else(|| pair_direction(&own.id, &neighbour.id));
+        (normal, cutoff_center + normal * cutoff_radius)
+    };
 
     let correction = projected_relative_velocity - relative_velocity;
-    let responsibility = if inside_velocity_obstacle {
-        queue_grid_responsibility(own, neighbour)
-    } else {
+    let responsibility = if neighbour.max_speed_mps <= EPSILON {
         1.0
+    } else {
+        queue_grid_responsibility(own, neighbour)
     };
     Line {
         point: own.velocity + correction * responsibility,
@@ -416,6 +451,7 @@ fn solve_relaxed_linear_program(
     radius: f64,
     failed_line: usize,
     partial_velocity: Vec2,
+    hard_lines: usize,
 ) -> Vec2 {
     let mut penetration = 0.0;
     let mut best = partial_velocity;
@@ -424,8 +460,8 @@ fn solve_relaxed_linear_program(
             continue;
         }
         let index = failed_line + offset;
-        let mut derived = Vec::with_capacity(index);
-        for previous in &lines[..index] {
+        let mut derived = lines[..hard_lines].to_vec();
+        for previous in &lines[hard_lines..index] {
             let determinant = line.direction.cross(previous.direction);
             let point = if determinant.abs() <= EPSILON {
                 if line.direction.dot(previous.direction) > 0.0 {
@@ -493,7 +529,10 @@ fn pair_direction(first_id: &str, second_id: &str) -> Vec2 {
 
 #[cfg(test)]
 mod tests {
-    use super::{AvoidanceAgent, QueueAvoidancePriority, Vec2, choose_velocity};
+    use super::{
+        AvoidanceAgent, QueueAvoidancePriority, Vec2, VelocityConstraint, choose_velocity,
+        choose_velocity_in_domain,
+    };
 
     fn agent(id: &str, x: f64, y: f64, vx: f64, vy: f64) -> AvoidanceAgent {
         AvoidanceAgent {
@@ -631,5 +670,48 @@ mod tests {
         let result = choose_velocity(&agents, 0, Vec2 { x: 0.6, y: -0.4 }, 1.0, 2.5, 0.1);
         assert_eq!(result.velocity, Vec2 { x: 0.6, y: -0.4 });
         assert!(!result.constraint_fallback);
+    }
+
+    #[test]
+    fn infeasible_agent_constraints_never_relax_a_wall_bound() {
+        let agents = [
+            agent("own", 0.0, 0.0, 0.0, 0.0),
+            agent("overlap", -0.1, 0.0, 0.0, 0.0),
+        ];
+        let domain = [VelocityConstraint {
+            normal: Vec2 { x: -1.0, y: 0.0 },
+            minimum: 0.0,
+        }];
+        let result =
+            choose_velocity_in_domain(&agents, 0, Vec2 { x: 1.0, y: 0.0 }, 1.0, 2.5, 0.2, &domain);
+        assert!(result.constraint_fallback);
+        assert!(result.velocity.x <= 1e-9);
+        assert!(result.velocity.length() <= 1.0 + 1e-9);
+    }
+
+    #[test]
+    fn stationary_relative_velocities_share_the_same_reciprocal_correction() {
+        let agents = [
+            agent("left", -0.4, 0.0, 0.0, 0.0),
+            agent("right", 0.4, 0.0, 0.0, 0.0),
+        ];
+        let left = choose_velocity(&agents, 0, Vec2 { x: 1.0, y: 0.0 }, 1.0, 2.5, 1.5);
+        let right = choose_velocity(&agents, 1, Vec2 { x: -1.0, y: 0.0 }, 1.0, 2.5, 1.5);
+        assert!(!left.constraint_fallback && !right.constraint_fallback);
+        let separation =
+            (agents[0].position + left.velocity * 1.5 - agents[1].position - right.velocity * 1.5)
+                .length();
+        assert!(separation >= 0.6 - 1e-9);
+    }
+
+    #[test]
+    fn a_moving_agent_takes_full_responsibility_for_an_immobile_person() {
+        let own = agent("moving", 0.0, 0.0, 1.0, 0.0);
+        let mut stationary = agent("dwelling", 1.0, 0.0, 0.0, 0.0);
+        stationary.max_speed_mps = 0.0;
+        let agents = [own, stationary];
+        let result = choose_velocity(&agents, 0, Vec2 { x: 1.0, y: 0.0 }, 1.0, 2.5, 1.0);
+        assert!(!result.constraint_fallback);
+        assert!((agents[0].position + result.velocity - agents[1].position).length() >= 0.6 - 1e-9);
     }
 }

@@ -1,5 +1,7 @@
 use crate::{
-    avoidance::{AvoidanceAgent, QueueAvoidancePriority, Vec2, choose_velocity},
+    avoidance::{
+        AvoidanceAgent, QueueAvoidancePriority, Vec2, choose_velocity, choose_velocity_in_domain,
+    },
     bundle::{
         AgentSnapshot, AgentState, BUNDLE_VERSION, InformationDeliveryMetrics,
         InformationInterventionKind, MovementMetrics, OnSurfaceClearanceMetrics, QueueMetrics,
@@ -18,6 +20,7 @@ use std::{
 };
 
 mod knowledge;
+mod static_domain;
 mod walk_visibility;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -231,9 +234,19 @@ impl Agent {
     }
 
     fn local_motion_speed_bound_mps(&self) -> f64 {
-        matches!(self.motion, Motion::OnSurface)
-            .then_some(self.speed_mps)
-            .unwrap_or(0.0)
+        let waiting_at_portal = self.queue_membership.is_none()
+            && (self.waiting_for_gate || self.waiting_for_exit || self.waiting_connector.is_some());
+        if matches!(self.motion, Motion::OnSurface) && !self.waiting_for_route && !waiting_at_portal
+        {
+            self.speed_mps
+        } else {
+            0.0
+        }
+    }
+
+    fn stop_for_route(&mut self) {
+        self.waiting_for_route = true;
+        self.velocity = Vec2::ZERO;
     }
 }
 
@@ -404,15 +417,33 @@ struct LocalMotionSnapshot {
 }
 
 impl LocalMotionSnapshot {
-    fn from_agents(scenario: &Scenario, agents: &[Agent]) -> Self {
+    fn from_agents(scenario: &Scenario, agents: &[Agent], queues: &PhysicalQueueSnapshot) -> Self {
         let mut maximum_speed_by_surface: HashMap<String, f64> = HashMap::new();
         let agents: Vec<_> = agents
             .iter()
-            .map(|agent| {
+            .enumerate()
+            .map(|(index, agent)| {
                 if !agent.occupies_surface() {
                     return None;
                 }
-                let max_speed_mps = agent.local_motion_speed_bound_mps();
+                let at_queue_slot = agent
+                    .queue_membership
+                    .as_ref()
+                    .and_then(|membership| {
+                        let assignment = queues.assignment(index)?;
+                        let footprint =
+                            scenario.queue_footprint_for_resource(&membership.resource)?;
+                        Some(
+                            agent.position.distance(footprint.position(assignment.rank))
+                                <= NAVIGATION_EPSILON_M,
+                        )
+                    })
+                    .unwrap_or(false);
+                let max_speed_mps = if at_queue_slot {
+                    0.0
+                } else {
+                    agent.local_motion_speed_bound_mps()
+                };
                 maximum_speed_by_surface
                     .entry(agent.surface.clone())
                     .and_modify(|maximum| *maximum = maximum.max(max_speed_mps))
@@ -423,7 +454,11 @@ impl LocalMotionSnapshot {
                         x: agent.position.x_m,
                         y: agent.position.y_m,
                     },
-                    velocity: agent.velocity,
+                    velocity: if max_speed_mps > 0.0 {
+                        agent.velocity
+                    } else {
+                        Vec2::ZERO
+                    },
                     radius_m: agent.radius_m,
                     max_speed_mps,
                     queue_priority: agent.queue_membership.as_ref().and_then(|membership| {
@@ -1776,7 +1811,7 @@ pub fn run(scenario: &Scenario, options: RunOptions) -> Result<RunBundle, RunErr
         ),
         (
             "integration".to_owned(),
-            "deterministic-orca-euler-0.42".to_owned(),
+            "deterministic-orca-euler-static-domain-0.45".to_owned(),
         ),
         (
             "local_motion".to_owned(),
@@ -2864,7 +2899,7 @@ fn reroute(
         agent.waiting_connector = None;
         agent.waiting_for_gate = false;
         agent.waiting_for_exit = false;
-        agent.waiting_for_route = true;
+        agent.stop_for_route();
         events.push(RunEvent {
             time_s,
             kind: "route_unavailable".to_owned(),
@@ -2986,8 +3021,9 @@ fn integrate(
     knowledge::observe_agents(scenario, agents, time_s, resources, events);
     preassign_authored_queue_slots(scenario, resources, agents, time_s, events);
     let local_motion_spatial_index = SpatialIndex::from_agents(agents);
-    let mut local_motion_snapshot = LocalMotionSnapshot::from_agents(scenario, agents);
     let physical_queue_snapshot = PhysicalQueueSnapshot::from_agents(agents);
+    let mut local_motion_snapshot =
+        LocalMotionSnapshot::from_agents(scenario, agents, &physical_queue_snapshot);
     let mut spatial_index = SpatialIndex::from_agents(agents);
     let mut lift_loads = current_lift_loads(scenario, agents);
     for (index, connector) in scenario.connectors.iter().enumerate() {
@@ -3287,7 +3323,7 @@ fn integrate(
                                     events,
                                 );
                             } else {
-                                agent.waiting_for_route = true;
+                                agent.stop_for_route();
                                 events.push(RunEvent {
                                     time_s,
                                     kind: "route_unavailable".to_owned(),
@@ -3419,7 +3455,7 @@ fn integrate(
                         if !connector.supports_height(agent.height_m)
                             || agent.excluded_connector_kinds.contains(&connector.kind())
                         {
-                            agent.waiting_for_route = true;
+                            agent.stop_for_route();
                             continue;
                         }
                         if resources.closed_connectors.contains(connector.id()) {
@@ -3435,7 +3471,7 @@ fn integrate(
                                 );
                                 continue;
                             }
-                            agent.waiting_for_route = true;
+                            agent.stop_for_route();
                             continue;
                         }
                         let resource = PortalResource::Connector {
@@ -3913,14 +3949,39 @@ fn move_toward(
         runtime_index,
         ORCA_TIME_HORIZON_S,
     );
-    let decision = choose_velocity(
-        &nearby_agents,
-        own_index,
+    let movement_speed_bound = local_motion_snapshot.agents[runtime_index]
+        .as_ref()
+        .expect("moving agent occupies the snapshot")
+        .max_speed_mps;
+    let domain = static_domain::constraints(
+        agent.position,
         preferred_velocity,
-        agent.speed_mps,
-        ORCA_TIME_HORIZON_S,
+        movement_speed_bound,
         timestep_s,
+        movement.surface,
+        movement.obstacles,
+        agent.radius_m,
     );
+    let decision = if domain.is_empty() {
+        choose_velocity(
+            &nearby_agents,
+            own_index,
+            preferred_velocity,
+            movement_speed_bound,
+            ORCA_TIME_HORIZON_S,
+            timestep_s,
+        )
+    } else {
+        choose_velocity_in_domain(
+            &nearby_agents,
+            own_index,
+            preferred_velocity,
+            movement_speed_bound,
+            ORCA_TIME_HORIZON_S,
+            timestep_s,
+            &domain,
+        )
+    };
     let candidate = Point3 {
         x_m: agent.position.x_m + decision.velocity.x * timestep_s,
         y_m: agent.position.y_m + decision.velocity.y * timestep_s,

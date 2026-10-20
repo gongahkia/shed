@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fmt::Write};
 
-pub const BUNDLE_VERSION: &str = "0.44";
+pub const BUNDLE_VERSION: &str = "0.45";
 
 /// Latest route-relevant evidence retained by an agent using local knowledge.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

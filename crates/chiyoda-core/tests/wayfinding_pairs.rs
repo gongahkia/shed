@@ -39,7 +39,7 @@ fn frozen_wayfinding_pairs_preserve_verified_inputs_and_the_original_checks() {
         assert!(case.evaluation.verify_replay);
         assert_eq!(case.evaluation.thresholds.min_evacuated_fraction, Some(1.0));
     }
-    for pair in suite.cases.chunks_exact(2) {
+    for pair in suite.cases.as_chunks::<2>().0 {
         let mut silent = pair[0].scenario.clone();
         let mut announced = pair[1].scenario.clone();
         assert!(silent.scenario.messages.is_empty());
@@ -48,7 +48,7 @@ fn frozen_wayfinding_pairs_preserve_verified_inputs_and_the_original_checks() {
         announced.scenario.messages.clear();
         assert_eq!(silent, announced);
     }
-    for pair in origin["cases"].as_array().unwrap().chunks_exact(2) {
+    for pair in origin["cases"].as_array().unwrap().as_chunks::<2>().0 {
         assert_eq!(pair[0]["passed"], false);
         assert_eq!(pair[1]["passed"], true);
         assert_eq!(pair[0]["context"], pair[1]["context"]);

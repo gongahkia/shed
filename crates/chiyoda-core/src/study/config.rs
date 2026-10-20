@@ -27,6 +27,8 @@ pub struct StudyConfig {
     pub operations: Operations,
     #[serde(default)]
     pub evaluation: EvaluationOptions,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub journey_diagnostics: Option<crate::journeys::JourneyOptions>,
 }
 
 /// Common physical and numerical assumptions. Study axes are separate fields,
@@ -271,6 +273,9 @@ impl StudyConfig {
             );
         }
         self.evaluation.thresholds.validate()?;
+        if let Some(options) = &self.journey_diagnostics {
+            options.validate()?;
+        }
         let services = &self.environment.services;
         for value in [
             services.exit_capacity_per_s,

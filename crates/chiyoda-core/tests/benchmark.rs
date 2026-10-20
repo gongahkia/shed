@@ -11,7 +11,12 @@ fn simple_report() -> BenchmarkReport {
     BenchmarkReport::new(suite, vec![case]).unwrap()
 }
 
-fn reseal(report: BenchmarkReport) -> BenchmarkReport {
+fn reseal(mut report: BenchmarkReport) -> BenchmarkReport {
+    // These comparison tests deliberately replace runtime metrics. Their
+    // synthetic cases have no corresponding per-person journey evidence.
+    for case in &mut report.cases {
+        case.journeys = None;
+    }
     BenchmarkReport::new_labeled(report.suite, report.cases, report.label).unwrap()
 }
 

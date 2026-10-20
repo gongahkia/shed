@@ -63,6 +63,8 @@ pub struct BenchmarkSuite {
     pub origin: Option<EvaluationOrigin>,
     #[serde(default)]
     pub diagnostics: DiagnosticOptions,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub journey_diagnostics: Option<crate::journeys::JourneyOptions>,
     pub cases: Vec<BenchmarkCase>,
 }
 
@@ -84,6 +86,9 @@ impl BenchmarkSuite {
             return Err(invalid("suites need a name and 1..=256 cases"));
         }
         self.diagnostics.validate().map_err(invalid)?;
+        if let Some(options) = &self.journey_diagnostics {
+            options.validate().map_err(invalid)?;
+        }
         let mut ids = BTreeSet::new();
         for case in &self.cases {
             if case.id.trim().is_empty() || !ids.insert(&case.id) {
@@ -133,6 +138,16 @@ impl BenchmarkSuite {
     /// across runtime revisions. Analysis and expectation changes are inputs.
     #[must_use]
     pub fn input_hash(&self, case: &BenchmarkCase) -> String {
+        if let Some(options) = &self.journey_diagnostics {
+            return canonical_hash(&(
+                &case.scenario,
+                case.expected,
+                &case.evaluation,
+                &case.checks,
+                &self.diagnostics,
+                options,
+            ));
+        }
         canonical_hash(&(
             &case.scenario,
             case.expected,
@@ -150,12 +165,15 @@ pub struct CaseResult {
     pub input_hash: String,
     pub evaluation: CaseReport,
     pub diagnosis: Diagnosis,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub journeys: Option<crate::journeys::JourneySummary>,
 }
 
 #[derive(Debug)]
 pub struct CaseRun {
     pub result: CaseResult,
     pub artifacts: CaseEvaluation,
+    pub journeys: Option<crate::journeys::JourneyAnalysis>,
 }
 
 /// Run one definition with the same full-step assertions and reconstruction
@@ -176,6 +194,22 @@ pub fn run_case(suite: &BenchmarkSuite, index: usize) -> Result<CaseRun, Benchma
     if let Some(bundle) = &artifacts.bundle {
         check_behavior(case, bundle, &mut artifacts.report);
     }
+    let mut journeys = None;
+    if let Some(bundle) = &artifacts.bundle {
+        match crate::journeys::analyze_with_controls(
+            bundle,
+            &suite.journey_diagnostics.clone().unwrap_or_default(),
+        ) {
+            Ok(analysis) => journeys = Some(analysis),
+            Err(detail) => {
+                artifacts.report.failures.push(CheckFailure {
+                    check: "journey_diagnostics".into(),
+                    detail,
+                });
+                artifacts.report.passed = false;
+            }
+        }
+    }
     let diagnosis = artifacts
         .bundle
         .as_ref()
@@ -187,8 +221,13 @@ pub fn run_case(suite: &BenchmarkSuite, index: usize) -> Result<CaseRun, Benchma
         input_hash: suite.input_hash(case),
         evaluation: artifacts.report.clone(),
         diagnosis,
+        journeys: journeys.as_ref().map(|analysis| analysis.report.summary()),
     };
-    Ok(CaseRun { result, artifacts })
+    Ok(CaseRun {
+        result,
+        artifacts,
+        journeys,
+    })
 }
 
 fn check_behavior(case: &BenchmarkCase, bundle: &RunBundle, report: &mut CaseReport) {
@@ -342,6 +381,20 @@ impl BenchmarkReport {
                 ));
             }
             result.diagnosis.validate().map_err(invalid)?;
+            if let Some(journeys) = &result.journeys {
+                journeys.validate().map_err(invalid)?;
+                let metrics = result
+                    .evaluation
+                    .metrics
+                    .as_ref()
+                    .ok_or_else(|| invalid("journeys require simulated metrics"))?;
+                if Some(&journeys.source_bundle_hash) != result.evaluation.bundle_hash.as_ref()
+                    || journeys.people != metrics.total_agents
+                    || journeys.completed != metrics.evacuated_agents
+                {
+                    return Err(invalid("journey summary disagrees with its evaluated case"));
+                }
+            }
             if let Some(metrics) = &result.evaluation.metrics {
                 validate_metrics(metrics)?;
             }

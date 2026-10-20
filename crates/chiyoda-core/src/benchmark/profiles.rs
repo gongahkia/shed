@@ -86,6 +86,7 @@ pub fn suite(name: &str) -> Result<BenchmarkSuite, BenchmarkError> {
         name: name.into(),
         origin: None,
         diagnostics: super::diagnostics::DiagnosticOptions::default(),
+        journey_diagnostics: None,
         cases,
     };
     suite.validate()?;

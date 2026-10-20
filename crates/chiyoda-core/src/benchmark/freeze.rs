@@ -65,6 +65,7 @@ pub fn from_evaluation(
             report_hash: canonical_hash(report),
         }),
         diagnostics: super::diagnostics::DiagnosticOptions::default(),
+        journey_diagnostics: None,
         cases,
     };
     suite.validate()?;

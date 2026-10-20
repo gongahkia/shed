@@ -36,6 +36,8 @@ pub struct StudyCaseResult {
     pub layout_hash: Option<String>,
     pub input_sha256: Option<String>,
     pub generation_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub journeys: Option<crate::journeys::JourneySummary>,
 }
 
 impl StudyCaseResult {
@@ -113,6 +115,9 @@ impl StudyCaseResult {
             );
         }
         information_observations(metrics, &mut values);
+        if let Some(journeys) = &self.journeys {
+            values.extend(journeys.observations());
+        }
         if let Some(movement) = &metrics.movement_metrics {
             if let Some(audit) = &movement.on_surface_clearance_audit {
                 values.insert("max_disc_overlap_m".into(), audit.maximum_disc_overlap_m);
@@ -143,6 +148,7 @@ pub struct StudyCaseArtifacts {
     /// population. The actual evaluated input is `input_json` and its context.
     pub generation: Option<GenerationManifest>,
     pub generated_json: Option<String>,
+    pub journeys: Option<crate::journeys::JourneyAnalysis>,
 }
 
 /// Streams one case at a time, caching exactly one layout and one population.
@@ -258,11 +264,13 @@ impl StudyRunner {
                 layout_hash: space.map(|space| geometry_hash(&space.scenario)),
                 input_sha256: None,
                 generation_hash: space.map(|space| canonical_hash(&space.manifest)),
+                journeys: None,
             },
             input_json: None,
             bundle: None,
             generation: space.map(|space| space.manifest.clone()),
             generated_json: space.map(|space| space.json.clone()),
+            journeys: None,
         };
         let input = match &self.population.as_ref().expect("prepared population").1 {
             Ok(input) => input,
@@ -282,12 +290,30 @@ impl StudyRunner {
         let scenario = input.with_policy(policy);
         let json = serde_json::to_string_pretty(&CanonicalScenario::from(scenario))
             .expect("validated finite study config");
-        let evaluation = evaluation::evaluate_json(
+        let mut evaluation = evaluation::evaluate_json(
             &case_name(coordinate),
             &json,
             ExpectedReachability::Reachable,
             &self.config.evaluation,
         );
+        if let Some(bundle) = &evaluation.bundle {
+            match crate::journeys::analyze_with_controls(
+                bundle,
+                &self.config.journey_diagnostics.clone().unwrap_or_default(),
+            ) {
+                Ok(analysis) => {
+                    artifacts.result.journeys = Some(analysis.report.summary());
+                    artifacts.journeys = Some(analysis);
+                }
+                Err(detail) => {
+                    evaluation.report.failures.push(evaluation::CheckFailure {
+                        check: "journey_diagnostics".into(),
+                        detail,
+                    });
+                    evaluation.report.passed = false;
+                }
+            }
+        }
         artifacts.result.passed = evaluation.report.passed;
         artifacts.result.evaluation = Some(evaluation.report);
         let input_json = json + "\n";

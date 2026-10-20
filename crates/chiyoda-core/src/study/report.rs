@@ -194,6 +194,23 @@ fn validate_cases(config: &StudyConfig, cases: &[StudyCaseResult]) -> Result<(),
     let mut controls = BTreeMap::new();
     let mut layouts = BTreeMap::new();
     for (coordinate, case) in config.coordinates().into_iter().zip(cases) {
+        if let Some(journeys) = &case.journeys {
+            journeys.validate()?;
+            let evaluation = case
+                .evaluation
+                .as_ref()
+                .ok_or("journey evidence requires a simulated case")?;
+            let metrics = evaluation
+                .metrics
+                .as_ref()
+                .ok_or("journey evidence requires metrics")?;
+            if Some(&journeys.source_bundle_hash) != evaluation.bundle_hash.as_ref()
+                || journeys.people != metrics.total_agents
+                || journeys.completed != metrics.evacuated_agents
+            {
+                return Err("journey summary disagrees with its evaluated case".into());
+            }
+        }
         if case.key != config.key(coordinate) {
             return Err("study cases must match the configured matrix in order".into());
         }

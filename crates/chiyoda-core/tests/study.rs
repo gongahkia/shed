@@ -357,6 +357,8 @@ fn summary_percentiles_and_comparisons_use_each_metrics_available_seed_pairs() {
         .map(|case| case.result)
         .collect::<Vec<_>>();
     for (index, case) in cases.iter_mut().enumerate() {
+        // The percentile fixture replaces observations with synthetic metrics.
+        case.journeys = None;
         let metrics = case.evaluation.as_mut().unwrap().metrics.as_mut().unwrap();
         if index != 7 {
             metrics.evacuated_agents = metrics.total_agents;

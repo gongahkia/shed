@@ -53,6 +53,58 @@ pub(super) fn derive(report: &JourneyReport) -> JourneySummary {
             .iter()
             .map(|agent| u64::try_from(agent.decisions.len()).expect("bounded event count"))
             .sum(),
+        completed_elapsed_journey_s: report
+            .agents
+            .iter()
+            .filter_map(|agent| agent.elapsed_journey_s)
+            .sum(),
+        nominal_estimates: count(
+            report
+                .agents
+                .iter()
+                .filter(|agent| agent.nominal_reference.is_some())
+                .count(),
+        ),
+        nominal_journey_s: report
+            .agents
+            .iter()
+            .filter_map(|agent| agent.nominal_reference.as_ref())
+            .map(|reference| reference.centre_route_duration_s + reference.authored_dwell_s)
+            .sum(),
+        controls_requested: count(report.isolated_controls.len()),
+        controls_run: count(
+            report
+                .isolated_controls
+                .iter()
+                .filter(|control| control.bundle_hash.is_some())
+                .count(),
+        ),
+        controls_completed: count(
+            report
+                .isolated_controls
+                .iter()
+                .filter(|control| control.evacuated_at_s.is_some())
+                .count(),
+        ),
+        control_pairs_completed: count(
+            report
+                .isolated_controls
+                .iter()
+                .filter(|control| control.crowded_minus_isolated_elapsed_s.is_some())
+                .count(),
+        ),
+        paired_crowded_elapsed_s: report
+            .isolated_controls
+            .iter()
+            .filter(|control| control.crowded_minus_isolated_elapsed_s.is_some())
+            .filter_map(|control| control.crowded_elapsed_journey_s)
+            .sum(),
+        paired_isolated_elapsed_s: report
+            .isolated_controls
+            .iter()
+            .filter(|control| control.crowded_minus_isolated_elapsed_s.is_some())
+            .filter_map(|control| control.elapsed_journey_s)
+            .sum(),
     }
 }
 

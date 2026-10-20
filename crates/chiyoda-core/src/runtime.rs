@@ -19,6 +19,7 @@ use std::{
 
 mod knowledge;
 mod motion_guard;
+mod nominal;
 mod static_domain;
 mod walk_visibility;
 
@@ -137,7 +138,11 @@ pub fn verify_run_bundle(bundle: &RunBundle) -> Result<BundleVerification, RunEr
             "trace_every_steps option must be greater than zero".to_owned(),
         ));
     }
-    let reconstructed = run(&bundle.scenario.scenario, RunOptions { trace_every_steps })?;
+    let reconstructed = run_selected(
+        &bundle.scenario.scenario,
+        RunOptions { trace_every_steps },
+        bundle.options.get("isolated_agent").map(String::as_str),
+    )?;
     if &reconstructed != bundle {
         return Err(RunError::InvalidBundle(
             "bundle does not match deterministic reconstruction".to_owned(),
@@ -1768,7 +1773,11 @@ fn swept_disc_overlap_m(
     clippy::cast_sign_loss,
     clippy::too_many_lines
 )] // validation bounds conversions; setup, stepping, metrics, and artifact construction share one contract
-pub fn run(scenario: &Scenario, options: RunOptions) -> Result<RunBundle, RunError> {
+fn run_selected(
+    scenario: &Scenario,
+    options: RunOptions,
+    isolated_agent: Option<&str>,
+) -> Result<RunBundle, RunError> {
     validate(scenario).map_err(RunError::InvalidScenario)?;
     if options.trace_every_steps == 0 {
         return Err(RunError::InvalidOptions(
@@ -1783,6 +1792,14 @@ pub fn run(scenario: &Scenario, options: RunOptions) -> Result<RunBundle, RunErr
         &resources.closed_exits,
         &resources.closed_gates,
     )?;
+    if let Some(id) = isolated_agent {
+        agents.retain(|agent| agent.id == id);
+        if agents.is_empty() {
+            return Err(RunError::InvalidOptions(format!(
+                "unknown isolated agent `{id}`"
+            )));
+        }
+    }
     let step_count = integration_step_count(scenario.duration_s, scenario.timestep_s);
     let mut events = initial_state_events(scenario);
     knowledge::observe_agents(scenario, &mut agents, 0.0, &resources, &mut events);
@@ -1926,8 +1943,34 @@ pub fn run(scenario: &Scenario, options: RunOptions) -> Result<RunBundle, RunErr
             "local-portal-observation-and-accepted-claims-0.44".into(),
         );
     }
+    if let Some(id) = isolated_agent {
+        options.insert("isolated_agent".into(), id.into());
+        options.insert(
+            "execution_scope".into(),
+            "one-original-agent-no-other-people-1".into(),
+        );
+    }
     Ok(RunBundle::new(canonical, options, trace, events, metrics))
 }
+
+/// Execute the ordinary deterministic reference law for all authored people.
+pub fn run(scenario: &Scenario, options: RunOptions) -> Result<RunBundle, RunError> {
+    run_selected(scenario, options, None)
+}
+
+/// A recorded counterfactual retaining one original generated identity, spawn,
+/// release schedule, seed, geometry, operations, and information. The complete
+/// original scenario remains in the bundle; its explicit execution scope is
+/// required for reconstruction. No renumbering or group rewriting occurs.
+pub fn run_isolated(
+    scenario: &Scenario,
+    options: RunOptions,
+    agent: &str,
+) -> Result<RunBundle, RunError> {
+    run_selected(scenario, options, Some(agent))
+}
+
+pub(crate) use nominal::journey_reference as nominal_journey_reference;
 
 fn spawn_agents(
     scenario: &Scenario,

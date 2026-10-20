@@ -46,6 +46,14 @@ pub(super) fn analyze(
             connector_interior_distance_m: 0.0,
             transition_distance_m: 0.0,
             time: TimeBudget::default(),
+            nominal_reference: crate::runtime::nominal_journey_reference(
+                scenario,
+                group,
+                group
+                    .spawn_positions()
+                    .nth(ordinal as usize)
+                    .ok_or("missing original spawn")?,
+            ),
             avoidance_fallback_steps: 0,
             swept_guard_steps: 0,
             low_progress: Vec::new(),
@@ -95,6 +103,7 @@ pub(super) fn analyze(
     let mut report = JourneyReport {
         journey_version: JOURNEY_VERSION.into(),
         runtime_version: bundle.runtime_version.clone(),
+        analyzer_runtime_version: crate::RUNTIME_VERSION.into(),
         source_bundle_hash: bundle.bundle_hash.clone(),
         scenario_hash: bundle.scenario_hash.clone(),
         options: options.clone(),
@@ -102,6 +111,7 @@ pub(super) fn analyze(
         hotspots: hotspots(bundle, &agents, options)?,
         resources: resources(bundle)?,
         agents,
+        isolated_controls: Vec::new(),
         report_hash: String::new(),
     };
     report.report_hash = canonical_hash(&report);

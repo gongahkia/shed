@@ -240,7 +240,8 @@ Study version 1 permits at most 4,096 requested cases, 1,024 people per floor,
 per case. Counts are never silently capped. The generator still supports
 4–16 tiles per axis and 1–4 floors. Search and geometric preflight retain their
 existing limits. Large cases can produce substantial traces: the CLI streams
-cases and retains at most one simulation bundle at a time.
+cases instead of accumulating complete traces for the whole study. Replay
+verification temporarily reconstructs a second bundle for the current case.
 
 Simulation movement rules and existing evaluation/benchmark commands are
 unchanged. Changes to study placement, service scaling, comparison, or sampling

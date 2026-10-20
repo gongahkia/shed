@@ -128,6 +128,14 @@ absolute paths to the supplied report directories; move the artifacts together
 and rerun the comparison if those paths change. Comparison itself requires
 only report JSON, so a saved metric report can be compared without its bundle.
 
+New simulated cases also save `journeys.json`, `journeys.csv`, and
+`journeys.md`. The case section links to per-person time and distance,
+low-progress locations, information/route timelines, and exact recorded replay
+steps. Optional `journey_diagnostics` settings request bounded isolated controls
+and retain their separate bundles. See [journey evidence](journeys.md).
+Explicit analysis options participate in the fixed-input hash. Omitted options
+preserve existing suite/input hashes, and old reports keep their checksums.
+
 ## Comparison rules and tolerances
 
 Reports include versioned schemas, suite/input hashes, and a report checksum.

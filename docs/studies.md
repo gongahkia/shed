@@ -238,6 +238,25 @@ free-flow prediction or a congestion adjustment. The report does not label a
 pattern detrimental from clearance time alone, establish statistical
 significance, or make calibrated real-building safety claims.
 
+## Journey evidence
+
+New simulated cases retain a per-person journey ledger, static obstacle-aware
+nominal reference, low-progress locations, resource exposure, and recorded
+information/route timelines. The main report adds walking-distance and state
+exposure comparisons, with links to each case's `journeys.md`, `journeys.csv`,
+and `journeys.json`. Earlier reports omit those optional fields and retain
+their original hashes.
+
+Use `journey_diagnostics` to change analysis windows or request bounded isolated
+controls. The [journey guide](journeys.md) explains their assumptions, budgets,
+verification, and exact-step replay commands. This focused example reproduces
+the shared-corner case and its announcement control:
+
+```console
+cargo run --release --locked -p chiyoda -- study run --config examples/studies/journey-diagnostics.json -o out/journey-study
+cargo run --release --locked -p chiyoda -- study verify out/journey-study/report.json --replay
+```
+
 ## Artifacts, verification, and limits
 
 Every numbered `case-0000/` directory has a `report.json`. A successful layout

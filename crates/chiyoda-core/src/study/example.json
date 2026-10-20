@@ -36,5 +36,9 @@
     }
   ],
   "seeds": [73, 74],
-  "evaluation": {"verify_replay": true, "thresholds": {"min_evacuated_fraction": 1.0}}
+  "evaluation": {"verify_replay": true, "thresholds": {"min_evacuated_fraction": 1.0}},
+  "journey_diagnostics": {
+    "low_progress_window_s": 5.0, "max_low_progress_travel_m": 0.1,
+    "hotspot_cell_size_m": 2.0
+  }
 }

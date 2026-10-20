@@ -359,3 +359,14 @@ The JSON scenario schema and WFC geometry rules remain unchanged. Authentic
 current reconstruction requires a fresh run. The frozen
 [wayfinding investigation](movement-investigation.md) separates the original
 outcomes from reruns under the changed motion contract.
+
+Journey analysis version 1 derives per-person evidence from complete recorded
+integration traces without changing the ordinary 0.45 execution. Its optional
+isolated execution scope uses bundle contract `0.45-isolated.1`, retains the
+complete original scenario, and records the selected original generated ID in
+`isolated_agent`. Only that person is materialized, with the original spawn,
+release eligibility, and information draws. Current replay reconstructs that
+scope; older ordinary-only binaries identify the bundle contract as
+incompatible. Ordinary 0.45 bundle hashes and reconstruction remain unchanged.
+See [journey diagnostics](journeys.md) for observation, reference, and control
+assumptions.

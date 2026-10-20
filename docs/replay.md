@@ -13,6 +13,12 @@ $ cargo run -p chiyoda-replay -- out/showcase/run.json --surface concourse --exp
 $ cargo run -p chiyoda-replay -- out/showcase/run.json --sprite-atlas assets/replay/undercity-atlas.json
 ```
 
+`--at-step N` starts at an exact recorded integration step. It can be combined
+with `--paused` and `--surface` for the replay moments linked from
+[journey diagnostics](journeys.md). A missing recorded step is rejected; the
+viewer does not invent an interpolated diagnostic frame. The option applies
+to saved bundles rather than live watching or GIF export.
+
 ## Live JSON debugging
 
 For the editing loop, pass a source file through `--watch` instead of a run

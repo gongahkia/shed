@@ -57,3 +57,33 @@ fn exactly_opposing_walkers_can_pass_beside_a_wall_without_overlapping() {
             < 1e-8
     );
 }
+
+#[test]
+fn opposing_groups_round_a_shared_virtual_corner_without_stopping_or_overlapping() {
+    let scenario =
+        decode_scenario(include_str!("fixtures/movement/corner-counterflow.json")).unwrap();
+    let bundle = run(
+        &scenario,
+        RunOptions {
+            trace_every_steps: 1,
+        },
+    )
+    .unwrap();
+    assert_eq!(bundle.metrics.evacuated_agents, 8);
+    let motion = bundle.metrics.movement_metrics.unwrap();
+    assert!(
+        motion
+            .on_surface_clearance_audit
+            .unwrap()
+            .maximum_disc_overlap_m
+            < 1e-8
+    );
+    assert!(
+        motion
+            .swept_on_surface_clearance_audit
+            .unwrap()
+            .maximum_swept_disc_overlap_m
+            < 1e-8
+    );
+    assert!(motion.local_avoidance_constraint_fallback_steps.unwrap() > 0);
+}

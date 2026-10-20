@@ -227,7 +227,7 @@ pub(crate) fn choose_velocity_in_domain(
         .collect();
     lines.extend(
         neighbours
-            .into_iter()
+            .iter()
             .map(|(_, neighbour)| orca_line(own, neighbour, time_horizon_s, timestep_s)),
     );
 
@@ -245,18 +245,33 @@ pub(crate) fn choose_velocity_in_domain(
             velocity,
             constraint_fallback: false,
         },
-        Err((failed_line, partial_velocity)) => AvoidanceDecision {
+        Err((failed_line, _)) => AvoidanceDecision {
             // Static domains contain a stop. Retain that feasible fallback if
             // numerical error prevents solving the hard prefix itself.
             velocity: if failed_line < domain.len() {
                 Vec2::ZERO
             } else {
-                solve_relaxed_linear_program(
-                    &lines,
-                    max_speed_mps,
-                    failed_line,
-                    partial_velocity,
-                    domain.len(),
+                // A crowded corner may have no velocity satisfying everyone's
+                // 2.5 s forecast. Retry only the actual integration interval;
+                // retain stable neighbour order and every hard wall bound.
+                // The simultaneous motion guard checks the resulting segments.
+                let mut immediate = lines[..domain.len()].to_vec();
+                immediate.extend(neighbours.iter().map(|(_, neighbour)| {
+                    orca_line(own, neighbour, timestep_s.min(time_horizon_s), timestep_s)
+                }));
+                solve_linear_program(&immediate, max_speed_mps, preferred_velocity).unwrap_or_else(
+                    |(failed, partial)| {
+                        if failed < domain.len() {
+                            return Vec2::ZERO;
+                        }
+                        solve_relaxed_linear_program(
+                            &immediate,
+                            max_speed_mps,
+                            failed,
+                            partial,
+                            domain.len(),
+                        )
+                    },
                 )
             },
             constraint_fallback: true,
@@ -744,6 +759,39 @@ mod tests {
         assert!(result.constraint_fallback);
         assert!(result.velocity.x <= 1e-9);
         assert!(result.velocity.length() <= 1.0 + 1e-9);
+    }
+
+    #[test]
+    fn an_infeasible_long_horizon_retries_the_immediate_step_inside_the_wall_domain() {
+        // An approaching neighbour demands a future retreat through a wall.
+        // There is still room for tangential movement during this actual step.
+        let agents = [
+            agent("own", 0.0, 0.0, 0.0, 0.0),
+            agent("approaching", -1.0, 0.0, 1.0, 0.0),
+            agent("distant", -2.0, 1.0, 0.5, 0.0),
+        ];
+        let domain = [
+            VelocityConstraint {
+                normal: Vec2 { x: -1.0, y: 0.0 },
+                minimum: 0.0,
+            },
+            VelocityConstraint {
+                normal: Vec2 { x: 0.0, y: -1.0 },
+                minimum: -0.01,
+            },
+            VelocityConstraint {
+                normal: Vec2 { x: 0.0, y: 1.0 },
+                minimum: 0.0,
+            },
+        ];
+        let preferred = Vec2 { x: 0.0, y: 0.01 };
+        let result = choose_velocity_in_domain(&agents, 0, preferred, 1.0, 2.5, 0.2, &domain);
+        assert!(result.constraint_fallback);
+        assert_eq!(result.velocity, preferred);
+        let reordered = [agents[0].clone(), agents[2].clone(), agents[1].clone()];
+        let repeated = choose_velocity_in_domain(&reordered, 0, preferred, 1.0, 2.5, 0.2, &domain);
+        assert_eq!(repeated.velocity, result.velocity);
+        assert_eq!(repeated.constraint_fallback, result.constraint_fallback);
     }
 
     #[test]

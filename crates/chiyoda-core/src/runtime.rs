@@ -1889,7 +1889,7 @@ pub fn run(scenario: &Scenario, options: RunOptions) -> Result<RunBundle, RunErr
         ),
         (
             "local_motion".to_owned(),
-            "snapshot-orca-f64-static-domain-right-hand-cruising-preference-swept-guard-0.45"
+            "snapshot-orca-f64-static-domain-cruising-corners-right-hand-bias-immediate-horizon-fallback-swept-guard-0.45"
                 .to_owned(),
         ),
         (
@@ -4048,7 +4048,13 @@ fn plan_movement(
             constraint_fallback: false,
         };
     };
-    let waypoint = path.get(1).copied().unwrap_or(movement.target);
+    let waypoint_index = path
+        .iter()
+        .skip(1)
+        .position(|point| agent.position.distance(*point) > NAVIGATION_EPSILON_M)
+        .map_or(path.len() - 1, |index| index + 1);
+    let waypoint = path[waypoint_index];
+    let intermediate_corner = waypoint_index + 1 < path.len();
     let dx = waypoint.x_m - agent.position.x_m;
     let dy = waypoint.y_m - agent.position.y_m;
     let dz = waypoint.z_m - agent.position.z_m;
@@ -4064,10 +4070,20 @@ fn plan_movement(
             z_m: agent.position.z_m + (dz / distance) * travel,
         }
     };
-    let preferred_velocity = Vec2 {
+    let mut preferred_velocity = Vec2 {
         x: (planned_next.x_m - agent.position.x_m) / timestep_s,
         y: (planned_next.y_m - agent.position.y_m) / timestep_s,
     };
+    // Visibility corners guide steering; they are not authored stopping points.
+    // Preserve maneuvering speed near a corner so nearby people do not all
+    // converge on the same almost-zero-speed point. Static bounds retain the
+    // obstacle clearance of every actual segment.
+    if intermediate_corner && distance > NAVIGATION_EPSILON_M && reached_waypoint {
+        preferred_velocity = Vec2 {
+            x: dx / distance * agent.speed_mps,
+            y: dy / distance * agent.speed_mps,
+        };
+    }
     let (nearby_agents, own_index) = local_motion_snapshot.nearby_agents(
         local_motion_spatial_index,
         agent,
@@ -4133,7 +4149,7 @@ fn plan_movement(
     MotionProposal {
         end: next,
         planned: planned_next,
-        goal: (path.len() <= 2).then_some((waypoint, target_reach_m)),
+        goal: (!intermediate_corner).then_some((waypoint, target_reach_m)),
         constraint_fallback: decision.constraint_fallback,
     }
 }

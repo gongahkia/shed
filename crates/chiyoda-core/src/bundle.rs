@@ -182,7 +182,8 @@ pub struct MovementMetrics {
     pub local_clearance_adjustment_steps: u64,
     /// Number of steps in which the local ORCA half-planes were infeasible
     /// under the authored speed bound and the runtime selected its documented
-    /// deterministic least-penetrating fallback.
+    /// fallback. Contract 0.45 first retries the immediate-step horizon, then
+    /// relaxes only agent constraints while retaining the static domain.
     /// Omitted before runtime contract 0.31 so historical bundle hashes remain
     /// independently verifiable after deserialization.
     #[serde(default, skip_serializing_if = "Option::is_none")]

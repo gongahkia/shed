@@ -226,6 +226,9 @@ fn save_case(
     if let Some(bundle) = &run.artifacts.bundle {
         write_json(&directory.join("run.json"), bundle)?;
     }
+    if let Some(analysis) = &run.journeys {
+        super::journeys::save(&directory, analysis)?;
+    }
     write_json(&directory.join("report.json"), &run.result)?;
     println!(
         "{}: {}; walking alerts: {}",

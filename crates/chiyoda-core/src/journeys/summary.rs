@@ -1,5 +1,6 @@
 use super::{JOURNEY_VERSION, JourneyReport, JourneySummary};
 
+#[allow(clippy::too_many_lines)] // one aggregate projection keeps each counter and its denominator together
 pub(super) fn derive(report: &JourneyReport) -> JourneySummary {
     JourneySummary {
         journey_version: JOURNEY_VERSION.into(),

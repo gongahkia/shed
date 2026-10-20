@@ -3,6 +3,7 @@
 
 mod controls;
 mod observations;
+pub mod rendering;
 mod summary;
 
 use crate::{RunBundle, benchmark::diagnostics::LowProgressWindow, bundle::RunEvent};
@@ -107,7 +108,18 @@ pub struct AgentJourney {
     pub swept_guard_steps: u64,
     pub low_progress: Vec<LowProgressWindow>,
     /// Authored information, route, stage, and service events in recorded order.
-    pub decisions: Vec<RunEvent>,
+    pub decisions: Vec<JourneyDecision>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct JourneyDecision {
+    pub event: RunEvent,
+    pub replay_step: u64,
+    pub surface: String,
+    /// Position in the first recorded integration frame at/after the event;
+    /// the runtime can apply the event before movement in that interval.
+    pub recorded_position: crate::model::Point3,
 }
 
 /// Centre-to-centre obstacle-aware nominal planning with every resource open,
@@ -292,6 +304,16 @@ pub fn analyze_with_controls(
 }
 
 impl JourneyReport {
+    pub fn check_hash(&self) -> Result<(), String> {
+        self.options.validate()?;
+        self.summary().validate()?;
+        let mut unsigned = self.clone();
+        unsigned.report_hash.clear();
+        if crate::bundle::canonical_hash(&unsigned) != self.report_hash {
+            return Err("journey report checksum does not match its content".into());
+        }
+        Ok(())
+    }
     #[must_use]
     pub fn summary(&self) -> JourneySummary {
         summary::derive(self)

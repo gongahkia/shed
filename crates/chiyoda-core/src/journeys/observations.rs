@@ -60,29 +60,7 @@ pub(super) fn analyze(
             decisions: Vec::new(),
         });
     }
-    for frames in bundle.trace.windows(2) {
-        let elapsed = frames[1].time_s - frames[0].time_s;
-        for ((start, end), journey) in frames[0]
-            .agents
-            .iter()
-            .zip(&frames[1].agents)
-            .zip(&mut agents)
-        {
-            account_state(&mut journey.time, &start.state, elapsed);
-            let distance = point(start).distance(point(end));
-            if start.state == AgentState::InTransit && end.state == AgentState::InTransit {
-                journey.connector_interior_distance_m += distance;
-            } else if start.state == AgentState::InTransit
-                || end.state == AgentState::InTransit
-                || start.surface != end.surface
-            {
-                journey.transition_distance_m += distance;
-            } else {
-                journey.walking_distance_m += distance;
-            }
-            journey.final_state = end.state.clone();
-        }
-    }
+    account_intervals(bundle, &mut agents);
     account_events(bundle, &mut agents)?;
     let diagnosis = diagnostics::analyze(
         bundle,
@@ -116,6 +94,32 @@ pub(super) fn analyze(
     };
     report.report_hash = canonical_hash(&report);
     Ok(report)
+}
+
+fn account_intervals(bundle: &RunBundle, agents: &mut [AgentJourney]) {
+    for frames in bundle.trace.windows(2) {
+        let elapsed = frames[1].time_s - frames[0].time_s;
+        for ((start, end), journey) in frames[0]
+            .agents
+            .iter()
+            .zip(&frames[1].agents)
+            .zip(agents.iter_mut())
+        {
+            account_state(&mut journey.time, &start.state, elapsed);
+            let distance = point(start).distance(point(end));
+            if start.state == AgentState::InTransit && end.state == AgentState::InTransit {
+                journey.connector_interior_distance_m += distance;
+            } else if start.state == AgentState::InTransit
+                || end.state == AgentState::InTransit
+                || start.surface != end.surface
+            {
+                journey.transition_distance_m += distance;
+            } else {
+                journey.walking_distance_m += distance;
+            }
+            journey.final_state = end.state.clone();
+        }
+    }
 }
 
 fn validate_trace(bundle: &RunBundle) -> Result<(), String> {
@@ -259,7 +263,16 @@ fn account_events(bundle: &RunBundle, agents: &mut [AgentJourney]) -> Result<(),
                 | "gate_processed"
                 | "queue_service_reserved"
         ) {
-            agent.decisions.push(event.clone());
+            let frame_index = bundle
+                .trace
+                .partition_point(|frame| frame.time_s < event.time_s);
+            let frame = &bundle.trace[frame_index.min(bundle.trace.len() - 1)];
+            agent.decisions.push(super::JourneyDecision {
+                event: event.clone(),
+                replay_step: frame.step,
+                surface: frame.agents[*index].surface.clone(),
+                recorded_position: point(&frame.agents[*index]),
+            });
         }
     }
     for agent in agents {
@@ -375,9 +388,9 @@ fn hotspots(
     let mut cells = BTreeMap::<(String, u64, u64), Cell>::new();
     for (index, agent) in agents.iter().enumerate() {
         for window in &agent.low_progress {
-            for frames in bundle.trace.windows(2).filter(|frames| {
-                frames[1].time_s > window.start_time_s && frames[0].time_s < window.end_time_s
-            }) {
+            let first = bundle.trace.partition_point(|frame| frame.time_s <= window.start_time_s).saturating_sub(1);
+            let last = bundle.trace.partition_point(|frame| frame.time_s < window.end_time_s).min(bundle.trace.len() - 1);
+            for frames in bundle.trace[first..=last].windows(2) {
                 let start = frames[0].time_s.max(window.start_time_s);
                 let end = frames[1].time_s.min(window.end_time_s);
                 let position = point(&frames[0].agents[index]).lerp(

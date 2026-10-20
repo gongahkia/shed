@@ -163,6 +163,9 @@ fn save_case(output: &Path, index: usize, case: &StudyCaseArtifacts) -> Result<(
     if let Some(bundle) = &case.bundle {
         write_json(&root.join("run.json"), bundle)?;
     }
+    if let Some(analysis) = &case.journeys {
+        super::journeys::save(&root, analysis)?;
+    }
     write_json(&root.join("report.json"), &case.result)
 }
 
@@ -259,7 +262,19 @@ fn verify_case(
                 && bundle.runtime_version == report.runtime_version,
             "bundle metrics or runtime mismatch"
         );
-        if replay && verify_run_bundle(&bundle)? != BundleVerification::Reconstructed {
+        if let Some(summary) = &case.journeys {
+            super::journeys::verify_saved(
+                root,
+                &bundle,
+                summary,
+                &report
+                    .config
+                    .journey_diagnostics
+                    .clone()
+                    .unwrap_or_default(),
+                replay,
+            )?;
+        } else if replay && verify_run_bundle(&bundle)? != BundleVerification::Reconstructed {
             bail!("bundle cannot be reconstructed with the current runtime");
         }
     }

@@ -59,6 +59,9 @@ pub fn run_markdown(report: &BenchmarkReport) -> Result<String, BenchmarkError> 
         )
         .unwrap();
         case_evidence(&mut text, result, Path::new("."), index);
+        if let Some(summary) = &result.journeys {
+            writeln!(text, "\nJourney evidence: {:.3} m walked; {:.3} agent s service wait; {} people with {:.3} agent s low-progress spans. Isolated controls: {}/{}. [Locations, people, routes and replay](case-{index:04}/journeys.md) · [Per-person CSV](case-{index:04}/journeys.csv).\n", summary.walking_distance_m, summary.service_wait_agent_s, summary.low_progress_agents, summary.low_progress_span_agent_s, summary.controls_run, summary.controls_requested).unwrap();
+        }
         for failure in &result.evaluation.failures {
             writeln!(
                 text,

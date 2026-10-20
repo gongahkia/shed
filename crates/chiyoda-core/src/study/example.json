@@ -28,7 +28,7 @@
       "id": "official-announcement",
       "messages": [{
         "id": "closure_notice", "source": "Official", "surface": "floor_0",
-        "origin": {"x_m": 0.0, "y_m": 0.0, "z_m": 0.0},
+        "origin": {"anchor": "arrival_hall"},
         "claim": {"ExitAvailability": {"exit": "primary", "open": false}},
         "truthful": true, "at_s": 10.0, "reach_m": 10000.0, "trust": 0.9,
         "sampling_key": "primary-closure"

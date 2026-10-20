@@ -1,11 +1,10 @@
-use super::STUDY_VERSION;
+use super::{PolicyCountermeasure, PolicyMessage, STUDY_VERSION};
 use crate::{
     evaluation::EvaluationOptions,
     generator::spaces::{FloorConstraint, Module, Preset, SpaceConfig},
     model::{
-        ConnectorCapacityChange, ConnectorKind, ConnectorStateChange, Countermeasure,
-        ExitCapacityChange, ExitStateChange, GateCapacityChange, GateStateChange, Message,
-        Scenario,
+        ConnectorCapacityChange, ConnectorKind, ConnectorStateChange, ExitCapacityChange,
+        ExitStateChange, GateCapacityChange, GateStateChange, Scenario,
     },
     wfc::ForbiddenNeighbor,
 };
@@ -163,9 +162,9 @@ pub enum Placement {
 pub struct CommunicationPolicy {
     pub id: String,
     #[serde(default)]
-    pub messages: Vec<Message>,
+    pub messages: Vec<PolicyMessage>,
     #[serde(default)]
-    pub countermeasures: Vec<Countermeasure>,
+    pub countermeasures: Vec<PolicyCountermeasure>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
@@ -180,7 +179,7 @@ pub struct Operations {
 }
 
 impl Operations {
-    pub fn apply(&self, scenario: &mut Scenario, multiplier: f64) {
+    pub(super) fn apply(&self, scenario: &mut Scenario, multiplier: f64) {
         scenario.exit_states.clone_from(&self.exit_states);
         scenario.gate_states.clone_from(&self.gate_states);
         scenario.connector_states.clone_from(&self.connector_states);

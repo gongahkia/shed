@@ -1,4 +1,4 @@
-use super::{AreaBasis, Load, Placement, Population, Scale, StudyConfig};
+use super::{AreaBasis, CommunicationPolicy, Load, Placement, Population, Scale, StudyConfig};
 use crate::{
     CanonicalScenario, Scenario,
     bundle::canonical_hash,
@@ -14,6 +14,7 @@ const MAX_CANDIDATES_PER_FLOOR: u32 = 200_000;
 const MAX_AGENT_STEPS: u64 = 2_000_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StudyFailure {
     pub stage: String,
     pub detail: String,
@@ -31,6 +32,7 @@ impl StudyFailure {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FloorPopulation {
     pub surface: String,
     pub gross_area_m2: f64,
@@ -42,6 +44,7 @@ pub struct FloorPopulation {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StudyContext {
     /// Surfaces, obstacles, exits, gates, and connectors, including service limits.
     pub physical_input_hash: String,
@@ -62,9 +65,16 @@ pub struct StudyContext {
 pub struct PreparedInput {
     pub scenario: Scenario,
     pub context: StudyContext,
+    arrival_origins: std::collections::BTreeMap<String, Point3>,
 }
 
 impl PreparedInput {
+    #[must_use]
+    pub fn with_policy(&self, policy: &CommunicationPolicy) -> Scenario {
+        let mut scenario = self.scenario.clone();
+        policy.apply(&mut scenario, &self.arrival_origins);
+        scenario
+    }
     /// Replace the generator's placeholder population and services without
     /// resampling geometry. A setup failure never triggers a new layout search.
     pub fn from_space(
@@ -152,7 +162,17 @@ impl PreparedInput {
             mean_direct_exit_distance_m,
             mean_release_time_s,
         };
-        Ok(Self { scenario, context })
+        let arrival_origins = space
+            .scenario
+            .agents
+            .iter()
+            .map(|group| (group.surface.clone(), group.at))
+            .collect();
+        Ok(Self {
+            scenario,
+            context,
+            arrival_origins,
+        })
     }
 }
 

@@ -317,3 +317,170 @@ fn summary_percentiles_and_comparisons_use_each_metrics_available_seed_pairs() {
     assert_eq!(differences.missing, 1);
     assert!((differences.mean - 0.01).abs() < f64::EPSILON);
 }
+
+#[test]
+fn anchored_communication_is_resolved_before_evaluation_and_preserves_common_inputs() {
+    let mut value = document();
+    value["environment"]["duration_s"] = json!(4.0);
+    value["loads"][0]["population"]["agents"] = json!(12);
+    let message = json!({"id":"rumor","source":"Peer","surface":"floor_0","origin":{"anchor":"arrival_hall"},
+        "claim":{"ExitAvailability":{"exit":"primary","open":false}},"truthful":false,"at_s":0.2,"reach_m":10000.0,"trust":1.0,"sampling_key":"shared-rumor"});
+    let correction = json!({"id":"correction","corrects":"rumor","source":"Staff","surface":"floor_0","origin":{"anchor":"arrival_hall"},
+        "at_s":0.4,"reach_m":10000.0,"trust":1.0,"sampling_key":"shared-correction"});
+    value["policies"] = json!([{"id":"quiet"},{"id":"rumor","messages":[message.clone()]},{"id":"corrected","messages":[message],"countermeasures":[correction]}]);
+    let study: StudyConfig = serde_json::from_value(value).unwrap();
+    let cases: Vec<_> = StudyRunner::new(study).unwrap().collect();
+    assert_eq!(cases.len(), 3);
+    assert_eq!(cases[0].result.context, cases[2].result.context);
+    for case in &cases {
+        assert!(case.result.passed, "{:?}", case.result.evaluation);
+    }
+    let misinformation = cases[1].bundle.as_ref().unwrap();
+    let corrected = cases[2].bundle.as_ref().unwrap();
+    assert_eq!(
+        misinformation.metrics.information_delivery["rumor"].accepted_agents,
+        12
+    );
+    assert_eq!(
+        corrected.metrics.information_delivery["correction"].accepted_agents,
+        12
+    );
+    assert_ne!(misinformation.trace, corrected.trace);
+    chiyoda_core::validate(&corrected.scenario.scenario).unwrap();
+    assert!(corrected.scenario.scenario.messages[0].origin.x_m > 0.0);
+    let generated = spaces::generate(73, &config_for_anchor()).unwrap();
+    let mut config = config();
+    config.scales[0].height = 8;
+    config.scales[0].width = 8;
+    let prepared =
+        PreparedInput::from_space(&config, &generated, &config.scales[0], &config.loads[0])
+            .unwrap();
+    let policy: chiyoda_core::study::CommunicationPolicy=serde_json::from_value(json!({"id":"large","messages":[{
+        "id":"notice","source":"Peer","surface":"floor_0","origin":{"anchor":"arrival_hall"},"claim":{"ExitAvailability":{"exit":"primary","open":false}},
+        "truthful":false,"at_s":0.0,"reach_m":10000.0,"trust":1.0}]})).unwrap();
+    let resolved = prepared.with_policy(&policy);
+    chiyoda_core::validate(&resolved).unwrap();
+    assert!(resolved.messages[0].origin.y_m > 24.0);
+}
+
+fn config_for_anchor() -> spaces::SpaceConfig {
+    let mut config = config();
+    config.scales[0].width = 8;
+    config.scales[0].height = 8;
+    config.generation(&config.patterns[0], &config.scales[0])
+}
+
+#[test]
+fn a_full_matrix_accounts_for_every_axis_and_uses_declared_references() {
+    let mut study = config();
+    study.environment.duration_s = 0.2;
+    study.patterns[0].id = "z-halls".into();
+    let mut other = study.patterns[0].clone();
+    other.id = "a-corridors".into();
+    other.preset = spaces::Preset::Corridors;
+    study.patterns.push(other);
+    let mut large = study.scales[0].clone();
+    large.id = "large".into();
+    large.width = 5;
+    large.height = 5;
+    study.scales.push(large);
+    let mut load = study.loads[0].clone();
+    load.id = "busy".into();
+    load.population = Population::FixedPerFloor { agents: 3 };
+    study.loads.push(load);
+    let mut policy = study.policies[0].clone();
+    policy.id = "same".into();
+    study.policies.push(policy);
+    study.seeds.push(74);
+    let cases = StudyRunner::new(study.clone())
+        .unwrap()
+        .map(|case| case.result)
+        .collect();
+    let report = StudyReport::from_cases(study, cases).unwrap();
+    report.verify().unwrap();
+    assert_eq!(report.requested, 32);
+    assert_eq!(report.requested_layouts, 8);
+    assert_eq!(report.groups.len(), 16);
+    assert_eq!(report.comparisons.len(), 32);
+    for comparison in &report.comparisons {
+        if comparison.axis == "pattern" {
+            assert_eq!(comparison.baseline.pattern, "z-halls");
+        }
+        if comparison.axis == "policy" {
+            assert_eq!(comparison.measured_pairs, 2);
+            for delta in comparison.deltas.values() {
+                assert!(delta.mean.abs() < f64::EPSILON);
+            }
+        }
+    }
+}
+
+#[test]
+fn service_events_and_lifts_scale_and_loads_share_a_deterministic_spatial_prefix() {
+    let mut value = document();
+    value["scales"][0]["floors"] = json!(2);
+    value["scales"][0]["service_rate_multiplier"] = json!(2.0);
+    value["loads"][0]["release_interval_s"] = json!(0.2);
+    value["loads"].as_array_mut().unwrap().push(json!({"id":"more","population":{"kind":"fixed_per_floor","agents":8},"release_interval_s":0.2}));
+    value["operations"] = json!({
+        "exit_capacity_states":[{"id":"exit-rate","exit":"primary","capacity_per_s":0.5,"at_s":2.0}],
+        "gate_capacity_states":[{"id":"gate-rate","gate":"primary_gate","capacity_per_s":0.25,"at_s":2.0}],
+        "connector_capacity_states":[{"id":"stair-rate","connector":"link_1_0","capacity_per_s":0.25,"at_s":2.0}]
+    });
+    let study: StudyConfig = serde_json::from_value(value).unwrap();
+    let generated =
+        spaces::generate(73, &study.generation(&study.patterns[0], &study.scales[0])).unwrap();
+    let light =
+        PreparedInput::from_space(&study, &generated, &study.scales[0], &study.loads[0]).unwrap();
+    let busy =
+        PreparedInput::from_space(&study, &generated, &study.scales[0], &study.loads[1]).unwrap();
+    for agent in &light.scenario.agents {
+        assert!(busy.scenario.agents.contains(agent));
+    }
+    assert_eq!(
+        light.scenario.exit_capacity_states[0]
+            .capacity_per_s
+            .to_bits(),
+        1.0_f64.to_bits()
+    );
+    assert_eq!(
+        light.scenario.gate_capacity_states[0]
+            .capacity_per_s
+            .to_bits(),
+        0.5_f64.to_bits()
+    );
+    assert_eq!(
+        light.scenario.connector_capacity_states[0]
+            .capacity_per_s
+            .to_bits(),
+        0.5_f64.to_bits()
+    );
+    for connector in &light.scenario.connectors {
+        if let chiyoda_core::model::Connector::Lift {
+            cycle_s, capacity, ..
+        } = connector
+        {
+            assert!((*cycle_s - 3.0).abs() < f64::EPSILON);
+            assert_eq!(*capacity, 4);
+        }
+    }
+    let mut too_large = study.clone();
+    too_large.environment.duration_s = 1000.0;
+    too_large.loads[0].population = Population::FixedPerFloor { agents: 1024 };
+    let generated = spaces::generate(
+        73,
+        &too_large.generation(&too_large.patterns[0], &too_large.scales[0]),
+    )
+    .unwrap();
+    assert_eq!(
+        PreparedInput::from_space(
+            &too_large,
+            &generated,
+            &too_large.scales[0],
+            &too_large.loads[0]
+        )
+        .unwrap_err()
+        .stage,
+        "resource_limit"
+    );
+}

@@ -216,7 +216,7 @@ fn verify_case(
         );
         return Ok(());
     };
-    let mut prepared =
+    let prepared =
         prepared.map_err(|failure| anyhow::anyhow!("{}: {}", failure.stage, failure.detail))?;
     ensure!(
         Some(&prepared.context) == case.context.as_ref(),
@@ -228,16 +228,12 @@ fn verify_case(
         .iter()
         .find(|policy| policy.id == case.key.policy)
         .expect("verified report");
-    prepared.scenario.messages.clone_from(&policy.messages);
-    prepared
-        .scenario
-        .countermeasures
-        .clone_from(&policy.countermeasures);
+    let expected_scenario = prepared.with_policy(policy);
     let input = read_text(&root.join("scenario.json"))?;
     ensure!(sha(&input) == *input_hash, "scenario JSON hash mismatch");
     let scenario = decode_scenario(&input)?;
     ensure!(
-        scenario == prepared.scenario,
+        scenario == expected_scenario,
         "evaluated input does not match the configured policy and population"
     );
     let evaluation = case.evaluation.as_ref().expect("verified report");

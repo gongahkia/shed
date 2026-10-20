@@ -251,3 +251,46 @@ fn impossible_population_and_generation_failures_remain_verifiable_without_simul
         success(&["study", "verify", text(&report)]);
     }
 }
+
+#[test]
+fn anchored_policy_sources_are_resolved_and_verified_in_archived_scenarios() {
+    let directory = Directory::new();
+    let config = directory.path("study.json");
+    let output = directory.path("run");
+    let mut value = input();
+    value["environment"]["duration_s"] = json!(0.4);
+    value["seeds"] = json!([73]);
+    value["policies"] = json!([{"id":"rumor","messages":[{
+        "id":"rumor","source":"Peer","surface":"floor_0","origin":{"anchor":"arrival_hall"},
+        "claim":{"ExitAvailability":{"exit":"primary","open":false}},"truthful":false,"at_s":0.2,"reach_m":10000.0,"trust":1.0
+    }]}]);
+    save(&config, &value);
+    success(&[
+        "study",
+        "run",
+        "--config",
+        text(&config),
+        "-o",
+        text(&output),
+    ]);
+    success(&[
+        "study",
+        "verify",
+        text(&output.join("report.json")),
+        "--replay",
+    ]);
+    let scenario = read(&output.join("case-0000/scenario.json"));
+    assert!(
+        scenario["scenario"]["messages"][0]["origin"]["x_m"]
+            .as_f64()
+            .unwrap()
+            > 0.0
+    );
+    let run = read(&output.join("case-0000/run.json"));
+    assert!(
+        run["metrics"]["information_delivery"]["rumor"]["accepted_agents"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+}

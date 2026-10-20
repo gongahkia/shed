@@ -278,10 +278,8 @@ impl StudyRunner {
             }
         };
         artifacts.result.context = Some(input.context.clone());
-        let mut scenario = input.scenario.clone();
         let policy = &self.config.policies[coordinate[4]];
-        scenario.messages.clone_from(&policy.messages);
-        scenario.countermeasures.clone_from(&policy.countermeasures);
+        let scenario = input.with_policy(policy);
         let json = serde_json::to_string_pretty(&CanonicalScenario::from(scenario))
             .expect("validated finite study config");
         let evaluation = evaluation::evaluate_json(

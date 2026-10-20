@@ -1,0 +1,1185 @@
+{
+  "source_revision": "5d27d20",
+  "runtime_version": "0.44.0-alpha.1",
+  "study_version": "1",
+  "report_hash": "af6ce2f02d5067eab88525c105cdb5fe6a3ea46e7e9b173f6312774f7f25e1ef",
+  "selection": "Five incomplete cases, each followed by its completed announcement counterpart.",
+  "cases": [
+    {
+      "id": "concourse-large-73-busy-silent",
+      "study_case_index": 10,
+      "key": {
+        "pattern": "concourse",
+        "scale": "large",
+        "seed": 73,
+        "load": "busy",
+        "policy": "no-announcement"
+      },
+      "context": {
+        "physical_input_hash": "cdf6bd823ab0d8848ca95768ec9c1c91ce790dde13c55b0bfe1b904fc4e4e98e",
+        "population_hash": "a3e7c66336dd310ec9b4026a4795bc023add6c162f35b03672379d728ecf9c25",
+        "operations_hash": "a56de46426b5f1b26c4e3c8335409ee30223f2b35a37fe268a93b275a1665887",
+        "controlled_input_hash": "4059993ecd0ee913cc8780cf5c381bfa677d4901e7147fab59a72c4a9604f48e",
+        "floors": [
+          {
+            "surface": "floor_0",
+            "gross_area_m2": 2304.0,
+            "walkable_area_m2": 1776.7103999999986,
+            "people": 47,
+            "gross_density_per_m2": 0.020399305555555556,
+            "walkable_density_per_m2": 0.026453382610919618
+          }
+        ],
+        "total_people": 47,
+        "service_rate_multiplier": 1.0,
+        "mean_direct_exit_distance_m": 31.94623960130205,
+        "mean_release_time_s": 0.0
+      },
+      "layout_hash": "c201b773d7d9c2f40e611760067cbe8af396919a9d552a280accb7b37b0afe03",
+      "scenario_hash": "4059993ecd0ee913cc8780cf5c381bfa677d4901e7147fab59a72c4a9604f48e",
+      "input_sha256": "535431d03fa072b72c468bb8e5ae0e36a0798d0265183932a07d8d0c19fa60af",
+      "bundle_hash": "4067025f27f8ccd4848aa59b11836fbe851429635ef54c447dce9f04c2b07637",
+      "passed": false,
+      "metrics": {
+        "total_agents": 47,
+        "evacuated_agents": 20,
+        "evacuated_by_exit": {
+          "alternative": 20
+        },
+        "remaining_by_state": {
+          "moving": 27
+        },
+        "clearance_time_s": null,
+        "last_exit_time_s": 118.2,
+        "mean_exit_time_s": 52.77,
+        "queued_for_lift_agents": 0,
+        "queued_for_connector_agents": 0,
+        "queued_for_gate_agents": 0,
+        "queued_for_exit_agents": 1,
+        "queue_metrics": {
+          "lift": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "connector": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "gate": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "exit": {
+            "ever_queued_agents": 1,
+            "cumulative_wait_agent_seconds": 0.2,
+            "peak_waiting_agents": 1
+          },
+          "by_resource": {
+            "lifts": {},
+            "connectors": {},
+            "gates": {
+              "primary_gate": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            },
+            "exits": {
+              "alternative": {
+                "ever_queued_agents": 1,
+                "cumulative_wait_agent_seconds": 0.2,
+                "peak_waiting_agents": 1
+              },
+              "primary": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            }
+          }
+        },
+        "movement_metrics": {
+          "agents_with_local_clearance_adjustments": 45,
+          "local_clearance_adjustment_steps": 14176,
+          "local_avoidance_constraint_fallback_steps": 2200,
+          "on_surface_clearance_audit": {
+            "agents_with_disc_overlaps": 43,
+            "disc_overlap_pair_steps": 2707,
+            "maximum_disc_overlap_m": 0.278445567
+          },
+          "swept_on_surface_clearance_audit": {
+            "agents_with_swept_disc_overlaps": 43,
+            "swept_disc_overlap_pair_steps": 3747,
+            "maximum_swept_disc_overlap_m": 0.278445567
+          },
+          "cumulative_local_clearance_adjustment_m": 2403.209208786,
+          "maximum_local_clearance_adjustment_m": 0.479157811
+        }
+      }
+    },
+    {
+      "id": "concourse-large-73-busy-announced",
+      "study_case_index": 11,
+      "key": {
+        "pattern": "concourse",
+        "scale": "large",
+        "seed": 73,
+        "load": "busy",
+        "policy": "official-announcement"
+      },
+      "context": {
+        "physical_input_hash": "cdf6bd823ab0d8848ca95768ec9c1c91ce790dde13c55b0bfe1b904fc4e4e98e",
+        "population_hash": "a3e7c66336dd310ec9b4026a4795bc023add6c162f35b03672379d728ecf9c25",
+        "operations_hash": "a56de46426b5f1b26c4e3c8335409ee30223f2b35a37fe268a93b275a1665887",
+        "controlled_input_hash": "4059993ecd0ee913cc8780cf5c381bfa677d4901e7147fab59a72c4a9604f48e",
+        "floors": [
+          {
+            "surface": "floor_0",
+            "gross_area_m2": 2304.0,
+            "walkable_area_m2": 1776.7103999999986,
+            "people": 47,
+            "gross_density_per_m2": 0.020399305555555556,
+            "walkable_density_per_m2": 0.026453382610919618
+          }
+        ],
+        "total_people": 47,
+        "service_rate_multiplier": 1.0,
+        "mean_direct_exit_distance_m": 31.94623960130205,
+        "mean_release_time_s": 0.0
+      },
+      "layout_hash": "c201b773d7d9c2f40e611760067cbe8af396919a9d552a280accb7b37b0afe03",
+      "scenario_hash": "124b577cb7ac935db2be37981714d01adcae50e04b7d249f2dda575700f77ff1",
+      "input_sha256": "09798deed99abd155565d60b8fb211050c426ec7853db25c7087fc32915fce8d",
+      "bundle_hash": "f2b84aa9918f85760d5d7b86d0cda271d7d8da0795ef0cf25ff1202bcb9f5b16",
+      "passed": true,
+      "metrics": {
+        "total_agents": 47,
+        "evacuated_agents": 47,
+        "evacuated_by_exit": {
+          "alternative": 47
+        },
+        "information_delivery": {
+          "closure_notice": {
+            "kind": "message",
+            "received_agents": 46,
+            "accepted_agents": 43
+          }
+        },
+        "clearance_time_s": 93.2,
+        "last_exit_time_s": 93.2,
+        "mean_exit_time_s": 59.582978723,
+        "queued_for_lift_agents": 0,
+        "queued_for_connector_agents": 0,
+        "queued_for_gate_agents": 0,
+        "queued_for_exit_agents": 3,
+        "queue_metrics": {
+          "lift": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "connector": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "gate": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "exit": {
+            "ever_queued_agents": 3,
+            "cumulative_wait_agent_seconds": 0.6,
+            "peak_waiting_agents": 1
+          },
+          "by_resource": {
+            "lifts": {},
+            "connectors": {},
+            "gates": {
+              "primary_gate": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            },
+            "exits": {
+              "alternative": {
+                "ever_queued_agents": 3,
+                "cumulative_wait_agent_seconds": 0.6,
+                "peak_waiting_agents": 1
+              },
+              "primary": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            }
+          }
+        },
+        "movement_metrics": {
+          "agents_with_local_clearance_adjustments": 46,
+          "local_clearance_adjustment_steps": 6715,
+          "local_avoidance_constraint_fallback_steps": 685,
+          "on_surface_clearance_audit": {
+            "agents_with_disc_overlaps": 44,
+            "disc_overlap_pair_steps": 806,
+            "maximum_disc_overlap_m": 0.258494332
+          },
+          "swept_on_surface_clearance_audit": {
+            "agents_with_swept_disc_overlaps": 44,
+            "swept_disc_overlap_pair_steps": 1162,
+            "maximum_swept_disc_overlap_m": 0.260449536
+          },
+          "cumulative_local_clearance_adjustment_m": 768.518283254,
+          "maximum_local_clearance_adjustment_m": 0.479534455
+        }
+      }
+    },
+    {
+      "id": "concourse-large-74-light-silent",
+      "study_case_index": 12,
+      "key": {
+        "pattern": "concourse",
+        "scale": "large",
+        "seed": 74,
+        "load": "light",
+        "policy": "no-announcement"
+      },
+      "context": {
+        "physical_input_hash": "84612edeee936fda9615d2badf5748e2a923de6cb7e5734b6bdbd1601ff26870",
+        "population_hash": "1c251322512087b60ec0faff11248f4bfc79e2d350fa5f651bd7a84cb6d1e5a7",
+        "operations_hash": "a56de46426b5f1b26c4e3c8335409ee30223f2b35a37fe268a93b275a1665887",
+        "controlled_input_hash": "5057ceecef13149687cbaccc9133df173638aad39ef322f620f91c99d0476fbc",
+        "floors": [
+          {
+            "surface": "floor_0",
+            "gross_area_m2": 2304.0,
+            "walkable_area_m2": 1740.9599999999987,
+            "people": 24,
+            "gross_density_per_m2": 0.010416666666666666,
+            "walkable_density_per_m2": 0.013785497656465409
+          }
+        ],
+        "total_people": 24,
+        "service_rate_multiplier": 1.0,
+        "mean_direct_exit_distance_m": 19.54623734820563,
+        "mean_release_time_s": 0.0
+      },
+      "layout_hash": "679aece8cc211a3d373568ded7a9351f6572a3655aa7231533a5aae59f5b1043",
+      "scenario_hash": "5057ceecef13149687cbaccc9133df173638aad39ef322f620f91c99d0476fbc",
+      "input_sha256": "719ecb132d114ec2c37c15a06f2fcee33d353b068e79468819a30e1580024b4e",
+      "bundle_hash": "17c156f048e04bca65fb28413bf1ba79929d610b5821ca5658e13bb347a27914",
+      "passed": false,
+      "metrics": {
+        "total_agents": 24,
+        "evacuated_agents": 22,
+        "evacuated_by_exit": {
+          "alternative": 21,
+          "primary": 1
+        },
+        "remaining_by_state": {
+          "moving": 2
+        },
+        "clearance_time_s": null,
+        "last_exit_time_s": 119.0,
+        "mean_exit_time_s": 58.945454545,
+        "queued_for_lift_agents": 0,
+        "queued_for_connector_agents": 0,
+        "queued_for_gate_agents": 0,
+        "queued_for_exit_agents": 1,
+        "queue_metrics": {
+          "lift": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "connector": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "gate": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "exit": {
+            "ever_queued_agents": 1,
+            "cumulative_wait_agent_seconds": 0.2,
+            "peak_waiting_agents": 1
+          },
+          "by_resource": {
+            "lifts": {},
+            "connectors": {},
+            "gates": {
+              "primary_gate": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            },
+            "exits": {
+              "alternative": {
+                "ever_queued_agents": 1,
+                "cumulative_wait_agent_seconds": 0.2,
+                "peak_waiting_agents": 1
+              },
+              "primary": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            }
+          }
+        },
+        "movement_metrics": {
+          "agents_with_local_clearance_adjustments": 20,
+          "local_clearance_adjustment_steps": 2551,
+          "local_avoidance_constraint_fallback_steps": 69,
+          "on_surface_clearance_audit": {
+            "agents_with_disc_overlaps": 16,
+            "disc_overlap_pair_steps": 249,
+            "maximum_disc_overlap_m": 0.234445459
+          },
+          "swept_on_surface_clearance_audit": {
+            "agents_with_swept_disc_overlaps": 17,
+            "swept_disc_overlap_pair_steps": 413,
+            "maximum_swept_disc_overlap_m": 0.234491
+          },
+          "cumulative_local_clearance_adjustment_m": 277.523148094,
+          "maximum_local_clearance_adjustment_m": 0.435666227
+        }
+      }
+    },
+    {
+      "id": "concourse-large-74-light-announced",
+      "study_case_index": 13,
+      "key": {
+        "pattern": "concourse",
+        "scale": "large",
+        "seed": 74,
+        "load": "light",
+        "policy": "official-announcement"
+      },
+      "context": {
+        "physical_input_hash": "84612edeee936fda9615d2badf5748e2a923de6cb7e5734b6bdbd1601ff26870",
+        "population_hash": "1c251322512087b60ec0faff11248f4bfc79e2d350fa5f651bd7a84cb6d1e5a7",
+        "operations_hash": "a56de46426b5f1b26c4e3c8335409ee30223f2b35a37fe268a93b275a1665887",
+        "controlled_input_hash": "5057ceecef13149687cbaccc9133df173638aad39ef322f620f91c99d0476fbc",
+        "floors": [
+          {
+            "surface": "floor_0",
+            "gross_area_m2": 2304.0,
+            "walkable_area_m2": 1740.9599999999987,
+            "people": 24,
+            "gross_density_per_m2": 0.010416666666666666,
+            "walkable_density_per_m2": 0.013785497656465409
+          }
+        ],
+        "total_people": 24,
+        "service_rate_multiplier": 1.0,
+        "mean_direct_exit_distance_m": 19.54623734820563,
+        "mean_release_time_s": 0.0
+      },
+      "layout_hash": "679aece8cc211a3d373568ded7a9351f6572a3655aa7231533a5aae59f5b1043",
+      "scenario_hash": "543a3ff761d953f1fcadb28ed05ea42df3e467b0733668ec68df67e87b03dd13",
+      "input_sha256": "41ffc4723344c5b79593ab7ce6460d8212425a3e7b3d6fd7099d5e05e11a244d",
+      "bundle_hash": "57deaafb0a9f99b96c5bca2f1afde3956a12fde06b8a9b81191d7e39a63350b3",
+      "passed": true,
+      "metrics": {
+        "total_agents": 24,
+        "evacuated_agents": 24,
+        "evacuated_by_exit": {
+          "alternative": 23,
+          "primary": 1
+        },
+        "information_delivery": {
+          "closure_notice": {
+            "kind": "message",
+            "received_agents": 21,
+            "accepted_agents": 16
+          }
+        },
+        "clearance_time_s": 85.8,
+        "last_exit_time_s": 85.8,
+        "mean_exit_time_s": 47.55,
+        "queued_for_lift_agents": 0,
+        "queued_for_connector_agents": 0,
+        "queued_for_gate_agents": 0,
+        "queued_for_exit_agents": 1,
+        "queue_metrics": {
+          "lift": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "connector": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "gate": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "exit": {
+            "ever_queued_agents": 1,
+            "cumulative_wait_agent_seconds": 0.2,
+            "peak_waiting_agents": 1
+          },
+          "by_resource": {
+            "lifts": {},
+            "connectors": {},
+            "gates": {
+              "primary_gate": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            },
+            "exits": {
+              "alternative": {
+                "ever_queued_agents": 1,
+                "cumulative_wait_agent_seconds": 0.2,
+                "peak_waiting_agents": 1
+              },
+              "primary": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            }
+          }
+        },
+        "movement_metrics": {
+          "agents_with_local_clearance_adjustments": 18,
+          "local_clearance_adjustment_steps": 1342,
+          "local_avoidance_constraint_fallback_steps": 20,
+          "on_surface_clearance_audit": {
+            "agents_with_disc_overlaps": 16,
+            "disc_overlap_pair_steps": 147,
+            "maximum_disc_overlap_m": 0.256805533
+          },
+          "swept_on_surface_clearance_audit": {
+            "agents_with_swept_disc_overlaps": 16,
+            "swept_disc_overlap_pair_steps": 222,
+            "maximum_swept_disc_overlap_m": 0.256805533
+          },
+          "cumulative_local_clearance_adjustment_m": 115.769788339,
+          "maximum_local_clearance_adjustment_m": 0.452043297
+        }
+      }
+    },
+    {
+      "id": "concourse-large-74-busy-silent",
+      "study_case_index": 14,
+      "key": {
+        "pattern": "concourse",
+        "scale": "large",
+        "seed": 74,
+        "load": "busy",
+        "policy": "no-announcement"
+      },
+      "context": {
+        "physical_input_hash": "84612edeee936fda9615d2badf5748e2a923de6cb7e5734b6bdbd1601ff26870",
+        "population_hash": "9cd821fac4a5142a62969ae7dc4d8d8e3e4603c32ba72d0db0446980daa59cf1",
+        "operations_hash": "a56de46426b5f1b26c4e3c8335409ee30223f2b35a37fe268a93b275a1665887",
+        "controlled_input_hash": "eed2fc320955666220513e497d33f01d641759beb76e7a2a045c2e2df63f4852",
+        "floors": [
+          {
+            "surface": "floor_0",
+            "gross_area_m2": 2304.0,
+            "walkable_area_m2": 1740.9599999999987,
+            "people": 47,
+            "gross_density_per_m2": 0.020399305555555556,
+            "walkable_density_per_m2": 0.02699659957724476
+          }
+        ],
+        "total_people": 47,
+        "service_rate_multiplier": 1.0,
+        "mean_direct_exit_distance_m": 21.94002165919963,
+        "mean_release_time_s": 0.0
+      },
+      "layout_hash": "679aece8cc211a3d373568ded7a9351f6572a3655aa7231533a5aae59f5b1043",
+      "scenario_hash": "eed2fc320955666220513e497d33f01d641759beb76e7a2a045c2e2df63f4852",
+      "input_sha256": "e970ab6ddc5df911560fa3eed9a27121d26d79ce4e04689c6120fc322379befb",
+      "bundle_hash": "cf4389ce494b39545a13bad68dd5658f32c110b29defad1d63f48d446b9a07e2",
+      "passed": false,
+      "metrics": {
+        "total_agents": 47,
+        "evacuated_agents": 30,
+        "evacuated_by_exit": {
+          "alternative": 28,
+          "primary": 2
+        },
+        "remaining_by_state": {
+          "moving": 17
+        },
+        "clearance_time_s": null,
+        "last_exit_time_s": 118.6,
+        "mean_exit_time_s": 52.633333333,
+        "queued_for_lift_agents": 0,
+        "queued_for_connector_agents": 0,
+        "queued_for_gate_agents": 0,
+        "queued_for_exit_agents": 1,
+        "queue_metrics": {
+          "lift": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "connector": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "gate": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "exit": {
+            "ever_queued_agents": 1,
+            "cumulative_wait_agent_seconds": 0.2,
+            "peak_waiting_agents": 1
+          },
+          "by_resource": {
+            "lifts": {},
+            "connectors": {},
+            "gates": {
+              "primary_gate": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            },
+            "exits": {
+              "alternative": {
+                "ever_queued_agents": 1,
+                "cumulative_wait_agent_seconds": 0.2,
+                "peak_waiting_agents": 1
+              },
+              "primary": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            }
+          }
+        },
+        "movement_metrics": {
+          "agents_with_local_clearance_adjustments": 45,
+          "local_clearance_adjustment_steps": 10509,
+          "local_avoidance_constraint_fallback_steps": 1160,
+          "on_surface_clearance_audit": {
+            "agents_with_disc_overlaps": 40,
+            "disc_overlap_pair_steps": 1747,
+            "maximum_disc_overlap_m": 0.263766451
+          },
+          "swept_on_surface_clearance_audit": {
+            "agents_with_swept_disc_overlaps": 41,
+            "swept_disc_overlap_pair_steps": 2562,
+            "maximum_swept_disc_overlap_m": 0.263766451
+          },
+          "cumulative_local_clearance_adjustment_m": 1817.728329123,
+          "maximum_local_clearance_adjustment_m": 0.463900564
+        }
+      }
+    },
+    {
+      "id": "concourse-large-74-busy-announced",
+      "study_case_index": 15,
+      "key": {
+        "pattern": "concourse",
+        "scale": "large",
+        "seed": 74,
+        "load": "busy",
+        "policy": "official-announcement"
+      },
+      "context": {
+        "physical_input_hash": "84612edeee936fda9615d2badf5748e2a923de6cb7e5734b6bdbd1601ff26870",
+        "population_hash": "9cd821fac4a5142a62969ae7dc4d8d8e3e4603c32ba72d0db0446980daa59cf1",
+        "operations_hash": "a56de46426b5f1b26c4e3c8335409ee30223f2b35a37fe268a93b275a1665887",
+        "controlled_input_hash": "eed2fc320955666220513e497d33f01d641759beb76e7a2a045c2e2df63f4852",
+        "floors": [
+          {
+            "surface": "floor_0",
+            "gross_area_m2": 2304.0,
+            "walkable_area_m2": 1740.9599999999987,
+            "people": 47,
+            "gross_density_per_m2": 0.020399305555555556,
+            "walkable_density_per_m2": 0.02699659957724476
+          }
+        ],
+        "total_people": 47,
+        "service_rate_multiplier": 1.0,
+        "mean_direct_exit_distance_m": 21.94002165919963,
+        "mean_release_time_s": 0.0
+      },
+      "layout_hash": "679aece8cc211a3d373568ded7a9351f6572a3655aa7231533a5aae59f5b1043",
+      "scenario_hash": "37dc1d36b9445f7b27b8c888188a123a5ed4017e77b1395b1706fd7696407abf",
+      "input_sha256": "844d8a13e336966293511b27c7469a2adc967682619e26265399121372a1dbc5",
+      "bundle_hash": "cbbfa7d801ea7f17f38f1020de4c5a14c4d59535914dab0fa65ec645f69f20a3",
+      "passed": true,
+      "metrics": {
+        "total_agents": 47,
+        "evacuated_agents": 47,
+        "evacuated_by_exit": {
+          "alternative": 45,
+          "primary": 2
+        },
+        "information_delivery": {
+          "closure_notice": {
+            "kind": "message",
+            "received_agents": 43,
+            "accepted_agents": 35
+          }
+        },
+        "clearance_time_s": 106.0,
+        "last_exit_time_s": 106.0,
+        "mean_exit_time_s": 61.0,
+        "queued_for_lift_agents": 0,
+        "queued_for_connector_agents": 0,
+        "queued_for_gate_agents": 0,
+        "queued_for_exit_agents": 1,
+        "queue_metrics": {
+          "lift": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "connector": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "gate": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "exit": {
+            "ever_queued_agents": 1,
+            "cumulative_wait_agent_seconds": 0.2,
+            "peak_waiting_agents": 1
+          },
+          "by_resource": {
+            "lifts": {},
+            "connectors": {},
+            "gates": {
+              "primary_gate": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            },
+            "exits": {
+              "alternative": {
+                "ever_queued_agents": 1,
+                "cumulative_wait_agent_seconds": 0.2,
+                "peak_waiting_agents": 1
+              },
+              "primary": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            }
+          }
+        },
+        "movement_metrics": {
+          "agents_with_local_clearance_adjustments": 44,
+          "local_clearance_adjustment_steps": 6892,
+          "local_avoidance_constraint_fallback_steps": 329,
+          "on_surface_clearance_audit": {
+            "agents_with_disc_overlaps": 39,
+            "disc_overlap_pair_steps": 792,
+            "maximum_disc_overlap_m": 0.277072246
+          },
+          "swept_on_surface_clearance_audit": {
+            "agents_with_swept_disc_overlaps": 40,
+            "swept_disc_overlap_pair_steps": 1219,
+            "maximum_swept_disc_overlap_m": 0.277072246
+          },
+          "cumulative_local_clearance_adjustment_m": 690.382077914,
+          "maximum_local_clearance_adjustment_m": 0.45555608
+        }
+      }
+    },
+    {
+      "id": "corridors-large-73-light-silent",
+      "study_case_index": 24,
+      "key": {
+        "pattern": "corridors",
+        "scale": "large",
+        "seed": 73,
+        "load": "light",
+        "policy": "no-announcement"
+      },
+      "context": {
+        "physical_input_hash": "379439d8084a4389eac11dbd398d4db00b5e458dc4fc7b028e5f0006ae2401ec",
+        "population_hash": "dd3768ae45a77f3eac7d4298fae848bc4728949285a993200dc78351937d8c55",
+        "operations_hash": "a56de46426b5f1b26c4e3c8335409ee30223f2b35a37fe268a93b275a1665887",
+        "controlled_input_hash": "eee625d53a79a617c97cf11a2788b310878451ce3175dd9a3cf1378837938af9",
+        "floors": [
+          {
+            "surface": "floor_0",
+            "gross_area_m2": 2304.0,
+            "walkable_area_m2": 1115.2256,
+            "people": 24,
+            "gross_density_per_m2": 0.010416666666666666,
+            "walkable_density_per_m2": 0.021520309433355905
+          }
+        ],
+        "total_people": 24,
+        "service_rate_multiplier": 1.0,
+        "mean_direct_exit_distance_m": 32.32542482913765,
+        "mean_release_time_s": 0.0
+      },
+      "layout_hash": "fe2a7d707f8d906f139e9f4b585b38c008095eb6cad63c43d0e9af623ad8a6f8",
+      "scenario_hash": "eee625d53a79a617c97cf11a2788b310878451ce3175dd9a3cf1378837938af9",
+      "input_sha256": "c7afdcad3f9cb53ee34df905e814949141cda470f3f8767c6762cf43c9017f9e",
+      "bundle_hash": "7ca1b075cb7b520795327fa6f88ae5d3493978e8be4a411c53340635637e617d",
+      "passed": false,
+      "metrics": {
+        "total_agents": 24,
+        "evacuated_agents": 18,
+        "evacuated_by_exit": {
+          "alternative": 18
+        },
+        "remaining_by_state": {
+          "moving": 6
+        },
+        "clearance_time_s": null,
+        "last_exit_time_s": 119.8,
+        "mean_exit_time_s": 62.0,
+        "queued_for_lift_agents": 0,
+        "queued_for_connector_agents": 0,
+        "queued_for_gate_agents": 0,
+        "queued_for_exit_agents": 1,
+        "queue_metrics": {
+          "lift": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "connector": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "gate": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "exit": {
+            "ever_queued_agents": 1,
+            "cumulative_wait_agent_seconds": 0.2,
+            "peak_waiting_agents": 1
+          },
+          "by_resource": {
+            "lifts": {},
+            "connectors": {},
+            "gates": {
+              "primary_gate": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            },
+            "exits": {
+              "alternative": {
+                "ever_queued_agents": 1,
+                "cumulative_wait_agent_seconds": 0.2,
+                "peak_waiting_agents": 1
+              },
+              "primary": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            }
+          }
+        },
+        "movement_metrics": {
+          "agents_with_local_clearance_adjustments": 20,
+          "local_clearance_adjustment_steps": 2903,
+          "local_avoidance_constraint_fallback_steps": 81,
+          "on_surface_clearance_audit": {
+            "agents_with_disc_overlaps": 17,
+            "disc_overlap_pair_steps": 231,
+            "maximum_disc_overlap_m": 0.220450386
+          },
+          "swept_on_surface_clearance_audit": {
+            "agents_with_swept_disc_overlaps": 18,
+            "swept_disc_overlap_pair_steps": 385,
+            "maximum_swept_disc_overlap_m": 0.221993526
+          },
+          "cumulative_local_clearance_adjustment_m": 271.711774199,
+          "maximum_local_clearance_adjustment_m": 0.472709863
+        }
+      }
+    },
+    {
+      "id": "corridors-large-73-light-announced",
+      "study_case_index": 25,
+      "key": {
+        "pattern": "corridors",
+        "scale": "large",
+        "seed": 73,
+        "load": "light",
+        "policy": "official-announcement"
+      },
+      "context": {
+        "physical_input_hash": "379439d8084a4389eac11dbd398d4db00b5e458dc4fc7b028e5f0006ae2401ec",
+        "population_hash": "dd3768ae45a77f3eac7d4298fae848bc4728949285a993200dc78351937d8c55",
+        "operations_hash": "a56de46426b5f1b26c4e3c8335409ee30223f2b35a37fe268a93b275a1665887",
+        "controlled_input_hash": "eee625d53a79a617c97cf11a2788b310878451ce3175dd9a3cf1378837938af9",
+        "floors": [
+          {
+            "surface": "floor_0",
+            "gross_area_m2": 2304.0,
+            "walkable_area_m2": 1115.2256,
+            "people": 24,
+            "gross_density_per_m2": 0.010416666666666666,
+            "walkable_density_per_m2": 0.021520309433355905
+          }
+        ],
+        "total_people": 24,
+        "service_rate_multiplier": 1.0,
+        "mean_direct_exit_distance_m": 32.32542482913765,
+        "mean_release_time_s": 0.0
+      },
+      "layout_hash": "fe2a7d707f8d906f139e9f4b585b38c008095eb6cad63c43d0e9af623ad8a6f8",
+      "scenario_hash": "c16b678492b5679fe2a51f3eb1a969dafdbb9a8fa04cb4224982adcc026a1c1a",
+      "input_sha256": "b17a5096c847c157e900409572886b19e74c4f68bf33c20ff5700f1403a260bb",
+      "bundle_hash": "e4c1db4108f36b6f7d4871a40f7700b51d186a6c7777374e91b6464e0381d756",
+      "passed": true,
+      "metrics": {
+        "total_agents": 24,
+        "evacuated_agents": 24,
+        "evacuated_by_exit": {
+          "alternative": 24
+        },
+        "information_delivery": {
+          "closure_notice": {
+            "kind": "message",
+            "received_agents": 23,
+            "accepted_agents": 21
+          }
+        },
+        "clearance_time_s": 108.2,
+        "last_exit_time_s": 108.2,
+        "mean_exit_time_s": 56.266666667,
+        "queued_for_lift_agents": 0,
+        "queued_for_connector_agents": 0,
+        "queued_for_gate_agents": 0,
+        "queued_for_exit_agents": 1,
+        "queue_metrics": {
+          "lift": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "connector": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "gate": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "exit": {
+            "ever_queued_agents": 1,
+            "cumulative_wait_agent_seconds": 0.2,
+            "peak_waiting_agents": 1
+          },
+          "by_resource": {
+            "lifts": {},
+            "connectors": {},
+            "gates": {
+              "primary_gate": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            },
+            "exits": {
+              "alternative": {
+                "ever_queued_agents": 1,
+                "cumulative_wait_agent_seconds": 0.2,
+                "peak_waiting_agents": 1
+              },
+              "primary": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            }
+          }
+        },
+        "movement_metrics": {
+          "agents_with_local_clearance_adjustments": 19,
+          "local_clearance_adjustment_steps": 2527,
+          "local_avoidance_constraint_fallback_steps": 42,
+          "on_surface_clearance_audit": {
+            "agents_with_disc_overlaps": 16,
+            "disc_overlap_pair_steps": 161,
+            "maximum_disc_overlap_m": 0.211311029
+          },
+          "swept_on_surface_clearance_audit": {
+            "agents_with_swept_disc_overlaps": 17,
+            "swept_disc_overlap_pair_steps": 291,
+            "maximum_swept_disc_overlap_m": 0.211311029
+          },
+          "cumulative_local_clearance_adjustment_m": 201.961967442,
+          "maximum_local_clearance_adjustment_m": 0.472709863
+        }
+      }
+    },
+    {
+      "id": "corridors-large-73-busy-silent",
+      "study_case_index": 26,
+      "key": {
+        "pattern": "corridors",
+        "scale": "large",
+        "seed": 73,
+        "load": "busy",
+        "policy": "no-announcement"
+      },
+      "context": {
+        "physical_input_hash": "379439d8084a4389eac11dbd398d4db00b5e458dc4fc7b028e5f0006ae2401ec",
+        "population_hash": "c18346c70f3cb0a7141cb3b950c4bcf56c4964c85b8f26af9a05e8b181e31d35",
+        "operations_hash": "a56de46426b5f1b26c4e3c8335409ee30223f2b35a37fe268a93b275a1665887",
+        "controlled_input_hash": "26b685a33fcf5a3d246a2b2c0cd52c86cd7a1e173b6b9797396fcb87862fcd5c",
+        "floors": [
+          {
+            "surface": "floor_0",
+            "gross_area_m2": 2304.0,
+            "walkable_area_m2": 1115.2256,
+            "people": 47,
+            "gross_density_per_m2": 0.020399305555555556,
+            "walkable_density_per_m2": 0.04214393930698865
+          }
+        ],
+        "total_people": 47,
+        "service_rate_multiplier": 1.0,
+        "mean_direct_exit_distance_m": 29.69653097641978,
+        "mean_release_time_s": 0.0
+      },
+      "layout_hash": "fe2a7d707f8d906f139e9f4b585b38c008095eb6cad63c43d0e9af623ad8a6f8",
+      "scenario_hash": "26b685a33fcf5a3d246a2b2c0cd52c86cd7a1e173b6b9797396fcb87862fcd5c",
+      "input_sha256": "6c2a58594bd4e1206ad755821206430eba82abe2dd2081b297d19cf04cbf0b27",
+      "bundle_hash": "7b8bd2310fc175bd9890391014f92ddf54c91d7d0fde99398fcb2e65281622ce",
+      "passed": false,
+      "metrics": {
+        "total_agents": 47,
+        "evacuated_agents": 28,
+        "evacuated_by_exit": {
+          "alternative": 26,
+          "primary": 2
+        },
+        "remaining_by_state": {
+          "moving": 19
+        },
+        "clearance_time_s": null,
+        "last_exit_time_s": 115.8,
+        "mean_exit_time_s": 37.764285714,
+        "queued_for_lift_agents": 0,
+        "queued_for_connector_agents": 0,
+        "queued_for_gate_agents": 0,
+        "queued_for_exit_agents": 1,
+        "queue_metrics": {
+          "lift": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "connector": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "gate": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "exit": {
+            "ever_queued_agents": 1,
+            "cumulative_wait_agent_seconds": 0.4,
+            "peak_waiting_agents": 1
+          },
+          "by_resource": {
+            "lifts": {},
+            "connectors": {},
+            "gates": {
+              "primary_gate": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            },
+            "exits": {
+              "alternative": {
+                "ever_queued_agents": 1,
+                "cumulative_wait_agent_seconds": 0.4,
+                "peak_waiting_agents": 1
+              },
+              "primary": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            }
+          }
+        },
+        "movement_metrics": {
+          "agents_with_local_clearance_adjustments": 42,
+          "local_clearance_adjustment_steps": 10017,
+          "local_avoidance_constraint_fallback_steps": 1060,
+          "on_surface_clearance_audit": {
+            "agents_with_disc_overlaps": 36,
+            "disc_overlap_pair_steps": 1404,
+            "maximum_disc_overlap_m": 0.247496269
+          },
+          "swept_on_surface_clearance_audit": {
+            "agents_with_swept_disc_overlaps": 38,
+            "swept_disc_overlap_pair_steps": 2003,
+            "maximum_swept_disc_overlap_m": 0.247496269
+          },
+          "cumulative_local_clearance_adjustment_m": 1629.374852097,
+          "maximum_local_clearance_adjustment_m": 0.467482807
+        }
+      }
+    },
+    {
+      "id": "corridors-large-73-busy-announced",
+      "study_case_index": 27,
+      "key": {
+        "pattern": "corridors",
+        "scale": "large",
+        "seed": 73,
+        "load": "busy",
+        "policy": "official-announcement"
+      },
+      "context": {
+        "physical_input_hash": "379439d8084a4389eac11dbd398d4db00b5e458dc4fc7b028e5f0006ae2401ec",
+        "population_hash": "c18346c70f3cb0a7141cb3b950c4bcf56c4964c85b8f26af9a05e8b181e31d35",
+        "operations_hash": "a56de46426b5f1b26c4e3c8335409ee30223f2b35a37fe268a93b275a1665887",
+        "controlled_input_hash": "26b685a33fcf5a3d246a2b2c0cd52c86cd7a1e173b6b9797396fcb87862fcd5c",
+        "floors": [
+          {
+            "surface": "floor_0",
+            "gross_area_m2": 2304.0,
+            "walkable_area_m2": 1115.2256,
+            "people": 47,
+            "gross_density_per_m2": 0.020399305555555556,
+            "walkable_density_per_m2": 0.04214393930698865
+          }
+        ],
+        "total_people": 47,
+        "service_rate_multiplier": 1.0,
+        "mean_direct_exit_distance_m": 29.69653097641978,
+        "mean_release_time_s": 0.0
+      },
+      "layout_hash": "fe2a7d707f8d906f139e9f4b585b38c008095eb6cad63c43d0e9af623ad8a6f8",
+      "scenario_hash": "43802255ff16fab63c81ac66015d3b47e5aa0985cbdff1a694b311605916bab7",
+      "input_sha256": "bb53ec0c6fd5237a86ec6c26125a96f0632727250844c91338e2123f7bba0f01",
+      "bundle_hash": "1378e7b1eb705327c83d0d18f4d0b7e72fc58ecdf23f1bc08dd9e721f2a76f1e",
+      "passed": true,
+      "metrics": {
+        "total_agents": 47,
+        "evacuated_agents": 47,
+        "evacuated_by_exit": {
+          "alternative": 45,
+          "primary": 2
+        },
+        "information_delivery": {
+          "closure_notice": {
+            "kind": "message",
+            "received_agents": 42,
+            "accepted_agents": 39
+          }
+        },
+        "clearance_time_s": 108.2,
+        "last_exit_time_s": 108.2,
+        "mean_exit_time_s": 53.212765957,
+        "queued_for_lift_agents": 0,
+        "queued_for_connector_agents": 0,
+        "queued_for_gate_agents": 0,
+        "queued_for_exit_agents": 2,
+        "queue_metrics": {
+          "lift": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "connector": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "gate": {
+            "ever_queued_agents": 0,
+            "cumulative_wait_agent_seconds": 0.0,
+            "peak_waiting_agents": 0
+          },
+          "exit": {
+            "ever_queued_agents": 2,
+            "cumulative_wait_agent_seconds": 0.8,
+            "peak_waiting_agents": 1
+          },
+          "by_resource": {
+            "lifts": {},
+            "connectors": {},
+            "gates": {
+              "primary_gate": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            },
+            "exits": {
+              "alternative": {
+                "ever_queued_agents": 2,
+                "cumulative_wait_agent_seconds": 0.8,
+                "peak_waiting_agents": 1
+              },
+              "primary": {
+                "ever_queued_agents": 0,
+                "cumulative_wait_agent_seconds": 0.0,
+                "peak_waiting_agents": 0
+              }
+            }
+          }
+        },
+        "movement_metrics": {
+          "agents_with_local_clearance_adjustments": 42,
+          "local_clearance_adjustment_steps": 5249,
+          "local_avoidance_constraint_fallback_steps": 153,
+          "on_surface_clearance_audit": {
+            "agents_with_disc_overlaps": 35,
+            "disc_overlap_pair_steps": 359,
+            "maximum_disc_overlap_m": 0.258588028
+          },
+          "swept_on_surface_clearance_audit": {
+            "agents_with_swept_disc_overlaps": 37,
+            "swept_disc_overlap_pair_steps": 586,
+            "maximum_swept_disc_overlap_m": 0.264844545
+          },
+          "cumulative_local_clearance_adjustment_m": 487.335243507,
+          "maximum_local_clearance_adjustment_m": 0.453179855
+        }
+      }
+    }
+  ]
+}

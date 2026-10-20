@@ -263,6 +263,6 @@ fn generator_v2_reference_source_has_a_stable_fingerprint() {
     );
     assert_eq!(
         generated.manifest.scenario_hash,
-        "12f310e892790341b1b594c96c287e1641af9dab47413b8a10a87b8076da4a19"
+        "3f530a050c47de49db2d112d51fb49c667e0ce02ad2651f70976086e03b2cfc2"
     );
 }

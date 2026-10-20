@@ -52,6 +52,15 @@ pub fn validate(scenario: &Scenario) -> Result<(), Vec<ValidationError>> {
         check_unique(&mut ids, &surface.id, &path, &mut errors);
         check_positive(&format!("{path}.width_m"), surface.width_m, &mut errors);
         check_positive(&format!("{path}.depth_m"), surface.depth_m, &mut errors);
+        if ![surface.origin.x_m, surface.origin.y_m, surface.origin.z_m]
+            .iter()
+            .all(|coordinate| coordinate.is_finite())
+        {
+            errors.push(issue(
+                &format!("{path}.origin"),
+                "coordinates must be finite",
+            ));
+        }
     }
     let surfaces: HashMap<&str, &Surface> = scenario
         .surfaces
@@ -737,6 +746,7 @@ pub fn validate(scenario: &Scenario) -> Result<(), Vec<ValidationError>> {
         let path = format!("messages[{index}]");
         check_unique(&mut ids, &message.id, &path, &mut errors);
         let sampling_key = message.sampling_key.as_deref().unwrap_or(&message.id);
+        check_nonempty(&format!("{path}.sampling_key"), sampling_key, &mut errors);
         if !sampling_keys.insert(sampling_key) {
             errors.push(issue(
                 &format!("{path}.sampling_key"),
@@ -809,10 +819,17 @@ pub fn validate(scenario: &Scenario) -> Result<(), Vec<ValidationError>> {
     for (index, countermeasure) in scenario.countermeasures.iter().enumerate() {
         let path = format!("countermeasures[{index}]");
         check_unique(&mut ids, &countermeasure.id, &path, &mut errors);
+        if countermeasure.source == crate::model::InformationSource::Peer {
+            errors.push(issue(
+                &format!("{path}.source"),
+                "a correction must come from official, signage, or staff",
+            ));
+        }
         let sampling_key = countermeasure
             .sampling_key
             .as_deref()
             .unwrap_or(&countermeasure.id);
+        check_nonempty(&format!("{path}.sampling_key"), sampling_key, &mut errors);
         if !sampling_keys.insert(sampling_key) {
             errors.push(issue(
                 &format!("{path}.sampling_key"),

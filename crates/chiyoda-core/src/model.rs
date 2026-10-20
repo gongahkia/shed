@@ -5,6 +5,7 @@ pub(crate) const NAVIGATION_CLEARANCE_EPSILON_M: f64 = 1e-6;
 
 /// A point in metres in the scenario's declared Cartesian coordinate system.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Point3 {
     pub x_m: f64,
     pub y_m: f64,
@@ -31,6 +32,7 @@ impl Point3 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Surface {
     pub id: String,
     pub origin: Point3,
@@ -52,6 +54,7 @@ impl Surface {
 
 /// An axis-aligned rectangular no-go zone on a declared walkable surface.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Obstacle {
     pub id: String,
     pub surface: String,
@@ -62,6 +65,7 @@ pub struct Obstacle {
 
 /// A required intermediate point in an agent group's authored journey.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Waypoint {
     pub id: String,
     pub surface: String,
@@ -91,6 +95,7 @@ impl Obstacle {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Exit {
     pub id: String,
     pub surface: String,
@@ -101,6 +106,7 @@ pub struct Exit {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Gate {
     pub id: String,
     pub surface: String,
@@ -115,6 +121,7 @@ pub struct Gate {
 /// The resource whose physical portal is partitioned into authored lanes.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[serde(deny_unknown_fields)]
 pub enum PortalResource {
     Connector { id: String },
     Exit { id: String },
@@ -161,6 +168,7 @@ impl PortalAxis {
 /// only target and landing placement; their count does not create a service
 /// rate or a calibrated queue model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PortalLanes {
     pub id: String,
     pub resource: PortalResource,
@@ -193,6 +201,7 @@ impl PortalLanes {
 /// describes where agents wait after an authored service limit denies them; it
 /// does not infer a rate, staffing level, or observed queue discipline.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QueueFootprint {
     pub id: String,
     pub resource: PortalResource,
@@ -262,6 +271,7 @@ impl QueueFootprint {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum Connector {
     Stair {
         id: String,
@@ -474,6 +484,7 @@ impl Connector {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AgentGroup {
     pub id: String,
     pub count: u32,
@@ -483,12 +494,14 @@ pub struct AgentGroup {
     pub destination: String,
     /// Additional final exits considered alongside `destination`; declaration
     /// order breaks equal nominal-route costs.
+    #[serde(default)]
     pub alternative_destinations: Vec<String>,
     pub speed_mps: f64,
     pub radius_m: f64,
     pub height_m: f64,
     /// The authored time at which this group becomes active in the simulation.
     /// This is a scenario input, not an inferred arrival distribution.
+    #[serde(default)]
     pub release_at_s: f64,
     /// Optional deterministic time between release instants. Omission releases
     /// the whole group at `release_at_s`, preserving the original simultaneous
@@ -501,9 +514,11 @@ pub struct AgentGroup {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub release_batch_size: Option<u32>,
     /// Ordered required stages before the group's final exit.
+    #[serde(default)]
     pub via: Vec<String>,
     /// Connector classes this group must not traverse. This is an authored
     /// route constraint, not an inferred mobility or accessibility profile.
+    #[serde(default)]
     pub excluded_connector_kinds: Vec<ConnectorKind>,
 }
 
@@ -557,6 +572,7 @@ fn spawn_grid_columns(count: u32) -> u32 {
 
 /// An authored change to a connector's physical availability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConnectorStateChange {
     pub id: String,
     pub connector: String,
@@ -566,6 +582,7 @@ pub struct ConnectorStateChange {
 
 /// An authored change to an exit's physical availability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ExitStateChange {
     pub id: String,
     pub exit: String,
@@ -575,6 +592,7 @@ pub struct ExitStateChange {
 
 /// An authored change to a gate's physical availability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GateStateChange {
     pub id: String,
     pub gate: String,
@@ -584,6 +602,7 @@ pub struct GateStateChange {
 
 /// An authored change to the service limit of a constrained non-lift connector.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConnectorCapacityChange {
     pub id: String,
     pub connector: String,
@@ -593,6 +612,7 @@ pub struct ConnectorCapacityChange {
 
 /// An authored change to the discharge limit of a constrained exit.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ExitCapacityChange {
     pub id: String,
     pub exit: String,
@@ -602,6 +622,7 @@ pub struct ExitCapacityChange {
 
 /// An authored change to a gate's service limit.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GateCapacityChange {
     pub id: String,
     pub gate: String,
@@ -633,6 +654,7 @@ impl InformationSource {
 /// intentionally excluded from the reference semantics: it belongs in an
 /// attached research note, not in an executable causal claim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum Proposition {
     ConnectorAvailability { connector: String, open: bool },
     ExitAvailability { exit: String, open: bool },
@@ -669,6 +691,7 @@ impl Proposition {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Message {
     pub id: String,
     pub source: InformationSource,
@@ -687,6 +710,7 @@ pub struct Message {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Countermeasure {
     pub id: String,
     pub corrects: String,
@@ -701,18 +725,24 @@ pub struct Countermeasure {
     pub sampling_key: Option<String>,
 }
 
-/// The parsed, typed source program. Its vectors retain declaration order,
+/// A typed scenario input. Its vectors retain declaration order,
 /// which is part of the deterministic execution contract.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Scenario {
     pub name: String,
     pub seed: u64,
     pub duration_s: f64,
     pub timestep_s: f64,
+    #[serde(default)]
     pub surfaces: Vec<Surface>,
+    #[serde(default)]
     pub obstacles: Vec<Obstacle>,
+    #[serde(default)]
     pub waypoints: Vec<Waypoint>,
+    #[serde(default)]
     pub exits: Vec<Exit>,
+    #[serde(default)]
     pub connectors: Vec<Connector>,
     /// Optional explicit spatial portal lanes. Omission preserves historical
     /// point-portal semantics and canonical bundle hashes.
@@ -722,6 +752,7 @@ pub struct Scenario {
     /// preserves historical abstract queue semantics and canonical hashes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub queue_footprints: Vec<QueueFootprint>,
+    #[serde(default)]
     pub connector_states: Vec<ConnectorStateChange>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exit_states: Vec<ExitStateChange>,
@@ -729,13 +760,17 @@ pub struct Scenario {
     pub connector_capacity_states: Vec<ConnectorCapacityChange>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exit_capacity_states: Vec<ExitCapacityChange>,
+    #[serde(default)]
     pub gates: Vec<Gate>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub gate_states: Vec<GateStateChange>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub gate_capacity_states: Vec<GateCapacityChange>,
+    #[serde(default)]
     pub agents: Vec<AgentGroup>,
+    #[serde(default)]
     pub messages: Vec<Message>,
+    #[serde(default)]
     pub countermeasures: Vec<Countermeasure>,
 }
 
@@ -909,18 +944,84 @@ impl Scenario {
     }
 }
 
-/// The compiler's stable interchange representation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// The versioned JSON scenario document embedded in run bundles.
+/// Legacy language-version envelopes remain readable only for archived bundles.
+#[derive(Debug, Clone, PartialEq)]
 pub struct CanonicalScenario {
-    pub language_version: String,
+    pub schema_version: String,
     pub scenario: Scenario,
+    legacy_envelope: bool,
+}
+
+impl CanonicalScenario {
+    pub fn check_schema(&self) -> Result<(), crate::ScenarioJsonError> {
+        if self.legacy_envelope || self.schema_version != crate::SCENARIO_SCHEMA_VERSION {
+            return Err(crate::ScenarioJsonError::Version {
+                found: if self.legacy_envelope {
+                    format!("legacy language_version {}", self.schema_version)
+                } else {
+                    self.schema_version.clone()
+                },
+            });
+        }
+        Ok(())
+    }
 }
 
 impl From<Scenario> for CanonicalScenario {
     fn from(scenario: Scenario) -> Self {
         Self {
-            language_version: crate::LANGUAGE_VERSION.to_owned(),
+            schema_version: crate::SCENARIO_SCHEMA_VERSION.to_owned(),
             scenario,
+            legacy_envelope: false,
         }
+    }
+}
+
+impl Serialize for CanonicalScenario {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut document = serializer.serialize_struct("CanonicalScenario", 2)?;
+        let key = if self.legacy_envelope {
+            "language_version"
+        } else {
+            "schema_version"
+        };
+        document.serialize_field(key, &self.schema_version)?;
+        document.serialize_field("scenario", &self.scenario)?;
+        document.end()
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ScenarioEnvelope {
+    #[serde(default)]
+    schema_version: Option<String>,
+    #[serde(default)]
+    language_version: Option<String>,
+    scenario: Scenario,
+}
+
+impl<'de> Deserialize<'de> for CanonicalScenario {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let document = ScenarioEnvelope::deserialize(deserializer)?;
+        let (schema_version, legacy_envelope) = match (
+            document.schema_version,
+            document.language_version,
+        ) {
+            (Some(version), None) => (version, false),
+            (None, Some(version)) => (version, true),
+            _ => {
+                return Err(serde::de::Error::custom(
+                    "expected exactly one schema_version field (language_version is reserved for archived bundles)",
+                ));
+            }
+        };
+        Ok(Self {
+            schema_version,
+            scenario: document.scenario,
+            legacy_envelope,
+        })
     }
 }

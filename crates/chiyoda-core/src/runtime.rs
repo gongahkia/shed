@@ -109,9 +109,18 @@ pub fn verify_run_bundle(bundle: &RunBundle) -> Result<BundleVerification, RunEr
             "bundle hash does not match its content".to_owned(),
         ));
     }
+    if bundle.scenario_hash != crate::bundle::canonical_hash(&bundle.scenario) {
+        return Err(RunError::InvalidBundle(
+            "scenario hash does not match its content".to_owned(),
+        ));
+    }
     if bundle.bundle_version != BUNDLE_VERSION || bundle.runtime_version != crate::RUNTIME_VERSION {
         return Ok(BundleVerification::HashOnlyLegacy);
     }
+    bundle
+        .scenario
+        .check_schema()
+        .map_err(|error| RunError::InvalidBundle(error.to_string()))?;
     let trace_every_steps = bundle
         .options
         .get("trace_every_steps")

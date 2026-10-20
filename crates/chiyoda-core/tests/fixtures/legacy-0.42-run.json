@@ -1,0 +1,179 @@
+{
+  "bundle_version": "0.42",
+  "runtime_version": "0.42.0-alpha.1",
+  "scenario_hash": "3c1a8ece6eb062685567b6fd585aa8808368545b0772bc263fd90314a77464f5",
+  "scenario": {
+    "language_version": "0.29",
+    "scenario": {
+      "name": "benchmark-free-walk",
+      "seed": 1,
+      "duration_s": 12.0,
+      "timestep_s": 0.2,
+      "surfaces": [
+        {
+          "id": "floor",
+          "origin": {
+            "x_m": 0.0,
+            "y_m": 0.0,
+            "z_m": 0.0
+          },
+          "width_m": 12.0,
+          "depth_m": 6.0
+        }
+      ],
+      "obstacles": [],
+      "waypoints": [],
+      "exits": [
+        {
+          "id": "out",
+          "surface": "floor",
+          "at": {
+            "x_m": 11.0,
+            "y_m": 3.0,
+            "z_m": 0.0
+          },
+          "width_m": 1.0,
+          "capacity_per_s": null
+        }
+      ],
+      "connectors": [],
+      "connector_states": [],
+      "gates": [],
+      "agents": [
+        {
+          "id": "person",
+          "count": 1,
+          "surface": "floor",
+          "at": {
+            "x_m": 1.0,
+            "y_m": 3.0,
+            "z_m": 0.0
+          },
+          "destination": "out",
+          "alternative_destinations": [],
+          "speed_mps": 1.2,
+          "radius_m": 0.3,
+          "height_m": 1.7,
+          "release_at_s": 0.0,
+          "via": [],
+          "excluded_connector_kinds": []
+        }
+      ],
+      "messages": [],
+      "countermeasures": []
+    }
+  },
+  "options": {
+    "initial_spawn_clearance": "all-declared-spawn-discs-pairwise-clear-0.42",
+    "integration": "deterministic-orca-euler-0.42",
+    "local_motion": "snapshot-orca-f64-horizon-2.5s-fifo-grid-predecessor-velocity-handoff-0.42",
+    "on_surface_clearance_audit": "reference-disc-overlap-at-every-integration-boundary-0.42",
+    "portal_landing": "authored-lanes-clear-or-retain-transit-0.42",
+    "queue_geometry": "authored-fifo-line-capacity-denial-or-serpentine-grid-preallocated-slots-fifo-priority-predecessor-velocity-handoff-physical-entry-reserve-lift-capacity-or-service-token-0.42",
+    "release_admission": "scheduled-eligibility-then-dynamic-spawn-disc-clearance-0.42",
+    "swept_on_surface_clearance_audit": "analytic-linear-reference-disc-overlap-for-same-surface-intervals-0.42",
+    "trace_every_steps": "1000"
+  },
+  "trace": [
+    {
+      "step": 0,
+      "time_s": 0.0,
+      "agents": [
+        {
+          "id": "person:0",
+          "group": "person",
+          "surface": "floor",
+          "x_m": 1.0,
+          "y_m": 3.0,
+          "z_m": 0.0,
+          "state": "moving",
+          "beliefs": {}
+        }
+      ]
+    },
+    {
+      "step": 60,
+      "time_s": 12.0,
+      "agents": [
+        {
+          "id": "person:0",
+          "group": "person",
+          "surface": "floor",
+          "x_m": 10.84,
+          "y_m": 3.0,
+          "z_m": 0.0,
+          "state": "evacuated",
+          "beliefs": {}
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "time_s": 8.2,
+      "kind": "evacuated",
+      "subject": "person:0",
+      "detail": "out"
+    }
+  ],
+  "metrics": {
+    "total_agents": 1,
+    "evacuated_agents": 1,
+    "evacuated_by_exit": {
+      "out": 1
+    },
+    "clearance_time_s": 8.2,
+    "last_exit_time_s": 8.2,
+    "mean_exit_time_s": 8.2,
+    "queued_for_lift_agents": 0,
+    "queued_for_connector_agents": 0,
+    "queued_for_gate_agents": 0,
+    "queued_for_exit_agents": 0,
+    "queue_metrics": {
+      "lift": {
+        "ever_queued_agents": 0,
+        "cumulative_wait_agent_seconds": 0.0,
+        "peak_waiting_agents": 0
+      },
+      "connector": {
+        "ever_queued_agents": 0,
+        "cumulative_wait_agent_seconds": 0.0,
+        "peak_waiting_agents": 0
+      },
+      "gate": {
+        "ever_queued_agents": 0,
+        "cumulative_wait_agent_seconds": 0.0,
+        "peak_waiting_agents": 0
+      },
+      "exit": {
+        "ever_queued_agents": 0,
+        "cumulative_wait_agent_seconds": 0.0,
+        "peak_waiting_agents": 0
+      },
+      "by_resource": {
+        "lifts": {},
+        "connectors": {},
+        "gates": {},
+        "exits": {}
+      }
+    },
+    "movement_metrics": {
+      "agents_with_local_clearance_adjustments": 0,
+      "local_clearance_adjustment_steps": 0,
+      "local_avoidance_constraint_fallback_steps": 0,
+      "on_surface_clearance_audit": {
+        "agents_with_disc_overlaps": 0,
+        "disc_overlap_pair_steps": 0,
+        "maximum_disc_overlap_m": 0.0
+      },
+      "swept_on_surface_clearance_audit": {
+        "agents_with_swept_disc_overlaps": 0,
+        "swept_disc_overlap_pair_steps": 0,
+        "maximum_swept_disc_overlap_m": 0.0
+      },
+      "cumulative_local_clearance_adjustment_m": 0.0,
+      "maximum_local_clearance_adjustment_m": 0.0
+    }
+  },
+  "bundle_hash": "55409216a5272b68f5fedaecce335a871b1c985b4eedd57fc92165553d120df3"
+}

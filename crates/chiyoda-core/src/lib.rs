@@ -13,6 +13,7 @@ pub mod model;
 pub mod parser;
 pub mod reachability;
 pub mod runtime;
+pub mod scenario_json;
 pub mod validate;
 pub mod wfc;
 
@@ -25,6 +26,9 @@ pub use formatter::format_scenario;
 pub use model::{CanonicalScenario, Scenario};
 pub use parser::{ParseError, parse};
 pub use runtime::{BundleVerification, RunOptions, integration_step_count, run, verify_run_bundle};
+pub use scenario_json::{
+    SCENARIO_SCHEMA_VERSION, ScenarioJsonError, decode_scenario, encode_scenario,
+};
 pub use validate::{ValidationError, validate};
 
 /// Increment this when the canonical IR or runtime trace contract changes.

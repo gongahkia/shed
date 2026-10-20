@@ -1,0 +1,31 @@
+{
+  "schema_version": "1",
+  "scenario": {
+    "name": "An announced exit closure",
+    "seed": 1,
+    "duration_s": 40.0,
+    "timestep_s": 0.2,
+    "surfaces": [
+      {"id": "hall", "origin": {"x_m": 0, "y_m": 0, "z_m": 0}, "width_m": 12, "depth_m": 16}
+    ],
+    "exits": [
+      {"id": "primary", "surface": "hall", "at": {"x_m": 10, "y_m": 3, "z_m": 0}, "width_m": 1},
+      {"id": "alternative", "surface": "hall", "at": {"x_m": 1, "y_m": 13, "z_m": 0}, "width_m": 1}
+    ],
+    "agents": [{
+      "id": "person", "count": 1, "surface": "hall", "at": {"x_m": 1, "y_m": 3, "z_m": 0},
+      "destination": "primary", "alternative_destinations": ["alternative"],
+      "speed_mps": 1, "radius_m": 0.3, "height_m": 1.7,
+      "knowledge": {"observation_radius_m": 1}
+    }],
+    "exit_states": [
+      {"id": "closure", "exit": "primary", "open": false, "at_s": 2}
+    ],
+    "messages": [{
+      "id": "notice", "source": "Official", "surface": "hall",
+      "origin": {"x_m": 1, "y_m": 3, "z_m": 0},
+      "claim": {"ExitAvailability": {"exit": "primary", "open": false}},
+      "truthful": true, "at_s": 2, "reach_m": 100, "trust": 1
+    }]
+  }
+}

@@ -8,6 +8,7 @@ use crate::{
     },
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -33,6 +34,8 @@ pub struct StudyCaseResult {
     /// Physical geometry only: dimensions, obstacle rectangles, and resource
     /// locations. Excludes seeds, population, service limits, and policies.
     pub layout_hash: Option<String>,
+    pub input_sha256: Option<String>,
+    pub generation_hash: Option<String>,
 }
 
 impl StudyCaseResult {
@@ -74,6 +77,20 @@ impl StudyCaseResult {
             f64::from(metrics.evacuated_agents) / count,
         );
         values.insert("people".into(), count);
+        let gross = context
+            .floors
+            .iter()
+            .map(|floor| floor.gross_area_m2)
+            .sum::<f64>();
+        let walkable = context
+            .floors
+            .iter()
+            .map(|floor| floor.walkable_area_m2)
+            .sum::<f64>();
+        values.insert("gross_area_m2".into(), gross);
+        values.insert("walkable_area_m2".into(), walkable);
+        values.insert("gross_density_per_m2".into(), count / gross);
+        values.insert("walkable_density_per_m2".into(), count / walkable);
         values.insert(
             "mean_direct_exit_distance_m".into(),
             context.mean_direct_exit_distance_m,
@@ -95,6 +112,22 @@ impl StudyCaseResult {
                     / count,
             );
         }
+        values.insert(
+            "information_received_deliveries".into(),
+            metrics
+                .information_delivery
+                .values()
+                .map(|delivery| f64::from(delivery.received_agents))
+                .sum(),
+        );
+        values.insert(
+            "information_accepted_deliveries".into(),
+            metrics
+                .information_delivery
+                .values()
+                .map(|delivery| f64::from(delivery.accepted_agents))
+                .sum(),
+        );
         if let Some(movement) = &metrics.movement_metrics {
             if let Some(audit) = &movement.on_surface_clearance_audit {
                 values.insert("max_disc_overlap_m".into(), audit.maximum_disc_overlap_m);
@@ -231,6 +264,8 @@ impl StudyRunner {
                 tile_counts: space
                     .map_or_else(BTreeMap::new, |space| space.manifest.tile_counts.clone()),
                 layout_hash: space.map(|space| geometry_hash(&space.scenario)),
+                input_sha256: None,
+                generation_hash: space.map(|space| canonical_hash(&space.manifest)),
             },
             input_json: None,
             bundle: None,
@@ -264,7 +299,10 @@ impl StudyRunner {
         );
         artifacts.result.passed = evaluation.report.passed;
         artifacts.result.evaluation = Some(evaluation.report);
-        artifacts.input_json = Some(json + "\n");
+        let input_json = json + "\n";
+        artifacts.result.input_sha256 =
+            Some(format!("{:x}", Sha256::digest(input_json.as_bytes())));
+        artifacts.input_json = Some(input_json);
         artifacts.bundle = evaluation.bundle;
         artifacts
     }

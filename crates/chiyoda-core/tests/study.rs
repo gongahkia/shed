@@ -1,4 +1,4 @@
-use chiyoda_core::study::StudyRunner;
+use chiyoda_core::study::{StudyReport, StudyRunner};
 use chiyoda_core::{
     generator::spaces,
     study::{AreaBasis, Placement, Population, PreparedInput, StudyConfig},
@@ -242,4 +242,77 @@ fn incomplete_runs_are_measured_and_invalid_policies_do_not_drop_later_cases() {
     let observations = cases[1].result.observations();
     assert_eq!(observations.get("evacuated_fraction"), Some(&0.0));
     assert!(!observations.contains_key("clearance_time_s"));
+}
+
+#[test]
+fn reports_verify_pairing_count_missing_outcomes_and_detect_tampering() {
+    let mut input = document();
+    input["environment"]["duration_s"] = json!(0.2);
+    input["evaluation"] =
+        json!({"thresholds":{"min_evacuated_fraction":1.0,"max_clearance_time_s":0.2}});
+    input["policies"] = json!([{"id":"quiet"}, {"id":"same"}]);
+    input["seeds"] = json!([73, 74, 75]);
+    let config: StudyConfig = serde_json::from_value(input).unwrap();
+    let cases = StudyRunner::new(config.clone())
+        .unwrap()
+        .map(|case| case.result)
+        .collect::<Vec<_>>();
+    let report = StudyReport::from_cases(config.clone(), cases.clone()).unwrap();
+    report.verify().unwrap();
+    let encoded = serde_json::to_string(&report).unwrap();
+    serde_json::from_str::<StudyReport>(&encoded)
+        .unwrap()
+        .verify()
+        .unwrap();
+    assert_eq!(report.requested_layouts, 3);
+    assert_eq!(report.generated_layouts, 3);
+    assert_eq!(report.failed, 6);
+    assert_eq!(report.groups[0].measured, 3);
+    assert_eq!(report.groups[0].fully_evacuated, 0);
+    assert!(!report.groups[0].metrics.contains_key("clearance_time_s"));
+    assert_eq!(report.comparisons.len(), 1);
+    let delta = &report.comparisons[0].deltas["evacuated_fraction"];
+    assert_eq!(delta.samples, 3);
+    assert!(delta.mean.abs() < f64::EPSILON);
+    let mut tampered = report.clone();
+    tampered.groups[0].measured += 1;
+    assert!(tampered.verify().is_err());
+    let mut tampered = cases.clone();
+    tampered[1].context.as_mut().unwrap().population_hash = "different".into();
+    assert!(StudyReport::from_cases(config.clone(), tampered).is_err());
+    let mut reordered = cases.clone();
+    reordered.swap(0, 1);
+    assert!(StudyReport::from_cases(config.clone(), reordered).is_err());
+    assert!(StudyReport::from_cases(config, cases[..5].to_vec()).is_err());
+}
+
+#[test]
+fn summary_percentiles_and_comparisons_use_each_metrics_available_seed_pairs() {
+    let mut input = document();
+    input["environment"]["duration_s"] = json!(0.2);
+    input["seeds"] = json!([73, 74, 75, 76]);
+    input["policies"] = json!([{"id":"quiet"},{"id":"second"}]);
+    let config: StudyConfig = serde_json::from_value(input).unwrap();
+    let mut cases = StudyRunner::new(config.clone())
+        .unwrap()
+        .map(|case| case.result)
+        .collect::<Vec<_>>();
+    for (index, case) in cases.iter_mut().enumerate() {
+        let metrics = case.evaluation.as_mut().unwrap().metrics.as_mut().unwrap();
+        if index != 7 {
+            metrics.clearance_time_s = Some(
+                f64::from(u32::try_from(index / 2 + 1).unwrap())
+                    + if index % 2 == 1 { 1.0 } else { 0.0 },
+            );
+        }
+    }
+    let report = StudyReport::from_cases(config, cases).unwrap();
+    let baseline = &report.groups[0].metrics["clearance_time_s"];
+    assert!((baseline.mean - 2.5).abs() < f64::EPSILON);
+    assert!((baseline.median - 2.5).abs() < f64::EPSILON);
+    assert!((baseline.p95 - 4.0).abs() < f64::EPSILON);
+    let differences = &report.comparisons[0].deltas["clearance_time_s"];
+    assert_eq!(differences.samples, 3);
+    assert_eq!(differences.missing, 1);
+    assert!((differences.mean - 1.0).abs() < f64::EPSILON);
 }

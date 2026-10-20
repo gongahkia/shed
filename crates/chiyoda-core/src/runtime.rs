@@ -3688,7 +3688,11 @@ fn preassign_authored_queue_slots(
         let Some(resource) = current_service_resource(scenario, agent) else {
             continue;
         };
-        if resource_is_open(resources, &resource) && resource_uses_queue_grid(scenario, &resource) {
+        // A local agent's chosen route already reflects remembered constraints.
+        // Queue approach must not reveal an unseen closure through assignment.
+        if (agent.knowledge.is_some() || resource_is_open(resources, &resource))
+            && resource_uses_queue_grid(scenario, &resource)
+        {
             let ticket = resources.preallocate_queue_membership(agent, resource.clone());
             events.push(RunEvent {
                 time_s,

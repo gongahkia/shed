@@ -626,6 +626,33 @@ fn queue_service_cannot_be_reserved_through_an_unseen_physical_closure() {
             .iter()
             .any(|event| event.kind == "queue_service_reserved" && event.time_s < 10.0)
     );
+    scenario.exit_states[0].at_s = 0.0;
+    let initially_closed = simulate(&scenario);
+    assert_eq!(initially_closed.metrics.evacuated_agents, 1);
+    assert!(
+        initially_closed
+            .events
+            .iter()
+            .any(|event| event.kind == "queue_slot_preallocated" && event.time_s < 2.0)
+    );
+    assert!(
+        initially_closed
+            .trace
+            .iter()
+            .filter(|frame| frame.time_s < 10.0)
+            .all(|frame| !frame.agents[0]
+                .knowledge
+                .as_ref()
+                .unwrap()
+                .availability
+                .contains_key("exit:primary"))
+    );
+    assert!(
+        !initially_closed
+            .events
+            .iter()
+            .any(|event| event.kind == "queue_service_reserved" && event.time_s < 10.0)
+    );
 }
 
 #[test]

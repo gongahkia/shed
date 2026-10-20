@@ -254,7 +254,7 @@ fn isolated_execution_keeps_original_ordinal_spawn_release_and_information_draws
     };
     assert_eq!(message(&ordinary), message(&isolated));
     assert_eq!(isolated.options["isolated_agent"], "person:2");
-    assert!(ordinary.options.get("isolated_agent").is_none());
+    assert!(!ordinary.options.contains_key("isolated_agent"));
     assert_eq!(
         chiyoda_core::verify_run_bundle(&isolated).unwrap(),
         chiyoda_core::BundleVerification::Reconstructed
@@ -335,4 +335,57 @@ fn paired_completed_controls_report_elapsed_differences_with_their_sample_popula
     assert!(control.crowded_minus_isolated_elapsed_s.unwrap().abs() < 1e-8);
     assert_eq!(analysis.report.summary().control_pairs_completed, 1);
     analysis.report.verify(&bundle).unwrap();
+}
+
+#[test]
+fn authentic_pre_journey_reports_keep_their_original_hashes_and_omitted_optional_fields() {
+    let study: chiyoda_core::study::StudyReport =
+        serde_json::from_str(include_str!("fixtures/pre-journey-study-0.45.json")).unwrap();
+    study.verify().unwrap();
+    assert_eq!(
+        study.report_hash,
+        "a2eef7808994c97eeb19c2614a1e93626c3e7977cdb798fe1136196887df54af"
+    );
+    assert!(study.cases.iter().all(|case| case.journeys.is_none()));
+    let encoded = serde_json::to_value(&study).unwrap();
+    assert!(encoded["config"].get("journey_diagnostics").is_none());
+    assert!(encoded["cases"][0].get("journeys").is_none());
+    let benchmark: chiyoda_core::benchmark::BenchmarkReport =
+        serde_json::from_str(include_str!("fixtures/pre-journey-benchmark-0.45.json")).unwrap();
+    benchmark.verify().unwrap();
+    assert_eq!(
+        benchmark.report_hash,
+        "6d9b8e364e454d506e4bd724696578767ff6e86c17087a6a6333ad098a3cc66b"
+    );
+    assert!(benchmark.cases[0].journeys.is_none());
+}
+
+#[test]
+fn journey_exports_preserve_missing_numbers_and_escape_text_and_replay_arguments() {
+    let bundle = run(
+        &free_walk(),
+        RunOptions {
+            trace_every_steps: 1,
+        },
+    )
+    .unwrap();
+    let report = journeys::analyze(&bundle, &JourneyOptions::default()).unwrap();
+    let csv = journeys::rendering::csv(&report).unwrap();
+    assert_eq!(csv.lines().next().unwrap().split(',').count(), 25);
+    assert_eq!(csv.lines().nth(1).unwrap().split(',').count(), 25);
+    let mut report = report;
+    report.agents[0].agent = "quote\"<script>|\nname".into();
+    report.agents[0].decisions[0].surface = "a'$(touch should-not-run)".into();
+    report.report_hash.clear();
+    report.report_hash = chiyoda_core::bundle::canonical_hash(&report);
+    let markdown = journeys::rendering::markdown(&report).unwrap();
+    assert!(markdown.contains("&lt;script&gt;&#124; name"));
+    assert!(!markdown.contains("<script>"));
+    assert!(markdown.contains("--at-step"));
+    assert!(markdown.contains("'a'\\''$(touch should-not-run)'"));
+    assert!(
+        journeys::rendering::csv(&report)
+            .unwrap()
+            .contains("quote\"\"<script>|\nname")
+    );
 }

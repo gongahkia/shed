@@ -16,8 +16,8 @@
     {"id": "large", "width": 8, "height": 8, "floors": 1, "service_rate_multiplier": 1.0}
   ],
   "loads": [
-    {"id": "light", "population": {"kind": "density", "agents_per_m2": 0.01, "basis": "gross"}},
-    {"id": "busy", "population": {"kind": "density", "agents_per_m2": 0.02, "basis": "gross"}}
+    {"id": "light", "population": {"kind": "density", "agents_per_m2": 0.01, "basis": "gross"}, "knowledge": {"observation_radius_m": 6.0}},
+    {"id": "busy", "population": {"kind": "density", "agents_per_m2": 0.02, "basis": "gross"}, "knowledge": {"observation_radius_m": 6.0}}
   ],
   "operations": {
     "exit_states": [{"id": "primary_closure", "exit": "primary", "open": false, "at_s": 10.0}]

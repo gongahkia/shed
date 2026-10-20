@@ -3,8 +3,8 @@ use crate::{
     evaluation::EvaluationOptions,
     generator::spaces::{FloorConstraint, Module, Preset, SpaceConfig},
     model::{
-        ConnectorCapacityChange, ConnectorKind, ConnectorStateChange, ExitCapacityChange,
-        ExitStateChange, GateCapacityChange, GateStateChange, Scenario,
+        AgentKnowledge, ConnectorCapacityChange, ConnectorKind, ConnectorStateChange,
+        ExitCapacityChange, ExitStateChange, GateCapacityChange, GateStateChange, Scenario,
     },
     wfc::ForbiddenNeighbor,
 };
@@ -126,6 +126,9 @@ pub struct Load {
     /// Cadence per floor, shared across policies. None releases everyone at 0.
     #[serde(default)]
     pub release_interval_s: Option<f64>,
+    /// Shared by every generated person and every policy in this load.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub knowledge: Option<AgentKnowledge>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -308,6 +311,23 @@ impl StudyConfig {
             }
             if let Some(interval) = load.release_interval_s {
                 positive(interval, "release_interval_s")?;
+            }
+            if let Some(knowledge) = &load.knowledge {
+                if !knowledge.observation_radius_m.is_finite()
+                    || knowledge.observation_radius_m < 0.0
+                {
+                    return Err("observation_radius_m must be finite and nonnegative".into());
+                }
+                if let Some(exits) = &knowledge.known_exits {
+                    let mut seen = BTreeSet::new();
+                    for exit in exits {
+                        if !["primary", "alternative"].contains(&exit.as_str())
+                            || !seen.insert(exit)
+                        {
+                            return Err("known_exits must be unique generated exit candidates: primary, alternative".into());
+                        }
+                    }
+                }
             }
         }
         // Reject NaN/Infinity in programmatically constructed documents as well

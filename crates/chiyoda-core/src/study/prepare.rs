@@ -353,6 +353,7 @@ fn population_groups(
             let mut group = template.clone();
             group.id = format!("study_{floor}_{ordinal}");
             group.count = 1;
+            group.knowledge.clone_from(&load.knowledge);
             group.at = at;
             group.release_at_s = load.release_interval_s.unwrap_or(0.0)
                 * f64::from(u32::try_from(ordinal).expect("bounded population"));

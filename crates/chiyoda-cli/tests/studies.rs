@@ -176,6 +176,39 @@ fn matrix_runs_write_reports_csv_and_replayable_inputs_and_reject_artifact_corru
 }
 
 #[test]
+fn locally_aware_populations_are_archived_and_reconstruct_through_the_cli() {
+    let directory = Directory::new();
+    let config = directory.path("study.json");
+    let output = directory.path("run");
+    let mut value = input();
+    value["loads"][0]["knowledge"] =
+        json!({"observation_radius_m": 3.0, "known_exits": ["primary"]});
+    save(&config, &value);
+    success(&["study", "check", "--config", text(&config)]);
+    success(&[
+        "study",
+        "run",
+        "--config",
+        text(&config),
+        "-o",
+        text(&output),
+    ]);
+    success(&[
+        "study",
+        "verify",
+        text(&output.join("report.json")),
+        "--replay",
+    ]);
+    let input = read(&output.join("case-0000/scenario.json"));
+    assert_eq!(
+        input["scenario"]["agents"][0]["knowledge"],
+        value["loads"][0]["knowledge"]
+    );
+    let bundle = read(&output.join("case-0000/run.json"));
+    assert!(bundle["trace"][0]["agents"][0]["knowledge"].is_object());
+}
+
+#[test]
 fn failed_thresholds_finish_the_matrix_and_keep_incomplete_results() {
     let directory = Directory::new();
     let config = directory.path("study.json");

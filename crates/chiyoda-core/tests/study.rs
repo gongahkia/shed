@@ -41,6 +41,65 @@ fn study_axes_are_explicit_strict_and_resolve_to_geometry_only_generation() {
 }
 
 #[test]
+fn local_knowledge_is_a_controlled_population_input_in_generated_studies() {
+    let mut input = document();
+    input["environment"]["duration_s"] = json!(0.4);
+    input["loads"][0]["knowledge"] = json!({"observation_radius_m": 0.0, "known_exits": []});
+    input["policies"] = json!([
+        {"id": "quiet"},
+        {"id": "introduce-exit", "messages": [{
+            "id": "notice", "source": "Official", "surface": "floor_0", "origin": {"anchor": "arrival_hall"},
+            "claim": {"ExitAvailability": {"exit": "primary", "open": true}},
+            "truthful": true, "at_s": 0.2, "reach_m": 10000, "trust": 1
+        }]}
+    ]);
+    let config: StudyConfig = serde_json::from_value(input.clone()).unwrap();
+    let cases: Vec<_> = StudyRunner::new(config.clone()).unwrap().collect();
+    assert!(cases.iter().all(|case| case.result.passed));
+    assert_eq!(cases[0].result.context, cases[1].result.context);
+    assert_eq!(
+        cases[0].result.generation_hash,
+        cases[1].result.generation_hash
+    );
+    let quiet = cases[0].bundle.as_ref().unwrap();
+    let announced = cases[1].bundle.as_ref().unwrap();
+    assert_eq!(
+        quiet.trace.last().unwrap().agents[0].state,
+        chiyoda_core::AgentState::WaitingForRoute
+    );
+    assert!(
+        announced
+            .trace
+            .last()
+            .unwrap()
+            .agents
+            .iter()
+            .all(|agent| agent.knowledge.as_ref().unwrap().known_exits == ["primary"])
+    );
+    assert_eq!(
+        announced.metrics.information_delivery["notice"].accepted_agents,
+        2
+    );
+    let report =
+        StudyReport::from_cases(config, cases.into_iter().map(|case| case.result).collect())
+            .unwrap();
+    report.verify().unwrap();
+    for knowledge in [
+        json!({"observation_radius_m": -1}),
+        json!({"observation_radius_m": 1, "known_exits": ["missing"]}),
+        json!({"observation_radius_m": 1, "known_exits": ["primary", "primary"]}),
+    ] {
+        input["loads"][0]["knowledge"] = knowledge;
+        assert!(
+            serde_json::from_value::<StudyConfig>(input.clone())
+                .unwrap()
+                .validate()
+                .is_err()
+        );
+    }
+}
+
+#[test]
 fn ambiguous_axes_invalid_searches_and_unbounded_studies_are_rejected() {
     for axis in ["patterns", "scales", "loads", "policies", "seeds"] {
         for duplicate in [false, true] {

@@ -1,5 +1,10 @@
 # WFC space generation and evaluation
 
+For controlled comparisons across architectural patterns, sizes, crowd loads,
+and communication policies, use an [architectural study](studies.md). Studies
+reuse generated geometry across policies and report distributions and
+comparisons across seeds.
+
 Chiyoda can generate different rectangular floor plans using tiled wave
 function collapse (WFC), build versioned JSON scenarios, and evaluate
 them with the existing pedestrian runtime. Generation does not change the scenario model,

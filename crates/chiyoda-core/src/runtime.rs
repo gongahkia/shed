@@ -3243,6 +3243,15 @@ fn integrate(
                     }
                     continue;
                 }
+                if let Some(resource) = &service_resource {
+                    knowledge::encounter(
+                        agent,
+                        resource,
+                        resource_is_open(resources, resource),
+                        time_s,
+                        events,
+                    );
+                }
                 match next_connector {
                     None => {
                         if let Some((waypoint_id, dwell_s)) = reached_waypoint {
@@ -3298,15 +3307,6 @@ fn integrate(
                             }
                         } else if let Some(gate_id) = final_gate {
                             if resources.closed_gates.contains(&gate_id) {
-                                knowledge::encounter(
-                                    agent,
-                                    &PortalResource::Gate {
-                                        id: gate_id.clone(),
-                                    },
-                                    false,
-                                    time_s,
-                                    events,
-                                );
                                 reroute(
                                     scenario,
                                     agent,
@@ -3359,15 +3359,6 @@ fn integrate(
                                 || effective_blocked_exits(agent, &resources.closed_exits)
                                     .contains(&agent.destination)
                             {
-                                knowledge::encounter(
-                                    agent,
-                                    &PortalResource::Exit {
-                                        id: agent.destination.clone(),
-                                    },
-                                    !resources.closed_exits.contains(&agent.destination),
-                                    time_s,
-                                    events,
-                                );
                                 reroute(
                                     scenario,
                                     agent,
@@ -3433,15 +3424,6 @@ fn integrate(
                         }
                         if resources.closed_connectors.contains(connector.id()) {
                             if agent.knowledge.is_some() {
-                                knowledge::encounter(
-                                    agent,
-                                    &PortalResource::Connector {
-                                        id: connector.id().into(),
-                                    },
-                                    false,
-                                    time_s,
-                                    events,
-                                );
                                 reroute(
                                     scenario,
                                     agent,

@@ -303,6 +303,14 @@ fn contact_discovers_closed_exits_even_with_zero_observation_range() {
             .iter()
             .any(|event| event.kind == "evacuated" && event.detail == "primary")
     );
+    assert!(
+        bundle.trace.last().unwrap().agents[0]
+            .knowledge
+            .as_ref()
+            .unwrap()
+            .availability["exit:fallback"]
+            .open
+    );
 }
 
 #[test]

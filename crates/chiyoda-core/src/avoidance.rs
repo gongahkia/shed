@@ -176,6 +176,7 @@ pub(crate) struct VelocityConstraint {
 /// The selector uses a deterministic two-dimensional linear program over
 /// line and speed-circle boundaries, with stable neighbour order.
 #[must_use]
+#[cfg(test)]
 pub(crate) fn choose_velocity(
     agents: &[AvoidanceAgent],
     own_index: usize,

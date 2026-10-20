@@ -1,7 +1,5 @@
 use crate::{
-    avoidance::{
-        AvoidanceAgent, QueueAvoidancePriority, Vec2, choose_velocity, choose_velocity_in_domain,
-    },
+    avoidance::{AvoidanceAgent, QueueAvoidancePriority, Vec2, choose_velocity_in_domain},
     bundle::{
         AgentSnapshot, AgentState, BUNDLE_VERSION, InformationDeliveryMetrics,
         InformationInterventionKind, MovementMetrics, OnSurfaceClearanceMetrics, QueueMetrics,
@@ -4103,26 +4101,15 @@ fn plan_movement(
         movement.obstacles,
         agent.radius_m,
     );
-    let decision = if domain.is_empty() {
-        choose_velocity(
-            &nearby_agents,
-            own_index,
-            preferred_velocity,
-            movement_speed_bound,
-            ORCA_TIME_HORIZON_S,
-            timestep_s,
-        )
-    } else {
-        choose_velocity_in_domain(
-            &nearby_agents,
-            own_index,
-            preferred_velocity,
-            movement_speed_bound,
-            ORCA_TIME_HORIZON_S,
-            timestep_s,
-            &domain,
-        )
-    };
+    let decision = choose_velocity_in_domain(
+        &nearby_agents,
+        own_index,
+        preferred_velocity,
+        movement_speed_bound,
+        ORCA_TIME_HORIZON_S,
+        timestep_s,
+        &domain,
+    );
     let candidate = Point3 {
         x_m: agent.position.x_m + decision.velocity.x * timestep_s,
         y_m: agent.position.y_m + decision.velocity.y * timestep_s,

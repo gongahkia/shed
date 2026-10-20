@@ -2,7 +2,7 @@
 
 <p align="center"><img src="./assets/logo/chiyoda-logo.png" width="40%" height="40%" alt="Yuho mascot"></p>
 
-<p align="center"><em>A Domain-specific Language for simulating Pedestrian-flow</em></p>
+<p align="center"><em>A deterministic simulator for Pedestrian-flow</em></p>
 
 <p align="center">
   <a href="https://github.com/gongahkia/chiyoda/releases/tag/1.0.0"><img src="https://img.shields.io/badge/chiyoda_1.0.0-passing-light_green"></a>
@@ -11,39 +11,77 @@
 
 ## What is Chiyoda?
 
-`Chiyoda` is a [deterministic](#features) 2D/3D [pedestrian-flow](https://www.researchgate.net/figure/Examples-of-pedestrian-flow-data_tbl1_366989142) simulator built atop a typed [DSL](https://en.wikipedia.org/wiki/Domain-specific_language) for [scenario source specification](#the-chiyoda-dsl).
+`Chiyoda` is a [deterministic](#features) 2D/3D [pedestrian-flow](https://www.researchgate.net/figure/Examples-of-pedestrian-flow-data_tbl1_366989142) simulator with [versioned JSON scenarios](#the-chiyoda-scenario-format).
 
 ## Features
 
-* **Text-first**: Author geometry, demand, routes, capacities, and state changes in a small DSL with explicit SI units
+* **Text-first**: Author geometry, demand, routes, capacities, and state changes in JSON with SI units encoded in field names
 * **Deterministic**: Run the same valid scenario with the same runtime and get the same result
-* **Inspectable**: Format, validate, compile, run, and replay from the command line
+* **Inspectable**: Format, validate, run, and replay from the command line
 * **Reproducible**: Runs include their source and a hash-verifiable `run.json` bundle
 
 ## GIFs
 
 ![](assets/demo/grand-interchange-showcase.gif)
 
-## The `Chiyoda` DSL
+## The `Chiyoda` scenario format
 
-Below is a simple example of the statically checked DSL in action. See [`docs/language.md`](./docs/language.md) for a more detailed language specificaton.
+Below is a simple example of a validated JSON scenario. See [`docs/scenarios.md`](./docs/scenarios.md) for a more detailed scenario specification.
 
-`Chiyoda` files end with the `.chy` file extension.
+`Chiyoda` scenarios use the `.json` file extension.
 
-```chy
-scenario "concourse-transfer"
-seed 73
-duration 120s
-timestep 100ms
-
-surface platform at (0m, 0m, 6m) size (40m, 16m)
-surface concourse at (0m, 0m, 0m) size (40m, 16m)
-obstacle retail_kiosk on concourse at (18m, 6m, 0m) size (4m, 4m)
-waypoint fare_hall on concourse at (28m, 8m, 0m) dwell 5s
-exit street on concourse at (40m, 8m, 0m) width 3m capacity 3/s
-stair north_stair from platform at (24m, 8m, 6m) to concourse at (24m, 8m, 0m) width 2m capacity 1.5/s clearance 2.1m
-gate fare_gate on concourse at (32m, 8m, 0m) width 2m capacity 18/s to street
-agents passengers count 120 on platform at (8m, 8m, 6m) to street speed 1.2m/s radius 0.3m height 1.7m via fare_hall release 0s
+```json
+{
+  "schema_version": "1",
+  "scenario": {
+    "name": "concourse-transfer",
+    "seed": 73,
+    "duration_s": 120.0,
+    "timestep_s": 0.1,
+    "surfaces": [
+      {"depth_m": 16.0, "id": "platform", "origin": {"x_m": 0.0, "y_m": 0.0, "z_m": 6.0}, "width_m": 40.0},
+      {"depth_m": 16.0, "id": "concourse", "origin": {"x_m": 0.0, "y_m": 0.0, "z_m": 0.0}, "width_m": 40.0}
+    ],
+    "obstacles": [
+      {"at": {"x_m": 18.0, "y_m": 6.0, "z_m": 0.0}, "depth_m": 4.0, "id": "retail_kiosk", "surface": "concourse", "width_m": 4.0}
+    ],
+    "waypoints": [
+      {"at": {"x_m": 28.0, "y_m": 8.0, "z_m": 0.0}, "dwell_s": 5.0, "id": "fare_hall", "surface": "concourse"}
+    ],
+    "exits": [
+      {"at": {"x_m": 40.0, "y_m": 8.0, "z_m": 0.0}, "capacity_per_s": 3.0, "id": "street", "surface": "concourse", "width_m": 3.0}
+    ],
+    "connectors": [
+      {"Stair": {
+        "capacity_per_s": 1.5,
+        "clearance_height_m": 2.1,
+        "from": {"x_m": 24.0, "y_m": 8.0, "z_m": 6.0},
+        "from_surface": "platform",
+        "id": "north_stair",
+        "to": {"x_m": 24.0, "y_m": 8.0, "z_m": 0.0},
+        "to_surface": "concourse",
+        "width_m": 2.0
+      }}
+    ],
+    "gates": [
+      {"at": {"x_m": 32.0, "y_m": 8.0, "z_m": 0.0}, "destination": "street", "id": "fare_gate", "service_rate_per_s": 18.0, "surface": "concourse", "width_m": 2.0}
+    ],
+    "agents": [
+      {
+        "at": {"x_m": 8.0, "y_m": 8.0, "z_m": 6.0},
+        "count": 120,
+        "destination": "street",
+        "height_m": 1.7,
+        "id": "passengers",
+        "radius_m": 0.3,
+        "release_at_s": 0.0,
+        "speed_mps": 1.2,
+        "surface": "platform",
+        "via": ["fare_hall"]
+      }
+    ]
+  }
+}
 ```
 
 ## Usage
@@ -69,11 +107,10 @@ $ export PATH="$PWD/target/release:$PATH"
 3. Finally, run any of below commands to use `Chiyoda`'s functionality.
 
 ```console
-$ chiyoda generate --seed 73 -o example.chy
-$ chiyoda format example.chy -o example.formatted.chy
-$ chiyoda check example.formatted.chy
-$ chiyoda compile example.formatted.chy -o out/example.ir.json
-$ chiyoda run example.formatted.chy -o out/example
+$ chiyoda generate --seed 73 -o example.json
+$ chiyoda format example.json -o example.formatted.json
+$ chiyoda check example.formatted.json
+$ chiyoda run example.formatted.json -o out/example
 $ chiyoda replay out/example/run.json
 ```
 

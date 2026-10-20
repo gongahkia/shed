@@ -17,6 +17,7 @@ use std::{
     fmt,
 };
 
+mod knowledge;
 mod walk_visibility;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -202,6 +203,7 @@ struct Agent {
     route_cursor: usize,
     motion: Motion,
     beliefs: BTreeMap<String, f64>,
+    knowledge: Option<knowledge::LocalKnowledge>,
     blocked_connectors: HashSet<String>,
     blocked_exits: HashSet<String>,
     blocked_gates: HashSet<String>,
@@ -1287,7 +1289,7 @@ fn apply_connector_state_change(
         resources.closed_connectors.insert(change.connector.clone());
     }
     events.push(connector_state_event(change));
-    for agent in agents.iter_mut() {
+    for agent in agents.iter_mut().filter(|agent| agent.knowledge.is_none()) {
         reroute(
             scenario,
             agent,
@@ -1326,7 +1328,7 @@ fn apply_exit_state_change(
         resources.closed_exits.insert(change.exit.clone());
     }
     events.push(exit_state_event(change));
-    for agent in agents.iter_mut() {
+    for agent in agents.iter_mut().filter(|agent| agent.knowledge.is_none()) {
         reroute(
             scenario,
             agent,
@@ -1392,7 +1394,7 @@ fn apply_gate_state_change(
         resources.closed_gates.insert(change.gate.clone());
     }
     events.push(gate_state_event(change));
-    for agent in agents.iter_mut() {
+    for agent in agents.iter_mut().filter(|agent| agent.knowledge.is_none()) {
         reroute(
             scenario,
             agent,
@@ -1675,8 +1677,9 @@ pub fn run(scenario: &Scenario, options: RunOptions) -> Result<RunBundle, RunErr
         &resources.closed_gates,
     )?;
     let step_count = integration_step_count(scenario.duration_s, scenario.timestep_s);
-    let mut trace = vec![snapshot(0, 0.0, &agents)];
     let mut events = initial_state_events(scenario);
+    knowledge::observe_agents(scenario, &mut agents, 0.0, &resources, &mut events);
+    let mut trace = vec![snapshot(0, 0.0, &agents)];
     let mut information_delivery = information_delivery_for_scenario(scenario);
     let mut movement_telemetry = MovementTelemetry::default();
     movement_telemetry.record_on_surface_disc_overlaps(&agents);
@@ -1766,7 +1769,7 @@ pub fn run(scenario: &Scenario, options: RunOptions) -> Result<RunBundle, RunErr
         queue_metrics: Some(queue_metrics),
         movement_metrics: Some(movement_telemetry.metrics()),
     };
-    let options = BTreeMap::from([
+    let mut options = BTreeMap::from([
         (
             "trace_every_steps".to_owned(),
             options.trace_every_steps.to_string(),
@@ -1806,6 +1809,16 @@ pub fn run(scenario: &Scenario, options: RunOptions) -> Result<RunBundle, RunErr
             "analytic-linear-reference-disc-overlap-for-same-surface-intervals-0.42".to_owned(),
         ),
     ]);
+    if scenario
+        .agents
+        .iter()
+        .any(|group| group.knowledge.is_some())
+    {
+        options.insert(
+            "agent_knowledge".into(),
+            "local-portal-observation-and-accepted-claims-0.44".into(),
+        );
+    }
     Ok(RunBundle::new(canonical, options, trace, events, metrics))
 }
 
@@ -1850,7 +1863,9 @@ fn spawn_agents(
                         planned.final_gate,
                     )
                 }
-                None if group_plan_becomes_available(scenario, route_start, group) => {
+                None if group.knowledge.is_some()
+                    || group_plan_becomes_available(scenario, route_start, group) =>
+                {
                     (Vec::new(), group.destination.clone(), None)
                 }
                 None => {
@@ -1886,6 +1901,10 @@ fn spawn_agents(
                     }
                 },
                 beliefs: BTreeMap::new(),
+                knowledge: group
+                    .knowledge
+                    .as_ref()
+                    .map(|config| knowledge::LocalKnowledge::new(config, group)),
                 blocked_connectors: HashSet::new(),
                 blocked_exits: HashSet::new(),
                 blocked_gates: HashSet::new(),
@@ -1938,17 +1957,25 @@ fn group_plan(
     closed_exits: &HashSet<String>,
     closed_gates: &HashSet<String>,
 ) -> Option<PlannedTarget> {
+    let empty = HashSet::new();
+    let local = group.knowledge.is_some();
     let exit_constraints = ExitPlanConstraints {
-        blocked_exits: closed_exits,
-        blocked_gates: closed_gates,
+        blocked_exits: if local { &empty } else { closed_exits },
+        blocked_gates: if local { &empty } else { closed_gates },
         passed_gates: None,
     };
     plan_for_stage(
         scenario,
         start,
         group.via.first().map(String::as_str),
-        group.exit_candidates(),
-        blocked_connectors,
+        group.exit_candidates().filter(|exit| {
+            group
+                .knowledge
+                .as_ref()
+                .and_then(|config| config.known_exits.as_ref())
+                .is_none_or(|known| known.iter().any(|id| id == exit))
+        }),
+        if local { &empty } else { blocked_connectors },
         exit_constraints,
     )
 }
@@ -1972,7 +1999,11 @@ fn agent_plan(
         scenario,
         start,
         agent.via.get(agent.via_cursor).map(String::as_str),
-        agent.exit_candidates.iter().map(String::as_str),
+        agent
+            .exit_candidates
+            .iter()
+            .map(String::as_str)
+            .filter(|exit| knowledge::knows_exit(agent, exit)),
         blocked_connectors,
         exit_constraints,
     )
@@ -2526,7 +2557,9 @@ fn deliver_message(
     information_delivery: &mut BTreeMap<String, InformationDeliveryMetrics>,
 ) {
     for agent in agents.iter_mut().filter(|agent| {
-        agent.surface == message.surface && matches!(agent.motion, Motion::OnSurface)
+        agent.surface == message.surface
+            && (matches!(agent.motion, Motion::OnSurface)
+                || agent.knowledge.is_some() && agent.occupies_surface())
     }) {
         if agent.position.distance(message.origin) <= message.reach_m {
             agent.beliefs.insert(message.id.clone(), message.trust);
@@ -2542,6 +2575,15 @@ fn deliver_message(
             }
             if accepted {
                 apply_claim(agent, &message.claim);
+                knowledge::learn(
+                    agent,
+                    &knowledge::resource_for_claim(&message.claim),
+                    message.claim.is_open(),
+                    message.at_s,
+                    crate::bundle::KnowledgeSource::Message {
+                        id: message.id.clone(),
+                    },
+                );
                 reroute(
                     scenario,
                     agent,
@@ -2583,7 +2625,9 @@ fn deliver_countermeasure(
     information_delivery: &mut BTreeMap<String, InformationDeliveryMetrics>,
 ) {
     for agent in agents.iter_mut().filter(|agent| {
-        agent.surface == countermeasure.surface && matches!(agent.motion, Motion::OnSurface)
+        agent.surface == countermeasure.surface
+            && (matches!(agent.motion, Motion::OnSurface)
+                || agent.knowledge.is_some() && agent.occupies_surface())
     }) {
         if agent.position.distance(countermeasure.origin) <= countermeasure.reach_m {
             agent
@@ -2614,6 +2658,16 @@ fn deliver_countermeasure(
                     &resources.closed_connectors,
                     &resources.closed_exits,
                     &resources.closed_gates,
+                );
+                let resource = knowledge::resource_for_claim(&message.claim);
+                knowledge::learn(
+                    agent,
+                    &resource,
+                    resource_is_open(resources, &resource),
+                    countermeasure.at_s,
+                    crate::bundle::KnowledgeSource::Countermeasure {
+                        id: countermeasure.id.clone(),
+                    },
                 );
                 reroute(
                     scenario,
@@ -2794,7 +2848,15 @@ fn reroute(
             time_s,
             kind: "route_recomputed".to_owned(),
             subject: agent.id.clone(),
-            detail: blocked.join(","),
+            detail: if agent.knowledge.is_some() {
+                format!(
+                    "destination={};blocked={}",
+                    agent.destination,
+                    blocked.join(",")
+                )
+            } else {
+                blocked.join(",")
+            },
         });
     } else {
         agent.queue_membership = None;
@@ -2817,19 +2879,31 @@ fn effective_blocked_connectors(
     agent: &Agent,
     closed_connectors: &HashSet<String>,
 ) -> HashSet<String> {
-    let mut blocked_connectors = closed_connectors.clone();
+    let mut blocked_connectors = if agent.knowledge.is_some() {
+        HashSet::new()
+    } else {
+        closed_connectors.clone()
+    };
     blocked_connectors.extend(agent.blocked_connectors.iter().cloned());
     blocked_connectors
 }
 
 fn effective_blocked_exits(agent: &Agent, closed_exits: &HashSet<String>) -> HashSet<String> {
-    let mut blocked_exits = closed_exits.clone();
+    let mut blocked_exits = if agent.knowledge.is_some() {
+        HashSet::new()
+    } else {
+        closed_exits.clone()
+    };
     blocked_exits.extend(agent.blocked_exits.iter().cloned());
     blocked_exits
 }
 
 fn effective_blocked_gates(agent: &Agent, closed_gates: &HashSet<String>) -> HashSet<String> {
-    let mut blocked_gates = closed_gates.clone();
+    let mut blocked_gates = if agent.knowledge.is_some() {
+        HashSet::new()
+    } else {
+        closed_gates.clone()
+    };
     blocked_gates.extend(agent.blocked_gates.iter().cloned());
     blocked_gates
 }
@@ -2894,10 +2968,22 @@ fn integrate(
                     subject: agent.id.clone(),
                     detail: waypoint_id,
                 });
+                if agent.knowledge.is_some() {
+                    reroute(
+                        scenario,
+                        agent,
+                        time_s,
+                        events,
+                        &resources.closed_connectors,
+                        &resources.closed_exits,
+                        &resources.closed_gates,
+                    );
+                }
             }
             _ => {}
         }
     }
+    knowledge::observe_agents(scenario, agents, time_s, resources, events);
     preassign_authored_queue_slots(scenario, resources, agents, time_s, events);
     let local_motion_spatial_index = SpatialIndex::from_agents(agents);
     let mut local_motion_snapshot = LocalMotionSnapshot::from_agents(scenario, agents);
@@ -3003,7 +3089,10 @@ fn integrate(
                         });
                     let final_exit_is_closed = agent.route_cursor == agent.route.len()
                         && resources.closed_exits.contains(&agent.destination);
-                    if remaining_connector_is_closed || final_exit_is_closed {
+                    if agent.knowledge.is_some()
+                        || remaining_connector_is_closed
+                        || final_exit_is_closed
+                    {
                         reroute(
                             scenario,
                             agent,
@@ -3216,6 +3305,15 @@ fn integrate(
                             }
                         } else if let Some(gate_id) = final_gate {
                             if resources.closed_gates.contains(&gate_id) {
+                                knowledge::encounter(
+                                    agent,
+                                    &PortalResource::Gate {
+                                        id: gate_id.clone(),
+                                    },
+                                    false,
+                                    time_s,
+                                    events,
+                                );
                                 reroute(
                                     scenario,
                                     agent,
@@ -3264,9 +3362,19 @@ fn integrate(
                                 detail: gate_id,
                             });
                         } else {
-                            if effective_blocked_exits(agent, &resources.closed_exits)
-                                .contains(&agent.destination)
+                            if resources.closed_exits.contains(&agent.destination)
+                                || effective_blocked_exits(agent, &resources.closed_exits)
+                                    .contains(&agent.destination)
                             {
+                                knowledge::encounter(
+                                    agent,
+                                    &PortalResource::Exit {
+                                        id: agent.destination.clone(),
+                                    },
+                                    !resources.closed_exits.contains(&agent.destination),
+                                    time_s,
+                                    events,
+                                );
                                 reroute(
                                     scenario,
                                     agent,
@@ -3331,6 +3439,27 @@ fn integrate(
                             continue;
                         }
                         if resources.closed_connectors.contains(connector.id()) {
+                            if agent.knowledge.is_some() {
+                                knowledge::encounter(
+                                    agent,
+                                    &PortalResource::Connector {
+                                        id: connector.id().into(),
+                                    },
+                                    false,
+                                    time_s,
+                                    events,
+                                );
+                                reroute(
+                                    scenario,
+                                    agent,
+                                    time_s,
+                                    events,
+                                    &resources.closed_connectors,
+                                    &resources.closed_exits,
+                                    &resources.closed_gates,
+                                );
+                                continue;
+                            }
                             agent.waiting_for_route = true;
                             continue;
                         }
@@ -3654,6 +3783,9 @@ fn reserve_queue_service(
     lift_loads: &mut HashMap<usize, u32>,
     resource: &PortalResource,
 ) -> bool {
+    if !resource_is_open(resources, resource) {
+        return false;
+    }
     match resource {
         PortalResource::Connector { id } => {
             let connector_index = scenario
@@ -4004,6 +4136,10 @@ fn snapshot(step: u64, time_s: f64, agents: &[Agent]) -> TraceFrame {
                 z_m: agent.position.z_m,
                 state: agent_state(agent),
                 beliefs: agent.beliefs.clone(),
+                knowledge: agent
+                    .knowledge
+                    .as_ref()
+                    .map(|knowledge| knowledge.snapshot.clone()),
             })
             .collect(),
     }

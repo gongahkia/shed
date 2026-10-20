@@ -17,9 +17,10 @@ pub mod validate;
 pub mod wfc;
 
 pub use bundle::{
-    AgentState, InformationDeliveryMetrics, InformationInterventionKind, MovementMetrics,
-    OnSurfaceClearanceMetrics, QueueMetrics, QueueResourceBreakdown, QueueResourceMetrics,
-    RunBundle, SweptOnSurfaceClearanceMetrics, bundle_hash,
+    AgentKnowledgeSnapshot, AgentState, InformationDeliveryMetrics, InformationInterventionKind,
+    KnowledgeSource, KnownAvailability, MovementMetrics, OnSurfaceClearanceMetrics, QueueMetrics,
+    QueueResourceBreakdown, QueueResourceMetrics, RunBundle, SweptOnSurfaceClearanceMetrics,
+    bundle_hash,
 };
 pub use model::{CanonicalScenario, Scenario};
 pub use runtime::{BundleVerification, RunOptions, integration_step_count, run, verify_run_bundle};

@@ -3,7 +3,30 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fmt::Write};
 
-pub const BUNDLE_VERSION: &str = "0.43";
+pub const BUNDLE_VERSION: &str = "0.44";
+
+/// Latest route-relevant evidence retained by an agent using local knowledge.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct KnownAvailability {
+    pub open: bool,
+    pub learned_at_s: f64,
+    pub source: KnowledgeSource,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KnowledgeSource {
+    Observation,
+    Message { id: String },
+    Countermeasure { id: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AgentKnowledgeSnapshot {
+    pub known_exits: Vec<String>,
+    /// Keys use `connector:ID`, `exit:ID`, or `gate:ID`.
+    pub availability: BTreeMap<String, KnownAvailability>,
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AgentSnapshot {
@@ -15,6 +38,8 @@ pub struct AgentSnapshot {
     pub z_m: f64,
     pub state: AgentState,
     pub beliefs: BTreeMap<String, f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub knowledge: Option<AgentKnowledgeSnapshot>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

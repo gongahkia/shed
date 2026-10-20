@@ -36,6 +36,13 @@ announcements against silence under both global and local awareness. See
 [local knowledge](knowledge.md) for the paired authored scenarios and the
 limits of the perception model.
 
+The template's larger, busy cases also stress local movement. Some can remain
+incomplete at 120 s and record avoidance fallbacks or reference-disc overlaps.
+Those cases retain their failed thresholds, missing clearance times, and
+replayable bundles. These outcomes can reflect the current movement model's
+limits as well as the layout, population, and communication assumptions; they
+do not establish real-world architectural performance.
+
 The template and run destinations must be new. A malformed configuration is
 rejected before the run directory is created. `study check` validates the
 matrix, numerical limits, and resolved generator configurations; generation

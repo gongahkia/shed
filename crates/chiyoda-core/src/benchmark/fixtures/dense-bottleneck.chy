@@ -1,9 +1,0 @@
-scenario "benchmark-bottleneck"
-seed 1
-duration 45s
-timestep 0.2s
-surface floor at (0m, 0m, 0m) size (20m, 12m)
-obstacle upper_wall on floor at (9m, 0m, 0m) size (1m, 5.4m)
-obstacle lower_wall on floor at (9m, 6.6m, 0m) size (1m, 5.4m)
-exit out on floor at (19m, 6m, 0m) width 1.2m
-agents people count 6 on floor at (2m, 5.2m, 0m) to out speed 1.2m/s radius 0.25m height 1.7m

@@ -177,10 +177,11 @@ fn rounded(value: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{RunOptions, parse, run};
+    use crate::{RunOptions, decode_scenario, run};
 
     fn stationary_trace() -> RunBundle {
-        let scenario = parse("scenario \"diagnostics\"\nseed 1\nduration 12s\ntimestep 1s\nsurface floor at (0m, 0m, 0m) size (100m, 10m)\nexit out on floor at (99m, 5m, 0m) width 1m\nagents person count 1 on floor at (1m, 5m, 0m) to out speed 1m/s radius 0.3m height 1.7m\n").unwrap();
+        let scenario =
+            decode_scenario(include_str!("fixtures/diagnostics/stationary_trace.json")).unwrap();
         let mut bundle = run(
             &scenario,
             RunOptions {

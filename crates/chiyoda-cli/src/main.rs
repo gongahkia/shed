@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, bail};
 use chiyoda_core::{
-    BundleVerification, CanonicalScenario, RunBundle, RunOptions, format_scenario, generator,
-    parse, run, validate, verify_run_bundle,
+    BundleVerification, RunBundle, RunOptions, decode_scenario, encode_scenario, generator, run,
+    validate, verify_run_bundle,
 };
 use clap::{Parser, Subcommand};
 use std::{
@@ -25,23 +25,17 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Parse and validate a scenario without executing it.
+    /// Read and validate a versioned JSON scenario without executing it.
     Check {
         source: PathBuf,
         /// Also check radius-clear geometric journeys independently of routing.
         #[arg(long)]
         geometry: bool,
     },
-    /// Compile a scenario to canonical, versioned JSON IR.
-    Compile {
-        source: PathBuf,
-        #[arg(short, long)]
-        output: PathBuf,
-    },
-    /// Render a scenario in canonical Chiyoda source style.
+    /// Normalize a validated JSON scenario to canonical field order and formatting.
     Format {
         source: PathBuf,
-        /// Write formatted source to a distinct file instead of standard output.
+        /// Write normalized JSON to a distinct file instead of standard output.
         #[arg(short, long, conflicts_with = "check")]
         output: Option<PathBuf>,
         /// Exit non-zero when the source is not already canonical.
@@ -87,18 +81,13 @@ fn main() -> Result<()> {
             }
             println!("valid: {}", scenario.name);
         }
-        Command::Compile { source, output } => {
-            let scenario = read_scenario(&source)?;
-            write_json(&output, &CanonicalScenario::from(scenario))?;
-            println!("compiled: {}", output.display());
-        }
         Command::Format {
             source,
             output,
             check,
         } => {
             let scenario = read_scenario(&source)?;
-            let formatted = format_scenario(&scenario);
+            let formatted = encode_scenario(&scenario)?;
             if check {
                 if read_text(&source)? != formatted {
                     bail!(
@@ -121,7 +110,7 @@ fn main() -> Result<()> {
             trace_every,
         } => {
             let text = read_text(&source)?;
-            let scenario = parse(&text).map_err(|error| anyhow::anyhow!(error))?;
+            let scenario = decode_scenario(&text).map_err(|error| anyhow::anyhow!(error))?;
             validate(&scenario).map_err(|errors| validation_error(&errors))?;
             let bundle = run(
                 &scenario,
@@ -131,7 +120,7 @@ fn main() -> Result<()> {
             )?;
             fs::create_dir_all(&output)
                 .with_context(|| format!("creating output directory {}", output.display()))?;
-            write_text(&output.join("scenario.chy"), &text)?;
+            write_text(&output.join("scenario.json"), &text)?;
             write_json(&output.join("run.json"), &bundle)?;
             println!("run: {}", output.join("run.json").display());
             println!("bundle hash: {}", bundle.bundle_hash);
@@ -141,7 +130,7 @@ fn main() -> Result<()> {
             );
         }
         Command::Generate { seed, output } => {
-            let source = generator::source(seed);
+            let source = generator::json(seed)?;
             let scenario = generator::scenario(seed)?;
             write_text(&output, &source)?;
             println!("generated: {} ({})", output.display(), scenario.name);
@@ -172,7 +161,7 @@ fn main() -> Result<()> {
 
 fn read_scenario(path: &Path) -> Result<chiyoda_core::Scenario> {
     let source = read_text(path)?;
-    let scenario = parse(&source).map_err(|error| anyhow::anyhow!(error))?;
+    let scenario = decode_scenario(&source).map_err(|error| anyhow::anyhow!(error))?;
     validate(&scenario).map_err(|errors| validation_error(&errors))?;
     Ok(scenario)
 }

@@ -6,7 +6,7 @@ use chiyoda_core::{
     generator::spaces::{FloorConstraint, SpaceConfig},
 };
 
-const SOURCE: &str = "scenario \"fixture\"\nseed 1\nduration 10s\ntimestep 200ms\nsurface floor at (0m, 0m, 0m) size (10m, 10m)\nexit out on floor at (9m, 5m, 0m) width 1m\nagents person count 1 on floor at (1m, 5m, 0m) to out speed 1m/s radius 0.3m height 1.7m\n";
+const SOURCE: &str = include_str!("fixtures/evaluation/shared.json");
 
 #[test]
 fn authored_cases_run_assertions_thresholds_and_full_reconstruction() {
@@ -22,7 +22,7 @@ fn authored_cases_run_assertions_thresholds_and_full_reconstruction() {
         verify_replay: true,
     };
     let case =
-        evaluation::evaluate_source("simple", SOURCE, ExpectedReachability::Reachable, &options);
+        evaluation::evaluate_json("simple", SOURCE, ExpectedReachability::Reachable, &options);
     assert!(case.report.passed, "{:?}", case.report.failures);
     assert!(case.report.replay_verified);
     assert_eq!(case.report.metrics.as_ref().unwrap().evacuated_agents, 1);
@@ -31,10 +31,13 @@ fn authored_cases_run_assertions_thresholds_and_full_reconstruction() {
 
 #[test]
 fn partial_runs_fail_clearance_thresholds_even_when_an_agent_has_evacuated() {
-    let source = format!(
-        "{}agents near count 1 on floor at (8m, 5m, 0m) to out speed 1m/s radius 0.3m height 1.7m\n",
-        SOURCE.replace("duration 10s", "duration 2s")
-    );
+    let mut scenario = chiyoda_core::decode_scenario(SOURCE).unwrap();
+    scenario.duration_s = 2.0;
+    let mut near = scenario.agents[0].clone();
+    near.id = "near".into();
+    near.at.x_m = 8.0;
+    scenario.agents.push(near);
+    let source = chiyoda_core::encode_scenario(&scenario).unwrap();
     let options = EvaluationOptions {
         thresholds: Thresholds {
             min_evacuated_fraction: Some(1.0),
@@ -43,7 +46,7 @@ fn partial_runs_fail_clearance_thresholds_even_when_an_agent_has_evacuated() {
         },
         verify_replay: false,
     };
-    let case = evaluation::evaluate_source(
+    let case = evaluation::evaluate_json(
         "partial",
         &source,
         ExpectedReachability::Reachable,
@@ -70,8 +73,16 @@ fn partial_runs_fail_clearance_thresholds_even_when_an_agent_has_evacuated() {
 
 #[test]
 fn deliberately_unreachable_fixtures_are_distinct_from_invalid_or_failed_cases() {
-    let blocked = format!("{SOURCE}obstacle wall on floor at (4m, 0m, 0m) size (2m, 10m)\n");
-    let expected = evaluation::evaluate_source(
+    let mut scenario = chiyoda_core::decode_scenario(SOURCE).unwrap();
+    scenario.obstacles.push(chiyoda_core::model::Obstacle {
+        id: "wall".into(),
+        surface: "floor".into(),
+        at: chiyoda_core::model::Point3::new(4.0, 0.0, 0.0),
+        width_m: 2.0,
+        depth_m: 10.0,
+    });
+    let blocked = chiyoda_core::encode_scenario(&scenario).unwrap();
+    let expected = evaluation::evaluate_json(
         "blocked",
         &blocked,
         ExpectedReachability::Unreachable,
@@ -80,7 +91,7 @@ fn deliberately_unreachable_fixtures_are_distinct_from_invalid_or_failed_cases()
     assert!(expected.report.passed);
     assert!(expected.bundle.is_none());
     assert!(expected.report.metrics.is_none());
-    let unexpected = evaluation::evaluate_source(
+    let unexpected = evaluation::evaluate_json(
         "blocked",
         &blocked,
         ExpectedReachability::Reachable,
@@ -89,7 +100,7 @@ fn deliberately_unreachable_fixtures_are_distinct_from_invalid_or_failed_cases()
     assert!(!unexpected.report.passed);
     assert_eq!(unexpected.report.failures[0].check, "reachability");
     assert!(
-        !evaluation::evaluate_source(
+        !evaluation::evaluate_json(
             "bad",
             "not source",
             ExpectedReachability::Unreachable,
@@ -99,7 +110,7 @@ fn deliberately_unreachable_fixtures_are_distinct_from_invalid_or_failed_cases()
         .passed
     );
     assert!(
-        !evaluation::evaluate_source(
+        !evaluation::evaluate_json(
             "clear",
             SOURCE,
             ExpectedReachability::Unreachable,
@@ -128,7 +139,7 @@ fn exhausted_generation_is_retained_in_suite_failures_and_rejection_counts() {
         ..SuiteConfig::default()
     };
     let case = evaluation::evaluate_seed(11, &config.generation, &config.evaluation);
-    assert!(case.source.is_none());
+    assert!(case.input_json.is_none());
     let report = SuiteReport::from_cases(config, vec![case.report]).unwrap();
     assert_eq!(report.failed, 1);
     assert_eq!(report.total_generation_attempts, 2);
@@ -152,7 +163,7 @@ fn generated_case_coverage_and_reports_are_deterministic_and_account_for_fixture
         seeds: vec![73],
         fixtures: vec![Fixture {
             name: "authored".into(),
-            source: SOURCE.into(),
+            scenario: serde_json::from_str(SOURCE).unwrap(),
             expected: ExpectedReachability::Reachable,
         }],
         ..SuiteConfig::default()
@@ -160,7 +171,7 @@ fn generated_case_coverage_and_reports_are_deterministic_and_account_for_fixture
     let generated = evaluation::evaluate_seed(73, &config.generation, &config.evaluation);
     assert!(generated.report.passed, "{:?}", generated.report.failures);
     assert_eq!(generated.report.coverage.tiles.values().sum::<u64>(), 16);
-    let fixture = evaluation::evaluate_source(
+    let fixture = evaluation::evaluate_json(
         "authored",
         SOURCE,
         ExpectedReachability::Reachable,

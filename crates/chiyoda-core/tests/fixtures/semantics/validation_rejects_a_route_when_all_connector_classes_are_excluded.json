@@ -1,0 +1,94 @@
+{
+  "schema_version": "1",
+  "scenario": {
+    "agents": [
+      {
+        "alternative_destinations": [],
+        "at": {
+          "x_m": 1.0,
+          "y_m": 1.0,
+          "z_m": 3.0
+        },
+        "count": 1,
+        "destination": "street",
+        "excluded_connector_kinds": [
+          "stair"
+        ],
+        "height_m": 1.7,
+        "id": "passengers",
+        "radius_m": 0.3,
+        "release_at_s": 0.0,
+        "speed_mps": 1.0,
+        "surface": "upper",
+        "via": []
+      }
+    ],
+    "connector_states": [],
+    "connectors": [
+      {
+        "Stair": {
+          "capacity_per_s": null,
+          "clearance_height_m": null,
+          "from": {
+            "x_m": 1.0,
+            "y_m": 1.0,
+            "z_m": 3.0
+          },
+          "from_surface": "upper",
+          "id": "only_route",
+          "to": {
+            "x_m": 1.0,
+            "y_m": 1.0,
+            "z_m": 0.0
+          },
+          "to_surface": "lower",
+          "width_m": 2.0
+        }
+      }
+    ],
+    "countermeasures": [],
+    "duration_s": 10.0,
+    "exits": [
+      {
+        "at": {
+          "x_m": 1.0,
+          "y_m": 1.0,
+          "z_m": 0.0
+        },
+        "capacity_per_s": null,
+        "id": "street",
+        "surface": "lower",
+        "width_m": 2.0
+      }
+    ],
+    "gates": [],
+    "messages": [],
+    "name": "ineligible-route",
+    "obstacles": [],
+    "seed": 1,
+    "surfaces": [
+      {
+        "depth_m": 10.0,
+        "id": "upper",
+        "origin": {
+          "x_m": 0.0,
+          "y_m": 0.0,
+          "z_m": 3.0
+        },
+        "width_m": 10.0
+      },
+      {
+        "depth_m": 10.0,
+        "id": "lower",
+        "origin": {
+          "x_m": 0.0,
+          "y_m": 0.0,
+          "z_m": 0.0
+        },
+        "width_m": 10.0
+      }
+    ],
+    "timestep_s": 1.0,
+    "waypoints": []
+  }
+}

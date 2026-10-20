@@ -25,7 +25,7 @@ pub(super) struct BenchmarkArgs {
 enum BenchmarkCommand {
     /// List embedded fixed-input profiles and their case counts.
     Profiles,
-    /// Export an embedded profile as an editable suite with literal sources.
+    /// Export an embedded profile as an editable suite with scenario documents.
     Export {
         #[arg(long, default_value = "smoke")]
         profile: String,
@@ -33,7 +33,7 @@ enum BenchmarkCommand {
         #[arg(short, long)]
         output: PathBuf,
     },
-    /// Freeze every archived evaluation source into a fixed-input suite.
+    /// Freeze every archived evaluation scenario into a fixed-input suite.
     Freeze {
         /// Directory containing an evaluation report and numbered case folders.
         #[arg(long)]
@@ -67,7 +67,7 @@ struct RunArgs {
     /// Embedded profile; defaults to smoke unless a baseline supplies its suite.
     #[arg(long, conflicts_with = "suite")]
     profile: Option<String>,
-    /// JSON `BenchmarkSuite` with exact source embedded for every case.
+    /// JSON `BenchmarkSuite` with a scenario document embedded for every case.
     #[arg(long)]
     suite: Option<PathBuf>,
     /// Verified passing report. With no profile/suite, reuse its exact suite.
@@ -123,7 +123,7 @@ fn freeze_evaluation(
     let report: SuiteReport = read_json(&directory.join("report.json"))?;
     let sources = (0..report.cases.len())
         .map(|index| {
-            read_text(&directory.join(format!("case-{index:04}/scenario.chy"))).context(
+            read_text(&directory.join(format!("case-{index:04}/scenario.json"))).context(
                 "every evaluation case needs a source; generation failures cannot be frozen",
             )
         })
@@ -218,7 +218,10 @@ fn save_case(
 ) -> Result<()> {
     let directory = output.join(format!("case-{index:04}"));
     fs::create_dir(&directory)?;
-    write_text(&directory.join("scenario.chy"), &suite.cases[index].source)?;
+    write_text(
+        &directory.join("scenario.json"),
+        &serde_json::to_string_pretty(&suite.cases[index].scenario)?,
+    )?;
     let run = benchmark::run_case(suite, index)?;
     if let Some(bundle) = &run.artifacts.bundle {
         write_json(&directory.join("run.json"), bundle)?;

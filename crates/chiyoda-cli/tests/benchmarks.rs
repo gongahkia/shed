@@ -145,7 +145,7 @@ fn baseline_runs_reuse_exact_inputs_and_offline_comparison_needs_no_simulation()
         "report.md",
         "comparison.json",
         "comparison.md",
-        "case-0000/scenario.chy",
+        "case-0000/scenario.json",
         "case-0000/run.json",
         "case-0000/report.json",
     ] {
@@ -377,7 +377,7 @@ fn check_frozen_threshold_override(
         text(&with_limits),
     ]);
     let limited: BenchmarkSuite = read(&with_limits);
-    assert_eq!(limited.cases[0].source, suite.cases[0].source);
+    assert_eq!(limited.cases[0].scenario, suite.cases[0].scenario);
     assert!(
         limited.cases[0]
             .evaluation
@@ -422,20 +422,21 @@ fn generated_evaluations_freeze_with_provenance_and_source_verification() {
     ]);
     let suite: BenchmarkSuite = read(&frozen);
     assert!(suite.origin.is_some());
-    let source_path = evaluation.join("case-0000/scenario.chy");
-    assert_eq!(
-        suite.cases[0].source,
-        fs::read_to_string(&source_path).unwrap()
-    );
+    let source_path = evaluation.join("case-0000/scenario.json");
+    assert_eq!(suite.cases[0].scenario, read(&source_path));
     let output = run_suite(&directory, "frozen-run", &suite);
     assert_eq!(
-        fs::read_to_string(output.join("case-0000/scenario.chy")).unwrap(),
-        suite.cases[0].source
+        read::<chiyoda_core::CanonicalScenario>(&output.join("case-0000/scenario.json")),
+        suite.cases[0].scenario
     );
     check_frozen_threshold_override(&directory, &evaluation, &suite);
-    let mut scenario = chiyoda_core::parse(&suite.cases[0].source).unwrap();
+    let mut scenario = suite.cases[0].scenario.scenario.clone();
     scenario.seed = scenario.seed.wrapping_add(1);
-    fs::write(&source_path, chiyoda_core::format_scenario(&scenario)).unwrap();
+    fs::write(
+        &source_path,
+        chiyoda_core::encode_scenario(&scenario).unwrap(),
+    )
+    .unwrap();
     let rejected = directory.path("edited.json");
     assert!(
         !cli(&[
@@ -474,7 +475,8 @@ fn generated_evaluations_freeze_with_provenance_and_source_verification() {
 fn negative_fixtures_are_reported_without_fake_telemetry_or_replay_links() {
     let directory = Directory::new();
     let mut suite = small_suite();
-    suite.cases[0].source = include_str!("../../../examples/generation/blocked.chy").into();
+    suite.cases[0].scenario =
+        serde_json::from_str(include_str!("../../../examples/generation/blocked.json")).unwrap();
     suite.cases[0].expected = chiyoda_core::evaluation::ExpectedReachability::Unreachable;
     let baseline = run_suite(&directory, "baseline", &suite);
     let output = directory.path("candidate");
@@ -501,12 +503,12 @@ fn negative_fixtures_are_reported_without_fake_telemetry_or_replay_links() {
 }
 
 #[test]
-fn malformed_case_sources_keep_failure_evidence_and_do_not_skip_later_cases() {
+fn invalid_scenarios_keep_failure_evidence_and_do_not_skip_later_cases() {
     let directory = Directory::new();
     let mut suite = small_suite();
     let mut malformed = suite.cases[0].clone();
     malformed.id = "../invalid | case".into();
-    malformed.source = "this is not Chiyoda source".into();
+    malformed.scenario.scenario.agents[0].destination = "missing-exit".into();
     suite.cases.insert(0, malformed);
     let path = directory.path("malformed.json");
     write(&path, &suite);
@@ -527,8 +529,8 @@ fn malformed_case_sources_keep_failure_evidence_and_do_not_skip_later_cases() {
     report.verify().unwrap();
     assert_eq!((report.passed, report.failed), (1, 1));
     assert_eq!(
-        fs::read_to_string(output.join("case-0000/scenario.chy")).unwrap(),
-        suite.cases[0].source
+        read::<chiyoda_core::CanonicalScenario>(&output.join("case-0000/scenario.json")),
+        suite.cases[0].scenario
     );
     assert!(!output.join("case-0000/run.json").exists());
     assert!(output.join("case-0001/run.json").exists());

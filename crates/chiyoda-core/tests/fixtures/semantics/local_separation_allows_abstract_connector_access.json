@@ -1,0 +1,127 @@
+{
+  "schema_version": "1",
+  "scenario": {
+    "agents": [
+      {
+        "alternative_destinations": [],
+        "at": {
+          "x_m": 3.0,
+          "y_m": 5.0,
+          "z_m": 3.0
+        },
+        "count": 24,
+        "destination": "street",
+        "excluded_connector_kinds": [],
+        "height_m": 1.7,
+        "id": "passengers",
+        "radius_m": 0.3,
+        "release_at_s": 5.0,
+        "release_batch_size": 4,
+        "release_interval_s": 1.0,
+        "speed_mps": 1.2,
+        "surface": "platform",
+        "via": []
+      }
+    ],
+    "connector_states": [],
+    "connectors": [
+      {
+        "Stair": {
+          "capacity_per_s": 1.2,
+          "clearance_height_m": 2.0,
+          "from": {
+            "x_m": 12.0,
+            "y_m": 5.0,
+            "z_m": 3.0
+          },
+          "from_surface": "platform",
+          "id": "central_stair",
+          "to": {
+            "x_m": 12.0,
+            "y_m": 5.0,
+            "z_m": 0.0
+          },
+          "to_surface": "concourse",
+          "width_m": 1.5
+        }
+      }
+    ],
+    "countermeasures": [],
+    "duration_s": 90.0,
+    "exits": [
+      {
+        "at": {
+          "x_m": 28.0,
+          "y_m": 5.0,
+          "z_m": 0.0
+        },
+        "capacity_per_s": 2.0,
+        "id": "street",
+        "surface": "concourse",
+        "width_m": 2.0
+      }
+    ],
+    "gate_capacity_states": [
+      {
+        "at_s": 30.0,
+        "capacity_per_s": 0.75,
+        "gate": "fare_gate",
+        "id": "fare_gate_reduced"
+      }
+    ],
+    "gates": [
+      {
+        "at": {
+          "x_m": 22.0,
+          "y_m": 5.0,
+          "z_m": 0.0
+        },
+        "destination": "street",
+        "id": "fare_gate",
+        "service_rate_per_s": 1.5,
+        "surface": "concourse",
+        "width_m": 1.2
+      }
+    ],
+    "messages": [],
+    "name": "connector-contact",
+    "obstacles": [
+      {
+        "at": {
+          "x_m": 14.0,
+          "y_m": 3.0,
+          "z_m": 0.0
+        },
+        "depth_m": 3.0,
+        "id": "kiosk",
+        "surface": "concourse",
+        "width_m": 3.0
+      }
+    ],
+    "seed": 113,
+    "surfaces": [
+      {
+        "depth_m": 10.0,
+        "id": "platform",
+        "origin": {
+          "x_m": 0.0,
+          "y_m": 0.0,
+          "z_m": 3.0
+        },
+        "width_m": 30.0
+      },
+      {
+        "depth_m": 10.0,
+        "id": "concourse",
+        "origin": {
+          "x_m": 0.0,
+          "y_m": 0.0,
+          "z_m": 0.0
+        },
+        "width_m": 30.0
+      }
+    ],
+    "timestep_s": 0.1,
+    "waypoints": []
+  }
+}

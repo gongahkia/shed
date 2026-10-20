@@ -1,10 +1,10 @@
 use chiyoda_core::{
-    RunBundle, RunOptions, bundle_hash, format_scenario, generator, parse, run, validate,
+    RunBundle, RunOptions, bundle_hash, decode_scenario, encode_scenario, generator, run, validate,
 };
 
 #[test]
 fn generated_source_is_parseable_and_valid() {
-    let scenario = generator::scenario(73).expect("generator must preserve the language contract");
+    let scenario = generator::scenario(73).expect("generator must preserve the scenario contract");
     assert_eq!(scenario.surfaces.len(), 2);
     assert_eq!(scenario.connectors.len(), 2);
     assert_eq!(scenario.exits.len(), 2);
@@ -21,44 +21,31 @@ fn generated_source_is_parseable_and_valid() {
 fn generated_source_is_valid_across_a_seed_range() {
     for seed in 0..1024 {
         generator::scenario(seed).unwrap_or_else(|error| {
-            panic!("generator must preserve the language contract for seed {seed}: {error}")
+            panic!("generator must preserve the scenario contract for seed {seed}: {error}")
         });
     }
 }
 
 #[test]
-fn parser_rejects_removed_walking_profile_declarations() {
-    let source = r#"
-scenario "profile"
-seed 7
-duration 10s
-timestep 1s
-walking-profile legacy horizontal-free-walking speed 1.2m/s catalog-sha256 a calibration-profile-sha256 b held-out-evaluation-sha256 c
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (9m, 1m, 0m) width 1m
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1.2m/s radius 0.3m height 1.7m
-"#;
-    let error = parse(source).expect_err("walking profiles are no longer part of the language");
+fn json_rejects_removed_walking_profile_fields() {
+    let mut document = serde_json::to_value(chiyoda_core::CanonicalScenario::from(
+        generator::scenario(73).unwrap(),
+    ))
+    .unwrap();
+    document["scenario"]["walking_profile"] = serde_json::json!({"speed_mps": 1.2});
     assert!(
-        error
-            .message
-            .contains("unknown declaration `walking-profile`")
+        decode_scenario(&document.to_string())
+            .unwrap_err()
+            .to_string()
+            .contains("walking_profile")
     );
 }
 
 #[test]
 fn fractional_final_step_ends_exactly_at_the_authored_duration() {
-    let scenario = parse(
-        r#"
-scenario "fractional-final-step"
-seed 1
-duration 1.5s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (2.5m, 1m, 0m) width 1m
-agents passenger count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.2m height 1.7m
-"#,
-    )
+    let scenario = decode_scenario(include_str!(
+        "fixtures/semantics/fractional_final_step_ends_exactly_at_the_authored_duration.json"
+    ))
     .expect("fractional-step fixture parses");
     validate(&scenario).expect("fractional-step fixture validates");
 
@@ -98,62 +85,58 @@ agents passenger count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radiu
 }
 
 #[test]
-fn parser_rejects_trailing_tokens_and_duplicate_zero_release() {
-    let trailing = parse("scenario \"unexpected\" trailing")
-        .expect_err("fixed-arity declarations must reject trailing tokens");
-    assert_eq!(trailing.line, 1);
-
-    let duplicate_release =
-        generator::source(73).replacen("release 0s", "release 0s release 0s", 1);
-    let duplicate = parse(&duplicate_release).expect_err("duplicate release must be rejected");
-    assert!(duplicate.message.contains("duplicate `release` clause"));
-
-    let duplicate_alternative =
-        generator::source(73).replacen("release 0s", "alternative street release 0s", 1);
-    let duplicate = parse(&duplicate_alternative)
-        .expect_err("an alternative cannot duplicate the primary exit");
+fn json_rejects_trailing_input_duplicate_release_fields_and_duplicate_exits() {
+    let input = generator::json(73).unwrap();
+    assert!(decode_scenario(&format!("{input} trailing")).is_err());
+    let duplicate = input.replacen(
+        "\"release_at_s\": 0.0",
+        "\"release_at_s\": 0.0, \"release_at_s\": 0.0",
+        1,
+    );
     assert!(
-        duplicate
-            .message
-            .contains("duplicate alternative exit `street`")
+        decode_scenario(&duplicate)
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate")
+    );
+    let mut scenario = generator::scenario(73).unwrap();
+    let destination = scenario.agents[0].destination.clone();
+    scenario.agents[0]
+        .alternative_destinations
+        .push(destination);
+    assert!(validate(&scenario).is_err());
+}
+
+#[test]
+fn json_rejects_unknown_waypoint_fields() {
+    let mut document = serde_json::to_value(chiyoda_core::CanonicalScenario::from(
+        generator::scenario(73).unwrap(),
+    ))
+    .unwrap();
+    document["scenario"]["waypoints"] = serde_json::json!([{ "id": "hall", "surface": "concourse", "at": {"x_m": 2.0, "y_m": 2.0, "z_m": 0.0}, "dwell_s": 1.0, "trailing": true }]);
+    assert!(
+        decode_scenario(&document.to_string())
+            .unwrap_err()
+            .to_string()
+            .contains("trailing")
     );
 }
 
 #[test]
-fn parser_rejects_trailing_waypoint_dwell_tokens() {
-    let source = r#"
-scenario "trailing-waypoint-option"
-seed 1
-duration 10s
-timestep 1s
-surface platform at (0m, 0m, 0m) size (10m, 10m)
-waypoint hall on platform at (2m, 2m, 0m) dwell 1s trailing
-"#;
-    let error = parse(source).expect_err("waypoint options must consume the full declaration");
-    assert!(error.message.contains("waypoint dwell"));
-}
-
-#[test]
-fn formatter_round_trips_to_the_same_typed_scenario() {
+fn json_round_trips_to_the_same_typed_scenario() {
     let scenario = generator::scenario(73).expect("valid generator output");
-    let formatted = format_scenario(&scenario);
-    let reparsed = parse(&formatted).expect("formatted source parses");
+    let formatted = encode_scenario(&scenario).unwrap();
+    let reparsed = decode_scenario(&formatted).expect("formatted source parses");
     assert_eq!(scenario, reparsed);
-    assert_eq!(formatted, format_scenario(&reparsed));
+    assert_eq!(formatted, encode_scenario(&reparsed).unwrap());
 }
 
 #[test]
 fn scenarios_without_optional_geometry_preserve_the_pre_024_json_shape() {
-    let source = r#"
-scenario "no-optional-geometry"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (9m, 5m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 5m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source without optional geometry parses");
+    let source = include_str!(
+        "fixtures/semantics/scenarios_without_optional_geometry_preserve_the_pre_024_json_shape.json"
+    );
+    let scenario = decode_scenario(source).expect("source without optional geometry parses");
     validate(&scenario).expect("source without optional geometry validates");
     assert!(scenario.portal_lanes.is_empty());
     assert!(scenario.queue_footprints.is_empty());
@@ -172,54 +155,26 @@ agents passengers count 1 on concourse at (1m, 5m, 0m) to street speed 1m/s radi
 }
 
 #[test]
-fn formatter_round_trips_ramps_and_escalators() {
-    let source = r#"
-scenario "vertical-connectors"
-seed 1
-duration 30s
-timestep 1s
-surface platform at (0m, 0m, 6m) size (10m, 10m)
-surface mezzanine at (0m, 0m, 3m) size (10m, 10m)
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-obstacle column on platform at (6m, 6m, 6m) size (1m, 1m)
-exit street on concourse at (9m, 1m, 0m) width 2m capacity 2/s
-exit plaza on concourse at (8m, 1m, 0m) width 2m
-ramp accessible_ramp from platform at (2m, 1m, 6m) to mezzanine at (2m, 1m, 3m) width 1.5m capacity 1.2/s clearance 1.8m
-escalator down_escalator from mezzanine at (2m, 1m, 3m) to concourse at (2m, 1m, 0m) width 1m belt 0.6m/s clearance 1.9m capacity 0.8/s
-lift accessible_lift from platform at (4m, 1m, 6m) to concourse at (4m, 1m, 0m) cabin 2m 2m capacity 4 cycle 5s clearance 2m
-connector-state escalator_closure connector down_escalator closed time 10s
-exit-state plaza_closure exit plaza closed time 15s
-agents passengers count 1 on platform at (1m, 1m, 6m) to street speed 1m/s radius 0.3m height 1.7m alternative plaza exclude lift exclude stair
-message plaza_notice source signage on concourse at (1m, 1m, 0m) claim exit plaza closed truth true time 15s reach 2m trust 1
-"#;
-    let scenario = parse(source).expect("source parses");
+fn json_round_trips_ramps_and_escalators() {
+    let source = include_str!("fixtures/semantics/json_round_trips_ramps_and_escalators.json");
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("source validates");
-    let formatted = format_scenario(&scenario);
+    let formatted = encode_scenario(&scenario).unwrap();
     assert_eq!(
-        parse(&formatted).expect("formatted source parses"),
+        decode_scenario(&formatted).expect("formatted source parses"),
         scenario
     );
 }
 
 #[test]
 fn portal_lanes_round_trip_and_replace_point_connector_landings() {
-    let source = r#"
-scenario "portal-lane-landing"
-seed 1
-duration 5s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (9m, 1m, 0m) width 2m
-stair down from upper at (4m, 5m, 3m) to lower at (4m, 5m, 0m) width 2m
-portal-lanes down_lanes connector down axis y count 2
-portal-lanes street_lanes exit street axis y count 2
-agents traveller count 1 on upper at (1m, 5m, 3m) to street speed 10m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("portal-lane source parses");
+    let source = include_str!(
+        "fixtures/semantics/portal_lanes_round_trip_and_replace_point_connector_landings.json"
+    );
+    let scenario = decode_scenario(source).expect("portal-lane source parses");
     validate(&scenario).expect("portal-lane source validates");
     assert_eq!(
-        parse(&format_scenario(&scenario)).expect("formatted source parses"),
+        decode_scenario(&encode_scenario(&scenario).unwrap()).expect("formatted source parses"),
         scenario
     );
 
@@ -246,21 +201,9 @@ agents traveller count 1 on upper at (1m, 5m, 3m) to street speed 10m/s radius 0
 
 #[test]
 fn authored_portal_landing_waits_for_a_clear_lane() {
-    let source = r#"
-scenario "portal-landing-wait"
-seed 1
-duration 8s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (9m, 1m, 0m) width 2m
-stair down from upper at (4m, 5m, 3m) to lower at (4m, 5m, 0m) width 1m
-portal-lanes down_lanes connector down axis y count 1
-agents traveller count 1 on upper at (1m, 5m, 3m) to street speed 10m/s radius 0.3m height 1.7m
-waypoint hold on lower at (4m, 5m, 0m) dwell 2s
-agents blocker count 1 on lower at (4m, 5m, 0m) to street speed 10m/s radius 0.3m height 1.7m via hold
-"#;
-    let scenario = parse(source).expect("portal-wait source parses");
+    let source =
+        include_str!("fixtures/semantics/authored_portal_landing_waits_for_a_clear_lane.json");
+    let scenario = decode_scenario(source).expect("portal-wait source parses");
     validate(&scenario).expect("portal-wait source validates");
     let bundle = run(
         &scenario,
@@ -289,20 +232,10 @@ agents blocker count 1 on lower at (4m, 5m, 0m) to street speed 10m/s radius 0.3
 
 #[test]
 fn validation_rejects_invalid_portal_lane_geometry_and_resources() {
-    let source = r#"
-scenario "invalid-portal-lanes"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (9m, 1m, 0m) width 1m
-stair down from upper at (0.5m, 5m, 3m) to lower at (0.5m, 5m, 0m) width 1m
-portal-lanes too_many connector down axis x count 2
-portal-lanes missing gate absent axis y count 1
-agents traveller count 1 on upper at (1m, 5m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("invalid portal-lane source parses");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_invalid_portal_lane_geometry_and_resources.json"
+    );
+    let scenario = decode_scenario(source).expect("invalid portal-lane source parses");
     let errors = validate(&scenario).expect_err("invalid portal lanes are rejected");
     assert!(
         errors
@@ -319,20 +252,13 @@ agents traveller count 1 on upper at (1m, 5m, 3m) to street speed 1m/s radius 0.
 
 #[test]
 fn authored_queue_footprint_advances_fifo_slots_before_service() {
-    let source = r#"
-scenario "queue-footprint"
-seed 1
-duration 45s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (25m, 10m)
-exit street on concourse at (22m, 5m, 0m) width 2m capacity 0.05/s
-queue-footprint street_queue exit street on concourse from (18m, 5m, 0m) to (14m, 5m, 0m) slots 2
-agents passengers count 2 on concourse at (20m, 5m, 0m) to street speed 10m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("queue-footprint source parses");
+    let source = include_str!(
+        "fixtures/semantics/authored_queue_footprint_advances_fifo_slots_before_service.json"
+    );
+    let scenario = decode_scenario(source).expect("queue-footprint source parses");
     validate(&scenario).expect("queue-footprint source validates");
     assert_eq!(
-        parse(&format_scenario(&scenario)).expect("formatted source parses"),
+        decode_scenario(&encode_scenario(&scenario).unwrap()).expect("formatted source parses"),
         scenario
     );
 
@@ -377,24 +303,13 @@ agents passengers count 2 on concourse at (20m, 5m, 0m) to street speed 10m/s ra
 
 #[test]
 fn authored_lift_queue_footprint_reserves_cabin_capacity_before_boarding() {
-    let source = r#"
-scenario "lift-queue-footprint"
-seed 1
-duration 40s
-timestep 0.5s
-surface platform at (0m, 0m, 0m) size (25m, 10m)
-surface concourse at (0m, 0m, 3m) size (25m, 10m)
-exit street on concourse at (15m, 5m, 3m) width 2m
-lift lift_a from platform at (10m, 5m, 0m) to concourse at (10m, 5m, 3m) cabin 2m 2m capacity 1 cycle 8s
-queue-footprint lift_queue connector lift_a on platform from (12m, 5m, 0m) to (16m, 5m, 0m) slots 3
-agents early count 1 on platform at (11m, 5m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-agents late count 1 on platform at (14m, 5m, 0m) to street speed 1m/s radius 0.3m height 1.7m release 1s
-agents later count 1 on platform at (16m, 5m, 0m) to street speed 1m/s radius 0.3m height 1.7m release 1s
-"#;
-    let scenario = parse(source).expect("lift queue-footprint source parses");
+    let source = include_str!(
+        "fixtures/semantics/authored_lift_queue_footprint_reserves_cabin_capacity_before_boarding.json"
+    );
+    let scenario = decode_scenario(source).expect("lift queue-footprint source parses");
     validate(&scenario).expect("lift queue-footprint source validates");
     assert_eq!(
-        parse(&format_scenario(&scenario)).expect("formatted source parses"),
+        decode_scenario(&encode_scenario(&scenario).unwrap()).expect("formatted source parses"),
         scenario
     );
 
@@ -444,20 +359,14 @@ agents later count 1 on platform at (16m, 5m, 0m) to street speed 1m/s radius 0.
 
 #[test]
 fn queue_grid_round_trips_and_preserves_serpentine_fifo_adjacency() {
-    let source = r#"
-scenario "queue-grid"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (32m, 12m)
-exit street on concourse at (28m, 6m, 0m) width 2m capacity 0.1/s
-queue-grid street_queue exit street on concourse from (27m, 6m, 0m) to (3m, 6m, 0m) width 3m lanes 4 slots 8
-agents passengers count 8 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("queue-grid source parses");
+    let source = include_str!(
+        "fixtures/semantics/queue_grid_round_trips_and_preserves_serpentine_fifo_adjacency.json"
+    );
+    let scenario = decode_scenario(source).expect("queue-grid source parses");
     validate(&scenario).expect("queue-grid source validates");
     assert_eq!(
-        parse(&format_scenario(&scenario)).expect("formatted queue-grid source parses"),
+        decode_scenario(&encode_scenario(&scenario).unwrap())
+            .expect("formatted queue-grid source parses"),
         scenario
     );
 
@@ -491,17 +400,10 @@ agents passengers count 8 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn queue_grid_preallocates_fifo_slots_and_requires_physical_entry_for_service() {
-    let source = r#"
-scenario "queue-grid-service"
-seed 1
-duration 80s
-timestep 0.5s
-surface concourse at (0m, 0m, 0m) size (32m, 12m)
-exit street on concourse at (28m, 6m, 0m) width 2m capacity 0.1/s
-queue-grid street_queue exit street on concourse from (24m, 6m, 0m) to (20m, 6m, 0m) width 2m lanes 2 slots 4
-agents passengers count 4 on concourse at (12m, 6m, 0m) to street speed 2m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("queue-grid service source parses");
+    let source = include_str!(
+        "fixtures/semantics/queue_grid_preallocates_fifo_slots_and_requires_physical_entry_for_service.json"
+    );
+    let scenario = decode_scenario(source).expect("queue-grid service source parses");
     validate(&scenario).expect("queue-grid service source validates");
     let bundle = run(
         &scenario,
@@ -561,17 +463,9 @@ agents passengers count 4 on concourse at (12m, 6m, 0m) to street speed 2m/s rad
 
 #[test]
 fn validation_rejects_queue_grid_with_unsafe_lanes() {
-    let source = r#"
-scenario "invalid-queue-grid"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (30m, 10m)
-exit street on concourse at (25m, 5m, 0m) width 2m capacity 1/s
-queue-grid street_queue exit street on concourse from (24m, 5m, 0m) to (4m, 5m, 0m) width 1m lanes 4 slots 4
-agents passengers count 4 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("invalid queue-grid source parses");
+    let source =
+        include_str!("fixtures/semantics/validation_rejects_queue_grid_with_unsafe_lanes.json");
+    let scenario = decode_scenario(source).expect("invalid queue-grid source parses");
     let errors = validate(&scenario).expect_err("unsafe queue-grid lanes are rejected");
     assert!(errors.iter().any(|error| {
         error.path == "queue_footprints[0].lanes" && error.message.contains("lane spacing")
@@ -580,23 +474,10 @@ agents passengers count 4 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn validation_rejects_incomplete_or_obstructed_queue_footprints() {
-    let source = r#"
-scenario "invalid-queue-footprints"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (25m, 10m)
-surface concourse at (0m, 0m, 0m) size (25m, 10m)
-obstacle column on concourse at (14m, 4m, 0m) size (1m, 2m)
-exit street on concourse at (22m, 5m, 0m) width 2m capacity 1/s
-exit plaza on concourse at (20m, 5m, 0m) width 2m capacity 1/s
-stair unrestricted from concourse at (3m, 5m, 0m) to upper at (3m, 5m, 3m) width 2m
-queue-footprint too_short exit street on concourse from (18m, 2m, 0m) to (16m, 2m, 0m) slots 2
-queue-footprint blocked exit plaza on concourse from (18m, 5m, 0m) to (10m, 5m, 0m) slots 3
-queue-footprint unsupported connector unrestricted on concourse from (3m, 2m, 0m) to (8m, 2m, 0m) slots 3
-agents passengers count 3 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("invalid queue-footprint source parses");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_incomplete_or_obstructed_queue_footprints.json"
+    );
+    let scenario = decode_scenario(source).expect("invalid queue-footprint source parses");
     let errors = validate(&scenario).expect_err("invalid queue footprints are rejected");
     assert!(
         errors
@@ -613,26 +494,10 @@ agents passengers count 3 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn capacity_state_changes_round_trip_log_and_limit_the_effective_rate() {
-    let source = r#"
-scenario "scheduled-capacity"
-seed 1
-duration 6s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (5m, 1m, 0m) width 2m capacity 2/s
-exit side on concourse at (8m, 1m, 0m) width 2m capacity 1/s
-stair down from upper at (2m, 1m, 3m) to concourse at (2m, 1m, 0m) width 2m capacity 1/s
-connector-state down_closed connector down closed time 0s
-connector-capacity-state down_slow connector down capacity 0.5/s time 0s
-connector-capacity-state down_restore connector down capacity 1/s time 3s
-exit-capacity-state street_slow exit street capacity 0.1/s time 2s
-gate side_gate on concourse at (7m, 1m, 0m) width 1m capacity 1/s to side
-gate-state side_gate_closed gate side_gate closed time 1s
-gate-capacity-state side_gate_slow gate side_gate capacity 0.5/s time 1s
-agents passengers count 3 on concourse at (1m, 1m, 0m) to street speed 10m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/capacity_state_changes_round_trip_log_and_limit_the_effective_rate.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("capacity-state source validates");
     assert_eq!(scenario.connector_service_rate_at("down", 0.0), Some(0.5));
     assert_eq!(scenario.connector_service_rate_at("down", 3.0), Some(1.0));
@@ -640,9 +505,9 @@ agents passengers count 3 on concourse at (1m, 1m, 0m) to street speed 10m/s rad
     assert_eq!(scenario.exit_capacity_at("street", 2.0), Some(0.1));
     assert_eq!(scenario.gate_service_rate_at("side_gate", 0.0), Some(1.0));
     assert_eq!(scenario.gate_service_rate_at("side_gate", 1.0), Some(0.5));
-    let formatted = format_scenario(&scenario);
+    let formatted = encode_scenario(&scenario).unwrap();
     assert_eq!(
-        parse(&formatted).expect("formatted source parses"),
+        decode_scenario(&formatted).expect("formatted source parses"),
         scenario
     );
 
@@ -702,21 +567,10 @@ agents passengers count 3 on concourse at (1m, 1m, 0m) to street speed 10m/s rad
 
 #[test]
 fn validation_rejects_capacity_changes_without_a_constrained_resource() {
-    let source = r#"
-scenario "invalid-capacity-state"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (5m, 1m, 0m) width 2m
-stair down from upper at (2m, 1m, 3m) to concourse at (2m, 1m, 0m) width 2m
-connector-capacity-state down_limit connector down capacity 1/s time 1s
-exit-capacity-state street_limit exit street capacity 1/s time 1s
-gate-capacity-state unknown_gate gate absent capacity 1/s time 1s
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses before semantic validation");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_capacity_changes_without_a_constrained_resource.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses before semantic validation");
     let errors = validate(&scenario).expect_err("invalid capacity-state resources are rejected");
     assert!(errors.iter().any(|error| {
         error.path == "connector_capacity_states[0].connector"
@@ -735,25 +589,14 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn gate_closure_reroutes_to_an_open_alternative_exit() {
-    let source = r#"
-scenario "gate-reroute"
-seed 1
-duration 40s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (20m, 10m)
-exit east on concourse at (18m, 1m, 0m) width 2m
-exit west on concourse at (18m, 8m, 0m) width 2m
-gate east_gate on concourse at (12m, 1m, 0m) width 1m capacity 2/s to east
-gate west_gate on concourse at (12m, 8m, 0m) width 1m capacity 2/s to west
-gate-state east_closure gate east_gate closed time 2s
-agents passengers count 1 on concourse at (1m, 1m, 0m) to east speed 1m/s radius 0.3m height 1.7m alternative west
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/gate_closure_reroutes_to_an_open_alternative_exit.json");
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("gate-state source validates");
     assert!(!scenario.gate_open_at("east_gate", 2.0));
     assert!(scenario.gate_open_at("west_gate", 2.0));
     assert_eq!(
-        parse(&format_scenario(&scenario)).expect("formatted source parses"),
+        decode_scenario(&encode_scenario(&scenario).unwrap()).expect("formatted source parses"),
         scenario
     );
 
@@ -780,23 +623,13 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to east speed 1m/s radius
 
 #[test]
 fn a_false_gate_closure_message_reroutes_until_its_correction() {
-    let source = r#"
-scenario "gate-information-reroute"
-seed 1
-duration 30s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (20m, 10m)
-exit primary on concourse at (18m, 2m, 0m) width 2m
-exit fallback on concourse at (18m, 8m, 0m) width 2m
-gate primary_gate on concourse at (10m, 2m, 0m) width 1m capacity 20/s to primary
-agents passengers count 1 on concourse at (1m, 2m, 0m) to primary speed 1m/s radius 0.3m height 1.7m alternative fallback
-message false_gate_closure source signage on concourse at (1m, 2m, 0m) claim gate primary_gate closed truth false time 1s reach 20m trust 1
-countermeasure correction corrects false_gate_closure source staff on concourse at (1m, 2m, 0m) time 2s reach 20m trust 1
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/a_false_gate_closure_message_reroutes_until_its_correction.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("gate-information source validates");
     assert_eq!(
-        parse(&format_scenario(&scenario)).expect("formatted source parses"),
+        decode_scenario(&encode_scenario(&scenario).unwrap()).expect("formatted source parses"),
         scenario
     );
 
@@ -830,19 +663,9 @@ countermeasure correction corrects false_gate_closure source staff on concourse 
 
 #[test]
 fn an_initially_closed_gate_recovers_when_it_reopens() {
-    let source = r#"
-scenario "gate-recovery"
-seed 1
-duration 12s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (8m, 1m, 0m) width 2m
-gate fare_gate on concourse at (5m, 1m, 0m) width 1m capacity 2/s to street
-gate-state initially_closed gate fare_gate closed time 0s
-gate-state reopened gate fare_gate open time 2s
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/an_initially_closed_gate_recovers_when_it_reopens.json");
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("gate-state source validates");
     let bundle = run(
         &scenario,
@@ -870,18 +693,10 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn gate_closure_does_not_revoke_a_completed_gate_passage() {
-    let source = r#"
-scenario "passed-gate"
-seed 1
-duration 3s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (3m, 1m, 0m) width 2m
-gate fare_gate on concourse at (2m, 1m, 0m) width 1m capacity 2/s to street
-gate-state late_closure gate fare_gate closed time 2s
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 10m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/gate_closure_does_not_revoke_a_completed_gate_passage.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("gate-state source validates");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
     assert!(bundle.events.iter().any(|event| {
@@ -892,17 +707,9 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 10m/s rad
 
 #[test]
 fn validation_rejects_a_gate_state_for_an_unknown_gate() {
-    let source = r#"
-scenario "unknown-gate-state"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (8m, 1m, 0m) width 2m
-gate-state invalid gate absent closed time 1s
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses before semantic validation");
+    let source =
+        include_str!("fixtures/semantics/validation_rejects_a_gate_state_for_an_unknown_gate.json");
+    let scenario = decode_scenario(source).expect("source parses before semantic validation");
     let errors = validate(&scenario).expect_err("unknown gate state must be rejected");
     assert!(
         errors
@@ -912,41 +719,25 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 }
 
 #[test]
-fn formatter_preserves_high_precision_authored_values() {
-    let source = r#"
-scenario "high-precision-capacity"
-seed 1
-duration 10s
-timestep 100ms
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (8m, 1m, 0m) width 1m capacity 1.1477832456710213/s
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1.2m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
-    let formatted = format_scenario(&scenario);
+fn json_preserves_high_precision_authored_values() {
+    let source =
+        include_str!("fixtures/semantics/json_preserves_high_precision_authored_values.json");
+    let scenario = decode_scenario(source).expect("source parses");
+    let formatted = encode_scenario(&scenario).unwrap();
 
-    assert!(formatted.contains("1.1477832456710213/s"));
+    assert!(formatted.contains("1.1477832456710213"));
     assert_eq!(
-        parse(&formatted).expect("formatted source parses"),
+        decode_scenario(&formatted).expect("formatted source parses"),
         scenario
     );
 }
 
 #[test]
 fn connector_exclusion_routes_agents_to_an_eligible_connector() {
-    let source = r#"
-scenario "connector-eligibility"
-seed 1
-duration 20s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair direct_stair from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m
-ramp accessible_ramp from upper at (2m, 1m, 3m) to lower at (2m, 1m, 0m) width 2m
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m exclude stair
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/connector_exclusion_routes_agents_to_an_eligible_connector.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("eligible route validates");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
     assert!(
@@ -958,20 +749,10 @@ agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0
 
 #[test]
 fn alternative_exit_is_selected_when_the_primary_route_is_closed() {
-    let source = r#"
-scenario "alternative-exit"
-seed 1
-duration 20s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit primary on lower at (1m, 1m, 0m) width 2m
-exit fallback on upper at (5m, 1m, 3m) width 2m
-stair down from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m
-connector-state initial_closure connector down closed time 0s
-agents passengers count 1 on upper at (1m, 1m, 3m) to primary speed 1m/s radius 0.3m height 1.7m alternative fallback
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/alternative_exit_is_selected_when_the_primary_route_is_closed.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("all declared final exits are statically reachable");
     let bundle = run(&scenario, RunOptions::default()).expect("fallback route runs");
     assert!(
@@ -984,20 +765,10 @@ agents passengers count 1 on upper at (1m, 1m, 3m) to primary speed 1m/s radius 
 
 #[test]
 fn alternative_exit_is_reselected_when_a_connector_closes() {
-    let source = r#"
-scenario "alternative-exit-reroute"
-seed 1
-duration 20s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit primary on lower at (1m, 1m, 0m) width 2m
-exit fallback on upper at (5m, 1m, 3m) width 2m
-stair down from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m
-connector-state closure connector down closed time 1s
-agents passengers count 1 on upper at (1m, 1m, 3m) to primary speed 1m/s radius 0.3m height 1.7m alternative fallback
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/alternative_exit_is_reselected_when_a_connector_closes.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("rerouted fallback runs");
     assert!(bundle.events.iter().any(|event| {
         event.kind == "connector_state_changed"
@@ -1014,18 +785,10 @@ agents passengers count 1 on upper at (1m, 1m, 3m) to primary speed 1m/s radius 
 
 #[test]
 fn exit_closure_reroutes_an_agent_to_an_alternative_exit() {
-    let source = r#"
-scenario "exit-closure-reroute"
-seed 1
-duration 12s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit primary on concourse at (2m, 1m, 0m) width 2m
-exit fallback on concourse at (6m, 1m, 0m) width 2m
-exit-state closure exit primary closed time 1s
-agents passengers count 1 on concourse at (1m, 1m, 0m) to primary speed 1m/s radius 0.3m height 1.7m alternative fallback
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/exit_closure_reroutes_an_agent_to_an_alternative_exit.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("rerouted fallback runs");
     let encoded = serde_json::to_value(&bundle).expect("bundle serializes to JSON");
     assert!(encoded["scenario"]["scenario"].get("exit_states").is_some());
@@ -1051,19 +814,10 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to primary speed 1m/s rad
 
 #[test]
 fn accepted_exit_misinformation_reroutes_and_a_correction_restores_the_physical_exit() {
-    let source = r#"
-scenario "exit-misinformation"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit primary on concourse at (2m, 1m, 0m) width 2m
-exit fallback on concourse at (8m, 1m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 1m, 0m) to primary speed 1m/s radius 0.3m height 1.7m alternative fallback
-message false_primary_closure source signage on concourse at (1m, 1m, 0m) claim exit primary closed truth false time 1s reach 10m trust 1
-countermeasure correction corrects false_primary_closure source staff on concourse at (1m, 1m, 0m) time 2s reach 10m trust 1
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/accepted_exit_misinformation_reroutes_and_a_correction_restores_the_physical_exit.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
     assert!(bundle.events.iter().any(|event| {
         event.kind == "message_received"
@@ -1116,20 +870,9 @@ countermeasure correction corrects false_primary_closure source staff on concour
 
 #[test]
 fn an_exit_closure_during_transit_reroutes_on_arrival() {
-    let source = r#"
-scenario "transit-exit-reroute"
-seed 1
-duration 12s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit primary on lower at (4m, 1m, 0m) width 2m
-exit fallback on lower at (8m, 1m, 0m) width 2m
-stair down from upper at (2m, 1m, 3m) to lower at (2m, 1m, 0m) width 2m
-exit-state primary_closure exit primary closed time 2s
-agents passengers count 1 on upper at (2m, 1m, 3m) to primary speed 1m/s radius 0.3m height 1.7m alternative fallback
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/an_exit_closure_during_transit_reroutes_on_arrival.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
     assert!(bundle.events.iter().any(|event| {
         event.kind == "route_recomputed"
@@ -1146,18 +889,10 @@ agents passengers count 1 on upper at (2m, 1m, 3m) to primary speed 1m/s radius 
 
 #[test]
 fn exit_metrics_attribute_each_completed_evacuation_to_its_final_exit() {
-    let source = r#"
-scenario "exit-metrics"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (20m, 10m)
-exit west on concourse at (4m, 1m, 0m) width 2m
-exit east on concourse at (16m, 1m, 0m) width 2m
-agents westbound count 1 on concourse at (1m, 1m, 0m) to west speed 1m/s radius 0.3m height 1.7m
-agents eastbound count 1 on concourse at (19m, 1m, 0m) to east speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/exit_metrics_attribute_each_completed_evacuation_to_its_final_exit.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("both groups evacuate");
     assert_eq!(bundle.metrics.evacuated_agents, 2);
     assert_eq!(bundle.metrics.evacuated_by_exit.get("west"), Some(&1));
@@ -1174,16 +909,10 @@ agents eastbound count 1 on concourse at (19m, 1m, 0m) to east speed 1m/s radius
 
 #[test]
 fn final_state_metrics_explain_agents_remaining_at_the_time_limit() {
-    let source = r#"
-scenario "remaining-state-metrics"
-seed 1
-duration 2s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (12m, 10m)
-exit street on concourse at (10m, 1m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/final_state_metrics_explain_agents_remaining_at_the_time_limit.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
     assert_eq!(bundle.metrics.evacuated_agents, 0);
     assert_eq!(bundle.metrics.remaining_by_state.get("moving"), Some(&1));
@@ -1210,17 +939,10 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn partial_evacuation_records_last_exit_but_not_system_clearance() {
-    let source = r#"
-scenario "partial-evacuation-metrics"
-seed 1
-duration 3s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (14m, 10m)
-exit street on concourse at (4m, 1m, 0m) width 2m
-agents quick count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-agents slow count 1 on concourse at (12m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/partial_evacuation_records_last_exit_but_not_system_clearance.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
 
     assert_eq!(bundle.metrics.total_agents, 2);
@@ -1231,18 +953,9 @@ agents slow count 1 on concourse at (12m, 1m, 0m) to street speed 1m/s radius 0.
 
 #[test]
 fn exit_reopening_recovers_agents_waiting_for_a_route() {
-    let source = r#"
-scenario "exit-reopening"
-seed 1
-duration 12s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (4m, 1m, 0m) width 2m
-exit-state initially_closed exit street closed time 0s
-exit-state reopen exit street open time 3s
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/exit_reopening_recovers_agents_waiting_for_a_route.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("waiting route recovers");
     assert!(bundle.trace.iter().any(|frame| {
         frame
@@ -1265,18 +978,10 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn alternative_exit_selection_prices_the_gate_path_to_a_final_exit() {
-    let source = r#"
-scenario "gate-aware-exit-selection"
-seed 1
-duration 8s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (12m, 10m)
-exit primary on concourse at (2m, 1m, 0m) width 2m
-exit fallback on concourse at (5m, 1m, 0m) width 2m
-gate distant_gate on concourse at (9m, 1m, 0m) width 2m capacity 10/s to primary
-agents passengers count 1 on concourse at (1m, 1m, 0m) to primary speed 1m/s radius 0.3m height 1.7m alternative fallback
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/alternative_exit_selection_prices_the_gate_path_to_a_final_exit.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
     assert!(
         bundle
@@ -1288,17 +993,9 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to primary speed 1m/s rad
 
 #[test]
 fn alternative_exit_ties_respect_declaration_order() {
-    let source = r#"
-scenario "alternative-exit-tie"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit first on concourse at (5m, 1m, 0m) width 2m
-exit second on concourse at (5m, 1m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 1m, 0m) to first speed 1m/s radius 0.3m height 1.7m alternative second
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/alternative_exit_ties_respect_declaration_order.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
     assert!(
         bundle
@@ -1310,16 +1007,9 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to first speed 1m/s radiu
 
 #[test]
 fn validation_rejects_an_unknown_alternative_exit() {
-    let source = r#"
-scenario "unknown-alternative-exit"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (5m, 1m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m alternative missing
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/validation_rejects_an_unknown_alternative_exit.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("unknown alternative exits must be rejected");
     assert!(
         errors
@@ -1330,17 +1020,10 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn validation_rejects_an_exit_state_for_an_unknown_exit() {
-    let source = r#"
-scenario "unknown-exit-state"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (5m, 1m, 0m) width 2m
-exit-state closure exit missing closed time 1s
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_an_exit_state_for_an_unknown_exit.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("unknown exit states must be rejected");
     assert!(
         errors
@@ -1351,18 +1034,10 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn validation_rejects_a_route_when_all_connector_classes_are_excluded() {
-    let source = r#"
-scenario "ineligible-route"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair only_route from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m exclude stair
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_a_route_when_all_connector_classes_are_excluded.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("ineligible route must be rejected");
     assert!(
         errors
@@ -1410,21 +1085,10 @@ fn runtime_is_reproducible_and_information_recomputes_routes() {
 
 #[test]
 fn route_selection_minimizes_nominal_travel_time_not_connector_hops() {
-    let source = r#"
-scenario "time-weighted-routing"
-seed 1
-duration 30s
-timestep 1s
-surface upper at (0m, 0m, 6m) size (10m, 10m)
-surface mezzanine at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-lift slow_lift from upper at (1m, 1m, 6m) to lower at (1m, 1m, 0m) cabin 2m 2m capacity 4 cycle 20s
-stair upper_stair from upper at (1m, 1m, 6m) to mezzanine at (1m, 1m, 3m) width 2m
-stair lower_stair from mezzanine at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m
-agents passengers count 1 on upper at (1m, 1m, 6m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/route_selection_minimizes_nominal_travel_time_not_connector_hops.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(
         &scenario,
         RunOptions {
@@ -1443,19 +1107,10 @@ agents passengers count 1 on upper at (1m, 1m, 6m) to street speed 1m/s radius 0
 
 #[test]
 fn escalator_belt_speed_is_used_by_nominal_route_selection() {
-    let source = r#"
-scenario "escalator-routing"
-seed 1
-duration 20s
-timestep 1s
-surface upper at (0m, 0m, 6m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair down_stair from upper at (1m, 1m, 6m) to lower at (1m, 1m, 0m) width 2m
-escalator down_escalator from upper at (1m, 1m, 6m) to lower at (1m, 1m, 0m) width 1m belt 1m/s
-agents passengers count 1 on upper at (1m, 1m, 6m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/escalator_belt_speed_is_used_by_nominal_route_selection.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
     assert!(
         bundle.events.iter().any(|event| {
@@ -1466,18 +1121,10 @@ agents passengers count 1 on upper at (1m, 1m, 6m) to street speed 1m/s radius 0
 
 #[test]
 fn validation_rejects_non_positive_escalator_belt_speed() {
-    let source = r#"
-scenario "invalid-escalator"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 6m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-escalator down from upper at (1m, 1m, 6m) to lower at (1m, 1m, 0m) width 1m belt 0m/s
-agents passengers count 1 on upper at (1m, 1m, 6m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_non_positive_escalator_belt_speed.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("zero belt speed must be rejected");
     assert!(
         errors
@@ -1488,19 +1135,10 @@ agents passengers count 1 on upper at (1m, 1m, 6m) to street speed 1m/s radius 0
 
 #[test]
 fn connector_clearance_routes_taller_agents_to_an_accessible_connector() {
-    let source = r#"
-scenario "height-aware-routing"
-seed 1
-duration 20s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair low_primary from upper at (3m, 1m, 3m) to lower at (3m, 1m, 0m) width 2m clearance 1.5m
-ramp accessible_backup from upper at (1m, 3m, 3m) to lower at (1m, 3m, 0m) width 2m clearance 2.1m
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/connector_clearance_routes_taller_agents_to_an_accessible_connector.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("height-aware route validates");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
     assert!(bundle.events.iter().any(|event| {
@@ -1516,18 +1154,10 @@ agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0
 
 #[test]
 fn validation_rejects_a_route_without_sufficient_connector_clearance() {
-    let source = r#"
-scenario "height-blocked"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair low_primary from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m clearance 1.5m
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_a_route_without_sufficient_connector_clearance.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("height-blocked route must be rejected");
     assert!(
         errors
@@ -1538,18 +1168,9 @@ agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0
 
 #[test]
 fn validation_rejects_non_positive_connector_clearance() {
-    let source = r#"
-scenario "invalid-clearance"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair primary from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m clearance 0m
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/validation_rejects_non_positive_connector_clearance.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("zero clearance must be rejected");
     assert!(
         errors
@@ -1560,21 +1181,10 @@ agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0
 
 #[test]
 fn connector_state_change_closes_a_route_even_when_a_message_is_untrusted() {
-    let source = r#"
-scenario "physical-closure"
-seed 1
-duration 20s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair primary from upper at (3m, 1m, 3m) to lower at (3m, 1m, 0m) width 2m
-stair backup from upper at (1m, 3m, 3m) to lower at (1m, 3m, 0m) width 2m
-connector-state primary_closure connector primary closed time 1s
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-message closure source signage on upper at (1m, 1m, 3m) claim connector primary closed truth true time 1s reach 2m trust 0
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/connector_state_change_closes_a_route_even_when_a_message_is_untrusted.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("truthful closure validates");
     let bundle = run(
         &scenario,
@@ -1604,20 +1214,10 @@ message closure source signage on upper at (1m, 1m, 3m) claim connector primary 
 
 #[test]
 fn physical_reopening_recovers_an_agent_waiting_for_a_route() {
-    let source = r#"
-scenario "closure-recovery"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair primary from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m
-connector-state primary_closed connector primary closed time 1s
-connector-state primary_opened connector primary open time 3s
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/physical_reopening_recovers_an_agent_waiting_for_a_route.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(
         &scenario,
         RunOptions {
@@ -1640,20 +1240,10 @@ agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0
 
 #[test]
 fn initial_physical_closure_waits_for_a_scheduled_reopening() {
-    let source = r#"
-scenario "initial-closure-recovery"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair primary from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m
-connector-state primary_opened connector primary open time 3s
-connector-state primary_initially_closed connector primary closed time 0s
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/initial_physical_closure_waits_for_a_scheduled_reopening.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(
         &scenario,
         RunOptions {
@@ -1679,19 +1269,10 @@ agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0
 
 #[test]
 fn validation_rejects_a_truthful_message_that_disagrees_with_physical_state() {
-    let source = r#"
-scenario "invalid-message-truth"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair primary from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-message false_truth source signage on upper at (1m, 1m, 3m) claim connector primary closed truth true time 1s reach 2m trust 1
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_a_truthful_message_that_disagrees_with_physical_state.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("incorrect truth label must be rejected");
     assert!(
         errors
@@ -1702,19 +1283,9 @@ message false_truth source signage on upper at (1m, 1m, 3m) claim connector prim
 
 #[test]
 fn validation_checks_exit_message_truth_and_references() {
-    let source = r#"
-scenario "invalid-exit-message"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (5m, 1m, 0m) width 2m
-exit-state street_closed exit street closed time 1s
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-message incorrect_truth source signage on concourse at (1m, 1m, 0m) claim exit street open truth true time 1s reach 2m trust 1
-message unknown_exit source signage on concourse at (1m, 1m, 0m) claim exit missing closed truth false time 1s reach 2m trust 1
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/validation_checks_exit_message_truth_and_references.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("invalid exit claims must be rejected");
     assert!(
         errors
@@ -1728,19 +1299,9 @@ message unknown_exit source signage on concourse at (1m, 1m, 0m) claim exit miss
 
 #[test]
 fn validation_checks_gate_message_truth_and_references() {
-    let source = r#"
-scenario "invalid-gate-message"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (8m, 1m, 0m) width 2m
-gate fare_gate on concourse at (5m, 1m, 0m) width 1m capacity 2/s to street
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-message incorrect_truth source signage on concourse at (1m, 1m, 0m) claim gate fare_gate closed truth true time 1s reach 2m trust 1
-message unknown_gate source signage on concourse at (1m, 1m, 0m) claim gate absent closed truth false time 1s reach 2m trust 1
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/validation_checks_gate_message_truth_and_references.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("invalid gate claims must be rejected");
     assert!(
         errors
@@ -1754,20 +1315,10 @@ message unknown_gate source signage on concourse at (1m, 1m, 0m) claim gate abse
 
 #[test]
 fn validation_rejects_a_countermeasure_that_precedes_its_message() {
-    let source = r#"
-scenario "premature-countermeasure"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair primary from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-message false_closure source signage on upper at (1m, 1m, 3m) claim connector primary closed truth false time 2s reach 2m trust 1
-countermeasure correction corrects false_closure source staff on upper at (1m, 1m, 3m) time 1s reach 2m trust 1
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_a_countermeasure_that_precedes_its_message.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("a correction cannot precede its message");
     assert!(
         errors
@@ -1777,37 +1328,23 @@ countermeasure correction corrects false_closure source staff on upper at (1m, 1
 }
 
 #[test]
-fn parser_rejects_a_peer_countermeasure() {
-    let source = r#"
-scenario "peer-countermeasure"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair primary from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-message false_closure source signage on upper at (1m, 1m, 3m) claim connector primary closed truth false time 1s reach 2m trust 1
-countermeasure correction corrects false_closure source peer on upper at (1m, 1m, 3m) time 2s reach 2m trust 1
-"#;
-    let error = parse(source).expect_err("peer countermeasure must be rejected");
-    assert!(error.message.contains("countermeasure source"));
+fn validation_rejects_a_peer_countermeasure() {
+    let mut scenario = generator::scenario(73).unwrap();
+    scenario.countermeasures[0].source = chiyoda_core::model::InformationSource::Peer;
+    assert!(
+        validate(&scenario)
+            .unwrap_err()
+            .iter()
+            .any(|error| error.path == "countermeasures[0].source")
+    );
 }
 
 #[test]
 fn rectangular_obstacles_are_never_crossed_by_on_surface_motion() {
-    let source = r#"
-scenario "obstacle-routing"
-seed 1
-duration 30s
-timestep 100ms
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-obstacle kiosk on concourse at (4m, 3m, 0m) size (2m, 4m)
-exit street on concourse at (9m, 5m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 5m, 0m) to street speed 1m/s radius 0.2m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/rectangular_obstacles_are_never_crossed_by_on_surface_motion.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("source validates");
     let bundle = run(
         &scenario,
@@ -1831,20 +1368,10 @@ agents passengers count 1 on concourse at (1m, 5m, 0m) to street speed 1m/s radi
 
 #[test]
 fn route_selection_includes_obstacle_aware_walking_time() {
-    let source = r#"
-scenario "obstacle-aware-routing"
-seed 1
-duration 40s
-timestep 1s
-surface upper at (0m, 0m, 6m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-obstacle wall on upper at (4m, 0m, 6m) size (2m, 7m)
-exit street on lower at (1m, 8m, 0m) width 2m
-stair blocked_near from upper at (7m, 1m, 6m) to lower at (7m, 1m, 0m) width 2m
-stair clear_far from upper at (1m, 8m, 6m) to lower at (1m, 8m, 0m) width 2m
-agents passengers count 1 on upper at (1m, 1m, 6m) to street speed 1m/s radius 0.2m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/route_selection_includes_obstacle_aware_walking_time.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
     assert!(
         bundle
@@ -1862,34 +1389,18 @@ agents passengers count 1 on upper at (1m, 1m, 6m) to street speed 1m/s radius 0
 
 #[test]
 fn validation_rejects_exit_inside_an_obstacle() {
-    let source = r#"
-scenario "blocked-exit"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-obstacle kiosk on concourse at (4m, 3m, 0m) size (2m, 4m)
-exit street on concourse at (5m, 5m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!("fixtures/semantics/validation_rejects_exit_inside_an_obstacle.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("an occupied exit must be rejected");
     assert!(errors.iter().any(|error| error.path == "exits[0].at"));
 }
 
 #[test]
 fn validation_rejects_an_intermediate_spawn_inside_an_obstacle() {
-    let source = r#"
-scenario "blocked-spawn"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-obstacle kiosk on concourse at (1.6m, 0.9m, 0m) size (0.1m, 0.2m)
-exit street on concourse at (9m, 1m, 0m) width 2m
-agents passengers count 3 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_an_intermediate_spawn_inside_an_obstacle.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("intermediate spawn must be rejected");
     assert!(
         errors
@@ -1900,17 +1411,10 @@ agents passengers count 3 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn validation_rejects_spawn_without_navigation_clearance() {
-    let source = r#"
-scenario "spawn-clearance"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-obstacle kiosk on concourse at (1.2m, 0.9m, 0m) size (0.1m, 0.2m)
-exit street on concourse at (9m, 1m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_spawn_without_navigation_clearance.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("spawn clearance must be rejected");
     assert!(errors.iter().any(|error| {
         error.path == "agents[0].at" && error.message.contains("does not clear obstacle")
@@ -1919,17 +1423,10 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn validation_rejects_overlapping_deterministic_spawns_across_groups() {
-    let source = r#"
-scenario "overlapping-spawns"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (12m, 10m)
-exit street on concourse at (10m, 8m, 0m) width 2m
-agents first count 1 on concourse at (2m, 2m, 0m) to street speed 1m/s radius 0.4m height 1.7m
-agents later count 1 on concourse at (2.7m, 2m, 0m) to street speed 1m/s radius 0.4m height 1.7m release 5s
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_overlapping_deterministic_spawns_across_groups.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("overlapping spawn discs must be rejected");
 
     assert!(errors.iter().any(|error| {
@@ -1942,19 +1439,10 @@ agents later count 1 on concourse at (2.7m, 2m, 0m) to street speed 1m/s radius 
 
 #[test]
 fn released_agents_become_active_after_their_declared_time() {
-    let source = r#"
-scenario "scheduled-release"
-seed 1
-duration 8s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (3m, 1m, 0m) width 2m
-stair down from upper at (3m, 1m, 3m) to lower at (3m, 1m, 0m) width 2m
-agents delayed count 1 on upper at (0m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m release 2s
-message before_release source signage on upper at (0m, 1m, 3m) claim connector down closed truth false time 1s reach 2m trust 1
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/released_agents_become_active_after_their_declared_time.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(
         &scenario,
         RunOptions {
@@ -1989,17 +1477,9 @@ message before_release source signage on upper at (0m, 1m, 3m) claim connector d
 
 #[test]
 fn scheduled_release_waits_for_dynamic_spawn_clearance() {
-    let source = r#"
-scenario "release-clearance-admission"
-seed 1
-duration 4s
-timestep 100ms
-surface concourse at (0m, 0m, 0m) size (12m, 4m)
-exit street on concourse at (10m, 1m, 0m) width 2m
-agents lead count 1 on concourse at (1m, 1m, 0m) to street speed 1.2m/s radius 0.3m height 1.7m
-agents delayed count 1 on concourse at (1.63m, 1m, 0m) to street speed 1.2m/s radius 0.3m height 1.7m release 0.2s
-"#;
-    let scenario = parse(source).expect("release-clearance fixture parses");
+    let source =
+        include_str!("fixtures/semantics/scheduled_release_waits_for_dynamic_spawn_clearance.json");
+    let scenario = decode_scenario(source).expect("release-clearance fixture parses");
     validate(&scenario).expect("release-clearance fixture validates");
     let bundle = run(
         &scenario,
@@ -2039,22 +1519,16 @@ agents delayed count 1 on concourse at (1.63m, 1m, 0m) to street speed 1.2m/s ra
 
 #[test]
 fn release_cadence_staggers_agents_deterministically_and_round_trips() {
-    let source = r#"
-scenario "scheduled-cadence"
-seed 1
-duration 6s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (20m, 10m)
-exit street on concourse at (18m, 1m, 0m) width 2m
-agents arrivals count 3 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m release 1s every 2s
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/release_cadence_staggers_agents_deterministically_and_round_trips.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("cadence source validates");
     assert_eq!(scenario.agents[0].release_interval_s, Some(2.0));
-    let formatted = format_scenario(&scenario);
-    assert!(formatted.contains("release 1s every 2s"));
+    let formatted = encode_scenario(&scenario).unwrap();
+    assert!(formatted.contains("\"release_interval_s\": 2.0"));
     assert_eq!(
-        parse(&formatted).expect("formatted source parses"),
+        decode_scenario(&formatted).expect("formatted source parses"),
         scenario
     );
 
@@ -2089,22 +1563,16 @@ agents arrivals count 3 on concourse at (1m, 1m, 0m) to street speed 1m/s radius
 
 #[test]
 fn release_batches_admit_clear_agents_at_each_cadence_instant() {
-    let source = r#"
-scenario "scheduled-pulses"
-seed 1
-duration 6s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (20m, 10m)
-exit street on concourse at (18m, 1m, 0m) width 2m
-agents arrivals count 5 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m release 1s every 2s batch 2
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/release_batches_admit_clear_agents_at_each_cadence_instant.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("batched cadence source validates");
     assert_eq!(scenario.agents[0].release_batch_size, Some(2));
-    let formatted = format_scenario(&scenario);
-    assert!(formatted.contains("release 1s every 2s batch 2"));
+    let formatted = encode_scenario(&scenario).unwrap();
+    assert!(formatted.contains("\"release_batch_size\": 2"));
     assert_eq!(
-        parse(&formatted).expect("formatted source parses"),
+        decode_scenario(&formatted).expect("formatted source parses"),
         scenario
     );
 
@@ -2128,17 +1596,11 @@ agents arrivals count 5 on concourse at (1m, 1m, 0m) to street speed 1m/s radius
 }
 
 #[test]
-fn validation_rejects_a_zero_release_batch_and_parser_rejects_an_unpaired_batch() {
-    let source = r#"
-scenario "invalid-pulse"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (9m, 1m, 0m) width 2m
-agents delayed count 3 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m release 1s every 2s batch 0
-"#;
-    let scenario = parse(source).expect("source parses before semantic validation");
+fn validation_rejects_a_zero_release_batch_and_validation_rejects_an_unpaired_batch() {
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_a_zero_release_batch_and_validation_rejects_an_unpaired_batch.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses before semantic validation");
     let errors = validate(&scenario).expect_err("zero batch must be rejected");
     assert!(
         errors
@@ -2146,27 +1608,22 @@ agents delayed count 3 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 
             .any(|error| error.path == "agents[0].release_batch_size")
     );
 
-    let parse_error = parse(source.replace("every 2s batch 0", "batch 2").as_str())
-        .expect_err("batch without cadence must not parse");
+    let mut scenario = scenario;
+    scenario.agents[0].release_interval_s = None;
+    scenario.agents[0].release_batch_size = Some(2);
     assert!(
-        parse_error
-            .message
-            .contains("requires `release DURATION every DURATION`")
+        validate(&scenario)
+            .unwrap_err()
+            .iter()
+            .any(|error| error.path == "agents[0].release_batch_size")
     );
 }
 
 #[test]
 fn validation_rejects_agent_release_after_the_scenario() {
-    let source = r#"
-scenario "late-release"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (9m, 1m, 0m) width 2m
-agents delayed count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m release 11s
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/validation_rejects_agent_release_after_the_scenario.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("release outside duration must be rejected");
     assert!(
         errors
@@ -2177,16 +1634,10 @@ agents delayed count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 
 
 #[test]
 fn validation_rejects_a_release_cadence_that_extends_past_duration() {
-    let source = r#"
-scenario "late-cadence"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (9m, 1m, 0m) width 2m
-agents delayed count 3 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m release 7s every 2s
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/validation_rejects_a_release_cadence_that_extends_past_duration.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("final release outside duration must be rejected");
     assert!(
         errors
@@ -2197,18 +1648,10 @@ agents delayed count 3 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 
 
 #[test]
 fn authored_connector_capacity_creates_a_deterministic_queue() {
-    let source = r#"
-scenario "stair-capacity"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair down from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m capacity 0.5/s
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/authored_connector_capacity_creates_a_deterministic_queue.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(
         &scenario,
         RunOptions {
@@ -2250,18 +1693,9 @@ agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0
 
 #[test]
 fn validation_rejects_non_positive_connector_capacity() {
-    let source = r#"
-scenario "invalid-stair-capacity"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair down from upper at (1m, 1m, 3m) to lower at (1m, 1m, 0m) width 2m capacity 0/s
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/validation_rejects_non_positive_connector_capacity.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("zero connector capacity must be rejected");
     assert!(
         errors
@@ -2272,16 +1706,10 @@ agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0
 
 #[test]
 fn authored_exit_capacity_creates_a_deterministic_queue() {
-    let source = r#"
-scenario "exit-capacity"
-seed 1
-duration 4s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (1m, 1m, 0m) width 2m capacity 0.5/s
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/authored_exit_capacity_creates_a_deterministic_queue.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(
         &scenario,
         RunOptions {
@@ -2323,16 +1751,9 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn validation_rejects_non_positive_exit_capacity() {
-    let source = r#"
-scenario "invalid-exit-capacity"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (9m, 1m, 0m) width 2m capacity 0/s
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/validation_rejects_non_positive_exit_capacity.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("zero exit capacity must be rejected");
     assert!(
         errors
@@ -2343,21 +1764,11 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn information_trust_probability_respects_zero_and_one_extremes() {
-    let source = r#"
-scenario "trust-extremes"
-seed 1
-duration 20s
-timestep 1s
-surface upper at (0m, 0m, 3m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (1m, 1m, 0m) width 2m
-stair primary from upper at (3m, 1m, 3m) to lower at (3m, 1m, 0m) width 2m
-stair backup from upper at (1m, 3m, 3m) to lower at (1m, 3m, 0m) width 2m
-agents passengers count 1 on upper at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m
-message closure source signage on upper at (1m, 1m, 3m) claim connector primary closed truth false time 1s reach 2m trust 0
-"#;
+    let source = include_str!(
+        "fixtures/semantics/information_trust_probability_respects_zero_and_one_extremes.json"
+    );
     let untrusted = run(
-        &parse(source).expect("source parses"),
+        &decode_scenario(source).expect("source parses"),
         RunOptions::default(),
     )
     .expect("run succeeds");
@@ -2382,9 +1793,9 @@ message closure source signage on upper at (1m, 1m, 3m) claim connector primary 
         0
     );
 
-    let trusted_source = source.replace("trust 0", "trust 1");
+    let trusted_source = source.replace("\"trust\": 0.0", "\"trust\": 1.0");
     let trusted = run(
-        &parse(&trusted_source).expect("source parses"),
+        &decode_scenario(&trusted_source).expect("source parses"),
         RunOptions::default(),
     )
     .expect("run succeeds");
@@ -2412,24 +1823,17 @@ message closure source signage on upper at (1m, 1m, 3m) claim connector primary 
 
 #[test]
 fn explicit_sampling_key_preserves_trust_draws_across_renamed_interventions() {
-    let source = r#"
-scenario "matched-trust-draws"
-seed 44
-duration 2s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (30m, 10m)
-exit street on concourse at (28m, 1m, 0m) width 2m
-agents passengers count 6 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-message baseline_notice source signage on concourse at (1m, 1m, 0m) claim exit street closed truth false time 1s reach 30m trust 0.5 sample matched_notice
-"#;
+    let source = include_str!(
+        "fixtures/semantics/explicit_sampling_key_preserves_trust_draws_across_renamed_interventions.json"
+    );
     let candidate_source = source.replace("baseline_notice", "candidate_notice");
     let baseline = run(
-        &parse(source).expect("baseline parses"),
+        &decode_scenario(source).expect("baseline parses"),
         RunOptions::default(),
     )
     .expect("baseline runs");
     let candidate = run(
-        &parse(&candidate_source).expect("candidate parses"),
+        &decode_scenario(&candidate_source).expect("candidate parses"),
         RunOptions::default(),
     )
     .expect("candidate runs");
@@ -2442,17 +1846,9 @@ message baseline_notice source signage on concourse at (1m, 1m, 0m) claim exit s
 
 #[test]
 fn required_waypoint_is_reached_before_the_final_exit() {
-    let source = r#"
-scenario "waypoint-journey"
-seed 1
-duration 12s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-waypoint checkpoint on concourse at (5m, 1m, 0m)
-exit street on concourse at (9m, 1m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m via checkpoint
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/required_waypoint_is_reached_before_the_final_exit.json");
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("source validates");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
     let waypoint = bundle
@@ -2471,54 +1867,27 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn validation_rejects_unknown_journey_waypoint() {
-    let source = r#"
-scenario "unknown-waypoint"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (9m, 1m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m via missing
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/validation_rejects_unknown_journey_waypoint.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("unknown waypoint must be rejected");
     assert!(errors.iter().any(|error| error.path == "agents[0].via[0]"));
 }
 
 #[test]
 fn validation_rejects_an_unreachable_required_waypoint() {
-    let source = r#"
-scenario "unreachable-waypoint"
-seed 1
-duration 10s
-timestep 1s
-surface platform at (0m, 0m, 3m) size (10m, 10m)
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-surface isolated_hall at (20m, 0m, 0m) size (10m, 10m)
-waypoint checkpoint on isolated_hall at (21m, 1m, 0m)
-exit street on concourse at (1m, 1m, 0m) width 2m
-stair down from platform at (1m, 1m, 3m) to concourse at (1m, 1m, 0m) width 2m
-agents passengers count 1 on platform at (1m, 1m, 3m) to street speed 1m/s radius 0.3m height 1.7m via checkpoint
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/validation_rejects_an_unreachable_required_waypoint.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("unreachable waypoint must be rejected");
     assert!(errors.iter().any(|error| error.path == "agents[0].via[0]"));
 }
 
 #[test]
 fn ordered_waypoints_are_reached_in_source_order() {
-    let source = r#"
-scenario "multi-waypoint-journey"
-seed 1
-duration 16s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (12m, 10m)
-waypoint first on concourse at (4m, 1m, 0m)
-waypoint second on concourse at (7m, 1m, 0m)
-exit street on concourse at (10m, 1m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m via first via second
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/ordered_waypoints_are_reached_in_source_order.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
     let reached: Vec<_> = bundle
         .events
@@ -2532,17 +1901,9 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn waypoint_dwell_holds_an_agent_before_its_next_stage() {
-    let source = r#"
-scenario "waypoint-dwell"
-seed 1
-duration 10s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-waypoint checkpoint on concourse at (3m, 1m, 0m) dwell 2s
-exit street on concourse at (6m, 1m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.3m height 1.7m via checkpoint
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/waypoint_dwell_holds_an_agent_before_its_next_stage.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let bundle = run(
         &scenario,
         RunOptions {
@@ -2571,18 +1932,8 @@ agents passengers count 1 on concourse at (1m, 1m, 0m) to street speed 1m/s radi
 
 #[test]
 fn lift_capacity_serializes_boarding() {
-    let source = r#"
-scenario "lift-capacity"
-seed 1
-duration 20s
-timestep 1s
-surface platform at (0m, 0m, 6m) size (10m, 10m)
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (9m, 1m, 0m) width 2m
-lift lift_a from platform at (2m, 1m, 6m) to concourse at (2m, 1m, 0m) cabin 2m 2m capacity 1 cycle 4s
-agents passengers count 2 on platform at (1m, 1m, 6m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!("fixtures/semantics/lift_capacity_serializes_boarding.json");
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("source validates");
     let bundle = run(
         &scenario,
@@ -2620,17 +1971,9 @@ agents passengers count 2 on platform at (1m, 1m, 6m) to street speed 1m/s radiu
 
 #[test]
 fn gate_service_rate_creates_a_deterministic_queue() {
-    let source = r#"
-scenario "gate-capacity"
-seed 1
-duration 20s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (10m, 10m)
-exit street on concourse at (9m, 1m, 0m) width 2m
-gate fare_gate on concourse at (3m, 1m, 0m) width 1m capacity 0.5/s to street
-agents passengers count 10 on concourse at (1m, 1m, 0m) to street speed 1m/s radius 0.1m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/gate_service_rate_creates_a_deterministic_queue.json");
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("source validates");
     let bundle = run(
         &scenario,
@@ -2682,16 +2025,10 @@ agents passengers count 10 on concourse at (1m, 1m, 0m) to street speed 1m/s rad
 
 #[test]
 fn ten_thousand_agents_execute_a_spatially_indexed_step() {
-    let source = r#"
-scenario "ten-thousand"
-seed 1
-duration 100ms
-timestep 100ms
-surface concourse at (0m, 0m, 0m) size (100m, 100m)
-exit street on concourse at (99m, 50m, 0m) width 4m
-agents passengers count 10000 on concourse at (0m, 0m, 0m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/ten_thousand_agents_execute_a_spatially_indexed_step.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("spawn extent validates");
     let bundle = run(
         &scenario,
@@ -2706,18 +2043,10 @@ agents passengers count 10000 on concourse at (0m, 0m, 0m) to street speed 1m/s 
 
 #[test]
 fn local_separation_keeps_converging_agents_outside_their_authored_radii() {
-    let source = r#"
-scenario "converging-agents"
-seed 1
-duration 1s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (20m, 10m)
-waypoint staging on concourse at (10m, 5m, 0m) dwell 1s
-exit street on concourse at (19m, 5m, 0m) width 2m
-agents north count 1 on concourse at (1m, 4m, 0m) to street speed 20m/s radius 0.3m height 1.7m via staging
-agents south count 1 on concourse at (1m, 6m, 0m) to street speed 20m/s radius 0.3m height 1.7m via staging
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/local_separation_keeps_converging_agents_outside_their_authored_radii.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("source validates");
     let bundle = run(
         &scenario,
@@ -2757,21 +2086,9 @@ agents south count 1 on concourse at (1m, 6m, 0m) to street speed 20m/s radius 0
 
 #[test]
 fn local_separation_allows_abstract_connector_access() {
-    let source = r#"
-scenario "connector-contact"
-seed 113
-duration 90s
-timestep 100ms
-surface platform at (0m, 0m, 3m) size (30m, 10m)
-surface concourse at (0m, 0m, 0m) size (30m, 10m)
-obstacle kiosk on concourse at (14m, 3m, 0m) size (3m, 3m)
-exit street on concourse at (28m, 5m, 0m) width 2m capacity 2/s
-stair central_stair from platform at (12m, 5m, 3m) to concourse at (12m, 5m, 0m) width 1.5m capacity 1.2/s clearance 2m
-gate fare_gate on concourse at (22m, 5m, 0m) width 1.2m capacity 1.5/s to street
-gate-capacity-state fare_gate_reduced gate fare_gate capacity 0.75/s time 30s
-agents passengers count 24 on platform at (3m, 5m, 3m) to street speed 1.2m/s radius 0.3m height 1.7m release 5s every 1s batch 4
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source =
+        include_str!("fixtures/semantics/local_separation_allows_abstract_connector_access.json");
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("source validates");
     let bundle = run(&scenario, RunOptions::default()).expect("run succeeds");
 
@@ -2788,20 +2105,10 @@ agents passengers count 24 on platform at (3m, 5m, 3m) to street speed 1.2m/s ra
 
 #[test]
 fn reciprocal_local_motion_prevents_a_swept_crossing_between_waypoints() {
-    let source = r#"
-scenario "crossing-waypoints"
-seed 1
-duration 1s
-timestep 1s
-surface concourse at (0m, 0m, 0m) size (20m, 20m)
-waypoint northeast on concourse at (11m, 11m, 0m) dwell 1s
-waypoint southeast on concourse at (11m, 1m, 0m) dwell 1s
-exit north_exit on concourse at (19m, 19m, 0m) width 2m
-exit south_exit on concourse at (19m, 1m, 0m) width 2m
-agents northbound count 1 on concourse at (1m, 1m, 0m) to north_exit speed 14.1421356237m/s radius 0.3m height 1.7m via northeast
-agents southbound count 1 on concourse at (1m, 11m, 0m) to south_exit speed 14.1421356237m/s radius 0.3m height 1.7m via southeast
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!(
+        "fixtures/semantics/reciprocal_local_motion_prevents_a_swept_crossing_between_waypoints.json"
+    );
+    let scenario = decode_scenario(source).expect("source parses");
     validate(&scenario).expect("source validates");
     let bundle = run(
         &scenario,
@@ -2867,17 +2174,8 @@ agents southbound count 1 on concourse at (1m, 11m, 0m) to south_exit speed 14.1
 
 #[test]
 fn validation_rejects_unreachable_agents() {
-    let source = r#"
-scenario "disconnected"
-seed 1
-duration 10s
-timestep 1s
-surface upper at (0m, 0m, 6m) size (10m, 10m)
-surface lower at (0m, 0m, 0m) size (10m, 10m)
-exit street on lower at (9m, 1m, 0m) width 2m
-agents passengers count 1 on upper at (1m, 1m, 6m) to street speed 1m/s radius 0.3m height 1.7m
-"#;
-    let scenario = parse(source).expect("source parses");
+    let source = include_str!("fixtures/semantics/validation_rejects_unreachable_agents.json");
+    let scenario = decode_scenario(source).expect("source parses");
     let errors = validate(&scenario).expect_err("topology must be rejected");
     assert!(
         errors

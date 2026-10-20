@@ -27,31 +27,31 @@ pub fn suite(name: &str) -> Result<BenchmarkSuite, BenchmarkError> {
             case(
                 "dense-bottleneck",
                 "Dense simultaneous arrivals expose current disc-overlap limits.",
-                include_str!("fixtures/dense-bottleneck.chy"),
+                include_str!("fixtures/dense-bottleneck.json"),
                 40.0,
             ),
             case(
                 "symmetric-crossing",
                 "Simultaneous symmetric streams expose current low-progress limits.",
-                include_str!("fixtures/symmetric-crossing.chy"),
+                include_str!("fixtures/symmetric-crossing.json"),
                 20.0,
             ),
             case(
                 "gate-queue",
                 "Strict disc-clearance check of the physical gate queue.",
-                include_str!("fixtures/gate-queue.chy"),
+                include_str!("fixtures/gate-queue.json"),
                 40.0,
             ),
             case(
                 "exit-queue",
                 "Strict disc-clearance check of the physical exit queue.",
-                include_str!("fixtures/exit-queue.chy"),
+                include_str!("fixtures/exit-queue.json"),
                 40.0,
             ),
             case(
                 "lift-queue",
                 "Strict disc-clearance check of the physical lift queue.",
-                include_str!("fixtures/lift-queue.chy"),
+                include_str!("fixtures/lift-queue.json"),
                 35.0,
             ),
         ]
@@ -96,7 +96,8 @@ fn case(id: &str, description: &str, source: &str, clearance_s: f64) -> Benchmar
     BenchmarkCase {
         id: id.into(),
         description: description.into(),
-        source: source.into(),
+        scenario: serde_json::from_str(source)
+            .expect("embedded benchmark document matches the scenario schema"),
         expected: ExpectedReachability::Reachable,
         evaluation: EvaluationOptions {
             verify_replay: true,
@@ -117,61 +118,61 @@ fn cases() -> Vec<BenchmarkCase> {
         case(
             "free-walk",
             "One pedestrian crosses an unobstructed floor.",
-            include_str!("fixtures/free-walk.chy"),
+            include_str!("fixtures/free-walk.json"),
             10.0,
         ),
         case(
             "obstacle-detour",
             "A pedestrian must walk around a rectangular island.",
-            include_str!("fixtures/obstacle-detour.chy"),
+            include_str!("fixtures/obstacle-detour.json"),
             18.0,
         ),
         case(
             "bottleneck",
             "Six paced arrivals pass a narrow physical opening.",
-            include_str!("fixtures/bottleneck.chy"),
+            include_str!("fixtures/bottleneck.json"),
             40.0,
         ),
         case(
             "counterflow",
             "Two opposing groups share a corridor.",
-            include_str!("fixtures/counterflow.chy"),
+            include_str!("fixtures/counterflow.json"),
             30.0,
         ),
         case(
             "crossing",
             "Four offset streams cross with staggered releases.",
-            include_str!("fixtures/crossing.chy"),
+            include_str!("fixtures/crossing.json"),
             20.0,
         ),
         case(
             "gate-queue",
             "A declared half-person-per-second gate produces a queue.",
-            include_str!("fixtures/gate-queue.chy"),
+            include_str!("fixtures/gate-queue.json"),
             40.0,
         ),
         case(
             "exit-queue",
             "A declared half-person-per-second exit produces a queue.",
-            include_str!("fixtures/exit-queue.chy"),
+            include_str!("fixtures/exit-queue.json"),
             40.0,
         ),
         case(
             "lift-queue",
             "A one-person cabin serializes a four-person transfer.",
-            include_str!("fixtures/lift-queue.chy"),
+            include_str!("fixtures/lift-queue.json"),
             35.0,
         ),
         case(
             "connector-closure",
             "A physical closure forces an initially preferred route to change.",
-            include_str!("fixtures/connector-closure.chy"),
+            include_str!("fixtures/connector-closure.json"),
             35.0,
         ),
         case(
             "queue-grid",
             "Six pedestrians form and drain a serpentine FIFO gate queue.",
-            include_str!("fixtures/queue-grid.chy"),
+            include_str!("fixtures/queue-grid.json"),
             75.0,
         ),
     ];

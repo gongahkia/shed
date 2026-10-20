@@ -12,9 +12,9 @@ test:
 	cargo test --workspace
 
 smoke:
-	cargo run --locked -p chiyoda -- check examples/demos/grand-interchange-showcase.chy
+	cargo run --locked -p chiyoda -- check examples/demos/grand-interchange-showcase.json
 	smoke_dir=$$(mktemp -d); trap 'rm -rf "$$smoke_dir"' EXIT; \
-	cargo run --locked -p chiyoda -- run examples/demos/grand-interchange-showcase.chy -o "$$smoke_dir" --trace-every 20 > /dev/null; \
+	cargo run --locked -p chiyoda -- run examples/demos/grand-interchange-showcase.json -o "$$smoke_dir" --trace-every 20 > /dev/null; \
 	cargo run --locked -p chiyoda -- replay "$$smoke_dir/run.json" > /dev/null
 
 build:
@@ -26,4 +26,4 @@ check:
 verify: fmt lint test smoke build
 
 generate-example:
-	cargo run -p chiyoda -- generate --seed 73 -o examples/generated-interchange.chy
+	cargo run -p chiyoda -- generate --seed 73 -o examples/generated-interchange.json

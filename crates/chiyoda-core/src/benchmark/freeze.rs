@@ -7,8 +7,9 @@ use super::{
 use crate::{
     CanonicalScenario,
     bundle::canonical_hash,
+    decode_scenario,
     evaluation::{EVALUATION_VERSION, SuiteReport},
-    parse, validate,
+    validate,
 };
 
 /// Sources must be in the evaluation's case order. Each is checked against the
@@ -36,9 +37,10 @@ pub fn from_evaluation(
     }
     let mut cases = Vec::new();
     for (case, source) in report.cases.iter().zip(sources) {
-        let scenario = parse(source).map_err(|error| invalid(format!("{}: {error}", case.name)))?;
+        let scenario =
+            decode_scenario(source).map_err(|error| invalid(format!("{}: {error}", case.name)))?;
         validate(&scenario).map_err(|errors| invalid(format!("{}: {errors:?}", case.name)))?;
-        let hash = canonical_hash(&CanonicalScenario::from(scenario));
+        let hash = canonical_hash(&CanonicalScenario::from(scenario.clone()));
         if case.scenario_hash.as_deref() != Some(hash.as_str()) {
             return Err(invalid(format!(
                 "{}: source does not match the archived scenario hash",
@@ -48,7 +50,7 @@ pub fn from_evaluation(
         cases.push(BenchmarkCase {
             id: case.name.clone(),
             description: format!("Frozen evaluation case {}", case.name),
-            source: source.clone(),
+            scenario: CanonicalScenario::from(scenario),
             expected: case.expected,
             evaluation: report.config.evaluation.clone(),
             checks: BehaviorChecks::default(),

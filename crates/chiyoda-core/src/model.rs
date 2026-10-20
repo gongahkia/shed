@@ -14,6 +14,10 @@ pub struct Point3 {
 
 impl Point3 {
     #[must_use]
+    pub const fn new(x_m: f64, y_m: f64, z_m: f64) -> Self {
+        Self { x_m, y_m, z_m }
+    }
+    #[must_use]
     pub fn distance(self, other: Self) -> f64 {
         let dx = self.x_m - other.x_m;
         let dy = self.y_m - other.y_m;
@@ -775,6 +779,34 @@ pub struct Scenario {
 }
 
 impl Scenario {
+    /// Start a programmatically constructed scenario; populate its resources
+    /// and agents before calling `validate` or `run`.
+    #[must_use]
+    pub fn new(name: impl Into<String>, seed: u64, duration_s: f64, timestep_s: f64) -> Self {
+        Self {
+            name: name.into(),
+            seed,
+            duration_s,
+            timestep_s,
+            surfaces: vec![],
+            obstacles: vec![],
+            waypoints: vec![],
+            exits: vec![],
+            connectors: vec![],
+            portal_lanes: vec![],
+            queue_footprints: vec![],
+            connector_states: vec![],
+            exit_states: vec![],
+            connector_capacity_states: vec![],
+            exit_capacity_states: vec![],
+            gates: vec![],
+            gate_states: vec![],
+            gate_capacity_states: vec![],
+            agents: vec![],
+            messages: vec![],
+            countermeasures: vec![],
+        }
+    }
     #[must_use]
     pub fn portal_lanes_for_connector(&self, connector_id: &str) -> Option<&PortalLanes> {
         self.portal_lanes.iter().find(|lanes| {

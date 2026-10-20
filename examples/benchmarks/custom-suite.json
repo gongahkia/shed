@@ -1,12 +1,14 @@
 {
-  "benchmark_version": "1",
+  "benchmark_version": "2",
   "name": "custom-walking",
-  "diagnostics": {"window_s": 5.0, "max_travel_m": 0.1},
+  "diagnostics": {
+    "window_s": 5.0,
+    "max_travel_m": 0.1
+  },
   "cases": [
     {
       "id": "custom-walk",
       "description": "One pedestrian walks eight meters to an unconstrained exit.",
-      "source": "scenario \"custom walk\"\nseed 73\nduration 12s\ntimestep 100ms\nsurface floor at (0m, 0m, 0m) size (10m, 10m)\nexit out on floor at (9m, 5m, 0m) width 1m\nagents person count 1 on floor at (1m, 5m, 0m) to out speed 1.2m/s radius 0.3m height 1.7m\n",
       "expected": "reachable",
       "evaluation": {
         "verify_replay": true,
@@ -17,6 +19,67 @@
           "max_avoidance_fallback_steps": 0,
           "max_disc_overlap_m": 0.0,
           "max_swept_disc_overlap_m": 0.0
+        }
+      },
+      "scenario": {
+        "schema_version": "1",
+        "scenario": {
+          "agents": [
+            {
+              "alternative_destinations": [],
+              "at": {
+                "x_m": 1.0,
+                "y_m": 5.0,
+                "z_m": 0.0
+              },
+              "count": 1,
+              "destination": "out",
+              "excluded_connector_kinds": [],
+              "height_m": 1.7,
+              "id": "person",
+              "radius_m": 0.3,
+              "release_at_s": 0.0,
+              "speed_mps": 1.2,
+              "surface": "floor",
+              "via": []
+            }
+          ],
+          "connector_states": [],
+          "connectors": [],
+          "countermeasures": [],
+          "duration_s": 12.0,
+          "exits": [
+            {
+              "at": {
+                "x_m": 9.0,
+                "y_m": 5.0,
+                "z_m": 0.0
+              },
+              "capacity_per_s": null,
+              "id": "out",
+              "surface": "floor",
+              "width_m": 1.0
+            }
+          ],
+          "gates": [],
+          "messages": [],
+          "name": "custom walk",
+          "obstacles": [],
+          "seed": 73,
+          "surfaces": [
+            {
+              "depth_m": 10.0,
+              "id": "floor",
+              "origin": {
+                "x_m": 0.0,
+                "y_m": 0.0,
+                "z_m": 0.0
+              },
+              "width_m": 10.0
+            }
+          ],
+          "timestep_s": 0.1,
+          "waypoints": []
         }
       }
     }

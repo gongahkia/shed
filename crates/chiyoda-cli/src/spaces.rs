@@ -1,7 +1,7 @@
-use super::{ensure_parent, read_json, read_text, write_json, write_text};
+use super::{ensure_parent, read_json, write_json, write_text};
 use anyhow::{Context, Result, bail};
 use chiyoda_core::{
-    Scenario,
+    CanonicalScenario, Scenario,
     evaluation::{
         self, CaseEvaluation, CaseReport, ExpectedReachability, Fixture, SuiteConfig, SuiteReport,
     },
@@ -64,10 +64,10 @@ pub(super) struct EvaluateArgs {
     /// Number of consecutive seeds. Zero runs only authored fixtures.
     #[arg(long)]
     cases: Option<u32>,
-    /// Add a .chy fixture expected to have geometrically reachable journeys.
+    /// Add a JSON scenario fixture expected to have geometrically reachable journeys.
     #[arg(long)]
     fixture: Vec<PathBuf>,
-    /// Add a valid .chy fixture expected to fail geometric reachability.
+    /// Add a valid .json fixture expected to fail geometric reachability.
     #[arg(long)]
     unreachable_fixture: Vec<PathBuf>,
     #[arg(short, long)]
@@ -108,9 +108,9 @@ pub(super) fn generate(args: &GenerateArgs) -> Result<()> {
     create_destination(&args.output)?;
     match spaces::generate(args.seed, &config) {
         Ok(space) => {
-            write_text(&args.output.join("scenario.chy"), &space.source)?;
+            write_text(&args.output.join("scenario.json"), &space.json)?;
             write_json(&args.output.join("generation.json"), &space.manifest)?;
-            println!("generated: {}", args.output.join("scenario.chy").display());
+            println!("generated: {}", args.output.join("scenario.json").display());
             println!(
                 "attempts: {}; geometric journeys: {}",
                 space.manifest.attempts.len(),
@@ -167,7 +167,7 @@ pub(super) fn evaluate(args: &EvaluateArgs) -> Result<()> {
                     .and_then(|stem| stem.to_str())
                     .context("fixture needs a UTF-8 file stem")?
                     .into(),
-                source: read_text(path)?,
+                scenario: read_json::<CanonicalScenario>(path)?,
                 expected,
             });
         }
@@ -181,9 +181,9 @@ pub(super) fn evaluate(args: &EvaluateArgs) -> Result<()> {
         save_case(&args.output, &mut reports, case)?;
     }
     for fixture in &config.fixtures {
-        let case = evaluation::evaluate_source(
+        let case = evaluation::evaluate_json(
             &fixture.name,
-            &fixture.source,
+            &serde_json::to_string_pretty(&fixture.scenario)?,
             fixture.expected,
             &config.evaluation,
         );
@@ -239,8 +239,8 @@ fn create_destination(output: &Path) -> Result<()> {
 fn save_case(output: &Path, reports: &mut Vec<CaseReport>, case: CaseEvaluation) -> Result<()> {
     let directory = output.join(format!("case-{:04}", reports.len()));
     fs::create_dir(&directory)?;
-    if let Some(source) = &case.source {
-        write_text(&directory.join("scenario.chy"), source)?;
+    if let Some(source) = &case.input_json {
+        write_text(&directory.join("scenario.json"), source)?;
     }
     if let Some(generation) = &case.generation {
         write_json(&directory.join("generation.json"), generation)?;

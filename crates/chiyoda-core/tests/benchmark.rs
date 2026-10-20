@@ -6,13 +6,42 @@ use chiyoda_core::benchmark::{self, BenchmarkReport, profiles};
 fn simple_report() -> BenchmarkReport {
     let mut suite = profiles::suite("smoke").unwrap();
     suite.cases.truncate(1);
-    suite.cases[0].source = suite.cases[0].source.replace("count 1", "count 2");
+    suite.cases[0].scenario.scenario.agents[0].count = 2;
     let case = benchmark::run_case(&suite, 0).unwrap().result;
     BenchmarkReport::new(suite, vec![case]).unwrap()
 }
 
 fn reseal(report: BenchmarkReport) -> BenchmarkReport {
     BenchmarkReport::new_labeled(report.suite, report.cases, report.label).unwrap()
+}
+
+#[test]
+fn json_migration_preserves_pre_migration_traces_events_and_metrics() {
+    let expected: std::collections::BTreeMap<String, String> =
+        serde_json::from_str(include_str!("fixtures/pre-json-execution-hashes.json")).unwrap();
+    let mut checked = std::collections::BTreeSet::new();
+    for profile in ["all", "stress"] {
+        let suite = profiles::suite(profile).unwrap();
+        for index in 0..suite.cases.len() {
+            let id = &suite.cases[index].id;
+            if !checked.insert(id.clone()) {
+                continue;
+            }
+            let bundle = benchmark::run_case(&suite, index)
+                .unwrap()
+                .artifacts
+                .bundle
+                .unwrap();
+            let hash = chiyoda_core::bundle::canonical_hash(&(
+                bundle.options,
+                bundle.trace,
+                bundle.events,
+                bundle.metrics,
+            ));
+            assert_eq!(hash, expected[id], "execution changed for {id}");
+        }
+    }
+    assert_eq!(checked.len(), expected.len());
 }
 
 #[test]
@@ -52,7 +81,7 @@ fn reports_require_every_case_and_matching_inputs_and_detect_tampering() {
     report.cases[0].evaluation.replay_verified = false;
     assert!(report.verify().is_err());
     assert!(BenchmarkReport::new(suite.clone(), vec![]).is_err());
-    suite.cases[0].source.push_str("# changed input\n");
+    suite.cases[0].scenario.scenario.seed += 1;
     assert!(BenchmarkReport::new(suite, vec![case]).is_err());
     assert!(profiles::suite("unknown").is_err());
 }
@@ -209,7 +238,8 @@ fn failed_runs_partial_clearance_and_missing_telemetry_remain_visible() {
 fn expected_unreachable_cases_have_no_simulation_metrics_or_replay_requirement() {
     let mut suite = profiles::suite("smoke").unwrap();
     suite.cases.truncate(1);
-    suite.cases[0].source = include_str!("../../../examples/generation/blocked.chy").into();
+    suite.cases[0].scenario =
+        serde_json::from_str(include_str!("../../../examples/generation/blocked.json")).unwrap();
     suite.cases[0].expected = chiyoda_core::evaluation::ExpectedReachability::Unreachable;
     let result = benchmark::run_case(&suite, 0).unwrap().result;
     assert!(result.evaluation.passed);
@@ -240,23 +270,26 @@ fn evaluation_freezing_preserves_exact_sources_and_rejects_missing_or_edited_cas
     config.generation.agents_per_floor = 1;
     config.generation.duration_s = 0.2;
     let evaluation = evaluation::evaluate_seed(73, &config.generation, &config.evaluation);
-    let source = evaluation.source.unwrap();
+    let source = evaluation.input_json.unwrap();
     let report = SuiteReport::from_cases(config, vec![evaluation.report]).unwrap();
     let sources = vec![source.clone()];
     let frozen = benchmark::freeze::from_evaluation(&report, &sources, "frozen").unwrap();
-    assert_eq!(frozen.cases[0].source, source);
+    assert_eq!(
+        frozen.cases[0].scenario,
+        serde_json::from_str(&source).unwrap()
+    );
     assert_eq!(frozen.cases[0].evaluation, report.config.evaluation);
     assert_eq!(
         frozen.origin.unwrap().report_hash,
         chiyoda_core::bundle::canonical_hash(&report)
     );
     assert!(benchmark::freeze::from_evaluation(&report, &[], "frozen").is_err());
+    let mut changed = chiyoda_core::decode_scenario(&source).unwrap();
+    changed.seed += 1;
     assert!(
         benchmark::freeze::from_evaluation(
             &report,
-            &[source
-                .replace("duration 200ms", "duration 1s")
-                .replace("duration 0.2s", "duration 1s")],
+            &[chiyoda_core::encode_scenario(&changed).unwrap()],
             "frozen"
         )
         .is_err()
@@ -300,5 +333,5 @@ fn reports_show_deltas_failures_and_allow_cross_runtime_comparison() {
     );
     assert!(markdown.contains("clearance_time_s"));
     assert!(markdown.contains("REGRESSED"));
-    assert!(markdown.contains("base%20path/case-0000/scenario.chy"));
+    assert!(markdown.contains("base%20path/case-0000/scenario.json"));
 }

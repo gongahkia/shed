@@ -2,8 +2,9 @@ use anyhow::{Context, Result, bail};
 use chiyoda_core::{
     AgentState, BundleVerification, RunBundle, RunOptions,
     bundle::TraceFrame,
+    decode_scenario,
     model::{ConnectorKind, Point3, PortalLanes, PortalResource, Scenario, Surface},
-    parse, run, validate, verify_run_bundle,
+    run, validate, verify_run_bundle,
 };
 use clap::Parser;
 use flate2::{Compression, write::ZlibEncoder};
@@ -82,7 +83,7 @@ const GIF_PALETTE: &[u32] = &[
 struct Cli {
     /// A `run.json` emitted by `chiyoda run`.
     bundle: Option<PathBuf>,
-    /// Compile, validate, and rerun this Chiyoda source after every saved edit.
+    /// Read, validate, and rerun this JSON scenario after every saved edit.
     #[arg(long, value_name = "SOURCE", conflicts_with = "bundle")]
     watch: Option<PathBuf>,
     /// Start paused; space toggles playback and arrow keys advance frames.
@@ -226,7 +227,7 @@ fn main() -> Result<()> {
             }
             replay_watch(source_path, &cli, sprite_atlas.as_ref())
         }
-        (None, None) => bail!("provide a run bundle or --watch SOURCE.chy"),
+        (None, None) => bail!("provide a run bundle or --watch SOURCE.json"),
         (Some(_), Some(_)) => unreachable!("clap rejects conflicting inputs"),
     }
 }
@@ -855,9 +856,9 @@ impl WatchController {
         let trace_every_steps = self.trace_every_steps;
         let revision = pending.revision;
         self.running_revision = Some(revision);
-        self.status = format!("watch revision {revision} compiling and running");
+        self.status = format!("watch revision {revision} loading and running");
         thread::spawn(move || {
-            let result = compile_watch_source(&pending.source, trace_every_steps);
+            let result = load_watch_scenario(&pending.source, trace_every_steps);
             let _ = sender.send(WatchUpdate { revision, result });
         });
     }
@@ -878,11 +879,11 @@ impl WatchController {
     }
 }
 
-fn compile_watch_source(
+fn load_watch_scenario(
     source: &str,
     trace_every_steps: u32,
 ) -> std::result::Result<RunBundle, String> {
-    let scenario = parse(source).map_err(|error| format!("compile error: {error}"))?;
+    let scenario = decode_scenario(source).map_err(|error| format!("JSON input error: {error}"))?;
     validate(&scenario).map_err(|errors| {
         let details = errors
             .iter()
@@ -2806,15 +2807,7 @@ mod tests {
     use flate2::read::ZlibDecoder;
     use std::io::Read;
 
-    const WATCH_SOURCE: &str = r#"
-scenario "watch fixture"
-seed 7
-duration 2s
-timestep 0.5s
-surface concourse at (0m, 0m, 0m) size (12m, 8m)
-exit street on concourse at (10m, 4m, 0m) width 2m
-agents passengers count 1 on concourse at (1m, 4m, 0m) to street speed 1.2m/s radius 0.3m height 1.7m
-"#;
+    const WATCH_SOURCE: &str = include_str!("fixtures/main/project.json");
 
     fn surface(id: &str, x_m: f64, y_m: f64, width_m: f64, depth_m: f64) -> Surface {
         Surface {
@@ -3009,9 +3002,9 @@ agents passengers count 1 on concourse at (1m, 4m, 0m) to street speed 1.2m/s ra
     }
 
     #[test]
-    fn watch_compilation_matches_an_explicit_in_memory_run() {
-        let watched = compile_watch_source(WATCH_SOURCE, 1).expect("watch fixture succeeds");
-        let scenario = parse(WATCH_SOURCE).expect("watch fixture parses");
+    fn watch_loading_matches_an_explicit_in_memory_run() {
+        let watched = load_watch_scenario(WATCH_SOURCE, 1).expect("watch fixture succeeds");
+        let scenario = decode_scenario(WATCH_SOURCE).expect("watch fixture parses");
         let expected = run(
             &scenario,
             RunOptions {
@@ -3026,19 +3019,19 @@ agents passengers count 1 on concourse at (1m, 4m, 0m) to street speed 1.2m/s ra
     }
 
     #[test]
-    fn watch_compilation_keeps_compile_and_validation_failures_explicit() {
-        let missing_scenario = compile_watch_source("seed 1\n", 1).unwrap_err();
-        assert!(missing_scenario.starts_with("compile error:"));
+    fn watch_loading_keeps_json_and_validation_failures_explicit() {
+        let missing_scenario = load_watch_scenario("seed 1\n", 1).unwrap_err();
+        assert!(missing_scenario.starts_with("JSON input error:"));
 
-        let invalid = WATCH_SOURCE.replace("duration 2s", "duration 0s");
-        let invalid_result = compile_watch_source(&invalid, 1).unwrap_err();
+        let invalid = WATCH_SOURCE.replace("\"duration_s\": 2.0", "\"duration_s\": 0.0");
+        let invalid_result = load_watch_scenario(&invalid, 1).unwrap_err();
         assert!(invalid_result.starts_with("validation error:"));
     }
 
     #[test]
     fn stale_watch_worker_result_is_discarded() {
         let path = std::env::temp_dir().join(format!(
-            "chiyoda-replay-watch-stale-{}-{}.chy",
+            "chiyoda-replay-watch-stale-{}-{}.json",
             std::process::id(),
             std::thread::current().name().unwrap_or("test")
         ));
@@ -3084,7 +3077,7 @@ agents passengers count 1 on concourse at (1m, 4m, 0m) to street speed 1.2m/s ra
 
     #[test]
     fn overview_renderer_draws_static_and_trace_layers_without_a_display_server() {
-        let bundle = compile_watch_source(WATCH_SOURCE, 1).expect("watch fixture succeeds");
+        let bundle = load_watch_scenario(WATCH_SOURCE, 1).expect("watch fixture succeeds");
         let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
         draw_overview(&mut buffer, &bundle, 0, None);
 
@@ -3098,7 +3091,7 @@ agents passengers count 1 on concourse at (1m, 4m, 0m) to street speed 1.2m/s ra
         let manifest_path =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/replay/undercity-atlas.json");
         let sprite_atlas = load_sprite_atlas(&manifest_path).expect("bundled sprite atlas loads");
-        let bundle = compile_watch_source(WATCH_SOURCE, 1).expect("watch fixture succeeds");
+        let bundle = load_watch_scenario(WATCH_SOURCE, 1).expect("watch fixture succeeds");
         let mut default_buffer = vec![BACKGROUND; WIDTH * HEIGHT];
         let mut atlas_buffer = vec![BACKGROUND; WIDTH * HEIGHT];
 
@@ -3139,11 +3132,11 @@ agents passengers count 1 on concourse at (1m, 4m, 0m) to street speed 1.2m/s ra
 
     #[test]
     fn debug_panel_reports_current_frame_without_covering_watch_status_space() {
-        let bundle = compile_watch_source(WATCH_SOURCE, 1).expect("watch fixture succeeds");
+        let bundle = load_watch_scenario(WATCH_SOURCE, 1).expect("watch fixture succeeds");
         let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
         draw_watch_status(
             &mut buffer,
-            "cannot read draft.chy: No such file or directory (os error 2)",
+            "cannot read draft.json: No such file or directory (os error 2)",
         );
         draw_debug_panel(
             &mut buffer,
@@ -3174,11 +3167,11 @@ agents passengers count 1 on concourse at (1m, 4m, 0m) to street speed 1.2m/s ra
         let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
         draw_watch_status(
             &mut buffer,
-            "cannot read draft.chy: No such file or directory (os error 2)",
+            "cannot read draft.json: No such file or directory (os error 2)",
         );
 
         assert!(watch_status_is_error(
-            "cannot read draft.chy: No such file or directory"
+            "cannot read draft.json: No such file or directory"
         ));
         assert!(buffer.contains(&WATCH_STATUS_PANEL));
         assert!(buffer.contains(&WATCH_ERROR));
@@ -3193,7 +3186,7 @@ agents passengers count 1 on concourse at (1m, 4m, 0m) to street speed 1.2m/s ra
             std::thread::current().name().unwrap_or("test")
         ));
         let output = directory.join("watch.gif");
-        let bundle = compile_watch_source(WATCH_SOURCE, 1).expect("watch fixture succeeds");
+        let bundle = load_watch_scenario(WATCH_SOURCE, 1).expect("watch fixture succeeds");
         let manifest_path =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/replay/undercity-atlas.json");
         let sprite_atlas = load_sprite_atlas(&manifest_path).expect("bundled sprite atlas loads");

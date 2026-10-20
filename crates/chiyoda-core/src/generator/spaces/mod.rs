@@ -1,15 +1,14 @@
 //! Rule-constrained space generation with explicit provenance and rejection logs.
 
 mod catalog;
+mod geometry;
 mod layout;
-mod source;
 
 use crate::{
     CanonicalScenario, Scenario,
     bundle::canonical_hash,
-    format_scenario,
+    encode_scenario,
     model::ConnectorKind,
-    parse,
     reachability::{self, ReachabilityReport},
     validate,
     wfc::{self, ForbiddenNeighbor, SolveError, SolveStats},
@@ -21,7 +20,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub use catalog::{Module, ModuleKind, modules_for};
 pub use layout::FloorLayout;
 
-pub const GENERATOR_VERSION: &str = "2";
+pub const GENERATOR_VERSION: &str = "3";
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -259,7 +258,7 @@ pub struct GenerationManifest {
     pub config_hash: String,
     pub catalog: Vec<Module>,
     pub rules_hash: String,
-    pub source_sha256: String,
+    pub json_sha256: String,
     pub scenario_hash: String,
     pub attempts: Vec<GenerationAttempt>,
     pub floors: Vec<FloorLayout>,
@@ -269,7 +268,7 @@ pub struct GenerationManifest {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GeneratedSpace {
-    pub source: String,
+    pub json: String,
     pub scenario: Scenario,
     pub manifest: GenerationManifest,
 }
@@ -375,7 +374,7 @@ fn assemble(
     attempts: Vec<GenerationAttempt>,
     finished: (String, Scenario, ReachabilityReport),
 ) -> GeneratedSpace {
-    let (source, scenario, reachability) = finished;
+    let (json, scenario, reachability) = finished;
     let mut tile_counts = catalog
         .iter()
         .map(|module| (module.id.clone(), 0))
@@ -394,7 +393,7 @@ fn assemble(
         config_hash: canonical_hash(config),
         catalog: catalog.to_vec(),
         rules_hash: canonical_hash(&config.rules(catalog)),
-        source_sha256: format!("{:x}", Sha256::digest(source.as_bytes())),
+        json_sha256: format!("{:x}", Sha256::digest(json.as_bytes())),
         scenario_hash: canonical_hash(&CanonicalScenario::from(scenario.clone())),
         attempts,
         floors,
@@ -402,7 +401,7 @@ fn assemble(
         reachability,
     };
     GeneratedSpace {
-        source,
+        json,
         scenario,
         manifest,
     }
@@ -414,11 +413,7 @@ fn finish(
     catalog: &[Module],
     floors: &[FloorLayout],
 ) -> Result<(String, Scenario, ReachabilityReport), Rejection> {
-    let raw = source::compile(seed, config, catalog, floors);
-    let scenario = parse(&raw).map_err(|error| Rejection {
-        kind: RejectionKind::InvalidGeometry,
-        detail: error.to_string(),
-    })?;
+    let scenario = geometry::build(seed, config, catalog, floors);
     validate(&scenario).map_err(|errors| Rejection {
         kind: RejectionKind::InvalidGeometry,
         detail: format!("{errors:?}"),
@@ -433,7 +428,14 @@ fn finish(
             detail: format!("{:?}", report.unreachable),
         });
     }
-    Ok((format_scenario(&scenario), scenario, report))
+    Ok((
+        encode_scenario(&scenario).map_err(|error| Rejection {
+            kind: RejectionKind::InvalidGeometry,
+            detail: error.to_string(),
+        })?,
+        scenario,
+        report,
+    ))
 }
 
 fn config_error(message: impl Into<String>) -> SpaceGenerationError {

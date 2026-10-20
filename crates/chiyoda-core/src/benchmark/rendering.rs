@@ -151,7 +151,7 @@ fn case_evidence(text: &mut String, result: &CaseResult, root: &Path, index: usi
     writeln!(
         text,
         "[Source](<{}>) · [Case report](<{}>)\n",
-        href(&directory.join("scenario.chy")),
+        href(&directory.join("scenario.json")),
         href(&directory.join("report.json"))
     )
     .unwrap();
@@ -171,7 +171,7 @@ fn artifact_links(text: &mut String, label: &str, root: &Path, index: usize) {
     writeln!(
         text,
         "\n{label}: [source](<{}>) · [case report](<{}>).",
-        href(&directory.join("scenario.chy")),
+        href(&directory.join("scenario.json")),
         href(&directory.join("report.json"))
     )
     .unwrap();

@@ -1,0 +1,83 @@
+{
+  "schema_version": "1",
+  "scenario": {
+    "agents": [
+      {
+        "alternative_destinations": [],
+        "at": {
+          "x_m": 1.0,
+          "y_m": 1.0,
+          "z_m": 0.0
+        },
+        "count": 6,
+        "destination": "street",
+        "excluded_connector_kinds": [],
+        "height_m": 1.7,
+        "id": "passengers",
+        "radius_m": 0.3,
+        "release_at_s": 0.0,
+        "speed_mps": 1.0,
+        "surface": "concourse",
+        "via": []
+      }
+    ],
+    "connector_states": [],
+    "connectors": [],
+    "countermeasures": [],
+    "duration_s": 2.0,
+    "exits": [
+      {
+        "at": {
+          "x_m": 28.0,
+          "y_m": 1.0,
+          "z_m": 0.0
+        },
+        "capacity_per_s": null,
+        "id": "street",
+        "surface": "concourse",
+        "width_m": 2.0
+      }
+    ],
+    "gates": [],
+    "messages": [
+      {
+        "at_s": 1.0,
+        "claim": {
+          "ExitAvailability": {
+            "exit": "street",
+            "open": false
+          }
+        },
+        "id": "baseline_notice",
+        "origin": {
+          "x_m": 1.0,
+          "y_m": 1.0,
+          "z_m": 0.0
+        },
+        "reach_m": 30.0,
+        "sampling_key": "matched_notice",
+        "source": "Signage",
+        "surface": "concourse",
+        "trust": 0.5,
+        "truthful": false
+      }
+    ],
+    "name": "matched-trust-draws",
+    "obstacles": [],
+    "seed": 44,
+    "surfaces": [
+      {
+        "depth_m": 10.0,
+        "id": "concourse",
+        "origin": {
+          "x_m": 0.0,
+          "y_m": 0.0,
+          "z_m": 0.0
+        },
+        "width_m": 30.0
+      }
+    ],
+    "timestep_s": 1.0,
+    "waypoints": []
+  }
+}

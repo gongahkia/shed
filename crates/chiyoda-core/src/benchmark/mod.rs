@@ -8,7 +8,7 @@ pub mod profiles;
 pub mod rendering;
 
 use crate::{
-    RunBundle,
+    CanonicalScenario, RunBundle,
     bundle::canonical_hash,
     evaluation::{
         self, CaseEvaluation, CaseReport, CheckFailure, EvaluationOptions, ExpectedReachability,
@@ -18,7 +18,7 @@ use diagnostics::{Diagnosis, DiagnosticOptions};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const BENCHMARK_VERSION: &str = "1";
+pub const BENCHMARK_VERSION: &str = "2";
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -44,8 +44,8 @@ pub struct BehaviorChecks {
 pub struct BenchmarkCase {
     pub id: String,
     pub description: String,
-    /// Exact source is embedded, never regenerated during a benchmark run.
-    pub source: String,
+    /// A complete JSON scenario document, never regenerated during a benchmark run.
+    pub scenario: CanonicalScenario,
     #[serde(default)]
     pub expected: ExpectedReachability,
     #[serde(default)]
@@ -100,7 +100,14 @@ impl BenchmarkSuite {
                     "minimum queue waits must be finite and nonnegative",
                 ));
             }
-            if case.source.len() > 4 * 1024 * 1024 {
+            case.scenario
+                .check_schema()
+                .map_err(|error| invalid(error.to_string()))?;
+            if serde_json::to_vec(&case.scenario)
+                .map_err(|error| invalid(error.to_string()))?
+                .len()
+                > 4 * 1024 * 1024
+            {
                 return Err(invalid("a benchmark source must not exceed 4 MiB"));
             }
             if case
@@ -127,7 +134,7 @@ impl BenchmarkSuite {
     #[must_use]
     pub fn input_hash(&self, case: &BenchmarkCase) -> String {
         canonical_hash(&(
-            &case.source,
+            &case.scenario,
             case.expected,
             &case.evaluation,
             &case.checks,
@@ -159,8 +166,13 @@ pub fn run_case(suite: &BenchmarkSuite, index: usize) -> Result<CaseRun, Benchma
         .cases
         .get(index)
         .ok_or_else(|| invalid("case index is out of bounds"))?;
-    let mut artifacts =
-        evaluation::evaluate_source(&case.id, &case.source, case.expected, &case.evaluation);
+    let mut artifacts = evaluation::evaluate_json(
+        &case.id,
+        &serde_json::to_string_pretty(&case.scenario)
+            .map_err(|error| invalid(error.to_string()))?,
+        case.expected,
+        &case.evaluation,
+    );
     if let Some(bundle) = &artifacts.bundle {
         check_behavior(case, bundle, &mut artifacts.report);
     }

@@ -340,15 +340,36 @@ impl Regions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parse;
+    use crate::decode_scenario;
 
-    fn floor(extra: &str) -> Scenario {
-        parse(&format!("scenario \"preflight\"\nseed 1\nduration 30s\ntimestep 100ms\nsurface floor at (0m, 0m, 0m) size (10m, 10m)\nexit out on floor at (9m, 5m, 0m) width 1m\nagents people count 1 on floor at (1m, 5m, 0m) to out speed 1m/s radius 0.3m height 1.7m\n{extra}")).unwrap()
+    fn floor(obstacles: Vec<Obstacle>) -> Scenario {
+        let mut scenario =
+            decode_scenario(include_str!("../tests/fixtures/json-free-walk.json")).unwrap();
+        scenario.name = "preflight".into();
+        scenario.duration_s = 30.0;
+        scenario.timestep_s = 0.1;
+        scenario.surfaces[0].width_m = 10.0;
+        scenario.surfaces[0].depth_m = 10.0;
+        scenario.exits[0].at = Point3::new(9.0, 5.0, 0.0);
+        scenario.agents[0].at = Point3::new(1.0, 5.0, 0.0);
+        scenario.agents[0].speed_mps = 1.0;
+        scenario.obstacles = obstacles;
+        scenario
+    }
+
+    fn obstacle(id: &str, x: f64, y: f64, width_m: f64, depth_m: f64) -> Obstacle {
+        Obstacle {
+            id: id.into(),
+            surface: "floor".into(),
+            at: Point3::new(x, y, 0.0),
+            width_m,
+            depth_m,
+        }
     }
 
     #[test]
     fn catches_a_wall_that_surface_topology_validation_accepts() {
-        let scenario = floor("obstacle wall on floor at (4m, 0m, 0m) size (2m, 10m)\n");
+        let scenario = floor(vec![obstacle("wall", 4.0, 0.0, 2.0, 10.0)]);
         validate(&scenario).unwrap();
         let report = check(&scenario).unwrap();
         assert_eq!(report.checked_spawns, 1);
@@ -359,15 +380,14 @@ mod tests {
     #[test]
     fn distinguishes_radius_clear_passages_and_obstacle_detours() {
         assert!(
-            check(&floor(
-                "obstacle island on floor at (4m, 3m, 0m) size (2m, 4m)\n"
-            ))
-            .unwrap()
-            .is_reachable()
+            check(&floor(vec![obstacle("island", 4.0, 3.0, 2.0, 4.0)]))
+                .unwrap()
+                .is_reachable()
         );
-        let mut scenario = floor(
-            "obstacle upper on floor at (4m, 0m, 0m) size (2m, 4.75m)\nobstacle lower on floor at (4m, 5.25m, 0m) size (2m, 4.75m)\n",
-        );
+        let mut scenario = floor(vec![
+            obstacle("upper", 4.0, 0.0, 2.0, 4.75),
+            obstacle("lower", 4.0, 5.25, 2.0, 4.75),
+        ]);
         assert!(!check(&scenario).unwrap().is_reachable());
         scenario.agents[0].radius_m = 0.2;
         assert!(check(&scenario).unwrap().is_reachable());
@@ -375,9 +395,21 @@ mod tests {
 
     #[test]
     fn checks_waypoints_and_gate_approaches_instead_of_just_the_exit() {
-        let mut scenario = floor(
-            "obstacle wall on floor at (4m, 0m, 0m) size (2m, 10m)\nwaypoint required on floor at (8m, 2m, 0m)\ngate fare on floor at (8m, 5m, 0m) width 1m capacity 1/s to out\n",
-        );
+        let mut scenario = floor(vec![obstacle("wall", 4.0, 0.0, 2.0, 10.0)]);
+        scenario.waypoints.push(crate::model::Waypoint {
+            id: "required".into(),
+            surface: "floor".into(),
+            at: Point3::new(8.0, 2.0, 0.0),
+            dwell_s: 0.0,
+        });
+        scenario.gates.push(crate::model::Gate {
+            id: "fare".into(),
+            surface: "floor".into(),
+            at: Point3::new(8.0, 5.0, 0.0),
+            width_m: 1.0,
+            service_rate_per_s: 1.0,
+            destination: "out".into(),
+        });
         scenario.exits[0].at.x_m = 2.0;
         scenario.agents[0].via.push("required".into());
         let report = check(&scenario).unwrap();
@@ -388,8 +420,10 @@ mod tests {
 
     #[test]
     fn follows_only_eligible_directed_connectors_and_ignores_schedules() {
-        let source = "scenario \"levels\"\nseed 1\nduration 30s\ntimestep 100ms\nsurface upper at (0m, 0m, 3m) size (10m, 10m)\nsurface lower at (0m, 0m, 0m) size (10m, 10m)\nexit out on lower at (9m, 5m, 0m) width 1m\nstair down from upper at (5m, 5m, 3m) to lower at (5m, 5m, 0m) width 1m\nconnector-state shut connector down closed time 0s\nagents people count 2 on upper at (1m, 5m, 3m) to out speed 1m/s radius 0.3m height 1.7m\n";
-        let mut scenario = parse(source).unwrap();
+        let source = include_str!(
+            "fixtures/reachability/follows_only_eligible_directed_connectors_and_ignores_schedules.json"
+        );
+        let mut scenario = decode_scenario(source).unwrap();
         assert_eq!(check(&scenario).unwrap().checked_journeys, 2);
         assert!(check(&scenario).unwrap().is_reachable());
         scenario.obstacles.push(Obstacle {
@@ -408,7 +442,7 @@ mod tests {
 
     #[test]
     fn handles_boundary_targets_and_rejects_invalid_sources() {
-        let mut scenario = floor("");
+        let mut scenario = floor(vec![]);
         scenario.exits[0].at.x_m = 10.0;
         assert!(check(&scenario).unwrap().is_reachable());
         scenario.agents[0].radius_m = -1.0;

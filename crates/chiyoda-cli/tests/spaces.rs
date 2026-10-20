@@ -69,7 +69,7 @@ fn generated_spaces_check_and_existing_outputs_are_preserved() {
         "{}",
         String::from_utf8_lossy(&result.stderr)
     );
-    let source = output.join("scenario.chy");
+    let source = output.join("scenario.json");
     assert!(
         cli(&["check", text(&source), "--geometry"])
             .status
@@ -79,7 +79,7 @@ fn generated_spaces_check_and_existing_outputs_are_preserved() {
     assert!(!cli(&args).status.success());
     assert_eq!(before, fs::read(&source).unwrap());
     assert_eq!(read_json(&output.join("generation.json"))["seed"], 73);
-    let legacy = directory.path("legacy.chy");
+    let legacy = directory.path("legacy.json");
     assert!(
         cli(&["generate", "--seed", "73", "-o", text(&legacy)])
             .status
@@ -108,7 +108,12 @@ fn failed_evaluations_exit_nonzero_and_retain_source_manifest_bundle_and_reports
     let report = read_json(&output.join("report.json"));
     assert_eq!(report["failed"], 1);
     assert_eq!(report["cases"][0]["replay_verified"], true);
-    for artifact in ["scenario.chy", "generation.json", "run.json", "report.json"] {
+    for artifact in [
+        "scenario.json",
+        "generation.json",
+        "run.json",
+        "report.json",
+    ] {
         assert!(output.join("case-0000").join(artifact).exists());
     }
     assert!(output.join("config.json").exists());
@@ -118,8 +123,14 @@ fn failed_evaluations_exit_nonzero_and_retain_source_manifest_bundle_and_reports
 #[test]
 fn expected_unreachable_fixture_passes_without_a_runtime_bundle() {
     let directory = Directory::new();
-    let fixture = directory.path("blocked.chy");
-    fs::write(&fixture, "scenario \"blocked\"\nseed 1\nduration 10s\ntimestep 100ms\nsurface floor at (0m, 0m, 0m) size (10m, 10m)\nobstacle wall on floor at (4m, 0m, 0m) size (2m, 10m)\nexit out on floor at (9m, 5m, 0m) width 1m\nagents people count 1 on floor at (1m, 5m, 0m) to out speed 1m/s radius 0.3m height 1.7m\n").unwrap();
+    let fixture = directory.path("blocked.json");
+    fs::write(
+        &fixture,
+        include_str!(
+            "fixtures/spaces/expected_unreachable_fixture_passes_without_a_runtime_bundle.json"
+        ),
+    )
+    .unwrap();
     let output = directory.path("evaluation");
     let result = cli(&[
         "evaluate",

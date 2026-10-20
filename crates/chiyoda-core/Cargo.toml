@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Formal language, semantics, and deterministic 3D pedestrian-flow runtime for Chiyoda"
+description = "Versioned JSON scenarios and deterministic 3D pedestrian-flow runtime for Chiyoda"
 
 [dependencies]
 serde.workspace = true

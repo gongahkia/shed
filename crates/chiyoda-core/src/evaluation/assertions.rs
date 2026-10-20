@@ -274,7 +274,10 @@ mod tests {
 
     #[test]
     fn a_corrupted_trace_fails_speed_and_segment_assertions() {
-        let scenario = crate::parse("scenario \"corrupt\"\nseed 1\nduration 1s\ntimestep 1s\nsurface floor at (0m, 0m, 0m) size (10m, 10m)\nobstacle wall on floor at (4m, 3m, 0m) size (2m, 4m)\nexit out on floor at (9m, 5m, 0m) width 1m\nagents person count 1 on floor at (1m, 5m, 0m) to out speed 1m/s radius 0.3m height 1.7m\n").unwrap();
+        let scenario = crate::decode_scenario(include_str!(
+            "fixtures/assertions/a_corrupted_trace_fails_speed_and_segment_assertions.json"
+        ))
+        .unwrap();
         let mut bundle = crate::run(
             &scenario,
             crate::RunOptions {

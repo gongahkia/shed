@@ -9,17 +9,17 @@ pub use report::{Coverage, SuiteReport};
 use crate::{
     CanonicalScenario, RunBundle, RunOptions,
     bundle::{RunMetrics, canonical_hash},
+    decode_scenario,
     generator::spaces::{
         self, GenerationAttempt, GenerationManifest, SpaceConfig, SpaceGenerationError,
     },
-    parse,
     reachability::{self, ReachabilityReport},
     run, validate, verify_run_bundle,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-pub const EVALUATION_VERSION: &str = "1";
+pub const EVALUATION_VERSION: &str = "2";
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -87,7 +87,7 @@ pub enum ExpectedReachability {
 #[serde(deny_unknown_fields)]
 pub struct Fixture {
     pub name: String,
-    pub source: String,
+    pub scenario: CanonicalScenario,
     #[serde(default)]
     pub expected: ExpectedReachability,
 }
@@ -132,6 +132,10 @@ impl SuiteConfig {
             .map(|seed| format!("seed-{seed}"))
             .collect();
         for fixture in &self.fixtures {
+            fixture
+                .scenario
+                .check_schema()
+                .map_err(|error| error.to_string())?;
             if fixture.name.trim().is_empty() || !names.insert(fixture.name.clone()) {
                 return Err("case names must be nonempty and unique".into());
             }
@@ -196,7 +200,7 @@ impl CaseReport {
 #[derive(Debug)]
 pub struct CaseEvaluation {
     pub report: CaseReport,
-    pub source: Option<String>,
+    pub input_json: Option<String>,
     pub generation: Option<GenerationManifest>,
     pub bundle: Option<RunBundle>,
 }
@@ -210,12 +214,8 @@ pub fn evaluate_seed(
     let name = format!("seed-{seed}");
     match spaces::generate(seed, config) {
         Ok(space) => {
-            let mut case = evaluate_source(
-                &name,
-                &space.source,
-                ExpectedReachability::Reachable,
-                options,
-            );
+            let mut case =
+                evaluate_json(&name, &space.json, ExpectedReachability::Reachable, options);
             case.report.seed = Some(seed);
             case.report
                 .generation_attempts
@@ -240,7 +240,7 @@ pub fn evaluate_seed(
             }
             CaseEvaluation {
                 report,
-                source: None,
+                input_json: None,
                 generation: None,
                 bundle: None,
             }
@@ -252,7 +252,7 @@ pub fn evaluate_seed(
 /// passes only when it is valid source and geometric preflight rejects a
 /// journey; it is not run. Simulation-metric thresholds apply only to reachable cases.
 #[must_use]
-pub fn evaluate_source(
+pub fn evaluate_json(
     name: &str,
     source: &str,
     expected: ExpectedReachability,
@@ -260,7 +260,7 @@ pub fn evaluate_source(
 ) -> CaseEvaluation {
     let mut case = CaseEvaluation {
         report: CaseReport::new(name.into(), None, expected),
-        source: Some(source.into()),
+        input_json: Some(source.into()),
         generation: None,
         bundle: None,
     };
@@ -268,7 +268,7 @@ pub fn evaluate_source(
         case.report.fail("configuration", error);
         return case;
     }
-    let scenario = match parse(source) {
+    let scenario = match decode_scenario(source) {
         Ok(scenario) => scenario,
         Err(error) => {
             case.report.fail("parse", error.to_string());

@@ -1,9 +1,10 @@
 use chiyoda_core::{
+    decode_scenario,
     generator::spaces::{
         self, FloorConstraint, ModuleKind, Preset, RejectionKind, SpaceConfig, SpaceGenerationError,
     },
     model::{ConnectorKind, Obstacle, Point3},
-    parse, reachability, validate,
+    reachability, validate,
 };
 use std::collections::BTreeSet;
 
@@ -19,13 +20,16 @@ fn small(preset: Preset) -> SpaceConfig {
 }
 
 #[test]
-fn generation_is_reproducible_and_round_trips_through_the_existing_language() {
+fn generation_is_reproducible_and_round_trips_through_versioned_json() {
     let generated = spaces::generate(73, &SpaceConfig::default()).unwrap();
     assert_eq!(
         generated,
         spaces::generate(73, &SpaceConfig::default()).unwrap()
     );
-    assert_eq!(generated.scenario, parse(&generated.source).unwrap());
+    assert_eq!(
+        generated.scenario,
+        decode_scenario(&generated.json).unwrap()
+    );
     assert_eq!(generated.scenario.surfaces.len(), 2);
     assert_eq!(generated.scenario.connectors.len(), 2);
     assert_eq!(generated.manifest.reachability.checked_spawns, 8);
@@ -41,6 +45,32 @@ fn generation_is_reproducible_and_round_trips_through_the_existing_language() {
             .rejection
             .is_none()
     );
+}
+
+#[test]
+fn typed_wfc_generation_preserves_the_pre_json_scenario_and_execution() {
+    let old: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/pre-json-wfc-73.json")).unwrap();
+    let old: chiyoda_core::CanonicalScenario =
+        serde_json::from_value(old["document"].clone()).unwrap();
+    let generated = spaces::generate(73, &SpaceConfig::default()).unwrap();
+    assert_eq!(generated.scenario, old.scenario);
+    let bundle = chiyoda_core::run(
+        &generated.scenario,
+        chiyoda_core::RunOptions {
+            trace_every_steps: 1,
+        },
+    )
+    .unwrap();
+    let hash = chiyoda_core::bundle::canonical_hash(&(
+        bundle.options,
+        bundle.trace,
+        bundle.events,
+        bundle.metrics,
+    ));
+    let expected: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/pre-json-wfc-73.json")).unwrap();
+    assert_eq!(hash, expected["execution_hash"]);
 }
 
 #[test]
@@ -254,12 +284,12 @@ fn configuration_rejects_unsafe_dimensions_unknown_fields_and_invalid_weights() 
 }
 
 #[test]
-fn generator_v2_reference_source_has_a_stable_fingerprint() {
+fn generator_v3_reference_json_has_a_stable_fingerprint() {
     let generated = spaces::generate(73, &SpaceConfig::default()).unwrap();
-    assert_eq!(spaces::GENERATOR_VERSION, "2");
+    assert_eq!(spaces::GENERATOR_VERSION, "3");
     assert_eq!(
-        generated.manifest.source_sha256,
-        "d18a73717ecc78f5833c684c56e8c6d760b96e89124275513b4260b942ad74b0"
+        generated.manifest.json_sha256,
+        "ab0b4b1ab191c6ef2b1b2e4a97894cf70800e1b8084f34d18533f921676096bd"
     );
     assert_eq!(
         generated.manifest.scenario_hash,

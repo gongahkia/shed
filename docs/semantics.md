@@ -1,7 +1,7 @@
-# Executable semantics 0.44
+# Executable semantics 0.45
 
 The Rust `chiyoda-core` runtime executes [JSON scenario schema 1](scenarios.md)
-under runtime contract 0.44. This document is normative where it describes public
+under runtime contract 0.45. This document is normative where it describes public
 behavior;
 the source and conformance tests make that behavior executable.
 
@@ -89,39 +89,53 @@ order breaks ties within one event kind.
    an assigned portal reveals physical state even at zero observation range.
    See [local knowledge](knowledge.md) for the complete optional contract.
    The visibility-graph path supplies each agent's preferred Euler velocity.
+   Visibility corners guide steering at cruising speed; authored waypoints,
+   queue slots, and final targets retain their exact arrival rules. A corner
+   within the navigation epsilon is skipped. On a predicted cruising conflict,
+   a deterministic right-hand bias of 5% of the speed bound breaks opposing
+   symmetries; the final speed remains bounded. Slowing into an actual target
+   does not receive that bias.
+   The runtime first constructs hard velocity half-planes for the surface
+   centre bounds and nearby radius-expanded rectangular obstacles. Each wall
+   retains an outside face selected by the most clearance along the intended
+   step, with stable axis-order ties. A stop remains feasible. The entire
+   segment stays in those half-spaces, with final static clipping as a guard.
    For every same-surface candidate whose current separation is at most the
-   sum of their radii plus both authored speed bounds over the fixed 2.5 s
-   horizon, the runtime constructs a deterministic `f64` ORCA half-plane,
-   except where the explicit queue-grid right-of-way rule below removes the
-   later ticket's constraint from the earlier ticket's program. This
-   conservative neighbour screen does not predict from a candidate's previous
-   velocity, because either agent may choose a new bounded preferred velocity
-   at this step. It chooses the
-   speed-bounded velocity closest to the preference from their intersection.
-   Two members of the same preallocated queue grid use their monotonic FIFO
-   tickets as an explicit local right-of-way rule: the earlier ticket does not
-   yield an ORCA constraint to the later ticket, while the later ticket bears
-   the full inside-obstacle correction. This applies only within one authored
-   grid; line footprints and all other pairs retain reciprocal ORCA treatment.
-   A later grid ticket receives an earlier same-grid ticket's selected,
-   statically clipped same-step velocity when forming its full-responsibility
-   constraint. All positions, all non-grid velocities, and every other pair
-   remain from the immutable snapshot. Exact co-location uses a stable
-   identifier-derived direction rather than a random draw. The selected segment
-   is clipped to the static surface/obstacle-free region; a static conflict can
-   shorten the selected velocity. If the speed-bounded half-planes are
-   infeasible, the runtime emits a `local_avoidance_constraint_fallback` event
-   and chooses a deterministic least-penetrating velocity. The horizon and
-   interaction screen are uncalibrated reference assumptions; they do not
-   establish a full-system physical-collision guarantee, especially for
-   unmodelled geometry, connector transit, or fallback states.
-   A `waiting_at_waypoint` agent is an immobile on-surface neighbour for this
-   snapshot and for later landing-clearance tests. A connector with
-   `portal_lanes` uses the agent's stable identifier-selected exact lane at
-   both portals. At destination arrival, it remains in transit until that lane
-   is statically and dynamically clear; it is not relocated to another lane or
-   endpoint. A connector without `portal_lanes` retains the separate legacy
-   endpoint-clearance placement rule.
+   sum of their radii plus both speed bounds over the fixed 2.5 s horizon, the
+   runtime constructs a deterministic `f64` ORCA half-plane. This conservative
+   screen allows either person to choose a new bounded velocity. Mobile pairs
+   each bear half the correction; a person passing an immobile neighbour bears
+   all of it. Waypoint dwell, route wait, abstract connector-capacity wait, and
+   standing at an assigned queue slot have a zero motion bound. Advancing to a
+   newly available slot restores movement.
+   Two members of the same preallocated queue grid use their FIFO tickets for
+   local right of way only beyond their combined radii plus both speed bounds
+   over the actual step. Within that immediate reach, even an earlier ticket
+   retains the later ticket's constraint. The later ticket bears the full
+   correction and receives the earlier ticket's selected, statically clipped
+   same-step velocity. Other pairs use immutable snapshot velocities. Exact
+   co-location uses a stable identifier-derived direction.
+   The speed-bounded program chooses the velocity closest to the preference.
+   If the 2.5 s agent constraints are infeasible, it emits
+   `local_avoidance_constraint_fallback` and retries the same stable neighbours
+   over the actual step (or the original horizon if shorter). If still
+   infeasible, it relaxes agent constraints while preserving every hard static
+   bound. Failure in the hard prefix returns a stop.
+   All on-surface segments are then resolved together before service or
+   evacuation transitions. An analytic swept-disc guard shortens conflicting
+   segments, or lets one safe escape proceed while the other stops, choosing
+   the option with most total travel and stable pair-order ties. After 32
+   scaling passes, a bounded stop propagation resolves remaining dependencies.
+   The guarded endpoint determines target arrival and stored velocity.
+   Connector landings must clear every complete planned on-surface interval
+   as well as current occupants; an unavailable landing retains transit.
+   Authored portal lanes remain exact. Legacy endpoint placement still selects
+   a candidate, but that candidate must also satisfy static and interval
+   clearance. Release and landing admission retain a 1e-8 m numerical margin.
+   These movement choices are uncalibrated reference assumptions. The guard
+   checks linear same-surface disc motion, not physical pedestrian dynamics or
+   connector interiors. The independent boundary and swept audits remain in
+   place and retain their existing transition exclusions.
    For an eligible line `queue_footprints`, capacity denial records the normal
    queue-entry audit and gives the agent a monotonic deterministic FIFO ticket.
    An immutable per-step queue snapshot ranks tickets, using the agent
@@ -182,7 +196,7 @@ cell order.
 
 ## What this does not mean
 
-The `0.44` local-motion law, nominal routing cost and alternative-exit
+The `0.45` local-motion law, nominal routing cost and alternative-exit
 selection, scheduled-release and service-capacity semantics, operational-state
 transitions, escalator walking-rider assumption, and seeded information
 acceptance law are reference semantics, not calibrated behavioral claims. A
@@ -205,6 +219,9 @@ adjustments larger than the navigation clearance epsilon;
 `cumulative_local_clearance_adjustment_m` sums the Euclidean
 distance from planned to resolved position, and
 `maximum_local_clearance_adjustment_m` is the largest one-attempt distance.
+The plan is the navigator's corner-clamped Euler step, so cruising-corner
+steering and passing bias also contribute; these values are not pure lost
+travel or delay.
 Zero-geometry service admission remains excluded for resources without a
 footprint. Ordinary on-surface motion uses snapshot ORCA, including an
 authored queue slot's approach and advancement. Where `portal_lanes` is
@@ -215,8 +232,9 @@ physical crowd model, an observed delay, or calibration evidence.
 
 Runtime contract `0.31`, retained in `0.43`, additionally records
 `local_avoidance_constraint_fallback_steps`: each step in which the
-speed-bounded ORCA half-planes were infeasible and the documented deterministic
-least-penetrating fallback was selected. Every such count is cross-checked
+speed-bounded ORCA half-planes were infeasible and the documented fallback was
+selected. In 0.45 this includes the immediate-horizon retry, even when that
+retry finds a feasible velocity. Every such count is cross-checked
 against one `local_avoidance_constraint_fallback` event whose subject is an
 agent present in the initial trace and whose detail fixes the reason. The
 counter and its event audit are omitted from earlier bundles rather than
@@ -224,6 +242,12 @@ backfilled as zeroes. They report solver infeasibility, not contacts,
 collisions, physical safety, or calibration evidence. A non-zero counter can
 arise from dense competing motion under a finite speed bound; it does not by
 itself identify an implementation fault or an initial overlap.
+
+Runtime contract `0.45` additionally records `swept_motion_guard_steps` and one
+`local_motion_limited_for_clearance` event for each individual segment shortened
+by more than 1e-10 m by the simultaneous guard. Earlier bundles omit this field.
+A fallback and a guard adjustment can occur on the same step; neither counter
+is an overlap count. Current reconstruction verifies both counters and events.
 
 Runtime contract `0.36` additionally records
 `on_surface_clearance_audit`. `agents_with_disc_overlaps` counts distinct
@@ -327,3 +351,11 @@ Runtime contract 0.44 adds opt-in local availability knowledge, exit familiarity
 and source-attributed knowledge snapshots. Omitted knowledge retains the
 previous movement and routing behavior. Earlier bundle contracts, including
 0.43, remain hash-verifiable archives rather than current reconstructed runs.
+
+Runtime contract 0.45 changes local motion, static constraints, simultaneous
+segment resolution, and dynamic release/landing clearance as described above.
+The JSON scenario schema and WFC geometry rules remain unchanged. Authentic
+0.44 bundles retain their original hashes for explicit archival inspection;
+current reconstruction requires a fresh run. The frozen
+[wayfinding investigation](movement-investigation.md) separates the original
+outcomes from reruns under the changed motion contract.

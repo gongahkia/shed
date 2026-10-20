@@ -36,12 +36,14 @@ announcements against silence under both global and local awareness. See
 [local knowledge](knowledge.md) for the paired authored scenarios and the
 limits of the perception model.
 
-The template's larger, busy cases also stress local movement. Some can remain
-incomplete at 120 s and record avoidance fallbacks or reference-disc overlaps.
-Those cases retain their failed thresholds, missing clearance times, and
-replayable bundles. These outcomes can reflect the current movement model's
-limits as well as the layout, population, and communication assumptions; they
-do not establish real-world architectural performance.
+The template's larger, busy cases also stress local movement. In the 0.44
+reference run, five remained incomplete at 120 s and recorded avoidance
+fallbacks or reference-disc overlaps. Those five and their matched announcement
+controls are retained as [ten frozen cases](movement-investigation.md), with
+unchanged sources and completion checks. The investigation separates movement
+defects from observed journey and queue delays before rerunning the study.
+These outcomes describe the movement, layout, population, and communication
+assumptions; they do not establish real-world architectural performance.
 
 The template and run destinations must be new. A malformed configuration is
 rejected before the run directory is created. `study check` validates the

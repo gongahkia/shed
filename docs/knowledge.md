@@ -124,9 +124,10 @@ and accepted announcements. Sample the trace every integration step when
 inspecting brief belief changes; the event log is retained at every cadence.
 
 Knowledge is included in scenario and bundle hashes and checked by complete
-deterministic reconstruction. Runtime and bundle contract 0.44 distinguish
-these rules from earlier runs. Authentic 0.43 bundles remain hash-verifiable
-archives; current reconstruction requires a fresh run. JSON scenario schema 1
+deterministic reconstruction. Runtime contract 0.44 introduced these knowledge
+rules; 0.45 retains them while changing local motion. Authentic 0.43 and 0.44
+bundles remain hash-verifiable archives; current reconstruction requires a fresh
+run. JSON scenario schema 1
 remains the input format, with this optional addition.
 
 ## Scope of the model

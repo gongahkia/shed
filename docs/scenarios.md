@@ -209,7 +209,7 @@ movement, queue behavior, and the model's geometry and calibration boundaries.
 The custom DSL, `.chy` input, parser, formatter implementation, and `compile`
 command have been removed. The `format` command now normalizes JSON. Existing
 scenario arrays, units, intervention rules, and movement behavior are retained.
-Runtime and bundle contracts are now 0.44, WFC generation version is 3, and
+Runtime and bundle contracts are now 0.45, WFC generation version is 3, and
 evaluation and benchmark report versions are 2. New scenario and bundle hashes
 reflect their new metadata and packaging; they are not expected to equal old
 artifact hashes.

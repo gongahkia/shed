@@ -61,20 +61,26 @@ serpentine case requires recorded service reservations.
 
 The standard bottleneck uses paced arrivals, and the crossing uses staggered
 streams. The stress profile retains simultaneous arrivals and stricter overlap
-checks to expose current model limitations:
+checks to exercise crowded movement:
 
 ```console
 target/release/chiyoda benchmark run --profile stress -o out/benchmark-stress
 ```
 
-At introduction, the dense bottleneck produces disc overlaps, the symmetric
-crossing fails to clear, and the gate/exit/lift queue cases produce overlaps.
-Their strict checks intentionally fail on the current reference implementation.
-The standard versions of those three queue cases check operations without an
-absolute overlap cap; their measured overlaps remain in reports and baseline
-comparisons. Other standard cases retain zero-overlap limits. Fixes to movement
-can be evaluated against these fixtures without changing their source or
-loosening their limits. Stress failures cannot be accepted as a passing baseline.
+At introduction, the dense bottleneck produced disc overlaps, the symmetric
+crossing failed to clear, and the gate/exit/lift queue cases produced overlaps.
+Under motion contract 0.45 all five pass their original checks, including their
+zero-overlap limits. Their scenario sources and thresholds are unchanged.
+The standard versions of those three queue cases still check operations
+without an absolute overlap cap; their measured overlaps remain in reports
+and baseline comparisons. Other standard cases retain zero-overlap limits.
+A failed stress run cannot be accepted as a passing baseline.
+
+The ten [frozen wayfinding cases](movement-investigation.md) retain five
+incomplete 0.44 architecture-study runs and their matched announcement controls.
+Their original inputs and completion criteria remain fixed while the movement
+contract changes. The investigation records provenance, isolated-agent controls,
+and the subsequent architecture and communication comparison.
 
 ## Read the evidence
 

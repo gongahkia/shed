@@ -10,6 +10,7 @@ use std::{
 };
 
 mod benchmarks;
+mod scenario_files;
 mod spaces;
 
 #[derive(Debug, Parser)]
@@ -70,6 +71,13 @@ enum Command {
     Benchmark(benchmarks::BenchmarkArgs),
     /// Reconstruct and summarize a current run bundle.
     Replay { bundle: PathBuf },
+    /// Export a current JSON scenario from a hash-verified run bundle.
+    ExtractScenario {
+        bundle: PathBuf,
+        /// New JSON file; existing files are never overwritten.
+        #[arg(short, long)]
+        output: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -139,6 +147,7 @@ fn main() -> Result<()> {
         Command::SpaceRules { preset } => spaces::print_config(preset)?,
         Command::Evaluate(args) => spaces::evaluate(&args)?,
         Command::Benchmark(args) => benchmarks::execute(&args)?,
+        Command::ExtractScenario { bundle, output } => scenario_files::extract(&bundle, &output)?,
         Command::Replay {
             bundle: bundle_path,
         } => {

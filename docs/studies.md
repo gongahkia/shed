@@ -193,6 +193,8 @@ excluded from metric distributions. Their cases and reasons are retained.
 Clearance time is absent for incomplete evacuations. Its distribution and its
 comparisons include only completed runs; always read evacuation fraction and
 completion counts alongside clearance.
+Mean exit time also describes completed agents only; it can decrease while
+more people remain unfinished. It must be read with the evacuation fraction.
 
 The report compares each nonreference value against the **first declared**
 pattern, scale, load, or policy, holding other axes fixed. Differences are

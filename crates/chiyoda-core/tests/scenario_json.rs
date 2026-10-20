@@ -73,6 +73,11 @@ fn input_rejects_missing_future_legacy_duplicate_and_unknown_schema_fields() {
             .to_string()
             .contains("widht_m")
     );
+    for extra_version in [Value::Null, json!("0.29")] {
+        let mut ambiguous = original.clone();
+        ambiguous["language_version"] = extra_version;
+        assert!(decode_scenario(&ambiguous.to_string()).is_err());
+    }
     let mut legacy = original;
     legacy.as_object_mut().unwrap().remove("schema_version");
     legacy["language_version"] = json!("0.29");

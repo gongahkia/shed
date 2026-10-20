@@ -1028,11 +1028,19 @@ impl Serialize for CanonicalScenario {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ScenarioEnvelope {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "version_field")]
     schema_version: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "version_field")]
     language_version: Option<String>,
     scenario: Scenario,
+}
+
+// An absent archival key is allowed, but an explicit null must not hide a
+// second version field in an otherwise current document.
+fn version_field<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error> {
+    String::deserialize(deserializer).map(Some)
 }
 
 impl<'de> Deserialize<'de> for CanonicalScenario {

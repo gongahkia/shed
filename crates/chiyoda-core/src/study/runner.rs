@@ -112,22 +112,7 @@ impl StudyCaseResult {
                     / count,
             );
         }
-        values.insert(
-            "information_received_deliveries".into(),
-            metrics
-                .information_delivery
-                .values()
-                .map(|delivery| f64::from(delivery.received_agents))
-                .sum(),
-        );
-        values.insert(
-            "information_accepted_deliveries".into(),
-            metrics
-                .information_delivery
-                .values()
-                .map(|delivery| f64::from(delivery.accepted_agents))
-                .sum(),
-        );
+        information_observations(metrics, &mut values);
         if let Some(movement) = &metrics.movement_metrics {
             if let Some(audit) = &movement.on_surface_clearance_audit {
                 values.insert("max_disc_overlap_m".into(), audit.maximum_disc_overlap_m);
@@ -138,6 +123,12 @@ impl StudyCaseResult {
                     audit.maximum_swept_disc_overlap_m,
                 );
             }
+        }
+        if values
+            .values()
+            .any(|value| !value.is_finite() || *value < 0.0)
+        {
+            return BTreeMap::new();
         }
         values
     }
@@ -151,6 +142,7 @@ pub struct StudyCaseArtifacts {
     /// Original generation manifest, describing geometry with a placeholder
     /// population. The actual evaluated input is `input_json` and its context.
     pub generation: Option<GenerationManifest>,
+    pub generated_json: Option<String>,
 }
 
 /// Streams one case at a time, caching exactly one layout and one population.
@@ -270,6 +262,7 @@ impl StudyRunner {
             input_json: None,
             bundle: None,
             generation: space.map(|space| space.manifest.clone()),
+            generated_json: space.map(|space| space.json.clone()),
         };
         let input = match &self.population.as_ref().expect("prepared population").1 {
             Ok(input) => input,
@@ -365,4 +358,26 @@ fn geometry_hash(scenario: &crate::Scenario) -> String {
             })
             .collect::<Vec<_>>(),
     ))
+}
+
+fn information_observations(
+    metrics: &crate::bundle::RunMetrics,
+    values: &mut BTreeMap<String, f64>,
+) {
+    values.insert(
+        "information_received_deliveries".into(),
+        metrics
+            .information_delivery
+            .values()
+            .map(|delivery| f64::from(delivery.received_agents))
+            .sum(),
+    );
+    values.insert(
+        "information_accepted_deliveries".into(),
+        metrics
+            .information_delivery
+            .values()
+            .map(|delivery| f64::from(delivery.accepted_agents))
+            .sum(),
+    );
 }

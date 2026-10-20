@@ -300,19 +300,20 @@ fn summary_percentiles_and_comparisons_use_each_metrics_available_seed_pairs() {
     for (index, case) in cases.iter_mut().enumerate() {
         let metrics = case.evaluation.as_mut().unwrap().metrics.as_mut().unwrap();
         if index != 7 {
+            metrics.evacuated_agents = metrics.total_agents;
             metrics.clearance_time_s = Some(
-                f64::from(u32::try_from(index / 2 + 1).unwrap())
-                    + if index % 2 == 1 { 1.0 } else { 0.0 },
+                f64::from(u32::try_from(index / 2 + 1).unwrap()) * 0.02
+                    + if index % 2 == 1 { 0.01 } else { 0.0 },
             );
         }
     }
     let report = StudyReport::from_cases(config, cases).unwrap();
     let baseline = &report.groups[0].metrics["clearance_time_s"];
-    assert!((baseline.mean - 2.5).abs() < f64::EPSILON);
-    assert!((baseline.median - 2.5).abs() < f64::EPSILON);
-    assert!((baseline.p95 - 4.0).abs() < f64::EPSILON);
+    assert!((baseline.mean - 0.05).abs() < f64::EPSILON);
+    assert!((baseline.median - 0.05).abs() < f64::EPSILON);
+    assert!((baseline.p95 - 0.08).abs() < f64::EPSILON);
     let differences = &report.comparisons[0].deltas["clearance_time_s"];
     assert_eq!(differences.samples, 3);
     assert_eq!(differences.missing, 1);
-    assert!((differences.mean - 1.0).abs() < f64::EPSILON);
+    assert!((differences.mean - 0.01).abs() < f64::EPSILON);
 }

@@ -1,0 +1,40 @@
+{
+  "study_version": "1",
+  "name": "Architecture, scale, and exit announcements",
+  "environment": {
+    "tile_size_m": 6.0,
+    "passage_width_m": 2.0,
+    "duration_s": 120.0,
+    "timestep_s": 0.2
+  },
+  "patterns": [
+    {"id": "concourse", "preset": "concourse"},
+    {"id": "corridors", "preset": "corridors"}
+  ],
+  "scales": [
+    {"id": "small", "width": 4, "height": 4, "floors": 1, "service_rate_multiplier": 1.0},
+    {"id": "large", "width": 8, "height": 8, "floors": 1, "service_rate_multiplier": 1.0}
+  ],
+  "loads": [
+    {"id": "light", "population": {"kind": "density", "agents_per_m2": 0.01, "basis": "gross"}},
+    {"id": "busy", "population": {"kind": "density", "agents_per_m2": 0.02, "basis": "gross"}}
+  ],
+  "operations": {
+    "exit_states": [{"id": "primary_closure", "exit": "primary", "open": false, "at_s": 10.0}]
+  },
+  "policies": [
+    {"id": "no-announcement"},
+    {
+      "id": "official-announcement",
+      "messages": [{
+        "id": "closure_notice", "source": "Official", "surface": "floor_0",
+        "origin": {"x_m": 0.0, "y_m": 0.0, "z_m": 0.0},
+        "claim": {"ExitAvailability": {"exit": "primary", "open": false}},
+        "truthful": true, "at_s": 10.0, "reach_m": 10000.0, "trust": 0.9,
+        "sampling_key": "primary-closure"
+      }]
+    }
+  ],
+  "seeds": [73, 74],
+  "evaluation": {"verify_replay": true, "thresholds": {"min_evacuated_fraction": 1.0}}
+}

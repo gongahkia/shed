@@ -12,6 +12,7 @@ use std::{
 mod benchmarks;
 mod scenario_files;
 mod spaces;
+mod studies;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -69,6 +70,8 @@ enum Command {
     Evaluate(spaces::EvaluateArgs),
     /// Run fixed benchmark profiles, freeze cases, and compare saved baselines.
     Benchmark(benchmarks::BenchmarkArgs),
+    /// Compare architectural patterns across size, population, and communication.
+    Study(studies::StudyArgs),
     /// Reconstruct and summarize a current run bundle.
     Replay { bundle: PathBuf },
     /// Export a current JSON scenario from a hash-verified run bundle.
@@ -147,6 +150,7 @@ fn main() -> Result<()> {
         Command::SpaceRules { preset } => spaces::print_config(preset)?,
         Command::Evaluate(args) => spaces::evaluate(&args)?,
         Command::Benchmark(args) => benchmarks::execute(&args)?,
+        Command::Study(args) => studies::execute(&args)?,
         Command::ExtractScenario { bundle, output } => scenario_files::extract(&bundle, &output)?,
         Command::Replay {
             bundle: bundle_path,

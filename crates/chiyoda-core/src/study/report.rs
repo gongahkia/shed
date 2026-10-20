@@ -220,11 +220,25 @@ fn validate_cases(config: &StudyConfig, cases: &[StudyCaseResult]) -> Result<(),
                 || case.input_sha256.is_none()
                 || context.floors.len() != config.scales[coordinate[1]].floors as usize
                 || context.total_people == 0
-                || context.total_people
-                    != context.floors.iter().map(|floor| floor.people).sum::<u32>()
+                || context.total_people > 4096
+                || context
+                    .floors
+                    .iter()
+                    .any(|floor| !(1..=1024).contains(&floor.people))
+                || Some(context.total_people)
+                    != context
+                        .floors
+                        .iter()
+                        .try_fold(0u32, |sum, floor| sum.checked_add(floor.people))
+                || (case.passed
+                    && (evaluation.metrics.is_none()
+                        || evaluation.bundle_hash.is_none()
+                        || (config.evaluation.verify_replay && !evaluation.replay_verified)))
                 || evaluation.metrics.as_ref().is_some_and(|metrics| {
                     metrics.total_agents != context.total_people
                         || metrics.evacuated_agents > metrics.total_agents
+                        || (metrics.clearance_time_s.is_some()
+                            && metrics.evacuated_agents != metrics.total_agents)
                 })
             {
                 return Err(

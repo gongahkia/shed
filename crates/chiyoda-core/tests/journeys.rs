@@ -113,6 +113,19 @@ fn sparse_missing_and_reordered_trace_frames_are_rejected_even_after_resealing()
         broken.bundle_hash = bundle_hash(&broken);
         assert!(journeys::analyze(&broken, &JourneyOptions::default()).is_err());
     }
+    // Canonical nine-decimal timestamps cannot resolve this authored cadence.
+    // Do not silently turn its distinct integration intervals into zero time.
+    let mut tiny = free_walk();
+    tiny.duration_s = 1e-8;
+    tiny.timestep_s = 1e-10;
+    let rounded = run(
+        &tiny,
+        RunOptions {
+            trace_every_steps: 1,
+        },
+    )
+    .unwrap();
+    assert!(journeys::analyze(&rounded, &JourneyOptions::default()).is_err());
 }
 
 #[test]

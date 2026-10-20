@@ -174,11 +174,12 @@ fn validate_trace(bundle: &RunBundle) -> Result<(), String> {
         let expected_time = ((step as f64) * scenario.timestep_s).min(scenario.duration_s);
         if frame.step != step
             || !frame.time_s.is_finite()
+            || (index > 0 && frame.time_s <= bundle.trace[index - 1].time_s)
             || (frame.time_s - expected_time).abs() > 1e-8 * (1.0 + expected_time)
             || frame.agents.len() != first.agents.len()
         {
             return Err(
-                "journey trace has missing, duplicate, or mistimed integration frames".into(),
+                "journey trace has missing, duplicate, nonmonotonic, or mistimed integration frames".into(),
             );
         }
         for (initial, agent) in first.agents.iter().zip(&frame.agents) {

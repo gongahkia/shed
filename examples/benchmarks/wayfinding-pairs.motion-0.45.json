@@ -1,0 +1,574 @@
+{
+  "runtime_version": "0.45.0-alpha.1",
+  "source_revision": "ccd9cfe",
+  "source_reference_report_hash": "af6ce2f02d5067eab88525c105cdb5fe6a3ea46e7e9b173f6312774f7f25e1ef",
+  "benchmark_report_hash": "0766664e3d5c50a24962e37f17edcde01ed52e90e537d77b5f7621154043df0c",
+  "suite_hash": "fc2270fc16797b286bea9ee2d0d4be39b626d709883a39798a8bcdd640e40786",
+  "reference_passed": 5,
+  "current_passed": 10,
+  "cases": [
+    {
+      "id": "concourse-large-73-busy-silent",
+      "scenario_hash": "4059993ecd0ee913cc8780cf5c381bfa677d4901e7147fab59a72c4a9604f48e",
+      "bundle_hash": "50d959a2c3ed7131bfaa3018883c18254f943352850eb393c6728dda00344bb0",
+      "reference_evacuated": 20,
+      "current_evacuated": 47,
+      "people": 47,
+      "reference_clearance_time_s": null,
+      "current_clearance_time_s": 110.6,
+      "current_mean_exit_time_s": 72.49787234,
+      "movement_metrics": {
+        "swept_motion_guard_steps": 171,
+        "agents_with_local_clearance_adjustments": 46,
+        "local_clearance_adjustment_steps": 7239,
+        "local_avoidance_constraint_fallback_steps": 812,
+        "on_surface_clearance_audit": {
+          "agents_with_disc_overlaps": 0,
+          "disc_overlap_pair_steps": 0,
+          "maximum_disc_overlap_m": 0.0
+        },
+        "swept_on_surface_clearance_audit": {
+          "agents_with_swept_disc_overlaps": 0,
+          "swept_disc_overlap_pair_steps": 0,
+          "maximum_swept_disc_overlap_m": 0.0
+        },
+        "cumulative_local_clearance_adjustment_m": 851.687439218,
+        "maximum_local_clearance_adjustment_m": 0.48
+      },
+      "walking_low_progress": [
+        {
+          "agent": "study_0_20:0",
+          "surface": "floor_0",
+          "start_step": 381,
+          "end_step": 507,
+          "start_time_s": 76.2,
+          "end_time_s": 101.4,
+          "minimum_window_travel_m": 0.0121219
+        }
+      ]
+    },
+    {
+      "id": "concourse-large-73-busy-announced",
+      "scenario_hash": "124b577cb7ac935db2be37981714d01adcae50e04b7d249f2dda575700f77ff1",
+      "bundle_hash": "58f1e60d705254e309d83554862d0a4f0c8fecb0bff6221b1535925323969413",
+      "reference_evacuated": 47,
+      "current_evacuated": 47,
+      "people": 47,
+      "reference_clearance_time_s": 93.2,
+      "current_clearance_time_s": 88.6,
+      "current_mean_exit_time_s": 48.872340426,
+      "movement_metrics": {
+        "swept_motion_guard_steps": 52,
+        "agents_with_local_clearance_adjustments": 46,
+        "local_clearance_adjustment_steps": 3727,
+        "local_avoidance_constraint_fallback_steps": 318,
+        "on_surface_clearance_audit": {
+          "agents_with_disc_overlaps": 0,
+          "disc_overlap_pair_steps": 0,
+          "maximum_disc_overlap_m": 0.0
+        },
+        "swept_on_surface_clearance_audit": {
+          "agents_with_swept_disc_overlaps": 0,
+          "swept_disc_overlap_pair_steps": 0,
+          "maximum_swept_disc_overlap_m": 0.0
+        },
+        "cumulative_local_clearance_adjustment_m": 311.663732067,
+        "maximum_local_clearance_adjustment_m": 0.48
+      },
+      "walking_low_progress": []
+    },
+    {
+      "id": "concourse-large-74-light-silent",
+      "scenario_hash": "5057ceecef13149687cbaccc9133df173638aad39ef322f620f91c99d0476fbc",
+      "bundle_hash": "dcce763bea2fb080e01c89bd33f60da529863359d085769cfbe9ab4fb66370e8",
+      "reference_evacuated": 22,
+      "current_evacuated": 24,
+      "people": 24,
+      "reference_clearance_time_s": null,
+      "current_clearance_time_s": 107.4,
+      "current_mean_exit_time_s": 56.241666667,
+      "movement_metrics": {
+        "swept_motion_guard_steps": 18,
+        "agents_with_local_clearance_adjustments": 24,
+        "local_clearance_adjustment_steps": 1492,
+        "local_avoidance_constraint_fallback_steps": 93,
+        "on_surface_clearance_audit": {
+          "agents_with_disc_overlaps": 0,
+          "disc_overlap_pair_steps": 0,
+          "maximum_disc_overlap_m": 0.0
+        },
+        "swept_on_surface_clearance_audit": {
+          "agents_with_swept_disc_overlaps": 0,
+          "swept_disc_overlap_pair_steps": 0,
+          "maximum_swept_disc_overlap_m": 0.0
+        },
+        "cumulative_local_clearance_adjustment_m": 158.733475233,
+        "maximum_local_clearance_adjustment_m": 0.478794068
+      },
+      "walking_low_progress": []
+    },
+    {
+      "id": "concourse-large-74-light-announced",
+      "scenario_hash": "543a3ff761d953f1fcadb28ed05ea42df3e467b0733668ec68df67e87b03dd13",
+      "bundle_hash": "278afc3f16de98ba89da04972186a0f57fc2b8406c07f5394c97db0d0b441874",
+      "reference_evacuated": 24,
+      "current_evacuated": 24,
+      "people": 24,
+      "reference_clearance_time_s": 85.8,
+      "current_clearance_time_s": 78.0,
+      "current_mean_exit_time_s": 43.916666667,
+      "movement_metrics": {
+        "swept_motion_guard_steps": 3,
+        "agents_with_local_clearance_adjustments": 24,
+        "local_clearance_adjustment_steps": 1026,
+        "local_avoidance_constraint_fallback_steps": 58,
+        "on_surface_clearance_audit": {
+          "agents_with_disc_overlaps": 0,
+          "disc_overlap_pair_steps": 0,
+          "maximum_disc_overlap_m": 0.0
+        },
+        "swept_on_surface_clearance_audit": {
+          "agents_with_swept_disc_overlaps": 0,
+          "swept_disc_overlap_pair_steps": 0,
+          "maximum_swept_disc_overlap_m": 0.0
+        },
+        "cumulative_local_clearance_adjustment_m": 89.295937393,
+        "maximum_local_clearance_adjustment_m": 0.478794068
+      },
+      "walking_low_progress": []
+    },
+    {
+      "id": "concourse-large-74-busy-silent",
+      "scenario_hash": "eed2fc320955666220513e497d33f01d641759beb76e7a2a045c2e2df63f4852",
+      "bundle_hash": "8ecc2f980c4ed899e25a8988528f5e3b00b605f20c7318a945cff959a2ff14e1",
+      "reference_evacuated": 30,
+      "current_evacuated": 47,
+      "people": 47,
+      "reference_clearance_time_s": null,
+      "current_clearance_time_s": 116.8,
+      "current_mean_exit_time_s": 66.255319149,
+      "movement_metrics": {
+        "swept_motion_guard_steps": 115,
+        "agents_with_local_clearance_adjustments": 47,
+        "local_clearance_adjustment_steps": 5782,
+        "local_avoidance_constraint_fallback_steps": 616,
+        "on_surface_clearance_audit": {
+          "agents_with_disc_overlaps": 0,
+          "disc_overlap_pair_steps": 0,
+          "maximum_disc_overlap_m": 0.0
+        },
+        "swept_on_surface_clearance_audit": {
+          "agents_with_swept_disc_overlaps": 0,
+          "swept_disc_overlap_pair_steps": 0,
+          "maximum_swept_disc_overlap_m": 0.0
+        },
+        "cumulative_local_clearance_adjustment_m": 585.304467812,
+        "maximum_local_clearance_adjustment_m": 0.479895947
+      },
+      "walking_low_progress": []
+    },
+    {
+      "id": "concourse-large-74-busy-announced",
+      "scenario_hash": "37dc1d36b9445f7b27b8c888188a123a5ed4017e77b1395b1706fd7696407abf",
+      "bundle_hash": "5c0001a63bbe1625e44be06c001a99c5b1d27add8a118ef875758c36febdd4a6",
+      "reference_evacuated": 47,
+      "current_evacuated": 47,
+      "people": 47,
+      "reference_clearance_time_s": 106.0,
+      "current_clearance_time_s": 96.4,
+      "current_mean_exit_time_s": 51.255319149,
+      "movement_metrics": {
+        "swept_motion_guard_steps": 37,
+        "agents_with_local_clearance_adjustments": 47,
+        "local_clearance_adjustment_steps": 3886,
+        "local_avoidance_constraint_fallback_steps": 270,
+        "on_surface_clearance_audit": {
+          "agents_with_disc_overlaps": 0,
+          "disc_overlap_pair_steps": 0,
+          "maximum_disc_overlap_m": 0.0
+        },
+        "swept_on_surface_clearance_audit": {
+          "agents_with_swept_disc_overlaps": 0,
+          "swept_disc_overlap_pair_steps": 0,
+          "maximum_swept_disc_overlap_m": 0.0
+        },
+        "cumulative_local_clearance_adjustment_m": 349.082550403,
+        "maximum_local_clearance_adjustment_m": 0.479696753
+      },
+      "walking_low_progress": []
+    },
+    {
+      "id": "corridors-large-73-light-silent",
+      "scenario_hash": "eee625d53a79a617c97cf11a2788b310878451ce3175dd9a3cf1378837938af9",
+      "bundle_hash": "ab91a41642de5471fbc2a47a77fc5dec3046c72b457fd01ef9adf8d1a68fe3db",
+      "reference_evacuated": 18,
+      "current_evacuated": 24,
+      "people": 24,
+      "reference_clearance_time_s": null,
+      "current_clearance_time_s": 115.0,
+      "current_mean_exit_time_s": 70.441666667,
+      "movement_metrics": {
+        "swept_motion_guard_steps": 15,
+        "agents_with_local_clearance_adjustments": 23,
+        "local_clearance_adjustment_steps": 2036,
+        "local_avoidance_constraint_fallback_steps": 68,
+        "on_surface_clearance_audit": {
+          "agents_with_disc_overlaps": 0,
+          "disc_overlap_pair_steps": 0,
+          "maximum_disc_overlap_m": 0.0
+        },
+        "swept_on_surface_clearance_audit": {
+          "agents_with_swept_disc_overlaps": 0,
+          "swept_disc_overlap_pair_steps": 0,
+          "maximum_swept_disc_overlap_m": 0.0
+        },
+        "cumulative_local_clearance_adjustment_m": 153.48385842,
+        "maximum_local_clearance_adjustment_m": 0.479852698
+      },
+      "walking_low_progress": []
+    },
+    {
+      "id": "corridors-large-73-light-announced",
+      "scenario_hash": "c16b678492b5679fe2a51f3eb1a969dafdbb9a8fa04cb4224982adcc026a1c1a",
+      "bundle_hash": "7eb1e8ddb524ec085cf8c1fb3693b38e4ef9dcf55b4838ef5940db63e6cdd07a",
+      "reference_evacuated": 24,
+      "current_evacuated": 24,
+      "people": 24,
+      "reference_clearance_time_s": 108.2,
+      "current_clearance_time_s": 106.2,
+      "current_mean_exit_time_s": 50.658333333,
+      "movement_metrics": {
+        "swept_motion_guard_steps": 19,
+        "agents_with_local_clearance_adjustments": 23,
+        "local_clearance_adjustment_steps": 1631,
+        "local_avoidance_constraint_fallback_steps": 129,
+        "on_surface_clearance_audit": {
+          "agents_with_disc_overlaps": 0,
+          "disc_overlap_pair_steps": 0,
+          "maximum_disc_overlap_m": 0.0
+        },
+        "swept_on_surface_clearance_audit": {
+          "agents_with_swept_disc_overlaps": 0,
+          "swept_disc_overlap_pair_steps": 0,
+          "maximum_swept_disc_overlap_m": 0.0
+        },
+        "cumulative_local_clearance_adjustment_m": 125.599652553,
+        "maximum_local_clearance_adjustment_m": 0.47873237
+      },
+      "walking_low_progress": []
+    },
+    {
+      "id": "corridors-large-73-busy-silent",
+      "scenario_hash": "26b685a33fcf5a3d246a2b2c0cd52c86cd7a1e173b6b9797396fcb87862fcd5c",
+      "bundle_hash": "c636cfa4f153223774b7c2825f97eb6cda485d90f5669b81732a6a2bff9a5178",
+      "reference_evacuated": 28,
+      "current_evacuated": 47,
+      "people": 47,
+      "reference_clearance_time_s": null,
+      "current_clearance_time_s": 117.6,
+      "current_mean_exit_time_s": 62.068085106,
+      "movement_metrics": {
+        "swept_motion_guard_steps": 36,
+        "agents_with_local_clearance_adjustments": 46,
+        "local_clearance_adjustment_steps": 4602,
+        "local_avoidance_constraint_fallback_steps": 276,
+        "on_surface_clearance_audit": {
+          "agents_with_disc_overlaps": 0,
+          "disc_overlap_pair_steps": 0,
+          "maximum_disc_overlap_m": 0.0
+        },
+        "swept_on_surface_clearance_audit": {
+          "agents_with_swept_disc_overlaps": 0,
+          "swept_disc_overlap_pair_steps": 0,
+          "maximum_swept_disc_overlap_m": 0.0
+        },
+        "cumulative_local_clearance_adjustment_m": 373.801141891,
+        "maximum_local_clearance_adjustment_m": 0.47817653
+      },
+      "walking_low_progress": []
+    },
+    {
+      "id": "corridors-large-73-busy-announced",
+      "scenario_hash": "43802255ff16fab63c81ac66015d3b47e5aa0985cbdff1a694b311605916bab7",
+      "bundle_hash": "9b82cb223fb87388889d4cca0eb4bfb0f94e0ddb39a01cd954bd56c47366cfb1",
+      "reference_evacuated": 47,
+      "current_evacuated": 47,
+      "people": 47,
+      "reference_clearance_time_s": 108.2,
+      "current_clearance_time_s": 111.6,
+      "current_mean_exit_time_s": 45.876595745,
+      "movement_metrics": {
+        "swept_motion_guard_steps": 39,
+        "agents_with_local_clearance_adjustments": 46,
+        "local_clearance_adjustment_steps": 3329,
+        "local_avoidance_constraint_fallback_steps": 194,
+        "on_surface_clearance_audit": {
+          "agents_with_disc_overlaps": 0,
+          "disc_overlap_pair_steps": 0,
+          "maximum_disc_overlap_m": 0.0
+        },
+        "swept_on_surface_clearance_audit": {
+          "agents_with_swept_disc_overlaps": 0,
+          "swept_disc_overlap_pair_steps": 0,
+          "maximum_swept_disc_overlap_m": 0.0
+        },
+        "cumulative_local_clearance_adjustment_m": 242.549992407,
+        "maximum_local_clearance_adjustment_m": 0.47618872
+      },
+      "walking_low_progress": []
+    }
+  ],
+  "note": "Recorded simulator observations for motion contract 0.45. Fixed inputs and original checks are retained in wayfinding-pairs.json; these results are not calibrated flow evidence.",
+  "study": {
+    "report_hash": "61670033c0893c03388ac567e9770ed5a399ee16e5c761eaa888a8dff331e3ae",
+    "config_hash": "96f3d03057dc3df39e550f8f8307ada3497a831a71d51a9a08258c9c162ba1d5",
+    "reference_passed": 27,
+    "current_passed": 32,
+    "cases": 32,
+    "unchanged_scenario_and_layout_hashes": 32,
+    "replay_verified_cases": 32,
+    "maximum_disc_overlap_m": 0,
+    "maximum_swept_disc_overlap_m": 0,
+    "policy_clearance_deltas": [
+      {
+        "baseline": {
+          "pattern": "concourse",
+          "scale": "small",
+          "load": "light",
+          "policy": "no-announcement"
+        },
+        "current": {
+          "pattern": "concourse",
+          "scale": "small",
+          "load": "light",
+          "policy": "official-announcement"
+        },
+        "requested_pairs": 2,
+        "measured_pairs": 2,
+        "clearance_time_s": {
+          "samples": 2,
+          "missing": 0,
+          "mean": -6.000000000000002,
+          "min": -12.000000000000004,
+          "median": -6.000000000000002,
+          "p95": 0.0,
+          "max": 0.0
+        }
+      },
+      {
+        "baseline": {
+          "pattern": "concourse",
+          "scale": "small",
+          "load": "busy",
+          "policy": "no-announcement"
+        },
+        "current": {
+          "pattern": "concourse",
+          "scale": "small",
+          "load": "busy",
+          "policy": "official-announcement"
+        },
+        "requested_pairs": 2,
+        "measured_pairs": 2,
+        "clearance_time_s": {
+          "samples": 2,
+          "missing": 0,
+          "mean": -1.5,
+          "min": -2.0,
+          "median": -1.5,
+          "p95": -1.0,
+          "max": -1.0
+        }
+      },
+      {
+        "baseline": {
+          "pattern": "concourse",
+          "scale": "large",
+          "load": "light",
+          "policy": "no-announcement"
+        },
+        "current": {
+          "pattern": "concourse",
+          "scale": "large",
+          "load": "light",
+          "policy": "official-announcement"
+        },
+        "requested_pairs": 2,
+        "measured_pairs": 2,
+        "clearance_time_s": {
+          "samples": 2,
+          "missing": 0,
+          "mean": -15.800000000000004,
+          "min": -29.400000000000006,
+          "median": -15.800000000000004,
+          "p95": -2.200000000000003,
+          "max": -2.200000000000003
+        }
+      },
+      {
+        "baseline": {
+          "pattern": "concourse",
+          "scale": "large",
+          "load": "busy",
+          "policy": "no-announcement"
+        },
+        "current": {
+          "pattern": "concourse",
+          "scale": "large",
+          "load": "busy",
+          "policy": "official-announcement"
+        },
+        "requested_pairs": 2,
+        "measured_pairs": 2,
+        "clearance_time_s": {
+          "samples": 2,
+          "missing": 0,
+          "mean": -21.199999999999996,
+          "min": -22.0,
+          "median": -21.199999999999996,
+          "p95": -20.39999999999999,
+          "max": -20.39999999999999
+        }
+      },
+      {
+        "baseline": {
+          "pattern": "corridors",
+          "scale": "small",
+          "load": "light",
+          "policy": "no-announcement"
+        },
+        "current": {
+          "pattern": "corridors",
+          "scale": "small",
+          "load": "light",
+          "policy": "official-announcement"
+        },
+        "requested_pairs": 2,
+        "measured_pairs": 2,
+        "clearance_time_s": {
+          "samples": 2,
+          "missing": 0,
+          "mean": -1.799999999999999,
+          "min": -3.599999999999998,
+          "median": -1.799999999999999,
+          "p95": 0.0,
+          "max": 0.0
+        }
+      },
+      {
+        "baseline": {
+          "pattern": "corridors",
+          "scale": "small",
+          "load": "busy",
+          "policy": "no-announcement"
+        },
+        "current": {
+          "pattern": "corridors",
+          "scale": "small",
+          "load": "busy",
+          "policy": "official-announcement"
+        },
+        "requested_pairs": 2,
+        "measured_pairs": 2,
+        "clearance_time_s": {
+          "samples": 2,
+          "missing": 0,
+          "mean": -0.6999999999999993,
+          "min": -1.3999999999999986,
+          "median": -0.6999999999999993,
+          "p95": 0.0,
+          "max": 0.0
+        }
+      },
+      {
+        "baseline": {
+          "pattern": "corridors",
+          "scale": "large",
+          "load": "light",
+          "policy": "no-announcement"
+        },
+        "current": {
+          "pattern": "corridors",
+          "scale": "large",
+          "load": "light",
+          "policy": "official-announcement"
+        },
+        "requested_pairs": 2,
+        "measured_pairs": 2,
+        "clearance_time_s": {
+          "samples": 2,
+          "missing": 0,
+          "mean": -4.5,
+          "min": -8.799999999999997,
+          "median": -4.5,
+          "p95": -0.20000000000000284,
+          "max": -0.20000000000000284
+        }
+      },
+      {
+        "baseline": {
+          "pattern": "corridors",
+          "scale": "large",
+          "load": "busy",
+          "policy": "no-announcement"
+        },
+        "current": {
+          "pattern": "corridors",
+          "scale": "large",
+          "load": "busy",
+          "policy": "official-announcement"
+        },
+        "requested_pairs": 2,
+        "measured_pairs": 2,
+        "clearance_time_s": {
+          "samples": 2,
+          "missing": 0,
+          "mean": -3.8999999999999986,
+          "min": -6.0,
+          "median": -3.8999999999999986,
+          "p95": -1.7999999999999972,
+          "max": -1.7999999999999972
+        }
+      }
+    ],
+    "matched_frozen_bundle_hashes": 10
+  },
+  "additional_checks": [
+    {
+      "name": "standard-final",
+      "report_hash": "d99741aca1a986b4562d8f7dde5771ef2f36c29b34992389bf5abe1443a7b0da",
+      "passed": 10,
+      "failed": 0,
+      "replay_verified_cases": 10,
+      "maximum_disc_overlap_m": 0,
+      "maximum_swept_disc_overlap_m": 0
+    },
+    {
+      "name": "stress-final",
+      "report_hash": "2bef0936c4cca9ae97c948983a57a527738e61e6b5f190a5ab36d17e118085aa",
+      "passed": 5,
+      "failed": 0,
+      "replay_verified_cases": 5,
+      "maximum_disc_overlap_m": 0,
+      "maximum_swept_disc_overlap_m": 0
+    },
+    {
+      "name": "local-awareness-final",
+      "report_hash": "803bacdf7248b7dcfeea3ef89214217f1136609abd454c564bcc8f1b779bf291",
+      "passed": 24,
+      "failed": 0,
+      "replay_verified_cases": 24,
+      "maximum_disc_overlap_m": 0,
+      "maximum_swept_disc_overlap_m": 0
+    },
+    {
+      "name": "communication-final",
+      "report_hash": "abeb2a23bbf0a6f19b1a047d581307d1e654be440e1baed1ae13885ebe1e1847",
+      "passed": 24,
+      "failed": 0,
+      "replay_verified_cases": 24,
+      "maximum_disc_overlap_m": 0,
+      "maximum_swept_disc_overlap_m": 0
+    }
+  ]
+}

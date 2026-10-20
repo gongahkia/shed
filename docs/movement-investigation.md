@@ -94,3 +94,63 @@ The default test checks the immutable scenario hashes and paired controls.
 The full test additionally requires every case to finish, reconstruct, and
 retain zero overlap in both independent disc audits. It leaves the frozen
 suite's original assertions unchanged.
+
+## Fixed-input rerun
+
+Under 0.45, all ten cases pass the original 120 s full-completion and replay
+checks. All ten report zero maximum boundary and swept reference-disc overlap.
+The five previously incomplete silent cases now finish alongside their matched
+announcement controls:
+
+| Pattern / seed / load | Original silent completion | 0.45 silent clearance | 0.45 announced clearance |
+| --- | ---: | ---: | ---: |
+| Concourse / 73 / busy | 20/47 | 110.6 s | 88.6 s |
+| Concourse / 74 / light | 22/24 | 107.4 s | 78.0 s |
+| Concourse / 74 / busy | 30/47 | 116.8 s | 96.4 s |
+| Corridors / 73 / light | 18/24 | 115.0 s | 106.2 s |
+| Corridors / 73 / busy | 28/47 | 117.6 s | 111.6 s |
+
+Announcements reduce modeled full-clearance time by 6.0–29.4 s in these five
+selected pairs. The original partial runs have no full-clearance time and are
+not assigned one for a before/after speed comparison. Selection deliberately
+focused on previous failures; it is not an unbiased estimate of policy effect.
+
+Solver fallbacks remain visible: 68–812 agent-steps in the five silent cases.
+The concourse/73 busy case retains one merged low-progress alert for
+`study_0_20:0`, from 76.2 to 101.4 s. It waits near `(40.25, 39.70)` while a
+sequence of other people passes through the adjacent corner, then continues
+and exits. This is temporary modeled crowd delay; the alert does not establish
+a permanent deadlock or validate the delay as realistic. A passing completion
+check is not a claim that every movement assumption is settled.
+
+## Architecture and communication rerun
+
+The complete saved 32-case configuration now passes 32/32, compared with 27/32
+in 0.44. All 32 retain identical scenario hashes, layout hashes, and controlled
+physical/population/operations context. All reconstruct and report zero maximum
+overlap in both disc audits. The ten benchmark bundles also match their study
+counterparts exactly, so the two execution paths agree on more than completion.
+
+The 32-case report retains all policy, scale, load, and pattern comparisons.
+For the large cases, the official announcement's mean clearance change across
+the two seeds is −15.8 s for light concourses, −21.2 s for busy concourses,
+−4.5 s for light corridors, and −3.9 s for busy corridors. These are paired
+within-layout simulator results with two samples per cell. Different patterns
+have different generated layouts and route lengths; these numbers alone do
+not rank architectural safety or establish a scaling law.
+
+The separate 24-case awareness and 24-case rumor/correction studies also pass
+with reconstruction and zero overlap in both audits. All ten standard and all
+five strict stress benchmarks pass their original checks. The
+[recorded result summary](../examples/benchmarks/wayfinding-pairs.motion-0.45.json)
+retains the report checksums, case input/bundle hashes, movement telemetry,
+remaining walking alert, and policy sample counts.
+
+Full local artifacts from this investigation are in
+`out/movement-validation-20261020/`: `reference-044`, `isolated-044`,
+`wayfinding-final`, `study-final`, `local-awareness-final`,
+`communication-final`, `standard-final`, and `stress-final`. Intermediate
+pilot directories are development evidence, not the final comparison. Rebuild
+and use the commands above to recreate the final fixed-input and study reports.
+The failed 0.44 reference remains an observation; it has not been promoted to
+a passing performance baseline.

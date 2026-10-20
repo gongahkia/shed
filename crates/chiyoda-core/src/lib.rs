@@ -12,6 +12,7 @@ pub mod model;
 pub mod reachability;
 pub mod runtime;
 pub mod scenario_json;
+pub mod study;
 pub mod validate;
 pub mod wfc;
 

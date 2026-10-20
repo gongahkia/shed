@@ -47,8 +47,12 @@ pub(crate) fn journey_reference(
             passed_gates: None,
         },
     )?;
+    let duration = travel + exit.plan.nominal_duration_s;
+    if !duration.is_finite() || !dwell.is_finite() {
+        return None;
+    }
     Some(NominalJourney {
-        centre_route_duration_s: travel + exit.plan.nominal_duration_s,
+        centre_route_duration_s: duration,
         authored_dwell_s: dwell,
         exit: exit.target.id,
     })

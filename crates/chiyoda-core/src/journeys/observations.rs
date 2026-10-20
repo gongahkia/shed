@@ -291,10 +291,16 @@ fn account_events(bundle: &RunBundle, agents: &mut [AgentJourney]) -> Result<(),
 
 fn check_accounting(bundle: &RunBundle, agents: &[AgentJourney]) -> Result<(), String> {
     let close = |left: f64, right: f64| (left - right).abs() <= 1e-7 * (1.0 + right.abs());
-    if agents
+    if agents.iter().any(|agent| {
+        ![
+            agent.walking_distance_m,
+            agent.connector_interior_distance_m,
+            agent.transition_distance_m,
+        ]
         .iter()
-        .any(|agent| !close(agent.time.total_s(), bundle.scenario.scenario.duration_s))
-    {
+        .all(|value| value.is_finite() && *value >= 0.0)
+            || !close(agent.time.total_s(), bundle.scenario.scenario.duration_s)
+    }) {
         return Err("journey state budgets do not cover the observed duration".into());
     }
     if let Some(queue) = &bundle.metrics.queue_metrics {
@@ -319,6 +325,22 @@ fn check_accounting(bundle: &RunBundle, agents: &[AgentJourney]) -> Result<(), S
             if !close(observed, expected) {
                 return Err("journey service waits disagree with runtime telemetry".into());
             }
+        }
+    }
+    if let Some(motion) = &bundle.metrics.movement_metrics {
+        let fallbacks: u64 = agents
+            .iter()
+            .map(|agent| agent.avoidance_fallback_steps)
+            .sum();
+        let guards: u64 = agents.iter().map(|agent| agent.swept_guard_steps).sum();
+        if motion
+            .local_avoidance_constraint_fallback_steps
+            .is_some_and(|count| count != fallbacks)
+            || motion
+                .swept_motion_guard_steps
+                .is_some_and(|count| count != guards)
+        {
+            return Err("journey motion events disagree with runtime telemetry".into());
         }
     }
     if agents
@@ -388,8 +410,14 @@ fn hotspots(
     let mut cells = BTreeMap::<(String, u64, u64), Cell>::new();
     for (index, agent) in agents.iter().enumerate() {
         for window in &agent.low_progress {
-            let first = bundle.trace.partition_point(|frame| frame.time_s <= window.start_time_s).saturating_sub(1);
-            let last = bundle.trace.partition_point(|frame| frame.time_s < window.end_time_s).min(bundle.trace.len() - 1);
+            let first = bundle
+                .trace
+                .partition_point(|frame| frame.time_s <= window.start_time_s)
+                .saturating_sub(1);
+            let last = bundle
+                .trace
+                .partition_point(|frame| frame.time_s < window.end_time_s)
+                .min(bundle.trace.len() - 1);
             for frames in bundle.trace[first..=last].windows(2) {
                 let start = frames[0].time_s.max(window.start_time_s);
                 let end = frames[1].time_s.min(window.end_time_s);

@@ -270,6 +270,7 @@ pub enum ControlStatus {
     BudgetLimit,
     AgentNotFound,
     RuntimeMismatch,
+    ExecutionScopeMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

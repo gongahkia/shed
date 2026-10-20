@@ -4,6 +4,9 @@ use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fmt::Write};
 
 pub const BUNDLE_VERSION: &str = "0.45";
+/// Explicit optional execution scope. Older ordinary-runtime binaries must
+/// identify these as incompatible instead of replaying the full population.
+pub const ISOLATED_BUNDLE_VERSION: &str = "0.45-isolated.1";
 
 /// Latest route-relevant evidence retained by an agent using local knowledge.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

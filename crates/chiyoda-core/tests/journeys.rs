@@ -254,6 +254,14 @@ fn isolated_execution_keeps_original_ordinal_spawn_release_and_information_draws
     };
     assert_eq!(message(&ordinary), message(&isolated));
     assert_eq!(isolated.options["isolated_agent"], "person:2");
+    assert_eq!(
+        isolated.bundle_version,
+        chiyoda_core::bundle::ISOLATED_BUNDLE_VERSION
+    );
+    assert_eq!(
+        ordinary.bundle_version,
+        chiyoda_core::bundle::BUNDLE_VERSION
+    );
     assert!(!ordinary.options.contains_key("isolated_agent"));
     assert_eq!(
         chiyoda_core::verify_run_bundle(&isolated).unwrap(),
@@ -388,4 +396,115 @@ fn journey_exports_preserve_missing_numbers_and_escape_text_and_replay_arguments
             .unwrap()
             .contains("quote\"\"<script>|\nname")
     );
+}
+
+#[test]
+fn unreleased_and_unfamiliar_people_keep_distinct_time_and_static_reference_assumptions() {
+    let mut scenario = free_walk();
+    scenario.agents[0].release_at_s = 5.0;
+    scenario.agents[0].knowledge = Some(chiyoda_core::model::AgentKnowledge {
+        observation_radius_m: 0.0,
+        known_exits: Some(Vec::new()),
+    });
+    let bundle = run(
+        &scenario,
+        RunOptions {
+            trace_every_steps: 1,
+        },
+    )
+    .unwrap();
+    let report = journeys::analyze(&bundle, &JourneyOptions::default()).unwrap();
+    let person = &report.agents[0];
+    assert!((person.time.waiting_to_depart_s - 5.0).abs() < 1e-8);
+    assert!((person.time.route_wait_s - 7.0).abs() < 1e-8);
+    assert!(person.low_progress.is_empty());
+    assert!(person.nominal_reference.is_some());
+    assert!(person.elapsed_journey_s.is_none());
+}
+
+#[test]
+fn transit_boundary_distances_are_explicit_and_motion_audit_events_reconcile() {
+    let scenario =
+        decode_scenario(include_str!("../src/benchmark/fixtures/lift-queue.json")).unwrap();
+    let mut bundle = run(
+        &scenario,
+        RunOptions {
+            trace_every_steps: 1,
+        },
+    )
+    .unwrap();
+    let report = journeys::analyze(&bundle, &JourneyOptions::default()).unwrap();
+    for (index, agent) in report.agents.iter().enumerate() {
+        let distance: f64 = bundle
+            .trace
+            .windows(2)
+            .map(|frames| {
+                let a = &frames[0].agents[index];
+                let b = &frames[1].agents[index];
+                chiyoda_core::model::Point3::new(a.x_m, a.y_m, a.z_m)
+                    .distance(chiyoda_core::model::Point3::new(b.x_m, b.y_m, b.z_m))
+            })
+            .sum();
+        assert!(
+            (distance
+                - agent.walking_distance_m
+                - agent.connector_interior_distance_m
+                - agent.transition_distance_m)
+                .abs()
+                < 1e-7
+        );
+        assert!(agent.time.transit_s > 0.0);
+    }
+    bundle
+        .metrics
+        .movement_metrics
+        .as_mut()
+        .unwrap()
+        .swept_motion_guard_steps = Some(999);
+    bundle.bundle_hash = bundle_hash(&bundle);
+    assert!(journeys::analyze(&bundle, &JourneyOptions::default()).is_err());
+}
+
+#[test]
+fn incompatible_and_nested_controls_and_unknown_analysis_versions_are_explicit() {
+    let options = JourneyOptions {
+        isolated_controls: Some(journeys::IsolationOptions {
+            all_agents: true,
+            ..journeys::IsolationOptions::default()
+        }),
+        ..JourneyOptions::default()
+    };
+    let scenario = free_walk();
+    let isolated = chiyoda_core::runtime::run_isolated(
+        &scenario,
+        RunOptions {
+            trace_every_steps: 1,
+        },
+        "person:0",
+    )
+    .unwrap();
+    let nested = journeys::analyze(&isolated, &options).unwrap();
+    assert_eq!(
+        nested.isolated_controls[0].status,
+        journeys::ControlStatus::ExecutionScopeMismatch
+    );
+    let mut legacy = run(
+        &scenario,
+        RunOptions {
+            trace_every_steps: 1,
+        },
+    )
+    .unwrap();
+    legacy.bundle_version = "older".into();
+    legacy.bundle_hash = bundle_hash(&legacy);
+    let report = journeys::analyze(&legacy, &options).unwrap();
+    assert_eq!(
+        report.isolated_controls[0].status,
+        journeys::ControlStatus::RuntimeMismatch
+    );
+    let mut report = report;
+    report.journey_version = "unknown".into();
+    report.report_hash.clear();
+    report.report_hash = chiyoda_core::bundle::canonical_hash(&report);
+    assert!(report.check_hash().is_err());
 }

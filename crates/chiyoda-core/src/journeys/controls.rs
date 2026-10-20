@@ -75,6 +75,7 @@ fn control_journey(
     id: &str,
 ) -> Result<AgentJourney, String> {
     if isolated.scenario != source.scenario
+        || isolated.bundle_version != crate::bundle::ISOLATED_BUNDLE_VERSION
         || isolated.runtime_version != source.runtime_version
         || isolated.options.get("isolated_agent").map(String::as_str) != Some(id)
         || isolated.options.get("execution_scope").map(String::as_str)
@@ -123,8 +124,10 @@ fn build(
         let person = people.get(id).copied();
         let status = if person.is_none() {
             Some(ControlStatus::AgentNotFound)
+        } else if bundle.options.contains_key("isolated_agent") {
+            Some(ControlStatus::ExecutionScopeMismatch)
         } else if bundle.runtime_version != crate::RUNTIME_VERSION
-            || bundle.options.contains_key("isolated_agent")
+            || bundle.bundle_version != crate::bundle::BUNDLE_VERSION
         {
             Some(ControlStatus::RuntimeMismatch)
         } else if count >= controls.max_agents

@@ -120,7 +120,13 @@ pub fn verify_run_bundle(bundle: &RunBundle) -> Result<BundleVerification, RunEr
             "scenario hash does not match its content".to_owned(),
         ));
     }
-    if bundle.bundle_version != BUNDLE_VERSION || bundle.runtime_version != crate::RUNTIME_VERSION {
+    let expected_version = if bundle.options.contains_key("isolated_agent") {
+        crate::bundle::ISOLATED_BUNDLE_VERSION
+    } else {
+        BUNDLE_VERSION
+    };
+    if bundle.bundle_version != expected_version || bundle.runtime_version != crate::RUNTIME_VERSION
+    {
         return Ok(BundleVerification::HashOnlyLegacy);
     }
     bundle
@@ -1950,7 +1956,12 @@ fn run_selected(
             "one-original-agent-no-other-people-1".into(),
         );
     }
-    Ok(RunBundle::new(canonical, options, trace, events, metrics))
+    let mut bundle = RunBundle::new(canonical, options, trace, events, metrics);
+    if isolated_agent.is_some() {
+        bundle.bundle_version = crate::bundle::ISOLATED_BUNDLE_VERSION.into();
+        bundle.bundle_hash = crate::bundle::bundle_hash(&bundle);
+    }
+    Ok(bundle)
 }
 
 /// Execute the ordinary deterministic reference law for all authored people.

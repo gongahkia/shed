@@ -1,7 +1,7 @@
-# Executable semantics 0.42
+# Executable semantics 0.43
 
-The Rust `chiyoda-core` runtime is the reference interpreter for language 0.27
-under runtime contract 0.42. This document is normative where it describes public
+The Rust `chiyoda-core` runtime executes [JSON scenario schema 1](scenarios.md)
+under runtime contract 0.43. This document is normative where it describes public
 behavior;
 the source and conformance tests make that behavior executable.
 
@@ -20,11 +20,11 @@ order breaks ties within one event kind.
 
 1. Apply each availability and capacity-state event whose declared time falls
    in `(previous step time, t]`. The final step is shortened when necessary so
-   that `t` is exactly the authored duration. `connector-state`, `exit-state`,
-   and `gate-state`
+   that `t` is exactly the authored duration. `connector_states`, `exit_states`,
+   and `gate_states`
    alter physical availability and immediately recompute every on-surface route.
-   `connector-capacity-state`, `exit-capacity-state`, and
-   `gate-capacity-state` alter only the effective service rate and emit an
+   `connector_capacity_states`, `exit_capacity_states`, and
+   `gate_capacity_states` alter only the effective service rate and emit an
    event; route selection does not forecast queues. State events at `0s` are
    applied before the initial trace; same-time declarations of one kind apply
    in declaration order. An availability change does not interrupt an agent
@@ -87,7 +87,7 @@ order breaks ties within one event kind.
    velocity, because either agent may choose a new bounded preferred velocity
    at this step. It chooses the
    speed-bounded velocity closest to the preference from their intersection.
-   Two members of the same preallocated `queue-grid` use their monotonic FIFO
+   Two members of the same preallocated queue grid use their monotonic FIFO
    tickets as an explicit local right-of-way rule: the earlier ticket does not
    yield an ORCA constraint to the later ticket, while the later ticket bears
    the full inside-obstacle correction. This applies only within one authored
@@ -106,16 +106,16 @@ order breaks ties within one event kind.
    unmodelled geometry, connector transit, or fallback states.
    A `waiting_at_waypoint` agent is an immobile on-surface neighbour for this
    snapshot and for later landing-clearance tests. A connector with
-   `portal-lanes` uses the agent's stable identifier-selected exact lane at
+   `portal_lanes` uses the agent's stable identifier-selected exact lane at
    both portals. At destination arrival, it remains in transit until that lane
    is statically and dynamically clear; it is not relocated to another lane or
-   endpoint. A connector without `portal-lanes` retains the separate legacy
+   endpoint. A connector without `portal_lanes` retains the separate legacy
    endpoint-clearance placement rule.
-   For an eligible line `queue-footprint`, capacity denial records the normal
+   For an eligible line `queue_footprints`, capacity denial records the normal
    queue-entry audit and gives the agent a monotonic deterministic FIFO ticket.
    An immutable per-step queue snapshot ranks tickets, using the agent
    identifier only as a stable tie-breaker, and each entrant walks to its
-   authored standing slot. A `queue-grid` instead gives each eligible
+   authored standing slot. A queue grid instead gives each eligible
    on-surface request a monotonic ticket and distinct standing-slot target
    before local motion, recording `queue_slot_preallocated` with the exact
    resource and ticket. Physical arrival records its queue-entry audit and
@@ -133,10 +133,10 @@ order breaks ties within one event kind.
    abstract service actions: an agent's clearance disc may contact a
    zero-geometry service target rather than requiring centre-point arrival.
    This avoids numerical deadlock without relaxing clearance during the
-   approach. For `release T
-   every I batch N`, ordinal agents share one release time by integer batch:
-   `T + I * floor(ordinal / N)`. Omitted `batch` is one; omitted `every`
-   releases the whole group at `T`. Each time is eligibility rather than an
+   approach. With `release_at_s = T`, `release_interval_s = I`, and
+   `release_batch_size = N`, ordinal agents share one release time by integer
+   batch: `T + I * floor(ordinal / N)`. Omitted batch size is one; omitted
+   interval releases the whole group at `T`. Each time is eligibility rather than an
    unconditional surface materialization: dynamic spawn clearance may delay
    individual admission. Release occurs after information delivery in the same
    step.
@@ -171,7 +171,7 @@ cell order.
 
 ## What this does not mean
 
-The `0.42` local-motion law, nominal routing cost and alternative-exit
+The `0.43` local-motion law, nominal routing cost and alternative-exit
 selection, scheduled-release and service-capacity semantics, operational-state
 transitions, escalator walking-rider assumption, and seeded information
 acceptance law are reference semantics, not calibrated behavioral claims. A
@@ -196,13 +196,13 @@ distance from planned to resolved position, and
 `maximum_local_clearance_adjustment_m` is the largest one-attempt distance.
 Zero-geometry service admission remains excluded for resources without a
 footprint. Ordinary on-surface motion uses snapshot ORCA, including an
-authored queue slot's approach and advancement. Where `portal-lanes` is
+authored queue slot's approach and advancement. Where `portal_lanes` is
 declared, exact connector lane arrivals are retained in transit until clear
 rather than adjusted; gate and exit lanes are target locations only. This
 telemetry is not a count of contacts or collisions, a density measure, a
 physical crowd model, an observed delay, or calibration evidence.
 
-Runtime contract `0.31`, retained in `0.42`, additionally records
+Runtime contract `0.31`, retained in `0.43`, additionally records
 `local_avoidance_constraint_fallback_steps`: each step in which the
 speed-bounded ORCA half-planes were infeasible and the documented deterministic
 least-penetrating fallback was selected. Every such count is cross-checked
@@ -252,7 +252,7 @@ step, and
 `peak_waiting_agents` is the largest count seen at a step boundary. These are
 internally consistent telemetry for this discrete runtime, not observed queue
 lengths, delays, throughput measurements, or calibrated flow values. A
-`queue-footprint` makes the waiter's simulated standing position explicit; it
+`queue_footprints` makes the waiter's simulated standing position explicit; it
 does not make that structural model an observation of a real queue.
 
 Current bundles additionally retain `queue_metrics.by_resource`. Its `lifts`,
@@ -269,7 +269,7 @@ all resources of that mechanism at a step boundary. The breakdown does not by
 itself identify a real-world bottleneck or a measured service rate; an authored
 footprint is separately visible in canonical source.
 
-Runtime contract `0.31`, retained in `0.42`, also records an event when an agent first enters each
+Runtime contract `0.31`, retained in `0.43`, also records an event when an agent first enters each
 such modeled resource queue. Its event kind is one of `queue_entered_lift`,
 `queue_entered_connector`, `queue_entered_gate`, or `queue_entered_exit`; its
 subject is the generated agent identifier and its detail is the exact authored
@@ -285,7 +285,7 @@ service token or lift cabin place. For a lift footprint its detail remains
 `connector:ID`, but its required prior entry audit is `queue_entered_lift`.
 These are runtime audit trails, not observations of a physical queue.
 
-Runtime contract `0.41`, retained in `0.42`, additionally records `queue_slot_preallocated` for
+Runtime contract `0.41`, retained in `0.43`, additionally records `queue_slot_preallocated` for
 each grid ticket before local motion. Its subject is the generated agent
 identifier and detail is `KIND:RESOURCE:TICKET`. It is not queue entry, a wait,
 or service admission; its purpose is to make the distinction between an
@@ -293,7 +293,7 @@ assigned future slot and physical queue arrival inspectable from a run bundle.
 
 ## Reproducibility contract
 
-`chiyoda run` writes `scenario.chy` and `run.json`. A run bundle contains its
+`chiyoda run` writes `scenario.json` and `run.json`. A run bundle contains its
 canonical scenario, runtime version, options, trace, event log, metrics,
 scenario hash, and SHA-256 bundle hash. The bundle hash is computed from the
 entire bundle with the hash field blank. For a bundle compatible with the
@@ -302,7 +302,12 @@ complete run from the embedded scenario and options before interpreting a
 trace. An incompatible legacy bundle is rejected by default; an explicit
 hash-only inspection mode is available for archival review.
 
-Given identical source, language/runtime version, options, and supported Linux
+Given identical scenario data, schema/runtime version, options, and supported Linux
 environment, the reference runtime is expected to emit an identical bundle
 hash. This is tested for the current implementation; it does not establish
 cross-version or cross-architecture numerical equivalence.
+
+Runtime contract 0.43 changes scenario packaging to JSON schema 1 while
+preserving the 0.42 movement rules. Legacy `language_version` envelopes are
+retained only when deserializing archived bundles, so their hashes stay
+verifiable. They are rejected as current scenario inputs.

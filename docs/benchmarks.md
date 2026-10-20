@@ -1,7 +1,7 @@
 # Fixed benchmarks and baseline comparisons
 
 Benchmarks hold scenario source and assertions fixed while the runtime changes.
-WFC evaluation explores layouts; a benchmark reruns exact archived `.chy` input.
+WFC evaluation explores layouts; a benchmark reruns archived versioned JSON scenarios.
 Both use independent geometric preflight, full-step trajectory checks, and replay
 reconstruction by default. The benchmarks are reference-runtime regression
 contracts, not empirical calibration against measured pedestrian data.
@@ -86,7 +86,7 @@ progress.json
 report.json
 report.md
 case-0000/
-  scenario.chy
+  scenario.json
   report.json
   run.json
 ...
@@ -94,11 +94,12 @@ comparison.json  # when --baseline is provided
 comparison.md
 ```
 
-`suite.json` contains literal source, assertions, replay settings, and diagnostic
-options. `progress.json` records completed results incrementally. The final
-report requires every requested case in suite order. A case that cannot be
-parsed, validated, or simulated retains its source and failure report; it has
-no run bundle. An expected-unreachable case also has no simulated metrics or
+`suite.json` contains structured scenario documents, assertions, replay settings,
+and diagnostic options. `progress.json` records completed results incrementally. The final
+report requires every requested case in suite order. A well-formed case that cannot be validated or simulated retains its
+scenario and failure report; it has no run bundle. Malformed JSON, unsupported
+schema versions, and wrong field types are rejected while loading the suite,
+before creating its output directory. An expected-unreachable case also has no simulated metrics or
 bundle. Neither receives a replay command.
 
 `report.md` shows completion, clearance, wait, overlap, assertion failures, and
@@ -125,10 +126,12 @@ only report JSON, so a saved metric report can be compared without its bundle.
 
 Reports include versioned schemas, suite/input hashes, and a report checksum.
 Reading a baseline or comparing reports verifies these and the case summaries.
-Cases match by identifier. Changed source, expected reachability, absolute
+Cases match by identifier. Changed scenario content, expected reachability, absolute
 thresholds, behavior checks, replay settings, or diagnostic options make that
 case incompatible. Added and removed cases are also incompatible. Runtime
-versions, suite names, descriptions, and run labels can differ.
+versions, suite names, descriptions, and run labels can differ. JSON whitespace
+and object-key order do not affect input hashes. Array order remains part of
+the scenario contract.
 
 The six comparison metrics are:
 
@@ -179,13 +182,13 @@ target/release/chiyoda benchmark run --suite out/wfc-regressions.json --label re
 target/release/chiyoda benchmark run --baseline out/wfc-baseline/report.json --label candidate -o out/wfc-candidate
 ```
 
-Freezing reads every numbered `scenario.chy` and checks its canonical scenario
+Freezing reads every numbered `scenario.json` and checks its canonical scenario
 hash against the archived evaluation report. It verifies the summary against
-its case list and config, embeds exact source text, and records the original
+its case list and config, embeds the parsed scenario documents, and records the original
 evaluation/runtime versions and report hash in `origin`. Changed or missing
 sources are rejected before writing the destination. A generation failure
 cannot be frozen because it produced no scenario; it is never silently dropped.
-Cases that produced source but failed runtime assertions can be frozen for
+Cases that produced scenarios but failed runtime assertions can be frozen for
 investigation, though a failing benchmark run cannot serve as a baseline.
 
 The original expected reachability, thresholds, and replay option are preserved.
@@ -199,7 +202,7 @@ target/release/chiyoda benchmark freeze --evaluation out/evaluation --name wfc-c
 
 That example requires full evacuation within 90 s; choose bounds appropriate to
 the authored duration and intended behavior. Generator rule changes after
-freezing do not affect the benchmark: reruns consume embedded source directly.
+freezing do not affect the benchmark: reruns consume embedded scenario documents directly.
 
 ## Author or edit a suite
 
@@ -209,10 +212,12 @@ target/release/chiyoda benchmark run --suite examples/benchmarks/custom-suite.js
 ```
 
 Both export and freeze require a new destination file. A suite has
-`benchmark_version: "1"`, `name`, optional `origin`, optional `diagnostics`, and
-1..256 `cases`. Each case needs a unique nonempty `id`, `description`, and exact
-`source`. `expected` defaults to `"reachable"`; `evaluation` defaults to replay
-enabled with no metric thresholds. Use `"unreachable"` for valid sources that
+`benchmark_version: "2"`, `name`, optional `origin`, optional `diagnostics`, and
+1..256 `cases`. Each case needs a unique nonempty `id`, `description`, and a
+`scenario` object containing `schema_version: "1"` and its `scenario` data. This
+is the same document accepted by `chiyoda check`, embedded as an object rather
+than an escaped JSON string. `expected` defaults to `"reachable"`; `evaluation`
+defaults to replay enabled with no metric thresholds. Use `"unreachable"` for valid sources that
 must fail geometric preflight, as in ordinary evaluations.
 
 Optional behavior checks use mechanism names `lift`, `connector`, `gate`, and
@@ -227,7 +232,13 @@ Optional behavior checks use mechanism names `lift`, `connector`, `gate`, and
 ```
 
 Place this object under a case's `checks` field. Unreachable fixtures cannot
-require simulated queue or event checks. Sources are limited to 4 MiB each;
+require simulated queue or event checks. Compact serialized scenario documents
+are limited to 4 MiB each;
 unknown suite, case, diagnostic, and check fields are rejected. Editing an
 assertion or source establishes a new contract: review it, create a fresh
 baseline, and retain the old baseline for rollback.
+
+Benchmark version 2 embeds JSON scenario documents. Version 1 reports and
+suites containing DSL source are not accepted as new baselines. Export their
+scenarios from saved run bundles and create a fresh baseline; see
+[migration](scenarios.md#migrate-existing-experiments).

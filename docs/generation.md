@@ -1,10 +1,10 @@
 # WFC space generation and evaluation
 
 Chiyoda can generate different rectangular floor plans using tiled wave
-function collapse (WFC), compile them into ordinary `.chy` source, and evaluate
-them with the existing pedestrian runtime. Generation does not change the DSL,
+function collapse (WFC), build versioned JSON scenarios, and evaluate
+them with the existing pedestrian runtime. Generation does not change the scenario model,
 routing cost, ORCA movement, service rules, or run-bundle contract. The original
-`generate --seed ... -o example.chy` command retains its fixed-layout behavior.
+`generate --seed ... -o example.json` command retains its fixed-layout behavior.
 
 ## Generate a space
 
@@ -12,12 +12,12 @@ From the repository root:
 
 ```console
 cargo run --release --locked -p chiyoda -- generate-space --seed 73 --preset concourse -o out/space-73
-cargo run --release --locked -p chiyoda -- check out/space-73/scenario.chy --geometry
-cargo run --release --locked -p chiyoda -- run out/space-73/scenario.chy -o out/space-73-run
+cargo run --release --locked -p chiyoda -- check out/space-73/scenario.json --geometry
+cargo run --release --locked -p chiyoda -- run out/space-73/scenario.json -o out/space-73-run
 cargo run --release --locked -p chiyoda -- replay out/space-73-run/run.json
 ```
 
-`generate-space` writes `scenario.chy` and `generation.json` into a new
+`generate-space` writes `scenario.json` and `generation.json` into a new
 directory. An existing destination is rejected. If all generation attempts
 fail, it writes `generation-failure.json`, including the seed, complete config,
 attempt logs, and versions, and exits nonzero.
@@ -81,7 +81,7 @@ Kinds have defined physical geometry:
 - `kiosk`: a hall with a central square obstacle and bypass space around it.
 
 Passages have `passage_width_m`; perimeter walls are 4% of `tile_size_m`.
-The compiler merges blocked regions into rectangular obstacles. Validation
+The generator merges blocked regions into rectangular obstacles. Validation
 requires passage and kiosk bypass widths to clear the authored agent diameter,
 and every generated spawn disc must fit inside its reserved hall.
 
@@ -125,8 +125,8 @@ generation does not infer them from widths or a real facility.
 The solver performs weighted minimum-entropy choices, adjacency propagation,
 and chronological backtracking. `max_backtracks` and `max_decisions` bound each
 floor's search. `max_attempts` bounds whole-space attempts, including rejection
-of disconnected floor layouts or invalid geometry. After a disconnected layout, generator
-version 2 retains the isolated cells as repair targets and reserves connecting
+of disconnected floor layouts or invalid geometry. After a disconnected layout, the generator
+retains the isolated cells as repair targets and reserves connecting
 paths in subsequent attempts. WFC still chooses modules and additional
 connections under all local rules and pins. Noncritical scaffold cells may be
 kiosks because their bypass geometry connects their openings. Contradiction and budget
@@ -141,7 +141,7 @@ Generation follows this sequence:
 1. Validate the config and resolve its catalog.
 2. Reserve route scaffolds and solve each floor's wave.
 3. Check whole-floor connectivity when requested.
-4. Compile and validate ordinary `.chy` source.
+4. Construct typed scenario data, validate it, and serialize schema-versioned JSON.
 5. Independently check every deterministic spawn, waypoint leg, and exit
    candidate through radius-expanded rectangular free space.
 
@@ -155,8 +155,8 @@ geometric reachability under the reference geometry, not eventual evacuation.
 
 `generation.json` includes the resolved config, catalog, generator/solver/runtime
 versions, root seed, floor seeds, reserved cells, solved tile maps, search
-statistics, and every rejected attempt before success. `source_sha256` hashes
-the exact emitted UTF-8 source; `scenario_hash`, `config_hash`, and `rules_hash`
+statistics, and every rejected attempt before success. `json_sha256` hashes
+the exact emitted UTF-8 JSON, including its terminal newline; `scenario_hash`, `config_hash`, and `rules_hash`
 use Chiyoda's canonical JSON hashing. Repeating a seed and config with the
 same versions reproduces the artifacts on a supported numerical environment.
 Changing algorithms requires a generator or solver version change. Cross-version
@@ -224,8 +224,8 @@ WFC cases complement small authored regressions. Add reachable fixtures or
 valid sources that deliberately have unreachable journeys:
 
 ```console
-cargo run --release --locked -p chiyoda -- evaluate --config examples/generation/evaluation.json --fixture examples/generation/detour.chy --unreachable-fixture examples/generation/blocked.chy -o out/with-fixtures
-cargo run --locked -p chiyoda -- evaluate --cases 0 --unreachable-fixture examples/generation/blocked.chy -o out/negative-only
+cargo run --release --locked -p chiyoda -- evaluate --config examples/generation/evaluation.json --fixture examples/generation/detour.json --unreachable-fixture examples/generation/blocked.json -o out/with-fixtures
+cargo run --locked -p chiyoda -- evaluate --cases 0 --unreachable-fixture examples/generation/blocked.json -o out/negative-only
 ```
 
 Fixture names come from file stems and must be unique within the suite. An
@@ -234,9 +234,14 @@ geometric preflight finds an unreachable journey. It is not simulated, has no
 metrics or replay verification, and does not receive simulation thresholds.
 Malformed source does not count as a successful expected rejection.
 
-The JSON equivalent is a `fixtures` entry with `name`, literal `.chy` `source`,
-and `expected: "reachable"` or `"unreachable"`. Fixture source text is embedded
-in the saved config so later file edits cannot change an archived experiment.
+The JSON equivalent is a `fixtures` entry with `name`, a complete versioned
+`scenario` object, and `expected: "reachable"` or `"unreachable"`. The scenario
+object is embedded in the saved config so later file edits cannot change an
+archived experiment. See [the scenario format](scenarios.md).
 
 To hold selected layouts fixed while comparing runtime revisions, use
 [benchmark profiles, evaluation freezing, and baseline comparisons](benchmarks.md).
+
+Generator version 3 emits JSON directly and retains version 2's layout and
+connectivity rules. Evaluation reports use version 2; pre-JSON evaluation
+archives require [migration](scenarios.md#migrate-existing-experiments).

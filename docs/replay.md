@@ -1,7 +1,7 @@
 # Native replay viewer
 
 `chiyoda-replay` is a local Linux viewer for either a hash-valid `run.json`
-artifact or an in-memory live DSL debug run. It visualizes the reference
+artifact or an in-memory live JSON scenario run. It visualizes the reference
 runtime's recorded state; it is not a simulation engine, a facility survey, a
 3D renderer, or an operational display.
 
@@ -13,25 +13,25 @@ $ cargo run -p chiyoda-replay -- out/showcase/run.json --surface concourse --exp
 $ cargo run -p chiyoda-replay -- out/showcase/run.json --sprite-atlas assets/replay/undercity-atlas.json
 ```
 
-## Live DSL debugging
+## Live JSON debugging
 
 For the editing loop, pass a source file through `--watch` instead of a run
 bundle:
 
 ```console
-$ cargo run -p chiyoda-replay -- --watch examples/demos/grand-interchange-showcase.chy
-$ cargo run -p chiyoda-replay -- --watch draft.chy --paused --surface platform --trace-every 1
+$ cargo run -p chiyoda-replay -- --watch examples/demos/grand-interchange-showcase.json
+$ cargo run -p chiyoda-replay -- --watch draft.json --paused --surface platform --trace-every 1
 ```
 
 The viewer polls saved source text, waits 150 ms for writes to settle, then
-compiles, validates, and executes the complete deterministic scenario on a
+loads, validates, and executes the complete deterministic scenario on a
 background worker. A newer save supersedes a stale worker result. A successful
 revision atomically replaces the displayed trace at simulation time zero; it
 does not mutate a running simulation. The default watch trace cadence is one
 integration step, which affects display smoothness only.
 
 An invalid edit leaves the most recent valid scene and trace on screen. The
-terminal prints the complete compile, validation, or runtime diagnostic; the
+terminal prints the complete JSON, validation, or runtime diagnostic; the
 window and an in-canvas diagnostic panel identify the failed revision. Before
 the first valid source revision, the viewer displays an empty debug canvas with
 the current status and any read error.
@@ -77,7 +77,7 @@ state. Use an animated GIF only when the sequence itself matters—for example,
 to review movement timing, queue-state transitions, or rerouting. `--export-gif
 PATH` verifies and reconstructs the input bundle before rendering every stored
 trace frame of the selected surface, writes `PATH`, then exits without opening a
-window. It never accepts `--watch`, does not re-run or compile source, and does
+window. It never accepts `--watch`, does not re-run or load a scenario, and does
 not modify the canonical bundle.
 
 `--gif-speed N` means `N` simulation seconds per playback second. GIF timing is

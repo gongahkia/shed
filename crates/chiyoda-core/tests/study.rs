@@ -1,3 +1,4 @@
+use chiyoda_core::study::StudyRunner;
 use chiyoda_core::{
     generator::spaces,
     study::{AreaBasis, Placement, Population, PreparedInput, StudyConfig},
@@ -166,4 +167,79 @@ fn impossible_population_and_cadence_are_reported_without_resampling_geometry() 
             .stage,
         "population"
     );
+}
+
+#[test]
+fn policy_cases_share_exact_inputs_and_identical_policies_have_identical_execution() {
+    let mut config = config();
+    let mut same = config.policies[0].clone();
+    same.id = "same-policy-different-label".into();
+    config.policies.push(same);
+    config.seeds.push(74);
+    let mut runner = StudyRunner::new(config).unwrap();
+    assert_eq!(runner.len(), 4);
+    let first = runner.next().unwrap();
+    let second = runner.next().unwrap();
+    assert_eq!(first.result.context, second.result.context);
+    assert_eq!(first.result.layout_hash, second.result.layout_hash);
+    assert_eq!(first.generation, second.generation);
+    assert_eq!(first.bundle, second.bundle);
+    assert!(
+        first
+            .result
+            .observations()
+            .contains_key("evacuated_fraction")
+    );
+    assert_eq!(runner.count(), 2);
+}
+
+#[test]
+fn failed_generation_is_retained_for_every_requested_policy_and_load() {
+    let mut config = config();
+    config.environment.max_attempts = 2;
+    config.patterns[0].pins.push(spaces::FloorConstraint {
+        floor: 0,
+        x: 0,
+        y: 0,
+        allowed_tiles: vec!["hall_nesw".into()],
+    });
+    let mut extra = config.policies[0].clone();
+    extra.id = "second".into();
+    config.policies.push(extra);
+    let cases: Vec<_> = StudyRunner::new(config).unwrap().collect();
+    assert_eq!(cases.len(), 2);
+    assert_eq!(cases[0].result.setup_failure, cases[1].result.setup_failure);
+    for case in cases {
+        assert_eq!(case.result.generation_attempts.len(), 2);
+        assert_eq!(
+            case.result.setup_failure.as_ref().unwrap().stage,
+            "generation"
+        );
+        assert!(!case.result.passed);
+        assert!(case.bundle.is_none());
+        assert!(case.result.observations().is_empty());
+    }
+}
+
+#[test]
+fn incomplete_runs_are_measured_and_invalid_policies_do_not_drop_later_cases() {
+    let mut input = document();
+    input["environment"]["duration_s"] = json!(0.2);
+    input["evaluation"] =
+        json!({"thresholds":{"min_evacuated_fraction":1.0, "max_clearance_time_s":0.2}});
+    input["policies"] = json!([
+        {"id":"invalid", "messages":[{"id":"notice", "source":"Official", "surface":"floor_0", "origin":{"x_m":0.0,"y_m":0.0,"z_m":0.0}, "claim":{"ExitAvailability":{"exit":"missing", "open":false}}, "truthful":true,"at_s":0.0,"reach_m":1000.0,"trust":1.0}]},
+        {"id":"quiet"}
+    ]);
+    let cases: Vec<_> = StudyRunner::new(serde_json::from_value(input).unwrap())
+        .unwrap()
+        .collect();
+    assert_eq!(cases.len(), 2);
+    assert!(cases[0].bundle.is_none());
+    assert!(cases[0].result.observations().is_empty());
+    assert!(cases[1].bundle.is_some());
+    assert!(!cases[1].result.passed);
+    let observations = cases[1].result.observations();
+    assert_eq!(observations.get("evacuated_fraction"), Some(&0.0));
+    assert!(!observations.contains_key("clearance_time_s"));
 }

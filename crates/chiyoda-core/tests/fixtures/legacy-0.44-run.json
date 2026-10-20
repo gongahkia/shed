@@ -1,0 +1,293 @@
+{
+  "bundle_version": "0.44",
+  "runtime_version": "0.44.0-alpha.1",
+  "scenario_hash": "7a33e8f4fcfeb0089ed15c06cc8a76dcc24dd0ab6f7e2789984329d92a5ad67e",
+  "scenario": {
+    "schema_version": "1",
+    "scenario": {
+      "name": "An announced exit closure",
+      "seed": 1,
+      "duration_s": 40.0,
+      "timestep_s": 0.2,
+      "surfaces": [
+        {
+          "id": "hall",
+          "origin": {
+            "x_m": 0.0,
+            "y_m": 0.0,
+            "z_m": 0.0
+          },
+          "width_m": 12.0,
+          "depth_m": 16.0
+        }
+      ],
+      "obstacles": [],
+      "waypoints": [],
+      "exits": [
+        {
+          "id": "primary",
+          "surface": "hall",
+          "at": {
+            "x_m": 10.0,
+            "y_m": 3.0,
+            "z_m": 0.0
+          },
+          "width_m": 1.0,
+          "capacity_per_s": null
+        },
+        {
+          "id": "alternative",
+          "surface": "hall",
+          "at": {
+            "x_m": 1.0,
+            "y_m": 13.0,
+            "z_m": 0.0
+          },
+          "width_m": 1.0,
+          "capacity_per_s": null
+        }
+      ],
+      "connectors": [],
+      "connector_states": [],
+      "exit_states": [
+        {
+          "id": "closure",
+          "exit": "primary",
+          "open": false,
+          "at_s": 2.0
+        }
+      ],
+      "gates": [],
+      "agents": [
+        {
+          "id": "person",
+          "count": 1,
+          "surface": "hall",
+          "at": {
+            "x_m": 1.0,
+            "y_m": 3.0,
+            "z_m": 0.0
+          },
+          "destination": "primary",
+          "alternative_destinations": [
+            "alternative"
+          ],
+          "speed_mps": 1.0,
+          "radius_m": 0.3,
+          "height_m": 1.7,
+          "release_at_s": 0.0,
+          "via": [],
+          "excluded_connector_kinds": [],
+          "knowledge": {
+            "observation_radius_m": 1.0
+          }
+        }
+      ],
+      "messages": [
+        {
+          "id": "notice",
+          "source": "Official",
+          "surface": "hall",
+          "origin": {
+            "x_m": 1.0,
+            "y_m": 3.0,
+            "z_m": 0.0
+          },
+          "claim": {
+            "ExitAvailability": {
+              "exit": "primary",
+              "open": false
+            }
+          },
+          "truthful": true,
+          "at_s": 2.0,
+          "reach_m": 100.0,
+          "trust": 1.0
+        }
+      ],
+      "countermeasures": []
+    }
+  },
+  "options": {
+    "agent_knowledge": "local-portal-observation-and-accepted-claims-0.44",
+    "initial_spawn_clearance": "all-declared-spawn-discs-pairwise-clear-0.42",
+    "integration": "deterministic-orca-euler-0.42",
+    "local_motion": "snapshot-orca-f64-horizon-2.5s-fifo-grid-predecessor-velocity-handoff-0.42",
+    "on_surface_clearance_audit": "reference-disc-overlap-at-every-integration-boundary-0.42",
+    "portal_landing": "authored-lanes-clear-or-retain-transit-0.42",
+    "queue_geometry": "authored-fifo-line-capacity-denial-or-serpentine-grid-preallocated-slots-fifo-priority-predecessor-velocity-handoff-physical-entry-reserve-lift-capacity-or-service-token-0.42",
+    "release_admission": "scheduled-eligibility-then-dynamic-spawn-disc-clearance-0.42",
+    "swept_on_surface_clearance_audit": "analytic-linear-reference-disc-overlap-for-same-surface-intervals-0.42",
+    "trace_every_steps": "1000"
+  },
+  "trace": [
+    {
+      "step": 0,
+      "time_s": 0.0,
+      "agents": [
+        {
+          "id": "person:0",
+          "group": "person",
+          "surface": "hall",
+          "x_m": 1.0,
+          "y_m": 3.0,
+          "z_m": 0.0,
+          "state": "moving",
+          "beliefs": {},
+          "knowledge": {
+            "known_exits": [
+              "primary",
+              "alternative"
+            ],
+            "availability": {}
+          }
+        }
+      ]
+    },
+    {
+      "step": 200,
+      "time_s": 40.0,
+      "agents": [
+        {
+          "id": "person:0",
+          "group": "person",
+          "surface": "hall",
+          "x_m": 1.028470017,
+          "y_m": 12.84183324,
+          "z_m": 0.0,
+          "state": "evacuated",
+          "beliefs": {
+            "notice": 1.0
+          },
+          "knowledge": {
+            "known_exits": [
+              "primary",
+              "alternative"
+            ],
+            "availability": {
+              "exit:alternative": {
+                "open": true,
+                "learned_at_s": 11.200000000000001,
+                "source": "observation"
+              },
+              "exit:primary": {
+                "open": false,
+                "learned_at_s": 2.0,
+                "source": {
+                  "message": {
+                    "id": "notice"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "time_s": 2.0,
+      "kind": "exit_state_changed",
+      "subject": "primary",
+      "detail": "closure: closed"
+    },
+    {
+      "time_s": 2.0,
+      "kind": "route_recomputed",
+      "subject": "person:0",
+      "detail": "destination=alternative;blocked=exit:primary"
+    },
+    {
+      "time_s": 2.0,
+      "kind": "message_received",
+      "subject": "person:0",
+      "detail": "notice: exit `primary` closed from official (truthful=true, accepted=true, sample=notice)"
+    },
+    {
+      "time_s": 11.2,
+      "kind": "resource_observed",
+      "subject": "person:0",
+      "detail": "exit:alternative=open"
+    },
+    {
+      "time_s": 11.2,
+      "kind": "route_recomputed",
+      "subject": "person:0",
+      "detail": "destination=alternative;blocked=exit:primary"
+    },
+    {
+      "time_s": 11.8,
+      "kind": "evacuated",
+      "subject": "person:0",
+      "detail": "alternative"
+    }
+  ],
+  "metrics": {
+    "total_agents": 1,
+    "evacuated_agents": 1,
+    "evacuated_by_exit": {
+      "alternative": 1
+    },
+    "information_delivery": {
+      "notice": {
+        "kind": "message",
+        "received_agents": 1,
+        "accepted_agents": 1
+      }
+    },
+    "clearance_time_s": 11.8,
+    "last_exit_time_s": 11.8,
+    "mean_exit_time_s": 11.8,
+    "queued_for_lift_agents": 0,
+    "queued_for_connector_agents": 0,
+    "queued_for_gate_agents": 0,
+    "queued_for_exit_agents": 0,
+    "queue_metrics": {
+      "lift": {
+        "ever_queued_agents": 0,
+        "cumulative_wait_agent_seconds": 0.0,
+        "peak_waiting_agents": 0
+      },
+      "connector": {
+        "ever_queued_agents": 0,
+        "cumulative_wait_agent_seconds": 0.0,
+        "peak_waiting_agents": 0
+      },
+      "gate": {
+        "ever_queued_agents": 0,
+        "cumulative_wait_agent_seconds": 0.0,
+        "peak_waiting_agents": 0
+      },
+      "exit": {
+        "ever_queued_agents": 0,
+        "cumulative_wait_agent_seconds": 0.0,
+        "peak_waiting_agents": 0
+      },
+      "by_resource": {
+        "lifts": {},
+        "connectors": {},
+        "gates": {},
+        "exits": {}
+      }
+    },
+    "movement_metrics": {
+      "agents_with_local_clearance_adjustments": 0,
+      "local_clearance_adjustment_steps": 0,
+      "local_avoidance_constraint_fallback_steps": 0,
+      "on_surface_clearance_audit": {
+        "agents_with_disc_overlaps": 0,
+        "disc_overlap_pair_steps": 0,
+        "maximum_disc_overlap_m": 0.0
+      },
+      "swept_on_surface_clearance_audit": {
+        "agents_with_swept_disc_overlaps": 0,
+        "swept_disc_overlap_pair_steps": 0,
+        "maximum_swept_disc_overlap_m": 0.0
+      },
+      "cumulative_local_clearance_adjustment_m": 0.0,
+      "maximum_local_clearance_adjustment_m": 0.0
+    }
+  },
+  "bundle_hash": "0947c7ef7f077ef013e673a465258f3c483d6d86a3882c678feec18322161d03"
+}

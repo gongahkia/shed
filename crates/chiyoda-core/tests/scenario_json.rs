@@ -7,6 +7,22 @@ use serde_json::{Value, json};
 const INPUT: &str = include_str!("fixtures/json-free-walk.json");
 
 #[test]
+fn authentic_local_knowledge_bundle_from_the_previous_motion_contract_retains_its_hash() {
+    let bundle: RunBundle =
+        serde_json::from_str(include_str!("fixtures/legacy-0.44-run.json")).unwrap();
+    assert_eq!(
+        bundle.bundle_hash,
+        "0947c7ef7f077ef013e673a465258f3c483d6d86a3882c678feec18322161d03"
+    );
+    assert!(bundle.verifies_hash());
+    assert!(bundle.trace.last().unwrap().agents[0].knowledge.is_some());
+    assert_eq!(
+        verify_run_bundle(&bundle).unwrap(),
+        BundleVerification::HashOnlyLegacy
+    );
+}
+
+#[test]
 fn authentic_pre_json_bundle_retains_its_hash_and_is_explicitly_legacy() {
     let bundle: RunBundle =
         serde_json::from_str(include_str!("fixtures/legacy-0.42-run.json")).unwrap();

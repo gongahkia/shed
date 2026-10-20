@@ -48,7 +48,7 @@ fn generation_is_reproducible_and_round_trips_through_versioned_json() {
 }
 
 #[test]
-fn typed_wfc_generation_preserves_the_pre_json_scenario_and_execution() {
+fn typed_wfc_generation_preserves_geometry_and_matches_the_current_motion_reference() {
     let old: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/pre-json-wfc-73.json")).unwrap();
     let old: chiyoda_core::CanonicalScenario =
@@ -69,8 +69,9 @@ fn typed_wfc_generation_preserves_the_pre_json_scenario_and_execution() {
         bundle.metrics,
     ));
     let expected: serde_json::Value =
-        serde_json::from_str(include_str!("fixtures/pre-json-wfc-73.json")).unwrap();
-    assert_eq!(hash, expected["execution_hash"]);
+        serde_json::from_str(include_str!("fixtures/motion-0.45-reference.json")).unwrap();
+    assert_eq!(expected["runtime_version"], chiyoda_core::RUNTIME_VERSION);
+    assert_eq!(hash, expected["wfc_default_73_execution"]);
 }
 
 #[test]

@@ -1589,7 +1589,39 @@ fn release_batches_admit_clear_agents_at_each_cadence_instant() {
         .filter(|event| event.kind == "agent_released")
         .map(|event| event.time_s)
         .collect();
-    assert_eq!(release_times, vec![1.0, 1.0, 3.0, 4.0, 5.0]);
+    // The 0.45 motion law leaves one eligible spawn occupied through t=4.
+    // Eligibility is unchanged; actual admission still waits for clearance.
+    assert_eq!(release_times, vec![1.0, 1.0, 3.0, 5.0, 5.0]);
+    let spawn_points: Vec<_> = scenario.agents[0].spawn_positions().collect();
+    for event in bundle
+        .events
+        .iter()
+        .filter(|event| event.kind == "agent_released")
+    {
+        let ordinal: usize = event.subject.rsplit(':').next().unwrap().parse().unwrap();
+        let previous = bundle
+            .trace
+            .iter()
+            .rev()
+            .find(|frame| frame.time_s < event.time_s)
+            .unwrap();
+        assert!(
+            previous
+                .agents
+                .iter()
+                .filter(|agent| !matches!(
+                    agent.state,
+                    chiyoda_core::AgentState::WaitingToDepart
+                        | chiyoda_core::AgentState::Evacuated
+                        | chiyoda_core::AgentState::InTransit
+                ))
+                .all(|other| {
+                    let point = chiyoda_core::model::Point3::new(other.x_m, other.y_m, other.z_m);
+                    spawn_points[ordinal].distance(point)
+                        >= scenario.agents[0].radius_m * 2.0 - 2e-9
+                })
+        );
+    }
     assert!(bundle.events.iter().any(|event| {
         event.kind == "agent_release_deferred_for_clearance" && (event.time_s - 3.0).abs() < 1e-9
     }));

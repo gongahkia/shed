@@ -70,10 +70,11 @@ fn opposing_groups_round_a_shared_virtual_corner_without_stopping_or_overlapping
     )
     .unwrap();
     assert_eq!(bundle.metrics.evacuated_agents, 8);
-    let motion = bundle.metrics.movement_metrics.unwrap();
+    let motion = bundle.metrics.movement_metrics.as_ref().unwrap();
     assert!(
         motion
             .on_surface_clearance_audit
+            .as_ref()
             .unwrap()
             .maximum_disc_overlap_m
             < 1e-8
@@ -81,9 +82,32 @@ fn opposing_groups_round_a_shared_virtual_corner_without_stopping_or_overlapping
     assert!(
         motion
             .swept_on_surface_clearance_audit
+            .as_ref()
             .unwrap()
             .maximum_swept_disc_overlap_m
             < 1e-8
     );
     assert!(motion.local_avoidance_constraint_fallback_steps.unwrap() > 0);
+    let guard_events = bundle
+        .events
+        .iter()
+        .filter(|event| event.kind == "local_motion_limited_for_clearance")
+        .count();
+    assert!(guard_events > 0);
+    assert_eq!(
+        motion.swept_motion_guard_steps,
+        Some(u64::try_from(guard_events).unwrap())
+    );
+    chiyoda_core::verify_run_bundle(&bundle).unwrap();
+    let mut corrupted = bundle;
+    *corrupted
+        .metrics
+        .movement_metrics
+        .as_mut()
+        .unwrap()
+        .swept_motion_guard_steps
+        .as_mut()
+        .unwrap() += 1;
+    corrupted.bundle_hash = chiyoda_core::bundle::bundle_hash(&corrupted);
+    assert!(chiyoda_core::verify_run_bundle(&corrupted).is_err());
 }

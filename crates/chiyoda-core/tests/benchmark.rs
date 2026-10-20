@@ -16,10 +16,16 @@ fn reseal(report: BenchmarkReport) -> BenchmarkReport {
 }
 
 #[test]
-fn json_migration_preserves_pre_migration_traces_events_and_metrics() {
+fn current_motion_contract_matches_its_versioned_execution_reference() {
+    let reference: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/motion-0.45-reference.json")).unwrap();
+    assert_eq!(reference["runtime_version"], chiyoda_core::RUNTIME_VERSION);
     let expected: std::collections::BTreeMap<String, String> =
+        serde_json::from_value(reference["benchmark_execution"].clone()).unwrap();
+    let historical: std::collections::BTreeMap<String, String> =
         serde_json::from_str(include_str!("fixtures/pre-json-execution-hashes.json")).unwrap();
     let mut checked = std::collections::BTreeSet::new();
+    let mut observed = std::collections::BTreeMap::new();
     for profile in ["all", "stress"] {
         let suite = profiles::suite(profile).unwrap();
         for index in 0..suite.cases.len() {
@@ -38,10 +44,14 @@ fn json_migration_preserves_pre_migration_traces_events_and_metrics() {
                 bundle.events,
                 bundle.metrics,
             ));
-            assert_eq!(hash, expected[id], "execution changed for {id}");
+            observed.insert(id.clone(), hash);
         }
     }
-    assert_eq!(checked.len(), expected.len());
+    assert_eq!(
+        observed.keys().collect::<Vec<_>>(),
+        historical.keys().collect::<Vec<_>>()
+    );
+    assert_eq!(observed, expected);
 }
 
 #[test]
@@ -70,6 +80,42 @@ fn embedded_profiles_have_fixed_inputs_and_explicit_passing_expectations() {
     let decoded: BenchmarkReport = serde_json::from_str(&encoded).unwrap();
     decoded.verify().unwrap();
     assert_eq!(report, decoded);
+}
+
+#[test]
+fn strict_stress_cases_pass_their_original_checks_without_disc_overlap() {
+    let suite = profiles::suite("stress").unwrap();
+    assert_eq!(suite.cases.len(), 5);
+    for index in 0..suite.cases.len() {
+        let run = benchmark::run_case(&suite, index).unwrap();
+        assert!(
+            run.result.evaluation.passed,
+            "{}: {:?}",
+            run.result.id, run.result.evaluation.failures
+        );
+        assert!(run.result.evaluation.replay_verified);
+        let motion = run
+            .artifacts
+            .bundle
+            .unwrap()
+            .metrics
+            .movement_metrics
+            .unwrap();
+        assert!(
+            motion
+                .on_surface_clearance_audit
+                .unwrap()
+                .maximum_disc_overlap_m
+                < 1e-8
+        );
+        assert!(
+            motion
+                .swept_on_surface_clearance_audit
+                .unwrap()
+                .maximum_swept_disc_overlap_m
+                < 1e-8
+        );
+    }
 }
 
 #[test]

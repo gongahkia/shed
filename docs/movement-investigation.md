@@ -154,3 +154,15 @@ pilot directories are development evidence, not the final comparison. Rebuild
 and use the commands above to recreate the final fixed-input and study reports.
 The failed 0.44 reference remains an observation; it has not been promoted to
 a passing performance baseline.
+
+## Verification
+
+`CARGO_PROFILE_TEST_OPT_LEVEL=2 make verify` passes formatting, Clippy with
+warnings denied, all 244 workspace tests, the demo check/run/replay smoke path,
+and the development workspace build. The separate full frozen regression run
+passes both tests, including all ten simulations and their reconstructions;
+that expensive test remains opt-in during ordinary workspace testing.
+`cargo build --release --workspace --locked` also passes, and the release CLI
+reconstructs the dense first frozen bundle exactly. Current study archives and
+the original failed 0.44 study archive retain verified report checksums.
+README.md is unchanged by this investigation.

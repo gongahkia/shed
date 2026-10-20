@@ -570,5 +570,20 @@
       "maximum_disc_overlap_m": 0,
       "maximum_swept_disc_overlap_m": 0
     }
-  ]
+  ],
+  "verification": {
+    "workspace_tests_passed": 244,
+    "workspace_tests_failed": 0,
+    "workspace_expensive_test_ignored": 1,
+    "explicit_frozen_regression_tests_passed": 2,
+    "explicit_frozen_regression_tests_failed": 0,
+    "test_profile_opt_level": 2,
+    "format_checked": true,
+    "clippy_warnings_denied": true,
+    "demo_check_run_replay_passed": true,
+    "development_workspace_build_passed": true,
+    "release_workspace_build_passed": true,
+    "release_reconstructs_dense_frozen_bundle": true,
+    "original_and_current_study_archives_verified": true
+  }
 }

@@ -1,0 +1,528 @@
+{
+  "reference_runtime": "0.44.0-alpha.1",
+  "source_report_hash": "af6ce2f02d5067eab88525c105cdb5fe6a3ea46e7e9b173f6312774f7f25e1ef",
+  "method": "Original full-step traces; diagnostic single-agent counterfactuals remove all other agent groups, keeping the remaining group, geometry, seed, operations, information, timing, and identifiers unchanged. Frozen regression inputs are not modified.",
+  "cases": [
+    {
+      "id": "concourse-large-73-busy-silent",
+      "study_case_index": 10,
+      "remaining_agents": [
+        {
+          "agent": "study_0_1:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.358426,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_2:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 2.786798,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_3:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 1.019045,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_5:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.730095,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_7:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 21.892518,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_9:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.983519,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_11:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 19.106774,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_14:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 6.374654,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_15:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 3.573794,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_16:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.419809,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_17:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 19.931025,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_19:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 19.061835,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_20:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 10.109775,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_21:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 20.282485,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_22:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 19.485412,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_24:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 2.774819,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_26:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.71284,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_27:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 16.977563,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_28:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.181332,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_29:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 17.517937,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_33:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 1.850502,
+          "knows_primary_closed": false
+        },
+        {
+          "agent": "study_0_36:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 1.218869,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_37:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 21.297346,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_39:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 14.612855,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_40:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 1.392073,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_41:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 23.001576,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_45:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 5.306766,
+          "knows_primary_closed": true
+        }
+      ],
+      "remaining_with_under_0_1m_in_last_20s": 0,
+      "isolated_completed": 27,
+      "isolated_tested": 27,
+      "isolated_latest_exit_s": 93.2
+    },
+    {
+      "id": "concourse-large-73-busy-announced",
+      "study_case_index": 11,
+      "remaining_agents": [],
+      "remaining_with_under_0_1m_in_last_20s": 0,
+      "isolated_completed": 0,
+      "isolated_tested": 0,
+      "isolated_latest_exit_s": null
+    },
+    {
+      "id": "concourse-large-74-light-silent",
+      "study_case_index": 12,
+      "remaining_agents": [
+        {
+          "agent": "study_0_13:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 19.152369,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_18:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 18.364078,
+          "knows_primary_closed": true
+        }
+      ],
+      "remaining_with_under_0_1m_in_last_20s": 0,
+      "isolated_completed": 2,
+      "isolated_tested": 2,
+      "isolated_latest_exit_s": 109.0
+    },
+    {
+      "id": "concourse-large-74-light-announced",
+      "study_case_index": 13,
+      "remaining_agents": [],
+      "remaining_with_under_0_1m_in_last_20s": 0,
+      "isolated_completed": 0,
+      "isolated_tested": 0,
+      "isolated_latest_exit_s": null
+    },
+    {
+      "id": "concourse-large-74-busy-silent",
+      "study_case_index": 14,
+      "remaining_agents": [
+        {
+          "agent": "study_0_0:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 20.953556,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_1:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.0,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_4:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 17.241118,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_5:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 1.8e-05,
+          "knows_primary_closed": false
+        },
+        {
+          "agent": "study_0_13:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.843411,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_15:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 21.186153,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_18:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 19.883704,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_22:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.542694,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_23:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 18.615356,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_24:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.229043,
+          "knows_primary_closed": false
+        },
+        {
+          "agent": "study_0_30:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.365311,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_32:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.560779,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_35:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 18.811765,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_38:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 1.175943,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_40:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.518044,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_44:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 1.260763,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_46:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.405882,
+          "knows_primary_closed": true
+        }
+      ],
+      "remaining_with_under_0_1m_in_last_20s": 2,
+      "isolated_completed": 17,
+      "isolated_tested": 17,
+      "isolated_latest_exit_s": 114.0
+    },
+    {
+      "id": "concourse-large-74-busy-announced",
+      "study_case_index": 15,
+      "remaining_agents": [],
+      "remaining_with_under_0_1m_in_last_20s": 0,
+      "isolated_completed": 0,
+      "isolated_tested": 0,
+      "isolated_latest_exit_s": null
+    },
+    {
+      "id": "corridors-large-73-light-silent",
+      "study_case_index": 24,
+      "remaining_agents": [
+        {
+          "agent": "study_0_1:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 20.653179,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_4:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 23.306991,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_6:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 23.745475,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_18:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 11.780281,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_19:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 22.204724,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_20:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 21.442594,
+          "knows_primary_closed": true
+        }
+      ],
+      "remaining_with_under_0_1m_in_last_20s": 0,
+      "isolated_completed": 6,
+      "isolated_tested": 6,
+      "isolated_latest_exit_s": 105.6
+    },
+    {
+      "id": "corridors-large-73-light-announced",
+      "study_case_index": 25,
+      "remaining_agents": [],
+      "remaining_with_under_0_1m_in_last_20s": 0,
+      "isolated_completed": 0,
+      "isolated_tested": 0,
+      "isolated_latest_exit_s": null
+    },
+    {
+      "id": "corridors-large-73-busy-silent",
+      "study_case_index": 26,
+      "remaining_agents": [
+        {
+          "agent": "study_0_1:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 4.38801,
+          "knows_primary_closed": false
+        },
+        {
+          "agent": "study_0_2:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 0.486359,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_3:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 8.746493,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_4:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 3.84,
+          "knows_primary_closed": false
+        },
+        {
+          "agent": "study_0_6:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 3.809725,
+          "knows_primary_closed": false
+        },
+        {
+          "agent": "study_0_8:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 22.186358,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_13:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 23.76173,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_14:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 21.542648,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_16:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 23.039014,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_18:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 9.055387,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_19:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 2.104728,
+          "knows_primary_closed": false
+        },
+        {
+          "agent": "study_0_20:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 1.229019,
+          "knows_primary_closed": false
+        },
+        {
+          "agent": "study_0_22:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 22.289333,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_25:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 2.362831,
+          "knows_primary_closed": false
+        },
+        {
+          "agent": "study_0_30:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 1.873088,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_35:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 22.018516,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_39:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 17.602513,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_43:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 17.485423,
+          "knows_primary_closed": true
+        },
+        {
+          "agent": "study_0_46:0",
+          "final_state": "moving",
+          "last_20s_travel_m": 20.129774,
+          "knows_primary_closed": true
+        }
+      ],
+      "remaining_with_under_0_1m_in_last_20s": 0,
+      "isolated_completed": 19,
+      "isolated_tested": 19,
+      "isolated_latest_exit_s": 107.2
+    },
+    {
+      "id": "corridors-large-73-busy-announced",
+      "study_case_index": 27,
+      "remaining_agents": [],
+      "remaining_with_under_0_1m_in_last_20s": 0,
+      "isolated_completed": 0,
+      "isolated_tested": 0,
+      "isolated_latest_exit_s": null
+    }
+  ]
+}

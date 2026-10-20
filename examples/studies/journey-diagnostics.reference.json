@@ -1,0 +1,431 @@
+{
+  "journey_version": "1",
+  "validated_revision": "45518e5",
+  "runtime_version": "0.45.0-alpha.1",
+  "ordinary_bundle_version": "0.45",
+  "isolated_bundle_version": "0.45-isolated.1",
+  "example_config": "examples/studies/journey-diagnostics.json",
+  "example_config_hash": "391f09603abd3d8a80d0f6c42bbab2f513744f16b91e90478ba0404234c3404d",
+  "example_report_hash": "c1c43947ed0ec2821075c6dded3d2fe4b24ab46d61a4ca85680d5e48403a4c2b",
+  "example_cases": [
+    {
+      "key": {
+        "pattern": "concourse",
+        "scale": "large",
+        "seed": 73,
+        "load": "busy",
+        "policy": "no-announcement"
+      },
+      "scenario_hash": "4059993ecd0ee913cc8780cf5c381bfa677d4901e7147fab59a72c4a9604f48e",
+      "run_bundle_hash": "50d959a2c3ed7131bfaa3018883c18254f943352850eb393c6728dda00344bb0",
+      "journey_summary": {
+        "journey_version": "1",
+        "report_hash": "a7bf7632405a8ed1aba732c493c1a1aae4a8bbdcd44c5ff6a31e4078feee7156",
+        "source_bundle_hash": "50d959a2c3ed7131bfaa3018883c18254f943352850eb393c6728dda00344bb0",
+        "people": 47,
+        "completed": 47,
+        "walking_distance_m": 3593.2718605524815,
+        "moving_agent_s": 3406.6,
+        "service_wait_agent_s": 0.799999999999983,
+        "waypoint_pause_agent_s": 0.0,
+        "route_wait_agent_s": 0.0,
+        "transit_agent_s": 0.0,
+        "low_progress_agents": 1,
+        "low_progress_span_agent_s": 25.200000000000003,
+        "decision_events": 249,
+        "completed_elapsed_journey_s": 3407.3999999999996,
+        "nominal_estimates": 47,
+        "nominal_journey_s": 1820.4950824546784,
+        "controls_requested": 1,
+        "controls_run": 1,
+        "controls_completed": 1,
+        "control_pairs_completed": 1,
+        "paired_crowded_elapsed_s": 110.2,
+        "paired_isolated_elapsed_s": 64.2
+      },
+      "focus_person": {
+        "agent": "study_0_20:0",
+        "group": "study_0_20",
+        "scheduled_release_s": 0.0,
+        "admitted_at_s": 0.0,
+        "evacuated_at_s": 110.2,
+        "elapsed_journey_s": 110.2,
+        "final_state": "evacuated",
+        "walking_distance_m": 82.88295327000515,
+        "connector_interior_distance_m": 0.0,
+        "transition_distance_m": 0.0,
+        "time": {
+          "moving_s": 110.2,
+          "waiting_to_depart_s": 0.0,
+          "waypoint_pause_s": 0.0,
+          "route_wait_s": 0.0,
+          "lift_wait_s": 0.0,
+          "connector_wait_s": 0.0,
+          "gate_wait_s": 0.0,
+          "exit_wait_s": 0.0,
+          "transit_s": 0.0,
+          "evacuated_s": 9.799999999999997
+        },
+        "nominal_reference": {
+          "centre_route_duration_s": 32.754845432068294,
+          "authored_dwell_s": 0.0,
+          "exit": "primary"
+        },
+        "avoidance_fallback_steps": 27,
+        "swept_guard_steps": 3,
+        "low_progress": [
+          {
+            "agent": "study_0_20:0",
+            "surface": "floor_0",
+            "start_step": 381,
+            "end_step": 507,
+            "start_time_s": 76.2,
+            "end_time_s": 101.4,
+            "minimum_window_travel_m": 0.0121219
+          }
+        ],
+        "decisions": [
+          {
+            "event": {
+              "time_s": 29.6,
+              "kind": "resource_observed",
+              "subject": "study_0_20:0",
+              "detail": "exit:primary=closed"
+            },
+            "replay_step": 148,
+            "surface": "floor_0",
+            "recorded_position": {
+              "x_m": 44.208453196,
+              "y_m": 8.377667842,
+              "z_m": 0.0
+            }
+          },
+          {
+            "event": {
+              "time_s": 29.6,
+              "kind": "resource_observed",
+              "subject": "study_0_20:0",
+              "detail": "gate:primary_gate=open"
+            },
+            "replay_step": 148,
+            "surface": "floor_0",
+            "recorded_position": {
+              "x_m": 44.208453196,
+              "y_m": 8.377667842,
+              "z_m": 0.0
+            }
+          },
+          {
+            "event": {
+              "time_s": 29.6,
+              "kind": "route_recomputed",
+              "subject": "study_0_20:0",
+              "detail": "destination=alternative;blocked=exit:primary"
+            },
+            "replay_step": 148,
+            "surface": "floor_0",
+            "recorded_position": {
+              "x_m": 44.208453196,
+              "y_m": 8.377667842,
+              "z_m": 0.0
+            }
+          },
+          {
+            "event": {
+              "time_s": 106.6,
+              "kind": "resource_observed",
+              "subject": "study_0_20:0",
+              "detail": "exit:alternative=open"
+            },
+            "replay_step": 533,
+            "surface": "floor_0",
+            "recorded_position": {
+              "x_m": 41.021803795,
+              "y_m": 43.91152709,
+              "z_m": 0.0
+            }
+          },
+          {
+            "event": {
+              "time_s": 106.6,
+              "kind": "route_recomputed",
+              "subject": "study_0_20:0",
+              "detail": "destination=alternative;blocked=exit:primary"
+            },
+            "replay_step": 533,
+            "surface": "floor_0",
+            "recorded_position": {
+              "x_m": 41.021803795,
+              "y_m": 43.91152709,
+              "z_m": 0.0
+            }
+          },
+          {
+            "event": {
+              "time_s": 110.2,
+              "kind": "evacuated",
+              "subject": "study_0_20:0",
+              "detail": "alternative"
+            },
+            "replay_step": 551,
+            "surface": "floor_0",
+            "recorded_position": {
+              "x_m": 44.773499789,
+              "y_m": 45.145912831,
+              "z_m": 0.0
+            }
+          }
+        ]
+      },
+      "hotspots": [
+        {
+          "surface": "floor_0",
+          "x_m": 41.0,
+          "y_m": 39.0,
+          "low_progress_agent_s": 25.200000000000003,
+          "agents": [
+            "study_0_20:0"
+          ],
+          "start_step": 381,
+          "end_step": 507
+        }
+      ],
+      "isolated_controls": [
+        {
+          "agent": "study_0_20:0",
+          "status": "completed",
+          "bundle_hash": "88c8014f1017a664b7ea33a9a36c90c7656f573935331979a7ebee19ec5116cf",
+          "replay_verified": true,
+          "admitted_at_s": 0.0,
+          "evacuated_at_s": 64.2,
+          "elapsed_journey_s": 64.2,
+          "walking_distance_m": 76.44895177220764,
+          "crowded_elapsed_journey_s": 110.2,
+          "crowded_minus_isolated_elapsed_s": 46.0
+        }
+      ]
+    },
+    {
+      "key": {
+        "pattern": "concourse",
+        "scale": "large",
+        "seed": 73,
+        "load": "busy",
+        "policy": "official-announcement"
+      },
+      "scenario_hash": "124b577cb7ac935db2be37981714d01adcae50e04b7d249f2dda575700f77ff1",
+      "run_bundle_hash": "58f1e60d705254e309d83554862d0a4f0c8fecb0bff6221b1535925323969413",
+      "journey_summary": {
+        "journey_version": "1",
+        "report_hash": "866693e97abf0983c55eb0cc24c71d97352a3c4a0b4fbbb02e5c8802cb06cc28",
+        "source_bundle_hash": "58f1e60d705254e309d83554862d0a4f0c8fecb0bff6221b1535925323969413",
+        "people": 47,
+        "completed": 47,
+        "walking_distance_m": 2595.6320181082897,
+        "moving_agent_s": 2296.5999999999995,
+        "service_wait_agent_s": 0.4000000000000057,
+        "waypoint_pause_agent_s": 0.0,
+        "route_wait_agent_s": 0.0,
+        "transit_agent_s": 0.0,
+        "low_progress_agents": 0,
+        "low_progress_span_agent_s": -0.0,
+        "decision_events": 241,
+        "completed_elapsed_journey_s": 2296.9999999999995,
+        "nominal_estimates": 47,
+        "nominal_journey_s": 1820.4950824546784,
+        "controls_requested": 0,
+        "controls_run": 0,
+        "controls_completed": 0,
+        "control_pairs_completed": 0,
+        "paired_crowded_elapsed_s": -0.0,
+        "paired_isolated_elapsed_s": -0.0
+      },
+      "focus_person": {
+        "agent": "study_0_20:0",
+        "group": "study_0_20",
+        "scheduled_release_s": 0.0,
+        "admitted_at_s": 0.0,
+        "evacuated_at_s": 40.4,
+        "elapsed_journey_s": 40.4,
+        "final_state": "evacuated",
+        "walking_distance_m": 47.922919312071045,
+        "connector_interior_distance_m": 0.0,
+        "transition_distance_m": 0.0,
+        "time": {
+          "moving_s": 40.4,
+          "waiting_to_depart_s": 0.0,
+          "waypoint_pause_s": 0.0,
+          "route_wait_s": 0.0,
+          "lift_wait_s": 0.0,
+          "connector_wait_s": 0.0,
+          "gate_wait_s": 0.0,
+          "exit_wait_s": 0.0,
+          "transit_s": 0.0,
+          "evacuated_s": 79.6
+        },
+        "nominal_reference": {
+          "centre_route_duration_s": 32.754845432068294,
+          "authored_dwell_s": 0.0,
+          "exit": "primary"
+        },
+        "avoidance_fallback_steps": 3,
+        "swept_guard_steps": 0,
+        "low_progress": [],
+        "decisions": [
+          {
+            "event": {
+              "time_s": 10.0,
+              "kind": "route_recomputed",
+              "subject": "study_0_20:0",
+              "detail": "destination=alternative;blocked=exit:primary"
+            },
+            "replay_step": 50,
+            "surface": "floor_0",
+            "recorded_position": {
+              "x_m": 26.498262358,
+              "y_m": 18.669728956,
+              "z_m": 0.0
+            }
+          },
+          {
+            "event": {
+              "time_s": 10.0,
+              "kind": "message_received",
+              "subject": "study_0_20:0",
+              "detail": "closure_notice: exit `primary` closed from official (truthful=true, accepted=true, sample=primary-closure)"
+            },
+            "replay_step": 50,
+            "surface": "floor_0",
+            "recorded_position": {
+              "x_m": 26.498262358,
+              "y_m": 18.669728956,
+              "z_m": 0.0
+            }
+          },
+          {
+            "event": {
+              "time_s": 37.0,
+              "kind": "resource_observed",
+              "subject": "study_0_20:0",
+              "detail": "exit:alternative=open"
+            },
+            "replay_step": 185,
+            "surface": "floor_0",
+            "recorded_position": {
+              "x_m": 40.901418462,
+              "y_m": 43.848656229,
+              "z_m": 0.0
+            }
+          },
+          {
+            "event": {
+              "time_s": 37.0,
+              "kind": "route_recomputed",
+              "subject": "study_0_20:0",
+              "detail": "destination=alternative;blocked=exit:primary"
+            },
+            "replay_step": 185,
+            "surface": "floor_0",
+            "recorded_position": {
+              "x_m": 40.901418462,
+              "y_m": 43.848656229,
+              "z_m": 0.0
+            }
+          },
+          {
+            "event": {
+              "time_s": 40.4,
+              "kind": "evacuated",
+              "subject": "study_0_20:0",
+              "detail": "alternative"
+            },
+            "replay_step": 202,
+            "surface": "floor_0",
+            "recorded_position": {
+              "x_m": 44.741395984,
+              "y_m": 44.95141658,
+              "z_m": 0.0
+            }
+          }
+        ]
+      },
+      "hotspots": [],
+      "isolated_controls": []
+    }
+  ],
+  "explicit_announced_control": {
+    "source_bundle_hash": "58f1e60d705254e309d83554862d0a4f0c8fecb0bff6221b1535925323969413",
+    "analysis_report_hash": "898d2636a99ea28452d28a03a54f025d357b5b1208e855417f490df202d851d6",
+    "options": {
+      "low_progress_window_s": 5.0,
+      "max_low_progress_travel_m": 0.1,
+      "hotspot_cell_size_m": 2.0,
+      "isolated_controls": {
+        "agents": [
+          "study_0_20:0"
+        ],
+        "low_progress_agents": false,
+        "all_agents": false,
+        "max_agents": 16,
+        "max_simulated_agent_steps": 20000,
+        "verify_replay": true
+      }
+    },
+    "controls": [
+      {
+        "agent": "study_0_20:0",
+        "status": "completed",
+        "bundle_hash": "da37924becd7563941371ebe5298e2a9a7febe6f42bbe5427dd39425b420c998",
+        "replay_verified": true,
+        "admitted_at_s": 0.0,
+        "evacuated_at_s": 40.0,
+        "elapsed_journey_s": 40.0,
+        "walking_distance_m": 47.60367339484757,
+        "crowded_elapsed_journey_s": 40.4,
+        "crowded_minus_isolated_elapsed_s": 0.3999999999999986
+      }
+    ]
+  },
+  "regressions": {
+    "architecture_study": {
+      "passed": 32,
+      "failed": 0,
+      "report_hash": "b2845cd292f51ab3556d32d5706bb5334af45e9d5b35a61d3da4fa8ac9bd4e79",
+      "unchanged_simulation_bundle_hashes": 32,
+      "controls_run": 1,
+      "controls_requested": 1
+    },
+    "frozen_benchmarks": {
+      "passed": 10,
+      "failed": 0,
+      "report_hash": "45369ec3f1707f1f4338ff3d017e415d00556b4adb09c71e823a21e2eda99745",
+      "comparison_unchanged": 10,
+      "regressed": 0,
+      "incompatible": 0,
+      "unchanged_simulation_bundle_hashes": 10
+    },
+    "local-awareness": {
+      "passed": 24,
+      "failed": 0,
+      "report_hash": "5ab38456df231039305d2128a591592e8ab834db048eaf1e6c4b8365cb18d4d8"
+    },
+    "stress-final": {
+      "passed": 5,
+      "failed": 0,
+      "report_hash": "1069bb712b471e5f0b4aa15bd317270b3597b2594b76daba45c810c96a619fad"
+    }
+  },
+  "verification": {
+    "workspace_tests_passed": 265,
+    "workspace_tests_failed": 0,
+    "ignored_expensive_regression": 1,
+    "trace_resolution_suite_passed": 15,
+    "format_checked": true,
+    "clippy_warnings_denied": true,
+    "development_build_and_demo_replay_passed": true,
+    "release_workspace_build_passed": true,
+    "release_reconstructs_source_and_isolated_control": true,
+    "older_ordinary_binary_rejects_isolated_contract": true
+  },
+  "interpretation": "Recorded simulator evidence for one fixed example and preserved regression cases. Static references, state exposure, low-progress spans, and complete isolated counterfactuals are distinct observations; their differences are not an additive causal decomposition or a calibrated architectural-safety claim."
+}

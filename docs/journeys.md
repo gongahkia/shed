@@ -25,7 +25,9 @@ Each destination must be new. `diagnose run` copies the unchanged source bundle
 into its output directory so the report and replay commands remain portable.
 Sparse traces are rejected: sampled chords can miss walked distance and
 sampled states cannot reconstruct every queue or dwell interval. Rerun the
-scenario with `--trace-every 1` to obtain that evidence.
+scenario with `--trace-every 1` to obtain that evidence. Distinct integration
+boundaries must also retain distinct recorded timestamps; a cadence finer than
+the bundle clock can resolve is rejected rather than treated as zero time.
 
 Without `--replay`, verification checks bundle hashes, complete trace shape,
 time/resource accounting, analysis checksums, and a fresh derivation of the
@@ -126,7 +128,11 @@ including a second execution when control replay is enabled. Configurable
 limits are 1–64 controls and 1–200,000 simulated agent steps. Missing identities,
 budget-limited selections, incomplete controls, and incompatible source
 runtimes remain explicit results. They are not replaced with successful
-controls or silently removed from the requested population. Isolated controls
+controls or silently removed from the requested population. Selecting people
+with low progress depends on the observed outcome, so different policy arms
+can select different people. This is not an unbiased population sample. Use
+explicit IDs for a planned matched sample, and read the selected identities
+and completion availability before comparing control averages. Isolated controls
 require the installed ordinary runtime contract and are not nested inside
 another isolated execution.
 
@@ -157,3 +163,49 @@ matching root seeds does not make those layouts equivalent. Observed changes,
 static planning references, and isolated counterfactuals provide evidence for
 an explanation without claiming calibrated architectural safety or an
 automatic causal ranking.
+
+## Recorded example and regression evidence
+
+The [focused study](../examples/studies/journey-diagnostics.json) retains the
+same geometry, population, operations, and random draws as its frozen pair.
+For `study_0_20:0`, the recorded results are:
+
+| Policy | Crowded elapsed journey | Isolated elapsed journey | Crowded walked distance | Isolated walked distance |
+| --- | ---: | ---: | ---: | ---: |
+| No announcement | 110.2 s | 64.2 s | 82.883 m | 76.449 m |
+| Official announcement | 40.4 s | 40.0 s | 47.923 m | 47.604 m |
+
+The silent run's 25.2 s low-progress window is 76.2–101.4 s, at recorded steps
+381–507, around a 2 m cell centred on `(41, 39)` on `floor_0`. The report
+identifies the person, exposes the route and information events, and supplies
+the exact replay command. The accepted announcement is recorded at 10 s; the
+silent person first records the alternative route at 29.6 s. These are one
+person's reference-runtime observations from one fixed seed.
+
+The default example automatically selects the silent person because of the
+low-progress window. The announced isolated row above uses an additional
+explicit selection, even though that arm has no qualifying window:
+
+```console
+cargo run --release --locked -p chiyoda -- diagnose run out/journey-study/case-0001/run.json --isolated-agent study_0_20:0 -o out/journey-announced-control
+```
+
+The [recorded reference](../examples/studies/journey-diagnostics.reference.json)
+retains case and analysis checksums, selected-person evidence, both isolated
+controls, and regression results. The ten frozen benchmarks pass and compare
+unchanged on every original comparison metric. All 32 architecture-study
+simulation bundle hashes, layouts, controlled inputs, and runtime metrics
+match the preceding motion reference exactly; journey evidence is additional.
+All five strict stress cases and the 24-case awareness study also pass.
+
+Verification includes 265 workspace tests, the focused trace-resolution tests,
+formatting, Clippy with warnings denied, development and release builds, the
+demo check/run/replay path, source and isolated replay through the release CLI,
+and derivation of the saved diagnostic archives. Ordinary pre-analysis report
+hashes remain verified. The expensive ten-case test remains opt-in; the full
+frozen CLI benchmark and baseline comparison were run for this change.
+
+Final local artifacts are in `out/journey-validation-20261020/`: `example-final`,
+`announced-control`, `study-final`, `wayfinding-final`, `stress-final`, and
+`local-awareness`. Earlier pilot folders are development evidence rather than
+the final comparison. README.md is unchanged.

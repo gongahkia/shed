@@ -52,3 +52,45 @@ stationary stalls and delayed journeys without labeling every incomplete run
 a deadlock. Interaction delays contribute to all five failures. Isolation alone
 does not establish whether a delay is realistic congestion or an algorithmic
 defect; movement fixes need smaller controlled reproductions as well.
+
+## Motion contract 0.45
+
+Mobile ORCA pairs now share the correction on both sides of the velocity
+obstacle. Immobile people retain a zero speed bound and moving neighbours bear
+the correction. Static half-planes participate in velocity selection before
+any final clipping, so a wall does not erase an independently promised lateral
+avoidance step. This follows the reciprocal-responsibility and hard-obstacle
+separation in the [RVO2 reference implementation](https://github.com/snape/RVO2/blob/main/src/Agent.cc);
+Chiyoda's rectangular, per-step static domains remain its own reference model.
+
+Every proposed on-surface segment is resolved before positions, service, or
+exit state change. A deterministic analytic swept-disc guard shortens
+conflicting segments, retaining safe escape motion where possible. Connector
+landings must clear complete surface intervals. Stationary queue slots clear
+stored momentum, and FIFO right of way no longer removes immediate physical
+conflicts. A small right-hand cruising preference breaks exactly opposing
+symmetries. Visibility corners remain steering guides rather than stopping
+points. If the 2.5 s program is infeasible, the solver retries the actual step,
+retaining static bounds and stable neighbour order. The guard still resolves
+the resulting segments. These choices and their telemetry are specified in
+[executable semantics](semantics.md).
+
+Small wall-counterflow and shared-corner fixtures exercise completion, speed
+bounds through existing trajectory checks, boundary and swept clearance, and
+guard-event reconstruction. The original standard and strict stress benchmark
+checks remain in place. Historical pre-JSON execution hashes remain archived;
+a separate versioned reference records the intentional 0.45 execution change.
+An authentic 0.44 knowledge bundle retains its original hash and explicit
+legacy inspection status.
+
+The full ten-case simulation and reconstruction test is opt-in because it
+reruns the large obstacle layouts twice per case:
+
+```console
+cargo test --release --locked -p chiyoda-core --test wayfinding_pairs -- --include-ignored
+```
+
+The default test checks the immutable scenario hashes and paired controls.
+The full test additionally requires every case to finish, reconstruct, and
+retain zero overlap in both independent disc audits. It leaves the frozen
+suite's original assertions unchanged.

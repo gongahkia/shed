@@ -56,3 +56,45 @@ fn frozen_wayfinding_pairs_preserve_verified_inputs_and_the_original_checks() {
         assert!(pair[1]["metrics"]["clearance_time_s"].is_number());
     }
 }
+
+#[test]
+#[ignore = "full ten-case fixed-input simulation and replay; run explicitly with an optimized test profile"]
+fn all_frozen_wayfinding_cases_finish_and_replay_without_reference_disc_overlap() {
+    let suite = suite();
+    for index in 0..suite.cases.len() {
+        let case = chiyoda_core::benchmark::run_case(&suite, index)
+            .unwrap()
+            .result;
+        assert!(
+            case.evaluation.passed,
+            "{}: {:?}",
+            case.id, case.evaluation.failures
+        );
+        assert!(case.evaluation.replay_verified);
+        let metrics = case.evaluation.metrics.unwrap();
+        assert_eq!(
+            metrics.evacuated_agents, metrics.total_agents,
+            "{}",
+            case.id
+        );
+        let motion = metrics.movement_metrics.unwrap();
+        assert!(
+            motion
+                .on_surface_clearance_audit
+                .unwrap()
+                .maximum_disc_overlap_m
+                <= 0.0,
+            "{}",
+            case.id
+        );
+        assert!(
+            motion
+                .swept_on_surface_clearance_audit
+                .unwrap()
+                .maximum_swept_disc_overlap_m
+                <= 0.0,
+            "{}",
+            case.id
+        );
+    }
+}

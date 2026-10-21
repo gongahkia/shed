@@ -144,13 +144,24 @@ pub(super) fn save(
     );
     for arm in &execution.report.arms {
         let metrics = arm.evaluation.metrics.as_ref();
+        let target = if arm.journeys.is_some() {
+            "journeys.md"
+        } else {
+            "scenario.json"
+        };
         let _ = writeln!(
             markdown,
-            "| [{}](arms/{}/journeys.md) | {} / {} | {} | {} | {} |",
+            "| [{}](arms/{}/{target}) | {} / {} | {} | {} | {} |",
             arm.id,
             arm.id,
-            metrics.map_or(0, |metrics| metrics.evacuated_agents),
-            metrics.map_or(0, |metrics| metrics.total_agents),
+            metrics.map_or_else(
+                || "unavailable".into(),
+                |metrics| metrics.evacuated_agents.to_string()
+            ),
+            metrics.map_or_else(
+                || "unavailable".into(),
+                |metrics| metrics.total_agents.to_string()
+            ),
             metrics
                 .and_then(|metrics| metrics.clearance_time_s)
                 .map_or_else(|| "unavailable".into(), |time| format!("{time:.3}")),

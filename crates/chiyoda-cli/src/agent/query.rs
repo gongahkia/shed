@@ -133,6 +133,12 @@ pub(super) fn execute(workspace: &Workspace, input: &QueryInput) -> ToolResult {
     if input.view == View::Comparisons {
         return comparisons(&report, input, id);
     }
+    if arm.journeys.is_none() {
+        return Err(ToolError::new(
+            "missing_evidence",
+            "this arm has no journey evidence; inspect its evaluation failures in the summary",
+        ));
+    }
     let artifact = format!("arms/{id}/journeys.json");
     let journeys: JourneyReport =
         files::read(&workspace.path(&format!("{}/{artifact}", input.experiment))?)?;

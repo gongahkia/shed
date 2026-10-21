@@ -1,0 +1,2652 @@
+{
+  "schema_version": "chiyoda.replay-comparison.v1",
+  "renderer": {
+    "version": "chiyoda.replay-renderer.v3",
+    "font_sha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+  },
+  "image_sha256": "8259c620180bd7fda677092a022130196972b3957ca263a9248b7f82272566eb",
+  "render_width_pixels": 1200,
+  "render_height_pixels": 800,
+  "request": {
+    "time_s": 20.0,
+    "surface": null,
+    "view": "surface",
+    "selection": {
+      "kind": "agent",
+      "id": "passengers:4"
+    },
+    "baseline_label": "baseline",
+    "candidate_label": "announcement",
+    "camera": {
+      "zoom": 1.0,
+      "pan_x_pixels": 0.0,
+      "pan_y_pixels": 0.0
+    }
+  },
+  "comparison": {
+    "comparison_version": "1",
+    "requested_time_s": 20.0,
+    "common_start_s": 0.0,
+    "common_end_s": 120.0,
+    "same_population_inputs": true,
+    "state_count_order": [
+      "moving",
+      "waiting",
+      "in_transit",
+      "not_released",
+      "completed"
+    ],
+    "common_camera_bounds": {
+      "min_x": 0.0,
+      "min_y": 0.0,
+      "max_x": 24.0,
+      "max_y": 16.0
+    },
+    "baseline": {
+      "bundle_sha256": "6e876c3f95c2c9f9b3b87fa7d1f443a61a0a758ffc485acb50db0548ceb192b0",
+      "scenario_sha256": "7c9ec77ddb554aa5e82513aa044824c6808e4cc83f4f22db9e8947bca205918b",
+      "recorded_step": 100,
+      "recorded_time_s": 20.0,
+      "held_for_s": 0.0,
+      "surface": "concourse",
+      "state_counts": [
+        19,
+        1,
+        0,
+        0,
+        4
+      ],
+      "population": 24,
+      "full_run_completed": 5,
+      "full_run_people": 24,
+      "full_run_duration_s": 120.0,
+      "full_run_clearance_s": null,
+      "inspection": {
+        "inspection_version": "1",
+        "source_bundle_hash": "6e876c3f95c2c9f9b3b87fa7d1f443a61a0a758ffc485acb50db0548ceb192b0",
+        "recorded_step": 100,
+        "recorded_time_s": 20.0,
+        "selection": {
+          "kind": "agent",
+          "id": "passengers:4"
+        },
+        "diagnostics": {
+          "status": "available",
+          "report_hash": "ba0060f48ca5665bdbab9bfe8ee69db94a799fa3de3c6a1ee9a91835fea7f1b0",
+          "journey_version": "1",
+          "analyzer_runtime_version": "0.45.0-alpha.1",
+          "options": {
+            "low_progress_window_s": 5.0,
+            "max_low_progress_travel_m": 0.1,
+            "hotspot_cell_size_m": 2.0
+          }
+        },
+        "person": {
+          "snapshot": {
+            "id": "passengers:4",
+            "group": "passengers",
+            "surface": "concourse",
+            "x_m": 22.961840936,
+            "y_m": 10.196897954,
+            "z_m": 0.0,
+            "state": "moving",
+            "beliefs": {},
+            "knowledge": {
+              "known_exits": [
+                "north",
+                "south"
+              ],
+              "availability": {
+                "exit:north": {
+                  "open": false,
+                  "learned_at_s": 13.200000000000001,
+                  "source": "observation"
+                },
+                "exit:south": {
+                  "open": true,
+                  "learned_at_s": 17.0,
+                  "source": "observation"
+                }
+              }
+            }
+          },
+          "snapshot_pointer": "/trace/100/agents/4",
+          "authored_group_pointer": "/scenario/scenario/agents/0",
+          "authored_destination": "north",
+          "alternative_destinations": [
+            "south"
+          ],
+          "via": [],
+          "latest_route_event": {
+            "time_s": 17.0,
+            "kind": "route_recomputed",
+            "subject": "passengers:4",
+            "detail": "destination=south;blocked=exit:north"
+          },
+          "whole_run": {
+            "scope": "whole_run",
+            "walking_distance_m": 25.58083055776455,
+            "time": {
+              "moving_s": 120.0,
+              "waiting_to_depart_s": 0.0,
+              "waypoint_pause_s": 0.0,
+              "route_wait_s": 0.0,
+              "lift_wait_s": 0.0,
+              "connector_wait_s": 0.0,
+              "gate_wait_s": 0.0,
+              "exit_wait_s": 0.0,
+              "transit_s": 0.0,
+              "evacuated_s": 0.0
+            },
+            "completed_elapsed_journey_s": null,
+            "admitted_at_s": 0.0,
+            "evacuated_at_s": null,
+            "low_progress_total": 2,
+            "low_progress": [
+              {
+                "agent": "passengers:4",
+                "surface": "concourse",
+                "start_step": 113,
+                "end_step": 217,
+                "start_time_s": 22.6,
+                "end_time_s": 43.4,
+                "minimum_window_travel_m": 6e-9
+              },
+              {
+                "agent": "passengers:4",
+                "surface": "concourse",
+                "start_step": 205,
+                "end_step": 600,
+                "start_time_s": 41.0,
+                "end_time_s": 120.0,
+                "minimum_window_travel_m": 3.917e-6
+              }
+            ],
+            "decision_events_total": 4,
+            "avoidance_fallback_steps": 303,
+            "swept_guard_steps": 22
+          }
+        },
+        "resource": null,
+        "events": [
+          {
+            "index": 358,
+            "event": {
+              "time_s": 17.0,
+              "kind": "route_recomputed",
+              "subject": "passengers:4",
+              "detail": "destination=south;blocked=exit:north"
+            },
+            "replay_step": 85,
+            "replay_frame_time_s": 17.0,
+            "source_pointer": "/events/358"
+          },
+          {
+            "index": 357,
+            "event": {
+              "time_s": 17.0,
+              "kind": "resource_observed",
+              "subject": "passengers:4",
+              "detail": "exit:south=open"
+            },
+            "replay_step": 85,
+            "replay_frame_time_s": 17.0,
+            "source_pointer": "/events/357"
+          },
+          {
+            "index": 331,
+            "event": {
+              "time_s": 13.2,
+              "kind": "route_recomputed",
+              "subject": "passengers:4",
+              "detail": "destination=south;blocked=exit:north"
+            },
+            "replay_step": 66,
+            "replay_frame_time_s": 13.2,
+            "source_pointer": "/events/331"
+          },
+          {
+            "index": 330,
+            "event": {
+              "time_s": 13.2,
+              "kind": "resource_observed",
+              "subject": "passengers:4",
+              "detail": "exit:north=closed"
+            },
+            "replay_step": 66,
+            "replay_frame_time_s": 13.2,
+            "source_pointer": "/events/330"
+          }
+        ],
+        "events_through_frame_total": 4,
+        "events_scope": "recorded route, information, release, stage and service events through the selected frame; per-step movement audit records are excluded",
+        "trail": [
+          {
+            "step": 0,
+            "time_s": 0.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 4.52,
+              "y_m": 8.0,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 1,
+            "time_s": 0.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 4.704664919,
+              "y_m": 7.846706597,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 2,
+            "time_s": 0.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 4.889329839,
+              "y_m": 7.693413193,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 3,
+            "time_s": 0.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 5.073994758,
+              "y_m": 7.54011979,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 4,
+            "time_s": 0.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 5.258659678,
+              "y_m": 7.386826386,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 5,
+            "time_s": 1.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 5.443324597,
+              "y_m": 7.233532983,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 6,
+            "time_s": 1.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 5.627989517,
+              "y_m": 7.08023958,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 7,
+            "time_s": 1.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 5.812654436,
+              "y_m": 6.926946176,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 8,
+            "time_s": 1.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 5.997319356,
+              "y_m": 6.773652773,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 9,
+            "time_s": 1.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 6.181984275,
+              "y_m": 6.620359369,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 10,
+            "time_s": 2.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 6.366649195,
+              "y_m": 6.467065966,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 11,
+            "time_s": 2.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 6.551314114,
+              "y_m": 6.313772563,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 12,
+            "time_s": 2.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 6.735979033,
+              "y_m": 6.160479159,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 13,
+            "time_s": 2.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 6.920643953,
+              "y_m": 6.007185756,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 14,
+            "time_s": 2.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 7.105308872,
+              "y_m": 5.853892353,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 15,
+            "time_s": 3.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 7.289973792,
+              "y_m": 5.700598949,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 16,
+            "time_s": 3.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 7.474638711,
+              "y_m": 5.547305546,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 17,
+            "time_s": 3.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 7.659303631,
+              "y_m": 5.394012142,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 18,
+            "time_s": 3.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 7.84396855,
+              "y_m": 5.240718739,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 19,
+            "time_s": 3.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 8.02863347,
+              "y_m": 5.087425336,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 20,
+            "time_s": 4.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 8.213298389,
+              "y_m": 4.934131932,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 21,
+            "time_s": 4.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 8.397963309,
+              "y_m": 4.780838529,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 22,
+            "time_s": 4.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 8.582628228,
+              "y_m": 4.627545125,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 23,
+            "time_s": 4.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 8.767293147,
+              "y_m": 4.474251722,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 24,
+            "time_s": 4.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 8.951958067,
+              "y_m": 4.320958319,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 25,
+            "time_s": 5.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 9.136622986,
+              "y_m": 4.167664915,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 26,
+            "time_s": 5.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 9.321287906,
+              "y_m": 4.014371512,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 27,
+            "time_s": 5.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 9.505952825,
+              "y_m": 3.861078108,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 28,
+            "time_s": 5.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 9.690617745,
+              "y_m": 3.707784705,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 29,
+            "time_s": 5.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 9.69999899,
+              "y_m": 3.467968125,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 30,
+            "time_s": 6.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 9.843070308,
+              "y_m": 3.27527511,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 31,
+            "time_s": 6.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 10.017425937,
+              "y_m": 3.110350538,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 32,
+            "time_s": 6.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 10.20584789,
+              "y_m": 2.961699376,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 33,
+            "time_s": 6.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 10.433594737,
+              "y_m": 2.88599354,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 34,
+            "time_s": 6.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 10.672789659,
+              "y_m": 2.90563505,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 35,
+            "time_s": 7.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 10.911984582,
+              "y_m": 2.92527656,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 36,
+            "time_s": 7.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 11.151179505,
+              "y_m": 2.944918071,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 37,
+            "time_s": 7.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 11.390374428,
+              "y_m": 2.964559581,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 38,
+            "time_s": 7.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 11.62956935,
+              "y_m": 2.984201091,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 39,
+            "time_s": 7.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 11.868764273,
+              "y_m": 3.003842602,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 40,
+            "time_s": 8.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 12.107959196,
+              "y_m": 3.023484112,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 41,
+            "time_s": 8.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 12.347154119,
+              "y_m": 3.043125622,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 42,
+            "time_s": 8.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 12.586349041,
+              "y_m": 3.062767133,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 43,
+            "time_s": 8.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 12.825543964,
+              "y_m": 3.082408643,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 44,
+            "time_s": 8.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 13.064738887,
+              "y_m": 3.102050153,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 45,
+            "time_s": 9.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 13.30393381,
+              "y_m": 3.121691664,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 46,
+            "time_s": 9.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 13.543128732,
+              "y_m": 3.141333174,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 47,
+            "time_s": 9.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 13.782323655,
+              "y_m": 3.160974684,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 48,
+            "time_s": 9.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 14.021518578,
+              "y_m": 3.180616195,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 49,
+            "time_s": 9.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 14.260713501,
+              "y_m": 3.200257705,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 50,
+            "time_s": 10.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 14.499908423,
+              "y_m": 3.219899215,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 51,
+            "time_s": 10.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 14.739103346,
+              "y_m": 3.239540726,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 52,
+            "time_s": 10.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 14.978298269,
+              "y_m": 3.259182236,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 53,
+            "time_s": 10.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 15.217493192,
+              "y_m": 3.278823746,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 54,
+            "time_s": 10.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 15.456688114,
+              "y_m": 3.298465257,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 55,
+            "time_s": 11.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 15.695883037,
+              "y_m": 3.318106767,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 56,
+            "time_s": 11.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 15.93507796,
+              "y_m": 3.337748277,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 57,
+            "time_s": 11.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 16.174272883,
+              "y_m": 3.357389788,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 58,
+            "time_s": 11.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 16.413467805,
+              "y_m": 3.377031298,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 59,
+            "time_s": 11.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 16.652662728,
+              "y_m": 3.396672808,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 60,
+            "time_s": 12.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 16.891857651,
+              "y_m": 3.416314319,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 61,
+            "time_s": 12.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 17.131052574,
+              "y_m": 3.435955829,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 62,
+            "time_s": 12.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 17.370247497,
+              "y_m": 3.455597339,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 63,
+            "time_s": 12.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 17.609442419,
+              "y_m": 3.47523885,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 64,
+            "time_s": 12.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 17.848637342,
+              "y_m": 3.49488036,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 65,
+            "time_s": 13.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 18.087832265,
+              "y_m": 3.51452187,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 66,
+            "time_s": 13.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 18.32324597,
+              "y_m": 3.561216488,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 67,
+            "time_s": 13.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 18.492295724,
+              "y_m": 3.731575464,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 68,
+            "time_s": 13.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 18.63233007,
+              "y_m": 3.92648668,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 69,
+            "time_s": 13.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 18.765206557,
+              "y_m": 4.126346228,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 70,
+            "time_s": 14.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 18.898083045,
+              "y_m": 4.326205777,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 71,
+            "time_s": 14.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.030959532,
+              "y_m": 4.526065325,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 72,
+            "time_s": 14.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.163836019,
+              "y_m": 4.725924874,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 73,
+            "time_s": 14.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.296712506,
+              "y_m": 4.925784422,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 74,
+            "time_s": 14.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.429588993,
+              "y_m": 5.125643971,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 75,
+            "time_s": 15.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.56246548,
+              "y_m": 5.32550352,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 76,
+            "time_s": 15.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.695341968,
+              "y_m": 5.525363068,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 77,
+            "time_s": 15.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.828218455,
+              "y_m": 5.725222617,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 78,
+            "time_s": 15.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.961094942,
+              "y_m": 5.925082165,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 79,
+            "time_s": 15.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 20.093971429,
+              "y_m": 6.124941714,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 80,
+            "time_s": 16.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 20.226847916,
+              "y_m": 6.324801263,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 81,
+            "time_s": 16.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 20.359724403,
+              "y_m": 6.524660811,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 82,
+            "time_s": 16.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 20.492600891,
+              "y_m": 6.72452036,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 83,
+            "time_s": 16.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 20.625477378,
+              "y_m": 6.924379908,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 84,
+            "time_s": 16.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 20.758353865,
+              "y_m": 7.124239457,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 85,
+            "time_s": 17.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 20.891230352,
+              "y_m": 7.324099005,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 86,
+            "time_s": 17.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.024106839,
+              "y_m": 7.523958554,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 87,
+            "time_s": 17.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.156983326,
+              "y_m": 7.723818103,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 88,
+            "time_s": 17.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.289859814,
+              "y_m": 7.923677651,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 89,
+            "time_s": 17.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.422736301,
+              "y_m": 8.1235372,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 90,
+            "time_s": 18.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.555612788,
+              "y_m": 8.323396748,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 91,
+            "time_s": 18.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.688489275,
+              "y_m": 8.523256297,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 92,
+            "time_s": 18.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.821365762,
+              "y_m": 8.723115846,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 93,
+            "time_s": 18.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.954242249,
+              "y_m": 8.922975394,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 94,
+            "time_s": 18.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.087097775,
+              "y_m": 9.1225001,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 95,
+            "time_s": 19.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.233553489,
+              "y_m": 9.309224119,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 96,
+            "time_s": 19.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.383296051,
+              "y_m": 9.485489502,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 97,
+            "time_s": 19.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.537807749,
+              "y_m": 9.647895666,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 98,
+            "time_s": 19.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.69850581,
+              "y_m": 9.79558377,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 99,
+            "time_s": 19.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.830691608,
+              "y_m": 9.995900806,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 100,
+            "time_s": 20.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.961840936,
+              "y_m": 10.196897954,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          }
+        ],
+        "trail_requested_start_step": 0,
+        "trail_omitted_points": 0,
+        "claim_boundary": "Frame state and event timestamps are recorded evidence. Whole-run totals and low-progress spans include the full run, including periods after this frame. Resource entrants are queue-entry history, not a reconstructed current queue or a per-resource individual wait. Trails use consecutive recorded positions, never interpolated movement or a measured path distance."
+      },
+      "selection_unavailable": null
+    },
+    "candidate": {
+      "bundle_sha256": "dd6aeb18eecd0f2d8859bd652939b9b393b04364630dedd55055427e741b70a9",
+      "scenario_sha256": "1035e564a7b0ccebcc996d3dd3cc08b9377ff8cc9d9edaeee2b6aee749067fcd",
+      "recorded_step": 100,
+      "recorded_time_s": 20.0,
+      "held_for_s": 0.0,
+      "surface": "concourse",
+      "state_counts": [
+        19,
+        1,
+        0,
+        0,
+        4
+      ],
+      "population": 24,
+      "full_run_completed": 24,
+      "full_run_people": 24,
+      "full_run_duration_s": 120.0,
+      "full_run_clearance_s": 41.6,
+      "inspection": {
+        "inspection_version": "1",
+        "source_bundle_hash": "dd6aeb18eecd0f2d8859bd652939b9b393b04364630dedd55055427e741b70a9",
+        "recorded_step": 100,
+        "recorded_time_s": 20.0,
+        "selection": {
+          "kind": "agent",
+          "id": "passengers:4"
+        },
+        "diagnostics": {
+          "status": "available",
+          "report_hash": "318dfd9e383d234eb8dd58dccd6b16dd51e540449a4c831f308db80dfa57579c",
+          "journey_version": "1",
+          "analyzer_runtime_version": "0.45.0-alpha.1",
+          "options": {
+            "low_progress_window_s": 5.0,
+            "max_low_progress_travel_m": 0.1,
+            "hotspot_cell_size_m": 2.0
+          }
+        },
+        "person": {
+          "snapshot": {
+            "id": "passengers:4",
+            "group": "passengers",
+            "surface": "concourse",
+            "x_m": 23.512958635,
+            "y_m": 10.43504851,
+            "z_m": 0.0,
+            "state": "moving",
+            "beliefs": {
+              "north_closure_notice": 1.0
+            },
+            "knowledge": {
+              "known_exits": [
+                "north",
+                "south"
+              ],
+              "availability": {
+                "exit:north": {
+                  "open": false,
+                  "learned_at_s": 14.4,
+                  "source": "observation"
+                },
+                "exit:south": {
+                  "open": true,
+                  "learned_at_s": 16.2,
+                  "source": "observation"
+                }
+              }
+            }
+          },
+          "snapshot_pointer": "/trace/100/agents/4",
+          "authored_group_pointer": "/scenario/scenario/agents/0",
+          "authored_destination": "north",
+          "alternative_destinations": [
+            "south"
+          ],
+          "via": [],
+          "latest_route_event": {
+            "time_s": 16.2,
+            "kind": "route_recomputed",
+            "subject": "passengers:4",
+            "detail": "destination=south;blocked=exit:north"
+          },
+          "whole_run": {
+            "scope": "whole_run",
+            "walking_distance_m": 28.333757184723133,
+            "time": {
+              "moving_s": 40.8,
+              "waiting_to_depart_s": 0.0,
+              "waypoint_pause_s": 0.0,
+              "route_wait_s": 0.0,
+              "lift_wait_s": 0.0,
+              "connector_wait_s": 0.0,
+              "gate_wait_s": 0.0,
+              "exit_wait_s": 0.8000000000000043,
+              "transit_s": 0.0,
+              "evacuated_s": 78.39999999999999
+            },
+            "completed_elapsed_journey_s": 41.6,
+            "admitted_at_s": 0.0,
+            "evacuated_at_s": 41.6,
+            "low_progress_total": 0,
+            "low_progress": [],
+            "decision_events_total": 7,
+            "avoidance_fallback_steps": 31,
+            "swept_guard_steps": 10
+          }
+        },
+        "resource": null,
+        "events": [
+          {
+            "index": 410,
+            "event": {
+              "time_s": 16.2,
+              "kind": "route_recomputed",
+              "subject": "passengers:4",
+              "detail": "destination=south;blocked=exit:north"
+            },
+            "replay_step": 81,
+            "replay_frame_time_s": 16.2,
+            "source_pointer": "/events/410"
+          },
+          {
+            "index": 409,
+            "event": {
+              "time_s": 16.2,
+              "kind": "resource_observed",
+              "subject": "passengers:4",
+              "detail": "exit:south=open"
+            },
+            "replay_step": 81,
+            "replay_frame_time_s": 16.2,
+            "source_pointer": "/events/409"
+          },
+          {
+            "index": 391,
+            "event": {
+              "time_s": 14.4,
+              "kind": "route_recomputed",
+              "subject": "passengers:4",
+              "detail": "destination=south;blocked=exit:north"
+            },
+            "replay_step": 72,
+            "replay_frame_time_s": 14.4,
+            "source_pointer": "/events/391"
+          },
+          {
+            "index": 390,
+            "event": {
+              "time_s": 14.4,
+              "kind": "resource_observed",
+              "subject": "passengers:4",
+              "detail": "exit:north=closed"
+            },
+            "replay_step": 72,
+            "replay_frame_time_s": 14.4,
+            "source_pointer": "/events/390"
+          },
+          {
+            "index": 301,
+            "event": {
+              "time_s": 10.0,
+              "kind": "message_received",
+              "subject": "passengers:4",
+              "detail": "north_closure_notice: exit `north` closed from official (truthful=true, accepted=true, sample=north-closure)"
+            },
+            "replay_step": 50,
+            "replay_frame_time_s": 10.0,
+            "source_pointer": "/events/301"
+          },
+          {
+            "index": 300,
+            "event": {
+              "time_s": 10.0,
+              "kind": "route_recomputed",
+              "subject": "passengers:4",
+              "detail": "destination=south;blocked=exit:north"
+            },
+            "replay_step": 50,
+            "replay_frame_time_s": 10.0,
+            "source_pointer": "/events/300"
+          }
+        ],
+        "events_through_frame_total": 6,
+        "events_scope": "recorded route, information, release, stage and service events through the selected frame; per-step movement audit records are excluded",
+        "trail": [
+          {
+            "step": 0,
+            "time_s": 0.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 4.52,
+              "y_m": 8.0,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 1,
+            "time_s": 0.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 4.704664919,
+              "y_m": 7.846706597,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 2,
+            "time_s": 0.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 4.889329839,
+              "y_m": 7.693413193,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 3,
+            "time_s": 0.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 5.073994758,
+              "y_m": 7.54011979,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 4,
+            "time_s": 0.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 5.258659678,
+              "y_m": 7.386826386,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 5,
+            "time_s": 1.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 5.443324597,
+              "y_m": 7.233532983,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 6,
+            "time_s": 1.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 5.627989517,
+              "y_m": 7.08023958,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 7,
+            "time_s": 1.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 5.812654436,
+              "y_m": 6.926946176,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 8,
+            "time_s": 1.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 5.997319356,
+              "y_m": 6.773652773,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 9,
+            "time_s": 1.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 6.181984275,
+              "y_m": 6.620359369,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 10,
+            "time_s": 2.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 6.366649195,
+              "y_m": 6.467065966,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 11,
+            "time_s": 2.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 6.551314114,
+              "y_m": 6.313772563,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 12,
+            "time_s": 2.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 6.735979033,
+              "y_m": 6.160479159,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 13,
+            "time_s": 2.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 6.920643953,
+              "y_m": 6.007185756,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 14,
+            "time_s": 2.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 7.105308872,
+              "y_m": 5.853892353,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 15,
+            "time_s": 3.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 7.289973792,
+              "y_m": 5.700598949,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 16,
+            "time_s": 3.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 7.474638711,
+              "y_m": 5.547305546,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 17,
+            "time_s": 3.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 7.659303631,
+              "y_m": 5.394012142,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 18,
+            "time_s": 3.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 7.84396855,
+              "y_m": 5.240718739,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 19,
+            "time_s": 3.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 8.02863347,
+              "y_m": 5.087425336,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 20,
+            "time_s": 4.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 8.213298389,
+              "y_m": 4.934131932,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 21,
+            "time_s": 4.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 8.397963309,
+              "y_m": 4.780838529,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 22,
+            "time_s": 4.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 8.582628228,
+              "y_m": 4.627545125,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 23,
+            "time_s": 4.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 8.767293147,
+              "y_m": 4.474251722,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 24,
+            "time_s": 4.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 8.951958067,
+              "y_m": 4.320958319,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 25,
+            "time_s": 5.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 9.136622986,
+              "y_m": 4.167664915,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 26,
+            "time_s": 5.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 9.321287906,
+              "y_m": 4.014371512,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 27,
+            "time_s": 5.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 9.505952825,
+              "y_m": 3.861078108,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 28,
+            "time_s": 5.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 9.690617745,
+              "y_m": 3.707784705,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 29,
+            "time_s": 5.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 9.69999899,
+              "y_m": 3.467968125,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 30,
+            "time_s": 6.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 9.843070308,
+              "y_m": 3.27527511,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 31,
+            "time_s": 6.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 10.017425937,
+              "y_m": 3.110350538,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 32,
+            "time_s": 6.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 10.20584789,
+              "y_m": 2.961699376,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 33,
+            "time_s": 6.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 10.433594737,
+              "y_m": 2.88599354,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 34,
+            "time_s": 6.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 10.672789659,
+              "y_m": 2.90563505,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 35,
+            "time_s": 7.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 10.911984582,
+              "y_m": 2.92527656,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 36,
+            "time_s": 7.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 11.151179505,
+              "y_m": 2.944918071,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 37,
+            "time_s": 7.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 11.390374428,
+              "y_m": 2.964559581,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 38,
+            "time_s": 7.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 11.62956935,
+              "y_m": 2.984201091,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 39,
+            "time_s": 7.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 11.868764273,
+              "y_m": 3.003842602,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 40,
+            "time_s": 8.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 12.107959196,
+              "y_m": 3.023484112,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 41,
+            "time_s": 8.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 12.347154119,
+              "y_m": 3.043125622,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 42,
+            "time_s": 8.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 12.586349041,
+              "y_m": 3.062767133,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 43,
+            "time_s": 8.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 12.825543964,
+              "y_m": 3.082408643,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 44,
+            "time_s": 8.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 13.064738887,
+              "y_m": 3.102050153,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 45,
+            "time_s": 9.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 13.30393381,
+              "y_m": 3.121691664,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 46,
+            "time_s": 9.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 13.543128732,
+              "y_m": 3.141333174,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 47,
+            "time_s": 9.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 13.782323655,
+              "y_m": 3.160974684,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 48,
+            "time_s": 9.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 14.021518578,
+              "y_m": 3.180616195,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 49,
+            "time_s": 9.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 14.260713501,
+              "y_m": 3.200257705,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 50,
+            "time_s": 10.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 14.497543617,
+              "y_m": 3.239135669,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 51,
+            "time_s": 10.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 14.731400489,
+              "y_m": 3.293089015,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 52,
+            "time_s": 10.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 14.961892968,
+              "y_m": 3.359971126,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 53,
+            "time_s": 10.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 15.188708922,
+              "y_m": 3.438421894,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 54,
+            "time_s": 10.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 15.411219109,
+              "y_m": 3.528361969,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 55,
+            "time_s": 11.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 15.62657853,
+              "y_m": 3.63428798,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 56,
+            "time_s": 11.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 15.835310731,
+              "y_m": 3.752739944,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 57,
+            "time_s": 11.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 16.044042933,
+              "y_m": 3.871191909,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 58,
+            "time_s": 11.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 16.235707515,
+              "y_m": 4.015638051,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 59,
+            "time_s": 11.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 16.416075342,
+              "y_m": 4.173965077,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 60,
+            "time_s": 12.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 16.589617145,
+              "y_m": 4.339745783,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 61,
+            "time_s": 12.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 16.759372184,
+              "y_m": 4.509401985,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 62,
+            "time_s": 12.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 16.927288721,
+              "y_m": 4.680878037,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 63,
+            "time_s": 12.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 17.094545533,
+              "y_m": 4.852997644,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 64,
+            "time_s": 12.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 17.261807253,
+              "y_m": 5.02511248,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 65,
+            "time_s": 13.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 17.42941565,
+              "y_m": 5.196889735,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 66,
+            "time_s": 13.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 17.597341834,
+              "y_m": 5.36835634,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 67,
+            "time_s": 13.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 17.765556646,
+              "y_m": 5.539539801,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 68,
+            "time_s": 13.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 17.934580793,
+              "y_m": 5.709924183,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 69,
+            "time_s": 13.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 18.104279374,
+              "y_m": 5.879636857,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 70,
+            "time_s": 14.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 18.274560103,
+              "y_m": 6.048765427,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 71,
+            "time_s": 14.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 18.445354619,
+              "y_m": 6.217375134,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 72,
+            "time_s": 14.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 18.616608784,
+              "y_m": 6.385517963,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 73,
+            "time_s": 14.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 18.788277513,
+              "y_m": 6.553237513,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 74,
+            "time_s": 14.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 18.960321927,
+              "y_m": 6.720571668,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 75,
+            "time_s": 15.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.132707744,
+              "y_m": 6.887554093,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 76,
+            "time_s": 15.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.305404303,
+              "y_m": 7.054215122,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 77,
+            "time_s": 15.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.478383958,
+              "y_m": 7.220582303,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 78,
+            "time_s": 15.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.65162165,
+              "y_m": 7.386680774,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 79,
+            "time_s": 15.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.825094602,
+              "y_m": 7.552533524,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 80,
+            "time_s": 16.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 19.99878208,
+              "y_m": 7.718161602,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 81,
+            "time_s": 16.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 20.172665183,
+              "y_m": 7.883584292,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 82,
+            "time_s": 16.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 20.346726682,
+              "y_m": 8.04881926,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 83,
+            "time_s": 16.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 20.520950861,
+              "y_m": 8.213882688,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 84,
+            "time_s": 16.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 20.695323386,
+              "y_m": 8.378789398,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 85,
+            "time_s": 17.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 20.874235637,
+              "y_m": 8.538759415,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 86,
+            "time_s": 17.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.051106935,
+              "y_m": 8.700983162,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 87,
+            "time_s": 17.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.227858588,
+              "y_m": 8.86333726,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 88,
+            "time_s": 17.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.404534841,
+              "y_m": 9.025773406,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 89,
+            "time_s": 17.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.581217343,
+              "y_m": 9.188202755,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 90,
+            "time_s": 18.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.756769546,
+              "y_m": 9.351853065,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 91,
+            "time_s": 18.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 21.93194969,
+              "y_m": 9.508366338,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 92,
+            "time_s": 18.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.111556155,
+              "y_m": 9.657174017,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 93,
+            "time_s": 18.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.294382796,
+              "y_m": 9.797329509,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 94,
+            "time_s": 18.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.481396321,
+              "y_m": 9.927774863,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 95,
+            "time_s": 19.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.660901614,
+              "y_m": 10.050157203,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 96,
+            "time_s": 19.2,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.831781108,
+              "y_m": 10.158589456,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 97,
+            "time_s": 19.4,
+            "surface": "concourse",
+            "position": {
+              "x_m": 22.981229769,
+              "y_m": 10.220559087,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 98,
+            "time_s": 19.6,
+            "surface": "concourse",
+            "position": {
+              "x_m": 23.140001875,
+              "y_m": 10.296234026,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 99,
+            "time_s": 19.8,
+            "surface": "concourse",
+            "position": {
+              "x_m": 23.321246987,
+              "y_m": 10.365086665,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          },
+          {
+            "step": 100,
+            "time_s": 20.0,
+            "surface": "concourse",
+            "position": {
+              "x_m": 23.512958635,
+              "y_m": 10.43504851,
+              "z_m": 0.0
+            },
+            "state": "moving"
+          }
+        ],
+        "trail_requested_start_step": 0,
+        "trail_omitted_points": 0,
+        "claim_boundary": "Frame state and event timestamps are recorded evidence. Whole-run totals and low-progress spans include the full run, including periods after this frame. Resource entrants are queue-entry history, not a reconstructed current queue or a per-resource individual wait. Trails use consecutive recorded positions, never interpolated movement or a measured path distance."
+      },
+      "selection_unavailable": null
+    },
+    "completed_at_shared_time_difference": 0,
+    "full_run_completed_difference": 19,
+    "full_run_clearance_difference_s": null,
+    "paired_completed_elapsed_difference_s": null,
+    "claim_boundary": "Panels share one authored-coordinate camera and simulation clock. Each shows the last recorded state at or before that clock, with its actual timestamp and hold duration. State counts describe those recorded frames. Full-run outcomes describe each run's own duration; unavailable clearance and unfinished elapsed journeys remain null. Changed population inputs disable individual pairing. Differences are model observations, not calibrated causal effects."
+  }
+}

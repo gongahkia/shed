@@ -5,6 +5,7 @@ mod changes;
 mod planning;
 mod runner;
 
+pub(crate) use planning::prepare;
 pub use planning::{inspect, plan};
 pub use runner::{
     AgentDifference, ArmArtifacts, ArmResult, Comparison, EvidenceReference, ExperimentExecution,

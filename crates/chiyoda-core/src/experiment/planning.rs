@@ -118,7 +118,7 @@ pub fn plan(request: &ExperimentRequest) -> Result<ExperimentPlan, ExperimentErr
     prepare(request).map(|(plan, _)| plan)
 }
 
-pub(super) fn prepare(
+pub(crate) fn prepare(
     request: &ExperimentRequest,
 ) -> Result<(ExperimentPlan, Vec<CanonicalScenario>), ExperimentError> {
     validate_request(request)?;

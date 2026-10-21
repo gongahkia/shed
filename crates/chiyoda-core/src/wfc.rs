@@ -11,7 +11,7 @@ const MAX_CELLS: usize = 4096;
 const MAX_TILES: usize = 64;
 
 /// Socket order throughout the generator is north, east, south, west.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Direction {
     North,
@@ -53,7 +53,7 @@ pub struct Tile {
 }
 
 /// An exclusion also forbids the reverse pair in the opposite direction.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ForbiddenNeighbor {
     pub tile: String,

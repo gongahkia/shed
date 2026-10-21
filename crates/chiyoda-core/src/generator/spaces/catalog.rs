@@ -2,7 +2,7 @@ use super::Preset;
 use crate::wfc::Tile;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ModuleKind {
     Solid,
@@ -13,7 +13,7 @@ pub enum ModuleKind {
 
 /// Openings are north/east/south/west. Every open edge has the same centered
 /// passage width; module geometry is derived from the kind, never from art.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Module {
     pub id: String,

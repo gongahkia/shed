@@ -22,7 +22,9 @@ pub use layout::FloorLayout;
 
 pub const GENERATOR_VERSION: &str = "3";
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Preset {
     #[default]
@@ -42,7 +44,7 @@ impl Preset {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FloorConstraint {
     pub floor: u32,
@@ -53,7 +55,7 @@ pub struct FloorConstraint {
 
 /// A complete experiment input. Omitted JSON fields take these versioned
 /// defaults; unknown fields are rejected so misspelled rules cannot be ignored.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct SpaceConfig {
     pub preset: Preset,

@@ -2,6 +2,7 @@
 mod canvas;
 mod compare;
 pub(crate) mod scene;
+pub use compare::VIEWPORTS as COMPARISON_VIEWPORTS;
 pub use scene::{Camera, MapConfig, VIEWPORT, WorldBounds, pick};
 
 use super::{HEIGHT, ViewMode, WIDTH};

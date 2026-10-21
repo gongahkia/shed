@@ -5,6 +5,9 @@ use crate::{
     inspection::Inspection,
 };
 use chiyoda_core::RunBundle;
+
+pub const VIEWPORTS: [[f32; 4]; 2] = [[32.0, 82.0, 548.0, 470.0], [620.0, 82.0, 548.0, 470.0]];
+
 impl Renderer {
     #[allow(clippy::too_many_lines)] // both panels use one shared camera, timeline and measured comparison
     pub fn render_comparison(
@@ -18,28 +21,10 @@ impl Renderer {
         assert_eq!(buffer.len(), WIDTH * HEIGHT);
         let c = &mut self.canvas;
         c.clear(BACKGROUND);
-        c.rect([0.0, 0.0, 1200.0, 80.0], PAPER);
-        c.text(
-            (860.0, 39.0),
-            &format!("Shared time {:.2} s", request.time_s),
-            18,
-            INK,
-            310.0,
-        );
-        c.line((600.0, 96.0), (600.0, 688.0), BORDER, 1.0);
+        c.line((600.0, 16.0), (600.0, 688.0), BORDER, 1.0);
         for (bundle, frame, label, viewport) in [
-            (
-                baseline,
-                &evidence.baseline,
-                "BASELINE",
-                [32.0, 162.0, 548.0, 390.0],
-            ),
-            (
-                candidate,
-                &evidence.candidate,
-                "CANDIDATE",
-                [620.0, 162.0, 548.0, 390.0],
-            ),
+            (baseline, &evidence.baseline, "BASELINE", VIEWPORTS[0]),
+            (candidate, &evidence.candidate, "CANDIDATE", VIEWPORTS[1]),
         ] {
             let left = viewport[0];
             let run_label = if label == "BASELINE" {
@@ -49,7 +34,7 @@ impl Renderer {
             }
             .unwrap_or(&bundle.scenario.scenario.name);
             c.text(
-                (left, 113.0),
+                (left, 33.0),
                 &format!("{label} / {run_label}"),
                 16,
                 INK,
@@ -61,7 +46,7 @@ impl Renderer {
                 String::new()
             };
             c.text(
-                (left, 140.0),
+                (left, 60.0),
                 &format!(
                     "{} · recorded {:.2} s · step {}{held}",
                     frame.surface, frame.recorded_time_s, frame.recorded_step
@@ -146,19 +131,15 @@ impl Renderer {
             MUTED,
             150.0,
         );
+        let playhead_x = 32.0 + 1136.0 * progress;
         c.line((32.0, 740.0), (1168.0, 740.0), BORDER, 3.0);
-        c.line(
-            (32.0, 740.0),
-            (32.0 + 1136.0 * progress, 740.0),
-            MOVING,
-            3.0,
-        );
-        c.circle(
-            (32.0 + 1136.0 * progress, 740.0),
-            4.5,
-            Some(MOVING),
-            Some((PAPER, 1.0)),
-        );
+        c.line((32.0, 740.0), (playhead_x, 740.0), MOVING, 3.0);
+        c.circle((playhead_x, 740.0), 4.5, Some(MOVING), Some((PAPER, 1.0)));
+        let time_label = c.fit_text(&format!("Shared time {:.2} s", request.time_s), 14, 250.0);
+        let label_width = c.text_width(&time_label, 14);
+        let label_x = (playhead_x - label_width / 2.0).clamp(32.0, 1168.0 - label_width);
+        c.line((playhead_x, 747.0), (playhead_x, 753.0), MOVING, 1.0);
+        c.text((label_x, 775.0), &time_label, 14, INK, 250.0);
         c.copy_to(buffer);
     }
 }

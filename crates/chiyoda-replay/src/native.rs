@@ -279,7 +279,7 @@ pub(super) fn open(
             };
             let mouse = window.get_mouse_pos(MouseMode::Pass);
             let viewport = if candidate.is_some() {
-                [32.0, 162.0, 548.0, 390.0]
+                render::COMPARISON_VIEWPORTS[0]
             } else {
                 render::VIEWPORT
             };
@@ -291,7 +291,7 @@ pub(super) fn open(
             if let (Some(b), Some(c), Some((x, _))) = (&candidate, &compare, mouse)
                 && x >= 600.0
             {
-                under_mouse.viewport = [620.0, 162.0, 548.0, 390.0];
+                under_mouse.viewport = render::COMPARISON_VIEWPORTS[1];
                 pick_bundle = b;
                 pick_index = index_at_time(&b.trace, clock.time_s)?;
                 pick_surface = b
@@ -390,7 +390,7 @@ pub(super) fn open(
                         ..CameraControl::default()
                     };
                     let viewport = if candidate.is_some() {
-                        [32.0, 162.0, 548.0, 390.0]
+                        render::COMPARISON_VIEWPORTS[0]
                     } else {
                         render::VIEWPORT
                     };

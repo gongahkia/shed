@@ -4,6 +4,16 @@ use crate::{CanonicalScenario, Scenario, ValidationError, validate};
 
 pub const SCENARIO_SCHEMA_VERSION: &str = "1";
 
+/// Machine-discoverable current input shape. Geometric and operational
+/// invariants still require [`validate`]; JSON Schema describes the envelope.
+#[must_use]
+pub fn json_schema() -> serde_json::Value {
+    let mut schema = serde_json::to_value(schemars::schema_for!(CanonicalScenario))
+        .expect("generated scenario schema is serializable");
+    schema["properties"]["schema_version"]["const"] = SCENARIO_SCHEMA_VERSION.into();
+    schema
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ScenarioJsonError {
     #[error("invalid scenario JSON: {0}")]

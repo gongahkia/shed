@@ -7,6 +7,21 @@ use serde_json::{Value, json};
 const INPUT: &str = include_str!("fixtures/json-free-walk.json");
 
 #[test]
+fn discoverable_schema_describes_current_inputs_without_archival_fields() {
+    let schema = chiyoda_core::scenario_json::json_schema();
+    assert_eq!(schema["properties"]["schema_version"]["const"], "1");
+    assert_eq!(schema["additionalProperties"], false);
+    assert!(schema["properties"].get("language_version").is_none());
+    assert!(schema["properties"].get("legacy_envelope").is_none());
+    assert!(
+        schema["$defs"]["Scenario"]["properties"]
+            .get("agents")
+            .is_some()
+    );
+    assert_eq!(schema["$defs"]["AgentGroup"]["additionalProperties"], false);
+}
+
+#[test]
 fn authentic_local_knowledge_bundle_from_the_previous_motion_contract_retains_its_hash() {
     let bundle: RunBundle =
         serde_json::from_str(include_str!("fixtures/legacy-0.44-run.json")).unwrap();

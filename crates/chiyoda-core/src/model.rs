@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub(crate) const NAVIGATION_CLEARANCE_EPSILON_M: f64 = 1e-6;
 
 /// A point in metres in the scenario's declared Cartesian coordinate system.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Point3 {
     pub x_m: f64,
@@ -35,7 +35,7 @@ impl Point3 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Surface {
     pub id: String,
@@ -57,7 +57,7 @@ impl Surface {
 }
 
 /// An axis-aligned rectangular no-go zone on a declared walkable surface.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Obstacle {
     pub id: String,
@@ -68,7 +68,7 @@ pub struct Obstacle {
 }
 
 /// A required intermediate point in an agent group's authored journey.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Waypoint {
     pub id: String,
@@ -98,7 +98,7 @@ impl Obstacle {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Exit {
     pub id: String,
@@ -109,7 +109,7 @@ pub struct Exit {
     pub capacity_per_s: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Gate {
     pub id: String,
@@ -123,7 +123,9 @@ pub struct Gate {
 }
 
 /// The resource whose physical portal is partitioned into authored lanes.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[serde(deny_unknown_fields)]
 pub enum PortalResource {
@@ -151,7 +153,7 @@ impl PortalResource {
 }
 
 /// The authored global surface-coordinate axis across a portal's width.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PortalAxis {
     X,
@@ -171,7 +173,7 @@ impl PortalAxis {
 /// Explicit spatial lanes at a connector, gate, or exit portal. Lanes affect
 /// only target and landing placement; their count does not create a service
 /// rate or a calibrated queue model.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PortalLanes {
     pub id: String,
@@ -204,7 +206,7 @@ impl PortalLanes {
 /// Explicit ordered standing slots for a modeled service queue. The footprint
 /// describes where agents wait after an authored service limit denies them; it
 /// does not infer a rate, staffing level, or observed queue discipline.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct QueueFootprint {
     pub id: String,
@@ -274,7 +276,7 @@ impl QueueFootprint {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub enum Connector {
     Stair {
@@ -328,7 +330,9 @@ pub enum Connector {
 }
 
 /// A connector class used for authored route-eligibility constraints.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectorKind {
     Stair,
@@ -489,7 +493,7 @@ impl Connector {
 
 /// Opt-in local knowledge of resource availability. Geometry and route costs
 /// remain known; this is not a visual mapping or crowd-perception model.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AgentKnowledge {
     /// Portal-centre observation range on the occupied surface, with walls
@@ -502,7 +506,7 @@ pub struct AgentKnowledge {
     pub known_exits: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AgentGroup {
     pub id: String,
@@ -593,7 +597,7 @@ fn spawn_grid_columns(count: u32) -> u32 {
 }
 
 /// An authored change to a connector's physical availability.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectorStateChange {
     pub id: String,
@@ -603,7 +607,7 @@ pub struct ConnectorStateChange {
 }
 
 /// An authored change to an exit's physical availability.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExitStateChange {
     pub id: String,
@@ -613,7 +617,7 @@ pub struct ExitStateChange {
 }
 
 /// An authored change to a gate's physical availability.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GateStateChange {
     pub id: String,
@@ -623,7 +627,7 @@ pub struct GateStateChange {
 }
 
 /// An authored change to the service limit of a constrained non-lift connector.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConnectorCapacityChange {
     pub id: String,
@@ -633,7 +637,7 @@ pub struct ConnectorCapacityChange {
 }
 
 /// An authored change to the discharge limit of a constrained exit.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExitCapacityChange {
     pub id: String,
@@ -643,7 +647,7 @@ pub struct ExitCapacityChange {
 }
 
 /// An authored change to a gate's service limit.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GateCapacityChange {
     pub id: String,
@@ -652,7 +656,7 @@ pub struct GateCapacityChange {
     pub at_s: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum InformationSource {
     Peer,
     Official,
@@ -675,7 +679,7 @@ impl InformationSource {
 /// A route-relevant, machine-checkable proposition. Free-form narrative is
 /// intentionally excluded from the reference semantics: it belongs in an
 /// attached research note, not in an executable causal claim.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub enum Proposition {
     ConnectorAvailability { connector: String, open: bool },
@@ -712,7 +716,7 @@ impl Proposition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Message {
     pub id: String,
@@ -731,7 +735,7 @@ pub struct Message {
     pub sampling_key: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Countermeasure {
     pub id: String,
@@ -749,7 +753,7 @@ pub struct Countermeasure {
 
 /// A typed scenario input. Its vectors retain declaration order,
 /// which is part of the deterministic execution contract.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Scenario {
     pub name: String,
@@ -996,10 +1000,12 @@ impl Scenario {
 
 /// The versioned JSON scenario document embedded in run bundles.
 /// Legacy language-version envelopes remain readable only for archived bundles.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, schemars::JsonSchema)]
+#[schemars(deny_unknown_fields)]
 pub struct CanonicalScenario {
     pub schema_version: String,
     pub scenario: Scenario,
+    #[schemars(skip)]
     legacy_envelope: bool,
 }
 

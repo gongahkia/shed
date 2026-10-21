@@ -28,6 +28,7 @@ pub const RENDERER_VERSION: &str = "chiyoda.replay-renderer.v2";
 
 /// Exact semantic colours plus coverage ramps for antialiased edges. One palette
 /// is used across the animation so rare status colours cannot drift per frame.
+#[must_use]
 pub fn gif_palette() -> Vec<u32> {
     let mut colors = vec![
         BACKGROUND,
@@ -89,6 +90,7 @@ pub struct Provenance {
     pub version: &'static str,
     pub font_sha256: String,
 }
+#[must_use]
 pub fn provenance() -> Provenance {
     Provenance {
         version: RENDERER_VERSION,
@@ -146,7 +148,13 @@ impl Default for Options<'_> {
 pub struct Renderer {
     canvas: Canvas,
 }
+impl Default for Renderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl Renderer {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             canvas: Canvas::new(),
@@ -432,6 +440,7 @@ fn sidebar(c: &mut Canvas, bundle: &RunBundle, options: Options<'_>) {
         236.0,
     );
 }
+#[must_use]
 pub fn state_counts(frame: &TraceFrame) -> [usize; 5] {
     let mut counts = [0; 5];
     for agent in &frame.agents {
@@ -520,7 +529,7 @@ mod tests {
     fn capture(name: &str, buffer: &[u32]) {
         if let Some(directory) = std::env::var_os("CHIYODA_REPLAY_REVIEW_DIR") {
             let path = std::path::PathBuf::from(directory).join(name);
-            crate::write_png(&path, buffer, WIDTH, HEIGHT)
+            crate::export::write_png(&path, buffer, WIDTH, HEIGHT)
                 .expect("review capture writes to new path");
         }
     }

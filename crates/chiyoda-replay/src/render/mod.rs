@@ -499,6 +499,41 @@ fn timeline(c: &mut Canvas, bundle: &RunBundle, options: Options<'_>) {
     );
     c.line((32.0, 737.0), (884.0, 737.0), BORDER, 3.0);
     c.line((32.0, 737.0), (32.0 + 852.0 * progress, 737.0), MOVING, 3.0);
+    if let Some(inspection) = options.inspection.filter(|_| options.details) {
+        #[allow(clippy::cast_possible_truncation)]
+        let x_at = |time: f64| {
+            32.0 + 852.0 * ((time - start) / (end - start).max(f64::EPSILON)).clamp(0.0, 1.0) as f32
+        };
+        if let Some(totals) = inspection
+            .person
+            .as_ref()
+            .and_then(|p| p.whole_run.as_ref())
+        {
+            for span in &totals.low_progress {
+                c.line(
+                    (x_at(span.start_time_s), 748.0),
+                    (x_at(span.end_time_s), 748.0),
+                    WAITING,
+                    4.0,
+                );
+            }
+        }
+        for event in &inspection.events {
+            let x = x_at(event.event.time_s);
+            c.line((x, 729.0), (x, 734.0), MUTED, 1.0);
+        }
+        c.text(
+            (210.0, 721.0),
+            if inspection.person.is_some() {
+                "Selected person · amber: whole-run low progress · ticks: retained events"
+            } else {
+                "Selected resource · ticks: retained events through frame"
+            },
+            10,
+            MUTED,
+            570.0,
+        );
+    }
     c.circle(
         (32.0 + 852.0 * progress, 737.0),
         4.5,
@@ -601,6 +636,18 @@ fn inspector(
                 let y = 397.0 + i as f32 * 21.0;
                 c.text((940.0, y), text, 12, INK, 236.0);
             }
+            if let Some(span) = totals.low_progress.last() {
+                c.text(
+                    (940.0, 500.0),
+                    &format!(
+                        "Retained span {:.2}–{:.2} s",
+                        span.start_time_s, span.end_time_s
+                    ),
+                    11,
+                    MUTED,
+                    236.0,
+                );
+            }
         } else if let crate::inspection::Availability::Unavailable { reason } =
             &inspection.diagnostics
         {
@@ -675,9 +722,9 @@ fn inspector(
             236.0,
         );
     }
-    c.line((940.0, 500.0), (1176.0, 500.0), BORDER, 1.0);
+    c.line((940.0, 514.0), (1176.0, 514.0), BORDER, 1.0);
     c.text(
-        (940.0, 522.0),
+        (940.0, 536.0),
         "EVENTS THROUGH THIS FRAME",
         10,
         MUTED,
@@ -717,7 +764,7 @@ fn inspector(
     };
     for (i, event) in displayed.into_iter().take(event_limit).enumerate() {
         #[allow(clippy::cast_precision_loss)]
-        let y = 548.0 + i as f32 * 47.0;
+        let y = 562.0 + i as f32 * 47.0;
         c.text(
             (940.0, y),
             &format!("{:.2} s · {}", event.time_s, event.kind),
@@ -729,7 +776,7 @@ fn inspector(
     }
     if inspection.events.is_empty() {
         c.text(
-            (940.0, 548.0),
+            (940.0, 562.0),
             "No recorded events through frame.",
             12,
             MUTED,

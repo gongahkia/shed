@@ -283,6 +283,14 @@ pub(super) fn verify_images(
             ));
         }
         if replay {
+            if value["renderer"]
+                != serde_json::to_value(chiyoda_replay::render::provenance()).expect("renderer")
+            {
+                return Err(ToolError::new(
+                    "renderer_mismatch",
+                    "saved image uses a different renderer; verify without replay for source/hash checks, or use its recorded renderer revision for exact pixel reconstruction",
+                ));
+            }
             let source: chiyoda_core::RunBundle =
                 files::read(&w.path(&format!("{root}/{bundle}"))?)?;
             let (expected, manifest) =

@@ -573,6 +573,64 @@ fn campaign_config(directory: &Directory) -> Value {
     let baseline = read(&directory.0.join("scenario.json"));
     json!({"campaign_version":"1","name":"Bounded campaign","screening":{"id":"screen","source":{"kind":"authored","scenario":baseline}},"stress_cases":[{"id":"stress","source":{"kind":"authored","scenario":baseline},"population_multiplier":2}],"candidates":[{"id":"wider","changes":[{"kind":"set_exit_width","id":"out","width_m":3.0}]},{"id":"forbidden","changes":[{"kind":"set_group_count","id":"person","count":4_294_967_295u64}]}],"constraints":{"allowed_edits":[{"kind":"set_exit_width","targets":["out"]}],"bounds":[{"field":"exit_width","target":"out","min":1.,"max":4.}]},"objectives":[{"metric":"completed_fraction","direction":"maximize"}],"promotion":{"max_candidates":1,"require_improvement":false}})
 }
+
+// Canonical Chiyoda hashes serialize the typed field order, rather than a
+// sorted JSON object. Reproduce the image-index wire shape to make tampering
+// tests reach semantic validation after a genuinely valid reseal.
+fn reseal_image_index(value: &mut Value) {
+    #[derive(serde::Deserialize, serde::Serialize)]
+    struct Image {
+        moment: chiyoda_core::campaign::EvidenceMoment,
+        receipt: Option<Value>,
+        error: Option<Value>,
+    }
+    #[derive(serde::Deserialize, serde::Serialize)]
+    struct EvidenceInventory {
+        campaign_report_hash: String,
+        images: Vec<Image>,
+        reconstruction_agent_steps_charged: u64,
+        index_hash: String,
+    }
+    let mut index: EvidenceInventory = serde_json::from_value(value.clone()).unwrap();
+    index.index_hash.clear();
+    index.index_hash = chiyoda_core::bundle::canonical_hash(&index);
+    *value = serde_json::to_value(index).unwrap();
+}
+fn assert_previous_renderer_verification(d: &Directory) {
+    // A prior presentation revision remains source/hash-verifiable; exact
+    // pixel reconstruction requires the renderer recorded in its sidecar.
+    let sidecar = d.0.join("archived/evidence/000.png.json");
+    let index = d.0.join("archived/evidence-index.json");
+    let original_sidecar = fs::read(&sidecar).unwrap();
+    let original_index = fs::read(&index).unwrap();
+    let mut previous_renderer = read(&sidecar);
+    previous_renderer["renderer"]["version"] = "chiyoda.replay-renderer.v3".into();
+    write(&sidecar, &previous_renderer);
+    let mut previous_index = read(&index);
+    previous_index["images"][0]["receipt"]["evidence_sha256"] =
+        chiyoda_replay::evidence::sha256(&fs::read(&sidecar).unwrap()).into();
+    reseal_image_index(&mut previous_index);
+    write(&index, &previous_index);
+    assert_eq!(
+        ok(
+            d,
+            "chiyoda_campaign_verify",
+            &json!({"campaign":"archived"})
+        )["verified"],
+        true
+    );
+    assert_eq!(
+        call(
+            d,
+            "chiyoda_campaign_verify",
+            &json!({"campaign":"archived","replay":true})
+        )["error"]["code"],
+        "renderer_mismatch"
+    );
+    fs::write(&sidecar, original_sidecar).unwrap();
+    fs::write(&index, original_index).unwrap();
+}
+
 #[test]
 fn campaign_tools_archive_controlled_trials_images_and_verify_after_moving_without_sources() {
     let d = Directory::new();
@@ -633,6 +691,7 @@ fn campaign_tools_archive_controlled_trials_images_and_verify_after_moving_witho
     assert_eq!(verified["verified"], true);
     assert_eq!(verified["images"]["successful"], 4);
     assert_eq!(verified["images"]["pixels_rederived"], true);
+    assert_previous_renderer_verification(&d);
     let evidence = ok(
         &d,
         "chiyoda_campaign_query",
@@ -755,8 +814,7 @@ fn mcp_campaign_loop_returns_the_same_annotated_png_as_its_archived_receipt() {
     let path = d.0.join("result/evidence-index.json");
     let mut malformed = read(&path);
     malformed["images"][0]["receipt"]["image"] = Value::Null;
-    malformed["index_hash"] = "".into();
-    malformed["index_hash"] = chiyoda_core::bundle::canonical_hash(&malformed).into();
+    reseal_image_index(&mut malformed);
     write(&path, &malformed);
     let response = rpc.request(&json!({
         "jsonrpc":"2.0","id":4,"method":"tools/call",
@@ -767,6 +825,12 @@ fn mcp_campaign_loop_returns_the_same_annotated_png_as_its_archived_receipt() {
     assert_eq!(
         response["result"]["structuredContent"]["error"]["code"],
         "integrity"
+    );
+    assert!(
+        response["result"]["structuredContent"]["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("malformed image receipt")
     );
     assert_eq!(
         rpc.tool("chiyoda_capabilities", &json!({}))["campaign_version"],

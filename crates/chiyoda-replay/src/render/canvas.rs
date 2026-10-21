@@ -125,6 +125,8 @@ impl Canvas {
             );
         }
     }
+    /// Small analytic coverage discs avoid allocating and masking vector paths
+    /// for every person. Raster work is bounded by the visible disc rectangle.
     pub fn circle(
         &mut self,
         at: (f32, f32),
@@ -132,29 +134,41 @@ impl Canvas {
         fill: Option<u32>,
         stroke: Option<(u32, f32)>,
     ) {
-        let Some(path) = PathBuilder::from_circle(at.0, at.1, radius) else {
+        if !at.0.is_finite() || !at.1.is_finite() || !radius.is_finite() || radius <= 0.0 {
             return;
-        };
-        if let Some(color) = fill {
-            self.pixels.fill_path(
-                &path,
-                &paint(color),
-                FillRule::Winding,
-                Transform::identity(),
-                self.map_clip.then_some(&self.clip),
-            );
         }
-        if let Some((color, width)) = stroke {
-            self.pixels.stroke_path(
-                &path,
-                &paint(color),
-                &Stroke {
-                    width,
-                    ..Stroke::default()
-                },
-                Transform::identity(),
-                self.map_clip.then_some(&self.clip),
-            );
+        let half = stroke.map_or(0.0, |(_, width)| width.max(0.0) / 2.0);
+        let outer = radius + half + 1.0;
+        let mut left = ((at.0 - outer).floor() as i32).clamp(0, WIDTH as i32);
+        let mut right = ((at.0 + outer).ceil() as i32).clamp(0, WIDTH as i32);
+        let mut top = ((at.1 - outer).floor() as i32).clamp(0, HEIGHT as i32);
+        let mut bottom = ((at.1 + outer).ceil() as i32).clamp(0, HEIGHT as i32);
+        if self.map_clip {
+            let [x, y, w, h] = super::scene::VIEWPORT;
+            left = left.max(x as i32);
+            right = right.min((x + w) as i32);
+            top = top.max(y as i32);
+            bottom = bottom.min((y + h) as i32);
+        }
+        let data = self.pixels.data_mut();
+        for y in top..bottom {
+            for x in left..right {
+                let distance = (x as f32 + 0.5 - at.0).hypot(y as f32 + 0.5 - at.1);
+                let index = (y as usize * WIDTH + x as usize) * 4;
+                if let Some(color) = fill {
+                    blend(
+                        data,
+                        index,
+                        color,
+                        (radius + 0.5 - distance).clamp(0.0, 1.0),
+                    );
+                }
+                if let Some((color, _)) = stroke {
+                    let coverage = (radius + half + 0.5 - distance).clamp(0.0, 1.0)
+                        - (radius - half + 0.5 - distance).clamp(0.0, 1.0);
+                    blend(data, index, color, coverage);
+                }
+            }
         }
     }
     fn display_char(&self, c: char) -> char {
@@ -258,4 +272,17 @@ fn paint(color: u32) -> Paint<'static> {
     paint.set_color(color_value(color));
     paint.anti_alias = true;
     paint
+}
+
+fn blend(data: &mut [u8], index: usize, color: u32, coverage: f32) {
+    let alpha = (coverage * 255.0).round() as u32;
+    if alpha == 0 {
+        return;
+    }
+    for (channel, shift) in [16, 8, 0].iter().enumerate() {
+        let foreground = (color >> shift) & 255;
+        data[index + channel] =
+            ((foreground * alpha + u32::from(data[index + channel]) * (255 - alpha) + 127) / 255)
+                as u8;
+    }
 }

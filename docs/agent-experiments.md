@@ -1,0 +1,293 @@
+# Agent experiments
+
+Chiyoda exposes the same headless experiment capability to Rust applications,
+command-line agents, and MCP clients. A caller can inspect a space, propose
+changes, check the complete plan, run controlled alternatives, retrieve
+evidence, and revise its next experiment. Chiyoda supplies simulation and
+observations; the calling agent supplies hypotheses and interpretation. No
+language-model API or credentials are required.
+
+The current API and experiment versions are **1**. This adds an analysis and
+intervention contract; ordinary scenario, movement, and run-bundle contracts
+remain unchanged.
+
+## Discover and try
+
+Build the CLI with `cargo build --release -p chiyoda --locked`, then discover
+the tools and their generated input schemas:
+
+```console
+target/release/chiyoda agent tools
+target/release/chiyoda agent call chiyoda_capabilities --input -
+{}
+```
+
+For the second command, send the JSON followed by EOF. One-shot calls also
+accept an arguments file. Standard output contains exactly one JSON envelope:
+
+```json
+{"api_version":"1","ok":true,"result":{}}
+```
+
+Failures have `ok: false` and an `error` containing `code`, `message`, and
+optional `details`; the one-shot process exits nonzero. Semantic failures in a
+*plan* are an ordinary result with `runnable: false` and structured issues.
+A successfully executed experiment can contain failed performance checks:
+inspect every arm's `evaluation.passed`, failures, measurements, and completion
+counts. Tool success does not mean an architecture performed well.
+
+All tool artifact paths are relative to `--workspace`, which defaults to the
+current directory. Existing destinations are preserved. Absolute paths,
+parent traversal, and symlinks resolving outside that workspace are rejected.
+The local process still has the invoking user's OS permissions; this path
+convention is not an operating-system sandbox.
+
+The checked-in station example compares three independent interventions with
+one baseline: moving a kiosk, announcing a scheduled exit closure, and doubling
+the number of arrivals. Run this from the repository root:
+
+```console
+python3 examples/experiments/compare_station.py --output out/agent-station --replay
+```
+
+The script uses only Python's standard library. The equivalent calls are:
+
+```python
+import json
+import subprocess
+from pathlib import Path
+
+binary = "./target/release/chiyoda"
+
+def call(tool, arguments):
+    process = subprocess.run(
+        [binary, "agent", "call", tool, "--input", "-", "--workspace", "."],
+        input=json.dumps(arguments), text=True, capture_output=True,
+    )
+    envelope = json.loads(process.stdout)
+    if not envelope["ok"]:
+        raise RuntimeError(envelope["error"])
+    return envelope["result"]
+
+experiment = json.loads(Path("examples/experiments/station.plan.json").read_text())
+plan = call("chiyoda_plan", experiment)
+if not plan["runnable"]:
+    raise RuntimeError(plan)
+
+output = "out/agent-station"  # must be a new directory
+result = call("chiyoda_run", {
+    "experiment": experiment,
+    "expected_input_hash": plan["input_hash"],
+    "output": output,
+})
+print([(arm["id"], arm["evaluation"]["passed"]) for arm in result["arms"]])
+print(call("chiyoda_query", {
+    "experiment": output, "view": "comparisons", "arm": "announcement",
+    "offset": 0, "limit": 10,
+}))
+print(call("chiyoda_verify", {"experiment": output, "replay": True}))
+```
+
+## Tools
+
+| Tool | Capability |
+|---|---|
+| `chiyoda_capabilities` | Versions, workflow, limits and interpretation rules |
+| `chiyoda_schema` | Generated current scenario or complete experiment JSON Schema |
+| `chiyoda_inspect` | Full authored scenario, stable object IDs, hash, population, step count, validation and geometric reachability |
+| `chiyoda_generate` | Seeded WFC generation into a new directory, with provenance and rejected attempts |
+| `chiyoda_plan` | Independent variants, actual changed fields, population controls, preflight and total cost |
+| `chiyoda_run` | Execute exactly the planned input and save complete comparison evidence |
+| `chiyoda_query` | Bounded pages of measurements, differences, people, queues, decisions and replay states |
+| `chiyoda_verify` | Independently re-derive evidence; optionally reconstruct every run |
+
+`chiyoda_generate` accepts an optional workspace-relative `config` path to the
+existing `SpaceConfig` JSON format. Obtain an editable configuration with
+`chiyoda space-rules --preset concourse`. Generation is the existing WFC
+implementation, including its bounded attempts and rejection record; tool
+calls do not introduce a second generator. Exhaustion writes
+`generation-failure.json` and returns its location in the error details.
+
+## Controlled changes
+
+`chiyoda_plan` takes a name, a scenario path, variants, and optional execution
+options. See [station.plan.json](../examples/experiments/station.plan.json).
+Each variant starts from the original baseline, then applies its own ordered
+changes. An empty change list is an explicit identical-input control.
+
+Changes target object IDs, rather than array positions:
+
+| Change kind | Required payload |
+|---|---|
+| `move_obstacle` | `id`, `at` point |
+| `resize_obstacle` | `id`, `width_m`, `depth_m` |
+| `add_obstacle` | complete `obstacle` |
+| `remove_obstacle` | `id` |
+| `set_exit_width` | `id`, `width_m` |
+| `set_exit_capacity` | `id`, `capacity_per_s`; null removes the limit |
+| `set_gate_rate` | `id`, `service_rate_per_s` |
+| `set_connector_width` | `id`, `width_m`; stairs, ramps and escalators only |
+| `set_group_count` | `id`, `count` |
+| `set_group_knowledge` | `id`, `knowledge`; null restores global awareness |
+| `replace_information` | complete ordered `messages` and `countermeasures` arrays |
+
+Width and service capacity remain independent inputs. Moving an obstacle does
+not silently relocate people or repair invalid geometry. Lift cabins retain
+their separate geometry. Existing semantic validation and independent
+radius-clear geometric preflight apply after edits. Unknown IDs, unsupported
+edits, blocked journeys and overlapping initial populations remain explicit
+issues. Arrays retain their authored order and event tie-breaking semantics.
+
+Plans hash the entire resolved request, including the embedded scenario,
+interventions, defaults, budgets, thresholds, and replay setting. A run requires
+that exact `expected_input_hash`. A changed file or proposed intervention
+requires a new plan; formatting alone does not alter the resolved scenario.
+This is an input-consistency check, not a separate approval mechanism.
+
+The seed and integration schedule are fixed across an experiment. Population
+hashes include group order, IDs, physical traits, starts, goals, release rules
+and seed. Initial knowledge is excluded because it can itself be the
+intervention. Changing demand disables individual pairing entirely, even when
+some IDs appear in both arms. It retains aggregate measurements and their
+separate denominators. Kiosk and announcement variants can retain person pairs.
+
+## Evidence queries
+
+`chiyoda_run` returns a compact report without per-person comparison arrays.
+The complete report is saved. `chiyoda_query` supplies these views:
+
+| View | Scope |
+|---|---|
+| `summary` | All arm outcomes and aggregate comparisons; no arm required |
+| `changes` | Actual changed top-level fields and before/after hashes for an arm |
+| `agents` | Person summaries, time budgets, completion, nominal references and evidence locations |
+| `comparisons` | Individual candidate-minus-baseline differences, matching and completed-pair counts |
+| `hotspots` | Spatial low-progress exposure and affected people |
+| `resources` | Per-resource queue exposure and peaks |
+| `low_progress` | Individual recorded low-progress windows |
+| `events` | Journey decision evidence in deterministic time/person/event order |
+| `trace` | Agent states at one exact recorded integration step |
+
+All detail views require an `arm`. Comparisons require a candidate arm. People,
+comparisons, low-progress windows, events and traces accept an `agent` filter.
+Trace queries additionally require `step`; they return structured replay
+program arguments, suitable for opening the existing paused native viewer.
+
+Pages contain `total`, `offset`, `limit`, `next_offset`, and `items`; follow
+`next_offset` until null. Default page size is 50, maximum 200. Source artifact
+paths are relative to the experiment directory, and JSON Pointers identify
+the complete underlying evidence. A person summary is a projection of its
+source journey, not a replacement for that full record. Querying checks linked
+hashes; independent re-derivation requires `chiyoda_verify`.
+
+Comparisons report raw measurements and candidate-minus-baseline differences.
+There is no automatic overall winner. Incomplete journeys have no completed
+elapsed or clearance time. Differences in elapsed time exist only for people
+who completed both journeys, with the count retained. Low-progress spans
+overlap moving exposure. Static nominal references and observed differences
+retain the interpretation limits in [journeys.md](journeys.md).
+
+Findings identify recorded low-progress locations and resource waits with
+artifact pointers and available replay steps. The calling agent can follow
+these, inspect route and information events, and state what the evidence
+supports. A temporal association alone does not establish why a person chose
+a route or isolate every source of delay.
+
+## Artifacts and verification
+
+An experiment directory contains `request.json`, `report.json`, `report.md`,
+and an `arms/ID` directory for each arm. Each arm retains its scenario, run,
+and the ordinary journey JSON, CSV and Markdown. Requests embed the complete
+baseline. The archive can move or be copied without the original source path;
+the run and analysis data remain independently verifiable.
+
+`report.json` is published last. A partial directory without it is incomplete;
+unexpected execution errors retain the request and `failure.json` when
+possible. Existing directories are never reused. Threshold failures remain
+in a completed report, including their measurements. Missing runtime or
+analysis evidence is never replaced with a successful result. Verification
+refuses an arm whose evidence is missing.
+
+Default verification re-prepares the request, checks the complete artifact
+inventory and hashes, rechecks trajectory assertions and thresholds, re-derives
+journeys, and rebuilds all comparisons. `replay: true` additionally executes
+each saved scenario and compares its complete run. This extra verification
+does not rewrite whether the original experiment requested replay.
+
+## Execution limits
+
+Experiments permit 1..=15 variants plus the baseline, at most 64 changes per
+variant, 1..=1024 people, 1..=10000 integration steps, and at most 1024 declared
+objects/interventions per arm. Complete evidence requires distinct recorded
+timestamps, and durations are bounded at 86400 seconds.
+
+Both agent-step and retained-snapshot budgets default to 1000000 and can be
+set in 1..=2000000. Agent-step estimates include every requested reconstruction
+execution; retained snapshots include each initial frame. These are bounded
+work estimates, not wall-clock predictions. Later explicit verification is
+additional work. Tool generation permits at most 64 attempts, 10000 backtracks
+and 100000 decisions per attempt, alongside ordinary `SpaceConfig` limits.
+Tool messages are bounded at 16 MiB, results at 1 MiB, and saved input/artifact
+files at 256 MiB. Oversized results return a resource-limit error; they are
+never silently truncated.
+
+Stable error codes include `arguments`, `configuration`, `version`, `path`,
+`artifact_io`, `resource_limit`, `destination_exists`, `stale_plan`,
+`invalid_plan`, `generation`, `analysis`, `unknown_id`, `unknown_tool`,
+`step_not_recorded`, `integrity`, `missing_evidence`, and `replay`. Plan issues
+also carry object paths, validation/reachability categories, and budget details.
+
+## MCP transport
+
+Start a local stdio server with:
+
+```console
+target/release/chiyoda agent serve --workspace /absolute/path/to/chiyoda
+```
+
+For clients using the common `mcpServers` configuration shape:
+
+```json
+{
+  "mcpServers": {
+    "chiyoda": {
+      "command": "/absolute/path/to/chiyoda/target/release/chiyoda",
+      "args": ["agent", "serve", "--workspace", "/absolute/path/to/chiyoda"]
+    }
+  }
+}
+```
+
+This binding implements the explicit MCP **2025-11-25** contract:
+[lifecycle](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle),
+[stdio framing](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports),
+and [tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
+It negotiates that version, requires initialization and the initialized
+notification before tool use, exposes generated `tools/list` schemas, and
+returns matching text and structured tool envelopes. Stdout contains only
+newline-delimited JSON-RPC. Domain failures use tool `isError`; invalid
+protocol/arguments use JSON-RPC errors. EOF ends the server.
+
+Tools execute synchronously. The server advertises tools only, with a static
+catalog; it does not advertise asynchronous tasks, progress, subscriptions,
+resources, prompts, or cancellation support. There is no HTTP listener or
+hosted sharing service. A browser or another application can build on the
+same experiment API without changing the simulation law.
+
+## Rust API
+
+`chiyoda_core::experiment` exposes `inspect`, `plan`, `execute`, the complete
+request/plan/report types, generated schema, and verification from saved
+artifacts. The library has no CLI, filesystem, MCP, or model-service dependency:
+
+```rust,ignore
+let request: chiyoda_core::experiment::ExperimentRequest =
+    serde_json::from_str(&request_json)?;
+let plan = chiyoda_core::experiment::plan(&request)?;
+let result = chiyoda_core::experiment::execute(&request, &plan.input_hash)?;
+result.report.verify(&request, &result.artifacts, true)?;
+```
+
+The library request embeds `baseline`; tool planning instead resolves a
+`scenario` path into that same request. Neither transport implements its own
+mutation, movement, or comparison engine.

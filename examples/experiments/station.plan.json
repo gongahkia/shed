@@ -1,0 +1,44 @@
+{
+  "name": "Concourse interventions with one fixed baseline",
+  "scenario": "examples/experiments/station.json",
+  "variants": [
+    {
+      "id": "moved-kiosk",
+      "changes": [
+        {"kind": "move_obstacle", "id": "kiosk", "at": {"x_m": 10.0, "y_m": 0.0, "z_m": 0.0}}
+      ]
+    },
+    {
+      "id": "announcement",
+      "changes": [
+        {
+          "kind": "replace_information",
+          "messages": [
+            {
+              "id": "north_closure_notice", "source": "Official", "surface": "concourse",
+              "origin": {"x_m": 2.0, "y_m": 8.0, "z_m": 0.0},
+              "claim": {"ExitAvailability": {"exit": "north", "open": false}},
+              "truthful": true, "at_s": 10.0, "reach_m": 100.0, "trust": 1.0,
+              "sampling_key": "north-closure"
+            }
+          ],
+          "countermeasures": []
+        }
+      ]
+    },
+    {
+      "id": "busier",
+      "changes": [
+        {"kind": "set_group_count", "id": "passengers", "count": 48}
+      ]
+    }
+  ],
+  "options": {
+    "evaluation": {
+      "verify_replay": true,
+      "thresholds": {"min_evacuated_fraction": 1.0, "max_disc_overlap_m": 1e-8, "max_swept_disc_overlap_m": 1e-8}
+    },
+    "max_agent_steps": 200000,
+    "max_trace_samples": 100000
+  }
+}

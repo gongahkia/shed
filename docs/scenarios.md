@@ -4,6 +4,10 @@ Chiyoda accepts versioned JSON scenario documents. There is no custom source
 language or compilation step. The same document is used by the CLI, generators,
 live viewer, and the scenarios embedded in evaluation and benchmark suites.
 
+[Agent experiments](agent-experiments.md) expose generated input schemas,
+ID-based interventions, bounded execution, and evidence queries through JSON
+CLI tools and MCP. They use this same scenario format.
+
 ```json
 {
   "schema_version": "1",

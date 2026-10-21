@@ -9,6 +9,11 @@ The study matrix is **pattern × scale × seed × load × policy**. Every reques
 case appears in the final report, including generation failures, impossible
 populations, invalid policies, and incomplete evacuations.
 
+For an agent proposing individual changes to one authored or generated space,
+[agent experiments](agent-experiments.md) provide a smaller controlled loop
+with preflight budgets, JSON tools, MCP, and paginated journey evidence. The
+matrix study runner remains the interface for declared multi-layout sweeps.
+
 ## Run a study
 
 ```console

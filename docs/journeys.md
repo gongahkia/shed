@@ -6,6 +6,10 @@ gets `journeys.json`, `journeys.csv`, and `journeys.md`. The main report links
 to those files and includes distance, moving-time, route-wait, and low-progress
 comparisons across the same available seed pairs.
 
+[Agent experiments](agent-experiments.md) retain this same journey evidence
+for controlled alternatives and expose paginated people, queue, decision,
+low-progress, and exact-step trace queries to calling agents.
+
 The analysis uses the original run. It does not change ordinary movement or
 regenerate WFC geometry. Journey analysis has its own version, options, source
 bundle hash, and checksum. Earlier study and benchmark reports remain readable

@@ -71,6 +71,7 @@ struct SchemaInput {
 enum SchemaKind {
     Scenario,
     Experiment,
+    Campaign,
 }
 
 fn tool<T: JsonSchema>(name: &str, description: &str, read_only: bool) -> Value {
@@ -87,7 +88,7 @@ pub(super) fn catalog() -> Vec<Value> {
         ),
         tool::<SchemaInput>(
             "chiyoda_schema",
-            "Get the generated JSON Schema for current scenarios or complete experiment requests. Semantic validation remains separate.",
+            "Get the generated JSON Schema for current scenarios, complete experiment requests or budgeted campaign configurations. Semantic validation remains separate.",
             true,
         ),
         tool::<InspectInput>(
@@ -119,6 +120,26 @@ pub(super) fn catalog() -> Vec<Value> {
             "chiyoda_render_evidence",
             "Reconstruct a bounded saved run, inspect one exact person/resource at a recorded step, and write an annotated PNG plus source-linked evidence. MCP returns the same PNG as image content. Whole-run totals remain separate from frame state and sparse-trace accounting stays unavailable.",
             false,
+        ),
+        tool::<super::campaign::PlanInput>(
+            "chiyoda_campaign_plan",
+            "Preflight a permissioned campaign with explicit objectives and worst-case screening, stress, generation and evidence-image budgets. Bounded WFC preparation does not simulate people.",
+            true,
+        ),
+        tool::<super::campaign::RunInput>(
+            "chiyoda_campaign_run",
+            "Run a preflighted campaign into a new directory: retain rejected trials, promote by declared objectives, stress-test selected candidates, and export bounded annotated evidence. Returns explicit coverage and regressions, not an architectural recommendation.",
+            false,
+        ),
+        tool::<super::campaign::QueryInput>(
+            "chiyoda_campaign_query",
+            "Read paginated campaign candidates, trials and annotated evidence, or its compact summary. Follow trial experiment paths with chiyoda_query for people, resources and trace details.",
+            true,
+        ),
+        tool::<super::campaign::VerifyInput>(
+            "chiyoda_campaign_verify",
+            "Re-derive a saved campaign's trials, selection, rankings, coverage and budgets. Check image/source hashes; replay additionally reconstructs runs and re-renders image pixels. Verification work is additional to the original execution budget.",
+            true,
         ),
         tool::<VerifyInput>(
             "chiyoda_verify",
@@ -156,6 +177,10 @@ pub(super) fn call(workspace: &Workspace, name: &str, input: Value) -> ToolResul
 
 fn dispatch(workspace: &Workspace, name: &str, input: Value) -> ToolResult {
     match name {
+        "chiyoda_campaign_plan" => super::campaign::plan(workspace, input),
+        "chiyoda_campaign_run" => super::campaign::run(workspace, input),
+        "chiyoda_campaign_query" => super::campaign::query(workspace, input),
+        "chiyoda_campaign_verify" => super::campaign::verify(workspace, input),
         "chiyoda_render_evidence" => {
             let input: super::replay::RenderInput = arguments(input)?;
             super::replay::execute(workspace, &input)
@@ -165,6 +190,7 @@ fn dispatch(workspace: &Workspace, name: &str, input: Value) -> ToolResult {
             Ok(
                 json!({"api_version":API_VERSION,"experiment_version":experiment::EXPERIMENT_VERSION,
                 "runtime_version":chiyoda_core::RUNTIME_VERSION,"bundle_version":chiyoda_core::bundle::BUNDLE_VERSION,
+                "campaign_version":chiyoda_core::campaign::CAMPAIGN_VERSION,"campaign_limits":{"candidates":32,"stress_cases":16,"trials":256,"evidence_images":16,"max_agent_steps":2_000_000,"max_trace_samples":2_000_000},
                 "replay_evidence_version":"1","replay_renderer_version":chiyoda_replay::render::RENDERER_VERSION,
                 "scenario_schema_version":chiyoda_core::SCENARIO_SCHEMA_VERSION,"generator_version":spaces::GENERATOR_VERSION,
                 "workflow":["inspect or generate a baseline","plan independent ID-based variants","run with the exact planned input hash","query paginated evidence and compare outcomes","verify and optionally reconstruct saved runs"],
@@ -177,6 +203,7 @@ fn dispatch(workspace: &Workspace, name: &str, input: Value) -> ToolResult {
             Ok(match input.kind {
                 SchemaKind::Scenario => chiyoda_core::scenario_json::json_schema(),
                 SchemaKind::Experiment => experiment::json_schema(),
+                SchemaKind::Campaign => chiyoda_core::campaign::json_schema(),
             })
         }
         "chiyoda_inspect" => {

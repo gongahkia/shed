@@ -90,7 +90,7 @@ fn tool_discovery_and_schemas_are_generated_and_strict() {
     assert!(output.status.success());
     let catalog: Value = serde_json::from_slice(&output.stdout).unwrap();
     let tools = catalog["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 9);
+    assert_eq!(tools.len(), 13);
     assert!(
         tools
             .iter()
@@ -451,7 +451,7 @@ fn mcp_negotiates_discovers_and_completes_a_real_agent_experiment_loop() {
             .as_array()
             .unwrap()
             .len(),
-        9
+        13
     );
     rpc.tool("chiyoda_inspect", &json!({"scenario":"scenario.json"}));
     let plan = rpc.tool("chiyoda_plan", &experiment());
@@ -567,4 +567,187 @@ fn annotated_replay_tool_and_mcp_image_share_exact_source_and_pixel_hashes() {
         false
     );
     assert!(!directory.0.join("evidence/bad.png").exists());
+}
+
+fn campaign_config(directory: &Directory) -> Value {
+    let baseline = read(&directory.0.join("scenario.json"));
+    json!({"campaign_version":"1","name":"Bounded campaign","screening":{"id":"screen","source":{"kind":"authored","scenario":baseline}},"stress_cases":[{"id":"stress","source":{"kind":"authored","scenario":baseline},"population_multiplier":2}],"candidates":[{"id":"wider","changes":[{"kind":"set_exit_width","id":"out","width_m":3.0}]},{"id":"forbidden","changes":[{"kind":"set_group_count","id":"person","count":4_294_967_295u64}]}],"constraints":{"allowed_edits":[{"kind":"set_exit_width","targets":["out"]}],"bounds":[{"field":"exit_width","target":"out","min":1.,"max":4.}]},"objectives":[{"metric":"completed_fraction","direction":"maximize"}],"promotion":{"max_candidates":1,"require_improvement":false}})
+}
+#[test]
+fn campaign_tools_archive_controlled_trials_images_and_verify_after_moving_without_sources() {
+    let d = Directory::new();
+    write(&d.0.join("campaign.json"), &campaign_config(&d));
+    let p = ok(
+        &d,
+        "chiyoda_campaign_plan",
+        &json!({"config":"campaign.json"}),
+    );
+    assert_eq!(p["runnable"], true);
+    assert_eq!(p["reserved_trials"], 3);
+    let inspection = ok(
+        &d,
+        "chiyoda_campaign_plan",
+        &json!({"config":"campaign.json","case":"stress"}),
+    );
+    assert_eq!(inspection["plan_hash"], p["plan_hash"]);
+    assert!(inspection["case"]["scenario"].is_object());
+    let result = ok(
+        &d,
+        "chiyoda_campaign_run",
+        &json!({"config":"campaign.json","expected_plan_hash":p["plan_hash"],"output":"result"}),
+    );
+    assert_eq!(result["executed_trials"], 2);
+    assert_eq!(result["rejected_trials"], 1);
+    assert_eq!(result["promoted"], json!(["wider"]));
+    assert!(d.0.join("result/report.md").exists());
+    let images = read(&d.0.join("result/evidence-index.json"));
+    assert_eq!(images["images"].as_array().unwrap().len(), 4);
+    assert!(
+        images["images"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|i| i["receipt"].is_object())
+    );
+    fs::rename(d.0.join("result"), d.0.join("archived")).unwrap();
+    fs::remove_file(d.0.join("scenario.json")).unwrap();
+    fs::remove_file(d.0.join("campaign.json")).unwrap();
+    let q = ok(
+        &d,
+        "chiyoda_campaign_query",
+        &json!({"campaign":"archived","view":"trials","limit":1}),
+    );
+    assert_eq!(q["total"], 3);
+    assert_eq!(q["next_offset"], 1);
+    assert!(
+        q["items"][0]["experiment"]
+            .as_str()
+            .unwrap()
+            .starts_with("archived/trials/")
+    );
+    let verified = ok(
+        &d,
+        "chiyoda_campaign_verify",
+        &json!({"campaign":"archived","replay":true}),
+    );
+    assert_eq!(verified["verified"], true);
+    assert_eq!(verified["images"]["successful"], 4);
+    assert_eq!(verified["images"]["pixels_rederived"], true);
+    let evidence = ok(
+        &d,
+        "chiyoda_campaign_query",
+        &json!({"campaign":"archived","view":"evidence","limit":2}),
+    );
+    assert_eq!(evidence["total"], 4);
+    assert_eq!(
+        evidence["items"][0]["value"]["receipt"]["image"]["artifact"],
+        "evidence/000.png"
+    );
+    let report_path = d.0.join("archived/report.json");
+    let report = read(&report_path);
+    let mut false_report = report.clone();
+    false_report["promoted"] = json!([]);
+    false_report["report_hash"] = "".into();
+    false_report["report_hash"] = chiyoda_core::bundle::canonical_hash(&false_report).into();
+    write(&report_path, &false_report);
+    assert_eq!(
+        call(
+            &d,
+            "chiyoda_campaign_verify",
+            &json!({"campaign":"archived"})
+        )["error"]["code"],
+        "integrity"
+    );
+    write(&report_path, &report);
+    fs::write(d.0.join("archived/evidence/000.png"), b"not a PNG").unwrap();
+    assert_eq!(
+        call(
+            &d,
+            "chiyoda_campaign_verify",
+            &json!({"campaign":"archived"})
+        )["error"]["code"],
+        "integrity"
+    );
+}
+#[test]
+fn campaign_invalid_budgets_stale_plans_and_workspace_escapes_never_create_outputs() {
+    let d = Directory::new();
+    let mut config = campaign_config(&d);
+    write(&d.0.join("campaign.json"), &config);
+    let p = ok(
+        &d,
+        "chiyoda_campaign_plan",
+        &json!({"config":"campaign.json"}),
+    );
+    config["name"] = "Changed".into();
+    write(&d.0.join("campaign.json"), &config);
+    assert_eq!(
+        call(
+            &d,
+            "chiyoda_campaign_run",
+            &json!({"config":"campaign.json","expected_plan_hash":p["plan_hash"],"output":"bad"})
+        )["error"]["code"],
+        "stale_plan"
+    );
+    assert!(!d.0.join("bad").exists());
+    config["options"] = json!({"budget":{"max_trials":1}});
+    write(&d.0.join("campaign.json"), &config);
+    let p = ok(
+        &d,
+        "chiyoda_campaign_plan",
+        &json!({"config":"campaign.json"}),
+    );
+    assert_eq!(p["runnable"], false);
+    assert_eq!(
+        call(
+            &d,
+            "chiyoda_campaign_run",
+            &json!({"config":"campaign.json","expected_plan_hash":p["plan_hash"],"output":"bad"})
+        )["error"]["code"],
+        "invalid_plan"
+    );
+    assert!(!d.0.join("bad").exists());
+    assert_eq!(
+        call(
+            &d,
+            "chiyoda_campaign_plan",
+            &json!({"config":"../outside.json"})
+        )["error"]["code"],
+        "path"
+    );
+}
+
+#[test]
+fn mcp_campaign_loop_returns_the_same_annotated_png_as_its_archived_receipt() {
+    use base64::Engine as _;
+    let d = Directory::new();
+    let mut config = campaign_config(&d);
+    config["options"] = json!({"budget":{"max_evidence_images":1}});
+    write(&d.0.join("campaign.json"), &config);
+    let mut rpc = Rpc::new(&d);
+    rpc.initialize();
+    let p = rpc.tool("chiyoda_campaign_plan", &json!({"config":"campaign.json"}));
+    let response=rpc.request(&json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"chiyoda_campaign_run","arguments":{"config":"campaign.json","expected_plan_hash":p["plan_hash"],"output":"result"}}}));
+    assert_eq!(response["result"]["isError"], false, "{response}");
+    let content = response["result"]["content"].as_array().unwrap();
+    let image = content.iter().find(|c| c["type"] == "image").unwrap();
+    let png = base64::engine::general_purpose::STANDARD
+        .decode(image["data"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(png, fs::read(d.0.join("result/evidence/000.png")).unwrap());
+    assert_eq!(
+        rpc.tool(
+            "chiyoda_campaign_verify",
+            &json!({"campaign":"result","replay":true})
+        )["verified"],
+        true
+    );
+    let response=rpc.request(&json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"chiyoda_campaign_query","arguments":{"campaign":"result","view":"evidence","limit":1}}}));
+    assert!(
+        response["result"]["content"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["type"] == "image")
+    );
 }

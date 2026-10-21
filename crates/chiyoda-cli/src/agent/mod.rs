@@ -1,5 +1,6 @@
 //! Machine interfaces share one backend; neither transport decides outcomes.
 
+mod campaign;
 mod files;
 mod mcp;
 mod query;

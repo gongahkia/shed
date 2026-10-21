@@ -86,14 +86,52 @@ pub(super) fn image_content(
     name: &str,
     result: &Value,
 ) -> Result<Option<Value>, ToolError> {
-    if name != "chiyoda_render_evidence" {
-        return Ok(None);
-    }
-    let path = result["image"]["artifact"]
-        .as_str()
-        .ok_or_else(|| ToolError::new("integrity", "render receipt omits image artifact"))?;
-    let bytes = files::read_bytes(&workspace.path(path)?, 4 * 1024 * 1024)?;
-    if sha256(&bytes) != result["image"]["sha256"] {
+    let (path, expected_hash) = match name {
+        "chiyoda_render_evidence" => (
+            result["image"]["artifact"]
+                .as_str()
+                .ok_or_else(|| ToolError::new("integrity", "render receipt omits image artifact"))?
+                .to_owned(),
+            &result["image"]["sha256"],
+        ),
+        "chiyoda_campaign_run" => {
+            let Some(receipt) = result["evidence_images"]["images"]
+                .as_array()
+                .and_then(|items| items.iter().find_map(|i| i["receipt"].as_object()))
+                .map(|r| &r["image"])
+            else {
+                return Ok(None);
+            };
+            (
+                format!(
+                    "{}/{}",
+                    result["output"].as_str().unwrap(),
+                    receipt["artifact"].as_str().unwrap()
+                ),
+                &receipt["sha256"],
+            )
+        }
+        "chiyoda_campaign_query" => {
+            let Some(receipt) = result["items"]
+                .as_array()
+                .and_then(|items| items.iter().find_map(|i| i["value"]["receipt"].as_object()))
+                .map(|r| &r["image"])
+            else {
+                return Ok(None);
+            };
+            (
+                format!(
+                    "{}/{}",
+                    result["campaign"].as_str().unwrap(),
+                    receipt["artifact"].as_str().unwrap()
+                ),
+                &receipt["sha256"],
+            )
+        }
+        _ => return Ok(None),
+    };
+    let bytes = files::read_bytes(&workspace.path(&path)?, 4 * 1024 * 1024)?;
+    if sha256(&bytes) != *expected_hash || !bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
         return Err(ToolError::new(
             "integrity",
             "rendered PNG differs from its evidence receipt",

@@ -336,7 +336,7 @@ fn moments(execution: &ExperimentExecution, result: &TrialResult) -> Vec<Evidenc
                 (a.end_time_s - a.start_time_s).total_cmp(&(b.end_time_s - b.start_time_s))
             })
             .map_or(bundle.trace.last().unwrap().step, |w| w.end_step);
-        moments.push(EvidenceMoment{case:result.case.clone(),candidate:result.candidate.clone(),arm:a.id.clone(),selection:MomentSelection::Agent{id:person.agent.clone()},step,reason:"Affected person; end of longest recorded low-progress span, otherwise final frame. Whole-run evidence remains separately labelled.".into(),source_bundle_hash:bundle.bundle_hash.clone(),reconstruction_agent_steps:u64::from(bundle.metrics.total_agents).saturating_mul(crate::integration_step_count(a.scenario.scenario.duration_s,a.scenario.scenario.timestep_s))});
+        moments.push(EvidenceMoment{case:result.case.clone(),candidate:result.candidate.clone(),arm:a.id.clone(),selection:MomentSelection::Agent{id:person.agent.clone()},step,reason:"Selected person; end of longest recorded low-progress span, otherwise final frame. Whole-run evidence remains separately labelled.".into(),source_bundle_hash:bundle.bundle_hash.clone(),reconstruction_agent_steps:u64::from(bundle.metrics.total_agents).saturating_mul(crate::integration_step_count(a.scenario.scenario.duration_s,a.scenario.scenario.timestep_s))});
     }
     for a in &execution.artifacts {
         let (Some(bundle), Some(journeys)) = (&a.bundle, &a.journeys) else {

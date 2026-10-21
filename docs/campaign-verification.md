@@ -79,6 +79,27 @@ reconstructed the runs and re-rendered the pixels and measurements. The client
 uses an ignored local virtual environment; no Python dependency is added to
 the product.
 
+## Helper progress and interruption checks
+
+Six additional Python regression tests exercise the campaign example helper:
+
+```console
+python3 -m unittest discover -s examples/campaigns -p 'test_*.py' -v
+```
+
+They hold a child tool open to check that phase, trial/image and elapsed-time
+messages appear before completion while stdout remains reserved for final JSON.
+They also check archive-only verification without planning or simulation,
+Ctrl+C stopping the tool and its descendants, forced termination of an
+unresponsive tool, retained complete/partial archives, existing-output
+protection, missing binaries and malformed/failed tool responses.
+
+The updated helper also completed a fresh station campaign with full replay
+verification and verified an existing station archive through `--verify-only`.
+The canonical campaign report hash matches the recorded release example; these
+changes affect progress and process handling rather than campaign results.
+These six helper tests are separate from the 170 Rust tests listed above.
+
 ## Real campaigns
 
 Both checked-in examples completed through the release CLI and independently

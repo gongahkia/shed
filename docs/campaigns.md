@@ -38,6 +38,26 @@ MCP. `--plan-only` prepares the complete bounded plan without simulating people.
 `--replay` asks for additional final reconstruction and image verification;
 verification is separate work outside the original execution budget.
 
+Progress appears immediately on stderr: planning, saved trial pairs, annotated
+exports and verification, with elapsed-time updates every five seconds while a
+tool is running. The final JSON result goes to stdout, so redirecting it to a
+file leaves progress visible in the terminal. Full replay verification repeats
+simulation work and re-renders the images; it can take as long as the campaign
+itself. The helper prints the saved `report.md` path before verification starts.
+
+If you interrupt verification after the campaign was saved, check that archive
+without running the campaign again:
+
+```console
+python3 examples/campaigns/run_campaign.py --verify-only --output out/campaign-station --replay
+```
+
+This mode uses the archived request and does not need the original configuration.
+Omit `--replay` for measurement and source/hash verification without reconstructing
+runs or re-rendering pixels. Ctrl+C stops the child tool and retains saved files.
+A partial archive without `report.json` cannot be resumed; use a fresh `--output`
+directory for another run. Existing directories are never overwritten.
+
 ## Agent workflow
 
 There are four campaign tools in the existing `agent call` and MCP interfaces:

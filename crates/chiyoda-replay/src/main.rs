@@ -3,7 +3,6 @@ use chiyoda_core::{
     BundleVerification, RunBundle, bundle::TraceFrame, model::Surface, verify_run_bundle,
 };
 use clap::Parser;
-use minifb::{Key, KeyRepeat, Window, WindowOptions};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -12,14 +11,19 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(test)]
 use chiyoda_replay::{
-    HEIGHT, ViewMode, WIDTH,
-    export::{
-        export_gif, export_png, frame_delay, gif_manifest_path, validate_playback_timing, write_png,
-    },
+    HEIGHT, WIDTH,
+    export::{export_png, frame_delay, write_png},
+};
+use chiyoda_replay::{
+    ViewMode,
+    export::{export_gif, gif_manifest_path, validate_playback_timing},
     load_watch_scenario, render,
 };
+#[cfg(test)]
 use render::BACKGROUND;
+mod native;
 const WATCH_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const WATCH_DEBOUNCE: Duration = Duration::from_millis(150);
 #[derive(Debug, Parser)]
@@ -46,6 +50,37 @@ struct Cli {
     /// Initial projection, also used by headless exports. V toggles it in the viewer.
     #[arg(long, value_enum, default_value_t = ViewMode::Surface)]
     view: ViewMode,
+    /// Inspect an exact recorded person ID (also annotates PNG exports).
+    #[arg(long, requires="bundle", conflicts_with_all=["resource","export_gif"])]
+    agent: Option<String>,
+    /// Inspect exit:ID, gate:ID, connector:ID or waypoint:ID.
+    #[arg(long, requires = "bundle", conflicts_with = "export_gif")]
+    resource: Option<String>,
+    /// First recorded step in a selected person's trail.
+    #[arg(long, requires = "agent")]
+    trail_start_step: Option<u64>,
+    /// Compare another reconstructed run using the same camera and simulation clock.
+    #[arg(long, requires="bundle", conflicts_with_all=["watch","export_gif","allow_legacy_hash_only"])]
+    compare: Option<PathBuf>,
+    /// Shared comparison time; panels use the latest recorded frame at or before it.
+    #[arg(long, requires = "compare", conflicts_with = "at_step")]
+    at_time: Option<f64>,
+    #[arg(long, default_value_t = 1.0, conflicts_with = "export_gif")]
+    zoom: f64,
+    #[arg(
+        long,
+        default_value_t = 0.0,
+        conflicts_with = "export_gif",
+        allow_hyphen_values = true
+    )]
+    pan_x: f64,
+    #[arg(
+        long,
+        default_value_t = 0.0,
+        conflicts_with = "export_gif",
+        allow_hyphen_values = true
+    )]
+    pan_y: f64,
     /// Simulation seconds shown per wall-clock second.
     #[arg(long, default_value_t = 1.0)]
     speed: f64,
@@ -107,8 +142,36 @@ fn replay_bundle(bundle_path: &Path, cli: &Cli) -> Result<()> {
         bail!("headless export requires a bundle reconstructed by the installed runtime");
     }
     if let Some(output) = &cli.export_png {
-        let index = replay_start_index(&bundle.trace, cli.at_step)?;
-        export_png(&bundle, output, surface_index, index, cli.view)?;
+        if let Some(path) = &cli.compare {
+            let (candidate, _) = load_bundle(path, false)?;
+            let request = native::comparison_request(&bundle, &candidate, cli)?;
+            chiyoda_replay::comparison::export_comparison(&bundle, &candidate, &request, output)?;
+        } else if let Some(selection) = native::selection(cli)? {
+            let index = replay_start_index(&bundle.trace, cli.at_step)?;
+            chiyoda_replay::evidence::export_evidence(
+                &bundle,
+                &chiyoda_replay::evidence::EvidenceRequest {
+                    step: bundle.trace[index].step,
+                    selection,
+                    surface: cli.surface.clone(),
+                    view: cli.view,
+                    trail_start_step: cli.trail_start_step,
+                    camera: native::camera(cli)?,
+                },
+                output,
+            )?;
+        } else {
+            let index = replay_start_index(&bundle.trace, cli.at_step)?;
+            let controls = native::camera(cli)?;
+            chiyoda_replay::export::export_png_with_camera(
+                &bundle,
+                output,
+                surface_index,
+                index,
+                cli.view,
+                controls,
+            )?;
+        }
         println!("PNG replay export: {}", output.display());
         println!(
             "provenance sidecar: {}",
@@ -133,36 +196,28 @@ fn replay_bundle(bundle_path: &Path, cli: &Cli) -> Result<()> {
     }
     validate_playback_timing(&bundle.trace, cli.speed)?;
     let initial_frame = replay_start_index(&bundle.trace, cli.at_step)?;
-    replay(
+    native::open(
         Some(bundle),
-        cli.paused,
-        surface_index,
-        cli.surface.as_deref(),
-        cli.speed,
-        &cli.snapshot_dir,
         None,
         initial_frame,
-        cli.view,
+        surface_index,
         if verification == BundleVerification::Reconstructed {
             render::Source::Reconstructed
         } else {
             render::Source::LegacyHashOnly
         },
+        cli,
     )
 }
 
 fn replay_watch(source_path: PathBuf, cli: &Cli) -> Result<()> {
-    replay(
+    native::open(
         None,
-        cli.paused,
-        0,
-        cli.surface.as_deref(),
-        cli.speed,
-        &cli.snapshot_dir,
         Some(WatchController::new(source_path, cli.trace_every)),
         0,
-        cli.view,
+        0,
         render::Source::LivePreview,
+        cli,
     )
 }
 
@@ -204,168 +259,6 @@ fn load_bundle(
     Ok((bundle, verification))
 }
 
-#[allow(clippy::too_many_lines, clippy::too_many_arguments)] // UI input, hot-reload state, and framebuffer presentation share one event loop
-fn replay(
-    mut bundle: Option<RunBundle>,
-    mut paused: bool,
-    mut surface_index: usize,
-    initial_surface: Option<&str>,
-    speed: f64,
-    snapshot_dir: &Path,
-    mut watch: Option<WatchController>,
-    initial_frame: usize,
-    initial_view: ViewMode,
-    source: render::Source,
-) -> Result<()> {
-    let mut window = Window::new(
-        "Chiyoda replay — loading",
-        WIDTH,
-        HEIGHT,
-        WindowOptions::default(),
-    )?;
-    window.set_target_fps(30);
-    let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
-    let mut index = initial_frame;
-    let mut last_advance = Instant::now();
-    let mut view_mode = initial_view;
-    let mut snapshot_number = 0_u64;
-    let mut details_open = true;
-    let mut renderer = render::Renderer::new();
-
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-        if let Some(controller) = &mut watch
-            && let Some(update) = controller.tick()
-        {
-            match update.result {
-                Ok(next_bundle) => {
-                    if let Err(error) = validate_playback_timing(&next_bundle.trace, speed) {
-                        let message = error.to_string();
-                        controller.mark_failed(update.revision, &message);
-                        eprintln!("watch revision {} failed: {message}", update.revision);
-                    } else {
-                        let previously_selected_surface = bundle.as_ref().and_then(|current| {
-                            current
-                                .scenario
-                                .scenario
-                                .surfaces
-                                .get(surface_index)
-                                .map(|surface| surface.id.as_str())
-                        });
-                        match select_reloaded_surface(
-                            &next_bundle.scenario.scenario.surfaces,
-                            previously_selected_surface,
-                            initial_surface,
-                        ) {
-                            Ok(next_surface_index) => {
-                                surface_index = next_surface_index;
-                                bundle = Some(next_bundle);
-                                index = 0;
-                                last_advance = Instant::now();
-                                controller.mark_loaded(update.revision);
-                                eprintln!("watch revision {} loaded", update.revision);
-                            }
-                            Err(error) => {
-                                let message = format!("view configuration error: {error}");
-                                controller.mark_failed(update.revision, &message);
-                                eprintln!("watch revision {} failed: {message}", update.revision);
-                            }
-                        }
-                    }
-                }
-                Err(message) => {
-                    controller.mark_failed(update.revision, &message);
-                    eprintln!("watch revision {} failed: {message}", update.revision);
-                }
-            }
-        }
-
-        if window.is_key_pressed(Key::Space, KeyRepeat::No) {
-            paused = !paused;
-            last_advance = Instant::now();
-        }
-        let mut manually_advanced = false;
-        if let Some(current_bundle) = &bundle {
-            if window.is_key_pressed(Key::Right, KeyRepeat::Yes) {
-                index = (index + 1).min(current_bundle.trace.len() - 1);
-                manually_advanced = true;
-            }
-            if window.is_key_pressed(Key::Left, KeyRepeat::Yes) {
-                index = index.saturating_sub(1);
-                manually_advanced = true;
-            }
-            if window.is_key_pressed(Key::Tab, KeyRepeat::No) {
-                surface_index =
-                    (surface_index + 1) % current_bundle.scenario.scenario.surfaces.len();
-            }
-        }
-        if window.is_key_pressed(Key::V, KeyRepeat::No) {
-            view_mode = view_mode.toggle();
-        }
-        if window.is_key_pressed(Key::D, KeyRepeat::No) {
-            details_open = !details_open;
-        }
-        if manually_advanced {
-            last_advance = Instant::now();
-        }
-        if let Some(current_bundle) = &bundle
-            && !paused
-            && index < current_bundle.trace.len() - 1
-            && last_advance.elapsed() >= frame_delay(&current_bundle.trace, index, speed)
-        {
-            index += 1;
-            last_advance = Instant::now();
-        }
-        let save_snapshot = window.is_key_pressed(Key::P, KeyRepeat::No);
-        renderer.render(
-            &mut buffer,
-            bundle.as_ref(),
-            render::Options {
-                index,
-                surface: surface_index,
-                view: view_mode,
-                source,
-                playback: if paused {
-                    render::Playback::Paused
-                } else {
-                    render::Playback::Playing
-                },
-                speed,
-                details: details_open,
-                watch_status: watch.as_ref().map(WatchController::status),
-                ..render::Options::default()
-            },
-        );
-        window.set_title(&window_title(
-            bundle.as_ref(),
-            surface_index,
-            index,
-            speed,
-            view_mode,
-            watch.as_ref().map(WatchController::status),
-        ));
-        if save_snapshot {
-            let step = bundle
-                .as_ref()
-                .and_then(|current| current.trace.get(index))
-                .map_or(0, |frame| frame.step);
-            match next_snapshot_path(snapshot_dir, &mut snapshot_number, step) {
-                Ok(path) => match write_png(&path, &buffer, WIDTH, HEIGHT) {
-                    Ok(()) => eprintln!("wrote PNG snapshot: {}", path.display()),
-                    Err(error) => {
-                        eprintln!("could not write PNG snapshot {}: {error}", path.display());
-                    }
-                },
-                Err(error) => eprintln!("could not allocate a PNG snapshot path: {error}"),
-            }
-        }
-        window.update_with_buffer(&buffer, WIDTH, HEIGHT)?;
-        if paused {
-            thread::sleep(Duration::from_millis(10));
-        }
-    }
-    Ok(())
-}
-
 fn window_title(
     bundle: Option<&RunBundle>,
     surface_index: usize,
@@ -374,20 +267,18 @@ fn window_title(
     view_mode: ViewMode,
     watch_status: Option<&str>,
 ) -> String {
-    let controls =
-        "space: pause, arrows: step, tab: surface, V: view, D: details, P: PNG, escape: quit";
     let status = watch_status.unwrap_or("recorded bundle replay");
     match bundle {
         Some(bundle) => {
             let surface = &bundle.scenario.scenario.surfaces[surface_index];
             format!(
-                "Chiyoda {} — {} — {:.3}s — {speed:.2}× — {status} — {controls}",
+                "Chiyoda {} — {} — {:.3}s — {speed:.2}× — {status}",
                 view_mode.label(),
                 surface.id,
                 bundle.trace[index].time_s,
             )
         }
-        None => format!("Chiyoda watch — no valid scene — {status} — {controls}"),
+        None => format!("Chiyoda watch — no valid scene — {status}"),
     }
 }
 
@@ -416,6 +307,7 @@ struct PendingRevision {
 struct WatchUpdate {
     revision: u64,
     result: std::result::Result<RunBundle, String>,
+    evidence: Option<chiyoda_replay::inspection::EvidenceIndex>,
 }
 
 #[derive(Debug)]
@@ -523,7 +415,15 @@ impl WatchController {
         self.status = format!("watch revision {revision} loading and running");
         thread::spawn(move || {
             let result = load_watch_scenario(&pending.source, trace_every_steps);
-            let _ = sender.send(WatchUpdate { revision, result });
+            let evidence = result
+                .as_ref()
+                .ok()
+                .map(chiyoda_replay::inspection::EvidenceIndex::new);
+            let _ = sender.send(WatchUpdate {
+                revision,
+                result,
+                evidence,
+            });
         });
     }
 
@@ -719,6 +619,7 @@ mod tests {
             .send(WatchUpdate {
                 revision: 1,
                 result: Err("stale failure".to_owned()),
+                evidence: None,
             })
             .expect("test receiver is live");
 

@@ -50,8 +50,8 @@ For a bundle made by the installed runtime, the viewer checks the bundle hash
 and reconstructs the complete deterministic run before opening a window. It
 rejects an incompatible legacy runtime by default; `--allow-legacy-hash-only`
 permits display after hash verification alone and emits a warning. The CLI also
-rejects an unknown initial surface and an empty trace. Interactive playback requires an available native display. PNG and GIF
-exports do not open a window.
+rejects an unknown initial surface and an empty trace. Interactive playback
+requires an available native display. PNG and GIF exports do not open a window.
 
 For locally aware groups, `run.json` also retains each agent's familiar exits
 and learned availability with its time and source. `resource_observed` and
@@ -114,9 +114,29 @@ limited to centiseconds; the companion `PATH.json` records the exact
 per-frame rounded delays, the terminal-delay policy, playback speed,
 `trace_every_steps`, trace-frame count, selected and rendered surfaces, scenario hash, bundle
 hash, runtime and bundle versions, projection, and a clear derived-artifact boundary.
-The GIF sidecar uses `chiyoda.replay-gif.v2`. The
-exporter refuses to overwrite either the GIF or its sidecar. The verified JSON
+The GIF sidecar uses `chiyoda.replay-gif.v2`. The exporter refuses to overwrite either the GIF or its sidecar. The verified JSON
 bundle remains the canonical replay and timing artifact.
+
+GIFs share one palette across the animation. Status colours are preserved
+exactly, while antialiased edge colours are quantized to coverage ramps. Use
+PNG when the finest text and edge detail matter.
+
+## Preview
+
+![Recorded concourse at 20 seconds](../assets/demo/replay-floor-plan.png)
+
+The same recorded moment is available as an [isometric overview](../assets/demo/replay-overview.png).
+Both PNGs and the [showcase GIF](../assets/demo/grand-interchange-showcase.gif)
+have adjacent JSON provenance sidecars. They were exported from the current
+runtime's `grand-interchange-showcase` run, with a trace cadence of 20 steps.
+
+To reproduce the source and export a reviewed frame:
+
+```console
+$ chiyoda run examples/demos/grand-interchange-showcase.json -o out/showcase --trace-every 20
+$ chiyoda-replay out/showcase/run.json --surface concourse --at-step 100 --export-png out/showcase/frame.png
+$ chiyoda-replay out/showcase/run.json --surface concourse --at-step 100 --view overview --export-png out/showcase/overview.png
+```
 
 ## Visual presentation
 

@@ -1,13 +1,17 @@
 {
-  "schema_version": "chiyoda.replay-gif.v1",
+  "schema_version": "chiyoda.replay-gif.v2",
   "format": "GIF89a",
-  "bundle_sha256": "e8ec07a3888f81fe932be1bb50a670f9497d634d0ec15abb0fea122d55a8d4ad",
-  "scenario_sha256": "9891cc8f4788fac57773bfecb0f39a8e8fe445fb52faa63b4730b745610d64bf",
-  "runtime_version": "0.42.0-alpha.1",
-  "bundle_version": "0.42",
+  "bundle_sha256": "97c3af8e687d17f5bbce55d4317cdfc20a42fc6d0f9602423f3544f3313b31ac",
+  "scenario_sha256": "004d20ae24c497963a9a1d0040141413eb28fddc653c764af3d92f93b97a7058",
+  "runtime_version": "0.45.0-alpha.1",
+  "bundle_version": "0.45",
   "trace_every_steps": 20,
   "trace_frame_count": 22,
-  "rendered_surface": "concourse",
+  "selected_surface": "concourse",
+  "rendered_surfaces": [
+    "concourse"
+  ],
+  "view": "surface",
   "render_width_pixels": 1200,
   "render_height_pixels": 800,
   "playback_speed": 10.0,
@@ -37,11 +41,9 @@
   ],
   "looping": true,
   "timing_policy": "Each non-terminal GIF delay is the next recorded trace timestamp gap divided by playback_speed, rounded to the nearest centisecond. A zero-length rounded gap and the terminal frame use one centisecond because GIF cannot encode a terminal hold without a delay. Exact trace timestamps remain in the verified canonical JSON bundle.",
-  "sprite_atlas": {
-    "manifest_sha256": "0d2668f83c20f563ceccd411308ecd9559163b9f42e57909b8d7797370a917df",
-    "image_sha256": "f3dfe44890406856911d0601d4fac5e7a0b05963db8ffe55986d17ad4866aa8e",
-    "tile_width_pixels": 128,
-    "tile_height_pixels": 128
+  "renderer": {
+    "version": "chiyoda.replay-renderer.v2",
+    "font_sha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
   },
-  "claim_boundary": "This derived visualization re-renders one verified deterministic trace on one authored surface. An optional sprite atlas changes only its visual treatment and is recorded above by content hash. It is not a canonical run bundle, a simulation rerun, a source of new metrics, or evidence of real-world pedestrian behavior."
+  "claim_boundary": "This derived visualization renders recorded state from one reconstructed deterministic trace. The selected surface applies to the floor plan; overview projects all authored surfaces. The canonical JSON bundle remains the source of timing and metrics."
 }

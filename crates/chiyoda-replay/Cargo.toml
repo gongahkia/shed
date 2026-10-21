@@ -17,11 +17,12 @@ clap.workspace = true
 flate2.workspace = true
 gif.workspace = true
 minifb.workspace = true
-png.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-sha2.workspace = true
 chiyoda-core = { path = "../chiyoda-core" }
+
+[dev-dependencies]
+png.workspace = true
 
 [lints]
 workspace = true

@@ -10,12 +10,11 @@ use clap::Parser;
 use flate2::{Compression, write::ZlibEncoder};
 use gif::{Encoder as GifEncoder, Frame as GifFrame, Repeat};
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use serde::Serialize;
 use std::{
     fs,
-    io::{BufReader, Write},
-    path::{Component, Path, PathBuf},
+    io::Write,
+    path::{Path, PathBuf},
     sync::mpsc::{self, Receiver, Sender},
     thread,
     time::{Duration, Instant},
@@ -51,9 +50,6 @@ const DEBUG_LABEL: u32 = 0x00c6_8cff;
 const DEBUG_TEXT: u32 = 0x00f8_f9fa;
 const WATCH_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const WATCH_DEBOUNCE: Duration = Duration::from_millis(150);
-const ATLAS_TERRAIN_PIXELS: usize = 32;
-const ATLAS_MARKER_PIXELS: usize = 24;
-const MAX_ATLAS_PIXELS: usize = 16_777_216;
 const GIF_PALETTE: &[u32] = &[
     BACKGROUND,
     SURFACE,
@@ -110,99 +106,9 @@ struct Cli {
     /// Simulation seconds represented by one wall-clock second in `--export-gif`.
     #[arg(long, default_value_t = 1.0, requires = "export_gif")]
     gif_speed: f64,
-    /// Optional JSON sprite-atlas manifest. Omit this flag to use the built-in geometric renderer.
-    #[arg(long, value_name = "ATLAS.json")]
-    sprite_atlas: Option<PathBuf>,
     /// Permit a hash-only display of an incompatible legacy runtime artifact.
     #[arg(long)]
     allow_legacy_hash_only: bool,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SpriteAtlasManifest {
-    schema_version: String,
-    image: PathBuf,
-    tile_width_pixels: usize,
-    tile_height_pixels: usize,
-    tiles: SpriteAtlasTiles,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SpriteAtlasTiles {
-    background: AtlasTile,
-    surface: AtlasTile,
-    surface_border: AtlasTile,
-    obstacle: AtlasTile,
-    waypoint: AtlasTile,
-    exit: AtlasTile,
-    gate: AtlasTile,
-    portal_lane: AtlasTile,
-    queue_footprint: AtlasTile,
-    stair: AtlasTile,
-    ramp: AtlasTile,
-    escalator: AtlasTile,
-    lift: AtlasTile,
-    moving: AtlasTile,
-    waiting: AtlasTile,
-    in_transit: AtlasTile,
-    evacuated: AtlasTile,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct AtlasTile {
-    column: usize,
-    row: usize,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum AtlasRole {
-    Background,
-    Surface,
-    SurfaceBorder,
-    Obstacle,
-    Waypoint,
-    Exit,
-    Gate,
-    PortalLane,
-    QueueFootprint,
-    Stair,
-    Ramp,
-    Escalator,
-    Lift,
-    Moving,
-    Waiting,
-    InTransit,
-    Evacuated,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct SpritePixel {
-    red: u8,
-    green: u8,
-    blue: u8,
-    alpha: u8,
-}
-
-#[derive(Debug)]
-struct SpriteAtlas {
-    pixels: Vec<SpritePixel>,
-    image_width_pixels: usize,
-    tile_width_pixels: usize,
-    tile_height_pixels: usize,
-    tiles: SpriteAtlasTiles,
-    manifest_sha256: String,
-    image_sha256: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct SpriteAtlasProvenance {
-    manifest_sha256: String,
-    image_sha256: String,
-    tile_width_pixels: usize,
-    tile_height_pixels: usize,
 }
 
 fn main() -> Result<()> {
@@ -216,198 +122,20 @@ fn main() -> Result<()> {
     if !cli.gif_speed.is_finite() || cli.gif_speed <= 0.0 {
         bail!("--gif-speed must be a finite value greater than zero");
     }
-    let sprite_atlas = cli
-        .sprite_atlas
-        .as_deref()
-        .map(load_sprite_atlas)
-        .transpose()?;
-
     match (cli.bundle.clone(), cli.watch.clone()) {
-        (Some(bundle_path), None) => replay_bundle(&bundle_path, &cli, sprite_atlas.as_ref()),
+        (Some(bundle_path), None) => replay_bundle(&bundle_path, &cli),
         (None, Some(source_path)) => {
             if cli.allow_legacy_hash_only {
                 bail!("--allow-legacy-hash-only applies only to a persisted run bundle");
             }
-            replay_watch(source_path, &cli, sprite_atlas.as_ref())
+            replay_watch(source_path, &cli)
         }
         (None, None) => bail!("provide a run bundle or --watch SOURCE.json"),
         (Some(_), Some(_)) => unreachable!("clap rejects conflicting inputs"),
     }
 }
 
-impl SpriteAtlas {
-    fn tile(&self, role: AtlasRole) -> AtlasTile {
-        match role {
-            AtlasRole::Background => self.tiles.background,
-            AtlasRole::Surface => self.tiles.surface,
-            AtlasRole::SurfaceBorder => self.tiles.surface_border,
-            AtlasRole::Obstacle => self.tiles.obstacle,
-            AtlasRole::Waypoint => self.tiles.waypoint,
-            AtlasRole::Exit => self.tiles.exit,
-            AtlasRole::Gate => self.tiles.gate,
-            AtlasRole::PortalLane => self.tiles.portal_lane,
-            AtlasRole::QueueFootprint => self.tiles.queue_footprint,
-            AtlasRole::Stair => self.tiles.stair,
-            AtlasRole::Ramp => self.tiles.ramp,
-            AtlasRole::Escalator => self.tiles.escalator,
-            AtlasRole::Lift => self.tiles.lift,
-            AtlasRole::Moving => self.tiles.moving,
-            AtlasRole::Waiting => self.tiles.waiting,
-            AtlasRole::InTransit => self.tiles.in_transit,
-            AtlasRole::Evacuated => self.tiles.evacuated,
-        }
-    }
-
-    fn provenance(&self) -> SpriteAtlasProvenance {
-        SpriteAtlasProvenance {
-            manifest_sha256: self.manifest_sha256.clone(),
-            image_sha256: self.image_sha256.clone(),
-            tile_width_pixels: self.tile_width_pixels,
-            tile_height_pixels: self.tile_height_pixels,
-        }
-    }
-}
-
-#[allow(clippy::too_many_lines)] // manifest, image, grid, and role validation need distinct user-facing errors
-fn load_sprite_atlas(manifest_path: &Path) -> Result<SpriteAtlas> {
-    let manifest_bytes = fs::read(manifest_path)
-        .with_context(|| format!("reading sprite atlas manifest {}", manifest_path.display()))?;
-    let manifest: SpriteAtlasManifest = serde_json::from_slice(&manifest_bytes)
-        .with_context(|| format!("parsing sprite atlas manifest {}", manifest_path.display()))?;
-    if manifest.schema_version != "chiyoda.replay-sprite-atlas.v1" {
-        bail!(
-            "sprite atlas {} has unsupported schema_version `{}`",
-            manifest_path.display(),
-            manifest.schema_version
-        );
-    }
-    if manifest.tile_width_pixels == 0 || manifest.tile_height_pixels == 0 {
-        bail!(
-            "sprite atlas {} requires non-zero tile dimensions",
-            manifest_path.display()
-        );
-    }
-    if manifest.image.as_os_str().is_empty()
-        || manifest.image.is_absolute()
-        || !manifest
-            .image
-            .components()
-            .all(|component| matches!(component, Component::Normal(_)))
-    {
-        bail!(
-            "sprite atlas {} must name its image as a relative path without traversal",
-            manifest_path.display()
-        );
-    }
-    let parent = manifest_path.parent().unwrap_or_else(|| Path::new("."));
-    let image_path = parent.join(&manifest.image);
-    let image_bytes = fs::read(&image_path)
-        .with_context(|| format!("reading sprite atlas image {}", image_path.display()))?;
-    let file = fs::File::open(&image_path)
-        .with_context(|| format!("opening sprite atlas image {}", image_path.display()))?;
-    let mut png_decoder = png::Decoder::new(BufReader::new(file));
-    png_decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
-    let mut reader = png_decoder
-        .read_info()
-        .with_context(|| format!("decoding sprite atlas image {}", image_path.display()))?;
-    let mut pixel_bytes = vec![
-        0;
-        reader
-            .output_buffer_size()
-            .context("sprite atlas output image size overflowed")?
-    ];
-    let output = reader
-        .next_frame(&mut pixel_bytes)
-        .with_context(|| format!("reading sprite atlas image {}", image_path.display()))?;
-    let image_width_pixels =
-        usize::try_from(output.width).context("sprite atlas width overflowed")?;
-    let image_height_pixels =
-        usize::try_from(output.height).context("sprite atlas height overflowed")?;
-    let pixel_count = image_width_pixels
-        .checked_mul(image_height_pixels)
-        .context("sprite atlas pixel count overflowed")?;
-    if pixel_count == 0 || pixel_count > MAX_ATLAS_PIXELS {
-        bail!(
-            "sprite atlas image {} has {pixel_count} pixels; supported range is 1..={MAX_ATLAS_PIXELS}",
-            image_path.display()
-        );
-    }
-    if image_width_pixels % manifest.tile_width_pixels != 0
-        || image_height_pixels % manifest.tile_height_pixels != 0
-    {
-        bail!(
-            "sprite atlas image {} dimensions {image_width_pixels}×{image_height_pixels} are not divisible by declared tile dimensions {}×{}",
-            image_path.display(),
-            manifest.tile_width_pixels,
-            manifest.tile_height_pixels
-        );
-    }
-    let channels = match output.color_type {
-        png::ColorType::Rgb => 3,
-        png::ColorType::Rgba => 4,
-        other => bail!(
-            "sprite atlas image {} decodes as {other:?}; use an RGB or RGBA PNG",
-            image_path.display()
-        ),
-    };
-    let pixel_bytes = &pixel_bytes[..output.buffer_size()];
-    if pixel_bytes.len() != pixel_count * channels {
-        bail!(
-            "sprite atlas image {} decoded to an unexpected byte count",
-            image_path.display()
-        );
-    }
-    let pixels = pixel_bytes
-        .chunks_exact(channels)
-        .map(|pixel| SpritePixel {
-            red: pixel[0],
-            green: pixel[1],
-            blue: pixel[2],
-            alpha: if channels == 4 { pixel[3] } else { u8::MAX },
-        })
-        .collect::<Vec<_>>();
-    let columns = image_width_pixels / manifest.tile_width_pixels;
-    let rows = image_height_pixels / manifest.tile_height_pixels;
-    for (name, tile) in [
-        ("background", manifest.tiles.background),
-        ("surface", manifest.tiles.surface),
-        ("surface_border", manifest.tiles.surface_border),
-        ("obstacle", manifest.tiles.obstacle),
-        ("waypoint", manifest.tiles.waypoint),
-        ("exit", manifest.tiles.exit),
-        ("gate", manifest.tiles.gate),
-        ("portal_lane", manifest.tiles.portal_lane),
-        ("queue_footprint", manifest.tiles.queue_footprint),
-        ("stair", manifest.tiles.stair),
-        ("ramp", manifest.tiles.ramp),
-        ("escalator", manifest.tiles.escalator),
-        ("lift", manifest.tiles.lift),
-        ("moving", manifest.tiles.moving),
-        ("waiting", manifest.tiles.waiting),
-        ("in_transit", manifest.tiles.in_transit),
-        ("evacuated", manifest.tiles.evacuated),
-    ] {
-        if tile.column >= columns || tile.row >= rows {
-            bail!(
-                "sprite atlas {} tile `{name}` at ({}, {}) is outside its {columns}×{rows} grid",
-                manifest_path.display(),
-                tile.column,
-                tile.row
-            );
-        }
-    }
-    Ok(SpriteAtlas {
-        pixels,
-        image_width_pixels,
-        tile_width_pixels: manifest.tile_width_pixels,
-        tile_height_pixels: manifest.tile_height_pixels,
-        tiles: manifest.tiles,
-        manifest_sha256: format!("{:x}", Sha256::digest(manifest_bytes)),
-        image_sha256: format!("{:x}", Sha256::digest(image_bytes)),
-    })
-}
-
-fn replay_bundle(bundle_path: &Path, cli: &Cli, sprite_atlas: Option<&SpriteAtlas>) -> Result<()> {
+fn replay_bundle(bundle_path: &Path, cli: &Cli) -> Result<()> {
     let (bundle, verification) = load_bundle(bundle_path, cli.allow_legacy_hash_only)?;
     let surface_index = surface_index(&bundle.scenario.scenario.surfaces, cli.surface.as_deref())?;
     if let Some(output) = &cli.export_gif {
@@ -416,7 +144,7 @@ fn replay_bundle(bundle_path: &Path, cli: &Cli, sprite_atlas: Option<&SpriteAtla
                 "--export-gif requires a bundle reconstructed by the installed runtime; legacy hash-only display artifacts are not exportable"
             );
         }
-        let manifest = export_gif(&bundle, output, surface_index, cli.gif_speed, sprite_atlas)?;
+        let manifest = export_gif(&bundle, output, surface_index, cli.gif_speed)?;
         println!("GIF replay export: {}", output.display());
         println!(
             "provenance sidecar: {}",
@@ -435,12 +163,11 @@ fn replay_bundle(bundle_path: &Path, cli: &Cli, sprite_atlas: Option<&SpriteAtla
         cli.speed,
         &cli.snapshot_dir,
         None,
-        sprite_atlas,
         initial_frame,
     )
 }
 
-fn replay_watch(source_path: PathBuf, cli: &Cli, sprite_atlas: Option<&SpriteAtlas>) -> Result<()> {
+fn replay_watch(source_path: PathBuf, cli: &Cli) -> Result<()> {
     replay(
         None,
         cli.paused,
@@ -449,7 +176,6 @@ fn replay_watch(source_path: PathBuf, cli: &Cli, sprite_atlas: Option<&SpriteAtl
         cli.speed,
         &cli.snapshot_dir,
         Some(WatchController::new(source_path, cli.trace_every)),
-        sprite_atlas,
         0,
     )
 }
@@ -501,7 +227,6 @@ fn replay(
     speed: f64,
     snapshot_dir: &Path,
     mut watch: Option<WatchController>,
-    sprite_atlas: Option<&SpriteAtlas>,
     initial_frame: usize,
 ) -> Result<()> {
     let mut window = Window::new(
@@ -604,14 +329,7 @@ fn replay(
         buffer.fill(BACKGROUND);
         let save_snapshot = window.is_key_pressed(Key::P, KeyRepeat::No);
         if let Some(current_bundle) = &bundle {
-            render_bundle_frame(
-                &mut buffer,
-                current_bundle,
-                index,
-                surface_index,
-                view_mode,
-                sprite_atlas,
-            );
+            render_bundle_frame(&mut buffer, current_bundle, index, surface_index, view_mode);
         }
         if let Some(status) = watch.as_ref().map(WatchController::status) {
             draw_watch_status(&mut buffer, status);
@@ -625,7 +343,6 @@ fn replay(
                 view_mode,
                 paused,
                 speed,
-                sprite_atlas.is_some(),
             );
         }
         window.set_title(&window_title(
@@ -665,35 +382,17 @@ fn render_bundle_frame(
     index: usize,
     surface_index: usize,
     view_mode: ViewMode,
-    sprite_atlas: Option<&SpriteAtlas>,
 ) {
     buffer.fill(BACKGROUND);
-    if let Some(sprite_atlas) = sprite_atlas {
-        draw_tiled_screen_rectangle(
-            buffer,
-            0,
-            0,
-            WIDTH,
-            HEIGHT,
-            sprite_atlas,
-            AtlasRole::Background,
-            ATLAS_TERRAIN_PIXELS,
-        );
-    }
+
     match view_mode {
         ViewMode::Surface => {
             let surface = &bundle.scenario.scenario.surfaces[surface_index];
             let extent = extent_for_surface(surface);
-            draw_scene(
-                buffer,
-                &bundle.scenario.scenario,
-                surface,
-                extent,
-                sprite_atlas,
-            );
-            draw_frame(buffer, bundle, index, &surface.id, extent, sprite_atlas);
+            draw_scene(buffer, &bundle.scenario.scenario, surface, extent);
+            draw_frame(buffer, bundle, index, &surface.id, extent);
         }
-        ViewMode::Overview => draw_overview(buffer, bundle, index, sprite_atlas),
+        ViewMode::Overview => draw_overview(buffer, bundle, index),
     }
 }
 
@@ -989,7 +688,6 @@ fn draw_debug_panel(
     view_mode: ViewMode,
     paused: bool,
     speed: f64,
-    uses_sprite_atlas: bool,
 ) {
     const PANEL_WIDTH: isize = 344;
     const PANEL_HEIGHT: isize = 236;
@@ -1010,7 +708,7 @@ fn draw_debug_panel(
         .count();
     let (moving, waiting, in_transit, evacuated) = debug_state_counts(frame);
     let text = format!(
-        "RUN: {}\nFRAME: {}/{}\nSTEP: {}\nTIME: {:.2}S\nSPEED: {:.2}X\nVIEW: {}\nSURFACE: {}\nAGENTS: {}/{}\nSTATE: M{} W{}\n       T{} E{}\nATLAS: {} D: CLOSE",
+        "RUN: {}\nFRAME: {}/{}\nSTEP: {}\nTIME: {:.2}S\nSPEED: {:.2}X\nVIEW: {}\nSURFACE: {}\nAGENTS: {}/{}\nSTATE: M{} W{}\n       T{} E{}\nRENDER: {} D: CLOSE",
         if paused { "PAUSED" } else { "RUNNING" },
         index + 1,
         bundle.trace.len(),
@@ -1025,11 +723,7 @@ fn draw_debug_panel(
         waiting,
         in_transit,
         evacuated,
-        if uses_sprite_atlas {
-            "SPRITE"
-        } else {
-            "GEOMETRIC"
-        },
+        "GEOMETRY",
     );
     draw_pixel_rectangle(
         buffer,
@@ -1388,8 +1082,6 @@ struct GifExportManifest {
     frame_delays_centiseconds: Vec<u16>,
     looping: bool,
     timing_policy: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    sprite_atlas: Option<SpriteAtlasProvenance>,
     claim_boundary: String,
 }
 
@@ -1400,7 +1092,6 @@ fn export_gif(
     output: &Path,
     surface_index: usize,
     playback_speed: f64,
-    sprite_atlas: Option<&SpriteAtlas>,
 ) -> Result<GifExportManifest> {
     validate_playback_timing(&bundle.trace, playback_speed)?;
     let trace_every_steps = bundle
@@ -1429,8 +1120,7 @@ fn export_gif(
         frame_delays_centiseconds,
         looping: true,
         timing_policy: "Each non-terminal GIF delay is the next recorded trace timestamp gap divided by playback_speed, rounded to the nearest centisecond. A zero-length rounded gap and the terminal frame use one centisecond because GIF cannot encode a terminal hold without a delay. Exact trace timestamps remain in the verified canonical JSON bundle.".to_owned(),
-        sprite_atlas: sprite_atlas.map(SpriteAtlas::provenance),
-        claim_boundary: "This derived visualization re-renders one verified deterministic trace on one authored surface. An optional sprite atlas changes only its visual treatment and is recorded above by content hash. It is not a canonical run bundle, a simulation rerun, a source of new metrics, or evidence of real-world pedestrian behavior.".to_owned(),
+        claim_boundary: "This derived visualization re-renders one verified deterministic trace on one authored surface. It is not a canonical run bundle, a simulation rerun, a source of new metrics, or evidence of real-world pedestrian behavior.".to_owned(),
     };
     let sidecar = gif_manifest_path(output);
     ensure_new_export_targets(output, &sidecar)?;
@@ -1440,7 +1130,6 @@ fn export_gif(
         surface_index,
         &manifest.frame_delays_centiseconds,
         output,
-        sprite_atlas,
     ) {
         let _ = fs::remove_file(output);
         return Err(error);
@@ -1486,7 +1175,6 @@ fn write_gif(
     surface_index: usize,
     frame_delays_centiseconds: &[u16],
     output: &Path,
-    sprite_atlas: Option<&SpriteAtlas>,
 ) -> Result<()> {
     if bundle.trace.len() != frame_delays_centiseconds.len() {
         bail!(
@@ -1502,57 +1190,27 @@ fn write_gif(
         .create_new(true)
         .open(output)
         .with_context(|| format!("creating GIF export {}", output.display()))?;
-    if let Some(sprite_atlas) = sprite_atlas {
-        let mut encoder =
-            GifEncoder::new(file, width, height, &[]).context("creating GIF89a encoder")?;
+    let palette = gif_palette_rgb();
+    let mut encoder =
+        GifEncoder::new(file, width, height, &palette).context("creating GIF89a encoder")?;
+    encoder
+        .set_repeat(Repeat::Infinite)
+        .context("setting GIF loop policy")?;
+    let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
+    for (index, delay) in frame_delays_centiseconds.iter().copied().enumerate() {
+        render_bundle_frame(&mut buffer, bundle, index, surface_index, ViewMode::Surface);
+        let mut frame = GifFrame::from_indexed_pixels(
+            width,
+            height,
+            framebuffer_palette_indices(&buffer)?,
+            None,
+        );
+        frame.delay = delay;
         encoder
-            .set_repeat(Repeat::Infinite)
-            .context("setting GIF loop policy")?;
-        let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
-        for (index, delay) in frame_delays_centiseconds.iter().copied().enumerate() {
-            render_bundle_frame(
-                &mut buffer,
-                bundle,
-                index,
-                surface_index,
-                ViewMode::Surface,
-                Some(sprite_atlas),
-            );
-            let mut frame = GifFrame::from_rgb_speed(width, height, &framebuffer_rgb(&buffer), 10);
-            frame.delay = delay;
-            encoder
-                .write_frame(&frame)
-                .with_context(|| format!("encoding GIF frame {index}"))?;
-        }
-    } else {
-        let palette = gif_palette_rgb();
-        let mut encoder =
-            GifEncoder::new(file, width, height, &palette).context("creating GIF89a encoder")?;
-        encoder
-            .set_repeat(Repeat::Infinite)
-            .context("setting GIF loop policy")?;
-        let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
-        for (index, delay) in frame_delays_centiseconds.iter().copied().enumerate() {
-            render_bundle_frame(
-                &mut buffer,
-                bundle,
-                index,
-                surface_index,
-                ViewMode::Surface,
-                None,
-            );
-            let mut frame = GifFrame::from_indexed_pixels(
-                width,
-                height,
-                framebuffer_palette_indices(&buffer)?,
-                None,
-            );
-            frame.delay = delay;
-            encoder
-                .write_frame(&frame)
-                .with_context(|| format!("encoding GIF frame {index}"))?;
-        }
+            .write_frame(&frame)
+            .with_context(|| format!("encoding GIF frame {index}"))?;
     }
+
     Ok(())
 }
 
@@ -1576,15 +1234,6 @@ fn framebuffer_palette_indices(buffer: &[u32]) -> Result<Vec<u8>> {
                 .with_context(|| format!("rendered GIF frame uses unknown color 0x{color:08x}"))
         })
         .collect()
-}
-
-fn framebuffer_rgb(buffer: &[u32]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(buffer.len() * 3);
-    for color in buffer {
-        let channels = color.to_be_bytes();
-        bytes.extend_from_slice(&channels[1..]);
-    }
-    bytes
 }
 
 fn gif_frame_delays_centiseconds(trace: &[TraceFrame], playback_speed: f64) -> Result<Vec<u16>> {
@@ -1653,7 +1302,6 @@ fn draw_scene(
     scenario: &Scenario,
     surface: &Surface,
     extent: (f64, f64, f64, f64),
-    sprite_atlas: Option<&SpriteAtlas>,
 ) {
     draw_rectangle(
         buffer,
@@ -1664,18 +1312,7 @@ fn draw_scene(
         SURFACE,
         extent,
     );
-    if let Some(sprite_atlas) = sprite_atlas {
-        draw_tiled_world_rectangle(
-            buffer,
-            surface.origin.x_m,
-            surface.origin.y_m,
-            surface.width_m,
-            surface.depth_m,
-            sprite_atlas,
-            AtlasRole::Surface,
-            extent,
-        );
-    }
+
     draw_rectangle_outline(
         buffer,
         surface.origin.x_m,
@@ -1685,18 +1322,7 @@ fn draw_scene(
         SURFACE_BORDER,
         extent,
     );
-    if let Some(sprite_atlas) = sprite_atlas {
-        draw_tiled_world_rectangle_outline(
-            buffer,
-            surface.origin.x_m,
-            surface.origin.y_m,
-            surface.width_m,
-            surface.depth_m,
-            sprite_atlas,
-            AtlasRole::SurfaceBorder,
-            extent,
-        );
-    }
+
     for obstacle in &scenario.obstacles {
         if obstacle.surface == surface.id {
             draw_rectangle(
@@ -1708,91 +1334,39 @@ fn draw_scene(
                 OBSTACLE,
                 extent,
             );
-            if let Some(sprite_atlas) = sprite_atlas {
-                draw_tiled_world_rectangle(
-                    buffer,
-                    obstacle.at.x_m,
-                    obstacle.at.y_m,
-                    obstacle.width_m,
-                    obstacle.depth_m,
-                    sprite_atlas,
-                    AtlasRole::Obstacle,
-                    extent,
-                );
-            }
         }
     }
-    draw_queue_footprints(buffer, scenario, surface, extent, sprite_atlas);
+    draw_queue_footprints(buffer, scenario, surface, extent);
     for waypoint in &scenario.waypoints {
         if waypoint.surface == surface.id {
-            draw_marker(
-                buffer,
-                waypoint.at.x_m,
-                waypoint.at.y_m,
-                WAYPOINT,
-                extent,
-                sprite_atlas,
-                AtlasRole::Waypoint,
-            );
+            draw_marker(buffer, waypoint.at.x_m, waypoint.at.y_m, WAYPOINT, extent);
         }
     }
-    draw_portal_lanes(buffer, scenario, surface, extent, sprite_atlas);
+    draw_portal_lanes(buffer, scenario, surface, extent);
     for exit in &scenario.exits {
         if exit.surface == surface.id {
-            draw_marker(
-                buffer,
-                exit.at.x_m,
-                exit.at.y_m,
-                EXIT,
-                extent,
-                sprite_atlas,
-                AtlasRole::Exit,
-            );
+            draw_marker(buffer, exit.at.x_m, exit.at.y_m, EXIT, extent);
         }
     }
     for gate in &scenario.gates {
         if gate.surface == surface.id {
-            draw_marker(
-                buffer,
-                gate.at.x_m,
-                gate.at.y_m,
-                GATE,
-                extent,
-                sprite_atlas,
-                AtlasRole::Gate,
-            );
+            draw_marker(buffer, gate.at.x_m, gate.at.y_m, GATE, extent);
         }
     }
     for connector in &scenario.connectors {
-        let (color, atlas_role) = match connector.kind() {
-            ConnectorKind::Stair => (STAIR, AtlasRole::Stair),
-            ConnectorKind::Ramp => (RAMP, AtlasRole::Ramp),
-            ConnectorKind::Escalator => (ESCALATOR, AtlasRole::Escalator),
-            ConnectorKind::Lift => (LIFT, AtlasRole::Lift),
+        let color = match connector.kind() {
+            ConnectorKind::Stair => STAIR,
+            ConnectorKind::Ramp => RAMP,
+            ConnectorKind::Escalator => ESCALATOR,
+            ConnectorKind::Lift => LIFT,
         };
         if connector.from_surface() == surface.id {
             let point = connector.from();
-            draw_marker(
-                buffer,
-                point.x_m,
-                point.y_m,
-                color,
-                extent,
-                sprite_atlas,
-                atlas_role,
-            );
+            draw_marker(buffer, point.x_m, point.y_m, color, extent);
         }
         if connector.to_surface() == surface.id {
             let point = connector.to();
-            draw_marker(
-                buffer,
-                point.x_m,
-                point.y_m,
-                color,
-                extent,
-                sprite_atlas,
-                atlas_role,
-            );
+            draw_marker(buffer, point.x_m, point.y_m, color, extent);
         }
     }
 }
@@ -1802,7 +1376,6 @@ fn draw_queue_footprints(
     scenario: &Scenario,
     surface: &Surface,
     extent: (f64, f64, f64, f64),
-    sprite_atlas: Option<&SpriteAtlas>,
 ) {
     for footprint in &scenario.queue_footprints {
         if footprint.surface != surface.id {
@@ -1832,16 +1405,6 @@ fn draw_queue_footprints(
             let x = project(slot.x_m, extent.0, extent.1, WIDTH);
             let y = project(slot.y_m, extent.2, extent.3, HEIGHT);
             draw_square(buffer, x, y, 1, QUEUE_FOOTPRINT);
-            if let Some(sprite_atlas) = sprite_atlas {
-                draw_sprite_center(
-                    buffer,
-                    x,
-                    y,
-                    sprite_atlas,
-                    AtlasRole::QueueFootprint,
-                    ATLAS_MARKER_PIXELS / 2,
-                );
-            }
         }
     }
 }
@@ -1851,7 +1414,6 @@ fn draw_portal_lanes(
     scenario: &Scenario,
     surface: &Surface,
     extent: (f64, f64, f64, f64),
-    sprite_atlas: Option<&SpriteAtlas>,
 ) {
     for lanes in &scenario.portal_lanes {
         match &lanes.resource {
@@ -1870,18 +1432,10 @@ fn draw_portal_lanes(
                         connector.from(),
                         connector.width_m(),
                         extent,
-                        sprite_atlas,
                     );
                 }
                 if connector.to_surface() == surface.id {
-                    draw_lane_positions(
-                        buffer,
-                        lanes,
-                        connector.to(),
-                        connector.width_m(),
-                        extent,
-                        sprite_atlas,
-                    );
+                    draw_lane_positions(buffer, lanes, connector.to(), connector.width_m(), extent);
                 }
             }
             chiyoda_core::model::PortalResource::Exit { id } => {
@@ -1889,7 +1443,7 @@ fn draw_portal_lanes(
                     continue;
                 };
                 if exit.surface == surface.id {
-                    draw_lane_positions(buffer, lanes, exit.at, exit.width_m, extent, sprite_atlas);
+                    draw_lane_positions(buffer, lanes, exit.at, exit.width_m, extent);
                 }
             }
             chiyoda_core::model::PortalResource::Gate { id } => {
@@ -1897,7 +1451,7 @@ fn draw_portal_lanes(
                     continue;
                 };
                 if gate.surface == surface.id {
-                    draw_lane_positions(buffer, lanes, gate.at, gate.width_m, extent, sprite_atlas);
+                    draw_lane_positions(buffer, lanes, gate.at, gate.width_m, extent);
                 }
             }
         }
@@ -1910,23 +1464,12 @@ fn draw_lane_positions(
     portal: chiyoda_core::model::Point3,
     width_m: f64,
     extent: (f64, f64, f64, f64),
-    sprite_atlas: Option<&SpriteAtlas>,
 ) {
     for lane_index in 0..lanes.count {
         let lane = lanes.position(portal, width_m, lane_index);
         let x = project(lane.x_m, extent.0, extent.1, WIDTH);
         let y = project(lane.y_m, extent.2, extent.3, HEIGHT);
         draw_square(buffer, x, y, 1, PORTAL_LANE);
-        if let Some(sprite_atlas) = sprite_atlas {
-            draw_sprite_center(
-                buffer,
-                x,
-                y,
-                sprite_atlas,
-                AtlasRole::PortalLane,
-                ATLAS_MARKER_PIXELS / 2,
-            );
-        }
     }
 }
 
@@ -1936,7 +1479,6 @@ fn draw_frame(
     index: usize,
     surface_id: &str,
     extent: (f64, f64, f64, f64),
-    sprite_atlas: Option<&SpriteAtlas>,
 ) {
     let frame = &bundle.trace[index];
     for agent in &frame.agents {
@@ -1947,16 +1489,6 @@ fn draw_frame(
         let y = project(agent.y_m, extent.2, extent.3, HEIGHT);
         let color = agent_color(&agent.state);
         draw_square(buffer, x, y, 2, color);
-        if let Some(sprite_atlas) = sprite_atlas {
-            draw_sprite_center(
-                buffer,
-                x,
-                y,
-                sprite_atlas,
-                agent_atlas_role(&agent.state),
-                ATLAS_MARKER_PIXELS,
-            );
-        }
     }
 }
 
@@ -1975,21 +1507,6 @@ fn agent_color(state: &AgentState) -> u32 {
     }
 }
 
-fn agent_atlas_role(state: &AgentState) -> AtlasRole {
-    match state {
-        AgentState::Moving => AtlasRole::Moving,
-        AgentState::WaitingToDepart
-        | AgentState::WaitingAtWaypoint
-        | AgentState::WaitingForRoute => AtlasRole::Waiting,
-        AgentState::WaitingForLift
-        | AgentState::WaitingForConnector
-        | AgentState::WaitingForGate
-        | AgentState::WaitingForExit
-        | AgentState::InTransit => AtlasRole::InTransit,
-        AgentState::Evacuated => AtlasRole::Evacuated,
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 struct OverviewExtent {
     min_u: f64,
@@ -1999,12 +1516,7 @@ struct OverviewExtent {
 }
 
 #[allow(clippy::too_many_lines)] // overview draws the same authored layers in their projection order
-fn draw_overview(
-    buffer: &mut [u32],
-    bundle: &RunBundle,
-    index: usize,
-    sprite_atlas: Option<&SpriteAtlas>,
-) {
+fn draw_overview(buffer: &mut [u32], bundle: &RunBundle, index: usize) {
     let scenario = &bundle.scenario.scenario;
     let extent = overview_extent(scenario);
     let mut surfaces = scenario.surfaces.iter().collect::<Vec<_>>();
@@ -2043,57 +1555,29 @@ fn draw_overview(
             );
         }
         for rank in 0..footprint.slots {
-            draw_overview_marker(
-                buffer,
-                footprint.position(rank),
-                QUEUE_FOOTPRINT,
-                extent,
-                sprite_atlas,
-                AtlasRole::QueueFootprint,
-            );
+            draw_overview_marker(buffer, footprint.position(rank), QUEUE_FOOTPRINT, extent);
         }
     }
     for waypoint in &scenario.waypoints {
-        draw_overview_marker(
-            buffer,
-            waypoint.at,
-            WAYPOINT,
-            extent,
-            sprite_atlas,
-            AtlasRole::Waypoint,
-        );
+        draw_overview_marker(buffer, waypoint.at, WAYPOINT, extent);
     }
-    draw_overview_portal_lanes(buffer, scenario, extent, sprite_atlas);
+    draw_overview_portal_lanes(buffer, scenario, extent);
     for exit in &scenario.exits {
-        draw_overview_marker(buffer, exit.at, EXIT, extent, sprite_atlas, AtlasRole::Exit);
+        draw_overview_marker(buffer, exit.at, EXIT, extent);
     }
     for gate in &scenario.gates {
-        draw_overview_marker(buffer, gate.at, GATE, extent, sprite_atlas, AtlasRole::Gate);
+        draw_overview_marker(buffer, gate.at, GATE, extent);
     }
     for connector in &scenario.connectors {
-        let (color, atlas_role) = match connector.kind() {
-            ConnectorKind::Stair => (STAIR, AtlasRole::Stair),
-            ConnectorKind::Ramp => (RAMP, AtlasRole::Ramp),
-            ConnectorKind::Escalator => (ESCALATOR, AtlasRole::Escalator),
-            ConnectorKind::Lift => (LIFT, AtlasRole::Lift),
+        let color = match connector.kind() {
+            ConnectorKind::Stair => STAIR,
+            ConnectorKind::Ramp => RAMP,
+            ConnectorKind::Escalator => ESCALATOR,
+            ConnectorKind::Lift => LIFT,
         };
         draw_overview_line(buffer, connector.from(), connector.to(), color, extent);
-        draw_overview_marker(
-            buffer,
-            connector.from(),
-            color,
-            extent,
-            sprite_atlas,
-            atlas_role,
-        );
-        draw_overview_marker(
-            buffer,
-            connector.to(),
-            color,
-            extent,
-            sprite_atlas,
-            atlas_role,
-        );
+        draw_overview_marker(buffer, connector.from(), color, extent);
+        draw_overview_marker(buffer, connector.to(), color, extent);
     }
     for agent in &bundle.trace[index].agents {
         draw_overview_marker(
@@ -2105,8 +1589,6 @@ fn draw_overview(
             },
             agent_color(&agent.state),
             extent,
-            sprite_atlas,
-            agent_atlas_role(&agent.state),
         );
     }
 }
@@ -2232,12 +1714,7 @@ fn overview_rectangle_corners(origin: Point3, width_m: f64, depth_m: f64) -> [Po
     ]
 }
 
-fn draw_overview_portal_lanes(
-    buffer: &mut [u32],
-    scenario: &Scenario,
-    extent: OverviewExtent,
-    sprite_atlas: Option<&SpriteAtlas>,
-) {
+fn draw_overview_portal_lanes(buffer: &mut [u32], scenario: &Scenario, extent: OverviewExtent) {
     for lanes in &scenario.portal_lanes {
         match &lanes.resource {
             PortalResource::Connector { id } => {
@@ -2254,7 +1731,6 @@ fn draw_overview_portal_lanes(
                     connector.from(),
                     connector.width_m(),
                     extent,
-                    sprite_atlas,
                 );
                 draw_overview_lane_positions(
                     buffer,
@@ -2262,34 +1738,19 @@ fn draw_overview_portal_lanes(
                     connector.to(),
                     connector.width_m(),
                     extent,
-                    sprite_atlas,
                 );
             }
             PortalResource::Exit { id } => {
                 let Some(exit) = scenario.exits.iter().find(|exit| &exit.id == id) else {
                     continue;
                 };
-                draw_overview_lane_positions(
-                    buffer,
-                    lanes,
-                    exit.at,
-                    exit.width_m,
-                    extent,
-                    sprite_atlas,
-                );
+                draw_overview_lane_positions(buffer, lanes, exit.at, exit.width_m, extent);
             }
             PortalResource::Gate { id } => {
                 let Some(gate) = scenario.gates.iter().find(|gate| &gate.id == id) else {
                     continue;
                 };
-                draw_overview_lane_positions(
-                    buffer,
-                    lanes,
-                    gate.at,
-                    gate.width_m,
-                    extent,
-                    sprite_atlas,
-                );
+                draw_overview_lane_positions(buffer, lanes, gate.at, gate.width_m, extent);
             }
         }
     }
@@ -2301,7 +1762,6 @@ fn draw_overview_lane_positions(
     portal: Point3,
     width_m: f64,
     extent: OverviewExtent,
-    sprite_atlas: Option<&SpriteAtlas>,
 ) {
     for lane_index in 0..lanes.count {
         draw_overview_marker(
@@ -2309,25 +1769,13 @@ fn draw_overview_lane_positions(
             lanes.position(portal, width_m, lane_index),
             PORTAL_LANE,
             extent,
-            sprite_atlas,
-            AtlasRole::PortalLane,
         );
     }
 }
 
-fn draw_overview_marker(
-    buffer: &mut [u32],
-    point: Point3,
-    color: u32,
-    extent: OverviewExtent,
-    sprite_atlas: Option<&SpriteAtlas>,
-    atlas_role: AtlasRole,
-) {
+fn draw_overview_marker(buffer: &mut [u32], point: Point3, color: u32, extent: OverviewExtent) {
     let (x, y) = project_overview(point, extent);
     draw_square(buffer, x, y, 3, color);
-    if let Some(sprite_atlas) = sprite_atlas {
-        draw_sprite_center(buffer, x, y, sprite_atlas, atlas_role, ATLAS_MARKER_PIXELS);
-    }
 }
 
 fn draw_overview_line(
@@ -2422,235 +1870,10 @@ fn draw_rectangle_outline(
     }
 }
 
-#[allow(clippy::too_many_arguments)] // world and framebuffer coordinates plus atlas role are all required at this boundary
-fn draw_tiled_world_rectangle(
-    buffer: &mut [u32],
-    x_m: f64,
-    y_m: f64,
-    width_m: f64,
-    depth_m: f64,
-    sprite_atlas: &SpriteAtlas,
-    role: AtlasRole,
-    extent: (f64, f64, f64, f64),
-) {
-    let left = project(x_m, extent.0, extent.1, WIDTH);
-    let right = project(x_m + width_m, extent.0, extent.1, WIDTH);
-    let top = project(y_m, extent.2, extent.3, HEIGHT);
-    let bottom = project(y_m + depth_m, extent.2, extent.3, HEIGHT);
-    let width = (right - left).unsigned_abs().saturating_add(1);
-    let height = (bottom - top).unsigned_abs().saturating_add(1);
-    draw_tiled_screen_rectangle(
-        buffer,
-        left.min(right),
-        top.min(bottom),
-        width,
-        height,
-        sprite_atlas,
-        role,
-        ATLAS_TERRAIN_PIXELS,
-    );
-}
-
-#[allow(clippy::too_many_arguments)] // world and framebuffer coordinates plus atlas role are all required at this boundary
-fn draw_tiled_world_rectangle_outline(
-    buffer: &mut [u32],
-    x_m: f64,
-    y_m: f64,
-    width_m: f64,
-    depth_m: f64,
-    sprite_atlas: &SpriteAtlas,
-    role: AtlasRole,
-    extent: (f64, f64, f64, f64),
-) {
-    let left = project(x_m, extent.0, extent.1, WIDTH);
-    let right = project(x_m + width_m, extent.0, extent.1, WIDTH);
-    let top = project(y_m, extent.2, extent.3, HEIGHT);
-    let bottom = project(y_m + depth_m, extent.2, extent.3, HEIGHT);
-    let left = left.min(right);
-    let right = left.max(right);
-    let top = top.min(bottom);
-    let bottom = top.max(bottom);
-    let width = (right - left).unsigned_abs().saturating_add(1);
-    let height = (bottom - top).unsigned_abs().saturating_add(1);
-    let thickness = ATLAS_TERRAIN_PIXELS.min(width).min(height);
-    draw_tiled_screen_rectangle(
-        buffer,
-        left,
-        top,
-        width,
-        thickness,
-        sprite_atlas,
-        role,
-        thickness,
-    );
-    if height > thickness {
-        draw_tiled_screen_rectangle(
-            buffer,
-            left,
-            bottom - thickness.cast_signed() + 1,
-            width,
-            thickness,
-            sprite_atlas,
-            role,
-            thickness,
-        );
-    }
-    if height > thickness * 2 {
-        let middle_height = height - thickness * 2;
-        draw_tiled_screen_rectangle(
-            buffer,
-            left,
-            top + thickness.cast_signed(),
-            thickness,
-            middle_height,
-            sprite_atlas,
-            role,
-            thickness,
-        );
-        if width > thickness {
-            draw_tiled_screen_rectangle(
-                buffer,
-                right - thickness.cast_signed() + 1,
-                top + thickness.cast_signed(),
-                thickness,
-                middle_height,
-                sprite_atlas,
-                role,
-                thickness,
-            );
-        }
-    }
-}
-
-#[allow(clippy::too_many_arguments)] // a clipped rectangle needs its framebuffer, atlas, role, and explicit tile scale
-fn draw_tiled_screen_rectangle(
-    buffer: &mut [u32],
-    left: isize,
-    top: isize,
-    width: usize,
-    height: usize,
-    sprite_atlas: &SpriteAtlas,
-    role: AtlasRole,
-    tile_pixels: usize,
-) {
-    if width == 0 || height == 0 || tile_pixels == 0 {
-        return;
-    }
-    for offset_y in (0..height).step_by(tile_pixels) {
-        let rendered_height = tile_pixels.min(height - offset_y);
-        for offset_x in (0..width).step_by(tile_pixels) {
-            let rendered_width = tile_pixels.min(width - offset_x);
-            blit_sprite_tile(
-                buffer,
-                sprite_atlas,
-                role,
-                left + offset_x.cast_signed(),
-                top + offset_y.cast_signed(),
-                rendered_width,
-                rendered_height,
-            );
-        }
-    }
-}
-
-fn draw_sprite_center(
-    buffer: &mut [u32],
-    center_x: isize,
-    center_y: isize,
-    sprite_atlas: &SpriteAtlas,
-    role: AtlasRole,
-    size_pixels: usize,
-) {
-    if size_pixels == 0 {
-        return;
-    }
-    let half = (size_pixels / 2).cast_signed();
-    blit_sprite_tile(
-        buffer,
-        sprite_atlas,
-        role,
-        center_x - half,
-        center_y - half,
-        size_pixels,
-        size_pixels,
-    );
-}
-
-fn blit_sprite_tile(
-    buffer: &mut [u32],
-    sprite_atlas: &SpriteAtlas,
-    role: AtlasRole,
-    destination_left: isize,
-    destination_top: isize,
-    destination_width: usize,
-    destination_height: usize,
-) {
-    if destination_width == 0 || destination_height == 0 {
-        return;
-    }
-    let tile = sprite_atlas.tile(role);
-    let source_left = tile.column * sprite_atlas.tile_width_pixels;
-    let source_top = tile.row * sprite_atlas.tile_height_pixels;
-    for destination_y in 0..destination_height {
-        let y = destination_top + destination_y.cast_signed();
-        if !(0..HEIGHT.cast_signed()).contains(&y) {
-            continue;
-        }
-        let source_y =
-            source_top + destination_y * sprite_atlas.tile_height_pixels / destination_height;
-        for destination_x in 0..destination_width {
-            let x = destination_left + destination_x.cast_signed();
-            if !(0..WIDTH.cast_signed()).contains(&x) {
-                continue;
-            }
-            let source_x =
-                source_left + destination_x * sprite_atlas.tile_width_pixels / destination_width;
-            let pixel = sprite_atlas.pixels[source_y * sprite_atlas.image_width_pixels + source_x];
-            if pixel.alpha == 0 {
-                continue;
-            }
-            let position = y.cast_unsigned() * WIDTH + x.cast_unsigned();
-            if pixel.alpha == u8::MAX {
-                buffer[position] = u32::from(pixel.red) << 16
-                    | u32::from(pixel.green) << 8
-                    | u32::from(pixel.blue);
-            } else {
-                let destination = buffer[position].to_be_bytes();
-                let alpha = u16::from(pixel.alpha);
-                let inverse_alpha = u16::from(u8::MAX) - alpha;
-                let red = (u16::from(pixel.red) * alpha
-                    + u16::from(destination[1]) * inverse_alpha
-                    + 127)
-                    / 255;
-                let green = (u16::from(pixel.green) * alpha
-                    + u16::from(destination[2]) * inverse_alpha
-                    + 127)
-                    / 255;
-                let blue = (u16::from(pixel.blue) * alpha
-                    + u16::from(destination[3]) * inverse_alpha
-                    + 127)
-                    / 255;
-                buffer[position] = u32::from(red) << 16 | u32::from(green) << 8 | u32::from(blue);
-            }
-        }
-    }
-}
-
-fn draw_marker(
-    buffer: &mut [u32],
-    x_m: f64,
-    y_m: f64,
-    color: u32,
-    extent: (f64, f64, f64, f64),
-    sprite_atlas: Option<&SpriteAtlas>,
-    atlas_role: AtlasRole,
-) {
+fn draw_marker(buffer: &mut [u32], x_m: f64, y_m: f64, color: u32, extent: (f64, f64, f64, f64)) {
     let x = project(x_m, extent.0, extent.1, WIDTH);
     let y = project(y_m, extent.2, extent.3, HEIGHT);
     draw_square(buffer, x, y, 3, color);
-    if let Some(sprite_atlas) = sprite_atlas {
-        draw_sprite_center(buffer, x, y, sprite_atlas, atlas_role, ATLAS_MARKER_PIXELS);
-    }
 }
 
 fn draw_line(
@@ -2955,7 +2178,7 @@ mod tests {
         };
         let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
         let extent = extent_for_surface(&surface);
-        draw_scene(&mut buffer, &scenario, &surface, extent, None);
+        draw_scene(&mut buffer, &scenario, &surface, extent);
 
         let location = |x_m, y_m| {
             project(x_m, extent.0, extent.1, WIDTH).cast_unsigned()
@@ -3126,55 +2349,11 @@ mod tests {
     fn overview_renderer_draws_static_and_trace_layers_without_a_display_server() {
         let bundle = load_watch_scenario(WATCH_SOURCE, 1).expect("watch fixture succeeds");
         let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
-        draw_overview(&mut buffer, &bundle, 0, None);
+        draw_overview(&mut buffer, &bundle, 0);
 
         assert!(buffer.contains(&SURFACE));
         assert!(buffer.contains(&SURFACE_BORDER));
         assert!(buffer.contains(&EXIT));
-    }
-
-    #[test]
-    fn bundled_sprite_atlas_is_optional_and_changes_only_rendered_pixels() {
-        let manifest_path =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/replay/undercity-atlas.json");
-        let sprite_atlas = load_sprite_atlas(&manifest_path).expect("bundled sprite atlas loads");
-        let bundle = load_watch_scenario(WATCH_SOURCE, 1).expect("watch fixture succeeds");
-        let mut default_buffer = vec![BACKGROUND; WIDTH * HEIGHT];
-        let mut atlas_buffer = vec![BACKGROUND; WIDTH * HEIGHT];
-
-        render_bundle_frame(&mut default_buffer, &bundle, 0, 0, ViewMode::Surface, None);
-        render_bundle_frame(
-            &mut atlas_buffer,
-            &bundle,
-            0,
-            0,
-            ViewMode::Surface,
-            Some(&sprite_atlas),
-        );
-
-        assert_eq!(sprite_atlas.tile_width_pixels, 128);
-        assert_eq!(sprite_atlas.tile_height_pixels, 128);
-        for role in [
-            AtlasRole::Moving,
-            AtlasRole::Waiting,
-            AtlasRole::InTransit,
-            AtlasRole::Evacuated,
-        ] {
-            let tile = sprite_atlas.tile(role);
-            let source_left = tile.column * sprite_atlas.tile_width_pixels;
-            let source_top = tile.row * sprite_atlas.tile_height_pixels;
-            let has_transparent_background = (0..sprite_atlas.tile_height_pixels).any(|offset_y| {
-                (0..sprite_atlas.tile_width_pixels).any(|offset_x| {
-                    sprite_atlas.pixels[(source_top + offset_y) * sprite_atlas.image_width_pixels
-                        + source_left
-                        + offset_x]
-                        .alpha
-                        == 0
-                })
-            });
-            assert!(has_transparent_background, "{role:?} tile has no alpha");
-        }
-        assert_ne!(default_buffer, atlas_buffer);
     }
 
     #[test]
@@ -3185,16 +2364,7 @@ mod tests {
             &mut buffer,
             "cannot read draft.json: No such file or directory (os error 2)",
         );
-        draw_debug_panel(
-            &mut buffer,
-            &bundle,
-            0,
-            0,
-            ViewMode::Surface,
-            true,
-            1.0,
-            true,
-        );
+        draw_debug_panel(&mut buffer, &bundle, 0, 0, ViewMode::Surface, true, 1.0);
 
         assert!(buffer.contains(&DEBUG_PANEL));
         assert!(buffer.contains(&DEBUG_BORDER));
@@ -3234,12 +2404,7 @@ mod tests {
         ));
         let output = directory.join("watch.gif");
         let bundle = load_watch_scenario(WATCH_SOURCE, 1).expect("watch fixture succeeds");
-        let manifest_path =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/replay/undercity-atlas.json");
-        let sprite_atlas = load_sprite_atlas(&manifest_path).expect("bundled sprite atlas loads");
-
-        let manifest =
-            export_gif(&bundle, &output, 0, 2.0, Some(&sprite_atlas)).expect("GIF export succeeds");
+        let manifest = export_gif(&bundle, &output, 0, 2.0).expect("GIF export succeeds");
         let gif = fs::read(&output).expect("GIF output reads");
         let sidecar: serde_json::Value = serde_json::from_str(
             &fs::read_to_string(gif_manifest_path(&output)).expect("sidecar reads"),
@@ -3253,10 +2418,7 @@ mod tests {
         assert_eq!(manifest.frame_delays_centiseconds.len(), bundle.trace.len());
         assert_eq!(sidecar["bundle_sha256"], bundle.bundle_hash);
         assert_eq!(sidecar["playback_speed"], 2.0);
-        assert_eq!(
-            sidecar["sprite_atlas"]["image_sha256"],
-            sprite_atlas.image_sha256
-        );
+        assert!(sidecar.get("sprite_atlas").is_none());
         fs::remove_dir_all(directory).expect("test GIF directory is removable");
     }
 

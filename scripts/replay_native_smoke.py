@@ -15,6 +15,9 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+SINGLE = (24, 24, 1152, 672)
+PANELS = ((24, 24, 564, 672), (612, 24, 564, 672))
+TIMELINE = (24, 712, 1152, 64)
 
 def applescript(code):
     return subprocess.check_output(["osascript", "-e", code], text=True).strip()
@@ -68,7 +71,7 @@ def main():
             paths = set((output / "snapshots").glob("*.png")) - before
             if paths:
                 path = next(iter(paths))
-                if path.stat().st_size > 32:
+                if path.read_bytes().endswith(bytes.fromhex("0000000049454e44ae426082")):
                     checks.append({"check": label, "title": title(), "snapshot": str(path.relative_to(output))})
                     return path
             time.sleep(0.1)
@@ -79,7 +82,22 @@ def main():
         return left + x * width / 1200.0, top + (height - 800.0) + y
     def key(code, label):
         event("key", code)
-        checks.append({"check": label, "title": title()})
+        checks.append({"check": label})
+    def expected(path, *flags):
+        # Validate actual window pixels against the shared headless renderer,
+        # rather than depending on diagnostic copy in the native title bar.
+        target = output / f"reference-{len(checks):03}.png"
+        reference = [str(args.binary.resolve()), "view", str(bundle_path), "--paused",
+                     "--at-step", str(args.at_step), "--surface", floor["id"]]
+        if args.candidate:
+            reference += ["--compare", str(args.candidate.resolve())]
+        reference += list(flags) + ["--export-png", str(target)]
+        subprocess.run(reference, check=True, stdout=subprocess.DEVNULL)
+        assert path.read_bytes() == target.read_bytes(), f"native/headless pixels differ: {path.name}"
+        checks[-1]["headless_reference"] = str(target.relative_to(output))
+        checks[-1]["image_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    def same(actual, reference):
+        assert actual.read_bytes() == reference.read_bytes(), f"unexpected change: {actual.name}"
     try:
         for _ in range(200):
             if process.poll() is not None:
@@ -96,45 +114,42 @@ def main():
             raise RuntimeError("native viewer did not expose a window")
         applescript(f'tell application "System Events" to set frontmost of (first process whose unix id is {process.pid}) to true')
         pointer = event("position").split()
-        capture("initial paused frame")
+        initial_png = capture("initial paused frame")
+        assert title() == "Chiyoda", title()
+        assert int(re.search(r"step-(\d+)", initial_png.name)[1]) == args.at_step
+        expected(initial_png)
+        selected_flags = ["--agent", person["id"]]
         if not args.candidate:
-            def projected(location, inspected=False):
-                width = 852 if inspected else 1136
-                scale = min((width - 64) / floor["width_m"], 406 / floor["depth_m"])
-                return (32 + width / 2 + (location["x_m"] - floor["origin"]["x_m"] - floor["width_m"] / 2) * scale,
-                        317 + (location["y_m"] - floor["origin"]["y_m"] - floor["depth_m"] / 2) * scale)
+            def projected(location):
+                left, top, width, height = SINGLE
+                scale = min((width - 64) / floor["width_m"], (height - 64) / floor["depth_m"])
+                return (left + width / 2 + (location["x_m"] - floor["origin"]["x_m"] - floor["width_m"] / 2) * scale,
+                        top + height / 2 + (location["y_m"] - floor["origin"]["y_m"] - floor["depth_m"] / 2) * scale)
             event("click", *point(*projected(person)))
-            selected = capture("person selected with mouse")
-            assert f'inspect {person["id"]}' in title(), title()
-            key(2, "hide selected inspector")
-            hidden = capture("inspector hidden and plan expanded")
-            assert hidden.read_bytes() != selected.read_bytes()
-            key(2, "restore selected inspector")
+            selected = capture("person selected without a sidebar")
+            expected(selected, *selected_flags)
             key(24, "keyboard zoom in")
-            assert "zoom 1.25" in title(), title()
             zoomed = capture("keyboard zoom")
-            event("drag", *point(458,317), 60, 20)
+            expected(zoomed, *selected_flags, "--zoom", "1.25")
+            event("drag", *point(600,360), 60, 20)
             panned = capture("right-button pan")
             assert zoomed.read_bytes() != panned.read_bytes(), "pan did not change the plan"
             key(15, "fit camera")
-            assert "zoom 1.00" in title(), title()
-            event("scroll", *point(458,317), 2)
-            capture("wheel zoom")
-            assert "zoom 1.00" not in title(), title()
+            same(capture("fit restores selected full-size plan"), selected)
+            event("scroll", *point(600,360), 2)
+            assert capture("wheel zoom").read_bytes() != selected.read_bytes()
             key(15, "restore fit")
             resources = [r for r in scenario["exits"] if r["surface"] == floor["id"]]
             if resources:
                 resource = resources[-1]
                 event("down",56)
-                event("click", *point(*projected(resource["at"], inspected=True)))
+                event("click", *point(*projected(resource["at"])))
                 event("up",56)
-                capture("resource selected with shift-click")
-                assert f'inspect {resource["id"]}' in title(), title()
-            event("click", *point(40,90))
-            assert "inspect " not in title(), title()
+                expected(capture("resource selected with shift-click"), "--resource", "exit:" + resource["id"])
+            event("click", *point(28,28))
+            same(capture("empty-space click clears selection without resizing"), initial_png)
             key(9, "overview projection")
-            assert "overview" in title(), title()
-            capture("overview frame")
+            expected(capture("overview frame"), "--view", "overview")
             key(9, "restore floor plan")
             key(48,"cycle authored floors")
         else:
@@ -144,36 +159,35 @@ def main():
             min_y = min(floor["origin"]["y_m"], other_floor["origin"]["y_m"])
             max_x = max(floor["origin"]["x_m"] + floor["width_m"], other_floor["origin"]["x_m"] + other_floor["width_m"])
             max_y = max(floor["origin"]["y_m"] + floor["depth_m"], other_floor["origin"]["y_m"] + other_floor["depth_m"])
-            scale = min(484 / (max_x - min_x), 406 / (max_y - min_y))
-            def compared(location, left):
-                return (left + 274 + (location["x_m"] - (min_x + max_x)/2)*scale,
-                        317 + (location["y_m"] - (min_y + max_y)/2)*scale)
-            event("click", *point(*compared(person, 32)))
-            capture("baseline person selected")
-            assert f'inspect {person["id"]}' in title(), title()
+            scale = min((PANELS[0][2] - 64) / (max_x - min_x), (PANELS[0][3] - 64) / (max_y - min_y))
+            def compared(location, viewport):
+                left, top, width, height = viewport
+                return (left + width / 2 + (location["x_m"] - (min_x + max_x)/2)*scale,
+                        top + height / 2 + (location["y_m"] - (min_y + max_y)/2)*scale)
+            event("click", *point(*compared(person, PANELS[0])))
+            selected = capture("baseline person selected")
+            expected(selected, *selected_flags)
             other_frame = next(f for f in reversed(candidate["trace"]) if f["time_s"] <= initial["time_s"])
             other = next(a for a in other_frame["agents"] if a["id"] == person["id"])
             if other["surface"] == floor["id"]:
-                event("click", *point(*compared(other, 620)))
-                capture("candidate person selected")
-                assert f'inspect {person["id"]}' in title(), title()
+                event("click", *point(*compared(other, PANELS[1])))
+                expected(capture("candidate person selected"), *selected_flags)
             key(24,"shared camera keyboard zoom")
             zoomed = capture("shared zoom")
-            assert "zoom 1.25" in title(), title()
-            event("drag", *point(894,317), 60, 20)
+            expected(zoomed, *selected_flags, "--zoom", "1.25")
+            event("drag", *point(894,360), 60, 20)
             panned = capture("shared camera pan from candidate")
             assert zoomed.read_bytes() != panned.read_bytes()
             key(15,"shared fit camera")
-            event("scroll", *point(894,317), 2)
-            capture("shared wheel zoom from candidate")
-            assert "zoom 1.00" not in title(), title()
+            same(capture("shared fit restores both plans"), selected)
+            event("scroll", *point(894,360), 2)
+            assert capture("shared wheel zoom from candidate").read_bytes() != selected.read_bytes()
             key(15,"restore shared fit")
             key(3,"focus selection")
-            assert "zoom 2.00" in title(), title()
-            capture("focused shared camera")
+            assert capture("focused shared camera").read_bytes() != selected.read_bytes()
             key(15,"restore fit after focus")
             key(9,"shared overview")
-            capture("shared overview frame")
+            expected(capture("shared overview frame"), *selected_flags, "--view", "overview")
             key(9,"restore shared plan")
             key(48,"cycle common authored floors")
         key(124,"next recorded frame")
@@ -181,14 +195,13 @@ def main():
         assert int(re.search(r"step-(\d+)",after_right.name)[1]) > args.at_step
         key(123,"previous recorded frame")
         key(30,"increase playback speed")
-        assert "8.00" in title(), title()
         key(33,"restore playback speed")
-        event("click", *point(400,738))
+        event("click", *point(400,740))
         sought = capture("timeline seek")
         assert int(re.search(r"step-(\d+)",sought.name)[1]) > args.at_step
-        if args.candidate:
-            assert "paused" in title()
-        event("click", *point(32,738))
+        time.sleep(0.2)
+        same(capture("timeline seek remains paused"), sought)
+        event("click", *point(TIMELINE[0],740))
         key(49,"play")
         time.sleep(1.0)
         key(49,"pause")
@@ -198,7 +211,7 @@ def main():
         stdout, stderr = process.communicate(timeout=10)
         assert process.returncode == 0,(stdout,stderr)
         profile = next(json.loads(line.split("=",1)[1]) for line in stderr.splitlines() if line.startswith("replay_profile="))
-        report = {"platform":"macOS","input_method":"targeted Core Graphics keys, focused-window mouse events and Accessibility window inspection","source_sha256":hashlib.sha256(raw).hexdigest(),"command":command,"checks":checks,"profile":profile,"exit_code":process.returncode}
+        report = {"platform":"macOS","input_method":"targeted Core Graphics keys, focused-window mouse events and Accessibility window inspection","source_sha256":hashlib.sha256(raw).hexdigest(),"command":command,"layout":{"single":SINGLE,"comparison":PANELS,"timeline":TIMELINE},"checks":checks,"profile":profile,"exit_code":process.returncode}
         assert bundle_path.read_bytes() == raw
         (output / "report.json").write_text(json.dumps(report,indent=2) + "\n")
         print(json.dumps({"checks":len(checks),"profile":profile,"report":str(output / "report.json")},indent=2))

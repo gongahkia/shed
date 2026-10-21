@@ -2,6 +2,7 @@
 mod canvas;
 mod chrome;
 mod compare;
+mod inspector;
 pub(crate) mod scene;
 pub use compare::VIEWPORTS as COMPARISON_VIEWPORTS;
 pub use scene::{Camera, MapConfig, VIEWPORT, WorldBounds, pick};
@@ -29,7 +30,19 @@ const WAYPOINT: u32 = 0x0074_6b8b;
 const TRAIL: u32 = 0x00a2_bfe2;
 const QUEUE: u32 = 0x009c_8cae;
 const ERROR: u32 = 0x00b4_3435;
-pub const RENDERER_VERSION: &str = "chiyoda.replay-renderer.v3";
+pub const RENDERER_VERSION: &str = "chiyoda.replay-renderer.v4";
+
+/// Shared seek target for single-run and comparison playback.
+pub const TIMELINE_BOUNDS: [f32; 4] = [32.0, 724.0, 1136.0, 28.0];
+
+#[must_use]
+pub fn single_viewport(inspector_visible: bool) -> [f32; 4] {
+    if inspector_visible {
+        [32.0, 82.0, 852.0, 470.0]
+    } else {
+        VIEWPORT
+    }
+}
 
 /// Exact semantic colours plus coverage ramps for antialiased edges. One palette
 /// is used across the animation so rare status colours cannot drift per frame.
@@ -171,7 +184,8 @@ impl Renderer {
             canvas: Canvas::new(),
         }
     }
-    #[allow(clippy::too_many_lines)] // one ordered presentation pass keeps map and chrome boundaries explicit
+
+    #[allow(clippy::too_many_lines)] // one presentation pass retains map, inspection and watch status ordering
     pub fn render(&mut self, buffer: &mut [u32], bundle: Option<&RunBundle>, options: Options<'_>) {
         assert_eq!(
             buffer.len(),
@@ -180,82 +194,62 @@ impl Renderer {
         );
         let c = &mut self.canvas;
         c.clear(BACKGROUND);
-        c.rect([0.0, 0.0, 1200.0, 80.0], PAPER);
-        c.line((0.0, 79.5), (1200.0, 79.5), BORDER, 1.0);
-        c.rect([916.0, 80.0, 284.0, 720.0], PAPER);
-        c.line((915.5, 80.0), (915.5, 800.0), BORDER, 1.0);
-        // A small plan glyph, drawn in the same stroke family as resource symbols.
-        c.polygon(
-            &[(32.0, 27.0), (52.0, 27.0), (52.0, 51.0), (32.0, 51.0)],
-            None,
-            Some((MOVING, 1.5)),
-        );
-        c.line((39.0, 27.0), (39.0, 43.0), MOVING, 1.5);
-        c.line((39.0, 43.0), (52.0, 43.0), MOVING, 1.5);
-        c.text((66.0, 38.0), "Chiyoda", 20, INK, 160.0);
-        c.text(
-            (66.0, 58.0),
-            "PEDESTRIAN SIMULATION / REPLAY",
-            10,
-            MUTED,
-            400.0,
-        );
-        c.text(
-            (940.0, 36.0),
-            options.source.label(),
-            13,
-            if options.source == Source::LegacyHashOnly {
-                WAITING
-            } else {
-                MUTED
-            },
-            240.0,
-        );
-        c.text(
-            (940.0, 57.0),
-            "Recorded state · deterministic model",
-            11,
-            MUTED,
-            240.0,
-        );
         if let Some(bundle) = bundle {
             let scenario = &bundle.scenario.scenario;
             let surface = &scenario.surfaces[options.surface];
             let frame = &bundle.trace[options.index];
-            c.text((320.0, 46.0), &scenario.name, 16, INK, 560.0);
-            let title = if options.view == ViewMode::Surface {
-                surface.id.as_str()
-            } else {
-                "All surfaces"
-            };
-            c.text((32.0, 117.0), title, 20, INK, 650.0);
-            let subtitle = if options.view == ViewMode::Surface {
+            let inspection = options.inspection.filter(|_| options.details);
+            let viewport = single_viewport(inspection.is_some());
+            let location = if options.view == ViewMode::Surface {
                 format!(
-                    "Floor plan   /   {:.1} × {:.1} m   /   elevation {:.1} m",
-                    surface.width_m, surface.depth_m, surface.origin.z_m
+                    "{} · {:.1} × {:.1} m · elevation {:.1} m",
+                    surface.id, surface.width_m, surface.depth_m, surface.origin.z_m
                 )
             } else {
-                format!(
-                    "Isometric overview   /   {} authored surfaces",
-                    scenario.surfaces.len()
-                )
+                format!("Overview · {} surfaces", scenario.surfaces.len())
             };
-            c.text((32.0, 141.0), &subtitle, 12, MUTED, 790.0);
+            let source = if options.source == Source::Reconstructed {
+                String::new()
+            } else {
+                format!("{} · ", options.source.label())
+            };
+            chrome::heading(
+                c,
+                32.0,
+                viewport[2],
+                &scenario.name,
+                &format!(
+                    "{source}{location} · recorded {:.2} s · step {}",
+                    frame.time_s, frame.step
+                ),
+            );
             scene::draw(
                 c,
                 scenario,
                 frame,
                 surface,
                 options.view,
-                options.map,
+                MapConfig {
+                    viewport,
+                    ..options.map
+                },
                 options.inspection,
             );
-            if options.details
-                && let Some(inspection) = options.inspection
-            {
-                inspector(c, bundle, options, inspection);
-            } else {
-                sidebar(c, bundle, options);
+            chrome::outcomes(
+                c,
+                32.0,
+                viewport[2],
+                &chrome::Outcomes {
+                    states: state_counts(frame),
+                    population: frame.agents.len(),
+                    completed: bundle.metrics.evacuated_agents,
+                    people: bundle.metrics.total_agents,
+                    duration_s: scenario.duration_s,
+                    clearance_s: bundle.metrics.clearance_time_s,
+                },
+            );
+            if let Some(inspection) = inspection {
+                inspector::draw(c, options, inspection);
             }
             timeline(c, bundle, options);
         } else {
@@ -264,206 +258,64 @@ impl Renderer {
                 "Waiting for a valid scenario",
                 26,
                 INK,
-                720.0,
+                1000.0,
             );
             c.text(
                 (90.0, 373.0),
                 "Save the watched JSON file to load its geometry and trace.",
                 14,
                 MUTED,
-                720.0,
-            );
-            c.text((940.0, 130.0), "No trace loaded", 16, INK, 230.0);
-            c.text(
-                (940.0, 159.0),
-                "Validation runs in the background.",
-                12,
-                MUTED,
-                235.0,
+                1000.0,
             );
         }
         if let Some(status) = options.watch_status {
             let error = super::watch_status_is_error(status);
             c.rect(
-                [0.0, 676.0, 915.0, 20.0],
+                [0.0, 676.0, 1200.0, 20.0],
                 if error { 0x00fc_eced } else { BACKGROUND },
             );
+            let status = if error && bundle.is_some() {
+                format!("Showing last valid revision · {status}")
+            } else {
+                status.to_owned()
+            };
             c.text(
                 (32.0, 690.0),
-                status,
+                &status,
                 11,
                 if error { ERROR } else { MUTED },
-                850.0,
+                1136.0,
             );
-            if error {
-                c.rect([936.0, 606.0, 248.0, 80.0], 0x00fc_eced);
-                c.text(
-                    (948.0, 628.0),
-                    if bundle.is_some() {
-                        "Showing last valid revision"
-                    } else {
-                        "Source revision failed"
-                    },
-                    12,
-                    ERROR,
-                    224.0,
-                );
-                wrapped(c, (948.0, 649.0), status, 224.0, 2, ERROR);
-            }
         }
         c.copy_to(buffer);
     }
 }
-#[allow(clippy::too_many_lines)] // fixed sidebar sections share one vertical layout
-fn sidebar(c: &mut Canvas, bundle: &RunBundle, options: Options<'_>) {
-    let frame = &bundle.trace[options.index];
-    let scenario = &bundle.scenario.scenario;
-    let state = match options.playback {
-        Playback::Export => "RECORDED TIME",
-        Playback::Paused => "PAUSED",
-        Playback::Playing if options.index + 1 == bundle.trace.len() => "END OF TRACE",
-        Playback::Playing => "PLAYING",
-    };
-    c.text((940.0, 112.0), state, 10, MUTED, 230.0);
-    c.text(
-        (940.0, 157.0),
-        &format!("{:.2}", frame.time_s),
-        36,
-        INK,
-        220.0,
-    );
-    c.text((1148.0, 156.0), "s", 16, MUTED, 30.0);
-    c.text(
-        (940.0, 185.0),
-        &format!(
-            "Frame {} / {} · step {}",
-            options.index + 1,
-            bundle.trace.len(),
-            frame.step
-        ),
-        12,
-        MUTED,
-        236.0,
-    );
-    c.line((940.0, 209.5), (1176.0, 209.5), BORDER, 1.0);
-    let states = state_counts(frame);
-    c.text(
-        (940.0, 240.0),
-        &format!(
-            "{} {} · all surfaces",
-            frame.agents.len(),
-            if frame.agents.len() == 1 {
-                "person"
-            } else {
-                "people"
+
+fn timeline(c: &mut Canvas, bundle: &RunBundle, options: Options<'_>) {
+    let start = bundle.trace[0].time_s;
+    let end = bundle.trace.last().expect("non-empty trace").time_s;
+    let now = bundle.trace[options.index].time_s;
+    chrome::timeline(c, start, end, now, "Time");
+    if let Some(inspection) = options.inspection.filter(|_| options.details) {
+        if let Some(totals) = inspection
+            .person
+            .as_ref()
+            .and_then(|p| p.whole_run.as_ref())
+        {
+            for span in &totals.low_progress {
+                c.line(
+                    (chrome::time_x(start, end, span.start_time_s), 757.0),
+                    (chrome::time_x(start, end, span.end_time_s), 757.0),
+                    WAITING,
+                    4.0,
+                );
             }
-        ),
-        18,
-        INK,
-        236.0,
-    );
-    let on_floor = frame
-        .agents
-        .iter()
-        .filter(|a| a.surface == scenario.surfaces[options.surface].id)
-        .count();
-    c.text(
-        (940.0, 264.0),
-        &format!(
-            "{}: {on_floor} recorded",
-            scenario.surfaces[options.surface].id
-        ),
-        12,
-        MUTED,
-        236.0,
-    );
-    for (i, (label, count, color, hollow)) in [
-        ("Moving", states[0], MOVING, false),
-        ("Waiting", states[1], WAITING, false),
-        ("In transit", states[2], CONNECTOR, false),
-        ("Not released", states[3], INACTIVE, true),
-        ("Completed", states[4], EXIT, true),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        #[allow(clippy::cast_precision_loss)]
-        let y = 296.0 + i as f32 * 27.0;
-        c.circle(
-            (946.0, y - 4.0),
-            4.0,
-            if hollow { None } else { Some(color) },
-            Some((color, 1.0)),
-        );
-        if label == "Waiting" {
-            c.line((944.0, y - 4.0), (948.0, y - 4.0), PAPER, 1.0);
         }
-        if label == "In transit" {
-            c.circle((946.0, y - 4.0), 1.0, Some(PAPER), None);
+        for event in &inspection.events {
+            let x = chrome::time_x(start, end, event.event.time_s);
+            c.line((x, 729.0), (x, 734.0), MUTED, 1.0);
         }
-        c.text((960.0, y), label, 13, INK, 160.0);
-        let count = count.to_string();
-        c.text(
-            (1176.0 - c.text_width(&count, 13), y),
-            &count,
-            13,
-            INK,
-            50.0,
-        );
     }
-    c.line((940.0, 426.5), (1176.0, 426.5), BORDER, 1.0);
-    c.text((940.0, 452.0), "PLAN KEY", 10, MUTED, 230.0);
-    for (i, (glyph, label, color)) in [
-        ("→", "Exit", EXIT),
-        ("=", "Gate", WAITING),
-        ("S R", "Stair · ramp", CONNECTOR),
-        ("E L", "Escalator · lift", CONNECTOR),
-        ("◇", "Waypoint", WAYPOINT),
-        ("○ · ○", "Authored queue slots", QUEUE),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        #[allow(clippy::cast_precision_loss)]
-        let y = 477.0 + i as f32 * 23.0;
-        c.text((940.0, y), glyph, 11, color, 50.0);
-        c.text((999.0, y), label, 12, MUTED, 179.0);
-    }
-    if options.details
-        && !options
-            .watch_status
-            .is_some_and(super::watch_status_is_error)
-    {
-        c.text((940.0, 618.0), "SOURCE BUNDLE", 10, MUTED, 230.0);
-        if options.source == Source::LivePreview {
-            c.text((940.0, 641.0), "Unpersisted watch run", 12, MUTED, 230.0);
-        } else {
-            c.text((940.0, 641.0), &bundle.bundle_hash, 12, INK, 230.0);
-        }
-        c.text(
-            (940.0, 663.0),
-            &format!("Runtime {}", bundle.runtime_version),
-            11,
-            MUTED,
-            230.0,
-        );
-    }
-    c.line((940.0, 696.5), (1176.0, 696.5), BORDER, 1.0);
-    wrapped(
-        c,
-        (940.0, 721.0),
-        "Model output. Symbols and minimum-size people markers are schematic.",
-        232.0,
-        3,
-        MUTED,
-    );
-    c.text(
-        (940.0, 784.0),
-        "Chiyoda / deterministic replay",
-        10,
-        MUTED,
-        236.0,
-    );
 }
 #[must_use]
 pub fn state_counts(frame: &TraceFrame) -> [usize; 5] {
@@ -479,346 +331,6 @@ pub fn state_counts(frame: &TraceFrame) -> [usize; 5] {
     }
     counts
 }
-fn timeline(c: &mut Canvas, bundle: &RunBundle, options: Options<'_>) {
-    c.line((0.0, 696.5), (915.0, 696.5), BORDER, 1.0);
-    let start = bundle.trace[0].time_s;
-    let end = bundle.trace.last().expect("non-empty trace").time_s;
-    let now = bundle.trace[options.index].time_s;
-    #[allow(clippy::cast_possible_truncation)]
-    let progress = if end > start {
-        ((now - start) / (end - start)).clamp(0.0, 1.0) as f32
-    } else {
-        0.0
-    };
-    c.text((32.0, 721.0), &format!("{start:.1} s"), 11, MUTED, 120.0);
-    let end_label = format!("{end:.1} s");
-    c.text(
-        (884.0 - c.text_width(&end_label, 11), 721.0),
-        &end_label,
-        11,
-        MUTED,
-        160.0,
-    );
-    c.line((32.0, 737.0), (884.0, 737.0), BORDER, 3.0);
-    c.line((32.0, 737.0), (32.0 + 852.0 * progress, 737.0), MOVING, 3.0);
-    if let Some(inspection) = options.inspection.filter(|_| options.details) {
-        #[allow(clippy::cast_possible_truncation)]
-        let x_at = |time: f64| {
-            32.0 + 852.0 * ((time - start) / (end - start).max(f64::EPSILON)).clamp(0.0, 1.0) as f32
-        };
-        if let Some(totals) = inspection
-            .person
-            .as_ref()
-            .and_then(|p| p.whole_run.as_ref())
-        {
-            for span in &totals.low_progress {
-                c.line(
-                    (x_at(span.start_time_s), 748.0),
-                    (x_at(span.end_time_s), 748.0),
-                    WAITING,
-                    4.0,
-                );
-            }
-        }
-        for event in &inspection.events {
-            let x = x_at(event.event.time_s);
-            c.line((x, 729.0), (x, 734.0), MUTED, 1.0);
-        }
-        c.text(
-            (210.0, 721.0),
-            if inspection
-                .person
-                .as_ref()
-                .is_some_and(|p| p.whole_run.is_some())
-            {
-                "Selected person · amber: whole-run low progress · ticks: retained events"
-            } else if inspection.person.is_some() {
-                "Selected person · detailed accounting unavailable · ticks: retained events"
-            } else {
-                "Selected resource · ticks: retained events through frame"
-            },
-            10,
-            MUTED,
-            570.0,
-        );
-    }
-    c.circle(
-        (32.0 + 852.0 * progress, 737.0),
-        4.5,
-        Some(MOVING),
-        Some((PAPER, 1.5)),
-    );
-    let footer = if options.playback == Playback::Export {
-        format!(
-            "Recorded trace  /  {} frames  /  {:.2}× playback  /  exact recorded frames",
-            bundle.trace.len(),
-            options.speed
-        )
-    } else {
-        format!(
-            "Click inspect · wheel zoom · right-drag pan · timeline seek · Space play · [ ] speed ({:.2}×) · R fit",
-            options.speed
-        )
-    };
-    c.text((32.0, 777.0), &footer, 12, MUTED, 852.0);
-}
-fn wrapped(c: &mut Canvas, at: (f32, f32), text: &str, width: f32, max_lines: usize, color: u32) {
-    let mut lines = vec![String::new()];
-    for word in text.split_whitespace() {
-        let last = lines.last_mut().unwrap();
-        let next = if last.is_empty() {
-            word.to_owned()
-        } else {
-            format!("{last} {word}")
-        };
-        if c.text_width(&next, 12) > width && !last.is_empty() {
-            lines.push(word.to_owned());
-        } else {
-            *last = next;
-        }
-    }
-    for (i, line) in lines.iter().take(max_lines).enumerate() {
-        let line = if i + 1 == max_lines && lines.len() > max_lines {
-            format!("{line} …")
-        } else {
-            line.clone()
-        };
-        #[allow(clippy::cast_precision_loss)]
-        let y = at.1 + i as f32 * 18.0;
-        c.text((at.0, y), &line, 12, color, width);
-    }
-}
-
-#[allow(clippy::too_many_lines)] // fixed inspector sections clearly separate frame state from whole-run evidence
-fn inspector(
-    c: &mut Canvas,
-    bundle: &RunBundle,
-    options: Options<'_>,
-    inspection: &crate::inspection::Inspection,
-) {
-    sidebar(c, bundle, options);
-    c.rect([936.0, 220.0, 248.0, 471.0], PAPER);
-    let label = if inspection.person.is_some() {
-        "PERSON"
-    } else {
-        "RESOURCE"
-    };
-    c.text((940.0, 240.0), label, 10, MUTED, 236.0);
-    c.text((940.0, 265.0), inspection.selection.id(), 17, INK, 236.0);
-    if let Some(person) = &inspection.person {
-        c.text(
-            (940.0, 289.0),
-            &format!("{:?}", person.snapshot.state),
-            13,
-            MOVING,
-            236.0,
-        );
-        c.text(
-            (940.0, 311.0),
-            &format!("On {}", person.snapshot.surface),
-            12,
-            MUTED,
-            236.0,
-        );
-        c.text(
-            (940.0, 333.0),
-            &format!("Authored goal: {}", person.authored_destination),
-            12,
-            INK,
-            236.0,
-        );
-        c.line((940.0, 350.0), (1176.0, 350.0), BORDER, 1.0);
-        c.text((940.0, 373.0), "WHOLE-RUN EVIDENCE", 10, MUTED, 236.0);
-        if let Some(totals) = &person.whole_run {
-            for (i, text) in [
-                format!("Walked {:.2} m", totals.walking_distance_m),
-                format!("Moving {:.2} s", totals.time.moving_s),
-                format!("Service waits {:.2} s", totals.time.service_wait_s()),
-                format!("Authored pauses {:.2} s", totals.time.waypoint_pause_s),
-                format!("Low progress: {} spans", totals.low_progress_total),
-            ]
-            .iter()
-            .enumerate()
-            {
-                #[allow(clippy::cast_precision_loss)]
-                let y = 397.0 + i as f32 * 21.0;
-                c.text((940.0, y), text, 12, INK, 236.0);
-            }
-            if let Some(span) = totals.low_progress.last() {
-                c.text(
-                    (940.0, 500.0),
-                    &format!(
-                        "Retained span {:.2}–{:.2} s",
-                        span.start_time_s, span.end_time_s
-                    ),
-                    11,
-                    MUTED,
-                    236.0,
-                );
-            }
-        } else if let crate::inspection::Availability::Unavailable { reason } =
-            &inspection.diagnostics
-        {
-            wrapped(c, (940.0, 397.0), reason, 236.0, 5, MUTED);
-        }
-    }
-    if let Some(resource) = &inspection.resource {
-        c.text(
-            (940.0, 290.0),
-            "Queue-entry history through frame",
-            12,
-            MUTED,
-            236.0,
-        );
-        c.text(
-            (940.0, 315.0),
-            &format!(
-                "{} {} · {} {}",
-                resource.queue_entries_through_frame,
-                if resource.queue_entries_through_frame == 1 {
-                    "entry"
-                } else {
-                    "entries"
-                },
-                resource.entrants_total,
-                if resource.entrants_total == 1 {
-                    "person"
-                } else {
-                    "people"
-                },
-            ),
-            14,
-            INK,
-            236.0,
-        );
-        c.line((940.0, 350.0), (1176.0, 350.0), BORDER, 1.0);
-        c.text((940.0, 373.0), "WHOLE-RUN QUEUE AUDIT", 10, MUTED, 236.0);
-        if let Some(audit) = &resource.whole_run_queue_audit {
-            c.text(
-                (940.0, 399.0),
-                &format!(
-                    "Peak waiting: {} {}",
-                    audit.peak_waiting_agents,
-                    if audit.peak_waiting_agents == 1 {
-                        "person"
-                    } else {
-                        "people"
-                    }
-                ),
-                13,
-                INK,
-                236.0,
-            );
-            c.text(
-                (940.0, 423.0),
-                &format!("Wait: {:.2} agent-s", audit.cumulative_wait_agent_seconds),
-                13,
-                INK,
-                236.0,
-            );
-            c.text(
-                (940.0, 447.0),
-                &format!("Ever queued: {}", audit.ever_queued_agents),
-                12,
-                INK,
-                236.0,
-            );
-        } else {
-            wrapped(
-                c,
-                (940.0, 399.0),
-                "No per-resource queue audit is recorded for this resource.",
-                236.0,
-                3,
-                MUTED,
-            );
-        }
-        c.text(
-            (940.0, 478.0),
-            &if resource.entrants_total > resource.entrants_through_frame.len() {
-                format!(
-                    "Rings: {} / {} historical entrants",
-                    resource.entrants_through_frame.len(),
-                    resource.entrants_total
-                )
-            } else {
-                "Rings mark historical entrants.".to_owned()
-            },
-            11,
-            WAITING,
-            236.0,
-        );
-    }
-    c.line((940.0, 514.0), (1176.0, 514.0), BORDER, 1.0);
-    c.text(
-        (940.0, 536.0),
-        "EVENTS THROUGH THIS FRAME",
-        10,
-        MUTED,
-        236.0,
-    );
-    let mut displayed: Vec<&chiyoda_core::bundle::RunEvent> = vec![];
-    if let Some(route) = inspection
-        .person
-        .as_ref()
-        .and_then(|p| p.latest_route_event.as_ref())
-    {
-        displayed.push(route);
-    }
-    if let Some(change) = inspection
-        .resource
-        .as_ref()
-        .and_then(|r| r.latest_availability_event.as_ref())
-    {
-        displayed.push(change);
-    }
-
-    for event in &inspection.events {
-        if !displayed.contains(&&event.event) {
-            displayed.push(&event.event);
-        }
-        if displayed.len() >= 2 {
-            break;
-        }
-    }
-    let event_limit = if options
-        .watch_status
-        .is_some_and(crate::watch_status_is_error)
-    {
-        1
-    } else {
-        2
-    };
-    for (i, event) in displayed.into_iter().take(event_limit).enumerate() {
-        #[allow(clippy::cast_precision_loss)]
-        let y = 562.0 + i as f32 * 47.0;
-        c.text(
-            (940.0, y),
-            &format!("{:.2} s · {}", event.time_s, event.kind),
-            11,
-            INK,
-            236.0,
-        );
-        c.text((940.0, y + 18.0), &event.detail, 11, MUTED, 236.0);
-    }
-    if inspection.events.is_empty() {
-        c.text(
-            (940.0, 562.0),
-            "No recorded events through frame.",
-            12,
-            MUTED,
-            236.0,
-        );
-    }
-    c.text(
-        (940.0, 660.0),
-        "Click empty space to clear.",
-        11,
-        MUTED,
-        236.0,
-    );
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -880,10 +392,10 @@ mod tests {
                 ..options
             },
         );
-        for y in 162..634 {
+        for y in 82..552 {
             assert_eq!(
-                &valid[y * WIDTH + 32..y * WIDTH + 884],
-                &failed[y * WIDTH + 32..y * WIDTH + 884]
+                &valid[y * WIDTH + 32..y * WIDTH + 1168],
+                &failed[y * WIDTH + 32..y * WIDTH + 1168]
             );
         }
         assert_ne!(valid, failed);
@@ -930,10 +442,87 @@ mod tests {
         for (index, color) in buffer.iter().enumerate() {
             let x = index % WIDTH;
             let y = index / WIDTH;
-            if !(32..884).contains(&x) || !(162..634).contains(&y) {
+            if !(32..1168).contains(&x) || !(82..552).contains(&y) {
                 assert_eq!(*color, BACKGROUND);
             }
         }
+    }
+
+    #[test]
+    fn inspector_is_contextual_and_clearing_restores_the_full_plan() {
+        use crate::inspection::{EvidenceIndex, Selection};
+        let bundle = fixture();
+        let evidence = EvidenceIndex::new(&bundle);
+        let inspection = evidence
+            .inspect(
+                &bundle,
+                0,
+                &Selection::Agent {
+                    id: bundle.trace[0].agents[0].id.clone(),
+                },
+                None,
+            )
+            .unwrap();
+        let mut renderer = Renderer::new();
+        let mut plain = vec![0; WIDTH * HEIGHT];
+        let mut inspected = plain.clone();
+        renderer.render(&mut plain, Some(&bundle), Options::default());
+        renderer.render(
+            &mut inspected,
+            Some(&bundle),
+            Options {
+                inspection: Some(&inspection),
+                ..Options::default()
+            },
+        );
+        assert_eq!(plain[100 * WIDTH + 1185], BACKGROUND);
+        assert_eq!(inspected[100 * WIDTH + 1185], PAPER);
+        capture("person-inspector.png", &inspected);
+        renderer.render(
+            &mut inspected,
+            Some(&bundle),
+            Options {
+                inspection: Some(&inspection),
+                details: false,
+                ..Options::default()
+            },
+        );
+        assert_eq!(inspected[100 * WIDTH + 1185], BACKGROUND);
+        renderer.render(&mut inspected, Some(&bundle), Options::default());
+        assert_eq!(plain, inspected);
+    }
+
+    #[test]
+    fn single_and_comparison_share_the_same_timeline_coordinates() {
+        use crate::{comparison, inspection::EvidenceIndex, navigation::CameraControl};
+        let bundle = fixture();
+        let index = EvidenceIndex::new(&bundle);
+        let request = comparison::ComparisonRequest {
+            time_s: bundle.trace[1].time_s,
+            surface: None,
+            view: ViewMode::Surface,
+            selection: None,
+            baseline_label: None,
+            candidate_label: None,
+            camera: CameraControl::default(),
+        };
+        let evidence = comparison::prepare(&bundle, &bundle, &request, &index, &index).unwrap();
+        let mut renderer = Renderer::new();
+        let mut single = vec![0; WIDTH * HEIGHT];
+        let mut paired = single.clone();
+        renderer.render(
+            &mut single,
+            Some(&bundle),
+            Options {
+                index: 1,
+                ..Options::default()
+            },
+        );
+        renderer.render_comparison(&mut paired, &bundle, &bundle, &request, &evidence);
+        assert_eq!(
+            &single[704 * WIDTH..754 * WIDTH],
+            &paired[704 * WIDTH..754 * WIDTH]
+        );
     }
 
     #[test]

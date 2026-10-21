@@ -14,7 +14,7 @@ use chiyoda_core::{
     model::{ConnectorKind, Point3, PortalResource, Scenario, Surface},
 };
 
-pub const VIEWPORT: [f32; 4] = [32.0, 162.0, 852.0, 472.0];
+pub const VIEWPORT: [f32; 4] = [32.0, 82.0, 1136.0, 470.0];
 #[derive(Clone, Copy, Debug, serde::Serialize)]
 pub struct WorldBounds {
     pub min_x: f64,

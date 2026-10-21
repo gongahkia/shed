@@ -6,7 +6,7 @@ use chiyoda_replay::{
     inspection::{ResourceKind, Selection},
     load_watch_scenario,
     navigation::CameraControl,
-    render::{Camera, MapConfig, pick},
+    render::{COMPARISON_VIEWPORTS, Camera, MapConfig, pick, single_viewport},
 };
 use std::{
     fs,
@@ -90,48 +90,57 @@ fn evidence_rejects_tampered_legacy_unknown_steps_and_invalid_cameras() {
 #[test]
 fn transformed_hit_testing_and_shift_resource_preference_share_the_drawn_camera() {
     let bundle = fixture();
-    let map = MapConfig {
-        camera: CameraControl {
-            zoom: 1.5,
-            pan_x_pixels: 100.0,
-            pan_y_pixels: 0.0,
-        },
-        ..MapConfig::default()
-    };
-    let scenario = &bundle.scenario.scenario;
-    let camera = Camera::controlled(scenario, &scenario.surfaces[0], ViewMode::Surface, map);
-    let person = &bundle.trace[0].agents[0];
-    let at = camera.point(chiyoda_core::model::Point3 {
-        x_m: person.x_m,
-        y_m: person.y_m,
-        z_m: person.z_m,
-    });
-    assert_eq!(
-        pick(&bundle, 0, 0, ViewMode::Surface, map, at, false),
-        Some(Selection::Agent {
-            id: person.id.clone()
-        })
-    );
-    let at = camera.point(scenario.exits[0].at);
-    assert_eq!(
-        pick(&bundle, 0, 0, ViewMode::Surface, map, at, true),
-        Some(Selection::Resource {
-            resource_kind: ResourceKind::Exit,
-            id: "street".into()
-        })
-    );
-    assert!(
-        pick(
-            &bundle,
-            0,
-            0,
-            ViewMode::Surface,
-            map,
-            (1200.0, 800.0),
-            false
-        )
-        .is_none()
-    );
+    for viewport in [
+        single_viewport(false),
+        single_viewport(true),
+        COMPARISON_VIEWPORTS[0],
+        COMPARISON_VIEWPORTS[1],
+    ] {
+        let map = MapConfig {
+            viewport,
+            camera: CameraControl {
+                zoom: 1.5,
+                // Keep both targets visible in the narrower comparison panes.
+                pan_x_pixels: 30.0,
+                pan_y_pixels: 0.0,
+            },
+            ..MapConfig::default()
+        };
+        let scenario = &bundle.scenario.scenario;
+        let camera = Camera::controlled(scenario, &scenario.surfaces[0], ViewMode::Surface, map);
+        let person = &bundle.trace[0].agents[0];
+        let at = camera.point(chiyoda_core::model::Point3 {
+            x_m: person.x_m,
+            y_m: person.y_m,
+            z_m: person.z_m,
+        });
+        assert_eq!(
+            pick(&bundle, 0, 0, ViewMode::Surface, map, at, false),
+            Some(Selection::Agent {
+                id: person.id.clone()
+            })
+        );
+        let at = camera.point(scenario.exits[0].at);
+        assert_eq!(
+            pick(&bundle, 0, 0, ViewMode::Surface, map, at, true),
+            Some(Selection::Resource {
+                resource_kind: ResourceKind::Exit,
+                id: "street".into()
+            })
+        );
+        assert!(
+            pick(
+                &bundle,
+                0,
+                0,
+                ViewMode::Surface,
+                map,
+                (1200.0, 800.0),
+                false
+            )
+            .is_none()
+        );
+    }
 }
 #[test]
 fn failed_creation_never_deletes_an_existing_artifact_and_uncommitted_files_are_removed() {

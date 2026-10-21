@@ -281,7 +281,7 @@ pub(super) fn open(
             let viewport = if candidate.is_some() {
                 render::COMPARISON_VIEWPORTS[0]
             } else {
-                render::VIEWPORT
+                render::single_viewport(details && selected.is_some())
             };
             let mut under_mouse = map(controls);
             under_mouse.viewport = viewport;
@@ -304,14 +304,11 @@ pub(super) fn open(
             }
             let left = window.get_mouse_down(MouseButton::Left);
             if let Some(at) = mouse {
-                let timeline_right = if candidate.is_some() { 1168.0 } else { 884.0 };
-                if left
-                    && (32.0..=timeline_right).contains(&at.0)
-                    && (724.0..=752.0).contains(&at.1)
-                {
+                let [timeline_left, _, timeline_width, _] = render::TIMELINE_BOUNDS;
+                if left && inside(at, render::TIMELINE_BOUNDS) {
                     if let Some((start, end)) = range {
                         clock.seek_fraction(
-                            f64::from((at.0 - 32.0) / (timeline_right - 32.0)),
+                            f64::from((at.0 - timeline_left) / timeline_width),
                             start,
                             end,
                         );
@@ -392,7 +389,7 @@ pub(super) fn open(
                     let viewport = if candidate.is_some() {
                         render::COMPARISON_VIEWPORTS[0]
                     } else {
-                        render::VIEWPORT
+                        render::single_viewport(details && selected.is_some())
                     };
                     let map = MapConfig {
                         viewport,

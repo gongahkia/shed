@@ -9,6 +9,7 @@ use gif::{Encoder as GifEncoder, Frame as GifFrame, Repeat};
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
 use serde::Serialize;
 use std::{
+    collections::HashMap,
     fs,
     io::Write,
     path::{Path, PathBuf},
@@ -853,13 +854,22 @@ fn write_gif(
         .create_new(true)
         .open(output)
         .with_context(|| format!("creating GIF export {}", output.display()))?;
+    let palette = render::gif_palette();
+    let rgb_palette: Vec<u8> = palette
+        .iter()
+        .flat_map(|color| {
+            let [_, r, g, b] = color.to_be_bytes();
+            [r, g, b]
+        })
+        .collect();
     let mut encoder =
-        GifEncoder::new(file, width, height, &[]).context("creating GIF89a encoder")?;
+        GifEncoder::new(file, width, height, &rgb_palette).context("creating GIF89a encoder")?;
     encoder
         .set_repeat(Repeat::Infinite)
         .context("setting GIF loop policy")?;
     let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
     let mut renderer = render::Renderer::new();
+    let mut color_indices = HashMap::new();
     for (index, delay) in frame_delays_centiseconds.iter().copied().enumerate() {
         renderer.render(
             &mut buffer,
@@ -872,14 +882,8 @@ fn write_gif(
                 ..render::Options::default()
             },
         );
-        let rgb: Vec<u8> = buffer
-            .iter()
-            .flat_map(|color| {
-                let [_, r, g, b] = color.to_be_bytes();
-                [r, g, b]
-            })
-            .collect();
-        let mut frame = GifFrame::from_rgb_speed(width, height, &rgb, 10);
+        let pixels = palette_indices(&buffer, &palette, &mut color_indices);
+        let mut frame = GifFrame::from_indexed_pixels(width, height, pixels, None);
         frame.delay = delay;
         encoder
             .write_frame(&frame)
@@ -887,6 +891,32 @@ fn write_gif(
     }
 
     Ok(())
+}
+
+fn palette_indices(buffer: &[u32], palette: &[u32], cache: &mut HashMap<u32, u8>) -> Vec<u8> {
+    buffer
+        .iter()
+        .map(|color| {
+            *cache.entry(*color).or_insert_with(|| {
+                let index = palette
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, candidate)| {
+                        [16, 8, 0]
+                            .into_iter()
+                            .map(|shift| {
+                                let distance = i64::from((**candidate >> shift) & 255)
+                                    - i64::from((*color >> shift) & 255);
+                                distance * distance
+                            })
+                            .sum::<i64>()
+                    })
+                    .expect("non-empty renderer palette")
+                    .0;
+                u8::try_from(index).expect("renderer palette has at most 256 entries")
+            })
+        })
+        .collect()
 }
 
 fn gif_frame_delays_centiseconds(trace: &[TraceFrame], playback_speed: f64) -> Result<Vec<u16>> {
@@ -1229,10 +1259,15 @@ mod tests {
         let mut decoder = gif::DecodeOptions::new();
         decoder.set_color_output(gif::ColorOutput::RGBA);
         let mut reader = decoder.read_info(gif.as_slice()).unwrap();
+        assert!(reader.global_palette().is_some());
         assert_eq!(usize::from(reader.width()), WIDTH);
         assert_eq!(usize::from(reader.height()), HEIGHT);
         let mut delays = Vec::new();
         while let Some(frame) = reader.read_next_frame().unwrap() {
+            assert!(
+                frame.palette.is_none(),
+                "every frame uses the same global palette"
+            );
             assert_eq!(frame.buffer.len(), WIDTH * HEIGHT * 4);
             delays.push(frame.delay);
         }
@@ -1315,6 +1350,21 @@ mod tests {
         ] {
             assert!(Cli::try_parse_from(args).is_err());
         }
+    }
+
+    #[test]
+    fn gif_palette_preserves_all_semantic_colors_exactly_and_reuses_edge_mappings() {
+        let palette = render::gif_palette();
+        let mut cache = HashMap::new();
+        let indices = palette_indices(&palette, &palette, &mut cache);
+        for (color, index) in palette.iter().zip(indices) {
+            assert_eq!(*color, palette[usize::from(index)]);
+        }
+        let edges = [0x0039_6e91, 0x00df_e1e7];
+        let first = palette_indices(&edges, &palette, &mut cache);
+        let count = cache.len();
+        assert_eq!(first, palette_indices(&edges, &palette, &mut cache));
+        assert_eq!(count, cache.len());
     }
 
     #[test]

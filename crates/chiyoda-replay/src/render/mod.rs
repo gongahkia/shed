@@ -26,6 +26,64 @@ const QUEUE: u32 = 0x009c_8cae;
 const ERROR: u32 = 0x00b4_3435;
 pub const RENDERER_VERSION: &str = "chiyoda.replay-renderer.v2";
 
+/// Exact semantic colours plus coverage ramps for antialiased edges. One palette
+/// is used across the animation so rare status colours cannot drift per frame.
+pub fn gif_palette() -> Vec<u32> {
+    let mut colors = vec![
+        BACKGROUND,
+        PAPER,
+        INK,
+        MUTED,
+        BORDER,
+        GRID,
+        OBSTACLE,
+        OBSTACLE_EDGE,
+        MOVING,
+        WAITING,
+        CONNECTOR,
+        INACTIVE,
+        EXIT,
+        WAYPOINT,
+        QUEUE,
+        ERROR,
+        0x00fc_eced,
+    ];
+    for foreground in [
+        INK,
+        MUTED,
+        OBSTACLE_EDGE,
+        MOVING,
+        WAITING,
+        CONNECTOR,
+        INACTIVE,
+        EXIT,
+        WAYPOINT,
+        QUEUE,
+        ERROR,
+    ] {
+        let steps = if [INK, MUTED].contains(&foreground) {
+            16
+        } else {
+            8
+        };
+        for background in [PAPER, BACKGROUND] {
+            for coverage in 1..steps {
+                let mut color = 0;
+                for shift in [16, 8, 0] {
+                    let a = (foreground >> shift) & 255;
+                    let b = (background >> shift) & 255;
+                    color |= ((a * coverage + b * (steps - coverage) + steps / 2) / steps) << shift;
+                }
+                if !colors.contains(&color) {
+                    colors.push(color);
+                }
+            }
+        }
+    }
+    assert!(colors.len() <= 256, "GIF palette fits its format");
+    colors
+}
+
 #[derive(Debug, Serialize)]
 pub struct Provenance {
     pub version: &'static str,

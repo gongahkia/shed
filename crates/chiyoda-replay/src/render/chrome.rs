@@ -16,10 +16,20 @@ pub(super) struct Outcomes {
 }
 
 pub(super) fn outcomes(c: &mut Canvas, left: f32, width: f32, values: &Outcomes) {
+    let transit = if values.states[2] > 0 {
+        format!(" · {} in transit", values.states[2])
+    } else {
+        String::new()
+    };
+    let unreleased = if values.states[3] > 0 {
+        format!(" · {} unreleased", values.states[3])
+    } else {
+        String::new()
+    };
     c.text(
         (left, 609.0),
         &format!(
-            "Recorded frame: {} / {} completed · {} moving · {} waiting",
+            "Recorded frame: {} / {} completed · {} moving · {} waiting{transit}{unreleased}",
             values.states[4], values.population, values.states[0], values.states[1]
         ),
         12,

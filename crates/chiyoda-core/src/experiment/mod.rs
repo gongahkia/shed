@@ -3,8 +3,10 @@
 
 mod changes;
 mod planning;
+mod runner;
 
 pub use planning::{inspect, plan};
+pub use runner::{ArmArtifacts, ExperimentExecution, ExperimentReport, execute};
 
 use crate::{
     CanonicalScenario,

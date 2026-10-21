@@ -326,21 +326,70 @@ pub fn evaluate_json(
             return case;
         }
     };
-    assertions::check(&bundle, &options.thresholds, &mut case.report);
+    finish_bundle(&bundle, options, &mut case.report);
+    case.bundle = Some(bundle);
+    case
+}
+
+/// Recheck saved full-step evidence without executing a new source run.
+/// Optional reconstruction independently checks the recorded dynamics.
+#[must_use]
+pub fn evaluate_bundle(name: &str, bundle: &RunBundle, options: &EvaluationOptions) -> CaseReport {
+    let mut report = CaseReport::new(name.into(), None, ExpectedReachability::Reachable);
+    if let Err(error) = options.thresholds.validate() {
+        report.fail("configuration", error);
+        return report;
+    }
+    if !bundle.verifies_hash()
+        || bundle.scenario_hash != canonical_hash(&bundle.scenario)
+        || bundle.scenario.check_schema().is_err()
+    {
+        report.fail(
+            "integrity",
+            "bundle or current scenario hash/schema is invalid",
+        );
+        return report;
+    }
+    report.scenario_hash = Some(bundle.scenario_hash.clone());
+    for connector in &bundle.scenario.scenario.connectors {
+        *report
+            .coverage
+            .connector_kinds
+            .entry(connector.kind().as_str().into())
+            .or_default() += 1;
+    }
+    match reachability::check(&bundle.scenario.scenario) {
+        Ok(reachability) => {
+            if !reachability.is_reachable() {
+                report.fail(
+                    "reachability",
+                    "one or more declared journeys have no radius-clear geometric path",
+                );
+            }
+            report.reachability = Some(reachability);
+        }
+        Err(error) => report.fail("reachability", error.to_string()),
+    }
+    if report.failures.is_empty() {
+        finish_bundle(bundle, options, &mut report);
+    }
+    report
+}
+
+fn finish_bundle(bundle: &RunBundle, options: &EvaluationOptions, report: &mut CaseReport) {
+    assertions::check(bundle, &options.thresholds, report);
     if options.verify_replay {
-        match verify_run_bundle(&bundle) {
-            Ok(crate::BundleVerification::Reconstructed) => case.report.replay_verified = true,
-            Ok(crate::BundleVerification::HashOnlyLegacy) => case.report.fail(
+        match verify_run_bundle(bundle) {
+            Ok(crate::BundleVerification::Reconstructed) => report.replay_verified = true,
+            Ok(crate::BundleVerification::HashOnlyLegacy) => report.fail(
                 "replay",
                 "current evaluation unexpectedly produced a legacy bundle",
             ),
-            Err(error) => case.report.fail("replay", error.to_string()),
+            Err(error) => report.fail("replay", error.to_string()),
         }
     }
-    case.report.coverage.add_metrics(&bundle.metrics);
-    case.report.metrics = Some(bundle.metrics.clone());
-    case.report.bundle_hash = Some(bundle.bundle_hash.clone());
-    case.report.passed = case.report.failures.is_empty();
-    case.bundle = Some(bundle);
-    case
+    report.coverage.add_metrics(&bundle.metrics);
+    report.metrics = Some(bundle.metrics.clone());
+    report.bundle_hash = Some(bundle.bundle_hash.clone());
+    report.passed = report.failures.is_empty();
 }

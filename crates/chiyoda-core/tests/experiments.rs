@@ -157,3 +157,132 @@ fn versions_ids_and_changes_are_strict_and_machine_discoverable() {
         11
     );
 }
+
+#[test]
+fn identical_control_reproduces_normal_runtime_and_rederives_saved_evidence() {
+    let input = request(vec![]);
+    let plan = experiment::plan(&input).unwrap();
+    let executed = experiment::execute(&input, &plan.input_hash).unwrap();
+    let baseline = executed.artifacts[0].bundle.as_ref().unwrap();
+    let ordinary = chiyoda_core::run(
+        &input.baseline.scenario,
+        chiyoda_core::RunOptions {
+            trace_every_steps: 1,
+        },
+    )
+    .unwrap();
+    assert_eq!(*baseline, ordinary);
+    assert_eq!(baseline, executed.artifacts[1].bundle.as_ref().unwrap());
+    assert!(
+        executed
+            .report
+            .arms
+            .iter()
+            .all(|arm| arm.evaluation.passed && arm.measured)
+    );
+    assert_eq!(executed.report.comparisons[0].matched_people, 1);
+    assert_eq!(
+        executed.report.comparisons[0].agents[0].elapsed_difference_s,
+        Some(0.0)
+    );
+    assert!(
+        executed.report.comparisons[0]
+            .metrics
+            .values()
+            .all(|metric| metric.candidate_minus_baseline == Some(0.0))
+    );
+    executed
+        .report
+        .verify(&input, &executed.artifacts, false)
+        .unwrap();
+    executed
+        .report
+        .verify(&input, &executed.artifacts, true)
+        .unwrap();
+    let roundtrip: experiment::ExperimentReport =
+        serde_json::from_str(&serde_json::to_string(&executed.report).unwrap()).unwrap();
+    roundtrip
+        .verify(&input, &executed.artifacts, false)
+        .unwrap();
+}
+
+#[test]
+fn incomplete_and_threshold_failed_runs_are_visible_without_fabricated_clearance() {
+    let mut input = request(vec![Change::SetExitCapacity {
+        id: "out".into(),
+        capacity_per_s: Some(0.01),
+    }]);
+    input.options.evaluation.thresholds.min_evacuated_fraction = Some(1.0);
+    input.options.evaluation.thresholds.max_clearance_time_s = Some(10.0);
+    let executed =
+        experiment::execute(&input, &experiment::plan(&input).unwrap().input_hash).unwrap();
+    assert!(executed.report.arms[0].evaluation.passed);
+    assert!(!executed.report.arms[1].evaluation.passed);
+    assert!(executed.report.arms[1].measured);
+    let comparison = &executed.report.comparisons[0];
+    assert_eq!(
+        comparison.metrics["completed_fraction"].candidate,
+        Some(0.0)
+    );
+    assert!(comparison.metrics["clearance_time_s"].baseline.is_some());
+    assert_eq!(comparison.metrics["clearance_time_s"].candidate, None);
+    assert_eq!(
+        comparison.metrics["clearance_time_s"].candidate_minus_baseline,
+        None
+    );
+    assert_eq!(comparison.both_completed, 0);
+    assert_eq!(comparison.agents[0].elapsed_difference_s, None);
+    assert!(
+        executed.report.arms[1]
+            .findings
+            .iter()
+            .any(|finding| finding.code == "observed_service_wait")
+    );
+    executed
+        .report
+        .verify(&input, &executed.artifacts, true)
+        .unwrap();
+}
+
+#[test]
+fn changed_demand_disables_person_pairs_and_stale_inputs_cannot_execute() {
+    let mut input = request(vec![Change::SetGroupCount {
+        id: "person".into(),
+        count: 2,
+    }]);
+    let hash = experiment::plan(&input).unwrap().input_hash;
+    input.options.max_agent_steps -= 1;
+    assert_eq!(
+        experiment::execute(&input, &hash).unwrap_err().code,
+        "stale_plan"
+    );
+    let executed =
+        experiment::execute(&input, &experiment::plan(&input).unwrap().input_hash).unwrap();
+    assert_eq!(executed.report.comparisons[0].matched_people, 0);
+    assert!(executed.report.comparisons[0].agents.is_empty());
+    assert_eq!(executed.report.arms[1].observations["people"], 2.0);
+}
+
+#[test]
+fn resealed_conclusions_and_cross_arm_evidence_do_not_verify() {
+    let mut input = request(vec![]);
+    input.options.evaluation.verify_replay = false;
+    let mut executed =
+        experiment::execute(&input, &experiment::plan(&input).unwrap().input_hash).unwrap();
+    executed
+        .report
+        .verify(&input, &executed.artifacts, true)
+        .unwrap();
+    assert!(!executed.report.arms[0].evaluation.replay_verified);
+    executed.report.comparisons[0].agents[0].elapsed_difference_s = Some(-100.0);
+    executed.report.report_hash.clear();
+    executed.report.report_hash = chiyoda_core::bundle::canonical_hash(&executed.report);
+    assert_eq!(
+        executed
+            .report
+            .verify(&input, &executed.artifacts, false)
+            .unwrap_err()
+            .code,
+        "integrity"
+    );
+}

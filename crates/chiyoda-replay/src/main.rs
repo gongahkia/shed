@@ -57,7 +57,7 @@ struct Cli {
     #[arg(long, requires = "bundle", conflicts_with = "export_gif")]
     resource: Option<String>,
     /// First recorded step in a selected person's trail.
-    #[arg(long, requires = "agent")]
+    #[arg(long, requires = "agent", conflicts_with = "compare")]
     trail_start_step: Option<u64>,
     /// Compare another reconstructed run using the same camera and simulation clock.
     #[arg(long, requires="bundle", conflicts_with_all=["watch","export_gif","allow_legacy_hash_only"])]

@@ -145,6 +145,17 @@ fn cli_rejects_bad_selectors_and_export_combinations_before_creating_artifacts()
             "bad.png",
         ],
         vec!["a.json", "--zoom", "33", "--export-png", "bad.png"],
+        vec![
+            "a.json",
+            "--compare",
+            "b.json",
+            "--agent",
+            "passengers:0",
+            "--trail-start-step",
+            "0",
+            "--export-png",
+            "bad.png",
+        ],
     ] {
         let output = run(&directory, &args);
         assert!(!output.status.success(), "{args:?}");

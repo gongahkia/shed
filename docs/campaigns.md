@@ -273,6 +273,10 @@ Default verification additionally checks image/sidecar hashes and their exact
 source/request links. With `replay: true`, it reconstructs saved runs and
 re-renders the annotated pixels and measurements. A recorded runtime failure
 without sufficient evidence requires explicit replay to substantiate it.
+Exact image reconstruction also requires the renderer version and font hash
+recorded in its sidecar. An older presentation returns `renderer_mismatch`
+rather than being described as corrupt simulation evidence; default verification
+can still check its source/hash links without re-rendering the pixels.
 Image export failures remain recorded failures; a verified campaign can report
 `all_requested_exports_succeeded: false`. This distinction prevents tool success
 from being mistaken for a successful intervention or a complete image set.

@@ -1,5 +1,33 @@
 # Inspectable replay review
 
+## Renderer 4 layout consistency
+
+The single-run and comparison modes now share headings, outcome summaries and
+one full-width timeline with a time label attached to its playhead. Single runs
+open as a full-width plan; selecting a person or resource opens its inspector.
+Clearing selection or hiding the inspector restores the full plan. The older
+branding bar, permanent dashboard, source panel and keyboard-help footer have
+been removed. This applies to authored/generated scenarios, native playback,
+plain/annotated PNGs, GIFs and agent image exports.
+
+Verification passed **41 replay tests and 14 agent/MCP tests**, formatting,
+workspace Clippy and locked release builds of both binaries. The native macOS
+driver passed **25 checks in each mode**, using the optimized test binary: the
+52-person interchange exercised contextual inspection, inspector hide/restore,
+resource selection, pan, zoom, floor/projection changes, seeking and playback;
+the station comparison exercised both panels and their shared controls.
+The driver restores the target window's focus before global mouse events.
+
+Fresh floor-plan, overview, person and comparison PNGs were inspected. The
+comparison PNG remains byte-identical to the preceding cleaned layout, with
+the same measured evidence. Release CLI evidence matches the viewer's PNG
+bytes. Older exports retain their recorded renderer revision: source/hash
+verification remains available, while an exact-pixel request with a different
+renderer returns `renderer_mismatch`. Canonical scenarios, runs and simulation
+semantics are unchanged. README.md was not edited.
+
+The review below records the preceding implementation and its verification.
+
 Full review, 21 October 2026. Scope: person/resource inspection, annotated PNG
 exports, MCP image results, native navigation, synchronized comparisons and
 crowd playback. This extends the [presentation review](replay-visual-review.md)

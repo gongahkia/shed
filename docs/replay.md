@@ -74,8 +74,9 @@ included in full reconstruction; see [local knowledge](knowledge.md).
 - Tab cycles surfaces in their authored declaration order. In comparisons,
   only IDs present in both runs are available.
 - V toggles the selected-surface 2D view and all-surface isometric overview.
-- D toggles the inspector/source details in the fixed sidebar. Playback time,
-  frame, step, counts, and the plan key remain visible.
+- D toggles the selected person's or resource's inspector. The single-run plan
+  uses the full width when no inspector is open. Clearing selection restores
+  that full plan; time, recorded step and outcome counts remain visible.
 - P writes the current framebuffer as a PNG under `--snapshot-dir` (default
   `out/chiyoda-replay`). Existing snapshots are preserved. For evidence with
   provenance, use `--export-png` instead.
@@ -244,10 +245,17 @@ $ chiyoda-replay out/showcase/run.json --surface concourse --at-step 100 --view 
 ## Visual presentation
 
 The viewer uses one 1200×800 CPU vector renderer for native playback, PNGs,
-and GIFs. The plan, run sidebar, and timeline occupy separate regions. Spatial
-layers are clipped to the plan viewport, including markers outside the camera
-extent. Watch failures retain the last valid plan and identify the failed
-revision below it and in the sidebar.
+and GIFs. Single-run and comparison views share compact headings, outcome rows
+and the same full-width timeline. The time label follows the playhead and stays
+inside the timeline at either end. A single run uses the full plan width until
+a person or resource is selected; its contextual inspector then opens beside
+the plan. Branding banners, permanent dashboard legends and keyboard-help
+footers are omitted in both modes.
+
+Spatial layers are clipped to the current plan viewport, including markers
+outside the camera extent. Drawing, mouse selection, zoom and focus use the
+same geometry when the inspector opens or closes. Watch failures retain the
+last valid plan and identify the failed revision below it.
 
 Floor plans preserve metric proportions with a uniform scale, a quiet metric
 grid, and a scale bar. The camera follows authored surface bounds rather than
@@ -263,10 +271,13 @@ Resource labels are placed where space permits; dense plans may omit a label
 while retaining its symbol. Connector symbols identify stairs (`S`), ramps
 (`R`), escalators (`E`), and lifts (`L`).
 
-The header distinguishes reconstructed bundles, legacy hash-only artifacts,
-and unpersisted live previews. Export sidecars record the renderer version and
-bundled font hash. The renderer is a derived presentation contract; changes to
-its pixels do not change canonical simulation evidence.
+The compact subtitle identifies legacy hash-only artifacts and unpersisted live
+previews. Export sidecars record the renderer version and bundled font hash.
+The unified presentation uses renderer revision **4**. Previously exported
+images keep their recorded revision; their source/hash checks remain available.
+Exact pixel reconstruction requires the recorded renderer revision. The
+renderer is a derived presentation contract; changing its pixels does not change
+canonical simulation evidence.
 
 ## Rendering contract
 
@@ -280,8 +291,10 @@ hollow grey, and completed journeys hollow green. Moving people use filled
 circles; waits carry a small horizontal mark and transit markers a white centre.
 Inactive records are drawn first so an unreleased or completed record does not
 cover an active person at a shared position. Counts always include every
-recorded person, including inactive records. The sidebar reports all-surface
-state totals separately from the selected-surface count.
+recorded person, including inactive records. Outcome rows report all-surface
+counts and distinguish the displayed frame from the whole run.
+In-transit and unreleased people are included in the frame summary whenever
+present, so multi-floor transfers and staggered arrivals remain visible.
 
 People markers follow their authored group radius, with a 2.5-pixel minimum for
 legibility. Symbol outlines, minimum-size markers, and resource glyphs are

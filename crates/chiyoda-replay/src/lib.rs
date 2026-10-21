@@ -1,4 +1,5 @@
 //! Shared replay rendering and recorded-evidence access for native and agent clients.
+pub mod evidence;
 pub mod export;
 pub mod inspection;
 pub mod navigation;
@@ -29,6 +30,7 @@ pub fn render_bundle_frame(
 
 #[derive(
     Debug,
+    Default,
     Clone,
     Copy,
     PartialEq,
@@ -40,6 +42,7 @@ pub fn render_bundle_frame(
 )]
 #[serde(rename_all = "snake_case")]
 pub enum ViewMode {
+    #[default]
     Surface,
     Overview,
 }

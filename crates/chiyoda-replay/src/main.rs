@@ -332,6 +332,7 @@ fn replay(
                 speed,
                 details: details_open,
                 watch_status: watch.as_ref().map(WatchController::status),
+                ..render::Options::default()
             },
         );
         window.set_title(&window_title(

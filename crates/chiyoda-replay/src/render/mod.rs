@@ -1,6 +1,7 @@
 //! Shared native/headless presentation. Rendering never changes a scenario or trace.
 mod canvas;
-mod scene;
+pub(crate) mod scene;
+pub use scene::{Camera, MapConfig, VIEWPORT, WorldBounds, pick};
 
 use super::{HEIGHT, ViewMode, WIDTH};
 use canvas::Canvas;
@@ -22,9 +23,10 @@ const CONNECTOR: u32 = 0x0069_589b;
 const INACTIVE: u32 = 0x0087_95a3;
 const EXIT: u32 = 0x0023_7c68;
 const WAYPOINT: u32 = 0x0074_6b8b;
+const TRAIL: u32 = 0x00a2_bfe2;
 const QUEUE: u32 = 0x009c_8cae;
 const ERROR: u32 = 0x00b4_3435;
-pub const RENDERER_VERSION: &str = "chiyoda.replay-renderer.v2";
+pub const RENDERER_VERSION: &str = "chiyoda.replay-renderer.v3";
 
 /// Exact semantic colours plus coverage ramps for antialiased edges. One palette
 /// is used across the animation so rare status colours cannot drift per frame.
@@ -46,6 +48,7 @@ pub fn gif_palette() -> Vec<u32> {
         EXIT,
         WAYPOINT,
         QUEUE,
+        TRAIL,
         ERROR,
         0x00fc_eced,
     ];
@@ -60,6 +63,7 @@ pub fn gif_palette() -> Vec<u32> {
         EXIT,
         WAYPOINT,
         QUEUE,
+        TRAIL,
         ERROR,
     ] {
         let steps = if [INK, MUTED].contains(&foreground) {
@@ -129,6 +133,8 @@ pub struct Options<'a> {
     pub speed: f64,
     pub details: bool,
     pub watch_status: Option<&'a str>,
+    pub map: MapConfig,
+    pub inspection: Option<&'a crate::inspection::Inspection>,
 }
 impl Default for Options<'_> {
     fn default() -> Self {
@@ -141,6 +147,8 @@ impl Default for Options<'_> {
             speed: 1.0,
             details: true,
             watch_status: None,
+            map: MapConfig::default(),
+            inspection: None,
         }
     }
 }
@@ -230,8 +238,22 @@ impl Renderer {
                 )
             };
             c.text((32.0, 141.0), &subtitle, 12, MUTED, 790.0);
-            scene::draw(c, scenario, frame, surface, options.view);
-            sidebar(c, bundle, options);
+            scene::draw(
+                c,
+                scenario,
+                frame,
+                surface,
+                options.view,
+                options.map,
+                options.inspection,
+            );
+            if options.details
+                && let Some(inspection) = options.inspection
+            {
+                inspector(c, bundle, options, inspection);
+            } else {
+                sidebar(c, bundle, options);
+            }
             timeline(c, bundle, options);
         } else {
             c.text(
@@ -490,7 +512,7 @@ fn timeline(c: &mut Canvas, bundle: &RunBundle, options: Options<'_>) {
         )
     } else {
         format!(
-            "Space  play / pause     ← →  frame     Tab  floor     V  projection     D  details     P  PNG     ·  {:.2}×",
+            "Click inspect · wheel zoom · right-drag pan · timeline seek · Space play · [ ] speed ({:.2}×) · R fit",
             options.speed
         )
     };
@@ -521,6 +543,181 @@ fn wrapped(c: &mut Canvas, at: (f32, f32), text: &str, width: f32, max_lines: us
         let y = at.1 + i as f32 * 18.0;
         c.text((at.0, y), &line, 12, color, width);
     }
+}
+
+#[allow(clippy::too_many_lines)] // fixed inspector sections clearly separate frame state from whole-run evidence
+fn inspector(
+    c: &mut Canvas,
+    bundle: &RunBundle,
+    options: Options<'_>,
+    inspection: &crate::inspection::Inspection,
+) {
+    sidebar(c, bundle, options);
+    c.rect([936.0, 220.0, 248.0, 471.0], PAPER);
+    let label = if inspection.person.is_some() {
+        "PERSON"
+    } else {
+        "RESOURCE"
+    };
+    c.text((940.0, 240.0), label, 10, MUTED, 236.0);
+    c.text((940.0, 265.0), inspection.selection.id(), 17, INK, 236.0);
+    if let Some(person) = &inspection.person {
+        c.text(
+            (940.0, 289.0),
+            &format!("{:?}", person.snapshot.state),
+            13,
+            MOVING,
+            236.0,
+        );
+        c.text(
+            (940.0, 311.0),
+            &format!("On {}", person.snapshot.surface),
+            12,
+            MUTED,
+            236.0,
+        );
+        c.text(
+            (940.0, 333.0),
+            &format!("Authored goal: {}", person.authored_destination),
+            12,
+            INK,
+            236.0,
+        );
+        c.line((940.0, 350.0), (1176.0, 350.0), BORDER, 1.0);
+        c.text((940.0, 373.0), "WHOLE-RUN EVIDENCE", 10, MUTED, 236.0);
+        if let Some(totals) = &person.whole_run {
+            for (i, text) in [
+                format!("Walked {:.2} m", totals.walking_distance_m),
+                format!("Moving {:.2} s", totals.time.moving_s),
+                format!("Service waits {:.2} s", totals.time.service_wait_s()),
+                format!("Authored pauses {:.2} s", totals.time.waypoint_pause_s),
+                format!("Low progress: {} spans", totals.low_progress_total),
+            ]
+            .iter()
+            .enumerate()
+            {
+                #[allow(clippy::cast_precision_loss)]
+                let y = 397.0 + i as f32 * 21.0;
+                c.text((940.0, y), text, 12, INK, 236.0);
+            }
+        } else if let crate::inspection::Availability::Unavailable { reason } =
+            &inspection.diagnostics
+        {
+            wrapped(c, (940.0, 397.0), reason, 236.0, 5, MUTED);
+        }
+    }
+    if let Some(resource) = &inspection.resource {
+        c.text(
+            (940.0, 290.0),
+            "Queue-entry history through frame",
+            12,
+            MUTED,
+            236.0,
+        );
+        c.text(
+            (940.0, 315.0),
+            &format!(
+                "{} entries · {} people",
+                resource.queue_entries_through_frame, resource.entrants_total
+            ),
+            14,
+            INK,
+            236.0,
+        );
+        c.line((940.0, 350.0), (1176.0, 350.0), BORDER, 1.0);
+        c.text((940.0, 373.0), "WHOLE-RUN QUEUE AUDIT", 10, MUTED, 236.0);
+        if let Some(audit) = &resource.whole_run_queue_audit {
+            c.text(
+                (940.0, 399.0),
+                &format!("Peak waiting: {} people", audit.peak_waiting_agents),
+                13,
+                INK,
+                236.0,
+            );
+            c.text(
+                (940.0, 423.0),
+                &format!("Wait: {:.2} agent-s", audit.cumulative_wait_agent_seconds),
+                13,
+                INK,
+                236.0,
+            );
+            c.text(
+                (940.0, 447.0),
+                &format!("Ever queued: {}", audit.ever_queued_agents),
+                12,
+                INK,
+                236.0,
+            );
+        } else {
+            wrapped(
+                c,
+                (940.0, 399.0),
+                "No per-resource queue audit is recorded for this resource.",
+                236.0,
+                3,
+                MUTED,
+            );
+        }
+        c.text(
+            (940.0, 478.0),
+            "Rings mark historical entrants.",
+            11,
+            WAITING,
+            236.0,
+        );
+    }
+    c.line((940.0, 500.0), (1176.0, 500.0), BORDER, 1.0);
+    c.text(
+        (940.0, 522.0),
+        "EVENTS THROUGH THIS FRAME",
+        10,
+        MUTED,
+        236.0,
+    );
+    let mut displayed: Vec<&chiyoda_core::bundle::RunEvent> = vec![];
+    if let Some(route) = inspection
+        .person
+        .as_ref()
+        .and_then(|p| p.latest_route_event.as_ref())
+    {
+        displayed.push(route);
+    }
+    for event in &inspection.events {
+        if !displayed.contains(&&event.event) {
+            displayed.push(&event.event);
+        }
+        if displayed.len() >= 2 {
+            break;
+        }
+    }
+    for (i, event) in displayed.into_iter().take(2).enumerate() {
+        #[allow(clippy::cast_precision_loss)]
+        let y = 548.0 + i as f32 * 47.0;
+        c.text(
+            (940.0, y),
+            &format!("{:.2} s · {}", event.time_s, event.kind),
+            11,
+            INK,
+            236.0,
+        );
+        c.text((940.0, y + 18.0), &event.detail, 11, MUTED, 236.0);
+    }
+    if inspection.events.is_empty() {
+        c.text(
+            (940.0, 548.0),
+            "No recorded events through frame.",
+            12,
+            MUTED,
+            236.0,
+        );
+    }
+    c.text(
+        (940.0, 660.0),
+        "Click empty space to clear.",
+        11,
+        MUTED,
+        236.0,
+    );
 }
 
 #[cfg(test)]

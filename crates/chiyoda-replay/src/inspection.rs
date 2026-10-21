@@ -118,6 +118,7 @@ pub struct Inspection {
     pub claim_boundary: &'static str,
 }
 
+#[derive(Debug)]
 pub struct EvidenceIndex {
     source_bundle_hash: String,
     report: Option<JourneyReport>,

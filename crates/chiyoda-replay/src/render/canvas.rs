@@ -15,6 +15,7 @@ pub const FONT_BYTES: &[u8] = include_bytes!("../../../../assets/fonts/Inter.ttf
 pub struct Canvas {
     pub pixels: Pixmap,
     clip: Mask,
+    viewport: [f32; 4],
     map_clip: bool,
     font: Font,
     glyphs: HashMap<(char, u16), (Metrics, Vec<u8>)>,
@@ -28,12 +29,29 @@ impl Canvas {
         clip.fill_path(&path, FillRule::Winding, false, Transform::identity());
         Self {
             clip,
+            viewport: super::scene::VIEWPORT,
             map_clip: false,
             pixels: Pixmap::new(WIDTH as u32, HEIGHT as u32).expect("fixed replay dimensions"),
             font: Font::from_bytes(FONT_BYTES, FontSettings::default())
                 .expect("bundled Inter font"),
             glyphs: HashMap::new(),
         }
+    }
+    pub fn set_map_viewport(&mut self, viewport: [f32; 4]) {
+        if self.viewport.map(f32::to_bits) == viewport.map(f32::to_bits) {
+            return;
+        }
+        let [x, y, w, h] = viewport;
+        self.clip.clear();
+        if let Some(rect) = Rect::from_xywh(x, y, w, h) {
+            self.clip.fill_path(
+                &PathBuilder::from_rect(rect),
+                FillRule::Winding,
+                false,
+                Transform::identity(),
+            );
+        }
+        self.viewport = viewport;
     }
     pub fn map_clip(&mut self, enabled: bool) {
         self.map_clip = enabled;
@@ -144,7 +162,7 @@ impl Canvas {
         let mut top = ((at.1 - outer).floor() as i32).clamp(0, HEIGHT as i32);
         let mut bottom = ((at.1 + outer).ceil() as i32).clamp(0, HEIGHT as i32);
         if self.map_clip {
-            let [x, y, w, h] = super::scene::VIEWPORT;
+            let [x, y, w, h] = self.viewport;
             left = left.max(x as i32);
             right = right.min((x + w) as i32);
             top = top.max(y as i32);

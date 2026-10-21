@@ -1,6 +1,6 @@
 //! Display-independent image exports and exact recorded-frame timing.
 use crate::render::BACKGROUND;
-use crate::{HEIGHT, ViewMode, WIDTH, render, render_bundle_frame};
+use crate::{HEIGHT, ViewMode, WIDTH, render};
 use anyhow::{Context, Result, bail};
 use chiyoda_core::{RunBundle, bundle::TraceFrame};
 use flate2::{Compression, write::ZlibEncoder};
@@ -147,6 +147,7 @@ pub struct PngExportManifest<'a> {
     pub recorded_time_s: f64,
     pub render_width_pixels: usize,
     pub render_height_pixels: usize,
+    pub camera: crate::navigation::CameraControl,
     pub claim_boundary: &'static str,
 }
 
@@ -157,11 +158,29 @@ pub fn export_png(
     index: usize,
     view: ViewMode,
 ) -> Result<()> {
+    export_png_with_camera(
+        bundle,
+        output,
+        surface_index,
+        index,
+        view,
+        crate::navigation::CameraControl::default(),
+    )
+}
+pub fn export_png_with_camera(
+    bundle: &RunBundle,
+    output: &Path,
+    surface_index: usize,
+    index: usize,
+    view: ViewMode,
+    camera: crate::navigation::CameraControl,
+) -> Result<()> {
+    camera.validate()?;
     let sidecar = gif_manifest_path(output);
     ensure_new_export_targets(output, &sidecar)?;
     let frame = &bundle.trace[index];
     let manifest = PngExportManifest {
-        schema_version: "chiyoda.replay-png.v1",
+        schema_version: "chiyoda.replay-png.v2",
         renderer: render::provenance(),
         bundle_sha256: &bundle.bundle_hash,
         scenario_sha256: &bundle.scenario_hash,
@@ -174,23 +193,26 @@ pub fn export_png(
         recorded_time_s: frame.time_s,
         render_width_pixels: WIDTH,
         render_height_pixels: HEIGHT,
+        camera,
         claim_boundary: "One exact recorded frame from a reconstructed deterministic trace. This derived image does not add measurements or interpolate movement. The canonical JSON bundle remains the source of timing and metrics.",
     };
     let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
-    render_bundle_frame(&mut buffer, bundle, index, surface_index, view);
-    write_png(output, &buffer, WIDTH, HEIGHT)?;
-    let result = (|| -> Result<()> {
-        let file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&sidecar)?;
-        serde_json::to_writer_pretty(file, &manifest)?;
-        Ok(())
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(output);
-    }
-    result
+    render::Renderer::new().render(
+        &mut buffer,
+        Some(bundle),
+        render::Options {
+            index,
+            surface: surface_index,
+            view,
+            map: render::MapConfig {
+                camera,
+                ..render::MapConfig::default()
+            },
+            ..render::Options::default()
+        },
+    );
+    let png = encode_png(&buffer, WIDTH, HEIGHT)?;
+    crate::evidence::save_pair(output, &png, &manifest)
 }
 
 pub fn ensure_new_export_targets(output: &Path, sidecar: &Path) -> Result<()> {
@@ -361,6 +383,13 @@ pub fn write_gif_manifest(path: &Path, manifest: &GifExportManifest) -> Result<(
 }
 
 pub fn write_png(path: &Path, buffer: &[u32], width: usize, height: usize) -> Result<()> {
+    let bytes = encode_png(buffer, width, height)?;
+    write_new_artifact(path, &bytes)?.keep();
+    Ok(())
+}
+
+pub fn encode_png(buffer: &[u32], width: usize, height: usize) -> Result<Vec<u8>> {
+    anyhow::ensure!(width > 0 && height > 0, "PNG dimensions must be nonzero");
     if buffer.len() != width.saturating_mul(height) {
         bail!(
             "framebuffer contains {} pixels but {width}×{height} pixels were expected",
@@ -391,23 +420,52 @@ pub fn write_png(path: &Path, buffer: &[u32], width: usize, height: usize) -> Re
     header.extend(width.to_be_bytes());
     header.extend(height.to_be_bytes());
     header.extend([8, 2, 0, 0, 0]);
-    if let Some(directory) = path.parent() {
-        fs::create_dir_all(directory)
-            .with_context(|| format!("creating snapshot directory {}", directory.display()))?;
+    let mut bytes = Vec::new();
+    bytes.write_all(b"\x89PNG\r\n\x1a\n")?;
+    write_png_chunk(&mut bytes, *b"IHDR", &header)?;
+    write_png_chunk(&mut bytes, *b"IDAT", &compressed)?;
+    write_png_chunk(&mut bytes, *b"IEND", &[])?;
+    Ok(bytes)
+}
+
+/// A freshly created artifact is removed unless its enclosing operation commits.
+/// Failed exclusive creation never acquires ownership of a pre-existing file.
+pub struct PendingArtifact {
+    path: PathBuf,
+    committed: bool,
+}
+impl PendingArtifact {
+    pub fn keep(mut self) {
+        self.committed = true;
+    }
+}
+impl Drop for PendingArtifact {
+    fn drop(&mut self) {
+        if !self.committed {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
+pub fn write_new_artifact(path: &Path, bytes: &[u8]) -> Result<PendingArtifact> {
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        fs::create_dir_all(parent)?;
     }
     let mut file = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(path)
-        .with_context(|| format!("creating PNG snapshot {}", path.display()))?;
-    file.write_all(b"\x89PNG\r\n\x1a\n")?;
-    write_png_chunk(&mut file, *b"IHDR", &header)?;
-    write_png_chunk(&mut file, *b"IDAT", &compressed)?;
-    write_png_chunk(&mut file, *b"IEND", &[])?;
-    Ok(())
+        .with_context(|| format!("creating new artifact {}", path.display()))?;
+    let artifact = PendingArtifact {
+        path: path.to_owned(),
+        committed: false,
+    };
+    let result = file.write_all(bytes);
+    drop(file);
+    result?;
+    Ok(artifact)
 }
 
-pub fn write_png_chunk(file: &mut fs::File, kind: [u8; 4], data: &[u8]) -> Result<()> {
+pub fn write_png_chunk(file: &mut impl Write, kind: [u8; 4], data: &[u8]) -> Result<()> {
     let length = u32::try_from(data.len()).context("PNG chunk exceeds u32 length")?;
     file.write_all(&length.to_be_bytes())?;
     file.write_all(&kind)?;

@@ -1,7 +1,7 @@
 {
-  "schema_version": "chiyoda.replay-png.v1",
+  "schema_version": "chiyoda.replay-png.v2",
   "renderer": {
-    "version": "chiyoda.replay-renderer.v2",
+    "version": "chiyoda.replay-renderer.v5",
     "font_sha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
   },
   "bundle_sha256": "97c3af8e687d17f5bbce55d4317cdfc20a42fc6d0f9602423f3544f3313b31ac",
@@ -19,5 +19,10 @@
   "recorded_time_s": 20.0,
   "render_width_pixels": 1200,
   "render_height_pixels": 800,
+  "camera": {
+    "zoom": 1.0,
+    "pan_x_pixels": 0.0,
+    "pan_y_pixels": 0.0
+  },
   "claim_boundary": "One exact recorded frame from a reconstructed deterministic trace. This derived image does not add measurements or interpolate movement. The canonical JSON bundle remains the source of timing and metrics."
 }

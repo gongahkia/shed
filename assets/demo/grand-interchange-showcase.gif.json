@@ -42,7 +42,7 @@
   "looping": true,
   "timing_policy": "Each non-terminal GIF delay is the next recorded trace timestamp gap divided by playback_speed, rounded to the nearest centisecond. A zero-length rounded gap and the terminal frame use one centisecond because GIF cannot encode a terminal hold without a delay. Exact trace timestamps remain in the verified canonical JSON bundle.",
   "renderer": {
-    "version": "chiyoda.replay-renderer.v2",
+    "version": "chiyoda.replay-renderer.v5",
     "font_sha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
   },
   "claim_boundary": "This derived visualization renders recorded state from one reconstructed deterministic trace. The selected surface applies to the floor plan; overview projects all authored surfaces. The canonical JSON bundle remains the source of timing and metrics."

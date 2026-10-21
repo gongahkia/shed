@@ -269,6 +269,10 @@ recorded replay step to request an inspectable image:
 }
 ```
 
+The PNG shows only the simulation, selection highlights and progress bar.
+Measurements, route decisions, resource IDs, diagnostics and provenance stay
+in the structured result and JSON sidecar; there is no inspector panel.
+
 Pass that object to `chiyoda_render_evidence`, using either `agent call` or MCP.
 For a resource, use `{"kind":"resource","resource_kind":"exit","id":"south"}`.
 Resource kinds are `exit`, `gate`, `connector` and `waypoint`; lifts use

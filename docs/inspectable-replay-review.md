@@ -1,5 +1,8 @@
 # Inspectable replay review
 
+Renderer revision 5 now uses [simulation and progress bar only](minimal-visualization-review.md).
+The sections below record earlier presentations and their verification.
+
 ## One Chiyoda executable
 
 The native viewer now runs as `chiyoda view`; there is no separate viewer

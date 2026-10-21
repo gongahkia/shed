@@ -36,10 +36,9 @@ does not mutate a running simulation. The default watch trace cadence is one
 integration step, which affects display smoothness only.
 
 An invalid edit leaves the most recent valid scene and trace on screen. The
-terminal prints the complete JSON, validation, or runtime diagnostic; the
-window and an in-canvas diagnostic panel identify the failed revision. Before
-the first valid source revision, the viewer displays an empty debug canvas with
-the current status and any read error.
+terminal prints the complete JSON, validation, or runtime diagnostic. Before
+the first valid source revision, the viewer displays an empty simulation canvas
+and an inactive progress track. Status and errors stay in the terminal.
 
 Watch runs are intentionally in-memory, unpersisted debug results. They are
 not hash-verified bundles and cannot be cited as a replayable experiment
@@ -62,7 +61,7 @@ included in full reconstruction; see [local knowledge](knowledge.md).
 
 ## Controls
 
-- Click a person to inspect it; Shift-click an exit, gate, connector endpoint,
+- Click a person to highlight it; Shift-click an exit, gate, connector endpoint,
   or waypoint to prefer the resource. Click empty plan space to clear selection.
 - Wheel or `+`/`-` zooms. Wheel zoom keeps the point under the pointer fixed.
   Drag with the right or middle button to pan. R restores the authored extent;
@@ -74,9 +73,6 @@ included in full reconstruction; see [local knowledge](knowledge.md).
 - Tab cycles surfaces in their authored declaration order. In comparisons,
   only IDs present in both runs are available.
 - V toggles the selected-surface 2D view and all-surface isometric overview.
-- D toggles the selected person's or resource's inspector. The single-run plan
-  uses the full width when no inspector is open. Clearing selection restores
-  that full plan; time, recorded step and outcome counts remain visible.
 - P writes the current framebuffer as a PNG under `--snapshot-dir` (default
   `out/chiyoda`). Existing snapshots are preserved. For evidence with
   provenance, use `--export-png` instead.
@@ -97,9 +93,11 @@ $ chiyoda view out/station/arms/baseline/run.json --paused --at-step 100 --agent
 $ chiyoda view out/station/arms/baseline/run.json --paused --resource exit:south
 ```
 
-The person inspector shows recorded state, the authored goal, latest recorded
-route decision, recent information/service events, and whole-run journey totals.
-Structured evidence also retains the recorded beliefs/knowledge snapshot. The authored destination is not presented as the
+Selection highlights the person and its recorded trail without opening a
+sidebar or changing the camera. PNG evidence sidecars and the agent tool retain
+recorded state, the authored goal, latest recorded route decision, recent
+information/service events, whole-run journey totals, and the recorded
+beliefs/knowledge snapshot. The authored destination is not presented as the
 current chosen destination. Where the runtime recorded a decision in event
 text, that text is retained without inventing an unrecorded route.
 
@@ -108,9 +106,9 @@ selected frame. It omits inactive and connector-transit segments. The last
 2,000 points are retained; `--trail-start-step N` can narrow the interval in a
 single-run view.
 Comparisons use each selected person's retained trail through its own frame.
-A trail is a sampled visual aid, not the distance measurement. Amber timeline
-bands show retained whole-run low-progress windows; ticks show retained
-recorded events through the frame.
+A trail is a sampled visual aid, not the distance measurement. Low-progress
+trail segments are amber. Low-progress windows and recorded events remain in
+the JSON evidence; the progress bar has no diagnostic bands or event ticks.
 
 Detailed distance, moving time, service waits, authored pauses, low-progress
 windows and movement fallback counts require the current runtime and a trace
@@ -119,12 +117,13 @@ recorded events, with an explicit unavailable reason for detailed accounting.
 Inspection re-derives journey accounting with the default analyzer options and
 records those options and the derived report hash. Separate journey reports
 with custom thresholds or isolated-agent controls retain their own evidence;
-the inspector does not import those controls. Whole-run totals and low-progress
+image evidence does not import those controls. Whole-run totals and low-progress
 windows include the complete run, even when viewing an earlier frame. Low progress is a diagnostic of movement exposure,
 not an additional mutually exclusive time-budget category.
 
-Resource inspection shows authored geometry, whole-run queue audit measurements,
-and recorded queue/service/availability events through the selected frame.
+Resource selection highlights its authored endpoints. JSON evidence retains
+whole-run queue audit measurements and recorded queue/service/availability
+events through the selected frame.
 Highlighted entrants are historical entrants through that time, not inferred
 current queue membership. The runtime does not record resource-attributed
 per-person wait durations; the viewer does not estimate them from proximity.
@@ -140,23 +139,26 @@ $ chiyoda view out/station/arms/baseline/run.json --compare out/station/arms/ann
 Both panels share one camera, authored coordinate extent, selected surface ID,
 and simulation clock. Different floor dimensions therefore keep the same metric
 scale. At a shared time, each panel shows its last recorded frame at or before
-that time; its exact timestamp and any hold duration remain visible. Seeking is
-restricted to the intersection of the recorded intervals. Missing surface IDs
-are rejected rather than matched by declaration order.
+that time; its exact timestamp and any hold duration remain in the JSON
+evidence. Seeking is restricted to the intersection of the recorded intervals.
+Missing surface IDs are rejected rather than matched by declaration order.
 
-Current-frame completion counts are separate from whole-run outcomes. The latter
-retain each run's own duration. Unfinished clearance and elapsed journeys remain
-unavailable. Population pairing requires equal seed and authored population
-inputs, excluding the knowledge intervention; a changed population disables
-individual elapsed-time pairing. A selected ID absent from one run is labelled
-unavailable in that panel. These are descriptive model observations; use the
-experiment report's validity and performance checks to assess an intervention.
+The comparison sidecar keeps current-frame completion counts separate from
+whole-run outcomes. The latter retain each run's own duration. Unfinished
+clearance and elapsed journeys remain unavailable. Population pairing requires
+equal seed and authored population inputs, excluding the knowledge intervention;
+a changed population disables individual elapsed-time pairing. A selected ID
+absent from one run has an unavailable reason in that panel's JSON evidence.
+These are descriptive model observations; use the experiment report's validity
+and performance checks to assess an intervention.
 
 Zoom, pan, timeline seeking, speed, projection, floor selection and person/resource
-selection operate together across both panels. Labels come from the input
-bundles' parent directory names. The PNG and `PATH.json` comparison sidecar use
-`chiyoda.replay-comparison.v1`, with both source hashes, shared camera bounds,
-recorded timestamps, request, selected evidence and measured differences.
+selection operate together across both panels. The baseline is always on the
+left and the candidate on the right. Neither pane has a visible label; the
+sidecar retains labels from the input bundles' parent directory names. The PNG
+and `PATH.json` comparison sidecar use `chiyoda.replay-comparison.v1`, with both
+source hashes, shared camera bounds, recorded timestamps, request, selected
+evidence and measured differences.
 
 ## Exact-frame PNG export
 
@@ -180,7 +182,7 @@ exclusive and cannot watch live source.
 
 Add `--agent ID` or `--resource KIND:ID` to export an annotated frame. The
 `chiyoda.replay-evidence.v1` sidecar includes the exact evidence used to draw the
-inspector, image SHA-256, source hashes, recorded timestamp, JSON pointers,
+selection highlights, image SHA-256, source hashes, recorded timestamp, JSON pointers,
 journey analyzer version/options/report hash, bounded events and trail. The
 native viewer and headless export share the same renderer.
 
@@ -224,11 +226,11 @@ The same recorded moment is available as an [isometric overview](../assets/demo/
 Both PNGs and the [showcase GIF](../assets/demo/grand-interchange-showcase.gif)
 have adjacent JSON provenance sidecars. They were exported from the current
 runtime's `grand-interchange-showcase` run, with a trace cadence of 20 steps.
-Their sidecars retain the renderer revision used for those earlier previews.
+The previews use renderer revision 5, with only the simulation and progress bar.
 
 The station experiment also has current annotated examples: a
-[person and low-progress periods](../assets/demo/replay-person.png), a
-[resource queue audit](../assets/demo/replay-resource.png), and a
+[person selection](../assets/demo/replay-person.png), a
+[resource selection](../assets/demo/replay-resource.png), and a
 [synchronized comparison](../assets/demo/replay-comparison.png). Each PNG has
 an adjacent `PNG.json` sidecar. Reproduce the source runs with
 `python3 examples/experiments/compare_station.py --output out/station --replay`,
@@ -244,40 +246,35 @@ $ chiyoda view out/showcase/run.json --surface concourse --at-step 100 --view ov
 
 ## Visual presentation
 
-The viewer uses one 1200×800 CPU vector renderer for native playback, PNGs,
-and GIFs. Single-run and comparison views share compact headings, outcome rows
-and the same full-width timeline. The time label follows the playhead and stays
-inside the timeline at either end. A single run uses the full plan width until
-a person or resource is selected; its contextual inspector then opens beside
-the plan. Branding banners, permanent dashboard legends and keyboard-help
-footers are omitted in both modes.
+The viewer uses one 1200×800 CPU vector renderer for native playback, plain and
+selected PNGs, GIFs, comparison images, and MCP image results. Every mode shows
+only the simulation and a progress bar. The bar retains start/end timestamps
+and the current time attached to its playhead. Before a watched scenario is
+available, only the inactive track is drawn.
 
-Spatial layers are clipped to the current plan viewport, including markers
-outside the camera extent. Drawing, mouse selection, zoom and focus use the
-same geometry when the inspector opens or closes. Watch failures retain the
-last valid plan and identify the failed revision below it.
+The scene always uses the same viewport, including when a person or resource
+is selected. Comparisons use two equally sized simulation panes and one shared
+bar. There are no headings, outcome rows, inspector panels, legends, map labels,
+scale bars, axis captions, metric grids, diagnostic timeline marks, or status
+banners. The native window title is simply `Chiyoda`.
 
-Floor plans preserve metric proportions with a uniform scale, a quiet metric
-grid, and a scale bar. The camera follows authored surface bounds rather than
+Spatial layers are clipped to the scene viewport. Drawing, mouse selection,
+zoom and focus use the same geometry. Floor plans preserve metric proportions
+with a uniform scale; the camera follows authored surface bounds rather than
 people's current positions. The overview uses the same fixed isometric
-projection for every surface and labels their authored elevations; overlapping
-floors can occlude geometry, so use a floor plan for detailed inspection.
+projection for every surface. Overlapping floors can occlude geometry, so use
+a floor plan for detailed inspection.
 
-Text uses a bundled Inter font under its included SIL Open Font License;
-no font installation or network connection is required. Timestamps and counts
-use tabular digits. Long names are ellipsized, and unavailable glyphs display
-as `?`. This is basic font rasterization, not a full text-shaping system.
-Resource labels are placed where space permits; dense plans may omit a label
-while retaining its symbol. Connector symbols identify stairs (`S`), ramps
-(`R`), escalators (`E`), and lifts (`L`).
+Timeline text uses the bundled Inter font with tabular digits. Export sidecars
+retain source hashes, renderer version, bundled font hash, selections and
+measurements. Watch errors and legacy hash-only notices stay in the terminal;
+images do not acquire warning or status overlays.
 
-The compact subtitle identifies legacy hash-only artifacts and unpersisted live
-previews. Export sidecars record the renderer version and bundled font hash.
-The unified presentation uses renderer revision **4**. Previously exported
-images keep their recorded revision; their source/hash checks remain available.
+The minimal presentation uses renderer revision **5**. Previously exported
+images keep their recorded revision; source/hash checks remain available.
 Exact pixel reconstruction requires the recorded renderer revision. The
-renderer is a derived presentation contract; changing its pixels does not change
-canonical simulation evidence.
+renderer is a derived presentation contract; changing its pixels does not
+change canonical simulation evidence.
 
 ## Rendering contract
 
@@ -290,16 +287,14 @@ blue, all released waits amber, in-transit agents purple, unreleased people
 hollow grey, and completed journeys hollow green. Moving people use filled
 circles; waits carry a small horizontal mark and transit markers a white centre.
 Inactive records are drawn first so an unreleased or completed record does not
-cover an active person at a shared position. Counts always include every
-recorded person, including inactive records. Outcome rows report all-surface
-counts and distinguish the displayed frame from the whole run.
-In-transit and unreleased people are included in the frame summary whenever
-present, so multi-floor transfers and staggered arrivals remain visible.
+cover an active person at a shared position. Structured evidence retains
+all-surface frame counts and whole-run outcomes, including in-transit and
+unreleased records; these measurements are not drawn on the canvas.
 
 People markers follow their authored group radius, with a 2.5-pixel minimum for
-legibility. Symbol outlines, minimum-size markers, and resource glyphs are
+legibility. Symbol outlines, minimum-size markers, and resource marks are
 schematic; their screen sizes do not measure crowd density or portal width.
-Static symbols distinguish waypoints, exits, gates, connector class, portal-lane
+Static symbols distinguish waypoints, exits, gates, connector endpoints, portal-lane
 centres, and queue geometry. The queue path and slots are authored placement
 geometry, not a measured queue, a claimed standing obstruction, or a density
 visualization.
@@ -349,5 +344,10 @@ On macOS, `scripts/replay_native_smoke.py --help` describes a repeatable check
 using OS keyboard/mouse events and Accessibility window inspection. It requires
 existing Accessibility access and Xcode tools, opens its own viewer, writes a new
 review directory, and restores the prior frontmost application and pointer.
-See the [inspection review](inspectable-replay-review.md) for measured results,
-reviewed outputs and verification limits.
+It compares native screenshots with headless reference PNGs rather than relying
+on diagnostic text in the window title. `scripts/replay_watch_smoke.py` checks
+missing-source, valid, invalid and corrected-source states against the same
+renderer. Both scripts require a new output directory. See the
+[minimal visualization review](minimal-visualization-review.md) for current
+results and the [inspection review](inspectable-replay-review.md) for earlier
+crowd measurements and verification limits.

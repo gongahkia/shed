@@ -1,5 +1,9 @@
 # Replay presentation review
 
+The current [minimal visualization review](minimal-visualization-review.md)
+supersedes the visible chrome described here. This document records the earlier
+presentation and its measurements.
+
 Follow-up: the [inspectable replay review](inspectable-replay-review.md) adds
 inspection/comparison and verifies native OS controls and crowd performance.
 

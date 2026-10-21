@@ -1,10 +1,10 @@
 {
   "schema_version": "chiyoda.replay-comparison.v1",
   "renderer": {
-    "version": "chiyoda.replay-renderer.v3",
+    "version": "chiyoda.replay-renderer.v5",
     "font_sha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
   },
-  "image_sha256": "8259c620180bd7fda677092a022130196972b3957ca263a9248b7f82272566eb",
+  "image_sha256": "6173b4aa04be4041784aafae926bd813ac71f718f9e7a2403256b383e2f4166c",
   "render_width_pixels": 1200,
   "render_height_pixels": 800,
   "request": {

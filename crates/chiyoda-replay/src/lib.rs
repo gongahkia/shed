@@ -1,4 +1,5 @@
 //! Shared replay rendering and recorded-evidence access for native and agent clients.
+pub mod comparison;
 pub mod evidence;
 pub mod export;
 pub mod inspection;

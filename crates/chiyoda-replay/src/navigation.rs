@@ -93,7 +93,7 @@ impl PlaybackClock {
     }
     pub fn seek_fraction(&mut self, fraction: f64, start: f64, end: f64) {
         if fraction.is_finite() {
-            self.time_s = start + (end - start) * fraction.clamp(0.0, 1.0);
+            self.time_s = (start + (end - start) * fraction.clamp(0.0, 1.0)).clamp(start, end);
             self.paused = true;
         }
     }

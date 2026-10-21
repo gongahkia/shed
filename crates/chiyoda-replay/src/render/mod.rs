@@ -1,5 +1,6 @@
 //! Shared native/headless presentation. Rendering never changes a scenario or trace.
 mod canvas;
+mod compare;
 pub(crate) mod scene;
 pub use scene::{Camera, MapConfig, VIEWPORT, WorldBounds, pick};
 

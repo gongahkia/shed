@@ -524,8 +524,14 @@ fn timeline(c: &mut Canvas, bundle: &RunBundle, options: Options<'_>) {
         }
         c.text(
             (210.0, 721.0),
-            if inspection.person.is_some() {
+            if inspection
+                .person
+                .as_ref()
+                .is_some_and(|p| p.whole_run.is_some())
+            {
                 "Selected person · amber: whole-run low progress · ticks: retained events"
+            } else if inspection.person.is_some() {
+                "Selected person · detailed accounting unavailable · ticks: retained events"
             } else {
                 "Selected resource · ticks: retained events through frame"
             },
@@ -665,8 +671,19 @@ fn inspector(
         c.text(
             (940.0, 315.0),
             &format!(
-                "{} entries · {} people",
-                resource.queue_entries_through_frame, resource.entrants_total
+                "{} {} · {} {}",
+                resource.queue_entries_through_frame,
+                if resource.queue_entries_through_frame == 1 {
+                    "entry"
+                } else {
+                    "entries"
+                },
+                resource.entrants_total,
+                if resource.entrants_total == 1 {
+                    "person"
+                } else {
+                    "people"
+                },
             ),
             14,
             INK,
@@ -677,7 +694,15 @@ fn inspector(
         if let Some(audit) = &resource.whole_run_queue_audit {
             c.text(
                 (940.0, 399.0),
-                &format!("Peak waiting: {} people", audit.peak_waiting_agents),
+                &format!(
+                    "Peak waiting: {} {}",
+                    audit.peak_waiting_agents,
+                    if audit.peak_waiting_agents == 1 {
+                        "person"
+                    } else {
+                        "people"
+                    }
+                ),
                 13,
                 INK,
                 236.0,

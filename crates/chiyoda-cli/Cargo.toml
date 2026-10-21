@@ -11,6 +11,10 @@ description = "CLI for authoring, running, and inspecting deterministic Chiyoda 
 name = "chiyoda"
 path = "src/main.rs"
 
+[features]
+default = ["native"]
+native = ["chiyoda-replay/native"]
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true

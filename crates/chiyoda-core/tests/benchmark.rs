@@ -305,7 +305,7 @@ fn expected_unreachable_cases_have_no_simulation_metrics_or_replay_requirement()
         std::path::Path::new("baseline"),
         std::path::Path::new("current"),
     );
-    assert!(!markdown.contains("chiyoda-replay"));
+    assert!(!markdown.contains("chiyoda view"));
 }
 
 #[test]
@@ -365,7 +365,7 @@ fn reports_show_deltas_failures_and_allow_cross_runtime_comparison() {
     );
     let markdown = benchmark::rendering::run_markdown(&current).unwrap();
     assert!(markdown.contains("candidate \\| &lt;test&gt;"));
-    assert!(markdown.contains("chiyoda-replay './case-0000/run.json' --paused"));
+    assert!(markdown.contains("chiyoda view './case-0000/run.json' --paused"));
     assert!(markdown.contains("1/2") || markdown.contains("2/2"));
     current.cases[0]
         .evaluation

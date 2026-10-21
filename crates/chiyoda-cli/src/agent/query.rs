@@ -245,7 +245,7 @@ fn trace(
     );
     result["step"] = step.into();
     result["time_s"] = frame.time_s.into();
-    result["replay"] = json!({"program":"chiyoda-replay","args":[format!("{}/{bundle_artifact}",input.experiment),"--paused","--at-step",step.to_string()]});
+    result["replay"] = json!({"program":"chiyoda","args":["view",format!("{}/{bundle_artifact}",input.experiment),"--paused","--at-step",step.to_string()]});
     Ok(result)
 }
 

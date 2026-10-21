@@ -5,15 +5,10 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Native deterministic trace viewer for Chiyoda runs"
-
-[[bin]]
-name = "chiyoda-replay"
-path = "src/main.rs"
-required-features = ["native"]
+description = "Shared rendering, evidence exports and optional native viewing for Chiyoda"
 
 [features]
-default = ["native"]
+default = []
 native = ["dep:minifb"]
 
 [dependencies]

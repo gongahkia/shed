@@ -1,3 +1,4 @@
+//! Native viewing and exports behind the unified `chiyoda view` command.
 use anyhow::{Context, Result, bail};
 use chiyoda_core::{
     BundleVerification, RunBundle, bundle::TraceFrame, model::Surface, verify_run_bundle,
@@ -12,11 +13,11 @@ use std::{
 };
 
 #[cfg(test)]
-use chiyoda_replay::{
+use crate::{
     HEIGHT, WIDTH,
     export::{export_png, frame_delay, write_png},
 };
-use chiyoda_replay::{
+use crate::{
     ViewMode,
     export::{export_gif, gif_manifest_path, validate_playback_timing},
     load_watch_scenario, render,
@@ -28,11 +29,11 @@ const WATCH_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const WATCH_DEBOUNCE: Duration = Duration::from_millis(150);
 #[derive(Debug, Parser)]
 #[command(
-    name = "chiyoda-replay",
+    name = "chiyoda view",
     version,
     about = "Native deterministic Chiyoda trace replay"
 )]
-struct Cli {
+pub struct ViewerArgs {
     /// A `run.json` emitted by `chiyoda run`.
     bundle: Option<PathBuf>,
     /// Read, validate, and rerun this JSON scenario after every saved edit.
@@ -88,7 +89,7 @@ struct Cli {
     #[arg(long, default_value_t = 1)]
     trace_every: u32,
     /// Directory in which pressing P writes a PNG snapshot of the current frame.
-    #[arg(long, default_value = "out/chiyoda-replay")]
+    #[arg(long, default_value = "out/chiyoda")]
     snapshot_dir: PathBuf,
     /// Write an animated GIF and a provenance sidecar from a verified run bundle, then exit.
     #[arg(long, value_name = "GIF", requires = "bundle", conflicts_with_all = ["watch", "export_png"])]
@@ -109,8 +110,7 @@ struct Cli {
     allow_legacy_hash_only: bool,
 }
 
-fn main() -> Result<()> {
-    let cli = Cli::parse();
+pub fn execute(cli: &ViewerArgs) -> Result<()> {
     if cli.export_gif.is_none() && (!cli.speed.is_finite() || cli.speed <= 0.0) {
         bail!("--speed must be a finite value greater than zero");
     }
@@ -121,19 +121,19 @@ fn main() -> Result<()> {
         bail!("--gif-speed must be a finite value greater than zero");
     }
     match (cli.bundle.clone(), cli.watch.clone()) {
-        (Some(bundle_path), None) => replay_bundle(&bundle_path, &cli),
+        (Some(bundle_path), None) => replay_bundle(&bundle_path, cli),
         (None, Some(source_path)) => {
             if cli.allow_legacy_hash_only {
                 bail!("--allow-legacy-hash-only applies only to a persisted run bundle");
             }
-            replay_watch(source_path, &cli)
+            replay_watch(source_path, cli)
         }
         (None, None) => bail!("provide a run bundle or --watch SOURCE.json"),
         (Some(_), Some(_)) => unreachable!("clap rejects conflicting inputs"),
     }
 }
 
-fn replay_bundle(bundle_path: &Path, cli: &Cli) -> Result<()> {
+fn replay_bundle(bundle_path: &Path, cli: &ViewerArgs) -> Result<()> {
     let (bundle, verification) = load_bundle(bundle_path, cli.allow_legacy_hash_only)?;
     let surface_index = surface_index(&bundle.scenario.scenario.surfaces, cli.surface.as_deref())?;
     if (cli.export_gif.is_some() || cli.export_png.is_some())
@@ -145,12 +145,12 @@ fn replay_bundle(bundle_path: &Path, cli: &Cli) -> Result<()> {
         if let Some(path) = &cli.compare {
             let (candidate, _) = load_bundle(path, false)?;
             let request = native::comparison_request(&bundle, &candidate, cli)?;
-            chiyoda_replay::comparison::export_comparison(&bundle, &candidate, &request, output)?;
+            crate::comparison::export_comparison(&bundle, &candidate, &request, output)?;
         } else if let Some(selection) = native::selection(cli)? {
             let index = replay_start_index(&bundle.trace, cli.at_step)?;
-            chiyoda_replay::evidence::export_evidence(
+            crate::evidence::export_evidence(
                 &bundle,
-                &chiyoda_replay::evidence::EvidenceRequest {
+                &crate::evidence::EvidenceRequest {
                     step: bundle.trace[index].step,
                     selection,
                     surface: cli.surface.clone(),
@@ -163,7 +163,7 @@ fn replay_bundle(bundle_path: &Path, cli: &Cli) -> Result<()> {
         } else {
             let index = replay_start_index(&bundle.trace, cli.at_step)?;
             let controls = native::camera(cli)?;
-            chiyoda_replay::export::export_png_with_camera(
+            crate::export::export_png_with_camera(
                 &bundle,
                 output,
                 surface_index,
@@ -210,7 +210,7 @@ fn replay_bundle(bundle_path: &Path, cli: &Cli) -> Result<()> {
     )
 }
 
-fn replay_watch(source_path: PathBuf, cli: &Cli) -> Result<()> {
+fn replay_watch(source_path: PathBuf, cli: &ViewerArgs) -> Result<()> {
     native::open(
         None,
         Some(WatchController::new(source_path, cli.trace_every)),
@@ -307,7 +307,7 @@ struct PendingRevision {
 struct WatchUpdate {
     revision: u64,
     result: std::result::Result<RunBundle, String>,
-    evidence: Option<chiyoda_replay::inspection::EvidenceIndex>,
+    evidence: Option<crate::inspection::EvidenceIndex>,
 }
 
 #[derive(Debug)]
@@ -418,7 +418,7 @@ impl WatchController {
             let evidence = result
                 .as_ref()
                 .ok()
-                .map(chiyoda_replay::inspection::EvidenceIndex::new);
+                .map(crate::inspection::EvidenceIndex::new);
             let _ = sender.send(WatchUpdate {
                 revision,
                 result,
@@ -488,13 +488,13 @@ fn next_snapshot_path(directory: &Path, snapshot_number: &mut u64, step: u64) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::export::{gif_frame_delays_centiseconds, palette_indices};
     use chiyoda_core::model::Point3;
     use chiyoda_core::{RunOptions, decode_scenario, run};
-    use chiyoda_replay::export::{gif_frame_delays_centiseconds, palette_indices};
     use flate2::read::ZlibDecoder;
     use std::collections::HashMap;
     use std::io::Read;
-    const WATCH_SOURCE: &str = include_str!("fixtures/main/project.json");
+    const WATCH_SOURCE: &str = include_str!("../fixtures/main/project.json");
 
     fn surface(id: &str, x_m: f64, y_m: f64, width_m: f64, depth_m: f64) -> Surface {
         Surface {
@@ -532,12 +532,12 @@ mod tests {
         assert!(replay_start_index(&trace, Some(4)).is_err());
         assert!(replay_start_index(&trace, Some(9)).is_err());
         assert!(
-            Cli::try_parse_from(["chiyoda-replay", "run.json", "--paused", "--at-step", "3"])
+            ViewerArgs::try_parse_from(["chiyoda view", "run.json", "--paused", "--at-step", "3"])
                 .is_ok()
         );
         assert!(
-            Cli::try_parse_from([
-                "chiyoda-replay",
+            ViewerArgs::try_parse_from([
+                "chiyoda view",
                 "--watch",
                 "scenario.json",
                 "--at-step",
@@ -746,7 +746,7 @@ mod tests {
 
     #[test]
     fn headless_cli_requires_a_bundle_and_rejects_conflicting_exports_and_sprites() {
-        let cli = Cli::try_parse_from([
+        let cli = ViewerArgs::try_parse_from([
             "replay",
             "run.json",
             "--export-png",
@@ -778,7 +778,7 @@ mod tests {
             ],
             vec!["replay", "run.json", "--sprite-atlas", "atlas.json"],
         ] {
-            assert!(Cli::try_parse_from(args).is_err());
+            assert!(ViewerArgs::try_parse_from(args).is_err());
         }
     }
 

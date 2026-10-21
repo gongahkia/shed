@@ -1,20 +1,20 @@
 //! Native input orchestration. Recorded evidence, camera math and exports live in the library.
 use super::{
-    Cli, WatchController, load_bundle, next_snapshot_path, replay_start_index,
+    ViewerArgs, WatchController, load_bundle, next_snapshot_path, replay_start_index,
     select_reloaded_surface, window_title,
 };
-use anyhow::{Result, ensure};
-use chiyoda_core::RunBundle;
-use chiyoda_replay::{
+use crate::{
     HEIGHT, WIDTH, comparison, evidence,
     inspection::{EvidenceIndex, Selection},
     navigation::{CameraControl, PlaybackClock, index_at_time},
     render::{self, Camera, MapConfig, Options, Renderer},
 };
+use anyhow::{Result, ensure};
+use chiyoda_core::RunBundle;
 use minifb::{Key, KeyRepeat, MouseButton, MouseMode, Window, WindowOptions};
 use std::time::Instant;
 
-pub(super) fn selection(cli: &Cli) -> Result<Option<Selection>> {
+pub(super) fn selection(cli: &ViewerArgs) -> Result<Option<Selection>> {
     if let Some(id) = &cli.agent {
         return Ok(Some(Selection::Agent { id: id.clone() }));
     }
@@ -26,10 +26,10 @@ pub(super) fn selection(cli: &Cli) -> Result<Option<Selection>> {
             })?;
             ensure!(!id.is_empty(), "resource ID must be nonempty");
             let resource_kind = match kind {
-                "exit" => chiyoda_replay::inspection::ResourceKind::Exit,
-                "gate" => chiyoda_replay::inspection::ResourceKind::Gate,
-                "connector" => chiyoda_replay::inspection::ResourceKind::Connector,
-                "waypoint" => chiyoda_replay::inspection::ResourceKind::Waypoint,
+                "exit" => crate::inspection::ResourceKind::Exit,
+                "gate" => crate::inspection::ResourceKind::Gate,
+                "connector" => crate::inspection::ResourceKind::Connector,
+                "waypoint" => crate::inspection::ResourceKind::Waypoint,
                 _ => anyhow::bail!("unknown resource kind `{kind}`"),
             };
             Ok(Selection::Resource {
@@ -39,7 +39,7 @@ pub(super) fn selection(cli: &Cli) -> Result<Option<Selection>> {
         })
         .transpose()
 }
-pub(super) fn camera(cli: &Cli) -> Result<CameraControl> {
+pub(super) fn camera(cli: &ViewerArgs) -> Result<CameraControl> {
     let camera = CameraControl {
         zoom: cli.zoom,
         pan_x_pixels: cli.pan_x,
@@ -51,7 +51,7 @@ pub(super) fn camera(cli: &Cli) -> Result<CameraControl> {
 pub(super) fn comparison_request(
     a: &RunBundle,
     b: &RunBundle,
-    cli: &Cli,
+    cli: &ViewerArgs,
 ) -> Result<comparison::ComparisonRequest> {
     let (start, _) = comparison::interval(a, b)?;
     let time_s = if let Some(time) = cli.at_time {
@@ -89,7 +89,7 @@ pub(super) fn open(
     initial_frame: usize,
     mut surface: usize,
     source: render::Source,
-    cli: &Cli,
+    cli: &ViewerArgs,
 ) -> Result<()> {
     let candidate = cli
         .compare
@@ -128,7 +128,7 @@ pub(super) fn open(
     let mut details = true;
     let mut renderer = Renderer::new();
     let mut buffer = vec![0; WIDTH * HEIGHT];
-    let mut window = Window::new("Chiyoda replay", WIDTH, HEIGHT, WindowOptions::default())?;
+    let mut window = Window::new("Chiyoda", WIDTH, HEIGHT, WindowOptions::default())?;
     window.set_target_fps(30);
     let mut profile = std::env::var_os("CHIYODA_REPLAY_PROFILE").map(|_| Profile::default());
     let mut last_render_key = String::new();
@@ -570,7 +570,7 @@ pub(super) fn open(
         if window.is_key_pressed(Key::P, KeyRepeat::No) {
             let step = bundle.as_ref().map_or(0, |b| b.trace[index].step);
             let path = next_snapshot_path(&cli.snapshot_dir, &mut snapshots, step)?;
-            chiyoda_replay::export::write_png(&path, &buffer, WIDTH, HEIGHT)?;
+            crate::export::write_png(&path, &buffer, WIDTH, HEIGHT)?;
             eprintln!("wrote PNG snapshot: {}", path.display());
         }
         window.update_with_buffer(&buffer, WIDTH, HEIGHT)?;

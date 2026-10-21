@@ -183,7 +183,7 @@ fn artifact_links(text: &mut String, label: &str, root: &Path, index: usize) {
 fn replay_command(text: &mut String, root: &Path, index: usize) {
     let path = root.join(format!("case-{index:04}/run.json"));
     let command = format!(
-        "chiyoda-replay {} --paused",
+        "chiyoda view {} --paused",
         shell_quote(&path.to_string_lossy())
     );
     writeln!(text, "\n    {}\n", command.replace('\n', "\n    ")).unwrap();

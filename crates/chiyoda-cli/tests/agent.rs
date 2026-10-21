@@ -151,7 +151,17 @@ fn full_cli_loop_retains_evidence_and_survives_moving_the_archive_and_removing_s
         &json!({"experiment":"result","view":"trace","arm":"baseline","step":0}),
     );
     assert_eq!(trace["items"][0]["value"]["id"], "person:0");
-    assert_eq!(trace["replay"]["args"][3], "0");
+    assert_eq!(trace["replay"]["program"], "chiyoda");
+    assert_eq!(
+        trace["replay"]["args"],
+        json!([
+            "view",
+            "result/arms/baseline/run.json",
+            "--paused",
+            "--at-step",
+            "0"
+        ])
+    );
     assert_eq!(
         call(
             &directory,

@@ -23,7 +23,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", required=True, type=Path)
     parser.add_argument("--candidate", type=Path)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/release/chiyoda-replay")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/release/chiyoda")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--at-step", type=int, default=0)
     parser.add_argument("--agent")
@@ -44,7 +44,7 @@ def main():
     person = next((a for a in initial["agents"] if a["id"] == args.agent), initial["agents"][0])
     scenario = bundle["scenario"]["scenario"]
     floor = next(s for s in scenario["surfaces"] if s["id"] == person["surface"])
-    command = [str(args.binary.resolve()), str(bundle_path), "--paused", "--at-step", str(args.at_step), "--surface", floor["id"], "--speed", "4", "--snapshot-dir", str(output / "snapshots")]
+    command = [str(args.binary.resolve()), "view", str(bundle_path), "--paused", "--at-step", str(args.at_step), "--surface", floor["id"], "--speed", "4", "--snapshot-dir", str(output / "snapshots")]
     if args.candidate:
         command += ["--compare", str(args.candidate.resolve())]
     env = dict(os.environ, CHIYODA_REPLAY_PROFILE="1")

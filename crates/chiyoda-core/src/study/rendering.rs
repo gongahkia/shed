@@ -175,7 +175,7 @@ pub fn csv(report: &StudyReport) -> Result<String, String> {
 }
 
 fn cases(report: &StudyReport, output: &mut String) {
-    output.push_str("\n## Cases and replay\n\nPaths are relative to this report. Open an available run with `chiyoda-replay case-0000/run.json`; the case index below selects the artifact.\n\n| Case | Pattern / scale / load / policy | Seed | Outcome | Artifacts |\n| --- | --- | --- | --- | --- |\n");
+    output.push_str("\n## Cases and replay\n\nPaths are relative to this report. Open an available run with `chiyoda view case-0000/run.json`; the case index below selects the artifact.\n\n| Case | Pattern / scale / load / policy | Seed | Outcome | Artifacts |\n| --- | --- | --- | --- | --- |\n");
     for (index, case) in report.cases.iter().enumerate() {
         let root = format!("case-{index:04}");
         let outcome = if case.passed {

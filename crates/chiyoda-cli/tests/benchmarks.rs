@@ -493,7 +493,7 @@ fn negative_fixtures_are_reported_without_fake_telemetry_or_replay_links() {
         assert!(
             !fs::read_to_string(output.join(artifact))
                 .unwrap()
-                .contains("chiyoda-replay")
+                .contains("chiyoda view")
         );
     }
     assert_eq!(

@@ -29,6 +29,9 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// View a recorded run, compare runs, watch a scenario, or export visualization.
+    #[cfg(feature = "native")]
+    View(chiyoda_replay::viewer::ViewerArgs),
     /// Discover and invoke structured experiment tools, or serve them over MCP.
     Agent(agent::AgentArgs),
     /// Read and validate a versioned JSON scenario without executing it.
@@ -91,6 +94,8 @@ enum Command {
 
 fn main() -> Result<()> {
     match Cli::parse().command {
+        #[cfg(feature = "native")]
+        Command::View(args) => chiyoda_replay::viewer::execute(&args)?,
         Command::Agent(args) => agent::execute(&args)?,
         Command::Check { source, geometry } => {
             let scenario = read_scenario(&source)?;
@@ -174,7 +179,7 @@ fn main() -> Result<()> {
                 "evacuated: {}/{}",
                 bundle.metrics.evacuated_agents, bundle.metrics.total_agents
             );
-            println!("open with: chiyoda-replay {}", bundle_path.display());
+            println!("open with: chiyoda view {}", bundle_path.display());
         }
     }
     Ok(())

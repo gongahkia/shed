@@ -5,6 +5,8 @@ pub mod export;
 pub mod inspection;
 pub mod navigation;
 pub mod render;
+#[cfg(feature = "native")]
+pub mod viewer;
 use chiyoda_core::{RunBundle, RunOptions, decode_scenario, run, validate};
 use clap::ValueEnum;
 use serde::Serialize;

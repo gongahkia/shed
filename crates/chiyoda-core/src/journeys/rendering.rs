@@ -201,7 +201,7 @@ fn moments(report: &JourneyReport, out: &mut String) {
 
 fn replay(out: &mut String, step: u64, surface: &str) {
     let command = format!(
-        "chiyoda-replay run.json --paused --at-step {step} --surface {}",
+        "chiyoda view run.json --paused --at-step {step} --surface {}",
         shell_quote(surface)
     );
     writeln!(out, "    {}\n", command.replace('\n', "\n    ")).unwrap();

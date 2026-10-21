@@ -1,3 +1,4 @@
+#![cfg(feature = "native")]
 use chiyoda_replay::load_watch_scenario;
 use serde_json::Value;
 use std::{
@@ -10,15 +11,17 @@ impl Directory {
     fn new() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let path = std::env::temp_dir().join(format!(
-            "chiyoda-replay-cli-{}-{}",
+            "chiyoda-view-cli-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir_all(&path).unwrap();
         for (file, cadence) in [("a.json", 1), ("b.json", 2)] {
-            let bundle =
-                load_watch_scenario(include_str!("../src/fixtures/main/project.json"), cadence)
-                    .unwrap();
+            let bundle = load_watch_scenario(
+                include_str!("../../chiyoda-replay/src/fixtures/main/project.json"),
+                cadence,
+            )
+            .unwrap();
             fs::write(path.join(file), serde_json::to_vec(&bundle).unwrap()).unwrap();
         }
         Self(path)
@@ -30,13 +33,43 @@ impl Drop for Directory {
     }
 }
 fn run(directory: &Directory, args: &[&str]) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_chiyoda-replay"))
+    Command::new(env!("CARGO_BIN_EXE_chiyoda"))
         .current_dir(&directory.0)
+        .arg("view")
         .env_remove("DISPLAY")
         .env_remove("WAYLAND_DISPLAY")
         .args(args)
         .output()
         .unwrap()
+}
+#[test]
+fn one_chiyoda_executable_exposes_viewing_and_headless_reconstruction() {
+    let directory = Directory::new();
+    let help = run(&directory, &["--help"]);
+    assert!(help.status.success());
+    let help = String::from_utf8(help.stdout).unwrap();
+    assert!(help.contains("Usage: chiyoda view"), "{help}");
+    for flag in ["--watch", "--compare", "--export-png", "--export-gif"] {
+        assert!(help.contains(flag), "{help}");
+    }
+    assert!(!help.contains("chiyoda-replay"));
+    let output = Command::new(env!("CARGO_BIN_EXE_chiyoda"))
+        .current_dir(&directory.0)
+        .args(["replay", "a.json"])
+        .env_remove("DISPLAY")
+        .env_remove("WAYLAND_DISPLAY")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("open with: chiyoda view a.json")
+    );
 }
 #[test]
 fn cli_exports_annotated_evidence_and_synchronized_comparison_without_a_display() {

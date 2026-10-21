@@ -100,6 +100,7 @@ print(call("chiyoda_verify", {"experiment": output, "replay": True}))
 | `chiyoda_run` | Execute exactly the planned input and save complete comparison evidence |
 | `chiyoda_query` | Bounded pages of measurements, differences, people, queues, decisions and replay states |
 | `chiyoda_verify` | Independently re-derive evidence; optionally reconstruct every run |
+| `chiyoda_render_evidence` | Annotated exact-step PNG and source-linked person/resource evidence |
 
 `chiyoda_generate` accepts an optional workspace-relative `config` path to the
 existing `SpaceConfig` JSON format. Obtain an editable configuration with
@@ -238,6 +239,65 @@ Stable error codes include `arguments`, `configuration`, `version`, `path`,
 `step_not_recorded`, `integrity`, `missing_evidence`, and `replay`. Plan issues
 also carry object paths, validation/reachability categories, and budget details.
 
+## Annotated replay evidence
+
+After querying a person's low-progress window or a resource event, use its
+recorded replay step to request an inspectable image:
+
+```json
+{
+  "bundle": "out/agent-station/arms/baseline/run.json",
+  "output": "out/agent-station/person-delay.png",
+  "request": {
+    "step": 100,
+    "selection": {"kind": "agent", "id": "passengers:4"},
+    "trail_start_step": 50,
+    "view": "surface",
+    "camera": {"zoom": 1.0, "pan_x_pixels": 0.0, "pan_y_pixels": 0.0}
+  }
+}
+```
+
+Pass that object to `chiyoda_render_evidence`, using either `agent call` or MCP.
+For a resource, use `{"kind":"resource","resource_kind":"exit","id":"south"}`.
+Resource kinds are `exit`, `gate`, `connector` and `waypoint`; lifts use
+`connector`. Optional `surface` chooses an authored surface explicitly;
+otherwise the selected person's surface or first resource endpoint is used.
+Every requested step and trail start must exist in the recorded trace.
+
+The tool reconstructs the saved run, exports a 1200×800 annotated PNG and a
+`PATH.json` evidence sidecar, then returns their paths and SHA-256 values with
+exact IDs, recorded step/time, source hashes, measurements and JSON pointers.
+MCP additionally returns the PNG as `image/png` image content. The one-shot JSON
+CLI returns the structured receipt without base64 image data.
+
+The receipt includes at most 20 event references and a pointer to the trail;
+the complete sidecar retains up to 100 recent relevant events, 200 low-progress
+windows and 2,000 consecutive trail points. Truncation counts are explicit.
+Per-step movement audit records stay in the source bundle rather than
+crowding out route, information, release and service events. The sidecar records
+the re-derived journey report hash, analyzer version and default options when
+detailed accounting is available. Custom thresholds and isolated controls from
+a separate journey report are not imported by this image tool.
+
+Whole-run totals are labelled separately from the selected frame. Sparse traces
+still expose recorded positions/events, with a reason for unavailable detailed
+journey accounting. Historical queue entrants are not claimed as current queue
+members. Resource-attributed per-person wait durations are not recorded by the
+runtime. See [replay inspection](replay.md#inspect-people-and-resources).
+
+Both destinations must be new workspace-relative artifacts. The tool preserves
+existing files and never changes its source bundle. Inputs are bounded to
+10,000 people, 2,000,000 simulated agent-steps and 2,000,000 recorded agent
+samples, in addition to the existing artifact-size limit. The structured
+receipt is capped at 1 MiB and MCP PNG content at 4 MiB. This is a synchronous
+export rather than a streaming replay session.
+
+Synchronized two-run comparison is available through the
+[`chiyoda-replay --compare` CLI](replay.md#compare-runs) and the shared Rust replay
+library. The current MCP image tool exports one selected run; callers can request
+both arms independently or invoke the comparison CLI.
+
 ## MCP transport
 
 Start a local stdio server with:
@@ -265,7 +325,9 @@ This binding implements the explicit MCP **2025-11-25** contract:
 and [tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
 It negotiates that version, requires initialization and the initialized
 notification before tool use, exposes generated `tools/list` schemas, and
-returns matching text and structured tool envelopes. Stdout contains only
+returns matching text and structured tool envelopes. Successful
+`chiyoda_render_evidence` calls additionally include an MCP `image` content
+block containing the same hash-checked PNG written to disk. Stdout contains only
 newline-delimited JSON-RPC. Domain failures use tool `isError`; invalid
 protocol/arguments use JSON-RPC errors. EOF ends the server.
 

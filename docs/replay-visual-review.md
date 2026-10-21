@@ -1,5 +1,8 @@
 # Replay presentation review
 
+Follow-up: the [inspectable replay review](inspectable-replay-review.md) adds
+inspection/comparison and verifies native OS controls and crowd performance.
+
 Full review, 21 October 2026. Scope: the native replay window, floor plan,
 isometric overview, watch loading/failure states, PNG snapshots and headless
 PNG/GIF exports. The application retains minifb and its CPU framebuffer;

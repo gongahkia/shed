@@ -56,29 +56,106 @@ requires an available native display. PNG and GIF exports do not open a window.
 For locally aware groups, `run.json` also retains each agent's familiar exits
 and learned availability with its time and source. `resource_observed` and
 information events explain changes. The viewer displays the resulting movement;
-inspect the saved trace for the knowledge state itself. These fields are
+select the person to inspect recorded decisions and export its knowledge
+snapshot as structured evidence. These fields are
 included in full reconstruction; see [local knowledge](knowledge.md).
 
 ## Controls
 
-- Space toggles playback.
-- Left and right arrows step the trace.
-- Tab cycles surfaces in their authored declaration order.
-- V toggles between the selected-surface 2D view and an all-surface isometric overview.
-- D toggles source details in the fixed sidebar. Playback time, frame and step,
-  selected-surface count, all-surface state counts, and the plan key stay visible.
-- P writes the current rendered frame as a PNG under `--snapshot-dir` (default
-  `out/chiyoda-replay`). No image is written until P is pressed; existing
-  snapshots are never overwritten.
+- Click a person to inspect it; Shift-click an exit, gate, connector endpoint,
+  or waypoint to prefer the resource. Click empty plan space to clear selection.
+- Wheel or `+`/`-` zooms. Wheel zoom keeps the point under the pointer fixed.
+  Drag with the right or middle button to pan. R restores the authored extent;
+  F focuses the selected person or resource.
+- Click or drag the timeline to seek and pause at a recorded frame.
+- Space toggles playback; at the end, it starts again from the beginning.
+- Left and right arrows pause and step to the adjacent recorded frame.
+- `[` and `]` halve and double playback speed.
+- Tab cycles surfaces in their authored declaration order. In comparisons,
+  only IDs present in both runs are available.
+- V toggles the selected-surface 2D view and all-surface isometric overview.
+- D toggles the inspector/source details in the fixed sidebar. Playback time,
+  frame, step, counts, and the plan key remain visible.
+- P writes the current framebuffer as a PNG under `--snapshot-dir` (default
+  `out/chiyoda-replay`). Existing snapshots are preserved. For evidence with
+  provenance, use `--export-png` instead.
 - Escape closes the viewer.
 
-The window title identifies the selected surface and current trace time. The
-camera extent comes from that authored surface, rather than from the agents
-visible in one trace frame, so static geometry remains stable while replaying.
-By default it advances according to the recorded simulation-time gaps; use
-`--speed N` to show `N` simulation seconds per wall-clock second. This avoids
-making a trace recorded at a different sampling frequency appear to have a
-different duration.
+The camera starts at authored surface bounds and stays stable while replaying.
+`--zoom N --pan-x X --pan-y Y` sets its initial transform; pan values are
+framebuffer pixels. Zoom is bounded to 0.25–32×. By default playback advances
+according to recorded simulation time. `--speed N` shows `N` simulation seconds
+per wall-clock second. If drawing cannot keep up, interactive playback skips
+display frames to catch up; it never interpolates people between stored states.
+GIF export still renders every stored frame.
+
+## Inspect people and resources
+
+```console
+$ chiyoda-replay out/station/arms/baseline/run.json --paused --at-step 100 --agent passengers:4
+$ chiyoda-replay out/station/arms/baseline/run.json --paused --resource exit:south
+```
+
+The person inspector shows recorded state, the authored goal, latest recorded
+route decision, recent information/service events, and whole-run journey totals.
+Structured evidence also retains the recorded beliefs/knowledge snapshot. The authored destination is not presented as the
+current chosen destination. Where the runtime recorded a decision in event
+text, that text is retained without inventing an unrecorded route.
+
+A selected person's trail joins consecutive recorded positions through the
+selected frame. It omits inactive and connector-transit segments. The last
+2,000 points are retained; `--trail-start-step N` can narrow the interval in a
+single-run view.
+Comparisons use each selected person's retained trail through its own frame.
+A trail is a sampled visual aid, not the distance measurement. Amber timeline
+bands show retained whole-run low-progress windows; ticks show retained
+recorded events through the frame.
+
+Detailed distance, moving time, service waits, authored pauses, low-progress
+windows and movement fallback counts require the current runtime and a trace
+recorded with `--trace-every 1`. Sparse traces still support positions and
+recorded events, with an explicit unavailable reason for detailed accounting.
+Inspection re-derives journey accounting with the default analyzer options and
+records those options and the derived report hash. Separate journey reports
+with custom thresholds or isolated-agent controls retain their own evidence;
+the inspector does not import those controls. Whole-run totals and low-progress
+windows include the complete run, even when viewing an earlier frame. Low progress is a diagnostic of movement exposure,
+not an additional mutually exclusive time-budget category.
+
+Resource inspection shows authored geometry, whole-run queue audit measurements,
+and recorded queue/service/availability events through the selected frame.
+Highlighted entrants are historical entrants through that time, not inferred
+current queue membership. The runtime does not record resource-attributed
+per-person wait durations; the viewer does not estimate them from proximity.
+See [journey diagnostics](journeys.md) for the accounting definitions.
+
+## Compare runs
+
+```console
+$ chiyoda-replay out/station/arms/baseline/run.json --compare out/station/arms/announcement/run.json --paused --at-time 20 --agent passengers:4
+$ chiyoda-replay out/station/arms/baseline/run.json --compare out/station/arms/announcement/run.json --at-time 20 --export-png out/station/comparison.png
+```
+
+Both panels share one camera, authored coordinate extent, selected surface ID,
+and simulation clock. Different floor dimensions therefore keep the same metric
+scale. At a shared time, each panel shows its last recorded frame at or before
+that time; its exact timestamp and any hold duration remain visible. Seeking is
+restricted to the intersection of the recorded intervals. Missing surface IDs
+are rejected rather than matched by declaration order.
+
+Current-frame completion counts are separate from whole-run outcomes. The latter
+retain each run's own duration. Unfinished clearance and elapsed journeys remain
+unavailable. Population pairing requires equal seed and authored population
+inputs, excluding the knowledge intervention; a changed population disables
+individual elapsed-time pairing. A selected ID absent from one run is labelled
+unavailable in that panel. These are descriptive model observations; use the
+experiment report's validity and performance checks to assess an intervention.
+
+Zoom, pan, timeline seeking, speed, projection, floor selection and person/resource
+selection operate together across both panels. Labels come from the input
+bundles' parent directory names. The PNG and `PATH.json` comparison sidecar use
+`chiyoda.replay-comparison.v1`, with both source hashes, shared camera bounds,
+recorded timestamps, request, selected evidence and measured differences.
 
 ## Exact-frame PNG export
 
@@ -95,9 +172,26 @@ $ cargo run -p chiyoda-replay -- out/showcase/run.json --view overview --export-
 The image and its `PATH.json` sidecar require a reconstructed bundle. The
 sidecar records its source hashes, runtime contract, selected surface and
 explicit list of rendered surfaces,
-projection, exact recorded step and timestamp, and image dimensions. Existing
+projection, camera transform, exact recorded step and timestamp, and image dimensions.
+Plain frame exports use `chiyoda.replay-png.v2`. Existing
 images and sidecars are never overwritten. PNG and GIF export are mutually
 exclusive and cannot watch live source.
+
+Add `--agent ID` or `--resource KIND:ID` to export an annotated frame. The
+`chiyoda.replay-evidence.v1` sidecar includes the exact evidence used to draw the
+inspector, image SHA-256, source hashes, recorded timestamp, JSON pointers,
+journey analyzer version/options/report hash, bounded events and trail. The
+native viewer and headless export share the same renderer.
+
+```console
+$ chiyoda-replay out/station/arms/baseline/run.json --agent passengers:4 --at-step 100 --trail-start-step 50 --export-png out/station/person.png
+$ chiyoda-replay out/station/arms/baseline/run.json --resource exit:south --at-step 100 --export-png out/station/exit.png
+```
+
+Agents can request the same image and structured evidence through
+[`chiyoda_render_evidence`](agent-experiments.md#annotated-replay-evidence).
+Annotated selections, comparison and transformed cameras are currently PNG/native
+features; the GIF path retains its ordinary full-run presentation.
 
 ## Animated GIF export
 
@@ -129,6 +223,15 @@ The same recorded moment is available as an [isometric overview](../assets/demo/
 Both PNGs and the [showcase GIF](../assets/demo/grand-interchange-showcase.gif)
 have adjacent JSON provenance sidecars. They were exported from the current
 runtime's `grand-interchange-showcase` run, with a trace cadence of 20 steps.
+Their sidecars retain the renderer revision used for those earlier previews.
+
+The station experiment also has current annotated examples: a
+[person and low-progress periods](../assets/demo/replay-person.png), a
+[resource queue audit](../assets/demo/replay-resource.png), and a
+[synchronized comparison](../assets/demo/replay-comparison.png). Each PNG has
+an adjacent `PNG.json` sidecar. Reproduce the source runs with
+`python3 examples/experiments/compare_station.py --output out/station --replay`,
+then use the inspection and comparison export commands above.
 
 To reproduce the source and export a reviewed frame:
 
@@ -204,3 +307,31 @@ static geometry, connectors, and recorded agent positions. It is a debugging
 aid, not a general 3D camera, a physical view of a station, or a new rendering
 engine. The selected-surface 2D view remains the detailed rendering of queues,
 portal lanes, obstacles, and resource markers.
+
+## Performance and native verification
+
+The shared renderer is usable without minifb: build its library with
+`cargo check -p chiyoda-replay --lib --no-default-features`. The ordinary Chiyoda
+CLI and MCP tool use this headless dependency. Native window support is the
+replay crate's default feature and is required for its binary.
+
+A reproducible CPU-only crowd measurement is available:
+
+```console
+$ cargo run --release -p chiyoda-replay --example render_benchmark --no-default-features -- 1000 60
+$ cargo run --release -p chiyoda-replay --example render_benchmark --no-default-features -- 5000 60
+```
+
+It reports steady-state median and p95 rendering time at 1200×800, including
+framebuffer copy and excluding simulation, verification and native presentation.
+Set `CHIYODA_REPLAY_PROFILE=1` when opening a native replay to print redraw and
+window-presentation measurements on graceful exit. The viewer targets 30 window
+updates per second. Paused/unchanged ordinary
+frames reuse the last rendered buffer; the window continues processing input.
+
+On macOS, `scripts/replay_native_smoke.py --help` describes a repeatable check
+using OS keyboard/mouse events and Accessibility window inspection. It requires
+existing Accessibility access and Xcode tools, opens its own viewer, writes a new
+review directory, and restores the prior frontmost application and pointer.
+See the [inspection review](inspectable-replay-review.md) for measured results,
+reviewed outputs and verification limits.

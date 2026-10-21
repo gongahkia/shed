@@ -1,4 +1,4 @@
-use super::*;
+use super::{Change, Constraints, EditKind, NumericBound, NumericField};
 use crate::{Scenario, experiment::Issue};
 pub(super) fn issue(code: &str, path: &str, message: impl Into<String>) -> Issue {
     Issue {
@@ -24,6 +24,7 @@ pub(super) fn kind_target(change: &Change) -> (EditKind, Option<&str>) {
 }
 pub(super) fn check(
     constraints: &Constraints,
+    case: &str,
     changes: &[Change],
     scenario: Option<&Scenario>,
     same_population: bool,
@@ -53,6 +54,9 @@ pub(super) fn check(
     }
     if let Some(scenario) = scenario {
         for (i, bound) in constraints.bounds.iter().enumerate() {
+            if bound.case.as_ref().is_some_and(|id| id != case) {
+                continue;
+            }
             if numeric(scenario, bound)
                 .is_none_or(|v| !v.is_finite() || v < bound.min || v > bound.max)
             {

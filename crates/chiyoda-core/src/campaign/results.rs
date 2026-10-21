@@ -1,7 +1,11 @@
-use super::*;
+use super::{
+    CampaignError, CampaignRequest, Direction, Issue, Metric, Objective, TrialPlan, policy,
+};
 use crate::experiment::{
     AgentDifference, EvidenceReference, ExperimentExecution, ExperimentRequest, Finding,
 };
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Phase {
@@ -95,6 +99,8 @@ pub struct CampaignReport {
     pub input_hash: String,
     pub plan_hash: String,
     pub objectives: Vec<Objective>,
+    pub screening_case: String,
+    pub declared_stress_cases: Vec<String>,
     pub promoted: Vec<String>,
     pub trials: Vec<TrialResult>,
     pub candidates: Vec<CandidateResult>,
@@ -148,6 +154,7 @@ pub(super) fn benefit(objective: &Objective, a: f64, b: f64) -> f64 {
 pub(super) fn prefix(reference: &mut EvidenceReference, case: &str, candidate: &str) {
     reference.artifact = format!("trials/{case}/{candidate}/{}", reference.artifact);
 }
+#[allow(clippy::too_many_lines)] // eligibility and its measured evidence remain one projection
 pub(super) fn outcomes(
     request: &CampaignRequest,
     trial: &TrialPlan,
@@ -215,18 +222,7 @@ pub(super) fn outcomes(
             .metrics
             .as_ref()
             .and_then(|m| m.movement_metrics.as_ref());
-        if audit
-            .and_then(|m| m.on_surface_clearance_audit.as_ref())
-            .is_none_or(|a| {
-                !a.maximum_disc_overlap_m.is_finite() || a.maximum_disc_overlap_m > 1e-8
-            })
-            || audit
-                .and_then(|m| m.swept_on_surface_clearance_audit.as_ref())
-                .is_none_or(|a| {
-                    !a.maximum_swept_disc_overlap_m.is_finite()
-                        || a.maximum_swept_disc_overlap_m > 1e-8
-                })
-        {
+        if !reference_audits_valid(audit) {
             r.reasons.push(policy::issue(
                 "reference_overlap",
                 arm,
@@ -259,6 +255,9 @@ pub(super) fn outcomes(
         });
     }
     for b in &request.constraints.outcomes {
+        if b.case.as_ref().is_some_and(|id| *id != trial.case) {
+            continue;
+        }
         if metric(b.metric, &after.observations)
             .is_none_or(|v| b.min.is_some_and(|min| v < min) || b.max.is_some_and(|max| v > max))
         {
@@ -270,7 +269,19 @@ pub(super) fn outcomes(
         }
     }
     r.eligible = r.reasons.is_empty();
-    let mut people = execution.report.comparisons[0].agents.clone();
+    let mut people: Vec<_> = execution.report.comparisons[0]
+        .agents
+        .iter()
+        .filter(|p| {
+            p.baseline_completed != p.candidate_completed
+                || p.elapsed_difference_s.is_some_and(|v| v != 0.)
+                || p.walking_distance_difference_m != 0.
+                || p.service_wait_difference_s != 0.
+                || p.route_wait_difference_s != 0.
+                || p.low_progress_span_difference_s != 0.
+        })
+        .cloned()
+        .collect();
     people.sort_by(|a, b| {
         affected_score(b)
             .total_cmp(&affected_score(a))
@@ -296,10 +307,10 @@ pub(super) fn outcomes(
     r
 }
 fn affected_score(p: &AgentDifference) -> f64 {
-    (if p.baseline_completed != p.candidate_completed {
-        1_000_000.
-    } else {
+    (if p.baseline_completed == p.candidate_completed {
         0.
+    } else {
+        1_000_000.
     }) + p.elapsed_difference_s.unwrap_or(0.).abs()
         + p.service_wait_difference_s.abs()
         + p.low_progress_span_difference_s.abs()
@@ -347,4 +358,51 @@ fn moments(execution: &ExperimentExecution, result: &TrialResult) -> Vec<Evidenc
         }
     }
     moments
+}
+
+fn reference_audits_valid(audit: Option<&crate::MovementMetrics>) -> bool {
+    audit
+        .and_then(|m| m.on_surface_clearance_audit.as_ref())
+        .is_some_and(|a| a.maximum_disc_overlap_m.is_finite() && a.maximum_disc_overlap_m <= 1e-8)
+        && audit
+            .and_then(|m| m.swept_on_surface_clearance_audit.as_ref())
+            .is_some_and(|a| {
+                a.maximum_swept_disc_overlap_m.is_finite() && a.maximum_swept_disc_overlap_m <= 1e-8
+            })
+}
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn missing_or_overlapping_reference_audits_are_never_rankable() {
+        let scenario =
+            crate::decode_scenario(include_str!("../../tests/fixtures/json-free-walk.json"))
+                .unwrap();
+        let bundle = crate::run(
+            &scenario,
+            crate::RunOptions {
+                trace_every_steps: 1,
+            },
+        )
+        .unwrap();
+        let mut audit = bundle.metrics.movement_metrics.unwrap();
+        assert!(super::reference_audits_valid(Some(&audit)));
+        audit
+            .on_surface_clearance_audit
+            .as_mut()
+            .unwrap()
+            .maximum_disc_overlap_m = 0.001;
+        assert!(!super::reference_audits_valid(Some(&audit)));
+        audit
+            .on_surface_clearance_audit
+            .as_mut()
+            .unwrap()
+            .maximum_disc_overlap_m = 0.;
+        audit
+            .swept_on_surface_clearance_audit
+            .as_mut()
+            .unwrap()
+            .maximum_swept_disc_overlap_m = 0.001;
+        assert!(!super::reference_audits_valid(Some(&audit)));
+        assert!(!super::reference_audits_valid(None));
+    }
 }

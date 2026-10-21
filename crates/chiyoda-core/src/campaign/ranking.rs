@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    CampaignRequest, CandidateResult, EvidenceMoment, Objective, ObjectiveSummary, ObjectiveValue,
+    Phase, TrialResult, TrialStatus,
+};
 use std::cmp::Ordering;
 fn compare_values(a: &[ObjectiveValue], b: &[ObjectiveValue]) -> Ordering {
     for (a, b) in a.iter().zip(b) {
@@ -22,7 +25,7 @@ pub(super) fn classification(values: &[ObjectiveValue], objectives: &[Objective]
     }
     0
 }
-pub(super) fn screen<'a>(trials: &'a [TrialResult]) -> Vec<&'a TrialResult> {
+pub(super) fn screen(trials: &[TrialResult]) -> Vec<&TrialResult> {
     let mut ranked: Vec<_> = trials
         .iter()
         .filter(|t| t.phase == Phase::Screening && t.eligible)
@@ -43,6 +46,7 @@ pub(super) fn promoted(request: &CampaignRequest, trials: &[TrialResult]) -> Vec
         .map(|t| t.candidate.clone())
         .collect()
 }
+#[allow(clippy::too_many_lines)] // one candidate projection preserves coverage and objective denominators
 pub(super) fn candidates(
     request: &CampaignRequest,
     trials: &[TrialResult],

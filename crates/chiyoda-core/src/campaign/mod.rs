@@ -13,7 +13,7 @@ use crate::{
 };
 pub use planning::plan;
 pub use results::*;
-pub use runner::{execute, execute_with};
+pub use runner::{PreparedCampaign, execute, execute_with, prepare_run};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -51,7 +51,7 @@ const fn one() -> u32 {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CaseSource {
-    Authored { scenario: CanonicalScenario },
+    Authored { scenario: Box<CanonicalScenario> },
     Generated { seed: u64, config: Box<SpaceConfig> },
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -84,7 +84,7 @@ pub enum EditKind {
 pub struct Permission {
     pub kind: EditKind,
     /// Exact object IDs. `*` explicitly permits every ID of this kind.
-    /// ReplaceInformation replaces the whole policy and requires an empty list.
+    /// `ReplaceInformation` replaces the whole policy and requires an empty list.
     pub targets: Vec<String>,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -103,6 +103,9 @@ pub enum NumericField {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NumericBound {
+    /// Omission applies the bound to every case.
+    #[serde(default)]
+    pub case: Option<String>,
     pub field: NumericField,
     pub target: String,
     pub min: f64,
@@ -153,6 +156,8 @@ pub struct Objective {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct OutcomeBound {
+    #[serde(default)]
+    pub case: Option<String>,
     pub metric: Metric,
     pub min: Option<f64>,
     pub max: Option<f64>,
@@ -173,17 +178,10 @@ impl Default for Promotion {
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
+#[derive(Default)]
 pub struct CampaignOptions {
     pub budget: Budget,
     pub evaluation: EvaluationOptions,
-}
-impl Default for CampaignOptions {
-    fn default() -> Self {
-        Self {
-            budget: Budget::default(),
-            evaluation: EvaluationOptions::default(),
-        }
-    }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]

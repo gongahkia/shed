@@ -7,9 +7,9 @@ fn request() -> CampaignRequest {
         screening: CaseSpec {
             id: "screen".into(),
             source: CaseSource::Authored {
-                scenario: CanonicalScenario::from(
+                scenario: Box::new(CanonicalScenario::from(
                     decode_scenario(include_str!("fixtures/json-free-walk.json")).unwrap(),
-                ),
+                )),
             },
             population_multiplier: 1,
         },
@@ -28,6 +28,7 @@ fn request() -> CampaignRequest {
                 targets: vec!["out".into()],
             }],
             bounds: vec![NumericBound {
+                case: None,
                 field: NumericField::ExitWidth,
                 target: "out".into(),
                 min: 1.,
@@ -277,4 +278,127 @@ fn unchanged_controls_are_not_promoted_as_improvements_and_missing_clearance_sta
             .iter()
             .any(|i| i.code == "missing_objective")
     );
+}
+
+#[test]
+fn wfc_stress_adapts_only_explicit_recipes_and_retains_generation_exhaustion() {
+    use chiyoda_core::generator::spaces::{FloorConstraint, SpaceConfig};
+    let mut r = request();
+    r.promotion.require_improvement = false;
+    r.constraints.bounds[0].case = Some("screen".into());
+    r.constraints.allowed_edits[0]
+        .targets
+        .push("primary".into());
+    let mut config = SpaceConfig {
+        width: 4,
+        height: 4,
+        floors: 1,
+        agents_per_floor: 1,
+        duration_s: 2.,
+        timestep_s: 0.5,
+        max_attempts: 2,
+        ..SpaceConfig::default()
+    };
+    r.stress_cases.push(CaseSpec {
+        id: "wfc".into(),
+        source: CaseSource::Generated {
+            seed: 11,
+            config: Box::new(config.clone()),
+        },
+        population_multiplier: 1,
+    });
+    r.candidates[0].case_changes.insert(
+        "wfc".into(),
+        vec![Change::SetExitWidth {
+            id: "primary".into(),
+            width_m: 3.,
+        }],
+    );
+    let p = plan(&r).unwrap();
+    assert!(p.runnable, "{:?}", p.issues);
+    assert!(p.cases[1].generation.as_ref().unwrap()["attempts"].is_array());
+    let e = execute(&r, &p.plan_hash).unwrap();
+    assert_eq!(e.report.trials.len(), 2);
+    assert!(
+        e.report.trials[1].eligible,
+        "{:?}",
+        e.report.trials[1].reasons
+    );
+    assert_eq!(e.report.candidates[0].eligible_cases, 2);
+    config.modules = config.catalog();
+    config.pins.push(FloorConstraint {
+        floor: 0,
+        x: 0,
+        y: 2,
+        allowed_tiles: vec!["solid".into()],
+    });
+    r.stress_cases[0].source = CaseSource::Generated {
+        seed: 11,
+        config: Box::new(config),
+    };
+    let p = plan(&r).unwrap();
+    assert!(p.runnable);
+    assert_eq!(
+        p.cases[1].generation.as_ref().unwrap()["attempts"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    let e = execute(&r, &p.plan_hash).unwrap();
+    assert_eq!(e.report.trials[1].status, TrialStatus::Rejected);
+    assert_eq!(e.report.candidates[0].status, "stress_incomplete");
+    assert!(e.report.candidates[0].final_rank.is_none());
+    assert_eq!(e.report.candidates[0].expected_cases, 2);
+    e.report
+        .verify_with(&r, false, |case, candidate| {
+            Ok(clone_trial(
+                e.trials
+                    .iter()
+                    .find(|t| t.result.case == case && t.result.candidate == candidate)
+                    .unwrap(),
+            ))
+        })
+        .unwrap();
+}
+
+#[test]
+fn a_promising_screen_result_can_regress_under_stress_without_losing_its_denominator() {
+    let mut r = request();
+    r.constraints.bounds.clear();
+    r.constraints.allowed_edits = vec![Permission {
+        kind: EditKind::SetExitCapacity,
+        targets: vec!["out".into()],
+    }];
+    r.candidates[0].changes = vec![Change::SetExitCapacity {
+        id: "out".into(),
+        capacity_per_s: Some(1.),
+    }];
+    if let CaseSource::Authored { scenario } = &mut r.screening.source {
+        scenario.scenario.exits[0].capacity_per_s = Some(0.1);
+    }
+    let mut stress = r.screening.clone();
+    stress.id = "high_capacity".into();
+    stress.population_multiplier = 2;
+    if let CaseSource::Authored { scenario } = &mut stress.source {
+        scenario.scenario.exits[0].capacity_per_s = Some(10.);
+    }
+    r.stress_cases.push(stress);
+    r.objectives.push(Objective {
+        metric: Metric::ServiceWaitPerPersonS,
+        direction: Direction::Minimize,
+        tolerance: 0.001,
+    });
+    let e = execute(&r, &plan(&r).unwrap().plan_hash).unwrap();
+    assert_eq!(e.report.promoted, ["wider"]);
+    assert_eq!(
+        e.report.candidates[0].status, "stress_regressed",
+        "{:?}",
+        e.report.trials
+    );
+    let objective = &e.report.candidates[0].objectives[1];
+    assert_eq!(objective.paired_cases, 2);
+    assert_eq!(objective.wins, 1);
+    assert_eq!(objective.losses, 1);
+    assert!(objective.worst_benefit.unwrap() < 0.);
 }

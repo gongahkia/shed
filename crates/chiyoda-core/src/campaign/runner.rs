@@ -1,41 +1,90 @@
-use super::*;
+use super::{
+    CAMPAIGN_VERSION, CampaignError, CampaignExecution, CampaignPlan, CampaignReport,
+    CampaignRequest, Phase, TrialExecution, TrialPlan, TrialResult, planning, ranking, results,
+};
 use crate::{
     bundle::canonical_hash,
     experiment::{self, ExperimentExecution, ExperimentRequest},
 };
 use std::{cell::RefCell, collections::BTreeMap};
 
+const CLAIM_BOUNDARY: &str = concat!(
+    "Candidate recipes and case overrides are declared before screening. Every trial ",
+    "independently compares its case baseline with one candidate, including separate ",
+    "deterministic baseline executions charged to the budget. Positive benefit follows each ",
+    "declared objective direction. Screening and final ranks use exact lexicographic values; ",
+    "tolerances classify wins/ties/losses only. Final ranks compare equally weighted mean ",
+    "paired benefits over every declared case, including screening, and require complete ",
+    "eligible coverage. Stress regressions and exclusions remain explicit. This finite ",
+    "candidate/case set is not a global optimum, statistical generalization or calibrated ",
+    "architectural recommendation. Case-specific recipes are explicit adaptations, not a proof ",
+    "of the same architectural pattern.",
+);
+
+/// An immutable request/plan pair prepared once per call, including WFC work.
+/// Its private fields prevent executing a caller-mutated plan.
+pub struct PreparedCampaign {
+    request: CampaignRequest,
+    plan: CampaignPlan,
+}
+pub fn prepare_run(request: &CampaignRequest) -> Result<PreparedCampaign, CampaignError> {
+    Ok(PreparedCampaign {
+        request: request.clone(),
+        plan: planning::prepare(request)?,
+    })
+}
+impl PreparedCampaign {
+    #[must_use]
+    pub fn plan(&self) -> &CampaignPlan {
+        &self.plan
+    }
+    pub fn execute_with(
+        &self,
+        expected_plan_hash: &str,
+        mut observe: impl FnMut(&TrialExecution) -> Result<(), CampaignError>,
+    ) -> Result<CampaignReport, CampaignError> {
+        if self.plan.plan_hash != expected_plan_hash {
+            return Err(CampaignError::new(
+                "stale_plan",
+                "campaign input, runtime or generated plan changed since preflight",
+            ));
+        }
+        if !self.plan.runnable {
+            return Err(CampaignError::new(
+                "invalid_plan",
+                "campaign budget preflight failed; inspect plan issues",
+            ));
+        }
+        drive(
+            &self.request,
+            &self.plan,
+            |r, p| {
+                Ok(experiment::execute(
+                    r,
+                    &p.experiment.as_ref().unwrap().input_hash,
+                ))
+            },
+            &mut observe,
+        )
+    }
+    pub fn verify_with(
+        &self,
+        report: &CampaignReport,
+        replay: bool,
+        load: impl FnMut(&str, &str) -> Result<TrialExecution, CampaignError>,
+    ) -> Result<(), CampaignError> {
+        report.verify_prepared(&self.request, &self.plan, replay, load)
+    }
+}
 /// Streaming execution persists one trial at a time; the callback may release its artifacts.
 pub fn execute_with(
     request: &CampaignRequest,
     expected_plan_hash: &str,
-    mut observe: impl FnMut(&TrialExecution) -> Result<(), CampaignError>,
+    observe: impl FnMut(&TrialExecution) -> Result<(), CampaignError>,
 ) -> Result<CampaignReport, CampaignError> {
-    let p = planning::prepare(request)?;
-    if p.plan_hash != expected_plan_hash {
-        return Err(CampaignError::new(
-            "stale_plan",
-            "campaign input, runtime or generated plan changed since preflight",
-        ));
-    }
-    if !p.runnable {
-        return Err(CampaignError::new(
-            "invalid_plan",
-            "campaign budget preflight failed; inspect plan issues",
-        ));
-    }
-    drive(
-        request,
-        &p,
-        |r, p| {
-            Ok(experiment::execute(
-                r,
-                &p.experiment.as_ref().unwrap().input_hash,
-            ))
-        },
-        &mut observe,
-    )
+    prepare_run(request)?.execute_with(expected_plan_hash, observe)
 }
+
 pub fn execute(
     request: &CampaignRequest,
     expected_plan_hash: &str,
@@ -111,9 +160,36 @@ fn drive(
     if p.cases.len() == 1 {
         promoted = ranking::promoted(request, &trials);
     }
+    finish(request, p, trials, promoted)
+}
+fn finish(
+    request: &CampaignRequest,
+    p: &CampaignPlan,
+    trials: Vec<TrialResult>,
+    promoted: Vec<String>,
+) -> Result<CampaignReport, CampaignError> {
     let candidates = ranking::candidates(request, &trials, &promoted);
     let evidence = ranking::evidence(request, &trials, &candidates);
-    let mut report=CampaignReport{campaign_version:CAMPAIGN_VERSION.into(),runtime_version:crate::RUNTIME_VERSION.into(),name:request.name.clone(),input_hash:p.input_hash.clone(),plan_hash:p.plan_hash.clone(),objectives:request.objectives.clone(),promoted,trials,candidates,evidence_moments:evidence,charged_simulation_agent_steps:0,retained_trace_samples:0,reserved_agent_steps:p.reserved_agent_steps,reserved_evidence_agent_steps:p.reserved_evidence_agent_steps,claim_boundary:"Candidate recipes and case overrides are declared before screening. Every trial independently compares its case baseline with one candidate, including separate deterministic baseline executions charged to the budget. Positive benefit follows each declared objective direction. Screening and final ranks use exact lexicographic values; tolerances classify wins/ties/losses only. Final ranks compare equally weighted mean paired benefits over every declared case, including screening, and require complete eligible coverage. Stress regressions and exclusions remain explicit. This finite candidate/case set is not a global optimum, statistical generalization or calibrated architectural recommendation. Case-specific recipes are explicit adaptations, not a proof of the same architectural pattern.".into(),report_hash:String::new()};
+    let mut report = CampaignReport {
+        campaign_version: CAMPAIGN_VERSION.into(),
+        runtime_version: crate::RUNTIME_VERSION.into(),
+        name: request.name.clone(),
+        input_hash: p.input_hash.clone(),
+        plan_hash: p.plan_hash.clone(),
+        objectives: request.objectives.clone(),
+        screening_case: request.screening.id.clone(),
+        declared_stress_cases: request.stress_cases.iter().map(|c| c.id.clone()).collect(),
+        promoted,
+        trials,
+        candidates,
+        evidence_moments: evidence,
+        charged_simulation_agent_steps: 0,
+        retained_trace_samples: 0,
+        reserved_agent_steps: p.reserved_agent_steps,
+        reserved_evidence_agent_steps: p.reserved_evidence_agent_steps,
+        claim_boundary: CLAIM_BOUNDARY.into(),
+        report_hash: String::new(),
+    };
     report.charged_simulation_agent_steps =
         report.trials.iter().map(|t| t.charged_agent_steps).sum();
     report.retained_trace_samples = report.trials.iter().map(|t| t.retained_trace_samples).sum();
@@ -158,8 +234,16 @@ impl CampaignReport {
         replay: bool,
         load: impl FnMut(&str, &str) -> Result<TrialExecution, CampaignError>,
     ) -> Result<(), CampaignError> {
+        prepare_run(request)?.verify_with(self, replay, load)
+    }
+    fn verify_prepared(
+        &self,
+        request: &CampaignRequest,
+        p: &CampaignPlan,
+        replay: bool,
+        load: impl FnMut(&str, &str) -> Result<TrialExecution, CampaignError>,
+    ) -> Result<(), CampaignError> {
         self.check_hash()?;
-        let p = planning::prepare(request)?;
         if !p.runnable || p.plan_hash != self.plan_hash {
             return Err(CampaignError::new(
                 "integrity",
@@ -170,7 +254,7 @@ impl CampaignReport {
         let records = RefCell::new(BTreeMap::new());
         let derived = drive(
             request,
-            &p,
+            p,
             |r, planned| {
                 let archived = (load.borrow_mut())(&planned.case, &planned.candidate)?;
                 if archived.request.as_ref() != Some(r) {

@@ -1,5 +1,8 @@
 use super::policy::issue;
-use super::*;
+use super::{
+    CAMPAIGN_VERSION, CampaignError, CampaignPlan, CampaignRequest, Candidate, CanonicalScenario,
+    CaseSource, CaseSpec, Change, EditKind, PreparedCase, TrialPlan, policy,
+};
 use crate::{
     RUNTIME_VERSION,
     bundle::canonical_hash,
@@ -44,6 +47,7 @@ pub(super) fn experiment_request(
         },
     })
 }
+#[allow(clippy::too_many_lines)] // one bounded configuration contract
 fn validate(request: &CampaignRequest) -> Result<(), CampaignError> {
     if request.campaign_version != CAMPAIGN_VERSION {
         return Err(CampaignError::new(
@@ -132,6 +136,9 @@ fn validate(request: &CampaignRequest) -> Result<(), CampaignError> {
         }
     }
     for b in &request.constraints.bounds {
+        if b.case.as_ref().is_some_and(|id| !ids.contains(id)) {
+            return Err(error("bound refers to an undeclared case"));
+        }
         if !b.min.is_finite() || !b.max.is_finite() || b.min > b.max || b.target.is_empty() {
             return Err(error(
                 "numeric bounds need a target and finite ordered endpoints",
@@ -139,6 +146,9 @@ fn validate(request: &CampaignRequest) -> Result<(), CampaignError> {
         }
     }
     for b in &request.constraints.outcomes {
+        if b.case.as_ref().is_some_and(|id| !ids.contains(id)) {
+            return Err(error("outcome bound refers to an undeclared case"));
+        }
         if b.min.is_none() && b.max.is_none()
             || b.min.into_iter().chain(b.max).any(|v| !v.is_finite())
             || b.min.zip(b.max).is_some_and(|(min, max)| min > max)
@@ -163,7 +173,7 @@ fn prepare_case(case: &CaseSpec) -> PreparedCase {
         issues: vec![],
     };
     let source = match &case.source {
-        CaseSource::Authored { scenario } => Some(scenario.clone()),
+        CaseSource::Authored { scenario } => Some(scenario.as_ref().clone()),
         CaseSource::Generated { seed, config } => match spaces::generate(*seed, config) {
             Ok(space) => {
                 p.generation =
@@ -200,6 +210,7 @@ fn prepare_case(case: &CaseSpec) -> PreparedCase {
 pub fn plan(request: &CampaignRequest) -> Result<CampaignPlan, CampaignError> {
     prepare(request)
 }
+#[allow(clippy::too_many_lines)] // preflight keeps reservation math beside each trial
 pub(super) fn prepare(request: &CampaignRequest) -> Result<CampaignPlan, CampaignError> {
     validate(request)?;
     let mut p = CampaignPlan {
@@ -228,8 +239,8 @@ pub(super) fn prepare(request: &CampaignRequest) -> Result<CampaignPlan, Campaig
                 u64::from(config.max_attempts).saturating_mul(u64::from(config.max_decisions)),
             );
             if config.max_attempts > 64
-                || config.max_backtracks > 10000
-                || config.max_decisions > 100000
+                || config.max_backtracks > 10_000
+                || config.max_decisions > 100_000
             {
                 p.issues.push(issue("generation_budget","source.config","per case at most 64 attempts, 10000 backtracks and 100000 decisions per attempt"));
             }
@@ -292,6 +303,7 @@ pub(super) fn prepare(request: &CampaignRequest) -> Result<CampaignPlan, Campaig
                 }
                 trial.issues.extend(policy::check(
                     &request.constraints,
+                    &case.id,
                     changes(candidate, &case.id),
                     scenarios.get(1).map(|s| &s.scenario),
                     exp.arms[1].same_population_inputs,

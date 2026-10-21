@@ -750,4 +750,26 @@ fn mcp_campaign_loop_returns_the_same_annotated_png_as_its_archived_receipt() {
             .iter()
             .any(|c| c["type"] == "image")
     );
+    // A resealed malformed receipt must return an integrity error, not panic
+    // while the MCP response attaches the image.
+    let path = d.0.join("result/evidence-index.json");
+    let mut malformed = read(&path);
+    malformed["images"][0]["receipt"]["image"] = Value::Null;
+    malformed["index_hash"] = "".into();
+    malformed["index_hash"] = chiyoda_core::bundle::canonical_hash(&malformed).into();
+    write(&path, &malformed);
+    let response = rpc.request(&json!({
+        "jsonrpc":"2.0","id":4,"method":"tools/call",
+        "params":{"name":"chiyoda_campaign_query",
+                  "arguments":{"campaign":"result","view":"evidence"}}
+    }));
+    assert_eq!(response["result"]["isError"], true);
+    assert_eq!(
+        response["result"]["structuredContent"]["error"]["code"],
+        "integrity"
+    );
+    assert_eq!(
+        rpc.tool("chiyoda_capabilities", &json!({}))["campaign_version"],
+        "1"
+    );
 }

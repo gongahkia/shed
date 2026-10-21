@@ -157,11 +157,17 @@ pub(super) fn render(
         let input:super::super::replay::RenderInput=serde_json::from_value(json!({"bundle":format!("{output}/{bundle}"),"output":format!("{output}/{image}"),"request":evidence_request(moment)})).expect("render input");
         index.reconstruction_agent_steps_charged += moment.reconstruction_agent_steps;
         let (receipt, error) = match super::super::replay::execute(w, &input) {
-            Ok(r) => (
+            Ok(r) if r["bundle_sha256"] == moment.source_bundle_hash => (
                 Some(
                     json!({"image":{"artifact":image,"sha256":r["image"]["sha256"],"mime_type":"image/png","width":1200,"height":800},"evidence_artifact":format!("{image}.json"),"evidence_sha256":r["evidence_sha256"],"bundle_artifact":bundle,"bundle_sha256":r["bundle_sha256"]}),
                 ),
                 None,
+            ),
+            Ok(_) => (
+                None,
+                Some(
+                    json!({"code":"integrity","message":"rendered source differs from the campaign moment"}),
+                ),
             ),
             Err(e) => (None, Some(serde_json::to_value(e).expect("render error"))),
         };
@@ -201,6 +207,32 @@ pub(super) fn read_index(
         return Err(integrity(
             "image inventory/hash/source linkage differs from campaign evidence moments",
         ));
+    }
+    for (n, item) in index.images.iter().enumerate() {
+        if let Some(receipt) = &item.receipt {
+            let image = format!("evidence/{n:03}.png");
+            let valid_hash = |value: &Value| {
+                value
+                    .as_str()
+                    .is_some_and(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit()))
+            };
+            if !receipt["image"].is_object()
+                || receipt["image"]["artifact"] != image
+                || receipt["evidence_artifact"] != format!("{image}.json")
+                || receipt["bundle_artifact"]
+                    != format!(
+                        "trials/{}/{}/arms/{}/run.json",
+                        item.moment.case, item.moment.candidate, item.moment.arm
+                    )
+                || receipt["bundle_sha256"] != item.moment.source_bundle_hash
+                || !valid_hash(&receipt["image"]["sha256"])
+                || !valid_hash(&receipt["evidence_sha256"])
+            {
+                return Err(integrity(
+                    "malformed image receipt or unexpected artifact/source path",
+                ));
+            }
+        }
     }
     index.index_hash = saved;
     Ok(index)

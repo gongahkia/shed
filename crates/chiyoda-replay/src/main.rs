@@ -654,7 +654,8 @@ struct GifExportManifest {
     bundle_version: String,
     trace_every_steps: u32,
     trace_frame_count: usize,
-    rendered_surface: String,
+    selected_surface: String,
+    rendered_surfaces: Vec<String>,
     view: ViewMode,
     render_width_pixels: usize,
     render_height_pixels: usize,
@@ -695,7 +696,8 @@ fn export_gif(
         bundle_version: bundle.bundle_version.clone(),
         trace_every_steps,
         trace_frame_count: bundle.trace.len(),
-        rendered_surface: bundle.scenario.scenario.surfaces[surface_index].id.clone(),
+        selected_surface: bundle.scenario.scenario.surfaces[surface_index].id.clone(),
+        rendered_surfaces: rendered_surface_ids(bundle, surface_index, view),
         view,
         render_width_pixels: WIDTH,
         render_height_pixels: HEIGHT,
@@ -741,7 +743,8 @@ struct PngExportManifest<'a> {
     scenario_sha256: &'a str,
     runtime_version: &'a str,
     bundle_version: &'a str,
-    rendered_surface: &'a str,
+    selected_surface: &'a str,
+    rendered_surfaces: Vec<String>,
     view: ViewMode,
     recorded_step: u64,
     recorded_time_s: f64,
@@ -767,7 +770,8 @@ fn export_png(
         scenario_sha256: &bundle.scenario_hash,
         runtime_version: &bundle.runtime_version,
         bundle_version: &bundle.bundle_version,
-        rendered_surface: &bundle.scenario.scenario.surfaces[surface_index].id,
+        selected_surface: &bundle.scenario.scenario.surfaces[surface_index].id,
+        rendered_surfaces: rendered_surface_ids(bundle, surface_index, view),
         view,
         recorded_step: frame.step,
         recorded_time_s: frame.time_s,
@@ -813,6 +817,18 @@ fn ensure_new_export_targets(output: &Path, sidecar: &Path) -> Result<()> {
             .with_context(|| format!("creating image export directory {}", parent.display()))?;
     }
     Ok(())
+}
+
+fn rendered_surface_ids(bundle: &RunBundle, selected: usize, view: ViewMode) -> Vec<String> {
+    bundle
+        .scenario
+        .scenario
+        .surfaces
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| view == ViewMode::Overview || *index == selected)
+        .map(|(_, surface)| surface.id.clone())
+        .collect()
 }
 
 fn write_gif(
@@ -1202,6 +1218,14 @@ mod tests {
         assert_eq!(sidecar["playback_speed"], 2.0);
         assert!(sidecar.get("sprite_atlas").is_none());
         assert_eq!(sidecar["renderer"]["version"], render::RENDERER_VERSION);
+        assert_eq!(
+            sidecar["selected_surface"],
+            bundle.scenario.scenario.surfaces[0].id
+        );
+        assert_eq!(
+            sidecar["rendered_surfaces"],
+            serde_json::json!([bundle.scenario.scenario.surfaces[0].id])
+        );
         let mut decoder = gif::DecodeOptions::new();
         decoder.set_color_output(gif::ColorOutput::RGBA);
         let mut reader = decoder.read_info(gif.as_slice()).unwrap();
@@ -1229,6 +1253,18 @@ mod tests {
         assert_eq!(sidecar["recorded_step"], bundle.trace[1].step);
         assert_eq!(sidecar["recorded_time_s"], bundle.trace[1].time_s);
         assert_eq!(sidecar["view"], "overview");
+        assert_eq!(
+            sidecar["rendered_surfaces"],
+            serde_json::json!(
+                bundle
+                    .scenario
+                    .scenario
+                    .surfaces
+                    .iter()
+                    .map(|surface| &surface.id)
+                    .collect::<Vec<_>>()
+            )
+        );
         assert_eq!(sidecar["bundle_sha256"], bundle.bundle_hash);
         assert_eq!(serde_json::to_vec(&bundle).unwrap(), original);
         let image = fs::read(&output).unwrap();

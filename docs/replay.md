@@ -93,7 +93,8 @@ $ cargo run -p chiyoda-replay -- out/showcase/run.json --view overview --export-
 ```
 
 The image and its `PATH.json` sidecar require a reconstructed bundle. The
-sidecar records its source hashes, runtime contract, selected surface,
+sidecar records its source hashes, runtime contract, selected surface and
+explicit list of rendered surfaces,
 projection, exact recorded step and timestamp, and image dimensions. Existing
 images and sidecars are never overwritten. PNG and GIF export are mutually
 exclusive and cannot watch live source.
@@ -111,7 +112,7 @@ not modify the canonical bundle.
 `--gif-speed N` means `N` simulation seconds per playback second. GIF timing is
 limited to centiseconds; the companion `PATH.json` records the exact
 per-frame rounded delays, the terminal-delay policy, playback speed,
-`trace_every_steps`, trace-frame count, rendered surface, scenario hash, bundle
+`trace_every_steps`, trace-frame count, selected and rendered surfaces, scenario hash, bundle
 hash, runtime and bundle versions, projection, and a clear derived-artifact boundary.
 The GIF sidecar uses `chiyoda.replay-gif.v2`. The
 exporter refuses to overwrite either the GIF or its sidecar. The verified JSON

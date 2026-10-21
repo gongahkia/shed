@@ -35,7 +35,7 @@ pub(super) fn apply(scenario: &mut Scenario, change: &Change) -> Result<(), Expe
         }
         Change::SetExitWidth { id, width_m } => target!(exits, id).width_m = *width_m,
         Change::SetExitCapacity { id, capacity_per_s } => {
-            target!(exits, id).capacity_per_s = *capacity_per_s
+            target!(exits, id).capacity_per_s = *capacity_per_s;
         }
         Change::SetGateRate {
             id,
@@ -63,7 +63,7 @@ pub(super) fn apply(scenario: &mut Scenario, change: &Change) -> Result<(), Expe
         }
         Change::SetGroupCount { id, count } => target!(agents, id).count = *count,
         Change::SetGroupKnowledge { id, knowledge } => {
-            target!(agents, id).knowledge.clone_from(knowledge)
+            target!(agents, id).knowledge.clone_from(knowledge);
         }
         Change::ReplaceInformation {
             messages,

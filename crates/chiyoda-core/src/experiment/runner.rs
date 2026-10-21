@@ -176,6 +176,11 @@ fn arm_result(id: &str, evaluation: CaseReport, journeys: Option<&JourneyReport>
             observations.insert("clearance_time_s".into(), time);
         }
         observations.extend(journeys.expect("measured").summary().observations());
+        observations.insert(
+            "service_wait_per_person_s".into(),
+            journeys.expect("measured").summary().service_wait_agent_s
+                / f64::from(metrics.total_agents),
+        );
     }
     ArmResult {
         id: id.into(),
@@ -367,6 +372,36 @@ impl ExperimentReport {
                 "experiment version, runtime or report hash does not match",
             ));
         }
+        let mut ids = BTreeSet::new();
+        if !(2..=16).contains(&self.arms.len())
+            || self.plan.arms.len() != self.arms.len()
+            || self.comparisons.len() + 1 != self.arms.len()
+            || self.arms[0].id != "baseline"
+            || !self.plan.runnable
+            || self.plan.input_hash != self.input_hash
+            || self.plan.experiment_version != self.experiment_version
+            || self.plan.runtime_version != self.runtime_version
+            || self.arms.iter().zip(&self.plan.arms).any(|(arm, planned)| {
+                arm.id != planned.id
+                    || !ids.insert(&arm.id)
+                    || arm.id.is_empty()
+                    || arm.id.len() > 64
+                    || !arm
+                        .id
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+            })
+            || self
+                .comparisons
+                .iter()
+                .zip(self.arms.iter().skip(1))
+                .any(|(comparison, arm)| comparison.candidate != arm.id)
+        {
+            return Err(ExperimentError::new(
+                "integrity",
+                "experiment arm and comparison inventory is inconsistent",
+            ));
+        }
         Ok(())
     }
 
@@ -410,6 +445,12 @@ impl ExperimentReport {
                     "an arm has no run or journey evidence; its failure remains recorded but cannot be independently re-derived",
                 ));
             };
+            if journeys.options != JourneyOptions::default() {
+                return Err(ExperimentError::new(
+                    "integrity",
+                    "journey analysis options differ from the experiment contract",
+                ));
+            }
             if bundle.scenario != *scenario
                 || bundle.bundle_version != crate::bundle::BUNDLE_VERSION
                 || bundle.runtime_version != RUNTIME_VERSION

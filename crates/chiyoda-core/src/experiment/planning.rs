@@ -74,14 +74,14 @@ pub fn inspect(document: &CanonicalScenario) -> ScenarioInspection {
             "full-step evidence requires a resolvable cadence and duration at most 86400 seconds",
         ));
     }
-    if issues.is_empty() {
-        if let Err(errors) = validate(scenario) {
-            issues.extend(
-                errors
-                    .into_iter()
-                    .map(|error| issue("validation", &error.path, error.message)),
-            );
-        }
+    if issues.is_empty()
+        && let Err(errors) = validate(scenario)
+    {
+        issues.extend(
+            errors
+                .into_iter()
+                .map(|error| issue("validation", &error.path, error.message)),
+        );
     }
     let reachability = if issues.is_empty() {
         match reachability::check(scenario) {
@@ -121,53 +121,8 @@ pub fn plan(request: &ExperimentRequest) -> Result<ExperimentPlan, ExperimentErr
 pub(super) fn prepare(
     request: &ExperimentRequest,
 ) -> Result<(ExperimentPlan, Vec<CanonicalScenario>), ExperimentError> {
-    if request.experiment_version != EXPERIMENT_VERSION {
-        return Err(ExperimentError::new(
-            "version",
-            format!("expected experiment_version `{EXPERIMENT_VERSION}`"),
-        ));
-    }
-    if request.name.trim().is_empty()
-        || request.name.len() > 256
-        || request.variants.is_empty()
-        || request.variants.len() > 15
-    {
-        return Err(ExperimentError::new(
-            "configuration",
-            "name must contain 1..=256 bytes and experiments require 1..=15 variants",
-        ));
-    }
-    let mut ids = BTreeSet::from(["baseline"]);
-    for variant in &request.variants {
-        if variant.id.is_empty()
-            || variant.id.len() > 64
-            || !variant
-                .id
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
-            || !ids.insert(&variant.id)
-            || variant.changes.len() > 64
-        {
-            return Err(ExperimentError::new(
-                "configuration",
-                "variant IDs must be unique portable identifiers other than `baseline`; at most 64 changes per variant",
-            ));
-        }
-    }
+    validate_request(request)?;
     let options = &request.options;
-    if !(1..=2_000_000).contains(&options.max_agent_steps)
-        || !(1..=2_000_000).contains(&options.max_trace_samples)
-    {
-        return Err(ExperimentError::new(
-            "configuration",
-            "agent-step and retained-snapshot budgets must be in 1..=2000000",
-        ));
-    }
-    options
-        .evaluation
-        .thresholds
-        .validate()
-        .map_err(|error| ExperimentError::new("configuration", error))?;
     let base_population = changes::population_hash(&request.baseline.scenario);
     let mut arms = vec![];
     let mut scenarios = vec![];
@@ -251,4 +206,55 @@ pub(super) fn prepare(
         },
         scenarios,
     ))
+}
+
+fn validate_request(request: &ExperimentRequest) -> Result<(), ExperimentError> {
+    if request.experiment_version != EXPERIMENT_VERSION {
+        return Err(ExperimentError::new(
+            "version",
+            format!("expected experiment_version `{EXPERIMENT_VERSION}`"),
+        ));
+    }
+    if request.name.trim().is_empty()
+        || request.name.len() > 256
+        || request.variants.is_empty()
+        || request.variants.len() > 15
+    {
+        return Err(ExperimentError::new(
+            "configuration",
+            "name must contain 1..=256 bytes and experiments require 1..=15 variants",
+        ));
+    }
+    let mut ids = BTreeSet::from(["baseline"]);
+    for variant in &request.variants {
+        if variant.id.is_empty()
+            || variant.id.len() > 64
+            || !variant
+                .id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+            || !ids.insert(&variant.id)
+            || variant.changes.len() > 64
+        {
+            return Err(ExperimentError::new(
+                "configuration",
+                "variant IDs must be unique portable identifiers other than `baseline`; at most 64 changes per variant",
+            ));
+        }
+    }
+    let options = &request.options;
+    if !(1..=2_000_000).contains(&options.max_agent_steps)
+        || !(1..=2_000_000).contains(&options.max_trace_samples)
+    {
+        return Err(ExperimentError::new(
+            "configuration",
+            "agent-step and retained-snapshot budgets must be in 1..=2000000",
+        ));
+    }
+    options
+        .evaluation
+        .thresholds
+        .validate()
+        .map_err(|error| ExperimentError::new("configuration", error))?;
+    Ok(())
 }

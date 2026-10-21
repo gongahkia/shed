@@ -6,7 +6,10 @@ mod planning;
 mod runner;
 
 pub use planning::{inspect, plan};
-pub use runner::{ArmArtifacts, ExperimentExecution, ExperimentReport, execute};
+pub use runner::{
+    AgentDifference, ArmArtifacts, ArmResult, Comparison, EvidenceReference, ExperimentExecution,
+    ExperimentReport, Finding, MetricDifference, execute,
+};
 
 use crate::{
     CanonicalScenario,

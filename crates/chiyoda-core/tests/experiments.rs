@@ -58,7 +58,10 @@ fn variants_start_independently_and_record_actual_changed_fields() {
         ["exits"]
     );
     assert!(plan.arms.iter().all(|arm| arm.same_population_inputs));
-    assert_eq!(input.baseline.scenario.obstacles[0].at.x_m, 4.0);
+    assert_eq!(
+        input.baseline.scenario.obstacles[0].at.x_m.to_bits(),
+        4.0_f64.to_bits()
+    );
     assert_eq!(plan.estimated_agent_steps, 360);
     assert_eq!(plan.retained_trace_samples, 183);
     assert_eq!(plan, experiment::plan(&input).unwrap());
@@ -260,7 +263,7 @@ fn changed_demand_disables_person_pairs_and_stale_inputs_cannot_execute() {
         experiment::execute(&input, &experiment::plan(&input).unwrap().input_hash).unwrap();
     assert_eq!(executed.report.comparisons[0].matched_people, 0);
     assert!(executed.report.comparisons[0].agents.is_empty());
-    assert_eq!(executed.report.arms[1].observations["people"], 2.0);
+    assert!((executed.report.arms[1].observations["people"] - 2.0).abs() < f64::EPSILON);
 }
 
 #[test]
@@ -285,4 +288,114 @@ fn resealed_conclusions_and_cross_arm_evidence_do_not_verify() {
             .code,
         "integrity"
     );
+}
+
+#[test]
+fn malformed_inventories_and_changed_analysis_contracts_are_rejected() {
+    let input = request(vec![]);
+    let mut executed =
+        experiment::execute(&input, &experiment::plan(&input).unwrap().input_hash).unwrap();
+    let mut malformed = executed.report.clone();
+    malformed.plan.arms.clear();
+    malformed.report_hash.clear();
+    malformed.report_hash = chiyoda_core::bundle::canonical_hash(&malformed);
+    assert_eq!(malformed.check_hash().unwrap_err().code, "integrity");
+    executed.artifacts[0]
+        .journeys
+        .as_mut()
+        .unwrap()
+        .options
+        .low_progress_window_s = 10.0;
+    assert_eq!(
+        executed
+            .report
+            .verify(&input, &executed.artifacts, false)
+            .unwrap_err()
+            .code,
+        "integrity"
+    );
+    executed.artifacts[0].journeys = None;
+    assert_eq!(
+        executed
+            .report
+            .verify(&input, &executed.artifacts, false)
+            .unwrap_err()
+            .code,
+        "missing_evidence"
+    );
+}
+
+#[test]
+fn geometry_service_and_information_changes_use_the_existing_domain_validation() {
+    use chiyoda_core::model::{Connector, Gate};
+    let mut input = request(vec![
+        Change::AddObstacle {
+            obstacle: Obstacle {
+                id: "kiosk".into(),
+                surface: "floor".into(),
+                at: Point3::new(4.0, 0.0, 0.0),
+                width_m: 1.0,
+                depth_m: 1.0,
+            },
+        },
+        Change::ResizeObstacle {
+            id: "kiosk".into(),
+            width_m: 2.0,
+            depth_m: 1.5,
+        },
+        Change::RemoveObstacle { id: "kiosk".into() },
+        Change::SetExitWidth {
+            id: "out".into(),
+            width_m: 2.0,
+        },
+        Change::SetGateRate {
+            id: "gate".into(),
+            service_rate_per_s: 2.0,
+        },
+        Change::SetConnectorWidth {
+            id: "stair".into(),
+            width_m: 2.0,
+        },
+        Change::ReplaceInformation {
+            messages: vec![],
+            countermeasures: vec![],
+        },
+    ]);
+    input.baseline.scenario.gates.push(Gate {
+        id: "gate".into(),
+        surface: "floor".into(),
+        at: Point3::new(9.0, 3.0, 0.0),
+        width_m: 1.0,
+        service_rate_per_s: 1.0,
+        destination: "out".into(),
+    });
+    let mut upper = input.baseline.scenario.surfaces[0].clone();
+    upper.id = "upper".into();
+    upper.origin.z_m = 3.0;
+    input.baseline.scenario.surfaces.push(upper);
+    input.baseline.scenario.connectors.push(Connector::Stair {
+        id: "stair".into(),
+        from_surface: "floor".into(),
+        from: Point3::new(6.0, 3.0, 0.0),
+        to_surface: "upper".into(),
+        to: Point3::new(6.0, 3.0, 3.0),
+        width_m: 1.0,
+        capacity_per_s: None,
+        clearance_height_m: None,
+    });
+    let plan = experiment::plan(&input).unwrap();
+    assert!(plan.runnable, "{plan:#?}");
+    assert_eq!(
+        plan.arms[1]
+            .changed_fields
+            .iter()
+            .map(|field| field.field.as_str())
+            .collect::<Vec<_>>(),
+        ["connectors", "exits", "gates"]
+    );
+    input.variants[0].changes = vec![Change::SetGateRate {
+        id: "gate".into(),
+        service_rate_per_s: -1.0,
+    }];
+    assert!(!experiment::plan(&input).unwrap().runnable);
 }

@@ -205,9 +205,9 @@ impl Renderer {
                 850.0,
             );
             if error {
-                c.rect([936.0, 562.0, 248.0, 110.0], 0x00fc_eced);
+                c.rect([936.0, 606.0, 248.0, 80.0], 0x00fc_eced);
                 c.text(
-                    (948.0, 584.0),
+                    (948.0, 628.0),
                     if bundle.is_some() {
                         "Showing last valid revision"
                     } else {
@@ -217,7 +217,7 @@ impl Renderer {
                     ERROR,
                     224.0,
                 );
-                wrapped(c, (948.0, 605.0), status, 224.0, 3, ERROR);
+                wrapped(c, (948.0, 649.0), status, 224.0, 2, ERROR);
             }
         }
         c.copy_to(buffer);
@@ -258,7 +258,15 @@ fn sidebar(c: &mut Canvas, bundle: &RunBundle, options: Options<'_>) {
     let states = state_counts(frame);
     c.text(
         (940.0, 240.0),
-        &format!("{} people · all surfaces", frame.agents.len()),
+        &format!(
+            "{} {} · all surfaces",
+            frame.agents.len(),
+            if frame.agents.len() == 1 {
+                "person"
+            } else {
+                "people"
+            }
+        ),
         18,
         INK,
         236.0,
@@ -296,6 +304,12 @@ fn sidebar(c: &mut Canvas, bundle: &RunBundle, options: Options<'_>) {
             if hollow { None } else { Some(color) },
             Some((color, 1.0)),
         );
+        if label == "Waiting" {
+            c.line((944.0, y - 4.0), (948.0, y - 4.0), PAPER, 1.0);
+        }
+        if label == "In transit" {
+            c.circle((946.0, y - 4.0), 1.0, Some(PAPER), None);
+        }
         c.text((960.0, y), label, 13, INK, 160.0);
         let count = count.to_string();
         c.text(
@@ -311,7 +325,8 @@ fn sidebar(c: &mut Canvas, bundle: &RunBundle, options: Options<'_>) {
     for (i, (glyph, label, color)) in [
         ("→", "Exit", EXIT),
         ("=", "Gate", WAITING),
-        ("S R E L", "Connector endpoints", CONNECTOR),
+        ("S R", "Stair · ramp", CONNECTOR),
+        ("E L", "Escalator · lift", CONNECTOR),
         ("◇", "Waypoint", WAYPOINT),
         ("○ · ○", "Authored queue slots", QUEUE),
     ]
@@ -444,6 +459,13 @@ fn wrapped(c: &mut Canvas, at: (f32, f32), text: &str, width: f32, max_lines: us
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn capture(name: &str, buffer: &[u32]) {
+        if let Some(directory) = std::env::var_os("CHIYODA_REPLAY_REVIEW_DIR") {
+            let path = std::path::PathBuf::from(directory).join(name);
+            crate::write_png(&path, buffer, WIDTH, HEIGHT)
+                .expect("review capture writes to new path");
+        }
+    }
     fn fixture() -> RunBundle {
         crate::load_watch_scenario(include_str!("../fixtures/main/project.json"), 1).unwrap()
     }
@@ -502,6 +524,8 @@ mod tests {
             );
         }
         assert_ne!(valid, failed);
+        capture("watch-valid.png", &valid);
+        capture("watch-error.png", &failed);
         let live_header = valid[..80 * WIDTH].to_vec();
         renderer.render(
             &mut valid,
@@ -511,6 +535,7 @@ mod tests {
                 ..options
             },
         );
+        capture("legacy.png", &valid);
         let legacy_header = valid[..80 * WIDTH].to_vec();
         renderer.render(&mut valid, Some(&bundle), Options::default());
         assert_ne!(live_header, legacy_header);
@@ -524,6 +549,7 @@ mod tests {
             },
         );
         assert!(failed.contains(&ERROR));
+        capture("watch-empty.png", &failed);
     }
 
     #[test]

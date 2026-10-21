@@ -230,7 +230,7 @@ fn replay(
     let mut last_advance = Instant::now();
     let mut view_mode = initial_view;
     let mut snapshot_number = 0_u64;
-    let mut debug_panel_open = true;
+    let mut details_open = true;
     let mut renderer = render::Renderer::new();
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
@@ -303,7 +303,7 @@ fn replay(
             view_mode = view_mode.toggle();
         }
         if window.is_key_pressed(Key::D, KeyRepeat::No) {
-            debug_panel_open = !debug_panel_open;
+            details_open = !details_open;
         }
         if manually_advanced {
             last_advance = Instant::now();
@@ -331,7 +331,7 @@ fn replay(
                     render::Playback::Playing
                 },
                 speed,
-                details: debug_panel_open,
+                details: details_open,
                 watch_status: watch.as_ref().map(WatchController::status),
             },
         );
@@ -417,7 +417,7 @@ fn window_title(
     watch_status: Option<&str>,
 ) -> String {
     let controls =
-        "space: pause, arrows: step, tab: surface, V: view, D: debug, P: PNG, escape: quit";
+        "space: pause, arrows: step, tab: surface, V: view, D: details, P: PNG, escape: quit";
     let status = watch_status.unwrap_or("recorded bundle replay");
     match bundle {
         Some(bundle) => {
@@ -1201,6 +1201,18 @@ mod tests {
         assert_eq!(sidecar["bundle_sha256"], bundle.bundle_hash);
         assert_eq!(sidecar["playback_speed"], 2.0);
         assert!(sidecar.get("sprite_atlas").is_none());
+        assert_eq!(sidecar["renderer"]["version"], render::RENDERER_VERSION);
+        let mut decoder = gif::DecodeOptions::new();
+        decoder.set_color_output(gif::ColorOutput::RGBA);
+        let mut reader = decoder.read_info(gif.as_slice()).unwrap();
+        assert_eq!(usize::from(reader.width()), WIDTH);
+        assert_eq!(usize::from(reader.height()), HEIGHT);
+        let mut delays = Vec::new();
+        while let Some(frame) = reader.read_next_frame().unwrap() {
+            assert_eq!(frame.buffer.len(), WIDTH * HEIGHT * 4);
+            delays.push(frame.delay);
+        }
+        assert_eq!(delays, manifest.frame_delays_centiseconds);
         fs::remove_dir_all(directory).expect("test GIF directory is removable");
     }
 

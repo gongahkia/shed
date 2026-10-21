@@ -255,12 +255,12 @@ pub fn draw(
     if view == ViewMode::Surface {
         let length = nice_step(90.0 / camera.scale);
         let pixels = (length * camera.scale) as f32;
-        canvas.line((48.0, 660.0), (48.0 + pixels, 660.0), INK, 1.5);
+        canvas.line((48.0, 650.0), (48.0 + pixels, 650.0), INK, 1.5);
         for x in [48.0, 48.0 + pixels] {
-            canvas.line((x, 656.0), (x, 664.0), INK, 1.5);
+            canvas.line((x, 646.0), (x, 654.0), INK, 1.5);
         }
-        canvas.text((48.0, 680.0), &format!("{length} m"), 12, MUTED, 130.0);
-        canvas.text((680.0, 671.0), "+x →   +y ↓", 12, MUTED, 200.0);
+        canvas.text((48.0, 670.0), &format!("{length} m"), 12, MUTED, 130.0);
+        canvas.text((670.0, 671.0), "+x →   +y ↓", 12, MUTED, 200.0);
     } else {
         canvas.text(
             (32.0, 666.0),

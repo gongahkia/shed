@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod agent;
 mod benchmarks;
 mod journeys;
 mod scenario_files;
@@ -28,6 +29,8 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Discover and invoke structured experiment tools, or serve them over MCP.
+    Agent(agent::AgentArgs),
     /// Read and validate a versioned JSON scenario without executing it.
     Check {
         source: PathBuf,
@@ -88,6 +91,7 @@ enum Command {
 
 fn main() -> Result<()> {
     match Cli::parse().command {
+        Command::Agent(args) => agent::execute(&args)?,
         Command::Check { source, geometry } => {
             let scenario = read_scenario(&source)?;
             if geometry {

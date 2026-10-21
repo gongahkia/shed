@@ -1,4 +1,4 @@
-use super::{BACKGROUND, BORDER, INK, MOVING, MUTED, MapConfig, PAPER, Renderer, scene};
+use super::{BACKGROUND, BORDER, INK, MUTED, MapConfig, Renderer, chrome, scene};
 use crate::{
     HEIGHT, WIDTH,
     comparison::{ComparisonEvidence, ComparisonRequest},
@@ -33,27 +33,20 @@ impl Renderer {
                 request.candidate_label.as_deref()
             }
             .unwrap_or(&bundle.scenario.scenario.name);
-            c.text(
-                (left, 33.0),
-                &format!("{label} / {run_label}"),
-                16,
-                INK,
-                548.0,
-            );
             let held = if frame.held_for_s > 0.000_000_1 {
                 format!(" · held {:.2} s", frame.held_for_s)
             } else {
                 String::new()
             };
-            c.text(
-                (left, 60.0),
+            chrome::heading(
+                c,
+                left,
+                548.0,
+                &format!("{label} / {run_label}"),
                 &format!(
                     "{} · recorded {:.2} s · step {}{held}",
                     frame.surface, frame.recorded_time_s, frame.recorded_step
                 ),
-                12,
-                MUTED,
-                548.0,
             );
             let surface = bundle
                 .scenario
@@ -80,31 +73,18 @@ impl Renderer {
                 },
                 frame.inspection.as_ref(),
             );
-            c.text(
-                (left, 609.0),
-                &format!(
-                    "Recorded frame: {} / {} completed · {} moving · {} waiting",
-                    frame.state_counts[4],
-                    frame.population,
-                    frame.state_counts[0],
-                    frame.state_counts[1]
-                ),
-                12,
-                INK,
+            chrome::outcomes(
+                c,
+                left,
                 548.0,
-            );
-            let clearance = frame
-                .full_run_clearance_s
-                .map_or_else(|| "unavailable".to_owned(), |v| format!("{v:.2} s"));
-            c.text(
-                (left, 633.0),
-                &format!(
-                    "Whole run ({:.1} s): {} / {} completed · clearance {clearance}",
-                    frame.full_run_duration_s, frame.full_run_completed, frame.full_run_people
-                ),
-                11,
-                MUTED,
-                548.0,
+                &chrome::Outcomes {
+                    states: frame.state_counts,
+                    population: frame.population,
+                    completed: frame.full_run_completed,
+                    people: frame.full_run_people,
+                    duration_s: frame.full_run_duration_s,
+                    clearance_s: frame.full_run_clearance_s,
+                },
             );
             if let Some(inspection) = &frame.inspection {
                 selection_line(c, (left, 660.0), inspection);
@@ -113,33 +93,13 @@ impl Renderer {
                 c.text((left, 660.0), reason, 11, MUTED, 548.0);
             }
         }
-        c.line((0.0, 704.0), (1200.0, 704.0), BORDER, 1.0);
-        let start = evidence.common_start_s;
-        let end = evidence.common_end_s;
-        #[allow(clippy::cast_possible_truncation)]
-        let progress = if end > start {
-            ((request.time_s - start) / (end - start)) as f32
-        } else {
-            0.0
-        };
-        c.text((32.0, 725.0), &format!("{start:.1} s"), 11, MUTED, 150.0);
-        let end_label = format!("{end:.1} s");
-        c.text(
-            (1168.0 - c.text_width(&end_label, 11), 725.0),
-            &end_label,
-            11,
-            MUTED,
-            150.0,
+        chrome::timeline(
+            c,
+            evidence.common_start_s,
+            evidence.common_end_s,
+            request.time_s,
+            "Shared time",
         );
-        let playhead_x = 32.0 + 1136.0 * progress;
-        c.line((32.0, 740.0), (1168.0, 740.0), BORDER, 3.0);
-        c.line((32.0, 740.0), (playhead_x, 740.0), MOVING, 3.0);
-        c.circle((playhead_x, 740.0), 4.5, Some(MOVING), Some((PAPER, 1.0)));
-        let time_label = c.fit_text(&format!("Shared time {:.2} s", request.time_s), 14, 250.0);
-        let label_width = c.text_width(&time_label, 14);
-        let label_x = (playhead_x - label_width / 2.0).clamp(32.0, 1168.0 - label_width);
-        c.line((playhead_x, 747.0), (playhead_x, 753.0), MOVING, 1.0);
-        c.text((label_x, 775.0), &time_label, 14, INK, 250.0);
         c.copy_to(buffer);
     }
 }

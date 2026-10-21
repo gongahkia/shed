@@ -19,6 +19,8 @@ serde.workspace = true
 schemars.workspace = true
 sha2.workspace = true
 chiyoda-core = { path = "../chiyoda-core" }
+chiyoda-replay = {path="../chiyoda-replay",default-features=false}
+base64 = "0.22.1"
 
 [lints]
 workspace = true

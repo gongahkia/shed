@@ -115,6 +115,11 @@ pub(super) fn catalog() -> Vec<Value> {
             "Read paginated experiment evidence: summary, changes, agents, comparisons, hotspots, resources, events or an exact trace step. Follow artifact pointers to support explanations. Checks linked hashes; use verify for independent re-derivation.",
             true,
         ),
+        tool::<super::replay::RenderInput>(
+            "chiyoda_render_evidence",
+            "Reconstruct a bounded saved run, inspect one exact person/resource at a recorded step, and write an annotated PNG plus source-linked evidence. MCP returns the same PNG as image content. Whole-run totals remain separate from frame state and sparse-trace accounting stays unavailable.",
+            false,
+        ),
         tool::<VerifyInput>(
             "chiyoda_verify",
             "Re-derive saved experiment evaluations, journey evidence and comparisons. Optionally reconstruct each run. Original replay flags are preserved.",
@@ -151,11 +156,16 @@ pub(super) fn call(workspace: &Workspace, name: &str, input: Value) -> ToolResul
 
 fn dispatch(workspace: &Workspace, name: &str, input: Value) -> ToolResult {
     match name {
+        "chiyoda_render_evidence" => {
+            let input: super::replay::RenderInput = arguments(input)?;
+            super::replay::execute(workspace, &input)
+        }
         "chiyoda_capabilities" => {
             let _: Empty = arguments(input)?;
             Ok(
                 json!({"api_version":API_VERSION,"experiment_version":experiment::EXPERIMENT_VERSION,
                 "runtime_version":chiyoda_core::RUNTIME_VERSION,"bundle_version":chiyoda_core::bundle::BUNDLE_VERSION,
+                "replay_evidence_version":"1","replay_renderer_version":chiyoda_replay::render::RENDERER_VERSION,
                 "scenario_schema_version":chiyoda_core::SCENARIO_SCHEMA_VERSION,"generator_version":spaces::GENERATOR_VERSION,
                 "workflow":["inspect or generate a baseline","plan independent ID-based variants","run with the exact planned input hash","query paginated evidence and compare outcomes","verify and optionally reconstruct saved runs"],
                 "limits":{"arms":16,"variants":15,"changes_per_variant":64,"people_per_arm":1024,"steps_per_arm":10000,"declared_objects_per_arm":1024,"max_agent_steps":2_000_000,"max_trace_samples":2_000_000,"query_page_items":200,"tool_result_bytes":1_048_576},

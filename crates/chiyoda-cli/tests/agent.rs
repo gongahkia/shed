@@ -90,7 +90,7 @@ fn tool_discovery_and_schemas_are_generated_and_strict() {
     assert!(output.status.success());
     let catalog: Value = serde_json::from_slice(&output.stdout).unwrap();
     let tools = catalog["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 8);
+    assert_eq!(tools.len(), 9);
     assert!(
         tools
             .iter()
@@ -451,7 +451,7 @@ fn mcp_negotiates_discovers_and_completes_a_real_agent_experiment_loop() {
             .as_array()
             .unwrap()
             .len(),
-        8
+        9
     );
     rpc.tool("chiyoda_inspect", &json!({"scenario":"scenario.json"}));
     let plan = rpc.tool("chiyoda_plan", &experiment());
@@ -502,4 +502,69 @@ fn mcp_keeps_protocol_errors_separate_from_domain_errors_and_notifications() {
         serde_json::from_str::<Value>(&line).unwrap()["error"]["code"],
         -32700
     );
+}
+
+#[test]
+fn annotated_replay_tool_and_mcp_image_share_exact_source_and_pixel_hashes() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    use sha2::{Digest, Sha256};
+    let directory = Directory::new();
+    run(&directory, &experiment());
+    let source_path = directory.0.join("result/arms/baseline/run.json");
+    let before = fs::read(&source_path).unwrap();
+    let source: Value = serde_json::from_slice(&before).unwrap();
+    let agent = source["trace"][0]["agents"][0]["id"].as_str().unwrap();
+    let step = source["trace"][2]["step"].as_u64().unwrap();
+    let mut input = json!({"bundle":"result/arms/baseline/run.json","output":"evidence/person.png","request":{"step":step,"selection":{"kind":"agent","id":agent}}});
+    let receipt = ok(&directory, "chiyoda_render_evidence", &input);
+    assert_eq!(receipt["recorded_step"], step);
+    assert_eq!(receipt["inspection"]["person"]["snapshot"]["id"], agent);
+    let pixels = fs::read(directory.0.join("evidence/person.png")).unwrap();
+    assert_eq!(
+        receipt["image"]["sha256"],
+        format!("{:x}", Sha256::digest(&pixels))
+    );
+    let metadata = read(&directory.0.join("evidence/person.png.json"));
+    assert_eq!(metadata["image_sha256"], receipt["image"]["sha256"]);
+    let pointer = metadata["inspection"]["person"]["snapshot_pointer"]
+        .as_str()
+        .unwrap();
+    assert_eq!(
+        source.pointer(pointer).unwrap(),
+        &metadata["inspection"]["person"]["snapshot"]
+    );
+    assert_eq!(
+        call(&directory, "chiyoda_render_evidence", &input)["ok"],
+        false
+    );
+    input["output"] = "evidence/mcp.png".into();
+    let mut rpc = Rpc::new(&directory);
+    rpc.initialize();
+    let response=rpc.request(&json!({"jsonrpc":"2.0","id":"image","method":"tools/call","params":{"name":"chiyoda_render_evidence","arguments":input}}));
+    assert_eq!(response["result"]["isError"], false, "{response}");
+    let image = &response["result"]["content"][1];
+    assert_eq!(image["type"], "image");
+    assert_eq!(image["mimeType"], "image/png");
+    let returned = STANDARD.decode(image["data"].as_str().unwrap()).unwrap();
+    assert_eq!(
+        returned,
+        fs::read(directory.0.join("evidence/mcp.png")).unwrap()
+    );
+    assert_eq!(
+        response["result"]["structuredContent"]["result"]["image"]["sha256"],
+        format!("{:x}", Sha256::digest(returned))
+    );
+    assert_eq!(fs::read(source_path).unwrap(), before);
+    input["output"] = "../escape.png".into();
+    assert_eq!(
+        call(&directory, "chiyoda_render_evidence", &input)["error"]["code"],
+        "path"
+    );
+    input["output"] = "evidence/bad.png".into();
+    input["request"]["step"] = 999_999.into();
+    assert_eq!(
+        call(&directory, "chiyoda_render_evidence", &input)["ok"],
+        false
+    );
+    assert!(!directory.0.join("evidence/bad.png").exists());
 }

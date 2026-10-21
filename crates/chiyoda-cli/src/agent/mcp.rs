@@ -131,10 +131,15 @@ impl Session {
                     .get("arguments")
                     .cloned()
                     .unwrap_or_else(|| json!({}));
-                let (envelope, is_error) = match tools::call(workspace, name, arguments) {
-                    Ok(result) => (
+                let result = tools::call(workspace, name, arguments).and_then(|result| {
+                    let image = super::replay::image_content(workspace, name, &result)?;
+                    Ok((result, image))
+                });
+                let (envelope, is_error, image) = match result {
+                    Ok((result, image)) => (
                         json!({"api_version":API_VERSION,"ok":true,"result":result}),
                         false,
+                        image,
                     ),
                     Err(tool_error) if tool_error.code == "arguments" => {
                         return Some(error(valid_id, -32602, &tool_error.message));
@@ -142,11 +147,18 @@ impl Session {
                     Err(tool_error) => (
                         json!({"api_version":API_VERSION,"ok":false,"error":tool_error}),
                         true,
+                        None,
                     ),
                 };
+                let mut content = vec![
+                    json!({"type":"text","text":serde_json::to_string(&envelope).expect("tool envelope JSON")}),
+                ];
+                if let Some(image) = image {
+                    content.push(image);
+                }
                 success(
                     valid_id,
-                    json!({"content":[{"type":"text","text":serde_json::to_string(&envelope).expect("tool envelope JSON")}],"structuredContent":envelope,"isError":is_error}),
+                    json!({"content":content,"structuredContent":envelope,"isError":is_error}),
                 )
             }
             _ => error(valid_id, -32601, "method not found"),

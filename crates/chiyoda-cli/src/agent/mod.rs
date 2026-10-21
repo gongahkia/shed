@@ -3,6 +3,7 @@
 mod files;
 mod mcp;
 mod query;
+mod replay;
 mod tools;
 
 use anyhow::Result;

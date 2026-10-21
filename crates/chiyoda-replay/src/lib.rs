@@ -1,5 +1,7 @@
 //! Shared replay rendering and recorded-evidence access for native and agent clients.
 pub mod export;
+pub mod inspection;
+pub mod navigation;
 pub mod render;
 use chiyoda_core::{RunBundle, RunOptions, decode_scenario, run, validate};
 use clap::ValueEnum;
@@ -25,7 +27,17 @@ pub fn render_bundle_frame(
     );
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    ValueEnum,
+    Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum ViewMode {
     Surface,

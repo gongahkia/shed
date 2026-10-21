@@ -173,6 +173,7 @@ dependencies = [
  "gif",
  "minifb",
  "png",
+ "schemars",
  "serde",
  "serde_json",
  "sha2",

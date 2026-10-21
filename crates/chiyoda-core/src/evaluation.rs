@@ -21,7 +21,7 @@ use std::collections::BTreeSet;
 
 pub const EVALUATION_VERSION: &str = "2";
 
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct Thresholds {
     pub min_evacuated_fraction: Option<f64>,
@@ -57,7 +57,7 @@ impl Thresholds {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct EvaluationOptions {
     pub thresholds: Thresholds,

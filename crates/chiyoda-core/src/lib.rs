@@ -7,6 +7,7 @@ mod avoidance;
 pub mod benchmark;
 pub mod bundle;
 pub mod evaluation;
+pub mod experiment;
 pub mod generator;
 pub mod journeys;
 pub mod model;

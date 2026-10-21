@@ -401,4 +401,15 @@ fn a_promising_screen_result_can_regress_under_stress_without_losing_its_denomin
     assert_eq!(objective.wins, 1);
     assert_eq!(objective.losses, 1);
     assert!(objective.worst_benefit.unwrap() < 0.);
+    r.constraints.outcomes.push(OutcomeBound {
+        case: Some("high_capacity".into()),
+        metric: Metric::ServiceWaitPerPersonS,
+        min: None,
+        max: Some(0.),
+    });
+    let e = execute(&r, &plan(&r).unwrap().plan_hash).unwrap();
+    assert!(!e.report.trials[1].eligible);
+    assert!(e.report.candidates[0].final_rank.is_none());
+    assert_eq!(e.report.candidates[0].objectives[1].paired_cases, 2);
+    assert_eq!(e.report.candidates[0].objectives[1].losses, 1);
 }

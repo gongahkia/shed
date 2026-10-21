@@ -91,7 +91,15 @@ pub(super) fn candidates(
         for (i, o) in request.objectives.iter().enumerate() {
             let values: Vec<_> = cases
                 .iter()
-                .filter(|t| t.eligible)
+                .filter(|t| {
+                    t.status == TrialStatus::Executed
+                        && t.reasons.iter().all(|i| {
+                            matches!(
+                                i.code.as_str(),
+                                "performance_checks" | "outcome_bound" | "missing_objective"
+                            )
+                        })
+                })
                 .filter_map(|t| t.objective_values.get(i)?.benefit)
                 .collect();
             let n = values.len();

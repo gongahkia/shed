@@ -88,6 +88,13 @@ print(call("chiyoda_query", {
 print(call("chiyoda_verify", {"experiment": output, "replay": True}))
 ```
 
+## Campaigns
+
+For permissioned candidate screening, held-out WFC/seed/load stress cases,
+explicit work budgets and annotated evidence, use the
+[budgeted campaign workflow](campaigns.md). Campaigns build on the same paired
+experiment archives; agents continue to supply hypotheses and candidate edits.
+
 ## Tools
 
 | Tool | Capability |
@@ -100,6 +107,10 @@ print(call("chiyoda_verify", {"experiment": output, "replay": True}))
 | `chiyoda_run` | Execute exactly the planned input and save complete comparison evidence |
 | `chiyoda_query` | Bounded pages of measurements, differences, people, queues, decisions and replay states |
 | `chiyoda_verify` | Independently re-derive evidence; optionally reconstruct every run |
+| `chiyoda_campaign_plan` | Permission, constraint, generation and worst-case work preflight |
+| `chiyoda_campaign_run` | Screen candidates, promote, stress-test and export bounded evidence |
+| `chiyoda_campaign_query` | Paginated campaign rankings, trials and annotated moments |
+| `chiyoda_campaign_verify` | Re-derive campaign conclusions; optionally reconstruct runs/image pixels |
 | `chiyoda_render_evidence` | Annotated exact-step PNG and source-linked person/resource evidence |
 
 `chiyoda_generate` accepts an optional workspace-relative `config` path to the
@@ -327,8 +338,10 @@ It negotiates that version, requires initialization and the initialized
 notification before tool use, exposes generated `tools/list` schemas, and
 returns matching text and structured tool envelopes. Successful
 `chiyoda_render_evidence` calls additionally include an MCP `image` content
-block containing the same hash-checked PNG written to disk. Stdout contains only
-newline-delimited JSON-RPC. Domain failures use tool `isError`; invalid
+block containing the same hash-checked PNG written to disk. Campaign execution
+and evidence queries return the first successful image in their result/page,
+with all remaining image receipts available through campaign queries. Stdout
+contains only newline-delimited JSON-RPC. Domain failures use tool `isError`; invalid
 protocol/arguments use JSON-RPC errors. EOF ends the server.
 
 Tools execute synchronously. The server advertises tools only, with a static

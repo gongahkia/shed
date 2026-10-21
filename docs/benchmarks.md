@@ -110,7 +110,7 @@ bundle. Neither receives a replay command.
 
 `report.md` shows completion, clearance, wait, overlap, assertion failures, and
 walking alerts. It links to individual sources and case reports and supplies
-`chiyoda-replay ... --paused` commands for available bundles. Run those commands
+`chiyoda view ... --paused` commands for available bundles. Run those commands
 from the report directory. Use the viewer's step controls to inspect the listed
 time intervals and integration steps; see [replay controls](replay.md).
 

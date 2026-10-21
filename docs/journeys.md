@@ -157,7 +157,7 @@ include movement after delivery in that interval.
 Replay commands select the recorded surface and exact step:
 
 ```console
-chiyoda-replay run.json --paused --at-step 381 --surface floor_0
+chiyoda view run.json --paused --at-step 381 --surface floor_0
 ```
 
 The viewer rejects a step absent from the recording. Compare policy-arm

@@ -305,7 +305,7 @@ receipt is capped at 1 MiB and MCP PNG content at 4 MiB. This is a synchronous
 export rather than a streaming replay session.
 
 Synchronized two-run comparison is available through the
-[`chiyoda-replay --compare` CLI](replay.md#compare-runs) and the shared Rust replay
+[`chiyoda view --compare` CLI](replay.md#compare-runs) and the shared Rust replay
 library. The current MCP image tool exports one selected run; callers can request
 both arms independently or invoke the comparison CLI.
 

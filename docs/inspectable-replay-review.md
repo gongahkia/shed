@@ -1,5 +1,32 @@
 # Inspectable replay review
 
+## One Chiyoda executable
+
+The native viewer now runs as `chiyoda view`; there is no separate viewer
+executable. `chiyoda replay` retains headless reconstruction and summary output.
+Reports, agent trace responses, usage examples and the native smoke driver use
+the unified command. The viewer implementation lives in
+`crates/chiyoda-replay/src/viewer/`, and its CLI integration tests live in
+`crates/chiyoda-cli/tests/viewer.rs`. The shared library remains available
+without native features. `cargo build -p chiyoda --no-default-features` builds
+the CLI without a display backend.
+
+Verification passed 83 CLI/replay tests, two benchmark report tests, workspace
+Clippy, locked native/headless checks and the locked release build. The unified
+release command reconstructs existing bundles; overview, annotated-person and
+comparison PNGs are byte-identical to the renderer 4 exports reviewed below.
+Cargo metadata lists only `chiyoda` as a workspace binary, and the headless CLI
+dependency tree excludes minifb. README.md was not edited.
+
+The release viewer opens and holds a paused frame correctly. A full native
+interaction pass remains unverified for this revision: repeated macOS runs
+lost Accessibility access to the target window, and two runs also recorded
+unexpected playback/floor changes. Individual-key isolation preserved paused
+time, but window lookup failures prevented completing the controls check.
+
+The sections below retain the commands, source locations and build results
+recorded for their original revisions.
+
 ## Renderer 4 layout consistency
 
 The single-run and comparison modes now share headings, outcome summaries and

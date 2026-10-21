@@ -332,7 +332,7 @@ assigned future slot and physical queue arrival inspectable from a run bundle.
 canonical scenario, runtime version, options, trace, event log, metrics,
 scenario hash, and SHA-256 bundle hash. The bundle hash is computed from the
 entire bundle with the hash field blank. For a bundle compatible with the
-installed runtime contract, `chiyoda replay` and `chiyoda-replay` rebuild the
+installed runtime contract, `chiyoda replay` and `chiyoda view` rebuild the
 complete run from the embedded scenario and options before interpreting a
 trace. An incompatible legacy bundle is rejected by default; an explicit
 hash-only inspection mode is available for archival review.

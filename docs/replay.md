@@ -1,15 +1,15 @@
 # Native replay viewer
 
-`chiyoda-replay` is a local native viewer for either a hash-valid `run.json`
+`chiyoda view` opens the local native viewer for either a hash-valid `run.json`
 artifact or an in-memory live JSON scenario run. It visualizes the reference
 runtime's recorded state; it is not a simulation engine, a facility survey, a
 3D renderer, or an operational display.
 
 ```console
-$ cargo run -p chiyoda-replay -- out/showcase/run.json --paused
-$ cargo run -p chiyoda-replay -- out/showcase/run.json --surface concourse
-$ cargo run -p chiyoda-replay -- out/showcase/run.json --speed 10
-$ cargo run -p chiyoda-replay -- out/showcase/run.json --surface concourse --export-gif out/showcase/replay.gif --gif-speed 4
+$ cargo run -p chiyoda -- view out/showcase/run.json --paused
+$ cargo run -p chiyoda -- view out/showcase/run.json --surface concourse
+$ cargo run -p chiyoda -- view out/showcase/run.json --speed 10
+$ cargo run -p chiyoda -- view out/showcase/run.json --surface concourse --export-gif out/showcase/replay.gif --gif-speed 4
 ```
 
 `--at-step N` starts at an exact recorded integration step. It can be combined
@@ -24,8 +24,8 @@ For the editing loop, pass a source file through `--watch` instead of a run
 bundle:
 
 ```console
-$ cargo run -p chiyoda-replay -- --watch examples/demos/grand-interchange-showcase.json
-$ cargo run -p chiyoda-replay -- --watch draft.json --paused --surface platform --trace-every 1
+$ cargo run -p chiyoda -- view --watch examples/demos/grand-interchange-showcase.json
+$ cargo run -p chiyoda -- view --watch draft.json --paused --surface platform --trace-every 1
 ```
 
 The viewer polls saved source text, waits 150 ms for writes to settle, then
@@ -78,7 +78,7 @@ included in full reconstruction; see [local knowledge](knowledge.md).
   uses the full width when no inspector is open. Clearing selection restores
   that full plan; time, recorded step and outcome counts remain visible.
 - P writes the current framebuffer as a PNG under `--snapshot-dir` (default
-  `out/chiyoda-replay`). Existing snapshots are preserved. For evidence with
+  `out/chiyoda`). Existing snapshots are preserved. For evidence with
   provenance, use `--export-png` instead.
 - Escape closes the viewer.
 
@@ -93,8 +93,8 @@ GIF export still renders every stored frame.
 ## Inspect people and resources
 
 ```console
-$ chiyoda-replay out/station/arms/baseline/run.json --paused --at-step 100 --agent passengers:4
-$ chiyoda-replay out/station/arms/baseline/run.json --paused --resource exit:south
+$ chiyoda view out/station/arms/baseline/run.json --paused --at-step 100 --agent passengers:4
+$ chiyoda view out/station/arms/baseline/run.json --paused --resource exit:south
 ```
 
 The person inspector shows recorded state, the authored goal, latest recorded
@@ -133,8 +133,8 @@ See [journey diagnostics](journeys.md) for the accounting definitions.
 ## Compare runs
 
 ```console
-$ chiyoda-replay out/station/arms/baseline/run.json --compare out/station/arms/announcement/run.json --paused --at-time 20 --agent passengers:4
-$ chiyoda-replay out/station/arms/baseline/run.json --compare out/station/arms/announcement/run.json --at-time 20 --export-png out/station/comparison.png
+$ chiyoda view out/station/arms/baseline/run.json --compare out/station/arms/announcement/run.json --paused --at-time 20 --agent passengers:4
+$ chiyoda view out/station/arms/baseline/run.json --compare out/station/arms/announcement/run.json --at-time 20 --export-png out/station/comparison.png
 ```
 
 Both panels share one camera, authored coordinate extent, selected surface ID,
@@ -166,8 +166,8 @@ recorded timestamps, request, selected evidence and measured differences.
 The same `--view` option selects the initial interactive or GIF projection.
 
 ```console
-$ cargo run -p chiyoda-replay -- out/showcase/run.json --at-step 100 --export-png out/showcase/frame.png
-$ cargo run -p chiyoda-replay -- out/showcase/run.json --view overview --export-png out/showcase/overview.png
+$ cargo run -p chiyoda -- view out/showcase/run.json --at-step 100 --export-png out/showcase/frame.png
+$ cargo run -p chiyoda -- view out/showcase/run.json --view overview --export-png out/showcase/overview.png
 ```
 
 The image and its `PATH.json` sidecar require a reconstructed bundle. The
@@ -185,8 +185,8 @@ journey analyzer version/options/report hash, bounded events and trail. The
 native viewer and headless export share the same renderer.
 
 ```console
-$ chiyoda-replay out/station/arms/baseline/run.json --agent passengers:4 --at-step 100 --trail-start-step 50 --export-png out/station/person.png
-$ chiyoda-replay out/station/arms/baseline/run.json --resource exit:south --at-step 100 --export-png out/station/exit.png
+$ chiyoda view out/station/arms/baseline/run.json --agent passengers:4 --at-step 100 --trail-start-step 50 --export-png out/station/person.png
+$ chiyoda view out/station/arms/baseline/run.json --resource exit:south --at-step 100 --export-png out/station/exit.png
 ```
 
 Agents can request the same image and structured evidence through
@@ -238,8 +238,8 @@ To reproduce the source and export a reviewed frame:
 
 ```console
 $ chiyoda run examples/demos/grand-interchange-showcase.json -o out/showcase --trace-every 20
-$ chiyoda-replay out/showcase/run.json --surface concourse --at-step 100 --export-png out/showcase/frame.png
-$ chiyoda-replay out/showcase/run.json --surface concourse --at-step 100 --view overview --export-png out/showcase/overview.png
+$ chiyoda view out/showcase/run.json --surface concourse --at-step 100 --export-png out/showcase/frame.png
+$ chiyoda view out/showcase/run.json --surface concourse --at-step 100 --view overview --export-png out/showcase/overview.png
 ```
 
 ## Visual presentation
@@ -324,9 +324,12 @@ portal lanes, obstacles, and resource markers.
 ## Performance and native verification
 
 The shared renderer is usable without minifb: build its library with
-`cargo check -p chiyoda-replay --lib --no-default-features`. The ordinary Chiyoda
-CLI and MCP tool use this headless dependency. Native window support is the
-replay crate's default feature and is required for its binary.
+`cargo check -p chiyoda-replay --lib --no-default-features`. The default
+`chiyoda` build includes native viewing through `chiyoda view`; the replay crate
+is an internal shared library, with no separate executable. For a CLI/MCP build
+without the display backend, use `cargo build -p chiyoda --no-default-features`.
+Its scenario, simulation, agent and PNG evidence commands remain available.
+Headless exports never open a window, including in the default native build.
 
 A reproducible CPU-only crowd measurement is available:
 

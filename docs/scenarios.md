@@ -42,7 +42,7 @@ cargo run --release --locked -p chiyoda -- replay out/hall/run.json
 `format` validates and normalizes JSON to stable field order with a terminal
 newline. It preserves array order and floating-point values. The old `compile`
 command has been removed. `run` saves the input as `scenario.json`, along with
-its reproducible `run.json` bundle. `chiyoda-replay --watch hall.json` reloads
+its reproducible `run.json` bundle. `chiyoda view --watch hall.json` reloads
 JSON after saved edits; see [replay](replay.md).
 
 ## Document and numeric rules

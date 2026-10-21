@@ -16,7 +16,7 @@ $ cargo run -p chiyoda-replay -- out/showcase/run.json --surface concourse --exp
 with `--paused` and `--surface` for the replay moments linked from
 [journey diagnostics](journeys.md). A missing recorded step is rejected; the
 viewer does not invent an interpolated diagnostic frame. The option applies
-to saved bundles rather than live watching or GIF export.
+to saved bundles, including PNG export, rather than live watching or GIF export.
 
 ## Live JSON debugging
 
@@ -81,13 +81,31 @@ By default it advances according to the recorded simulation-time gaps; use
 making a trace recorded at a different sampling frequency appear to have a
 different duration.
 
+## Exact-frame PNG export
+
+`--export-png PATH` writes a reviewed frame without opening a window. Use
+`--at-step N` for an exact recorded step; otherwise it exports the first frame.
+`--surface ID` selects a floor and `--view overview` projects every floor.
+The same `--view` option selects the initial interactive or GIF projection.
+
+```console
+$ cargo run -p chiyoda-replay -- out/showcase/run.json --at-step 100 --export-png out/showcase/frame.png
+$ cargo run -p chiyoda-replay -- out/showcase/run.json --view overview --export-png out/showcase/overview.png
+```
+
+The image and its `PATH.json` sidecar require a reconstructed bundle. The
+sidecar records its source hashes, runtime contract, selected surface,
+projection, exact recorded step and timestamp, and image dimensions. Existing
+images and sidecars are never overwritten. PNG and GIF export are mutually
+exclusive and cannot watch live source.
+
 ## Animated GIF export
 
 PNG snapshots remain the smallest and clearest artifact for a single reviewed
 state. Use an animated GIF only when the sequence itself matters—for example,
 to review movement timing, queue-state transitions, or rerouting. `--export-gif
 PATH` verifies and reconstructs the input bundle before rendering every stored
-trace frame of the selected surface, writes `PATH`, then exits without opening a
+trace frame of the selected projection, writes `PATH`, then exits without opening a
 window. It never accepts `--watch`, does not re-run or load a scenario, and does
 not modify the canonical bundle.
 
@@ -95,7 +113,8 @@ not modify the canonical bundle.
 limited to centiseconds; the companion `PATH.json` records the exact
 per-frame rounded delays, the terminal-delay policy, playback speed,
 `trace_every_steps`, trace-frame count, rendered surface, scenario hash, bundle
-hash, runtime and bundle versions, and a clear derived-artifact boundary. The
+hash, runtime and bundle versions, projection, and a clear derived-artifact boundary.
+The GIF sidecar uses `chiyoda.replay-gif.v2`. The
 exporter refuses to overwrite either the GIF or its sidecar. The verified JSON
 bundle remains the canonical replay and timing artifact.
 

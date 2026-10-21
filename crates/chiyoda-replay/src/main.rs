@@ -6,7 +6,7 @@ use chiyoda_core::{
     model::{ConnectorKind, Point3, PortalLanes, PortalResource, Scenario, Surface},
     run, validate, verify_run_bundle,
 };
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use flate2::{Compression, write::ZlibEncoder};
 use gif::{Encoder as GifEncoder, Frame as GifFrame, Repeat};
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
@@ -91,6 +91,9 @@ struct Cli {
     /// Initial authored surface to display. Tab cycles declared surfaces.
     #[arg(long)]
     surface: Option<String>,
+    /// Initial projection, also used by headless exports. V toggles it in the viewer.
+    #[arg(long, value_enum, default_value_t = ViewMode::Surface)]
+    view: ViewMode,
     /// Simulation seconds shown per wall-clock second.
     #[arg(long, default_value_t = 1.0)]
     speed: f64,
@@ -101,8 +104,16 @@ struct Cli {
     #[arg(long, default_value = "out/chiyoda-replay")]
     snapshot_dir: PathBuf,
     /// Write an animated GIF and a provenance sidecar from a verified run bundle, then exit.
-    #[arg(long, value_name = "GIF", conflicts_with = "watch")]
+    #[arg(long, value_name = "GIF", requires = "bundle", conflicts_with_all = ["watch", "export_png"])]
     export_gif: Option<PathBuf>,
+    /// Write one exact recorded frame as PNG with provenance, then exit without a window.
+    #[arg(
+        long,
+        value_name = "PNG",
+        requires = "bundle",
+        conflicts_with = "watch"
+    )]
+    export_png: Option<PathBuf>,
     /// Simulation seconds represented by one wall-clock second in `--export-gif`.
     #[arg(long, default_value_t = 1.0, requires = "export_gif")]
     gif_speed: f64,
@@ -138,13 +149,28 @@ fn main() -> Result<()> {
 fn replay_bundle(bundle_path: &Path, cli: &Cli) -> Result<()> {
     let (bundle, verification) = load_bundle(bundle_path, cli.allow_legacy_hash_only)?;
     let surface_index = surface_index(&bundle.scenario.scenario.surfaces, cli.surface.as_deref())?;
+    if (cli.export_gif.is_some() || cli.export_png.is_some())
+        && verification != BundleVerification::Reconstructed
+    {
+        bail!("headless export requires a bundle reconstructed by the installed runtime");
+    }
+    if let Some(output) = &cli.export_png {
+        let index = replay_start_index(&bundle.trace, cli.at_step)?;
+        export_png(&bundle, output, surface_index, index, cli.view)?;
+        println!("PNG replay export: {}", output.display());
+        println!(
+            "provenance sidecar: {}",
+            gif_manifest_path(output).display()
+        );
+        return Ok(());
+    }
     if let Some(output) = &cli.export_gif {
         if verification != BundleVerification::Reconstructed {
             bail!(
                 "--export-gif requires a bundle reconstructed by the installed runtime; legacy hash-only display artifacts are not exportable"
             );
         }
-        let manifest = export_gif(&bundle, output, surface_index, cli.gif_speed)?;
+        let manifest = export_gif(&bundle, output, surface_index, cli.gif_speed, cli.view)?;
         println!("GIF replay export: {}", output.display());
         println!(
             "provenance sidecar: {}",
@@ -164,6 +190,7 @@ fn replay_bundle(bundle_path: &Path, cli: &Cli) -> Result<()> {
         &cli.snapshot_dir,
         None,
         initial_frame,
+        cli.view,
     )
 }
 
@@ -177,6 +204,7 @@ fn replay_watch(source_path: PathBuf, cli: &Cli) -> Result<()> {
         &cli.snapshot_dir,
         Some(WatchController::new(source_path, cli.trace_every)),
         0,
+        cli.view,
     )
 }
 
@@ -228,6 +256,7 @@ fn replay(
     snapshot_dir: &Path,
     mut watch: Option<WatchController>,
     initial_frame: usize,
+    initial_view: ViewMode,
 ) -> Result<()> {
     let mut window = Window::new(
         "Chiyoda replay — loading",
@@ -239,7 +268,7 @@ fn replay(
     let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
     let mut index = initial_frame;
     let mut last_advance = Instant::now();
-    let mut view_mode = ViewMode::Surface;
+    let mut view_mode = initial_view;
     let mut snapshot_number = 0_u64;
     let mut debug_panel_open = true;
 
@@ -396,7 +425,8 @@ fn render_bundle_frame(
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize)]
+#[serde(rename_all = "snake_case")]
 enum ViewMode {
     Surface,
     Overview,
@@ -1076,6 +1106,7 @@ struct GifExportManifest {
     trace_every_steps: u32,
     trace_frame_count: usize,
     rendered_surface: String,
+    view: ViewMode,
     render_width_pixels: usize,
     render_height_pixels: usize,
     playback_speed: f64,
@@ -1092,6 +1123,7 @@ fn export_gif(
     output: &Path,
     surface_index: usize,
     playback_speed: f64,
+    view: ViewMode,
 ) -> Result<GifExportManifest> {
     validate_playback_timing(&bundle.trace, playback_speed)?;
     let trace_every_steps = bundle
@@ -1105,7 +1137,7 @@ fn export_gif(
     }
     let frame_delays_centiseconds = gif_frame_delays_centiseconds(&bundle.trace, playback_speed)?;
     let manifest = GifExportManifest {
-        schema_version: "chiyoda.replay-gif.v1".to_owned(),
+        schema_version: "chiyoda.replay-gif.v2".to_owned(),
         format: "GIF89a".to_owned(),
         bundle_sha256: bundle.bundle_hash.clone(),
         scenario_sha256: bundle.scenario_hash.clone(),
@@ -1114,13 +1146,14 @@ fn export_gif(
         trace_every_steps,
         trace_frame_count: bundle.trace.len(),
         rendered_surface: bundle.scenario.scenario.surfaces[surface_index].id.clone(),
+        view,
         render_width_pixels: WIDTH,
         render_height_pixels: HEIGHT,
         playback_speed,
         frame_delays_centiseconds,
         looping: true,
         timing_policy: "Each non-terminal GIF delay is the next recorded trace timestamp gap divided by playback_speed, rounded to the nearest centisecond. A zero-length rounded gap and the terminal frame use one centisecond because GIF cannot encode a terminal hold without a delay. Exact trace timestamps remain in the verified canonical JSON bundle.".to_owned(),
-        claim_boundary: "This derived visualization re-renders one verified deterministic trace on one authored surface. It is not a canonical run bundle, a simulation rerun, a source of new metrics, or evidence of real-world pedestrian behavior.".to_owned(),
+        claim_boundary: "This derived visualization renders recorded state from one reconstructed deterministic trace. The selected surface applies to the floor plan; overview projects all authored surfaces. The canonical JSON bundle remains the source of timing and metrics.".to_owned(),
     };
     let sidecar = gif_manifest_path(output);
     ensure_new_export_targets(output, &sidecar)?;
@@ -1130,6 +1163,7 @@ fn export_gif(
         surface_index,
         &manifest.frame_delays_centiseconds,
         output,
+        view,
     ) {
         let _ = fs::remove_file(output);
         return Err(error);
@@ -1147,16 +1181,73 @@ fn gif_manifest_path(output: &Path) -> PathBuf {
     PathBuf::from(sidecar)
 }
 
+#[derive(Debug, Serialize)]
+struct PngExportManifest<'a> {
+    schema_version: &'static str,
+    bundle_sha256: &'a str,
+    scenario_sha256: &'a str,
+    runtime_version: &'a str,
+    bundle_version: &'a str,
+    rendered_surface: &'a str,
+    view: ViewMode,
+    recorded_step: u64,
+    recorded_time_s: f64,
+    render_width_pixels: usize,
+    render_height_pixels: usize,
+    claim_boundary: &'static str,
+}
+
+fn export_png(
+    bundle: &RunBundle,
+    output: &Path,
+    surface_index: usize,
+    index: usize,
+    view: ViewMode,
+) -> Result<()> {
+    let sidecar = gif_manifest_path(output);
+    ensure_new_export_targets(output, &sidecar)?;
+    let frame = &bundle.trace[index];
+    let manifest = PngExportManifest {
+        schema_version: "chiyoda.replay-png.v1",
+        bundle_sha256: &bundle.bundle_hash,
+        scenario_sha256: &bundle.scenario_hash,
+        runtime_version: &bundle.runtime_version,
+        bundle_version: &bundle.bundle_version,
+        rendered_surface: &bundle.scenario.scenario.surfaces[surface_index].id,
+        view,
+        recorded_step: frame.step,
+        recorded_time_s: frame.time_s,
+        render_width_pixels: WIDTH,
+        render_height_pixels: HEIGHT,
+        claim_boundary: "One exact recorded frame from a reconstructed deterministic trace. This derived image does not add measurements or interpolate movement. The canonical JSON bundle remains the source of timing and metrics.",
+    };
+    let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
+    render_bundle_frame(&mut buffer, bundle, index, surface_index, view);
+    write_png(output, &buffer, WIDTH, HEIGHT)?;
+    let result = (|| -> Result<()> {
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&sidecar)?;
+        serde_json::to_writer_pretty(file, &manifest)?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(output);
+    }
+    result
+}
+
 fn ensure_new_export_targets(output: &Path, sidecar: &Path) -> Result<()> {
     if output == sidecar {
-        bail!("GIF output and provenance sidecar must be distinct paths");
+        bail!("image output and provenance sidecar must be distinct paths");
     }
     if output.exists() {
-        bail!("refusing to overwrite GIF export {}", output.display());
+        bail!("refusing to overwrite image export {}", output.display());
     }
     if sidecar.exists() {
         bail!(
-            "refusing to overwrite GIF provenance sidecar {}",
+            "refusing to overwrite image provenance sidecar {}",
             sidecar.display()
         );
     }
@@ -1165,7 +1256,7 @@ fn ensure_new_export_targets(output: &Path, sidecar: &Path) -> Result<()> {
         .filter(|parent| !parent.as_os_str().is_empty())
     {
         fs::create_dir_all(parent)
-            .with_context(|| format!("creating GIF export directory {}", parent.display()))?;
+            .with_context(|| format!("creating image export directory {}", parent.display()))?;
     }
     Ok(())
 }
@@ -1175,6 +1266,7 @@ fn write_gif(
     surface_index: usize,
     frame_delays_centiseconds: &[u16],
     output: &Path,
+    view: ViewMode,
 ) -> Result<()> {
     if bundle.trace.len() != frame_delays_centiseconds.len() {
         bail!(
@@ -1198,7 +1290,7 @@ fn write_gif(
         .context("setting GIF loop policy")?;
     let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
     for (index, delay) in frame_delays_centiseconds.iter().copied().enumerate() {
-        render_bundle_frame(&mut buffer, bundle, index, surface_index, ViewMode::Surface);
+        render_bundle_frame(&mut buffer, bundle, index, surface_index, view);
         let mut frame = GifFrame::from_indexed_pixels(
             width,
             height,
@@ -2404,7 +2496,8 @@ mod tests {
         ));
         let output = directory.join("watch.gif");
         let bundle = load_watch_scenario(WATCH_SOURCE, 1).expect("watch fixture succeeds");
-        let manifest = export_gif(&bundle, &output, 0, 2.0).expect("GIF export succeeds");
+        let manifest =
+            export_gif(&bundle, &output, 0, 2.0, ViewMode::Surface).expect("GIF export succeeds");
         let gif = fs::read(&output).expect("GIF output reads");
         let sidecar: serde_json::Value = serde_json::from_str(
             &fs::read_to_string(gif_manifest_path(&output)).expect("sidecar reads"),
@@ -2420,6 +2513,71 @@ mod tests {
         assert_eq!(sidecar["playback_speed"], 2.0);
         assert!(sidecar.get("sprite_atlas").is_none());
         fs::remove_dir_all(directory).expect("test GIF directory is removable");
+    }
+
+    #[test]
+    fn headless_png_uses_an_exact_frame_preserves_the_bundle_and_refuses_overwrites() {
+        let directory =
+            std::env::temp_dir().join(format!("chiyoda-replay-png-{}", std::process::id()));
+        let output = directory.join("frame.png");
+        let bundle = load_watch_scenario(WATCH_SOURCE, 1).expect("fixture runs");
+        let original = serde_json::to_vec(&bundle).unwrap();
+        export_png(&bundle, &output, 0, 1, ViewMode::Overview).unwrap();
+        let sidecar: serde_json::Value =
+            serde_json::from_slice(&fs::read(gif_manifest_path(&output)).unwrap()).unwrap();
+        assert_eq!(sidecar["recorded_step"], bundle.trace[1].step);
+        assert_eq!(sidecar["recorded_time_s"], bundle.trace[1].time_s);
+        assert_eq!(sidecar["view"], "overview");
+        assert_eq!(sidecar["bundle_sha256"], bundle.bundle_hash);
+        assert_eq!(serde_json::to_vec(&bundle).unwrap(), original);
+        let image = fs::read(&output).unwrap();
+        assert!(export_png(&bundle, &output, 0, 0, ViewMode::Surface).is_err());
+        assert_eq!(fs::read(&output).unwrap(), image);
+        fs::remove_file(&output).unwrap();
+        assert!(export_png(&bundle, &output, 0, 0, ViewMode::Surface).is_err());
+        assert!(
+            !output.exists(),
+            "a pre-existing sidecar blocks the image too"
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn headless_cli_requires_a_bundle_and_rejects_conflicting_exports_and_sprites() {
+        let cli = Cli::try_parse_from([
+            "replay",
+            "run.json",
+            "--export-png",
+            "frame.png",
+            "--at-step",
+            "20",
+            "--view",
+            "overview",
+        ])
+        .unwrap();
+        assert_eq!(cli.at_step, Some(20));
+        assert_eq!(cli.view, ViewMode::Overview);
+        for args in [
+            vec!["replay", "--export-png", "frame.png"],
+            vec![
+                "replay",
+                "run.json",
+                "--export-png",
+                "frame.png",
+                "--export-gif",
+                "run.gif",
+            ],
+            vec![
+                "replay",
+                "--watch",
+                "source.json",
+                "--export-png",
+                "frame.png",
+            ],
+            vec!["replay", "run.json", "--sprite-atlas", "atlas.json"],
+        ] {
+            assert!(Cli::try_parse_from(args).is_err());
+        }
     }
 
     #[test]

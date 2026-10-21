@@ -1,6 +1,7 @@
 //! Machine interfaces share one backend; neither transport decides outcomes.
 
 mod files;
+mod mcp;
 mod query;
 mod tools;
 
@@ -31,6 +32,11 @@ enum AgentCommand {
         /// JSON arguments file, or `-` for stdin.
         #[arg(long)]
         input: PathBuf,
+        #[arg(long, default_value = ".")]
+        workspace: PathBuf,
+    },
+    /// Serve MCP 2025-11-25 tools over newline-delimited stdio JSON-RPC.
+    Serve {
         #[arg(long, default_value = ".")]
         workspace: PathBuf,
     },
@@ -70,6 +76,11 @@ pub(super) fn execute(args: &AgentArgs) -> Result<()> {
                 &json!({"api_version":API_VERSION,"tools":tools::catalog()})
             )?
         ),
+        AgentCommand::Serve { workspace } => {
+            let workspace = files::Workspace::new(workspace)
+                .map_err(|error| anyhow::anyhow!("{}: {}", error.code, error.message))?;
+            mcp::serve(&workspace, io::stdin().lock(), io::stdout().lock())?;
+        }
         AgentCommand::Call {
             tool,
             input,

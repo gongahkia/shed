@@ -1,9 +1,9 @@
 use serde_json::{Value, json};
 use std::{
     fs,
-    io::Write,
+    io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
     sync::atomic::{AtomicU64, Ordering},
 };
 
@@ -374,5 +374,132 @@ fn agents_generate_reproducible_wfc_baselines_with_provenance() {
             &json!({"scenario":"generated-a/scenario.json"})
         )["issues"],
         json!([])
+    );
+}
+
+struct Rpc {
+    child: Child,
+    input: Option<ChildStdin>,
+    output: BufReader<ChildStdout>,
+}
+impl Rpc {
+    fn new(directory: &Directory) -> Self {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_chiyoda"))
+            .args(["agent", "serve", "--workspace"])
+            .arg(&directory.0)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let input = child.stdin.take();
+        let output = BufReader::new(child.stdout.take().unwrap());
+        Self {
+            child,
+            input,
+            output,
+        }
+    }
+    fn send(&mut self, value: &Value) {
+        writeln!(self.input.as_mut().unwrap(), "{value}").unwrap();
+        self.input.as_mut().unwrap().flush().unwrap();
+    }
+    fn request(&mut self, value: &Value) -> Value {
+        self.send(value);
+        let mut line = String::new();
+        self.output.read_line(&mut line).unwrap();
+        serde_json::from_str(&line).unwrap()
+    }
+    fn initialize(&mut self) {
+        assert_eq!(self.request(&json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}))["result"]["protocolVersion"],"2025-11-25");
+        self.send(&json!({"jsonrpc":"2.0","method":"notifications/initialized"}));
+    }
+    fn tool(&mut self, name: &str, args: &Value) -> Value {
+        let response=self.request(&json!({"jsonrpc":"2.0","id":"tool","method":"tools/call","params":{"name":name,"arguments":args}}));
+        assert_eq!(response["result"]["isError"], false, "{response:#}");
+        assert_eq!(
+            serde_json::from_str::<Value>(
+                response["result"]["content"][0]["text"].as_str().unwrap()
+            )
+            .unwrap(),
+            response["result"]["structuredContent"]
+        );
+        response["result"]["structuredContent"]["result"].clone()
+    }
+}
+impl Drop for Rpc {
+    fn drop(&mut self) {
+        self.input.take();
+        self.child.wait().unwrap();
+    }
+}
+
+#[test]
+fn mcp_negotiates_discovers_and_completes_a_real_agent_experiment_loop() {
+    let directory = Directory::new();
+    let mut rpc = Rpc::new(&directory);
+    assert_eq!(
+        rpc.request(&json!({"jsonrpc":"2.0","id":"probe","method":"server/discover"}))["error"]["code"],
+        -32601
+    );
+    assert_eq!(
+        rpc.request(&json!({"jsonrpc":"2.0","id":0,"method":"tools/list"}))["error"]["code"],
+        -32600
+    );
+    rpc.initialize();
+    assert_eq!(
+        rpc.request(&json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}))["result"]["tools"]
+            .as_array()
+            .unwrap()
+            .len(),
+        8
+    );
+    rpc.tool("chiyoda_inspect", &json!({"scenario":"scenario.json"}));
+    let plan = rpc.tool("chiyoda_plan", &experiment());
+    rpc.tool("chiyoda_run",&json!({"experiment":experiment(),"expected_input_hash":plan["input_hash"],"output":"mcp-result"}));
+    let pairs=rpc.tool("chiyoda_query",&json!({"experiment":"mcp-result","view":"comparisons","arm":"candidate","agent":"person:0"}));
+    assert_eq!(pairs["total"], 1);
+    assert_eq!(
+        rpc.tool(
+            "chiyoda_verify",
+            &json!({"experiment":"mcp-result","replay":true})
+        )["verified"],
+        true
+    );
+}
+
+#[test]
+fn mcp_keeps_protocol_errors_separate_from_domain_errors_and_notifications() {
+    let directory = Directory::new();
+    let mut rpc = Rpc::new(&directory);
+    rpc.initialize();
+    assert_eq!(rpc.request(&json!([]))["error"]["code"], -32600);
+    assert_eq!(
+        rpc.request(&json!({"jsonrpc":"2.0","id":null,"method":"ping"}))["error"]["code"],
+        -32600
+    );
+    rpc.send(
+        &json!({"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":"old"}}),
+    );
+    assert_eq!(
+        rpc.request(&json!({"jsonrpc":"2.0","id":3,"method":"ping"}))["id"],
+        3
+    );
+    assert_eq!(
+        rpc.request(&json!({"jsonrpc":"2.0","id":4,"method":"unsupported"}))["error"]["code"],
+        -32601
+    );
+    assert_eq!(rpc.request(&json!({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"chiyoda_inspect","arguments":{"typo":true}}}))["error"]["code"],-32602);
+    let domain=rpc.request(&json!({"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"chiyoda_inspect","arguments":{"scenario":"missing.json"}}}));
+    assert_eq!(domain["result"]["isError"], true);
+    assert_eq!(
+        domain["result"]["structuredContent"]["error"]["code"],
+        "artifact_io"
+    );
+    writeln!(rpc.input.as_mut().unwrap(), "not JSON").unwrap();
+    let mut line = String::new();
+    rpc.output.read_line(&mut line).unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&line).unwrap()["error"]["code"],
+        -32700
     );
 }

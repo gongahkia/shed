@@ -289,8 +289,6 @@ pub(super) fn prepare(request: &CampaignRequest) -> Result<CampaignPlan, Campaig
                 trial.issues.extend(exp.issues.clone());
                 for arm in &exp.arms {
                     trial.issues.extend(arm.issues.clone());
-                    maximum_image_work =
-                        maximum_image_work.max(arm.people.saturating_mul(arm.integration_steps));
                 }
                 trial.issues.extend(policy::check(
                     &request.constraints,
@@ -300,6 +298,10 @@ pub(super) fn prepare(request: &CampaignRequest) -> Result<CampaignPlan, Campaig
                 ));
                 if trial.issues.is_empty() {
                     costs.push((exp.estimated_agent_steps, exp.retained_trace_samples));
+                    for arm in &exp.arms {
+                        maximum_image_work = maximum_image_work
+                            .max(arm.people.saturating_mul(arm.integration_steps));
+                    }
                 }
                 trial.experiment = Some(exp);
             }

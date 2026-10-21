@@ -2,6 +2,9 @@
 //! Callers propose candidates; this layer executes and explains an explicit objective order.
 mod planning;
 mod policy;
+mod ranking;
+mod results;
+mod runner;
 use crate::{
     CanonicalScenario,
     evaluation::EvaluationOptions,
@@ -9,6 +12,8 @@ use crate::{
     generator::spaces::SpaceConfig,
 };
 pub use planning::plan;
+pub use results::*;
+pub use runner::{execute, execute_with};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

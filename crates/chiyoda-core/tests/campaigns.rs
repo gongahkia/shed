@@ -127,3 +127,154 @@ fn generation_budgets_are_checked_before_the_solver_and_recipe_overrides_are_str
     r.candidates[0].case_changes.insert("typo".into(), vec![]);
     assert_eq!(plan(&r).unwrap_err().code, "configuration");
 }
+
+fn clone_trial(t: &TrialExecution) -> TrialExecution {
+    TrialExecution {
+        result: t.result.clone(),
+        request: t.request.clone(),
+        execution: t
+            .execution
+            .as_ref()
+            .map(|e| chiyoda_core::experiment::ExperimentExecution {
+                report: e.report.clone(),
+                artifacts: e.artifacts.clone(),
+            }),
+    }
+}
+#[test]
+fn screening_promotes_only_declared_candidates_and_stress_keeps_every_case_and_source() {
+    let mut r = request();
+    r.promotion.require_improvement = false;
+    r.promotion.max_candidates = 1;
+    r.stress_cases.push(CaseSpec {
+        id: "more_people".into(),
+        population_multiplier: 2,
+        ..r.screening.clone()
+    });
+    r.candidates.push(Candidate {
+        id: "forbidden".into(),
+        changes: vec![Change::SetGroupCount {
+            id: "person".into(),
+            count: u32::MAX,
+        }],
+        case_changes: BTreeMap::new(),
+    });
+    let p = plan(&r).unwrap();
+    assert!(p.runnable, "{:?}", p.issues);
+    let execution = execute(&r, &p.plan_hash).unwrap();
+    let report = &execution.report;
+    assert_eq!(report.promoted, ["wider"]);
+    assert_eq!(report.trials.len(), 3);
+    assert_eq!(report.trials[1].status, TrialStatus::Rejected);
+    assert!(report.candidates[0].final_rank.is_some());
+    assert_eq!(report.candidates[0].expected_cases, 2);
+    assert_eq!(report.candidates[0].eligible_cases, 2);
+    assert!(
+        report.charged_simulation_agent_steps
+            + report
+                .evidence_moments
+                .iter()
+                .map(|m| m.reconstruction_agent_steps)
+                .sum::<u64>()
+            <= p.reserved_agent_steps
+    );
+    report
+        .verify_with(&r, true, |case, candidate| {
+            Ok(clone_trial(
+                execution
+                    .trials
+                    .iter()
+                    .find(|t| t.result.case == case && t.result.candidate == candidate)
+                    .unwrap(),
+            ))
+        })
+        .unwrap();
+    for t in &execution.trials {
+        if let Some(e) = &t.execution {
+            assert_eq!(e.report.arms.len(), 2);
+            assert_eq!(
+                e.report.comparisons[0].matched_people,
+                e.artifacts[0].bundle.as_ref().unwrap().metrics.total_agents
+            );
+            for moment in &t.result.moments {
+                let arm = e.artifacts.iter().find(|a| a.id == moment.arm).unwrap();
+                assert!(
+                    arm.bundle
+                        .as_ref()
+                        .unwrap()
+                        .trace
+                        .iter()
+                        .any(|f| f.step == moment.step)
+                );
+                assert_eq!(
+                    moment.source_bundle_hash,
+                    arm.bundle.as_ref().unwrap().bundle_hash
+                );
+            }
+        }
+    }
+}
+#[test]
+fn stale_plans_do_not_run_and_resealed_campaign_conclusions_do_not_verify() {
+    let mut r = request();
+    r.promotion.require_improvement = false;
+    let p = plan(&r).unwrap();
+    let execution = execute(&r, &p.plan_hash).unwrap();
+    r.objectives[0].tolerance = 0.01;
+    let mut observed = 0;
+    assert_eq!(
+        execute_with(&r, &p.plan_hash, |_| {
+            observed += 1;
+            Ok(())
+        })
+        .unwrap_err()
+        .code,
+        "stale_plan"
+    );
+    assert_eq!(observed, 0);
+    r.objectives[0].tolerance = 0.;
+    let mut false_report = execution.report.clone();
+    false_report.promoted.clear();
+    false_report.report_hash.clear();
+    false_report.report_hash = chiyoda_core::bundle::canonical_hash(&false_report);
+    assert!(false_report.check_hash().is_ok());
+    assert_eq!(
+        false_report
+            .verify_with(&r, false, |case, candidate| Ok(clone_trial(
+                execution
+                    .trials
+                    .iter()
+                    .find(|t| t.result.case == case && t.result.candidate == candidate)
+                    .unwrap()
+            )))
+            .unwrap_err()
+            .code,
+        "integrity"
+    );
+}
+#[test]
+fn unchanged_controls_are_not_promoted_as_improvements_and_missing_clearance_stays_missing() {
+    let mut r = request();
+    r.candidates[0].changes.clear();
+    let p = plan(&r).unwrap();
+    let e = execute(&r, &p.plan_hash).unwrap();
+    assert!(e.report.promoted.is_empty());
+    assert_eq!(e.report.candidates[0].status, "not_promoted");
+    if let CaseSource::Authored { scenario } = &mut r.screening.source {
+        scenario.scenario.duration_s = 0.5;
+    }
+    r.objectives.push(Objective {
+        metric: Metric::ClearanceTimeS,
+        direction: Direction::Minimize,
+        tolerance: 0.,
+    });
+    let e = execute(&r, &plan(&r).unwrap().plan_hash).unwrap();
+    assert!(!e.report.trials[0].eligible);
+    assert!(e.report.trials[0].objective_values[1].benefit.is_none());
+    assert!(
+        e.report.trials[0]
+            .reasons
+            .iter()
+            .any(|i| i.code == "missing_objective")
+    );
+}

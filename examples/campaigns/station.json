@@ -1,0 +1,408 @@
+{
+  "campaign_version": "1",
+  "name": "Station interventions under fixed demand and stress",
+  "screening": {
+    "id": "station",
+    "source": {
+      "kind": "authored",
+      "scenario": {
+        "schema_version": "1",
+        "scenario": {
+          "name": "Concourse with a kiosk and a scheduled exit closure",
+          "seed": 73,
+          "duration_s": 120.0,
+          "timestep_s": 0.2,
+          "surfaces": [
+            {
+              "id": "concourse",
+              "origin": {
+                "x_m": 0.0,
+                "y_m": 0.0,
+                "z_m": 0.0
+              },
+              "width_m": 24.0,
+              "depth_m": 16.0
+            }
+          ],
+          "obstacles": [
+            {
+              "id": "kiosk",
+              "surface": "concourse",
+              "at": {
+                "x_m": 10.0,
+                "y_m": 4.0,
+                "z_m": 0.0
+              },
+              "width_m": 4.0,
+              "depth_m": 8.0
+            }
+          ],
+          "exits": [
+            {
+              "id": "north",
+              "surface": "concourse",
+              "at": {
+                "x_m": 24.0,
+                "y_m": 4.0,
+                "z_m": 0.0
+              },
+              "width_m": 2.0,
+              "capacity_per_s": 1.0
+            },
+            {
+              "id": "south",
+              "surface": "concourse",
+              "at": {
+                "x_m": 24.0,
+                "y_m": 12.0,
+                "z_m": 0.0
+              },
+              "width_m": 2.0,
+              "capacity_per_s": 1.0
+            }
+          ],
+          "exit_states": [
+            {
+              "id": "north_closure",
+              "exit": "north",
+              "open": false,
+              "at_s": 10.0
+            }
+          ],
+          "agents": [
+            {
+              "id": "passengers",
+              "count": 24,
+              "surface": "concourse",
+              "at": {
+                "x_m": 2.0,
+                "y_m": 8.0,
+                "z_m": 0.0
+              },
+              "destination": "north",
+              "alternative_destinations": [
+                "south"
+              ],
+              "speed_mps": 1.2,
+              "radius_m": 0.3,
+              "height_m": 1.7,
+              "knowledge": {
+                "observation_radius_m": 6.0
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "stress_cases": [
+    {
+      "id": "new-seed",
+      "source": {
+        "kind": "authored",
+        "scenario": {
+          "schema_version": "1",
+          "scenario": {
+            "name": "Concourse with a kiosk and a scheduled exit closure",
+            "seed": 74,
+            "duration_s": 120.0,
+            "timestep_s": 0.2,
+            "surfaces": [
+              {
+                "id": "concourse",
+                "origin": {
+                  "x_m": 0.0,
+                  "y_m": 0.0,
+                  "z_m": 0.0
+                },
+                "width_m": 24.0,
+                "depth_m": 16.0
+              }
+            ],
+            "obstacles": [
+              {
+                "id": "kiosk",
+                "surface": "concourse",
+                "at": {
+                  "x_m": 10.0,
+                  "y_m": 4.0,
+                  "z_m": 0.0
+                },
+                "width_m": 4.0,
+                "depth_m": 8.0
+              }
+            ],
+            "exits": [
+              {
+                "id": "north",
+                "surface": "concourse",
+                "at": {
+                  "x_m": 24.0,
+                  "y_m": 4.0,
+                  "z_m": 0.0
+                },
+                "width_m": 2.0,
+                "capacity_per_s": 1.0
+              },
+              {
+                "id": "south",
+                "surface": "concourse",
+                "at": {
+                  "x_m": 24.0,
+                  "y_m": 12.0,
+                  "z_m": 0.0
+                },
+                "width_m": 2.0,
+                "capacity_per_s": 1.0
+              }
+            ],
+            "exit_states": [
+              {
+                "id": "north_closure",
+                "exit": "north",
+                "open": false,
+                "at_s": 10.0
+              }
+            ],
+            "agents": [
+              {
+                "id": "passengers",
+                "count": 24,
+                "surface": "concourse",
+                "at": {
+                  "x_m": 2.0,
+                  "y_m": 8.0,
+                  "z_m": 0.0
+                },
+                "destination": "north",
+                "alternative_destinations": [
+                  "south"
+                ],
+                "speed_mps": 1.2,
+                "radius_m": 0.3,
+                "height_m": 1.7,
+                "knowledge": {
+                  "observation_radius_m": 6.0
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "double-demand",
+      "source": {
+        "kind": "authored",
+        "scenario": {
+          "schema_version": "1",
+          "scenario": {
+            "name": "Concourse with a kiosk and a scheduled exit closure",
+            "seed": 73,
+            "duration_s": 120.0,
+            "timestep_s": 0.2,
+            "surfaces": [
+              {
+                "id": "concourse",
+                "origin": {
+                  "x_m": 0.0,
+                  "y_m": 0.0,
+                  "z_m": 0.0
+                },
+                "width_m": 24.0,
+                "depth_m": 16.0
+              }
+            ],
+            "obstacles": [
+              {
+                "id": "kiosk",
+                "surface": "concourse",
+                "at": {
+                  "x_m": 10.0,
+                  "y_m": 4.0,
+                  "z_m": 0.0
+                },
+                "width_m": 4.0,
+                "depth_m": 8.0
+              }
+            ],
+            "exits": [
+              {
+                "id": "north",
+                "surface": "concourse",
+                "at": {
+                  "x_m": 24.0,
+                  "y_m": 4.0,
+                  "z_m": 0.0
+                },
+                "width_m": 2.0,
+                "capacity_per_s": 1.0
+              },
+              {
+                "id": "south",
+                "surface": "concourse",
+                "at": {
+                  "x_m": 24.0,
+                  "y_m": 12.0,
+                  "z_m": 0.0
+                },
+                "width_m": 2.0,
+                "capacity_per_s": 1.0
+              }
+            ],
+            "exit_states": [
+              {
+                "id": "north_closure",
+                "exit": "north",
+                "open": false,
+                "at_s": 10.0
+              }
+            ],
+            "agents": [
+              {
+                "id": "passengers",
+                "count": 24,
+                "surface": "concourse",
+                "at": {
+                  "x_m": 2.0,
+                  "y_m": 8.0,
+                  "z_m": 0.0
+                },
+                "destination": "north",
+                "alternative_destinations": [
+                  "south"
+                ],
+                "speed_mps": 1.2,
+                "radius_m": 0.3,
+                "height_m": 1.7,
+                "knowledge": {
+                  "observation_radius_m": 6.0
+                }
+              }
+            ]
+          }
+        }
+      },
+      "population_multiplier": 2
+    }
+  ],
+  "candidates": [
+    {
+      "id": "moved-kiosk",
+      "changes": [
+        {
+          "kind": "move_obstacle",
+          "id": "kiosk",
+          "at": {
+            "x_m": 10.0,
+            "y_m": 0.0,
+            "z_m": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "announcement",
+      "changes": [
+        {
+          "kind": "replace_information",
+          "messages": [
+            {
+              "id": "north_closure_notice",
+              "source": "Official",
+              "surface": "concourse",
+              "origin": {
+                "x_m": 2.0,
+                "y_m": 8.0,
+                "z_m": 0.0
+              },
+              "claim": {
+                "ExitAvailability": {
+                  "exit": "north",
+                  "open": false
+                }
+              },
+              "truthful": true,
+              "at_s": 10.0,
+              "reach_m": 100.0,
+              "trust": 1.0,
+              "sampling_key": "north-closure"
+            }
+          ],
+          "countermeasures": []
+        }
+      ]
+    },
+    {
+      "id": "unchanged-control",
+      "changes": []
+    }
+  ],
+  "constraints": {
+    "allowed_edits": [
+      {
+        "kind": "move_obstacle",
+        "targets": [
+          "kiosk"
+        ]
+      },
+      {
+        "kind": "replace_information",
+        "targets": []
+      }
+    ],
+    "preserve_population": true,
+    "bounds": [
+      {
+        "field": "obstacle_x",
+        "target": "kiosk",
+        "min": 0.0,
+        "max": 20.0
+      },
+      {
+        "field": "obstacle_y",
+        "target": "kiosk",
+        "min": 0.0,
+        "max": 8.0
+      }
+    ],
+    "outcomes": [
+      {
+        "metric": "completed_fraction",
+        "min": 1.0,
+        "max": null
+      }
+    ]
+  },
+  "objectives": [
+    {
+      "metric": "completed_fraction",
+      "direction": "maximize",
+      "tolerance": 0.0
+    },
+    {
+      "metric": "service_wait_per_person_s",
+      "direction": "minimize",
+      "tolerance": 0.001
+    }
+  ],
+  "promotion": {
+    "max_candidates": 2,
+    "require_improvement": true
+  },
+  "options": {
+    "budget": {
+      "max_candidates": 3,
+      "max_trials": 7,
+      "max_agent_steps": 1000000,
+      "max_trace_samples": 500000,
+      "max_evidence_images": 4
+    },
+    "evaluation": {
+      "verify_replay": true,
+      "thresholds": {
+        "min_evacuated_fraction": 1.0
+      }
+    }
+  }
+}

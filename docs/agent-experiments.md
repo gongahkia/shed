@@ -199,7 +199,8 @@ An experiment directory contains `request.json`, `report.json`, `report.md`,
 and an `arms/ID` directory for each arm. Each arm retains its scenario, run,
 and the ordinary journey JSON, CSV and Markdown. Requests embed the complete
 baseline. The archive can move or be copied without the original source path;
-the run and analysis data remain independently verifiable.
+the run and analysis data remain independently verifiable with the compatible
+runtime and analysis contracts.
 
 `report.json` is published last. A partial directory without it is incomplete;
 unexpected execution errors retain the request and `failure.json` when
@@ -291,3 +292,39 @@ result.report.verify(&request, &result.artifacts, true)?;
 The library request embeds `baseline`; tool planning instead resolves a
 `scenario` path into that same request. Neither transport implements its own
 mutation, movement, or comparison engine.
+
+## Recorded station example
+
+[station.reference.json](../examples/experiments/station.reference.json)
+records the validated inputs, run and analysis hashes, comparison counts,
+and verification results. The JSON CLI, official Python MCP SDK 2.3.0, and
+release CLI produced identical reports, with report hash
+`548d9ebb31140de82d840fa4b8af77a6a2722837911b058b076524600151a8bb`.
+The SDK negotiated MCP 2025-11-25, validated the generated schemas and tool
+arguments, queried all nine evidence views, and reconstructed every arm.
+
+| Arm | Completed / people at 120 s | Clearance (s) | Completion goal |
+|---|---:|---:|---|
+| baseline | 5 / 24 | unavailable | failed |
+| moved-kiosk | 6 / 24 | unavailable | failed |
+| announcement | 24 / 24 | 41.6 | passed |
+| busier | 6 / 48 | unavailable | failed |
+
+The unfinished people remain in moving states with prolonged low progress
+near the south exit. The evidence retains those movement stalls and does not
+reclassify them as service queue waits. These are observations of this
+reference model on one layout and seed, with limits to investigate before
+drawing architectural or communication-policy conclusions.
+
+The kiosk and announcement comparisons each retain 24 matched people, but
+only two and five respectively completed both journeys. Completed-time
+differences therefore have those smaller denominators. The busier arm has no
+person pairs. All four runs have zero recorded boundary and swept disc overlap.
+
+Validation passed 287 workspace tests, formatting, Clippy with warnings denied,
+the release workspace build, and release demo reconstruction. One expensive
+unit gate remains ignored by default. Separately, the full ten-case frozen CLI
+benchmark passed its original checks: all people completed, every run
+reconstructed, and all boundary/swept overlap audits were zero. Two pinned
+pre-agent 0.45 cases also reproduced their exact historical run hashes. The
+reference retains all ten current frozen scenario and bundle hashes.

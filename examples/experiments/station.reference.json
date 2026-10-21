@@ -1,0 +1,195 @@
+{
+  "experiment_version": "1",
+  "validated_code_revision": "4abef35",
+  "runtime_version": "0.45.0-alpha.1",
+  "bundle_version": "0.45",
+  "scenario": "examples/experiments/station.json",
+  "plan_input": "examples/experiments/station.plan.json",
+  "input_hash": "0eda3a8b447f0f8efd2bca2425659f8062588a6e69ced5e0c08789318b73e4db",
+  "report_hash": "548d9ebb31140de82d840fa4b8af77a6a2722837911b058b076524600151a8bb",
+  "identical_reports": [
+    "JSON CLI",
+    "official Python MCP client",
+    "release JSON CLI"
+  ],
+  "arms": [
+    {
+      "id": "baseline",
+      "scenario_hash": "7c9ec77ddb554aa5e82513aa044824c6808e4cc83f4f22db9e8947bca205918b",
+      "run_bundle_hash": "6e876c3f95c2c9f9b3b87fa7d1f443a61a0a758ffc485acb50db0548ceb192b0",
+      "journey_report_hash": "ba0060f48ca5665bdbab9bfe8ee69db94a799fa3de3c6a1ee9a91835fea7f1b0",
+      "people": 24,
+      "completed": 5,
+      "clearance_time_s": null,
+      "checks_passed": false,
+      "replay_verified": true,
+      "max_boundary_disc_overlap_m": 0.0,
+      "max_swept_disc_overlap_m": 0.0
+    },
+    {
+      "id": "moved-kiosk",
+      "scenario_hash": "326ceb57cde420e30978f813be0e58d84e20dcebaedb5946b8c32cf36d05abe7",
+      "run_bundle_hash": "00066175092da0a3b44c35898d929c02e135165bdaa50a1f9efdb52388aabd69",
+      "journey_report_hash": "74a6eb734bd8ec93d1cde19f6673c7fce15b32854e2e6fdd7c758b79b88392b2",
+      "people": 24,
+      "completed": 6,
+      "clearance_time_s": null,
+      "checks_passed": false,
+      "replay_verified": true,
+      "max_boundary_disc_overlap_m": 0.0,
+      "max_swept_disc_overlap_m": 0.0
+    },
+    {
+      "id": "announcement",
+      "scenario_hash": "1035e564a7b0ccebcc996d3dd3cc08b9377ff8cc9d9edaeee2b6aee749067fcd",
+      "run_bundle_hash": "dd6aeb18eecd0f2d8859bd652939b9b393b04364630dedd55055427e741b70a9",
+      "journey_report_hash": "318dfd9e383d234eb8dd58dccd6b16dd51e540449a4c831f308db80dfa57579c",
+      "people": 24,
+      "completed": 24,
+      "clearance_time_s": 41.6,
+      "checks_passed": true,
+      "replay_verified": true,
+      "max_boundary_disc_overlap_m": 0.0,
+      "max_swept_disc_overlap_m": 0.0
+    },
+    {
+      "id": "busier",
+      "scenario_hash": "5f493f6fe91fdd63a801179671f1f7eed30b98d4aa151e74be06a180bd0da888",
+      "run_bundle_hash": "b017743ce7c7bdc506e095ee997430fbb013b09c093eece5e6a067067e38e8c6",
+      "journey_report_hash": "f5f8edcd1d64dfa1bede5748f541683eb35e45a42fe0d958680644ec31193587",
+      "people": 48,
+      "completed": 6,
+      "clearance_time_s": null,
+      "checks_passed": false,
+      "replay_verified": true,
+      "max_boundary_disc_overlap_m": 0.0,
+      "max_swept_disc_overlap_m": 0.0
+    }
+  ],
+  "comparison_pair_counts": [
+    {
+      "candidate": "moved-kiosk",
+      "same_population_inputs": true,
+      "matched_people": 24,
+      "both_completed": 2
+    },
+    {
+      "candidate": "announcement",
+      "same_population_inputs": true,
+      "matched_people": 24,
+      "both_completed": 5
+    },
+    {
+      "candidate": "busier",
+      "same_population_inputs": false,
+      "matched_people": 0,
+      "both_completed": 0
+    }
+  ],
+  "mcp_interoperability": {
+    "sdk_version": "2.3.0",
+    "jsonschema_version": "4.26.0",
+    "negotiated_protocol_version": "2025-11-25",
+    "tools_discovered": 8,
+    "evidence_views_checked": [
+      "summary",
+      "changes",
+      "agents",
+      "comparisons",
+      "hotspots",
+      "resources",
+      "low_progress",
+      "events",
+      "trace"
+    ],
+    "generated_schemas_and_tool_arguments_validated": true,
+    "all_station_runs_reconstructed": true
+  },
+  "verification": {
+    "workspace_tests_passed": 287,
+    "workspace_tests_failed": 0,
+    "default_ignored_tests": 1,
+    "format_checked": true,
+    "clippy_warnings_denied": true,
+    "release_workspace_build_passed": true,
+    "release_demo_reconstruction_passed": true
+  },
+  "frozen_regressions": {
+    "suite": "examples/benchmarks/wayfinding-pairs.json",
+    "report_hash": "e4c7fdb69349e614839961357e0f85c96aa2c2770ec5f5e857651fc1ecb666f7",
+    "passed": 10,
+    "failed": 0,
+    "all_completed": true,
+    "all_replay_verified": true,
+    "all_boundary_and_swept_overlap_audits_zero": true,
+    "cases": [
+      {
+        "id": "concourse-large-73-busy-silent",
+        "scenario_hash": "4059993ecd0ee913cc8780cf5c381bfa677d4901e7147fab59a72c4a9604f48e",
+        "run_bundle_hash": "50d959a2c3ed7131bfaa3018883c18254f943352850eb393c6728dda00344bb0"
+      },
+      {
+        "id": "concourse-large-73-busy-announced",
+        "scenario_hash": "124b577cb7ac935db2be37981714d01adcae50e04b7d249f2dda575700f77ff1",
+        "run_bundle_hash": "58f1e60d705254e309d83554862d0a4f0c8fecb0bff6221b1535925323969413"
+      },
+      {
+        "id": "concourse-large-74-light-silent",
+        "scenario_hash": "5057ceecef13149687cbaccc9133df173638aad39ef322f620f91c99d0476fbc",
+        "run_bundle_hash": "dcce763bea2fb080e01c89bd33f60da529863359d085769cfbe9ab4fb66370e8"
+      },
+      {
+        "id": "concourse-large-74-light-announced",
+        "scenario_hash": "543a3ff761d953f1fcadb28ed05ea42df3e467b0733668ec68df67e87b03dd13",
+        "run_bundle_hash": "278afc3f16de98ba89da04972186a0f57fc2b8406c07f5394c97db0d0b441874"
+      },
+      {
+        "id": "concourse-large-74-busy-silent",
+        "scenario_hash": "eed2fc320955666220513e497d33f01d641759beb76e7a2a045c2e2df63f4852",
+        "run_bundle_hash": "8ecc2f980c4ed899e25a8988528f5e3b00b605f20c7318a945cff959a2ff14e1"
+      },
+      {
+        "id": "concourse-large-74-busy-announced",
+        "scenario_hash": "37dc1d36b9445f7b27b8c888188a123a5ed4017e77b1395b1706fd7696407abf",
+        "run_bundle_hash": "5c0001a63bbe1625e44be06c001a99c5b1d27add8a118ef875758c36febdd4a6"
+      },
+      {
+        "id": "corridors-large-73-light-silent",
+        "scenario_hash": "eee625d53a79a617c97cf11a2788b310878451ce3175dd9a3cf1378837938af9",
+        "run_bundle_hash": "ab91a41642de5471fbc2a47a77fc5dec3046c72b457fd01ef9adf8d1a68fe3db"
+      },
+      {
+        "id": "corridors-large-73-light-announced",
+        "scenario_hash": "c16b678492b5679fe2a51f3eb1a969dafdbb9a8fa04cb4224982adcc026a1c1a",
+        "run_bundle_hash": "7eb1e8ddb524ec085cf8c1fb3693b38e4ef9dcf55b4838ef5940db63e6cdd07a"
+      },
+      {
+        "id": "corridors-large-73-busy-silent",
+        "scenario_hash": "26b685a33fcf5a3d246a2b2c0cd52c86cd7a1e173b6b9797396fcb87862fcd5c",
+        "run_bundle_hash": "c636cfa4f153223774b7c2825f97eb6cda485d90f5669b81732a6a2bff9a5178"
+      },
+      {
+        "id": "corridors-large-73-busy-announced",
+        "scenario_hash": "43802255ff16fab63c81ac66015d3b47e5aa0985cbdff1a694b311605916bab7",
+        "run_bundle_hash": "9b82cb223fb87388889d4cca0eb4bfb0f94e0ddb39a01cd954bd56c47366cfb1"
+      }
+    ]
+  },
+  "pinned_pre_agent_hashes_reproduced": [
+    {
+      "scenario_hash": "124b577cb7ac935db2be37981714d01adcae50e04b7d249f2dda575700f77ff1",
+      "bundle_hash": "58f1e60d705254e309d83554862d0a4f0c8fecb0bff6221b1535925323969413"
+    },
+    {
+      "scenario_hash": "4059993ecd0ee913cc8780cf5c381bfa677d4901e7147fab59a72c4a9604f48e",
+      "bundle_hash": "50d959a2c3ed7131bfaa3018883c18254f943352850eb393c6728dda00344bb0"
+    }
+  ],
+  "interpretation": [
+    "These are reference-model observations from one fixed station layout and seed, not a general architectural or communication-policy ranking.",
+    "At 120 seconds the baseline, moved-kiosk and busier arms retain moving people with prolonged low progress near the south exit; those stalls are not silently relabeled as capacity queue waits.",
+    "The announcement arm completes 24 journeys, but elapsed differences are available for only the five people who also completed the baseline.",
+    "The busier arm changes population inputs and therefore has no individual comparison pairs.",
+    "Incomplete arms fail the authored completion goal and have no clearance time. All four arms remain visible with their original evidence."
+  ]
+}

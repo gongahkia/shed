@@ -148,3 +148,48 @@ fn failed_creation_never_deletes_an_existing_artifact_and_uncommitted_files_are_
     assert_eq!(fs::read(&target).unwrap(), b"existing");
     fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+fn resource_inspection_retains_operational_changes_without_inferring_a_current_queue() {
+    let mut scenario =
+        chiyoda_core::decode_scenario(include_str!("../src/fixtures/main/project.json")).unwrap();
+    scenario.duration_s = 5.0;
+    scenario
+        .exit_states
+        .push(chiyoda_core::model::ExitStateChange {
+            id: "close-street".into(),
+            exit: "street".into(),
+            open: false,
+            at_s: 3.0,
+        });
+    let bundle = chiyoda_core::run(
+        &scenario,
+        chiyoda_core::RunOptions {
+            trace_every_steps: 1,
+        },
+    )
+    .unwrap();
+    let index = chiyoda_replay::inspection::EvidenceIndex::new(&bundle);
+    let selection = Selection::Resource {
+        resource_kind: ResourceKind::Exit,
+        id: "street".into(),
+    };
+    let initial = index.inspect(&bundle, 0, &selection, None).unwrap();
+    assert!(
+        initial
+            .resource
+            .unwrap()
+            .latest_availability_event
+            .is_none()
+    );
+    let end = index
+        .inspect(&bundle, bundle.trace.len() - 1, &selection, None)
+        .unwrap();
+    let resource = end.resource.unwrap();
+    let change = resource.latest_availability_event.unwrap();
+    assert_eq!(change.kind, "exit_state_changed");
+    assert!(change.detail.ends_with(": closed"));
+    assert_eq!(resource.queue_entries_through_frame, 0);
+    assert_eq!(resource.entrants_total, 0);
+    assert!(end.events.iter().any(|e| e.event == change));
+}

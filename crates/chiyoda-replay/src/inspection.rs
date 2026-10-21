@@ -45,8 +45,15 @@ pub enum ResourceKind {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum Availability {
-    Available { report_hash: String },
-    Unavailable { reason: String },
+    Available {
+        report_hash: String,
+        journey_version: String,
+        analyzer_runtime_version: String,
+        options: JourneyOptions,
+    },
+    Unavailable {
+        reason: String,
+    },
 }
 #[derive(Debug, Clone, Serialize)]
 pub struct EventEvidence {
@@ -75,6 +82,8 @@ pub struct PersonTotals {
     pub low_progress_total: usize,
     pub low_progress: Vec<LowProgressWindow>,
     pub decision_events_total: usize,
+    pub avoidance_fallback_steps: u64,
+    pub swept_guard_steps: u64,
 }
 #[derive(Debug, Clone, Serialize)]
 pub struct PersonEvidence {
@@ -98,6 +107,7 @@ pub struct ResourceEvidence {
     pub queue_entries_through_frame: usize,
     pub entrants_through_frame: Vec<String>,
     pub entrants_total: usize,
+    pub latest_availability_event: Option<RunEvent>,
     pub attribution_note: &'static str,
 }
 #[derive(Debug, Clone, Serialize)]
@@ -112,6 +122,7 @@ pub struct Inspection {
     pub resource: Option<ResourceEvidence>,
     pub events: Vec<EventEvidence>,
     pub events_through_frame_total: usize,
+    pub events_scope: &'static str,
     pub trail: Vec<TrailPoint>,
     pub trail_requested_start_step: u64,
     pub trail_omitted_points: usize,
@@ -130,7 +141,13 @@ impl EvidenceIndex {
     /// is the caller's trust boundary; live previews retain their distinct label.
     #[must_use]
     pub fn new(bundle: &RunBundle) -> Self {
-        let result = if bundle.runtime_version != chiyoda_core::RUNTIME_VERSION {
+        let result = if bundle.runtime_version != chiyoda_core::RUNTIME_VERSION
+            || ![
+                chiyoda_core::bundle::BUNDLE_VERSION,
+                chiyoda_core::bundle::ISOLATED_BUNDLE_VERSION,
+            ]
+            .contains(&bundle.bundle_version.as_str())
+        {
             Err("journey diagnostics require the current runtime contract".to_owned())
         } else if bundle.options.get("trace_every_steps").map(String::as_str) != Some("1") {
             Err("Detailed journey accounting is unavailable: record every integration step with --trace-every 1".to_owned())
@@ -141,13 +158,21 @@ impl EvidenceIndex {
             Ok(report) => {
                 let status = Availability::Available {
                     report_hash: report.report_hash.clone(),
+                    journey_version: report.journey_version.clone(),
+                    analyzer_runtime_version: report.analyzer_runtime_version.clone(),
+                    options: report.options.clone(),
                 };
                 (Some(report), status)
             }
             Err(reason) => (None, Availability::Unavailable { reason }),
         };
         let mut agent_events: BTreeMap<String, Vec<usize>> = BTreeMap::new();
-        for (index, event) in bundle.events.iter().enumerate() {
+        for (index, event) in bundle
+            .events
+            .iter()
+            .enumerate()
+            .filter(|(_, event)| inspection_event(&event.kind))
+        {
             agent_events
                 .entry(event.subject.clone())
                 .or_default()
@@ -196,6 +221,7 @@ impl EvidenceIndex {
             resource: None,
             events: vec![],
             events_through_frame_total: 0,
+            events_scope: "recorded route, information, release, stage and service events through the selected frame; per-step movement audit records are excluded",
             trail: vec![],
             trail_requested_start_step: start,
             trail_omitted_points: 0,
@@ -230,6 +256,8 @@ impl EvidenceIndex {
                     low_progress_total: j.low_progress.len(),
                     low_progress: j.low_progress.iter().take(200).cloned().collect(),
                     decision_events_total: j.decisions.len(),
+                    avoidance_fallback_steps: j.avoidance_fallback_steps,
+                    swept_guard_steps: j.swept_guard_steps,
                 });
                 let indices: Vec<_> = self
                     .agent_events
@@ -300,6 +328,12 @@ impl EvidenceIndex {
                     .filter(|e| e.kind.starts_with("queue_entered_"))
                     .map(|e| e.subject.clone())
                     .collect();
+                resource.latest_availability_event = indices
+                    .iter()
+                    .rev()
+                    .map(|i| &bundle.events[*i])
+                    .find(|e| e.kind.ends_with("_state_changed"))
+                    .cloned();
                 resource.queue_entries_through_frame = indices
                     .iter()
                     .filter(|i| bundle.events[**i].kind.starts_with("queue_entered_"))
@@ -334,6 +368,26 @@ impl EvidenceIndex {
         Ok(result)
     }
 }
+fn inspection_event(kind: &str) -> bool {
+    kind.starts_with("queue_entered_")
+        || matches!(
+            kind,
+            "agent_released"
+                | "evacuated"
+                | "route_recomputed"
+                | "route_unavailable"
+                | "message_received"
+                | "countermeasure_received"
+                | "resource_observed"
+                | "waypoint_reached"
+                | "waypoint_wait_started"
+                | "waypoint_wait_ended"
+                | "connector_boarding"
+                | "connector_arrival"
+                | "gate_processed"
+                | "queue_service_reserved"
+        )
+}
 fn resource_queue_kind(bundle: &RunBundle, kind: ResourceKind, id: &str) -> &'static str {
     match kind {
         ResourceKind::Exit => "exit",
@@ -355,7 +409,14 @@ fn resource_queue_kind(bundle: &RunBundle, kind: ResourceKind, id: &str) -> &'st
     }
 }
 fn resource_event(event: &RunEvent, kind: &str, id: &str) -> bool {
-    (event.kind == format!("queue_entered_{kind}") && event.detail == id)
+    let operation_kind = if kind == "lift" { "connector" } else { kind };
+    (event.subject == id
+        && [
+            format!("{operation_kind}_state_changed"),
+            format!("{operation_kind}_capacity_changed"),
+        ]
+        .contains(&event.kind))
+        || (event.kind == format!("queue_entered_{kind}") && event.detail == id)
         || (event.kind == "queue_service_reserved" && event.detail == format!("{kind}:{id}"))
         || (matches!(
             event.kind.as_str(),
@@ -466,6 +527,7 @@ pub fn resource_evidence(
         queue_entries_through_frame: 0,
         entrants_through_frame: vec![],
         entrants_total: 0,
+        latest_availability_event: None,
         attribution_note: "Queue entries prove historical exposure to this resource; current queue membership and per-resource individual wait are not inferred from nearby positions.",
     })
 }

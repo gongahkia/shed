@@ -24,6 +24,10 @@ pub struct ComparisonRequest {
     #[serde(default)]
     pub selection: Option<Selection>,
     #[serde(default)]
+    pub baseline_label: Option<String>,
+    #[serde(default)]
+    pub candidate_label: Option<String>,
+    #[serde(default)]
     pub camera: CameraControl,
 }
 #[derive(Debug, Serialize)]

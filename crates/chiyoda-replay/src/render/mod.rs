@@ -661,7 +661,15 @@ fn inspector(
         }
         c.text(
             (940.0, 478.0),
-            "Rings mark historical entrants.",
+            &if resource.entrants_total > resource.entrants_through_frame.len() {
+                format!(
+                    "Rings: {} / {} historical entrants",
+                    resource.entrants_through_frame.len(),
+                    resource.entrants_total
+                )
+            } else {
+                "Rings mark historical entrants.".to_owned()
+            },
             11,
             WAITING,
             236.0,
@@ -683,6 +691,14 @@ fn inspector(
     {
         displayed.push(route);
     }
+    if let Some(change) = inspection
+        .resource
+        .as_ref()
+        .and_then(|r| r.latest_availability_event.as_ref())
+    {
+        displayed.push(change);
+    }
+
     for event in &inspection.events {
         if !displayed.contains(&&event.event) {
             displayed.push(&event.event);
@@ -691,7 +707,15 @@ fn inspector(
             break;
         }
     }
-    for (i, event) in displayed.into_iter().take(2).enumerate() {
+    let event_limit = if options
+        .watch_status
+        .is_some_and(crate::watch_status_is_error)
+    {
+        1
+    } else {
+        2
+    };
+    for (i, event) in displayed.into_iter().take(event_limit).enumerate() {
         #[allow(clippy::cast_precision_loss)]
         let y = 548.0 + i as f32 * 47.0;
         c.text(

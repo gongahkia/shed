@@ -59,9 +59,15 @@ impl Renderer {
             ),
         ] {
             let left = viewport[0];
+            let run_label = if label == "BASELINE" {
+                request.baseline_label.as_deref()
+            } else {
+                request.candidate_label.as_deref()
+            }
+            .unwrap_or(&bundle.scenario.scenario.name);
             c.text(
                 (left, 113.0),
-                &format!("{label} / {}", bundle.scenario.scenario.name),
+                &format!("{label} / {run_label}"),
                 16,
                 INK,
                 548.0,
@@ -187,7 +193,7 @@ impl Renderer {
         );
         let footer = if interactive {
             format!(
-                "Space play / pause · arrows frame · click timeline · wheel zoom · right-drag pan · R fit · [ ] speed ({speed:.2}×)"
+                "Space play / pause · arrows frame · click timeline · wheel zoom · right-drag pan · R fit · Tab floor · V view · P PNG · [ ] speed ({speed:.2}×)"
             )
         } else {
             "Verified comparison · counts are recorded states · full-run outcomes retain their own durations".to_owned()

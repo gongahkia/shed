@@ -26,6 +26,8 @@ fn request() -> ComparisonRequest {
         selection: Some(Selection::Agent {
             id: "passengers:0".into(),
         }),
+        baseline_label: None,
+        candidate_label: None,
         camera: CameraControl::default(),
     }
 }
@@ -102,4 +104,31 @@ fn comparison_rejects_missing_common_surfaces_bad_times_and_tampered_candidates(
     assert!(prepare(&a, &b, &args, &ai, &bi).is_err());
     b.trace[0].agents[0].x_m += 1.0;
     assert!(render_comparison(&a, &b, &request()).is_err());
+}
+
+#[test]
+fn unavailable_clearance_and_unfinished_individual_elapsed_are_never_zero_differences() {
+    let baseline = fixture(1, 1, 12.0);
+    let mut scenario = baseline.scenario.scenario.clone();
+    scenario.duration_s = 1.0;
+    let short = run(
+        &scenario,
+        RunOptions {
+            trace_every_steps: 1,
+        },
+    )
+    .unwrap();
+    let evidence = prepare(
+        &baseline,
+        &short,
+        &request(),
+        &EvidenceIndex::new(&baseline),
+        &EvidenceIndex::new(&short),
+    )
+    .unwrap();
+    assert!(evidence.same_population_inputs);
+    assert!(evidence.baseline.full_run_clearance_s.is_some());
+    assert!(evidence.candidate.full_run_clearance_s.is_none());
+    assert!(evidence.full_run_clearance_difference_s.is_none());
+    assert!(evidence.paired_completed_elapsed_difference_s.is_none());
 }

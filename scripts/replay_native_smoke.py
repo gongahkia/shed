@@ -53,6 +53,9 @@ def main():
     pointer = None
     prior = applescript('tell application "System Events" to get unix id of first process whose frontmost is true')
     def event(kind, *values):
+        if kind in {"click", "drag", "scroll"}:
+            applescript(f'tell application "System Events" to set frontmost of (first process whose unix id is {process.pid}) to true')
+            time.sleep(0.2)
         result = subprocess.check_output([str(helper), str(process.pid), kind, *map(str, values)], text=True).strip()
         time.sleep(0.12)
         return result

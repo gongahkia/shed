@@ -13,6 +13,8 @@ use tiny_skia::{FillRule, Mask, Paint, PathBuilder, Pixmap, Rect, Stroke, Transf
 pub const FONT_BYTES: &[u8] = include_bytes!("../../../../assets/fonts/Inter.ttf");
 
 pub struct Canvas {
+    #[cfg(test)]
+    pub text_runs: Vec<((f32, f32), String)>,
     pub pixels: Pixmap,
     clip: Mask,
     viewport: [f32; 4],
@@ -28,6 +30,8 @@ impl Canvas {
         let path = PathBuilder::from_rect(Rect::from_xywh(x, y, w, h).unwrap());
         clip.fill_path(&path, FillRule::Winding, false, Transform::identity());
         Self {
+            #[cfg(test)]
+            text_runs: vec![],
             clip,
             viewport: super::scene::VIEWPORT,
             map_clip: false,
@@ -57,6 +61,8 @@ impl Canvas {
         self.map_clip = enabled;
     }
     pub fn clear(&mut self, color: u32) {
+        #[cfg(test)]
+        self.text_runs.clear();
         self.pixels.fill(color_value(color));
     }
     pub fn rect(&mut self, rect: [f32; 4], color: u32) {
@@ -232,6 +238,8 @@ impl Canvas {
     }
     pub fn text(&mut self, at: (f32, f32), text: &str, size: u16, color: u32, max_width: f32) {
         let text = self.fit_text(text, size, max_width);
+        #[cfg(test)]
+        self.text_runs.push((at, text.clone()));
         let mut x = at.0;
         for c in text.chars() {
             let advance = self.advance(c, size);

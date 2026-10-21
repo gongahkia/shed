@@ -5,16 +5,16 @@
     clippy::cast_sign_loss
 )]
 use super::{
-    BORDER, CONNECTOR, EXIT, GRID, INACTIVE, INK, MOVING, MUTED, OBSTACLE, OBSTACLE_EDGE, PAPER,
-    QUEUE, ViewMode, WAITING, WAYPOINT, canvas::Canvas,
+    BORDER, CONNECTOR, EXIT, INACTIVE, INK, MOVING, OBSTACLE, OBSTACLE_EDGE, PAPER, QUEUE,
+    ViewMode, WAITING, WAYPOINT, canvas::Canvas,
 };
 use chiyoda_core::{
     AgentState,
     bundle::{AgentSnapshot, TraceFrame},
-    model::{ConnectorKind, Point3, PortalResource, Scenario, Surface},
+    model::{Point3, PortalResource, Scenario, Surface},
 };
 
-pub const VIEWPORT: [f32; 4] = [32.0, 82.0, 1136.0, 470.0];
+pub const VIEWPORT: [f32; 4] = [24.0, 24.0, 1152.0, 672.0];
 #[derive(Clone, Copy, Debug, serde::Serialize)]
 pub struct WorldBounds {
     pub min_x: f64,
@@ -148,15 +148,6 @@ fn corners(at: Point3, width: f64, depth: f64) -> [Point3; 4] {
         },
     ]
 }
-pub fn nice_step(value: f64) -> f64 {
-    let power = 10.0_f64.powf(value.log10().floor());
-    [1.0, 2.0, 5.0, 10.0]
-        .into_iter()
-        .map(|n| n * power)
-        .find(|n| *n >= value)
-        .unwrap_or(power * 10.0)
-}
-
 #[allow(clippy::too_many_lines)] // authored layers are drawn in a deliberate back-to-front order
 pub fn draw(
     canvas: &mut Canvas,
@@ -176,16 +167,9 @@ pub fn draw(
         .filter(|floor| view == ViewMode::Overview || floor.id == surface.id)
         .collect();
     floors.sort_by(|a, b| a.origin.z_m.total_cmp(&b.origin.z_m));
-    let mut labels = Labels {
-        bounds: map.viewport,
-        occupied: vec![],
-    };
     for floor in floors {
         let outline = corners(floor.origin, floor.width_m, floor.depth_m).map(|p| camera.point(p));
         canvas.polygon(&outline, Some(PAPER), Some((BORDER, 1.5)));
-        if view == ViewMode::Surface {
-            grid(canvas, floor, camera);
-        }
         for obstacle in scenario.obstacles.iter().filter(|o| o.surface == floor.id) {
             let points =
                 corners(obstacle.at, obstacle.width_m, obstacle.depth_m).map(|p| camera.point(p));
@@ -256,29 +240,27 @@ pub fn draw(
         }
         for exit in scenario.exits.iter().filter(|r| r.surface == floor.id) {
             let p = camera.point(exit.at);
-            symbol(canvas, p, "→", EXIT);
-            labels.add(canvas, p, &exit.id, EXIT);
+            symbol(canvas, p, EXIT);
+            canvas.line((p.0 - 3.0, p.1), (p.0 + 3.0, p.1), EXIT, 1.2);
+            canvas.line((p.0, p.1 - 3.0), (p.0 + 3.0, p.1), EXIT, 1.2);
+            canvas.line((p.0, p.1 + 3.0), (p.0 + 3.0, p.1), EXIT, 1.2);
         }
         for gate in scenario.gates.iter().filter(|r| r.surface == floor.id) {
             let p = camera.point(gate.at);
-            symbol(canvas, p, "=", WAITING);
-            labels.add(canvas, p, &gate.id, WAITING);
+            symbol(canvas, p, WAITING);
+            for dy in [-2.0, 2.0] {
+                canvas.line((p.0 - 3.0, p.1 + dy), (p.0 + 3.0, p.1 + dy), WAITING, 1.2);
+            }
         }
         for connector in &scenario.connectors {
-            let glyph = match connector.kind() {
-                ConnectorKind::Stair => "S",
-                ConnectorKind::Ramp => "R",
-                ConnectorKind::Escalator => "E",
-                ConnectorKind::Lift => "L",
-            };
             for (id, at) in [
                 (connector.from_surface(), connector.from()),
                 (connector.to_surface(), connector.to()),
             ] {
                 if id == floor.id {
                     let p = camera.point(at);
-                    symbol(canvas, p, glyph, CONNECTOR);
-                    labels.add(canvas, p, connector.id(), MUTED);
+                    symbol(canvas, p, CONNECTOR);
+                    canvas.circle(p, 2.5, None, Some((CONNECTOR, 1.2)));
                 }
             }
         }
@@ -305,99 +287,12 @@ pub fn draw(
             );
         }
     }
-    if view == ViewMode::Overview {
-        for floor in &scenario.surfaces {
-            labels.add(
-                canvas,
-                camera.point(floor.origin),
-                &format!("{} · {:.1} m", floor.id, floor.origin.z_m),
-                INK,
-            );
-        }
-    }
     if let Some(inspection) = inspection {
         highlight(canvas, scenario, frame, surface, view, camera, inspection);
     }
     canvas.map_clip(false);
-    let [vx, vy, vw, vh] = map.viewport;
-    let footer_y = vy + vh + 16.0;
-    if view == ViewMode::Surface {
-        let length = nice_step(90.0 / camera.scale);
-        let pixels = (length * camera.scale) as f32;
-        canvas.line(
-            (vx + 16.0, footer_y),
-            (vx + 16.0 + pixels, footer_y),
-            INK,
-            1.5,
-        );
-        for x in [vx + 16.0, vx + 16.0 + pixels] {
-            canvas.line((x, footer_y - 4.0), (x, footer_y + 4.0), INK, 1.5);
-        }
-        canvas.text(
-            (vx + 16.0, footer_y + 20.0),
-            &format!("{length} m"),
-            12,
-            MUTED,
-            130.0,
-        );
-        canvas.text(
-            (vx + vw - 200.0, footer_y + 20.0),
-            "+x →   +y ↓",
-            12,
-            MUTED,
-            200.0,
-        );
-    } else {
-        canvas.text(
-            (vx, footer_y + 16.0),
-            "Authored elevations · connector links · surfaces can occlude",
-            12,
-            MUTED,
-            vw,
-        );
-    }
 }
-fn grid(canvas: &mut Canvas, surface: &Surface, camera: Camera) {
-    let spacing = nice_step(42.0 / camera.scale);
-    let start = surface.origin;
-    let right = start.x_m + surface.width_m;
-    let bottom = start.y_m + surface.depth_m;
-    let mut x = (start.x_m / spacing).ceil() * spacing;
-    for _ in 0..200 {
-        if x >= right {
-            break;
-        }
-        canvas.line(
-            camera.point(Point3 { x_m: x, ..start }),
-            camera.point(Point3 {
-                x_m: x,
-                y_m: bottom,
-                ..start
-            }),
-            GRID,
-            0.6,
-        );
-        x += spacing;
-    }
-    let mut y = (start.y_m / spacing).ceil() * spacing;
-    for _ in 0..200 {
-        if y >= bottom {
-            break;
-        }
-        canvas.line(
-            camera.point(Point3 { y_m: y, ..start }),
-            camera.point(Point3 {
-                x_m: right,
-                y_m: y,
-                ..start
-            }),
-            GRID,
-            0.6,
-        );
-        y += spacing;
-    }
-}
-fn symbol(canvas: &mut Canvas, p: (f32, f32), glyph: &str, color: u32) {
+fn symbol(canvas: &mut Canvas, p: (f32, f32), color: u32) {
     canvas.rect([p.0 - 7.0, p.1 - 7.0, 14.0, 14.0], PAPER);
     canvas.polygon(
         &[
@@ -409,8 +304,6 @@ fn symbol(canvas: &mut Canvas, p: (f32, f32), glyph: &str, color: u32) {
         None,
         Some((color, 1.2)),
     );
-    let width = canvas.text_width(glyph, 11);
-    canvas.text((p.0 - width / 2.0, p.1 + 4.0), glyph, 11, color, 20.0);
 }
 fn person(canvas: &mut Canvas, agent: &AgentSnapshot, scenario: &Scenario, camera: Camera) {
     let p = camera.point(Point3 {
@@ -440,39 +333,6 @@ fn person(canvas: &mut Canvas, agent: &AgentSnapshot, scenario: &Scenario, camer
         }
     }
 }
-struct Labels {
-    bounds: [f32; 4],
-    occupied: Vec<[f32; 4]>,
-}
-impl Labels {
-    fn add(&mut self, canvas: &mut Canvas, p: (f32, f32), label: &str, color: u32) {
-        let label = canvas.fit_text(label, 11, 132.0);
-        let width = canvas.text_width(&label, 11) + 8.0;
-        for (x, y) in [
-            (p.0 + 12.0, p.1 - 12.0),
-            (p.0 - width - 12.0, p.1 - 12.0),
-            (p.0 + 12.0, p.1 + 26.0),
-        ] {
-            let bounds = [x - 4.0, y - 12.0, width, 17.0];
-            if x < self.bounds[0]
-                || x + width > self.bounds[0] + self.bounds[2]
-                || y < self.bounds[1] + 12.0
-                || y > self.bounds[1] + self.bounds[3] - 4.0
-                || self.occupied.iter().any(|other| overlaps(bounds, *other))
-            {
-                continue;
-            }
-            canvas.rect(bounds, PAPER);
-            canvas.text((x, y), &label, 11, color, width);
-            self.occupied.push(bounds);
-            break;
-        }
-    }
-}
-fn overlaps(a: [f32; 4], b: [f32; 4]) -> bool {
-    a[0] < b[0] + b[2] && a[0] + a[2] > b[0] && a[1] < b[1] + b[3] && a[1] + a[3] > b[1]
-}
-
 fn trail(
     canvas: &mut Canvas,
     inspection: &crate::inspection::Inspection,

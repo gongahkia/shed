@@ -118,7 +118,7 @@ pub(super) fn catalog() -> Vec<Value> {
         ),
         tool::<super::replay::RenderInput>(
             "chiyoda_render_evidence",
-            "Reconstruct a bounded saved run, inspect one exact person/resource at a recorded step, and write an annotated PNG plus source-linked evidence. MCP returns the same PNG as image content. Whole-run totals remain separate from frame state and sparse-trace accounting stays unavailable.",
+            "Reconstruct a bounded saved run and write a simulation PNG highlighting one exact person/resource at a recorded step, plus source-linked JSON evidence. The image shows only the simulation and timeline; measurements and diagnostics are in the evidence. MCP returns the same PNG as image content. Whole-run totals remain separate from frame state and sparse-trace accounting stays unavailable.",
             false,
         ),
         tool::<super::campaign::PlanInput>(

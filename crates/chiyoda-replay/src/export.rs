@@ -113,7 +113,6 @@ pub fn export_gif(
         &manifest.frame_delays_centiseconds,
         output,
         view,
-        playback_speed,
     ) {
         let _ = fs::remove_file(output);
         return Err(error);
@@ -257,7 +256,6 @@ pub fn write_gif(
     frame_delays_centiseconds: &[u16],
     output: &Path,
     view: ViewMode,
-    playback_speed: f64,
 ) -> Result<()> {
     if bundle.trace.len() != frame_delays_centiseconds.len() {
         bail!(
@@ -297,7 +295,6 @@ pub fn write_gif(
                 index,
                 surface: surface_index,
                 view,
-                speed: playback_speed,
                 ..render::Options::default()
             },
         );

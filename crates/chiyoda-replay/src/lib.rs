@@ -84,8 +84,3 @@ pub fn load_watch_scenario(
     run(&scenario, RunOptions { trace_every_steps })
         .map_err(|error| format!("runtime error: {error}"))
 }
-
-#[must_use]
-pub fn watch_status_is_error(status: &str) -> bool {
-    status.starts_with("cannot read") || status.contains(" failed:")
-}

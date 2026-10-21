@@ -1,4 +1,4 @@
-//! Verified annotated images with the exact evidence used to draw them.
+//! Verified simulation images with selection highlights and source-linked JSON evidence.
 use crate::{
     HEIGHT, ViewMode, WIDTH,
     export::{
@@ -108,7 +108,6 @@ pub fn render_evidence(
                 ..MapConfig::default()
             },
             inspection: Some(&inspection),
-            ..Options::default()
         },
     );
     let png = encode_png(&buffer, WIDTH, HEIGHT)?;

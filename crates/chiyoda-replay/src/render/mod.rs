@@ -2,7 +2,6 @@
 mod canvas;
 mod chrome;
 mod compare;
-mod inspector;
 pub(crate) mod scene;
 pub use compare::VIEWPORTS as COMPARISON_VIEWPORTS;
 pub use scene::{Camera, MapConfig, VIEWPORT, WorldBounds, pick};
@@ -18,7 +17,6 @@ const PAPER: u32 = 0x00ff_ffff;
 const INK: u32 = 0x0025_3342;
 const MUTED: u32 = 0x005e_6d7c;
 const BORDER: u32 = 0x00d8_dfe6;
-const GRID: u32 = 0x00e9_edf1;
 const OBSTACLE: u32 = 0x00c5_cdd6;
 const OBSTACLE_EDGE: u32 = 0x0092_9fad;
 const MOVING: u32 = 0x0025_66b0;
@@ -29,20 +27,10 @@ const EXIT: u32 = 0x0023_7c68;
 const WAYPOINT: u32 = 0x0074_6b8b;
 const TRAIL: u32 = 0x00a2_bfe2;
 const QUEUE: u32 = 0x009c_8cae;
-const ERROR: u32 = 0x00b4_3435;
-pub const RENDERER_VERSION: &str = "chiyoda.replay-renderer.v4";
+pub const RENDERER_VERSION: &str = "chiyoda.replay-renderer.v5";
 
-/// Shared seek target for single-run and comparison playback.
-pub const TIMELINE_BOUNDS: [f32; 4] = [32.0, 724.0, 1136.0, 28.0];
-
-#[must_use]
-pub fn single_viewport(inspector_visible: bool) -> [f32; 4] {
-    if inspector_visible {
-        [32.0, 82.0, 852.0, 470.0]
-    } else {
-        VIEWPORT
-    }
-}
+/// Shared seek target for every single-run and comparison projection.
+pub const TIMELINE_BOUNDS: [f32; 4] = [24.0, 712.0, 1152.0, 64.0];
 
 /// Exact semantic colours plus coverage ramps for antialiased edges. One palette
 /// is used across the animation so rare status colours cannot drift per frame.
@@ -54,7 +42,6 @@ pub fn gif_palette() -> Vec<u32> {
         INK,
         MUTED,
         BORDER,
-        GRID,
         OBSTACLE,
         OBSTACLE_EDGE,
         MOVING,
@@ -65,8 +52,6 @@ pub fn gif_palette() -> Vec<u32> {
         WAYPOINT,
         QUEUE,
         TRAIL,
-        ERROR,
-        0x00fc_eced,
     ];
     for foreground in [
         INK,
@@ -80,7 +65,6 @@ pub fn gif_palette() -> Vec<u32> {
         WAYPOINT,
         QUEUE,
         TRAIL,
-        ERROR,
     ] {
         let steps = if [INK, MUTED].contains(&foreground) {
             16
@@ -118,55 +102,15 @@ pub fn provenance() -> Provenance {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Source {
-    Reconstructed,
-    LegacyHashOnly,
-    LivePreview,
-}
-impl Source {
-    fn label(self) -> &'static str {
-        match self {
-            Self::Reconstructed => "Reconstructed bundle",
-            Self::LegacyHashOnly => "Legacy · hash only",
-            Self::LivePreview => "Live preview · unpersisted",
-        }
-    }
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Playback {
-    Playing,
-    Paused,
-    Export,
-}
-#[derive(Clone, Copy)]
+/// Scene inputs only: provenance, diagnostics and playback status stay in
+/// structured evidence and terminal output, never in the visualization.
+#[derive(Clone, Copy, Default)]
 pub struct Options<'a> {
     pub index: usize,
     pub surface: usize,
     pub view: ViewMode,
-    pub source: Source,
-    pub playback: Playback,
-    pub speed: f64,
-    pub details: bool,
-    pub watch_status: Option<&'a str>,
     pub map: MapConfig,
     pub inspection: Option<&'a crate::inspection::Inspection>,
-}
-impl Default for Options<'_> {
-    fn default() -> Self {
-        Self {
-            index: 0,
-            surface: 0,
-            view: ViewMode::Surface,
-            source: Source::Reconstructed,
-            playback: Playback::Export,
-            speed: 1.0,
-            details: true,
-            watch_status: None,
-            map: MapConfig::default(),
-            inspection: None,
-        }
-    }
 }
 
 pub struct Renderer {
@@ -185,7 +129,6 @@ impl Renderer {
         }
     }
 
-    #[allow(clippy::too_many_lines)] // one presentation pass retains map, inspection and watch status ordering
     pub fn render(&mut self, buffer: &mut [u32], bundle: Option<&RunBundle>, options: Options<'_>) {
         assert_eq!(
             buffer.len(),
@@ -194,129 +137,32 @@ impl Renderer {
         );
         let c = &mut self.canvas;
         c.clear(BACKGROUND);
-        if let Some(bundle) = bundle {
+        let interval = bundle.map(|bundle| {
             let scenario = &bundle.scenario.scenario;
-            let surface = &scenario.surfaces[options.surface];
             let frame = &bundle.trace[options.index];
-            let inspection = options.inspection.filter(|_| options.details);
-            let viewport = single_viewport(inspection.is_some());
-            let location = if options.view == ViewMode::Surface {
-                format!(
-                    "{} · {:.1} × {:.1} m · elevation {:.1} m",
-                    surface.id, surface.width_m, surface.depth_m, surface.origin.z_m
-                )
-            } else {
-                format!("Overview · {} surfaces", scenario.surfaces.len())
-            };
-            let source = if options.source == Source::Reconstructed {
-                String::new()
-            } else {
-                format!("{} · ", options.source.label())
-            };
-            chrome::heading(
-                c,
-                32.0,
-                viewport[2],
-                &scenario.name,
-                &format!(
-                    "{source}{location} · recorded {:.2} s · step {}",
-                    frame.time_s, frame.step
-                ),
-            );
             scene::draw(
                 c,
                 scenario,
                 frame,
-                surface,
+                &scenario.surfaces[options.surface],
                 options.view,
                 MapConfig {
-                    viewport,
+                    viewport: VIEWPORT,
                     ..options.map
                 },
                 options.inspection,
             );
-            chrome::outcomes(
-                c,
-                32.0,
-                viewport[2],
-                &chrome::Outcomes {
-                    states: state_counts(frame),
-                    population: frame.agents.len(),
-                    completed: bundle.metrics.evacuated_agents,
-                    people: bundle.metrics.total_agents,
-                    duration_s: scenario.duration_s,
-                    clearance_s: bundle.metrics.clearance_time_s,
-                },
-            );
-            if let Some(inspection) = inspection {
-                inspector::draw(c, options, inspection);
-            }
-            timeline(c, bundle, options);
-        } else {
-            c.text(
-                (90.0, 340.0),
-                "Waiting for a valid scenario",
-                26,
-                INK,
-                1000.0,
-            );
-            c.text(
-                (90.0, 373.0),
-                "Save the watched JSON file to load its geometry and trace.",
-                14,
-                MUTED,
-                1000.0,
-            );
-        }
-        if let Some(status) = options.watch_status {
-            let error = super::watch_status_is_error(status);
-            c.rect(
-                [0.0, 676.0, 1200.0, 20.0],
-                if error { 0x00fc_eced } else { BACKGROUND },
-            );
-            let status = if error && bundle.is_some() {
-                format!("Showing last valid revision · {status}")
-            } else {
-                status.to_owned()
-            };
-            c.text(
-                (32.0, 690.0),
-                &status,
-                11,
-                if error { ERROR } else { MUTED },
-                1136.0,
-            );
-        }
+            (
+                bundle.trace[0].time_s,
+                bundle.trace.last().expect("non-empty trace").time_s,
+                frame.time_s,
+            )
+        });
+        chrome::timeline(c, interval);
         c.copy_to(buffer);
     }
 }
 
-fn timeline(c: &mut Canvas, bundle: &RunBundle, options: Options<'_>) {
-    let start = bundle.trace[0].time_s;
-    let end = bundle.trace.last().expect("non-empty trace").time_s;
-    let now = bundle.trace[options.index].time_s;
-    chrome::timeline(c, start, end, now, "Time");
-    if let Some(inspection) = options.inspection.filter(|_| options.details) {
-        if let Some(totals) = inspection
-            .person
-            .as_ref()
-            .and_then(|p| p.whole_run.as_ref())
-        {
-            for span in &totals.low_progress {
-                c.line(
-                    (chrome::time_x(start, end, span.start_time_s), 757.0),
-                    (chrome::time_x(start, end, span.end_time_s), 757.0),
-                    WAITING,
-                    4.0,
-                );
-            }
-        }
-        for event in &inspection.events {
-            let x = chrome::time_x(start, end, event.event.time_s);
-            c.line((x, 729.0), (x, 734.0), MUTED, 1.0);
-        }
-    }
-}
 #[must_use]
 pub fn state_counts(frame: &TraceFrame) -> [usize; 5] {
     let mut counts = [0; 5];
@@ -373,58 +219,14 @@ mod tests {
     }
 
     #[test]
-    fn watch_failure_preserves_the_last_valid_plan_and_source_verification_stays_explicit() {
-        let bundle = fixture();
+    fn empty_scene_has_only_an_unlabelled_progress_track() {
         let mut renderer = Renderer::new();
-        let mut valid = vec![0; WIDTH * HEIGHT];
-        let mut failed = valid.clone();
-        let options = Options {
-            source: Source::LivePreview,
-            playback: Playback::Paused,
-            ..Options::default()
-        };
-        renderer.render(&mut valid, Some(&bundle), options);
-        renderer.render(
-            &mut failed,
-            Some(&bundle),
-            Options {
-                watch_status: Some("revision 2 failed: invalid scenario"),
-                ..options
-            },
-        );
-        for y in 82..552 {
-            assert_eq!(
-                &valid[y * WIDTH + 32..y * WIDTH + 1168],
-                &failed[y * WIDTH + 32..y * WIDTH + 1168]
-            );
-        }
-        assert_ne!(valid, failed);
-        capture("watch-valid.png", &valid);
-        capture("watch-error.png", &failed);
-        let live_header = valid[..80 * WIDTH].to_vec();
-        renderer.render(
-            &mut valid,
-            Some(&bundle),
-            Options {
-                source: Source::LegacyHashOnly,
-                ..options
-            },
-        );
-        capture("legacy.png", &valid);
-        let legacy_header = valid[..80 * WIDTH].to_vec();
-        renderer.render(&mut valid, Some(&bundle), Options::default());
-        assert_ne!(live_header, legacy_header);
-        assert_ne!(legacy_header, valid[..80 * WIDTH]);
-        renderer.render(
-            &mut failed,
-            None,
-            Options {
-                watch_status: Some("cannot read draft.json"),
-                ..options
-            },
-        );
-        assert!(failed.contains(&ERROR));
-        capture("watch-empty.png", &failed);
+        let mut buffer = vec![0; WIDTH * HEIGHT];
+        renderer.render(&mut buffer, None, Options::default());
+        assert!(renderer.canvas.text_runs.is_empty());
+        assert!(buffer[..712 * WIDTH].iter().all(|p| *p == BACKGROUND));
+        assert!(buffer.contains(&BORDER));
+        capture("empty.png", &buffer);
     }
 
     #[test]
@@ -435,61 +237,107 @@ mod tests {
         canvas.rect([0.0, 0.0, 1200.0, 800.0], PAPER);
         canvas.circle((916.0, 300.0), 100.0, Some(MOVING), None);
         canvas.line((0.0, 0.0), (1200.0, 800.0), INK, 20.0);
-        canvas.text((900.0, 400.0), "Out of bounds", 32, ERROR, 500.0);
+        canvas.text((900.0, 400.0), "Out of bounds", 32, MOVING, 500.0);
         let mut buffer = vec![0; WIDTH * HEIGHT];
         canvas.copy_to(&mut buffer);
         assert!(buffer.contains(&PAPER));
         for (index, color) in buffer.iter().enumerate() {
             let x = index % WIDTH;
             let y = index / WIDTH;
-            if !(32..1168).contains(&x) || !(82..552).contains(&y) {
+            if !(24..1176).contains(&x) || !(24..696).contains(&y) {
                 assert_eq!(*color, BACKGROUND);
             }
         }
     }
 
+    fn assert_only_simulation_and_timeline(renderer: &Renderer, buffer: &[u32], paired: bool) {
+        assert_eq!(
+            renderer.canvas.text_runs.len(),
+            3,
+            "only timeline timestamps"
+        );
+        for (at, text) in &renderer.canvas.text_runs {
+            assert!(at.1 >= TIMELINE_BOUNDS[1], "unexpected scene label: {text}");
+            assert!(
+                text.chars()
+                    .all(|c| c.is_ascii_digit() || ". s".contains(c)),
+                "{text}"
+            );
+        }
+        for (index, pixel) in buffer.iter().enumerate() {
+            let x = index % WIDTH;
+            let y = index / WIDTH;
+            let scene = (24..1176).contains(&x)
+                && (24..696).contains(&y)
+                && (!paired || !(588..612).contains(&x));
+            let timeline = (712..790).contains(&y);
+            if !scene && !timeline {
+                assert_eq!(*pixel, BACKGROUND, "chrome at ({x}, {y})");
+            }
+        }
+    }
+
     #[test]
-    fn inspector_is_contextual_and_clearing_restores_the_full_plan() {
-        use crate::inspection::{EvidenceIndex, Selection};
+    fn every_projection_and_selection_keeps_only_the_scene_and_timeline() {
+        use crate::{
+            comparison,
+            inspection::{EvidenceIndex, ResourceKind, Selection},
+            navigation::CameraControl,
+        };
         let bundle = fixture();
+        let before = serde_json::to_vec(&bundle).unwrap();
         let evidence = EvidenceIndex::new(&bundle);
-        let inspection = evidence
-            .inspect(
-                &bundle,
-                0,
-                &Selection::Agent {
-                    id: bundle.trace[0].agents[0].id.clone(),
-                },
-                None,
-            )
-            .unwrap();
         let mut renderer = Renderer::new();
-        let mut plain = vec![0; WIDTH * HEIGHT];
-        let mut inspected = plain.clone();
-        renderer.render(&mut plain, Some(&bundle), Options::default());
-        renderer.render(
-            &mut inspected,
-            Some(&bundle),
-            Options {
-                inspection: Some(&inspection),
-                ..Options::default()
-            },
-        );
-        assert_eq!(plain[100 * WIDTH + 1185], BACKGROUND);
-        assert_eq!(inspected[100 * WIDTH + 1185], PAPER);
-        capture("person-inspector.png", &inspected);
-        renderer.render(
-            &mut inspected,
-            Some(&bundle),
-            Options {
-                inspection: Some(&inspection),
-                details: false,
-                ..Options::default()
-            },
-        );
-        assert_eq!(inspected[100 * WIDTH + 1185], BACKGROUND);
-        renderer.render(&mut inspected, Some(&bundle), Options::default());
-        assert_eq!(plain, inspected);
+        let mut buffer = vec![0; WIDTH * HEIGHT];
+        for (name, selection) in [
+            ("plain", None),
+            (
+                "person",
+                Some(Selection::Agent {
+                    id: bundle.trace[0].agents[0].id.clone(),
+                }),
+            ),
+            (
+                "resource",
+                Some(Selection::Resource {
+                    resource_kind: ResourceKind::Exit,
+                    id: "street".into(),
+                }),
+            ),
+        ] {
+            for view in [ViewMode::Surface, ViewMode::Overview] {
+                let inspection = selection
+                    .as_ref()
+                    .map(|s| evidence.inspect(&bundle, 1, s, None).unwrap());
+                renderer.render(
+                    &mut buffer,
+                    Some(&bundle),
+                    Options {
+                        index: 1,
+                        view,
+                        inspection: inspection.as_ref(),
+                        ..Options::default()
+                    },
+                );
+                assert_only_simulation_and_timeline(&renderer, &buffer, false);
+                capture(&format!("{name}-{}.png", view.label()), &buffer);
+                let request = comparison::ComparisonRequest {
+                    time_s: bundle.trace[1].time_s,
+                    surface: None,
+                    view,
+                    selection: selection.clone(),
+                    baseline_label: Some("This label belongs only in JSON".into()),
+                    candidate_label: Some("This label also belongs only in JSON".into()),
+                    camera: CameraControl::default(),
+                };
+                let paired =
+                    comparison::prepare(&bundle, &bundle, &request, &evidence, &evidence).unwrap();
+                renderer.render_comparison(&mut buffer, &bundle, &bundle, &request, &paired);
+                assert_only_simulation_and_timeline(&renderer, &buffer, true);
+                capture(&format!("compare-{name}-{}.png", view.label()), &buffer);
+            }
+        }
+        assert_eq!(serde_json::to_vec(&bundle).unwrap(), before);
     }
 
     #[test]
@@ -519,10 +367,7 @@ mod tests {
             },
         );
         renderer.render_comparison(&mut paired, &bundle, &bundle, &request, &evidence);
-        assert_eq!(
-            &single[704 * WIDTH..754 * WIDTH],
-            &paired[704 * WIDTH..754 * WIDTH]
-        );
+        assert_eq!(&single[712 * WIDTH..], &paired[712 * WIDTH..]);
     }
 
     #[test]

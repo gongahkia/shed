@@ -13,6 +13,8 @@ use std::{
 };
 
 #[cfg(test)]
+use crate::render::{self, BACKGROUND};
+#[cfg(test)]
 use crate::{
     HEIGHT, WIDTH,
     export::{export_png, frame_delay, write_png},
@@ -20,10 +22,8 @@ use crate::{
 use crate::{
     ViewMode,
     export::{export_gif, gif_manifest_path, validate_playback_timing},
-    load_watch_scenario, render,
+    load_watch_scenario,
 };
-#[cfg(test)]
-use render::BACKGROUND;
 mod native;
 const WATCH_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const WATCH_DEBOUNCE: Duration = Duration::from_millis(150);
@@ -51,10 +51,10 @@ pub struct ViewerArgs {
     /// Initial projection, also used by headless exports. V toggles it in the viewer.
     #[arg(long, value_enum, default_value_t = ViewMode::Surface)]
     view: ViewMode,
-    /// Inspect an exact recorded person ID (also annotates PNG exports).
+    /// Highlight an exact recorded person ID; PNG sidecars retain its detailed evidence.
     #[arg(long, requires="bundle", conflicts_with_all=["resource","export_gif"])]
     agent: Option<String>,
-    /// Inspect exit:ID, gate:ID, connector:ID or waypoint:ID.
+    /// Highlight exit:ID, gate:ID, connector:ID or waypoint:ID; retain its evidence in PNG sidecars.
     #[arg(long, requires = "bundle", conflicts_with = "export_gif")]
     resource: Option<String>,
     /// First recorded step in a selected person's trail.
@@ -196,18 +196,7 @@ fn replay_bundle(bundle_path: &Path, cli: &ViewerArgs) -> Result<()> {
     }
     validate_playback_timing(&bundle.trace, cli.speed)?;
     let initial_frame = replay_start_index(&bundle.trace, cli.at_step)?;
-    native::open(
-        Some(bundle),
-        None,
-        initial_frame,
-        surface_index,
-        if verification == BundleVerification::Reconstructed {
-            render::Source::Reconstructed
-        } else {
-            render::Source::LegacyHashOnly
-        },
-        cli,
-    )
+    native::open(Some(bundle), None, initial_frame, surface_index, cli)
 }
 
 fn replay_watch(source_path: PathBuf, cli: &ViewerArgs) -> Result<()> {
@@ -216,7 +205,6 @@ fn replay_watch(source_path: PathBuf, cli: &ViewerArgs) -> Result<()> {
         Some(WatchController::new(source_path, cli.trace_every)),
         0,
         0,
-        render::Source::LivePreview,
         cli,
     )
 }
@@ -257,29 +245,6 @@ fn load_bundle(
         bail!("bundle contains no trace frames");
     }
     Ok((bundle, verification))
-}
-
-fn window_title(
-    bundle: Option<&RunBundle>,
-    surface_index: usize,
-    index: usize,
-    speed: f64,
-    view_mode: ViewMode,
-    watch_status: Option<&str>,
-) -> String {
-    let status = watch_status.unwrap_or("recorded bundle replay");
-    match bundle {
-        Some(bundle) => {
-            let surface = &bundle.scenario.scenario.surfaces[surface_index];
-            format!(
-                "Chiyoda {} — {} — {:.3}s — {speed:.2}× — {status}",
-                view_mode.label(),
-                surface.id,
-                bundle.trace[index].time_s,
-            )
-        }
-        None => format!("Chiyoda watch — no valid scene — {status}"),
-    }
 }
 
 fn select_reloaded_surface(

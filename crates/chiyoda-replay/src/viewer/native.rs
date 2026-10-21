@@ -1,7 +1,7 @@
 //! Native input orchestration. Recorded evidence, camera math and exports live in the library.
 use super::{
     ViewerArgs, WatchController, load_bundle, next_snapshot_path, replay_start_index,
-    select_reloaded_surface, window_title,
+    select_reloaded_surface,
 };
 use crate::{
     HEIGHT, WIDTH, comparison, evidence,
@@ -88,7 +88,6 @@ pub(super) fn open(
     mut watch: Option<WatchController>,
     initial_frame: usize,
     mut surface: usize,
-    source: render::Source,
     cli: &ViewerArgs,
 ) -> Result<()> {
     let candidate = cli
@@ -125,7 +124,6 @@ pub(super) fn open(
     }
     let mut clock = PlaybackClock::new(time, cli.paused, cli.speed)?;
     let mut view = cli.view;
-    let mut details = true;
     let mut renderer = Renderer::new();
     let mut buffer = vec![0; WIDTH * HEIGHT];
     let mut window = Window::new("Chiyoda", WIDTH, HEIGHT, WindowOptions::default())?;
@@ -201,9 +199,6 @@ pub(super) fn open(
         }
         if window.is_key_pressed(Key::RightBracket, KeyRepeat::No) {
             clock.change_speed(2.0);
-        }
-        if window.is_key_pressed(Key::D, KeyRepeat::No) {
-            details = !details;
         }
         if window.is_key_pressed(Key::V, KeyRepeat::No) {
             view = view.toggle();
@@ -281,7 +276,7 @@ pub(super) fn open(
             let viewport = if candidate.is_some() {
                 render::COMPARISON_VIEWPORTS[0]
             } else {
-                render::single_viewport(details && selected.is_some())
+                render::VIEWPORT
             };
             let mut under_mouse = map(controls);
             under_mouse.viewport = viewport;
@@ -389,7 +384,7 @@ pub(super) fn open(
                     let viewport = if candidate.is_some() {
                         render::COMPARISON_VIEWPORTS[0]
                     } else {
-                        render::single_viewport(details && selected.is_some())
+                        render::VIEWPORT
                     };
                     let map = MapConfig {
                         viewport,
@@ -437,7 +432,6 @@ pub(super) fn open(
                 view,
                 controls,
                 selected.as_ref(),
-                details,
                 clock.paused,
                 clock.speed,
                 if candidate.is_some() {
@@ -500,15 +494,6 @@ pub(super) fn open(
                             index,
                             surface,
                             view,
-                            source,
-                            playback: if clock.paused {
-                                render::Playback::Paused
-                            } else {
-                                render::Playback::Playing
-                            },
-                            speed: clock.speed,
-                            details,
-                            watch_status: watch.as_ref().map(WatchController::status),
                             map: MapConfig {
                                 camera: controls,
                                 ..MapConfig::default()
@@ -518,49 +503,7 @@ pub(super) fn open(
                     );
                 }
             } else {
-                renderer.render(
-                    &mut buffer,
-                    None,
-                    Options {
-                        source,
-                        watch_status: watch.as_ref().map(WatchController::status),
-                        ..Options::default()
-                    },
-                );
-                window.set_title(&window_title(
-                    None,
-                    surface,
-                    0,
-                    clock.speed,
-                    view,
-                    watch.as_ref().map(WatchController::status),
-                ));
-            }
-            if let Some(a) = &bundle {
-                let base = if candidate.is_some() {
-                    format!(
-                        "Chiyoda comparison — {:.3}s — {:.2}× — {}",
-                        clock.time_s,
-                        clock.speed,
-                        if clock.paused { "paused" } else { "playing" }
-                    )
-                } else {
-                    window_title(
-                        Some(a),
-                        surface,
-                        index,
-                        clock.speed,
-                        view,
-                        watch.as_ref().map(WatchController::status),
-                    )
-                };
-                window.set_title(&format!(
-                    "{base} — zoom {:.2}×{}",
-                    controls.zoom,
-                    selected
-                        .as_ref()
-                        .map_or_else(String::new, |s| format!(" — inspect {}", s.id()))
-                ));
+                renderer.render(&mut buffer, None, Options::default());
             }
             if let Some(profile) = &mut profile {
                 profile.record(render_started.elapsed().as_secs_f64() * 1000.0);

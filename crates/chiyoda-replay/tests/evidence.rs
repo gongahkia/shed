@@ -6,7 +6,7 @@ use chiyoda_replay::{
     inspection::{ResourceKind, Selection},
     load_watch_scenario,
     navigation::CameraControl,
-    render::{COMPARISON_VIEWPORTS, Camera, MapConfig, pick, single_viewport},
+    render::{COMPARISON_VIEWPORTS, Camera, MapConfig, VIEWPORT, pick},
 };
 use std::{
     fs,
@@ -90,16 +90,11 @@ fn evidence_rejects_tampered_legacy_unknown_steps_and_invalid_cameras() {
 #[test]
 fn transformed_hit_testing_and_shift_resource_preference_share_the_drawn_camera() {
     let bundle = fixture();
-    for viewport in [
-        single_viewport(false),
-        single_viewport(true),
-        COMPARISON_VIEWPORTS[0],
-        COMPARISON_VIEWPORTS[1],
-    ] {
+    for viewport in [VIEWPORT, COMPARISON_VIEWPORTS[0], COMPARISON_VIEWPORTS[1]] {
         let map = MapConfig {
             viewport,
             camera: CameraControl {
-                zoom: 1.5,
+                zoom: 1.25,
                 // Keep both targets visible in the narrower comparison panes.
                 pan_x_pixels: 30.0,
                 pan_y_pixels: 0.0,

@@ -253,7 +253,7 @@ pub fn render_comparison(
     let comparison = prepare(a, b, request, &ai, &bi)?;
     let mut renderer = render::Renderer::new();
     let mut buffer = vec![0; WIDTH * HEIGHT];
-    renderer.render_comparison(&mut buffer, a, b, request, &comparison, false, 1.0);
+    renderer.render_comparison(&mut buffer, a, b, request, &comparison);
     let png = encode_png(&buffer, WIDTH, HEIGHT)?;
     let manifest = ComparisonManifest {
         schema_version: "chiyoda.replay-comparison.v1",

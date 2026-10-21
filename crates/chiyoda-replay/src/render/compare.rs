@@ -6,7 +6,7 @@ use crate::{
 };
 use chiyoda_core::RunBundle;
 impl Renderer {
-    #[allow(clippy::too_many_arguments, clippy::too_many_lines)] // both panels use one shared camera, timeline and measured comparison
+    #[allow(clippy::too_many_lines)] // both panels use one shared camera, timeline and measured comparison
     pub fn render_comparison(
         &mut self,
         buffer: &mut [u32],
@@ -14,33 +14,16 @@ impl Renderer {
         candidate: &RunBundle,
         request: &ComparisonRequest,
         evidence: &ComparisonEvidence,
-        interactive: bool,
-        speed: f64,
     ) {
         assert_eq!(buffer.len(), WIDTH * HEIGHT);
         let c = &mut self.canvas;
         c.clear(BACKGROUND);
         c.rect([0.0, 0.0, 1200.0, 80.0], PAPER);
-        c.text((32.0, 38.0), "Chiyoda / compare", 20, INK, 350.0);
-        c.text(
-            (32.0, 59.0),
-            "RECONSTRUCTED RUNS · SHARED CAMERA & CLOCK",
-            10,
-            MUTED,
-            560.0,
-        );
         c.text(
             (860.0, 39.0),
             &format!("Shared time {:.2} s", request.time_s),
             18,
             INK,
-            310.0,
-        );
-        c.text(
-            (860.0, 60.0),
-            "Each panel retains its recorded timestamp",
-            11,
-            MUTED,
             310.0,
         );
         c.line((600.0, 96.0), (600.0, 688.0), BORDER, 1.0);
@@ -145,21 +128,6 @@ impl Renderer {
                 c.text((left, 660.0), reason, 11, MUTED, 548.0);
             }
         }
-        let pairing = if evidence.same_population_inputs {
-            "Same population inputs · individual pairing available"
-        } else {
-            "Population changed · individual pairing disabled"
-        };
-        c.text(
-            (32.0, 689.0),
-            &format!(
-                "{pairing} · completed difference at shared time: {:+}",
-                evidence.completed_at_shared_time_difference
-            ),
-            12,
-            INK,
-            1136.0,
-        );
         c.line((0.0, 704.0), (1200.0, 704.0), BORDER, 1.0);
         let start = evidence.common_start_s;
         let end = evidence.common_end_s;
@@ -191,14 +159,6 @@ impl Renderer {
             Some(MOVING),
             Some((PAPER, 1.0)),
         );
-        let footer = if interactive {
-            format!(
-                "Space play / pause · arrows frame · click timeline · wheel zoom · right-drag pan · R fit · Tab floor · V view · P PNG · [ ] speed ({speed:.2}×)"
-            )
-        } else {
-            "Verified comparison · counts are recorded states · full-run outcomes retain their own durations".to_owned()
-        };
-        c.text((32.0, 782.0), &footer, 12, MUTED, 1136.0);
         c.copy_to(buffer);
     }
 }

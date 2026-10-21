@@ -481,15 +481,7 @@ pub(super) fn open(
                         evidence.as_ref().unwrap(),
                         candidate_evidence.as_ref().unwrap(),
                     )?;
-                    renderer.render_comparison(
-                        &mut buffer,
-                        a,
-                        b,
-                        &request,
-                        &comparison,
-                        true,
-                        clock.speed,
-                    );
+                    renderer.render_comparison(&mut buffer, a, b, &request, &comparison);
                 } else {
                     let inspection = selected.as_ref().and_then(|s| {
                         evidence

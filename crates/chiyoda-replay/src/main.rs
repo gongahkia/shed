@@ -1,9 +1,6 @@
 use anyhow::{Context, Result, bail};
 use chiyoda_core::{
-    AgentState, BundleVerification, RunBundle, RunOptions,
-    bundle::TraceFrame,
-    decode_scenario,
-    model::{ConnectorKind, Point3, PortalLanes, PortalResource, Scenario, Surface},
+    BundleVerification, RunBundle, RunOptions, bundle::TraceFrame, decode_scenario, model::Surface,
     run, validate, verify_run_bundle,
 };
 use clap::{Parser, ValueEnum};
@@ -22,54 +19,10 @@ use std::{
 
 const WIDTH: usize = 1_200;
 const HEIGHT: usize = 800;
-const BACKGROUND: u32 = 0x0010_141a;
-const SURFACE: u32 = 0x001d_2835;
-const SURFACE_BORDER: u32 = 0x0045_6078;
-const OBSTACLE: u32 = 0x003d_4a56;
-const WAYPOINT: u32 = 0x00c6_8cff;
-const EXIT: u32 = 0x004a_de80;
-const GATE: u32 = 0x00ff_c857;
-const PORTAL_LANE: u32 = 0x00f8_f9fa;
-const QUEUE_FOOTPRINT: u32 = 0x00b5_6bff;
-const STAIR: u32 = 0x00ff_9f1c;
-const RAMP: u32 = 0x005c_d5f5;
-const ESCALATOR: u32 = 0x00e8_79f9;
-const LIFT: u32 = 0x00fb_7185;
-const MOVING: u32 = 0x0065_d1ff;
-const WAITING_TO_DEPART: u32 = 0x008a_94a6;
-const IN_TRANSIT: u32 = 0x00ff_c857;
-const EVACUATED: u32 = 0x004a_de80;
-const WATCH_STATUS_PANEL: u32 = 0x001d_2835;
-const WATCH_STATUS_BORDER: u32 = 0x0045_6078;
-const WATCH_STATUS_TEXT: u32 = 0x00f8_f9fa;
-const WATCH_ERROR: u32 = 0x00ff_6b6b;
-const WATCH_INFO: u32 = 0x0065_d1ff;
-const DEBUG_PANEL: u32 = 0x0014_202b;
-const DEBUG_BORDER: u32 = 0x0065_d1ff;
-const DEBUG_LABEL: u32 = 0x00c6_8cff;
-const DEBUG_TEXT: u32 = 0x00f8_f9fa;
+use render::BACKGROUND;
+mod render;
 const WATCH_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const WATCH_DEBOUNCE: Duration = Duration::from_millis(150);
-const GIF_PALETTE: &[u32] = &[
-    BACKGROUND,
-    SURFACE,
-    SURFACE_BORDER,
-    OBSTACLE,
-    WAYPOINT,
-    EXIT,
-    GATE,
-    PORTAL_LANE,
-    QUEUE_FOOTPRINT,
-    STAIR,
-    RAMP,
-    ESCALATOR,
-    LIFT,
-    MOVING,
-    WAITING_TO_DEPART,
-    IN_TRANSIT,
-    EVACUATED,
-];
-
 #[derive(Debug, Parser)]
 #[command(
     name = "chiyoda-replay",
@@ -191,6 +144,11 @@ fn replay_bundle(bundle_path: &Path, cli: &Cli) -> Result<()> {
         None,
         initial_frame,
         cli.view,
+        if verification == BundleVerification::Reconstructed {
+            render::Source::Reconstructed
+        } else {
+            render::Source::LegacyHashOnly
+        },
     )
 }
 
@@ -205,6 +163,7 @@ fn replay_watch(source_path: PathBuf, cli: &Cli) -> Result<()> {
         Some(WatchController::new(source_path, cli.trace_every)),
         0,
         cli.view,
+        render::Source::LivePreview,
     )
 }
 
@@ -257,6 +216,7 @@ fn replay(
     mut watch: Option<WatchController>,
     initial_frame: usize,
     initial_view: ViewMode,
+    source: render::Source,
 ) -> Result<()> {
     let mut window = Window::new(
         "Chiyoda replay — loading",
@@ -271,6 +231,7 @@ fn replay(
     let mut view_mode = initial_view;
     let mut snapshot_number = 0_u64;
     let mut debug_panel_open = true;
+    let mut renderer = render::Renderer::new();
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if let Some(controller) = &mut watch
@@ -355,25 +316,25 @@ fn replay(
             index += 1;
             last_advance = Instant::now();
         }
-        buffer.fill(BACKGROUND);
         let save_snapshot = window.is_key_pressed(Key::P, KeyRepeat::No);
-        if let Some(current_bundle) = &bundle {
-            render_bundle_frame(&mut buffer, current_bundle, index, surface_index, view_mode);
-        }
-        if let Some(status) = watch.as_ref().map(WatchController::status) {
-            draw_watch_status(&mut buffer, status);
-        }
-        if debug_panel_open && let Some(current_bundle) = &bundle {
-            draw_debug_panel(
-                &mut buffer,
-                current_bundle,
+        renderer.render(
+            &mut buffer,
+            bundle.as_ref(),
+            render::Options {
                 index,
-                surface_index,
-                view_mode,
-                paused,
+                surface: surface_index,
+                view: view_mode,
+                source,
+                playback: if paused {
+                    render::Playback::Paused
+                } else {
+                    render::Playback::Playing
+                },
                 speed,
-            );
-        }
+                details: debug_panel_open,
+                watch_status: watch.as_ref().map(WatchController::status),
+            },
+        );
         window.set_title(&window_title(
             bundle.as_ref(),
             surface_index,
@@ -412,17 +373,16 @@ fn render_bundle_frame(
     surface_index: usize,
     view_mode: ViewMode,
 ) {
-    buffer.fill(BACKGROUND);
-
-    match view_mode {
-        ViewMode::Surface => {
-            let surface = &bundle.scenario.scenario.surfaces[surface_index];
-            let extent = extent_for_surface(surface);
-            draw_scene(buffer, &bundle.scenario.scenario, surface, extent);
-            draw_frame(buffer, bundle, index, &surface.id, extent);
-        }
-        ViewMode::Overview => draw_overview(buffer, bundle, index),
-    }
+    render::Renderer::new().render(
+        buffer,
+        Some(bundle),
+        render::Options {
+            index,
+            surface: surface_index,
+            view: view_mode,
+            ..render::Options::default()
+        },
+    );
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize)]
@@ -458,7 +418,7 @@ fn window_title(
 ) -> String {
     let controls =
         "space: pause, arrows: step, tab: surface, V: view, D: debug, P: PNG, escape: quit";
-    let status = watch_status.unwrap_or("verified bundle replay");
+    let status = watch_status.unwrap_or("recorded bundle replay");
     match bundle {
         Some(bundle) => {
             let surface = &bundle.scenario.scenario.surfaces[surface_index];
@@ -655,419 +615,8 @@ fn concise_message(message: &str) -> String {
     }
 }
 
-fn draw_watch_status(buffer: &mut [u32], status: &str) {
-    const PANEL_X: isize = 28;
-    const PANEL_Y: isize = 28;
-    const PANEL_WIDTH: isize = 750;
-    const PANEL_HEIGHT: isize = 122;
-    const TEXT_X: isize = PANEL_X + 18;
-    const TEXT_Y: isize = PANEL_Y + 16;
-    const TEXT_SCALE: isize = 2;
-    const MAXIMUM_COLUMNS: usize = 55;
-    const MAXIMUM_LINES: usize = 4;
-
-    let error = watch_status_is_error(status);
-    draw_pixel_rectangle(
-        buffer,
-        PANEL_X,
-        PANEL_Y,
-        PANEL_WIDTH,
-        PANEL_HEIGHT,
-        WATCH_STATUS_PANEL,
-    );
-    draw_pixel_rectangle_outline(
-        buffer,
-        PANEL_X,
-        PANEL_Y,
-        PANEL_WIDTH,
-        PANEL_HEIGHT,
-        if error {
-            WATCH_ERROR
-        } else {
-            WATCH_STATUS_BORDER
-        },
-    );
-    draw_bitmap_text(
-        buffer,
-        TEXT_X,
-        TEXT_Y,
-        if error { "WATCH ERROR" } else { "WATCH STATUS" },
-        if error { WATCH_ERROR } else { WATCH_INFO },
-        TEXT_SCALE,
-    );
-    draw_wrapped_bitmap_text(
-        buffer,
-        TEXT_X,
-        TEXT_Y + 22,
-        status,
-        BitmapTextLayout {
-            color: WATCH_STATUS_TEXT,
-            scale: TEXT_SCALE,
-            maximum_columns: MAXIMUM_COLUMNS,
-            maximum_lines: MAXIMUM_LINES,
-        },
-    );
-}
-
-#[allow(clippy::too_many_arguments)] // the panel reports the independent current replay inputs
-fn draw_debug_panel(
-    buffer: &mut [u32],
-    bundle: &RunBundle,
-    index: usize,
-    surface_index: usize,
-    view_mode: ViewMode,
-    paused: bool,
-    speed: f64,
-) {
-    const PANEL_WIDTH: isize = 344;
-    const PANEL_HEIGHT: isize = 236;
-    const PANEL_X: isize = WIDTH.cast_signed() - PANEL_WIDTH - 28;
-    const PANEL_Y: isize = 28;
-    const TEXT_X: isize = PANEL_X + 16;
-    const TEXT_Y: isize = PANEL_Y + 14;
-    const TEXT_SCALE: isize = 2;
-    const MAXIMUM_COLUMNS: usize = 26;
-    const MAXIMUM_LINES: usize = 11;
-
-    let frame = &bundle.trace[index];
-    let surface = &bundle.scenario.scenario.surfaces[surface_index];
-    let on_selected_surface = frame
-        .agents
-        .iter()
-        .filter(|agent| agent.surface == surface.id)
-        .count();
-    let (moving, waiting, in_transit, evacuated) = debug_state_counts(frame);
-    let text = format!(
-        "RUN: {}\nFRAME: {}/{}\nSTEP: {}\nTIME: {:.2}S\nSPEED: {:.2}X\nVIEW: {}\nSURFACE: {}\nAGENTS: {}/{}\nSTATE: M{} W{}\n       T{} E{}\nRENDER: {} D: CLOSE",
-        if paused { "PAUSED" } else { "RUNNING" },
-        index + 1,
-        bundle.trace.len(),
-        frame.step,
-        frame.time_s,
-        speed,
-        view_mode.label(),
-        debug_label(&surface.id, 14),
-        on_selected_surface,
-        frame.agents.len(),
-        moving,
-        waiting,
-        in_transit,
-        evacuated,
-        "GEOMETRY",
-    );
-    draw_pixel_rectangle(
-        buffer,
-        PANEL_X,
-        PANEL_Y,
-        PANEL_WIDTH,
-        PANEL_HEIGHT,
-        DEBUG_PANEL,
-    );
-    draw_pixel_rectangle_outline(
-        buffer,
-        PANEL_X,
-        PANEL_Y,
-        PANEL_WIDTH,
-        PANEL_HEIGHT,
-        DEBUG_BORDER,
-    );
-    draw_bitmap_text(buffer, TEXT_X, TEXT_Y, "DEBUG", DEBUG_LABEL, TEXT_SCALE);
-    draw_wrapped_bitmap_text(
-        buffer,
-        TEXT_X,
-        TEXT_Y + 22,
-        &text,
-        BitmapTextLayout {
-            color: DEBUG_TEXT,
-            scale: TEXT_SCALE,
-            maximum_columns: MAXIMUM_COLUMNS,
-            maximum_lines: MAXIMUM_LINES,
-        },
-    );
-}
-
-fn debug_state_counts(frame: &TraceFrame) -> (usize, usize, usize, usize) {
-    let mut moving = 0;
-    let mut waiting = 0;
-    let mut in_transit = 0;
-    let mut evacuated = 0;
-    for agent in &frame.agents {
-        match &agent.state {
-            AgentState::Moving => moving += 1,
-            AgentState::WaitingToDepart
-            | AgentState::WaitingAtWaypoint
-            | AgentState::WaitingForRoute
-            | AgentState::WaitingForLift
-            | AgentState::WaitingForConnector
-            | AgentState::WaitingForGate
-            | AgentState::WaitingForExit => waiting += 1,
-            AgentState::InTransit => in_transit += 1,
-            AgentState::Evacuated => evacuated += 1,
-        }
-    }
-    (moving, waiting, in_transit, evacuated)
-}
-
-fn debug_label(value: &str, maximum_characters: usize) -> String {
-    let mut label = value.chars().take(maximum_characters).collect::<String>();
-    if value.chars().count() > maximum_characters {
-        label.push_str("...");
-    }
-    label
-}
-
 fn watch_status_is_error(status: &str) -> bool {
     status.starts_with("cannot read") || status.contains(" failed:")
-}
-
-fn draw_pixel_rectangle(
-    buffer: &mut [u32],
-    x: isize,
-    y: isize,
-    width: isize,
-    height: isize,
-    color: u32,
-) {
-    for row in y..y + height {
-        for column in x..x + width {
-            set_pixel(buffer, column, row, color);
-        }
-    }
-}
-
-fn draw_pixel_rectangle_outline(
-    buffer: &mut [u32],
-    x: isize,
-    y: isize,
-    width: isize,
-    height: isize,
-    color: u32,
-) {
-    for column in x..x + width {
-        set_pixel(buffer, column, y, color);
-        set_pixel(buffer, column, y + height - 1, color);
-    }
-    for row in y..y + height {
-        set_pixel(buffer, x, row, color);
-        set_pixel(buffer, x + width - 1, row, color);
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct BitmapTextLayout {
-    color: u32,
-    scale: isize,
-    maximum_columns: usize,
-    maximum_lines: usize,
-}
-
-fn draw_wrapped_bitmap_text(
-    buffer: &mut [u32],
-    x: isize,
-    y: isize,
-    text: &str,
-    layout: BitmapTextLayout,
-) {
-    let mut column = 0_usize;
-    let mut line = 0_usize;
-    let advance_x = 6 * layout.scale;
-    let advance_y = 9 * layout.scale;
-    for character in text.chars() {
-        if character == '\n' || column == layout.maximum_columns {
-            line += 1;
-            column = 0;
-            if line == layout.maximum_lines {
-                return;
-            }
-            if character == '\n' {
-                continue;
-            }
-        }
-        draw_bitmap_glyph(
-            buffer,
-            x + advance_x * column.cast_signed(),
-            y + advance_y * line.cast_signed(),
-            character,
-            layout.color,
-            layout.scale,
-        );
-        column += 1;
-    }
-}
-
-fn draw_bitmap_text(buffer: &mut [u32], x: isize, y: isize, text: &str, color: u32, scale: isize) {
-    for (index, character) in text.chars().enumerate() {
-        draw_bitmap_glyph(
-            buffer,
-            x + 6 * scale * index.cast_signed(),
-            y,
-            character,
-            color,
-            scale,
-        );
-    }
-}
-
-fn draw_bitmap_glyph(
-    buffer: &mut [u32],
-    x: isize,
-    y: isize,
-    character: char,
-    color: u32,
-    scale: isize,
-) {
-    for (row, bits) in bitmap_glyph(character).iter().enumerate() {
-        for column in 0..5 {
-            if *bits & (1 << (4 - column)) != 0 {
-                draw_pixel_rectangle(
-                    buffer,
-                    x + column * scale,
-                    y + row.cast_signed() * scale,
-                    scale,
-                    scale,
-                    color,
-                );
-            }
-        }
-    }
-}
-
-#[allow(clippy::too_many_lines)] // one inspectable table keeps the dependency-free overlay readable
-fn bitmap_glyph(character: char) -> [u8; 7] {
-    match character.to_ascii_uppercase() {
-        'A' => [
-            0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001,
-        ],
-        'B' => [
-            0b11110, 0b10001, 0b10001, 0b11110, 0b10001, 0b10001, 0b11110,
-        ],
-        'C' => [
-            0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110,
-        ],
-        'D' => [
-            0b11110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11110,
-        ],
-        'E' => [
-            0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111,
-        ],
-        'F' => [
-            0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000,
-        ],
-        'G' => [
-            0b01110, 0b10001, 0b10000, 0b10111, 0b10001, 0b10001, 0b01110,
-        ],
-        'H' => [
-            0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001,
-        ],
-        'I' => [
-            0b01110, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110,
-        ],
-        'J' => [
-            0b00001, 0b00001, 0b00001, 0b00001, 0b10001, 0b10001, 0b01110,
-        ],
-        'K' => [
-            0b10001, 0b10010, 0b10100, 0b11000, 0b10100, 0b10010, 0b10001,
-        ],
-        'L' => [
-            0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111,
-        ],
-        'M' => [
-            0b10001, 0b11011, 0b10101, 0b10101, 0b10001, 0b10001, 0b10001,
-        ],
-        'N' => [
-            0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001, 0b10001,
-        ],
-        'O' => [
-            0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110,
-        ],
-        'P' => [
-            0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000,
-        ],
-        'Q' => [
-            0b01110, 0b10001, 0b10001, 0b10001, 0b10101, 0b10010, 0b01101,
-        ],
-        'R' => [
-            0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001,
-        ],
-        'S' => [
-            0b01111, 0b10000, 0b10000, 0b01110, 0b00001, 0b00001, 0b11110,
-        ],
-        'T' => [
-            0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100,
-        ],
-        'U' => [
-            0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110,
-        ],
-        'V' => [
-            0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01010, 0b00100,
-        ],
-        'W' => [
-            0b10001, 0b10001, 0b10001, 0b10101, 0b10101, 0b10101, 0b01010,
-        ],
-        'X' => [
-            0b10001, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001, 0b10001,
-        ],
-        'Y' => [
-            0b10001, 0b10001, 0b01010, 0b00100, 0b00100, 0b00100, 0b00100,
-        ],
-        'Z' => [
-            0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b10000, 0b11111,
-        ],
-        '0' => [
-            0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110,
-        ],
-        '1' => [
-            0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110,
-        ],
-        '2' => [
-            0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111,
-        ],
-        '3' => [
-            0b11110, 0b00001, 0b00001, 0b01110, 0b00001, 0b00001, 0b11110,
-        ],
-        '4' => [
-            0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010,
-        ],
-        '5' => [
-            0b11111, 0b10000, 0b10000, 0b11110, 0b00001, 0b00001, 0b11110,
-        ],
-        '6' => [
-            0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110,
-        ],
-        '7' => [
-            0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000,
-        ],
-        '8' => [
-            0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110,
-        ],
-        '9' => [
-            0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b11100,
-        ],
-        ' ' => [0; 7],
-        ':' => [0, 0b00100, 0b00100, 0, 0b00100, 0b00100, 0],
-        '.' => [0, 0, 0, 0, 0, 0b00100, 0b00100],
-        ',' => [0, 0, 0, 0, 0b00100, 0b00100, 0b01000],
-        '-' => [0, 0, 0, 0b11111, 0, 0, 0],
-        '_' => [0, 0, 0, 0, 0, 0, 0b11111],
-        '/' => [0b00001, 0b00010, 0b00100, 0b01000, 0b10000, 0, 0],
-        '\\' => [0b10000, 0b01000, 0b00100, 0b00010, 0b00001, 0, 0],
-        '(' => [
-            0b00010, 0b00100, 0b01000, 0b01000, 0b01000, 0b00100, 0b00010,
-        ],
-        ')' => [
-            0b01000, 0b00100, 0b00010, 0b00010, 0b00010, 0b00100, 0b01000,
-        ],
-        '[' => [
-            0b01110, 0b01000, 0b01000, 0b01000, 0b01000, 0b01000, 0b01110,
-        ],
-        ']' => [
-            0b01110, 0b00010, 0b00010, 0b00010, 0b00010, 0b00010, 0b01110,
-        ],
-        '=' => [0, 0b11111, 0, 0b11111, 0, 0, 0],
-        '!' => [0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0, 0b00100],
-        '?' => [0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0, 0b00100],
-        _ => [0b01110, 0b10001, 0b00010, 0b00100, 0b01000, 0, 0b01000],
-    }
 }
 
 fn validate_playback_timing(trace: &[TraceFrame], speed: f64) -> Result<()> {
@@ -1113,6 +662,7 @@ struct GifExportManifest {
     frame_delays_centiseconds: Vec<u16>,
     looping: bool,
     timing_policy: String,
+    renderer: render::Provenance,
     claim_boundary: String,
 }
 
@@ -1152,6 +702,7 @@ fn export_gif(
         playback_speed,
         frame_delays_centiseconds,
         looping: true,
+        renderer: render::provenance(),
         timing_policy: "Each non-terminal GIF delay is the next recorded trace timestamp gap divided by playback_speed, rounded to the nearest centisecond. A zero-length rounded gap and the terminal frame use one centisecond because GIF cannot encode a terminal hold without a delay. Exact trace timestamps remain in the verified canonical JSON bundle.".to_owned(),
         claim_boundary: "This derived visualization renders recorded state from one reconstructed deterministic trace. The selected surface applies to the floor plan; overview projects all authored surfaces. The canonical JSON bundle remains the source of timing and metrics.".to_owned(),
     };
@@ -1164,6 +715,7 @@ fn export_gif(
         &manifest.frame_delays_centiseconds,
         output,
         view,
+        playback_speed,
     ) {
         let _ = fs::remove_file(output);
         return Err(error);
@@ -1184,6 +736,7 @@ fn gif_manifest_path(output: &Path) -> PathBuf {
 #[derive(Debug, Serialize)]
 struct PngExportManifest<'a> {
     schema_version: &'static str,
+    renderer: render::Provenance,
     bundle_sha256: &'a str,
     scenario_sha256: &'a str,
     runtime_version: &'a str,
@@ -1209,6 +762,7 @@ fn export_png(
     let frame = &bundle.trace[index];
     let manifest = PngExportManifest {
         schema_version: "chiyoda.replay-png.v1",
+        renderer: render::provenance(),
         bundle_sha256: &bundle.bundle_hash,
         scenario_sha256: &bundle.scenario_hash,
         runtime_version: &bundle.runtime_version,
@@ -1267,6 +821,7 @@ fn write_gif(
     frame_delays_centiseconds: &[u16],
     output: &Path,
     view: ViewMode,
+    playback_speed: f64,
 ) -> Result<()> {
     if bundle.trace.len() != frame_delays_centiseconds.len() {
         bail!(
@@ -1282,21 +837,33 @@ fn write_gif(
         .create_new(true)
         .open(output)
         .with_context(|| format!("creating GIF export {}", output.display()))?;
-    let palette = gif_palette_rgb();
     let mut encoder =
-        GifEncoder::new(file, width, height, &palette).context("creating GIF89a encoder")?;
+        GifEncoder::new(file, width, height, &[]).context("creating GIF89a encoder")?;
     encoder
         .set_repeat(Repeat::Infinite)
         .context("setting GIF loop policy")?;
     let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
+    let mut renderer = render::Renderer::new();
     for (index, delay) in frame_delays_centiseconds.iter().copied().enumerate() {
-        render_bundle_frame(&mut buffer, bundle, index, surface_index, view);
-        let mut frame = GifFrame::from_indexed_pixels(
-            width,
-            height,
-            framebuffer_palette_indices(&buffer)?,
-            None,
+        renderer.render(
+            &mut buffer,
+            Some(bundle),
+            render::Options {
+                index,
+                surface: surface_index,
+                view,
+                speed: playback_speed,
+                ..render::Options::default()
+            },
         );
+        let rgb: Vec<u8> = buffer
+            .iter()
+            .flat_map(|color| {
+                let [_, r, g, b] = color.to_be_bytes();
+                [r, g, b]
+            })
+            .collect();
+        let mut frame = GifFrame::from_rgb_speed(width, height, &rgb, 10);
         frame.delay = delay;
         encoder
             .write_frame(&frame)
@@ -1304,28 +871,6 @@ fn write_gif(
     }
 
     Ok(())
-}
-
-fn gif_palette_rgb() -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(GIF_PALETTE.len() * 3);
-    for color in GIF_PALETTE {
-        let channels = color.to_be_bytes();
-        bytes.extend_from_slice(&channels[1..]);
-    }
-    bytes
-}
-
-fn framebuffer_palette_indices(buffer: &[u32]) -> Result<Vec<u8>> {
-    buffer
-        .iter()
-        .map(|color| {
-            GIF_PALETTE
-                .iter()
-                .position(|candidate| candidate == color)
-                .and_then(|index| u8::try_from(index).ok())
-                .with_context(|| format!("rendered GIF frame uses unknown color 0x{color:08x}"))
-        })
-        .collect()
 }
 
 fn gif_frame_delays_centiseconds(trace: &[TraceFrame], playback_speed: f64) -> Result<Vec<u16>> {
@@ -1375,640 +920,6 @@ fn surface_index(surfaces: &[Surface], requested: Option<&str>) -> Result<usize>
             .position(|surface| surface.id == id)
             .with_context(|| format!("surface `{id}` is not present in the bundle")),
         None => Ok(0),
-    }
-}
-
-fn extent_for_surface(surface: &Surface) -> (f64, f64, f64, f64) {
-    let padding = (surface.width_m.max(surface.depth_m) * 0.05).max(1.0);
-    (
-        surface.origin.x_m - padding,
-        surface.width_m + padding * 2.0,
-        surface.origin.y_m - padding,
-        surface.depth_m + padding * 2.0,
-    )
-}
-
-#[allow(clippy::too_many_lines)] // every authored static layer is deliberately visible in one ordered draw pass
-fn draw_scene(
-    buffer: &mut [u32],
-    scenario: &Scenario,
-    surface: &Surface,
-    extent: (f64, f64, f64, f64),
-) {
-    draw_rectangle(
-        buffer,
-        surface.origin.x_m,
-        surface.origin.y_m,
-        surface.width_m,
-        surface.depth_m,
-        SURFACE,
-        extent,
-    );
-
-    draw_rectangle_outline(
-        buffer,
-        surface.origin.x_m,
-        surface.origin.y_m,
-        surface.width_m,
-        surface.depth_m,
-        SURFACE_BORDER,
-        extent,
-    );
-
-    for obstacle in &scenario.obstacles {
-        if obstacle.surface == surface.id {
-            draw_rectangle(
-                buffer,
-                obstacle.at.x_m,
-                obstacle.at.y_m,
-                obstacle.width_m,
-                obstacle.depth_m,
-                OBSTACLE,
-                extent,
-            );
-        }
-    }
-    draw_queue_footprints(buffer, scenario, surface, extent);
-    for waypoint in &scenario.waypoints {
-        if waypoint.surface == surface.id {
-            draw_marker(buffer, waypoint.at.x_m, waypoint.at.y_m, WAYPOINT, extent);
-        }
-    }
-    draw_portal_lanes(buffer, scenario, surface, extent);
-    for exit in &scenario.exits {
-        if exit.surface == surface.id {
-            draw_marker(buffer, exit.at.x_m, exit.at.y_m, EXIT, extent);
-        }
-    }
-    for gate in &scenario.gates {
-        if gate.surface == surface.id {
-            draw_marker(buffer, gate.at.x_m, gate.at.y_m, GATE, extent);
-        }
-    }
-    for connector in &scenario.connectors {
-        let color = match connector.kind() {
-            ConnectorKind::Stair => STAIR,
-            ConnectorKind::Ramp => RAMP,
-            ConnectorKind::Escalator => ESCALATOR,
-            ConnectorKind::Lift => LIFT,
-        };
-        if connector.from_surface() == surface.id {
-            let point = connector.from();
-            draw_marker(buffer, point.x_m, point.y_m, color, extent);
-        }
-        if connector.to_surface() == surface.id {
-            let point = connector.to();
-            draw_marker(buffer, point.x_m, point.y_m, color, extent);
-        }
-    }
-}
-
-fn draw_queue_footprints(
-    buffer: &mut [u32],
-    scenario: &Scenario,
-    surface: &Surface,
-    extent: (f64, f64, f64, f64),
-) {
-    for footprint in &scenario.queue_footprints {
-        if footprint.surface != surface.id {
-            continue;
-        }
-        if footprint.width_m.is_some() {
-            for rank in 1..footprint.slots {
-                draw_line(
-                    buffer,
-                    footprint.position(rank - 1),
-                    footprint.position(rank),
-                    QUEUE_FOOTPRINT,
-                    extent,
-                );
-            }
-        } else {
-            draw_line(
-                buffer,
-                footprint.head,
-                footprint.tail,
-                QUEUE_FOOTPRINT,
-                extent,
-            );
-        }
-        for rank in 0..footprint.slots {
-            let slot = footprint.position(rank);
-            let x = project(slot.x_m, extent.0, extent.1, WIDTH);
-            let y = project(slot.y_m, extent.2, extent.3, HEIGHT);
-            draw_square(buffer, x, y, 1, QUEUE_FOOTPRINT);
-        }
-    }
-}
-
-fn draw_portal_lanes(
-    buffer: &mut [u32],
-    scenario: &Scenario,
-    surface: &Surface,
-    extent: (f64, f64, f64, f64),
-) {
-    for lanes in &scenario.portal_lanes {
-        match &lanes.resource {
-            chiyoda_core::model::PortalResource::Connector { id } => {
-                let Some(connector) = scenario
-                    .connectors
-                    .iter()
-                    .find(|connector| connector.id() == id)
-                else {
-                    continue;
-                };
-                if connector.from_surface() == surface.id {
-                    draw_lane_positions(
-                        buffer,
-                        lanes,
-                        connector.from(),
-                        connector.width_m(),
-                        extent,
-                    );
-                }
-                if connector.to_surface() == surface.id {
-                    draw_lane_positions(buffer, lanes, connector.to(), connector.width_m(), extent);
-                }
-            }
-            chiyoda_core::model::PortalResource::Exit { id } => {
-                let Some(exit) = scenario.exits.iter().find(|exit| &exit.id == id) else {
-                    continue;
-                };
-                if exit.surface == surface.id {
-                    draw_lane_positions(buffer, lanes, exit.at, exit.width_m, extent);
-                }
-            }
-            chiyoda_core::model::PortalResource::Gate { id } => {
-                let Some(gate) = scenario.gates.iter().find(|gate| &gate.id == id) else {
-                    continue;
-                };
-                if gate.surface == surface.id {
-                    draw_lane_positions(buffer, lanes, gate.at, gate.width_m, extent);
-                }
-            }
-        }
-    }
-}
-
-fn draw_lane_positions(
-    buffer: &mut [u32],
-    lanes: &PortalLanes,
-    portal: chiyoda_core::model::Point3,
-    width_m: f64,
-    extent: (f64, f64, f64, f64),
-) {
-    for lane_index in 0..lanes.count {
-        let lane = lanes.position(portal, width_m, lane_index);
-        let x = project(lane.x_m, extent.0, extent.1, WIDTH);
-        let y = project(lane.y_m, extent.2, extent.3, HEIGHT);
-        draw_square(buffer, x, y, 1, PORTAL_LANE);
-    }
-}
-
-fn draw_frame(
-    buffer: &mut [u32],
-    bundle: &RunBundle,
-    index: usize,
-    surface_id: &str,
-    extent: (f64, f64, f64, f64),
-) {
-    let frame = &bundle.trace[index];
-    for agent in &frame.agents {
-        if agent.surface != surface_id {
-            continue;
-        }
-        let x = project(agent.x_m, extent.0, extent.1, WIDTH);
-        let y = project(agent.y_m, extent.2, extent.3, HEIGHT);
-        let color = agent_color(&agent.state);
-        draw_square(buffer, x, y, 2, color);
-    }
-}
-
-fn agent_color(state: &AgentState) -> u32 {
-    match state {
-        AgentState::Moving => MOVING,
-        AgentState::WaitingToDepart
-        | AgentState::WaitingAtWaypoint
-        | AgentState::WaitingForRoute => WAITING_TO_DEPART,
-        AgentState::WaitingForLift
-        | AgentState::WaitingForConnector
-        | AgentState::WaitingForGate
-        | AgentState::WaitingForExit
-        | AgentState::InTransit => IN_TRANSIT,
-        AgentState::Evacuated => EVACUATED,
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct OverviewExtent {
-    min_u: f64,
-    span_u: f64,
-    min_v: f64,
-    span_v: f64,
-}
-
-#[allow(clippy::too_many_lines)] // overview draws the same authored layers in their projection order
-fn draw_overview(buffer: &mut [u32], bundle: &RunBundle, index: usize) {
-    let scenario = &bundle.scenario.scenario;
-    let extent = overview_extent(scenario);
-    let mut surfaces = scenario.surfaces.iter().collect::<Vec<_>>();
-    surfaces.sort_by(|left, right| left.origin.z_m.total_cmp(&right.origin.z_m));
-    for surface in surfaces {
-        draw_overview_surface(buffer, surface, extent);
-    }
-    for obstacle in &scenario.obstacles {
-        draw_overview_rectangle(
-            buffer,
-            obstacle.at,
-            obstacle.width_m,
-            obstacle.depth_m,
-            OBSTACLE,
-            extent,
-        );
-    }
-    for footprint in &scenario.queue_footprints {
-        if footprint.width_m.is_some() {
-            for rank in 1..footprint.slots {
-                draw_overview_line(
-                    buffer,
-                    footprint.position(rank - 1),
-                    footprint.position(rank),
-                    QUEUE_FOOTPRINT,
-                    extent,
-                );
-            }
-        } else {
-            draw_overview_line(
-                buffer,
-                footprint.head,
-                footprint.tail,
-                QUEUE_FOOTPRINT,
-                extent,
-            );
-        }
-        for rank in 0..footprint.slots {
-            draw_overview_marker(buffer, footprint.position(rank), QUEUE_FOOTPRINT, extent);
-        }
-    }
-    for waypoint in &scenario.waypoints {
-        draw_overview_marker(buffer, waypoint.at, WAYPOINT, extent);
-    }
-    draw_overview_portal_lanes(buffer, scenario, extent);
-    for exit in &scenario.exits {
-        draw_overview_marker(buffer, exit.at, EXIT, extent);
-    }
-    for gate in &scenario.gates {
-        draw_overview_marker(buffer, gate.at, GATE, extent);
-    }
-    for connector in &scenario.connectors {
-        let color = match connector.kind() {
-            ConnectorKind::Stair => STAIR,
-            ConnectorKind::Ramp => RAMP,
-            ConnectorKind::Escalator => ESCALATOR,
-            ConnectorKind::Lift => LIFT,
-        };
-        draw_overview_line(buffer, connector.from(), connector.to(), color, extent);
-        draw_overview_marker(buffer, connector.from(), color, extent);
-        draw_overview_marker(buffer, connector.to(), color, extent);
-    }
-    for agent in &bundle.trace[index].agents {
-        draw_overview_marker(
-            buffer,
-            Point3 {
-                x_m: agent.x_m,
-                y_m: agent.y_m,
-                z_m: agent.z_m,
-            },
-            agent_color(&agent.state),
-            extent,
-        );
-    }
-}
-
-fn overview_extent(scenario: &Scenario) -> OverviewExtent {
-    let mut coordinates = Vec::new();
-    for surface in &scenario.surfaces {
-        coordinates.extend([
-            surface.origin,
-            Point3 {
-                x_m: surface.origin.x_m + surface.width_m,
-                y_m: surface.origin.y_m,
-                z_m: surface.origin.z_m,
-            },
-            Point3 {
-                x_m: surface.origin.x_m + surface.width_m,
-                y_m: surface.origin.y_m + surface.depth_m,
-                z_m: surface.origin.z_m,
-            },
-            Point3 {
-                x_m: surface.origin.x_m,
-                y_m: surface.origin.y_m + surface.depth_m,
-                z_m: surface.origin.z_m,
-            },
-        ]);
-    }
-    for connector in &scenario.connectors {
-        coordinates.extend([connector.from(), connector.to()]);
-    }
-    let (mut min_u, mut max_u, mut min_v, mut max_v) = (
-        f64::INFINITY,
-        f64::NEG_INFINITY,
-        f64::INFINITY,
-        f64::NEG_INFINITY,
-    );
-    for point in coordinates {
-        let (u, v) = isometric_coordinates(point);
-        min_u = min_u.min(u);
-        max_u = max_u.max(u);
-        min_v = min_v.min(v);
-        max_v = max_v.max(v);
-    }
-    let span_u = (max_u - min_u).max(1.0);
-    let span_v = (max_v - min_v).max(1.0);
-    let padding = span_u.max(span_v) * 0.08;
-    OverviewExtent {
-        min_u: min_u - padding,
-        span_u: span_u + padding * 2.0,
-        min_v: min_v - padding,
-        span_v: span_v + padding * 2.0,
-    }
-}
-
-fn isometric_coordinates(point: Point3) -> (f64, f64) {
-    (
-        point.x_m - point.y_m,
-        point.x_m.midpoint(point.y_m) - point.z_m,
-    )
-}
-
-fn project_overview(point: Point3, extent: OverviewExtent) -> (isize, isize) {
-    let (u, v) = isometric_coordinates(point);
-    (
-        project(u, extent.min_u, extent.span_u, WIDTH),
-        project(v, extent.min_v, extent.span_v, HEIGHT),
-    )
-}
-
-fn draw_overview_surface(buffer: &mut [u32], surface: &Surface, extent: OverviewExtent) {
-    draw_overview_rectangle(
-        buffer,
-        surface.origin,
-        surface.width_m,
-        surface.depth_m,
-        SURFACE,
-        extent,
-    );
-    let corners = overview_rectangle_corners(surface.origin, surface.width_m, surface.depth_m);
-    for (from, to) in corners
-        .iter()
-        .copied()
-        .zip(corners.iter().copied().cycle().skip(1))
-        .take(corners.len())
-    {
-        draw_overview_line(buffer, from, to, SURFACE_BORDER, extent);
-    }
-}
-
-fn draw_overview_rectangle(
-    buffer: &mut [u32],
-    origin: Point3,
-    width_m: f64,
-    depth_m: f64,
-    color: u32,
-    extent: OverviewExtent,
-) {
-    let corners = overview_rectangle_corners(origin, width_m, depth_m).map(|point| {
-        let (x, y) = project_overview(point, extent);
-        (x, y)
-    });
-    draw_triangle(buffer, corners[0], corners[1], corners[2], color);
-    draw_triangle(buffer, corners[0], corners[2], corners[3], color);
-}
-
-fn overview_rectangle_corners(origin: Point3, width_m: f64, depth_m: f64) -> [Point3; 4] {
-    [
-        origin,
-        Point3 {
-            x_m: origin.x_m + width_m,
-            y_m: origin.y_m,
-            z_m: origin.z_m,
-        },
-        Point3 {
-            x_m: origin.x_m + width_m,
-            y_m: origin.y_m + depth_m,
-            z_m: origin.z_m,
-        },
-        Point3 {
-            x_m: origin.x_m,
-            y_m: origin.y_m + depth_m,
-            z_m: origin.z_m,
-        },
-    ]
-}
-
-fn draw_overview_portal_lanes(buffer: &mut [u32], scenario: &Scenario, extent: OverviewExtent) {
-    for lanes in &scenario.portal_lanes {
-        match &lanes.resource {
-            PortalResource::Connector { id } => {
-                let Some(connector) = scenario
-                    .connectors
-                    .iter()
-                    .find(|connector| connector.id() == id)
-                else {
-                    continue;
-                };
-                draw_overview_lane_positions(
-                    buffer,
-                    lanes,
-                    connector.from(),
-                    connector.width_m(),
-                    extent,
-                );
-                draw_overview_lane_positions(
-                    buffer,
-                    lanes,
-                    connector.to(),
-                    connector.width_m(),
-                    extent,
-                );
-            }
-            PortalResource::Exit { id } => {
-                let Some(exit) = scenario.exits.iter().find(|exit| &exit.id == id) else {
-                    continue;
-                };
-                draw_overview_lane_positions(buffer, lanes, exit.at, exit.width_m, extent);
-            }
-            PortalResource::Gate { id } => {
-                let Some(gate) = scenario.gates.iter().find(|gate| &gate.id == id) else {
-                    continue;
-                };
-                draw_overview_lane_positions(buffer, lanes, gate.at, gate.width_m, extent);
-            }
-        }
-    }
-}
-
-fn draw_overview_lane_positions(
-    buffer: &mut [u32],
-    lanes: &PortalLanes,
-    portal: Point3,
-    width_m: f64,
-    extent: OverviewExtent,
-) {
-    for lane_index in 0..lanes.count {
-        draw_overview_marker(
-            buffer,
-            lanes.position(portal, width_m, lane_index),
-            PORTAL_LANE,
-            extent,
-        );
-    }
-}
-
-fn draw_overview_marker(buffer: &mut [u32], point: Point3, color: u32, extent: OverviewExtent) {
-    let (x, y) = project_overview(point, extent);
-    draw_square(buffer, x, y, 3, color);
-}
-
-fn draw_overview_line(
-    buffer: &mut [u32],
-    from: Point3,
-    to: Point3,
-    color: u32,
-    extent: OverviewExtent,
-) {
-    let (from_x, from_y) = project_overview(from, extent);
-    let (to_x, to_y) = project_overview(to, extent);
-    draw_pixel_line(buffer, from_x, from_y, to_x, to_y, color);
-}
-
-fn draw_triangle(
-    buffer: &mut [u32],
-    first: (isize, isize),
-    second: (isize, isize),
-    third: (isize, isize),
-    color: u32,
-) {
-    let min_x = first.0.min(second.0).min(third.0).max(0);
-    let max_x = first
-        .0
-        .max(second.0)
-        .max(third.0)
-        .min(WIDTH.cast_signed() - 1);
-    let min_y = first.1.min(second.1).min(third.1).max(0);
-    let max_y = first
-        .1
-        .max(second.1)
-        .max(third.1)
-        .min(HEIGHT.cast_signed() - 1);
-    for y in min_y..=max_y {
-        for x in min_x..=max_x {
-            let first_side = triangle_side(first, second, (x, y));
-            let second_side = triangle_side(second, third, (x, y));
-            let third_side = triangle_side(third, first, (x, y));
-            if (first_side >= 0 && second_side >= 0 && third_side >= 0)
-                || (first_side <= 0 && second_side <= 0 && third_side <= 0)
-            {
-                set_pixel(buffer, x, y, color);
-            }
-        }
-    }
-}
-
-fn triangle_side(from: (isize, isize), to: (isize, isize), point: (isize, isize)) -> isize {
-    (point.0 - from.0) * (to.1 - from.1) - (point.1 - from.1) * (to.0 - from.0)
-}
-
-fn draw_rectangle(
-    buffer: &mut [u32],
-    x_m: f64,
-    y_m: f64,
-    width_m: f64,
-    depth_m: f64,
-    color: u32,
-    extent: (f64, f64, f64, f64),
-) {
-    let left = project(x_m, extent.0, extent.1, WIDTH);
-    let right = project(x_m + width_m, extent.0, extent.1, WIDTH);
-    let top = project(y_m, extent.2, extent.3, HEIGHT);
-    let bottom = project(y_m + depth_m, extent.2, extent.3, HEIGHT);
-    for y in top.min(bottom)..=top.max(bottom) {
-        for x in left.min(right)..=left.max(right) {
-            set_pixel(buffer, x, y, color);
-        }
-    }
-}
-
-fn draw_rectangle_outline(
-    buffer: &mut [u32],
-    x_m: f64,
-    y_m: f64,
-    width_m: f64,
-    depth_m: f64,
-    color: u32,
-    extent: (f64, f64, f64, f64),
-) {
-    let left = project(x_m, extent.0, extent.1, WIDTH);
-    let right = project(x_m + width_m, extent.0, extent.1, WIDTH);
-    let top = project(y_m, extent.2, extent.3, HEIGHT);
-    let bottom = project(y_m + depth_m, extent.2, extent.3, HEIGHT);
-    for x in left.min(right)..=left.max(right) {
-        set_pixel(buffer, x, top, color);
-        set_pixel(buffer, x, bottom, color);
-    }
-    for y in top.min(bottom)..=top.max(bottom) {
-        set_pixel(buffer, left, y, color);
-        set_pixel(buffer, right, y, color);
-    }
-}
-
-fn draw_marker(buffer: &mut [u32], x_m: f64, y_m: f64, color: u32, extent: (f64, f64, f64, f64)) {
-    let x = project(x_m, extent.0, extent.1, WIDTH);
-    let y = project(y_m, extent.2, extent.3, HEIGHT);
-    draw_square(buffer, x, y, 3, color);
-}
-
-fn draw_line(
-    buffer: &mut [u32],
-    from: chiyoda_core::model::Point3,
-    to: chiyoda_core::model::Point3,
-    color: u32,
-    extent: (f64, f64, f64, f64),
-) {
-    let from_x = project(from.x_m, extent.0, extent.1, WIDTH);
-    let from_y = project(from.y_m, extent.2, extent.3, HEIGHT);
-    let to_x = project(to.x_m, extent.0, extent.1, WIDTH);
-    let to_y = project(to.y_m, extent.2, extent.3, HEIGHT);
-    draw_pixel_line(buffer, from_x, from_y, to_x, to_y, color);
-}
-
-fn draw_pixel_line(
-    buffer: &mut [u32],
-    mut x: isize,
-    mut y: isize,
-    end_x: isize,
-    end_y: isize,
-    color: u32,
-) {
-    let delta_x = (end_x - x).abs();
-    let step_x = if x < end_x { 1 } else { -1 };
-    let delta_y = -(end_y - y).abs();
-    let step_y = if y < end_y { 1 } else { -1 };
-    let mut error = delta_x + delta_y;
-    loop {
-        set_pixel(buffer, x, y, color);
-        if x == end_x && y == end_y {
-            break;
-        }
-        let double_error = 2 * error;
-        if double_error >= delta_y {
-            error += delta_y;
-            x += step_x;
-        }
-        if double_error <= delta_x {
-            error += delta_x;
-            y += step_y;
-        }
     }
 }
 
@@ -2102,43 +1013,12 @@ fn png_crc32(bytes: &[u8]) -> u32 {
     !crc
 }
 
-fn draw_square(buffer: &mut [u32], x: isize, y: isize, radius: isize, color: u32) {
-    for offset_y in -radius..=radius {
-        for offset_x in -radius..=radius {
-            set_pixel(buffer, x + offset_x, y + offset_y, color);
-        }
-    }
-}
-
-fn set_pixel(buffer: &mut [u32], x: isize, y: isize, color: u32) {
-    if x >= 0 && x < WIDTH.cast_signed() && y >= 0 && y < HEIGHT.cast_signed() {
-        buffer[y.cast_unsigned() * WIDTH + x.cast_unsigned()] = color;
-    }
-}
-
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_precision_loss,
-    clippy::cast_sign_loss
-)] // values are clamped to the small, fixed native framebuffer before conversion
-fn project(value: f64, origin: f64, span: f64, pixels: usize) -> isize {
-    let upper = (pixels - 1) as f64;
-    (((value - origin) / span * upper).round().clamp(0.0, upper)) as isize
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chiyoda_core::{
-        bundle::TraceFrame,
-        model::{
-            Connector, Exit, Gate, Obstacle, Point3, PortalAxis, PortalLanes, PortalResource,
-            QueueFootprint, Scenario, Waypoint,
-        },
-    };
+    use chiyoda_core::model::Point3;
     use flate2::read::ZlibDecoder;
     use std::io::Read;
-
     const WATCH_SOURCE: &str = include_str!("fixtures/main/project.json");
 
     fn surface(id: &str, x_m: f64, y_m: f64, width_m: f64, depth_m: f64) -> Surface {
@@ -2148,147 +1028,6 @@ mod tests {
             width_m,
             depth_m,
         }
-    }
-
-    #[test]
-    fn surface_extent_uses_authored_dimensions_not_trace_positions() {
-        assert_eq!(
-            extent_for_surface(&surface("concourse", 10.0, 20.0, 40.0, 10.0)),
-            (8.0, 44.0, 18.0, 14.0)
-        );
-    }
-
-    #[test]
-    #[allow(clippy::too_many_lines)] // one complete static-scene fixture makes the layer order explicit
-    fn drawing_a_scene_preserves_static_geometry_beneath_agents() {
-        let surface = surface("concourse", 0.0, 0.0, 10.0, 10.0);
-        let scenario = Scenario {
-            name: "view-test".to_owned(),
-            seed: 0,
-            duration_s: 1.0,
-            timestep_s: 1.0,
-            surfaces: vec![surface.clone()],
-            obstacles: vec![Obstacle {
-                id: "column".to_owned(),
-                surface: "concourse".to_owned(),
-                at: Point3 {
-                    x_m: 1.0,
-                    y_m: 1.0,
-                    z_m: 0.0,
-                },
-                width_m: 2.0,
-                depth_m: 2.0,
-            }],
-            waypoints: vec![Waypoint {
-                id: "meeting".to_owned(),
-                surface: "concourse".to_owned(),
-                at: Point3 {
-                    x_m: 4.0,
-                    y_m: 4.0,
-                    z_m: 0.0,
-                },
-                dwell_s: 0.0,
-            }],
-            exits: vec![Exit {
-                id: "street".to_owned(),
-                surface: "concourse".to_owned(),
-                at: Point3 {
-                    x_m: 5.0,
-                    y_m: 5.0,
-                    z_m: 0.0,
-                },
-                width_m: 1.0,
-                capacity_per_s: None,
-            }],
-            connectors: vec![Connector::Stair {
-                id: "stairs".to_owned(),
-                from_surface: "concourse".to_owned(),
-                from: Point3 {
-                    x_m: 6.0,
-                    y_m: 6.0,
-                    z_m: 0.0,
-                },
-                to_surface: "upper".to_owned(),
-                to: Point3 {
-                    x_m: 6.0,
-                    y_m: 6.0,
-                    z_m: 3.0,
-                },
-                width_m: 1.0,
-                capacity_per_s: None,
-                clearance_height_m: None,
-            }],
-            portal_lanes: vec![PortalLanes {
-                id: "stairs_lanes".to_owned(),
-                resource: PortalResource::Connector {
-                    id: "stairs".to_owned(),
-                },
-                axis: PortalAxis::X,
-                count: 2,
-            }],
-            queue_footprints: vec![QueueFootprint {
-                id: "street_queue".to_owned(),
-                resource: PortalResource::Exit {
-                    id: "street".to_owned(),
-                },
-                surface: "concourse".to_owned(),
-                head: Point3 {
-                    x_m: 8.0,
-                    y_m: 8.0,
-                    z_m: 0.0,
-                },
-                tail: Point3 {
-                    x_m: 9.0,
-                    y_m: 8.0,
-                    z_m: 0.0,
-                },
-                slots: 4,
-                width_m: Some(1.0),
-                lanes: Some(2),
-            }],
-            connector_states: Vec::new(),
-            exit_states: Vec::new(),
-            connector_capacity_states: Vec::new(),
-            exit_capacity_states: Vec::new(),
-            gates: vec![Gate {
-                id: "barrier".to_owned(),
-                surface: "concourse".to_owned(),
-                at: Point3 {
-                    x_m: 7.0,
-                    y_m: 7.0,
-                    z_m: 0.0,
-                },
-                width_m: 1.0,
-                service_rate_per_s: 1.0,
-                destination: "street".to_owned(),
-            }],
-            gate_states: Vec::new(),
-            gate_capacity_states: Vec::new(),
-            agents: Vec::new(),
-            messages: Vec::new(),
-            countermeasures: Vec::new(),
-        };
-        let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
-        let extent = extent_for_surface(&surface);
-        draw_scene(&mut buffer, &scenario, &surface, extent);
-
-        let location = |x_m, y_m| {
-            project(x_m, extent.0, extent.1, WIDTH).cast_unsigned()
-                + project(y_m, extent.2, extent.3, HEIGHT).cast_unsigned() * WIDTH
-        };
-        let center = location(5.0, 5.0);
-        let corner = project(0.0, extent.0, extent.1, WIDTH).cast_unsigned()
-            + project(0.0, extent.2, extent.3, HEIGHT).cast_unsigned() * WIDTH;
-        assert_eq!(buffer[center], EXIT);
-        assert_eq!(buffer[corner], SURFACE_BORDER);
-        assert_eq!(buffer[location(2.0, 2.0)], OBSTACLE);
-        assert_eq!(buffer[location(4.0, 4.0)], WAYPOINT);
-        assert_eq!(buffer[location(6.0, 6.0)], STAIR);
-        assert_eq!(buffer[location(7.0, 7.0)], GATE);
-        assert_eq!(buffer[location(5.75, 6.0)], PORTAL_LANE);
-        assert_eq!(buffer[location(8.0, 8.0)], QUEUE_FOOTPRINT);
-        assert_eq!(buffer[location(8.0, 9.0)], QUEUE_FOOTPRINT);
-        assert_eq!(buffer[location(9.0, 8.5)], QUEUE_FOOTPRINT);
     }
 
     #[test]
@@ -2438,56 +1177,6 @@ mod tests {
     }
 
     #[test]
-    fn overview_renderer_draws_static_and_trace_layers_without_a_display_server() {
-        let bundle = load_watch_scenario(WATCH_SOURCE, 1).expect("watch fixture succeeds");
-        let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
-        draw_overview(&mut buffer, &bundle, 0);
-
-        assert!(buffer.contains(&SURFACE));
-        assert!(buffer.contains(&SURFACE_BORDER));
-        assert!(buffer.contains(&EXIT));
-    }
-
-    #[test]
-    fn debug_panel_reports_current_frame_without_covering_watch_status_space() {
-        let bundle = load_watch_scenario(WATCH_SOURCE, 1).expect("watch fixture succeeds");
-        let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
-        draw_watch_status(
-            &mut buffer,
-            "cannot read draft.json: No such file or directory (os error 2)",
-        );
-        draw_debug_panel(&mut buffer, &bundle, 0, 0, ViewMode::Surface, true, 1.0);
-
-        assert!(buffer.contains(&DEBUG_PANEL));
-        assert!(buffer.contains(&DEBUG_BORDER));
-        assert!(buffer.contains(&DEBUG_LABEL));
-        assert!(buffer.contains(&DEBUG_TEXT));
-        assert!(buffer.contains(&WATCH_ERROR));
-        assert_eq!(debug_label("abcdefghijklmnop", 14), "abcdefghijklmn...");
-        let state_counts = debug_state_counts(&bundle.trace[0]);
-        assert_eq!(
-            state_counts.0 + state_counts.1 + state_counts.2 + state_counts.3,
-            bundle.trace[0].agents.len()
-        );
-    }
-
-    #[test]
-    fn watch_error_is_visible_in_the_rendered_canvas() {
-        let mut buffer = vec![BACKGROUND; WIDTH * HEIGHT];
-        draw_watch_status(
-            &mut buffer,
-            "cannot read draft.json: No such file or directory (os error 2)",
-        );
-
-        assert!(watch_status_is_error(
-            "cannot read draft.json: No such file or directory"
-        ));
-        assert!(buffer.contains(&WATCH_STATUS_PANEL));
-        assert!(buffer.contains(&WATCH_ERROR));
-        assert!(buffer.contains(&WATCH_STATUS_TEXT));
-    }
-
-    #[test]
     fn verified_bundle_gif_export_records_trace_provenance_without_rerunning() {
         let directory = std::env::temp_dir().join(format!(
             "chiyoda-replay-gif-{}-{}",
@@ -2595,7 +1284,6 @@ mod tests {
             },
         ];
         assert_eq!(gif_frame_delays_centiseconds(&trace, 2.0).unwrap(), [25, 1]);
-        assert!(framebuffer_palette_indices(&[0x00de_adbe]).is_err());
     }
 
     #[test]

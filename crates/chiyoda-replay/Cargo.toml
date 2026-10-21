@@ -19,7 +19,10 @@ gif.workspace = true
 minifb.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 chiyoda-core = { path = "../chiyoda-core" }
+fontdue = "0.9.4"
+tiny-skia = { version = "0.12.0", default-features = false, features = ["std", "simd"] }
 
 [dev-dependencies]
 png.workspace = true

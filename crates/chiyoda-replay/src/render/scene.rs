@@ -1,0 +1,435 @@
+//! Spatial layers use authored coordinates and recorded states exclusively.
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss
+)]
+use super::{
+    BORDER, CONNECTOR, EXIT, GRID, INACTIVE, INK, MOVING, MUTED, OBSTACLE, OBSTACLE_EDGE, PAPER,
+    QUEUE, ViewMode, WAITING, WAYPOINT, canvas::Canvas,
+};
+use chiyoda_core::{
+    AgentState,
+    bundle::{AgentSnapshot, TraceFrame},
+    model::{ConnectorKind, Point3, PortalResource, Scenario, Surface},
+};
+
+pub const VIEWPORT: [f32; 4] = [32.0, 162.0, 852.0, 472.0];
+#[derive(Clone, Copy, Debug)]
+pub struct Camera {
+    pub scale: f64,
+    min: (f64, f64),
+    offset: (f64, f64),
+    view: ViewMode,
+}
+impl Camera {
+    pub fn new(scenario: &Scenario, surface: &Surface, view: ViewMode) -> Self {
+        let surfaces: Vec<_> = if view == ViewMode::Surface {
+            vec![surface]
+        } else {
+            scenario.surfaces.iter().collect()
+        };
+        let mut bounds = (
+            f64::INFINITY,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NEG_INFINITY,
+        );
+        for surface in surfaces {
+            for point in corners(surface.origin, surface.width_m, surface.depth_m) {
+                let (x, y) = coordinates(point, view);
+                bounds.0 = bounds.0.min(x);
+                bounds.1 = bounds.1.min(y);
+                bounds.2 = bounds.2.max(x);
+                bounds.3 = bounds.3.max(y);
+            }
+        }
+        let width = (bounds.2 - bounds.0).max(0.001);
+        let height = (bounds.3 - bounds.1).max(0.001);
+        let scale =
+            ((f64::from(VIEWPORT[2]) - 64.0) / width).min((f64::from(VIEWPORT[3]) - 64.0) / height);
+        Self {
+            scale,
+            min: (bounds.0, bounds.1),
+            offset: (
+                f64::from(VIEWPORT[0]) + (f64::from(VIEWPORT[2]) - width * scale) / 2.0,
+                f64::from(VIEWPORT[1]) + (f64::from(VIEWPORT[3]) - height * scale) / 2.0,
+            ),
+            view,
+        }
+    }
+    pub fn point(self, point: Point3) -> (f32, f32) {
+        let (x, y) = coordinates(point, self.view);
+        (
+            (self.offset.0 + (x - self.min.0) * self.scale) as f32,
+            (self.offset.1 + (y - self.min.1) * self.scale) as f32,
+        )
+    }
+}
+fn coordinates(p: Point3, view: ViewMode) -> (f64, f64) {
+    match view {
+        ViewMode::Surface => (p.x_m, p.y_m),
+        ViewMode::Overview => (
+            (p.x_m - p.y_m) * 0.866_025_403_784_438_6,
+            p.x_m.midpoint(p.y_m) - p.z_m,
+        ),
+    }
+}
+fn corners(at: Point3, width: f64, depth: f64) -> [Point3; 4] {
+    [
+        at,
+        Point3 {
+            x_m: at.x_m + width,
+            ..at
+        },
+        Point3 {
+            x_m: at.x_m + width,
+            y_m: at.y_m + depth,
+            ..at
+        },
+        Point3 {
+            y_m: at.y_m + depth,
+            ..at
+        },
+    ]
+}
+pub fn nice_step(value: f64) -> f64 {
+    let power = 10.0_f64.powf(value.log10().floor());
+    [1.0, 2.0, 5.0, 10.0]
+        .into_iter()
+        .map(|n| n * power)
+        .find(|n| *n >= value)
+        .unwrap_or(power * 10.0)
+}
+
+#[allow(clippy::too_many_lines)] // authored layers are drawn in a deliberate back-to-front order
+pub fn draw(
+    canvas: &mut Canvas,
+    scenario: &Scenario,
+    frame: &TraceFrame,
+    surface: &Surface,
+    view: ViewMode,
+) {
+    let camera = Camera::new(scenario, surface, view);
+    canvas.map_clip(true);
+    let mut floors: Vec<_> = scenario
+        .surfaces
+        .iter()
+        .filter(|floor| view == ViewMode::Overview || floor.id == surface.id)
+        .collect();
+    floors.sort_by(|a, b| a.origin.z_m.total_cmp(&b.origin.z_m));
+    let mut labels = Labels::default();
+    for floor in floors {
+        let outline = corners(floor.origin, floor.width_m, floor.depth_m).map(|p| camera.point(p));
+        canvas.polygon(&outline, Some(PAPER), Some((BORDER, 1.5)));
+        if view == ViewMode::Surface {
+            grid(canvas, floor, camera);
+        }
+        for obstacle in scenario.obstacles.iter().filter(|o| o.surface == floor.id) {
+            let points =
+                corners(obstacle.at, obstacle.width_m, obstacle.depth_m).map(|p| camera.point(p));
+            canvas.polygon(&points, Some(OBSTACLE), Some((OBSTACLE_EDGE, 1.0)));
+        }
+        for footprint in scenario
+            .queue_footprints
+            .iter()
+            .filter(|q| q.surface == floor.id)
+        {
+            for rank in 0..footprint.slots {
+                let point = camera.point(footprint.position(rank));
+                if rank > 0 {
+                    canvas.dashed(camera.point(footprint.position(rank - 1)), point, QUEUE);
+                }
+                canvas.circle(point, 2.0, None, Some((QUEUE, 1.0)));
+            }
+        }
+        for lanes in &scenario.portal_lanes {
+            let endpoints = match &lanes.resource {
+                PortalResource::Exit { id } => scenario
+                    .exits
+                    .iter()
+                    .filter(|r| r.id == *id)
+                    .map(|r| (r.surface.as_str(), r.at, r.width_m))
+                    .collect::<Vec<_>>(),
+                PortalResource::Gate { id } => scenario
+                    .gates
+                    .iter()
+                    .filter(|r| r.id == *id)
+                    .map(|r| (r.surface.as_str(), r.at, r.width_m))
+                    .collect(),
+                PortalResource::Connector { id } => scenario
+                    .connectors
+                    .iter()
+                    .filter(|r| r.id() == id)
+                    .flat_map(|r| {
+                        [
+                            (r.from_surface(), r.from(), r.width_m()),
+                            (r.to_surface(), r.to(), r.width_m()),
+                        ]
+                    })
+                    .collect(),
+            };
+            for (_, at, width) in endpoints.into_iter().filter(|(id, _, _)| *id == floor.id) {
+                for rank in 0..lanes.count {
+                    canvas.circle(
+                        camera.point(lanes.position(at, width, rank)),
+                        2.0,
+                        Some(PAPER),
+                        Some((INK, 1.0)),
+                    );
+                }
+            }
+        }
+        for resource in scenario.waypoints.iter().filter(|r| r.surface == floor.id) {
+            let p = camera.point(resource.at);
+            canvas.polygon(
+                &[
+                    (p.0, p.1 - 4.0),
+                    (p.0 + 4.0, p.1),
+                    (p.0, p.1 + 4.0),
+                    (p.0 - 4.0, p.1),
+                ],
+                None,
+                Some((WAYPOINT, 1.5)),
+            );
+        }
+        for exit in scenario.exits.iter().filter(|r| r.surface == floor.id) {
+            let p = camera.point(exit.at);
+            symbol(canvas, p, "→", EXIT);
+            labels.add(canvas, p, &exit.id, EXIT);
+        }
+        for gate in scenario.gates.iter().filter(|r| r.surface == floor.id) {
+            let p = camera.point(gate.at);
+            symbol(canvas, p, "=", WAITING);
+            labels.add(canvas, p, &gate.id, WAITING);
+        }
+        for connector in &scenario.connectors {
+            let glyph = match connector.kind() {
+                ConnectorKind::Stair => "S",
+                ConnectorKind::Ramp => "R",
+                ConnectorKind::Escalator => "E",
+                ConnectorKind::Lift => "L",
+            };
+            for (id, at) in [
+                (connector.from_surface(), connector.from()),
+                (connector.to_surface(), connector.to()),
+            ] {
+                if id == floor.id {
+                    let p = camera.point(at);
+                    symbol(canvas, p, glyph, CONNECTOR);
+                    labels.add(canvas, p, connector.id(), MUTED);
+                }
+            }
+        }
+        // Draw inactive records first; active movement stays legible at shared endpoints.
+        for inactive in [true, false] {
+            for agent in frame.agents.iter().filter(|a| {
+                a.surface == floor.id
+                    && matches!(a.state, AgentState::Evacuated | AgentState::WaitingToDepart)
+                        == inactive
+            }) {
+                person(canvas, agent, scenario, camera);
+            }
+        }
+    }
+    if view == ViewMode::Overview {
+        for connector in &scenario.connectors {
+            canvas.dashed(
+                camera.point(connector.from()),
+                camera.point(connector.to()),
+                CONNECTOR,
+            );
+        }
+    }
+    if view == ViewMode::Overview {
+        for floor in &scenario.surfaces {
+            labels.add(
+                canvas,
+                camera.point(floor.origin),
+                &format!("{} · {:.1} m", floor.id, floor.origin.z_m),
+                INK,
+            );
+        }
+    }
+    canvas.map_clip(false);
+    if view == ViewMode::Surface {
+        let length = nice_step(90.0 / camera.scale);
+        let pixels = (length * camera.scale) as f32;
+        canvas.line((48.0, 660.0), (48.0 + pixels, 660.0), INK, 1.5);
+        for x in [48.0, 48.0 + pixels] {
+            canvas.line((x, 656.0), (x, 664.0), INK, 1.5);
+        }
+        canvas.text((48.0, 680.0), &format!("{length} m"), 12, MUTED, 130.0);
+        canvas.text((680.0, 671.0), "+x →   +y ↓", 12, MUTED, 200.0);
+    } else {
+        canvas.text(
+            (32.0, 666.0),
+            "Authored elevations · connector links · surfaces can occlude",
+            12,
+            MUTED,
+            820.0,
+        );
+    }
+}
+fn grid(canvas: &mut Canvas, surface: &Surface, camera: Camera) {
+    let spacing = nice_step(42.0 / camera.scale);
+    let start = surface.origin;
+    let right = start.x_m + surface.width_m;
+    let bottom = start.y_m + surface.depth_m;
+    let mut x = (start.x_m / spacing).ceil() * spacing;
+    for _ in 0..200 {
+        if x >= right {
+            break;
+        }
+        canvas.line(
+            camera.point(Point3 { x_m: x, ..start }),
+            camera.point(Point3 {
+                x_m: x,
+                y_m: bottom,
+                ..start
+            }),
+            GRID,
+            0.6,
+        );
+        x += spacing;
+    }
+    let mut y = (start.y_m / spacing).ceil() * spacing;
+    for _ in 0..200 {
+        if y >= bottom {
+            break;
+        }
+        canvas.line(
+            camera.point(Point3 { y_m: y, ..start }),
+            camera.point(Point3 {
+                x_m: right,
+                y_m: y,
+                ..start
+            }),
+            GRID,
+            0.6,
+        );
+        y += spacing;
+    }
+}
+fn symbol(canvas: &mut Canvas, p: (f32, f32), glyph: &str, color: u32) {
+    canvas.rect([p.0 - 7.0, p.1 - 7.0, 14.0, 14.0], PAPER);
+    canvas.polygon(
+        &[
+            (p.0 - 7.0, p.1 - 7.0),
+            (p.0 + 7.0, p.1 - 7.0),
+            (p.0 + 7.0, p.1 + 7.0),
+            (p.0 - 7.0, p.1 + 7.0),
+        ],
+        None,
+        Some((color, 1.2)),
+    );
+    let width = canvas.text_width(glyph, 11);
+    canvas.text((p.0 - width / 2.0, p.1 + 4.0), glyph, 11, color, 20.0);
+}
+fn person(canvas: &mut Canvas, agent: &AgentSnapshot, scenario: &Scenario, camera: Camera) {
+    let p = camera.point(Point3 {
+        x_m: agent.x_m,
+        y_m: agent.y_m,
+        z_m: agent.z_m,
+    });
+    let radius = scenario
+        .agents
+        .iter()
+        .find(|g| g.id == agent.group)
+        .map_or(0.0, |g| g.radius_m);
+    // A minimum screen radius preserves visibility; this is a marker, not a density estimate.
+    let radius = (radius * camera.scale) as f32;
+    let radius = radius.max(2.5);
+    match agent.state {
+        AgentState::WaitingToDepart => canvas.circle(p, radius, None, Some((INACTIVE, 1.2))),
+        AgentState::Evacuated => canvas.circle(p, radius, None, Some((EXIT, 1.3))),
+        AgentState::InTransit => {
+            canvas.circle(p, radius, Some(CONNECTOR), Some((PAPER, 1.0)));
+            canvas.circle(p, 1.0, Some(PAPER), None);
+        }
+        AgentState::Moving => canvas.circle(p, radius, Some(MOVING), Some((PAPER, 1.0))),
+        _ => {
+            canvas.circle(p, radius, Some(WAITING), Some((PAPER, 1.0)));
+            canvas.line((p.0 - 1.5, p.1), (p.0 + 1.5, p.1), PAPER, 1.0);
+        }
+    }
+}
+#[derive(Default)]
+struct Labels(Vec<[f32; 4]>);
+impl Labels {
+    fn add(&mut self, canvas: &mut Canvas, p: (f32, f32), label: &str, color: u32) {
+        let label = canvas.fit_text(label, 11, 132.0);
+        let width = canvas.text_width(&label, 11) + 8.0;
+        for (x, y) in [
+            (p.0 + 12.0, p.1 - 12.0),
+            (p.0 - width - 12.0, p.1 - 12.0),
+            (p.0 + 12.0, p.1 + 26.0),
+        ] {
+            let bounds = [x - 4.0, y - 12.0, width, 17.0];
+            if x < 32.0
+                || x + width > 884.0
+                || y < 174.0
+                || y > 630.0
+                || self.0.iter().any(|other| overlaps(bounds, *other))
+            {
+                continue;
+            }
+            canvas.rect(bounds, PAPER);
+            canvas.text((x, y), &label, 11, color, width);
+            self.0.push(bounds);
+            break;
+        }
+    }
+}
+fn overlaps(a: [f32; 4], b: [f32; 4]) -> bool {
+    a[0] < b[0] + b[2] && a[0] + a[2] > b[0] && a[1] < b[1] + b[3] && a[1] + a[3] > b[1]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::decode_scenario;
+
+    #[test]
+    fn floor_projection_preserves_metric_aspect_ratio_and_stays_inside_its_viewport() {
+        let canonical = decode_scenario(include_str!("../fixtures/main/project.json")).unwrap();
+        let scenario = &canonical;
+        let mut floor = scenario.surfaces[0].clone();
+        for (width, depth) in [(100.0, 5.0), (5.0, 100.0), (20.0, 20.0)] {
+            floor.width_m = width;
+            floor.depth_m = depth;
+            floor.origin.x_m = -30.0;
+            floor.origin.y_m = 17.0;
+            let camera = Camera::new(scenario, &floor, ViewMode::Surface);
+            let origin = camera.point(floor.origin);
+            let x = camera.point(Point3 {
+                x_m: floor.origin.x_m + 1.0,
+                ..floor.origin
+            });
+            let y = camera.point(Point3 {
+                y_m: floor.origin.y_m + 1.0,
+                ..floor.origin
+            });
+            assert!(((x.0 - origin.0) - (y.1 - origin.1)).abs() < 0.001);
+            for point in corners(floor.origin, width, depth) {
+                let p = camera.point(point);
+                assert!((VIEWPORT[0]..=VIEWPORT[0] + VIEWPORT[2]).contains(&p.0));
+                assert!((VIEWPORT[1]..=VIEWPORT[1] + VIEWPORT[3]).contains(&p.1));
+            }
+        }
+    }
+
+    #[test]
+    fn overview_fits_authored_surface_corners_with_one_uniform_projection_scale() {
+        let canonical = decode_scenario(include_str!("../fixtures/main/project.json")).unwrap();
+        let scenario = &canonical;
+        let camera = Camera::new(scenario, &scenario.surfaces[0], ViewMode::Overview);
+        for surface in &scenario.surfaces {
+            for point in corners(surface.origin, surface.width_m, surface.depth_m) {
+                let p = camera.point(point);
+                assert!(p.0 >= VIEWPORT[0] && p.0 <= VIEWPORT[0] + VIEWPORT[2]);
+                assert!(p.1 >= VIEWPORT[1] && p.1 <= VIEWPORT[1] + VIEWPORT[3]);
+            }
+        }
+    }
+}

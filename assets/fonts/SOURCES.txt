@@ -1,0 +1,8 @@
+Inter, by Rasmus Andersson. Bundled unmodified under the SIL Open Font License
+in OFL-Inter.txt. The original variable font is Inter[opsz,wght].ttf; the replay
+uses its default face. No network access or system font installation is needed.
+
+Source: https://github.com/google/fonts/tree/main/ofl/inter
+Font: https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz,wght%5D.ttf
+License: https://raw.githubusercontent.com/google/fonts/main/ofl/inter/OFL.txt
+The replay export sidecar records the SHA-256 of the bundled font bytes.

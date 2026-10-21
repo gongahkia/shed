@@ -1,6 +1,6 @@
 # Native replay viewer
 
-`chiyoda-replay` is a local Linux viewer for either a hash-valid `run.json`
+`chiyoda-replay` is a local native viewer for either a hash-valid `run.json`
 artifact or an in-memory live JSON scenario run. It visualizes the reference
 runtime's recorded state; it is not a simulation engine, a facility survey, a
 3D renderer, or an operational display.
@@ -50,8 +50,8 @@ For a bundle made by the installed runtime, the viewer checks the bundle hash
 and reconstructs the complete deterministic run before opening a window. It
 rejects an incompatible legacy runtime by default; `--allow-legacy-hash-only`
 permits display after hash verification alone and emits a warning. The CLI also
-rejects an unknown initial surface and an empty trace. It requires an available
-Linux display server.
+rejects an unknown initial surface and an empty trace. Interactive playback requires an available native display. PNG and GIF
+exports do not open a window.
 
 For locally aware groups, `run.json` also retains each agent's familiar exits
 and learned availability with its time and source. `resource_observed` and
@@ -65,9 +65,8 @@ included in full reconstruction; see [local knowledge](knowledge.md).
 - Left and right arrows step the trace.
 - Tab cycles surfaces in their authored declaration order.
 - V toggles between the selected-surface 2D view and an all-surface isometric overview.
-- D toggles the top-right debug panel. It starts open and reports playback
-  state, frame/step/time, speed, view, selected surface, agent-state counts,
-  and the geometric renderer.
+- D toggles source details in the fixed sidebar. Playback time, frame and step,
+  selected-surface count, all-surface state counts, and the plan key stay visible.
 - P writes the current rendered frame as a PNG under `--snapshot-dir` (default
   `out/chiyoda-replay`). No image is written until P is pressed; existing
   snapshots are never overwritten.
@@ -118,6 +117,33 @@ The GIF sidecar uses `chiyoda.replay-gif.v2`. The
 exporter refuses to overwrite either the GIF or its sidecar. The verified JSON
 bundle remains the canonical replay and timing artifact.
 
+## Visual presentation
+
+The viewer uses one 1200×800 CPU vector renderer for native playback, PNGs,
+and GIFs. The plan, run sidebar, and timeline occupy separate regions. Spatial
+layers are clipped to the plan viewport, including markers outside the camera
+extent. Watch failures retain the last valid plan and identify the failed
+revision below it and in the sidebar.
+
+Floor plans preserve metric proportions with a uniform scale, a quiet metric
+grid, and a scale bar. The camera follows authored surface bounds rather than
+people's current positions. The overview uses the same fixed isometric
+projection for every surface and labels their authored elevations; overlapping
+floors can occlude geometry, so use a floor plan for detailed inspection.
+
+Text uses a bundled Inter font under its included SIL Open Font License;
+no font installation or network connection is required. Timestamps and counts
+use tabular digits. Long names are ellipsized, and unavailable glyphs display
+as `?`. This is basic font rasterization, not a full text-shaping system.
+Resource labels are placed where space permits; dense plans may omit a label
+while retaining its symbol. Connector symbols identify stairs (`S`), ramps
+(`R`), escalators (`E`), and lifts (`L`).
+
+The header distinguishes reconstructed bundles, legacy hash-only artifacts,
+and unpersisted live previews. Export sidecars record the renderer version and
+bundled font hash. The renderer is a derived presentation contract; changes to
+its pixels do not change canonical simulation evidence.
+
 ## Rendering contract
 
 For the selected surface the viewer draws its rectangular walkable boundary,
@@ -125,10 +151,19 @@ rectangular obstacles, line-footprint or serpentine-grid queue paths and slot ce
 gates, portal-lane centres, and the endpoint of every authored stair, ramp,
 escalator, or lift on that surface. Agents are drawn only
 when their recorded `surface` matches the selected surface. Moving agents are
-blue, departure/route/waypoint waits grey, connector/lift/gate/exit waits and
-in-transit agents amber, and evacuated agents green. Static marker colours
-distinguish waypoints, exits, gates, connector class, portal-lane centres, and
-queue geometry. The queue path and slots are authored placement
+blue, all released waits amber, in-transit agents purple, unreleased people
+hollow grey, and completed journeys hollow green. Moving people use filled
+circles; waits carry a small horizontal mark and transit markers a white centre.
+Inactive records are drawn first so an unreleased or completed record does not
+cover an active person at a shared position. Counts always include every
+recorded person, including inactive records. The sidebar reports all-surface
+state totals separately from the selected-surface count.
+
+People markers follow their authored group radius, with a 2.5-pixel minimum for
+legibility. Symbol outlines, minimum-size markers, and resource glyphs are
+schematic; their screen sizes do not measure crowd density or portal width.
+Static symbols distinguish waypoints, exits, gates, connector class, portal-lane
+centres, and queue geometry. The queue path and slots are authored placement
 geometry, not a measured queue, a claimed standing obstruction, or a density
 visualization.
 

@@ -9,11 +9,34 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
 
 class DevContainerSessionServiceTest {
     @TempDir
     Path tempDir;
+
+    @Test
+    void aliasesShareOneConnectionAndSupportTerminalSourceMapping() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("project"));
+        Path alias = tempDir.resolve("project-alias");
+        try {
+            Files.createSymbolicLink(alias, root);
+        } catch (UnsupportedOperationException | java.nio.file.FileSystemException error) {
+            Assumptions.assumeTrue(false, "symbolic links unavailable: " + error.getMessage());
+            return;
+        }
+        DevContainerSessionService service = new DevContainerSessionService();
+        service.connect(alias, "/workspaces/old");
+        assertTrue(service.isConnected(root.toRealPath()));
+        assertEquals(alias.resolve("src/Main.java"), service.connectionFor(root.toRealPath())
+            .sourcePathMapper().map("src/Main.java", root.toRealPath()));
+
+        service.connect(root, "/workspaces/new");
+        assertEquals("/workspaces/new", service.connectionFor(alias.resolve("new-file.java")).remoteWorkingDirectory());
+        assertTrue(service.disconnect(alias));
+        assertNull(service.connectionFor(root));
+    }
 
     @Test
     void mapsOnlyDeclaredContainerWorkspacePathsToTheHostWorkspace() throws Exception {

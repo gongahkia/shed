@@ -4,10 +4,32 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.List;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class WorkspaceRootResolverTest {
+    @Test
+    void resolvesAliasesAndUncreatedFilesWithoutAdmittingAnEscapingLink(@TempDir Path directory) throws Exception {
+        Path root = Files.createDirectory(directory.resolve("workspace"));
+        Path outside = Files.createDirectory(directory.resolve("outside"));
+        Path alias = directory.resolve("alias");
+        try {
+            Files.createSymbolicLink(alias, root);
+            Files.createSymbolicLink(root.resolve("escape"), outside);
+        } catch (UnsupportedOperationException | java.nio.file.FileSystemException error) {
+            Assumptions.assumeTrue(false, "symbolic links unavailable: " + error.getMessage());
+            return;
+        }
+
+        assertEquals(root.resolve("new/file.txt"), WorkspaceRootResolver.pathWithinRoot(alias.resolve("new/file.txt"), root));
+        assertEquals(alias.resolve("new/file.txt"), WorkspaceRootResolver.pathWithinRoot(root.toRealPath().resolve("new/file.txt"), alias));
+        assertNull(WorkspaceRootResolver.pathWithinRoot(root.resolve("escape/file.txt"), root));
+        assertNull(WorkspaceRootResolver.pathWithinRoot(outside, root));
+    }
+
     @Test
     void picksTheMostSpecificContainingConfiguredRoot() {
         Path outer = Path.of("work/outer").toAbsolutePath().normalize();

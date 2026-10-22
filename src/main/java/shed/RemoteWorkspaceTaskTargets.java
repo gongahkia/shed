@@ -24,17 +24,20 @@ final class RemoteWorkspaceTaskTargets {
     synchronized Target targetFor(String id, Path localPath) {
         Target target = targets.get(normalize(id));
         if (target == null || localPath == null) return null;
-        Path candidate = localPath.toAbsolutePath().normalize();
-        return candidate.startsWith(target.localRoot()) ? target : null;
+        return WorkspaceRootResolver.pathWithinRoot(localPath, target.localRoot()) == null ? null : target;
     }
 
     synchronized Target targetForPath(Path localPath) {
         if (localPath == null) return null;
-        Path candidate = localPath.toAbsolutePath().normalize();
+        Path candidate = WorkspaceRootResolver.normalizedIdentity(localPath);
         Target selected = null;
+        int selectedDepth = -1;
         for (Target target : targets.values()) {
-            if (!candidate.startsWith(target.localRoot())) continue;
-            if (selected == null || target.localRoot().getNameCount() > selected.localRoot().getNameCount()) selected = target;
+            Path root = WorkspaceRootResolver.normalizedIdentity(target.localRoot());
+            if (candidate.startsWith(root) && root.getNameCount() > selectedDepth) {
+                selected = target;
+                selectedDepth = root.getNameCount();
+            }
         }
         return selected;
     }

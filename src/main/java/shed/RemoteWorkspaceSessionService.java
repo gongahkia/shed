@@ -14,7 +14,7 @@ final class RemoteWorkspaceSessionService {
     synchronized void activate(String id, RemoteWorkspace workspace) {
         Connection connection = new Connection(id, workspace);
         connections.entrySet().removeIf(entry -> entry.getValue().id().equals(connection.id()));
-        connections.put(connection.localRoot(), connection);
+        connections.put(WorkspaceRootResolver.normalizedIdentity(connection.localRoot()), connection);
     }
 
     synchronized boolean deactivate(String id) {
@@ -26,9 +26,11 @@ final class RemoteWorkspaceSessionService {
     synchronized Connection connectionFor(Path candidate) {
         Path normalized = normalizedPath(candidate);
         if (normalized == null) return null;
-        return connections.values().stream()
-            .filter(connection -> normalized.startsWith(connection.localRoot()))
-            .max(Comparator.comparingInt(connection -> connection.localRoot().getNameCount()))
+        Path identity = WorkspaceRootResolver.normalizedIdentity(normalized);
+        return connections.entrySet().stream()
+            .filter(entry -> identity.startsWith(entry.getKey()))
+            .max(Comparator.comparingInt(entry -> entry.getKey().getNameCount()))
+            .map(Map.Entry::getValue)
             .orElse(null);
     }
 
@@ -65,8 +67,8 @@ final class RemoteWorkspaceSessionService {
             if (remoteRoot == null || remoteRoot.isBlank()) return null;
             try {
                 RemoteLspEndpoint endpoint = new RemoteLspEndpoint(localRoot, remoteRoot, List.of());
-                Path startDirectory = normalizedPath(terminalWorkingDirectory);
-                if (startDirectory == null || !startDirectory.startsWith(localRoot)) return null;
+                Path startDirectory = WorkspaceRootResolver.pathWithinRoot(terminalWorkingDirectory, localRoot);
+                if (startDirectory == null) return null;
                 return (sourcePath, ignoredWorkingDirectory) -> mapTerminalSource(endpoint, startDirectory, sourcePath);
             } catch (IllegalArgumentException error) {
                 return null;
@@ -87,8 +89,8 @@ final class RemoteWorkspaceSessionService {
         }
 
         private String relativeDirectory(Path workingDirectory) {
-            Path normalized = normalizedPath(workingDirectory);
-            if (normalized == null || !normalized.startsWith(localRoot)) {
+            Path normalized = WorkspaceRootResolver.pathWithinRoot(workingDirectory, localRoot);
+            if (normalized == null) {
                 throw new IllegalArgumentException("remote terminal directory is outside the active workspace");
             }
             return localRoot.relativize(normalized).toString().replace('\\', '/');

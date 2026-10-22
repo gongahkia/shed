@@ -7,10 +7,47 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.List;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class RemoteWorkspaceSessionServiceTest {
+    @Test
+    void aliasesRouteToTheSameSessionAndExplicitTaskTarget(@TempDir Path directory) throws Exception {
+        Path root = Files.createDirectory(directory.resolve("workspace"));
+        Path alias = directory.resolve("alias");
+        Path outside = Files.createDirectory(directory.resolve("outside"));
+        try {
+            Files.createSymbolicLink(alias, root);
+            Files.createSymbolicLink(root.resolve("escape"), outside);
+        } catch (UnsupportedOperationException | java.nio.file.FileSystemException error) {
+            Assumptions.assumeTrue(false, "symbolic links unavailable: " + error.getMessage());
+            return;
+        }
+        StubWorkspace workspace = new StubWorkspace(alias, "/srv/project");
+        RemoteWorkspaceSessionService service = new RemoteWorkspaceSessionService();
+        service.activate("remote", workspace);
+        RemoteWorkspaceSessionService.Connection connection = service.connectionFor(root.toRealPath().resolve("src"));
+        assertNotNull(connection);
+        connection.terminalInvocation(root.toRealPath().resolve("src"), List.of("sh"));
+        assertEquals("src", workspace.lastTerminalRequest.relativeWorkingDirectory());
+        assertEquals(alias.resolve("src/Main.java"), connection.sourcePathMapper(root.toRealPath().resolve("src"))
+            .map("Main.java", root));
+        assertNull(service.connectionFor(alias.resolve("escape/new-file.txt")));
+
+        RemoteWorkspaceTaskTargets targets = new RemoteWorkspaceTaskTargets();
+        targets.register("remote", workspace);
+        assertEquals("remote", targets.targetForPath(root.toRealPath()).id());
+        assertEquals("remote", targets.targetFor("remote", root.resolve("new-file.txt")).id());
+        assertNull(targets.targetForPath(alias.resolve("escape/new-file.txt")));
+
+        service.activate("replacement", new StubWorkspace(root, "/srv/project"));
+        assertEquals(1, service.activeConnections().size());
+        assertEquals("replacement", service.connectionFor(alias).id());
+    }
+
     @Test
     void usesDeepestExplicitSessionAndMapsTerminalDirectory() throws Exception {
         RemoteWorkspaceSessionService service = new RemoteWorkspaceSessionService();

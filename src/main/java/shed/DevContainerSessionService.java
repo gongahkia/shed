@@ -11,26 +11,27 @@ final class DevContainerSessionService {
 
     synchronized void connect(Path workspace, String remoteWorkingDirectory) {
         Connection connection = new Connection(workspace, remoteWorkingDirectory);
-        connections.put(connection.workspace(), connection);
+        connections.put(WorkspaceRootResolver.normalizedIdentity(connection.workspace()), connection);
     }
 
     synchronized boolean disconnect(Path workspace) {
-        Path normalized = normalizedWorkspace(workspace);
+        Path normalized = workspace == null ? null : WorkspaceRootResolver.normalizedIdentity(workspace);
         return normalized != null && connections.remove(normalized) != null;
     }
 
     /** Returns the deepest explicitly connected workspace containing the candidate path. */
     synchronized Connection connectionFor(Path candidate) {
-        Path normalized = normalizedWorkspace(candidate);
+        Path normalized = candidate == null ? null : WorkspaceRootResolver.normalizedIdentity(candidate);
         if (normalized == null) return null;
-        return connections.values().stream()
-            .filter(connection -> normalized.startsWith(connection.workspace()))
-            .max(Comparator.comparingInt(connection -> connection.workspace().getNameCount()))
+        return connections.entrySet().stream()
+            .filter(entry -> normalized.startsWith(entry.getKey()))
+            .max(Comparator.comparingInt(entry -> entry.getKey().getNameCount()))
+            .map(Map.Entry::getValue)
             .orElse(null);
     }
 
     synchronized boolean isConnected(Path workspace) {
-        Path normalized = normalizedWorkspace(workspace);
+        Path normalized = workspace == null ? null : WorkspaceRootResolver.normalizedIdentity(workspace);
         return normalized != null && connections.containsKey(normalized);
     }
 
@@ -63,8 +64,8 @@ final class DevContainerSessionService {
             }
             if (workingDirectory == null) return null;
             try {
-                Path directory = workingDirectory.toAbsolutePath().normalize();
-                if (!directory.startsWith(workspace)) return null;
+                Path directory = WorkspaceRootResolver.pathWithinRoot(workingDirectory, workspace);
+                if (directory == null) return null;
                 return resolveInsideWorkspace(directory, sourcePath);
             } catch (RuntimeException error) {
                 return null;

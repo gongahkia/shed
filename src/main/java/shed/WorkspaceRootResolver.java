@@ -41,6 +41,16 @@ final class WorkspaceRootResolver {
         }
     }
 
+    /** Returns a contained path using the root's spelling, resolving aliases before checking ownership. */
+    static Path pathWithinRoot(Path candidate, Path root) {
+        if (candidate == null || root == null) return null;
+        Path normalizedRoot = root.toAbsolutePath().normalize();
+        Path rootIdentity = normalizedIdentity(normalizedRoot);
+        Path candidateIdentity = normalizedIdentity(candidate);
+        return candidateIdentity.startsWith(rootIdentity)
+            ? normalizedRoot.resolve(rootIdentity.relativize(candidateIdentity)) : null;
+    }
+
     /**
      * Uses the deepest workspace folder for a resource and otherwise retains the
      * user's selected folder.  This avoids treating a sibling project as the

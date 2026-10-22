@@ -12,7 +12,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 /** Owns a picker's asynchronous query/selection lifecycle, entirely from the EDT. */
-final class PaletteFilterController implements AutoCloseable {
+final class PaletteFilterSession implements AutoCloseable {
     private final JTextField filter;
     private final JList<String> list;
     private final DefaultListModel<String> model;
@@ -26,7 +26,7 @@ final class PaletteFilterController implements AutoCloseable {
     private boolean acceptWhenReady;
     private boolean closed;
 
-    PaletteFilterController(JTextField filter, JList<String> list, JLabel status,
+    PaletteFilterSession(JTextField filter, JList<String> list, JLabel status,
                             Function<String, List<String>> matcher, BiConsumer<String, String> accept) {
         this.filter = filter;
         this.list = list;

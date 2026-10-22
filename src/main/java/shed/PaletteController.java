@@ -950,7 +950,7 @@ final class PaletteController {
         status.setForeground(editor.configManager.getCommandBarForeground());
         status.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
         AccessibilitySupport.describe(status, title + " status", "Current filter progress and result count.");
-        PaletteFilterController filtering = new PaletteFilterController(filterField, list, status,
+        PaletteFilterSession filtering = new PaletteFilterSession(filterField, list, status,
             matcher, (value, query) -> { selection[0] = new PaletteSelection(value, query); dialog.dispose(); });
         dialog.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
             .put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0), "dismiss");

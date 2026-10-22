@@ -9,19 +9,19 @@ import java.util.function.Function;
 import javax.swing.*;
 import org.junit.jupiter.api.Test;
 
-class PaletteFilterControllerTest {
+class PaletteFilterSessionTest {
     private static final class Fixture implements AutoCloseable {
         final JTextField field = new JTextField();
         final DefaultListModel<String> model = new DefaultListModel<>();
         final JList<String> list = new JList<>(model);
         final JLabel status = new JLabel();
         final CompletableFuture<String> accepted = new CompletableFuture<>();
-        final PaletteFilterController controller;
+        final PaletteFilterSession controller;
 
         Fixture(Function<String, List<String>> matcher) {
             model.addElement("old result");
             list.setSelectedIndex(0);
-            controller = new PaletteFilterController(field, list, status, matcher,
+            controller = new PaletteFilterSession(field, list, status, matcher,
                 (value, query) -> accepted.complete(value + "|" + query));
         }
 

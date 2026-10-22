@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JButton;
 import javax.swing.JEditorPane;
+import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JToggleButton;
 import javax.swing.SwingUtilities;
@@ -67,6 +68,16 @@ class NotebookPanelTest {
                     assertEquals(String.format("#%06x", config.getNormalColor().getRGB() & 0xffffff), background);
                 }
                 assertTrue(previews.getFirst().getText().contains("Unsaved note"));
+                JEditorPane markdownOutput = previews.stream().filter(preview -> "Notebook Markdown Output"
+                    .equals(preview.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow();
+                JScrollPane rendered = (JScrollPane) SwingUtilities.getAncestorOfClass(JScrollPane.class, markdownOutput);
+                JTextArea plainOutput = descendants(panel, JTextArea.class).stream().filter(area -> !area.isEditable()).findFirst().orElseThrow();
+                JScrollPane plain = (JScrollPane) SwingUtilities.getAncestorOfClass(JScrollPane.class, plainOutput);
+                Container outputStack = rendered.getParent();
+                outputStack.setSize(1000, 400);
+                outputStack.doLayout();
+                assertEquals(0, plain.getX(), "Plain output should start at the cell's leading edge");
+                assertEquals(plain.getX(), rendered.getX(), "Mixed plain and Markdown outputs should share the leading edge");
                 button(panel, "+ Code").doClick();
                 assertEquals(1, newlyStyled.size());
                 assertTrue(newlyStyled.getFirst() != panel);

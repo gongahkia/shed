@@ -205,7 +205,9 @@ final class NotebookPanel extends JPanel {
                     outputs.setLineWrap(true);
                     outputs.setWrapStyleWord(true);
                     plainOutputs.add(outputs);
-                    contents.add(new JScrollPane(outputs));
+                    JScrollPane plain = new JScrollPane(outputs);
+                    plain.setAlignmentX(Component.LEFT_ALIGNMENT);
+                    contents.add(plain);
                 }
                 for (NotebookDocument.MarkdownOutput value : markdown) {
                     JEditorPane preview = new JEditorPane();
@@ -219,7 +221,7 @@ final class NotebookPanel extends JPanel {
                     rendered.setAlignmentX(Component.LEFT_ALIGNMENT);
                     rendered.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, 360));
                     rendered.setPreferredSize(new java.awt.Dimension(700, 220));
-                    contents.add(Box.createVerticalStrut(5));
+                    addOutputGap(contents);
                     contents.add(rendered);
                 }
                 for (NotebookDocument.ImageOutput image : images) {
@@ -228,7 +230,7 @@ final class NotebookPanel extends JPanel {
                         if (decoded != null) {
                             JLabel display = new JLabel(new ImageIcon(decoded));
                             display.setAlignmentX(Component.LEFT_ALIGNMENT);
-                            contents.add(Box.createVerticalStrut(5));
+                            addOutputGap(contents);
                             contents.add(display);
                         }
                     } catch (IOException ignored) {
@@ -239,6 +241,12 @@ final class NotebookPanel extends JPanel {
                 add(outputPanel, BorderLayout.SOUTH);
             }
             setAlignmentX(Component.LEFT_ALIGNMENT);
+        }
+
+        private static void addOutputGap(JPanel contents) {
+            javax.swing.JComponent gap = (javax.swing.JComponent) Box.createVerticalStrut(5);
+            gap.setAlignmentX(Component.LEFT_ALIGNMENT);
+            contents.add(gap);
         }
 
         private NotebookDocument.Cell cell() {

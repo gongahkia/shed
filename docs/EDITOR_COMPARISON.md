@@ -1,5 +1,7 @@
 # Shed editor comparison and improvement plan
 
+The subsequent keymap, search, open-editor and measured-performance implementation is recorded in [Editor workflow follow-up](EDITOR_WORKFLOWS.md). The findings and roadmap below describe the original review baseline.
+
 Review dates: 2026-10-22–23. Baseline: `d45c51ff`. “LightXL” is interpreted as **Lite XL**.
 
 ## What Shed sets out to do

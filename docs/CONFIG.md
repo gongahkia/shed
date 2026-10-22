@@ -64,7 +64,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `font.size` | `16` | int | Buffer font size |
 | `ui.font.family` | empty | string | UI font family; empty retains the system UI font, otherwise must resolve uniquely to a Java-installed family |
 | `ui.font.size` | `0` | int | UI font size; `0` retains each system UI default size |
-| `ui.open_editors.visible` | boolean | `true` | Show the open document strip with unsaved indicators and close controls. |
+| `ui.open_editors.visible` | `true` | boolean | Show the open document strip with unsaved indicators and close controls. |
 | `ui.zoom` | `1.0` | number | Interface scale from `0.5` to `4.0`; `Ctrl/Cmd` + `+` or `-` adjusts it live and `Ctrl/Cmd` + `0` resets it |
 | `terminal.font.family` | `Monospaced` | string | Terminal font family; must resolve uniquely to a Java-installed family |
 | `terminal.font.size` | `14` | int | Terminal font size |
@@ -352,7 +352,7 @@ When a native executable regular file exists directly in `build/`, `target/debug
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `keymap.profile` | `plain` | string | non-modal `plain`, modal `vim`, or chorded `emacs`; non-Vim profiles bypass `keybind.<mode>.*` |
+| `keymap.profile` | `plain` | string | non-modal `plain`, modal `vim`, or chorded `emacs`; each supports profile/global action bindings |
 
 ## Focus and Command UI Keys
 
@@ -393,7 +393,7 @@ With unsafe project keys enabled and the `.shed.toml` file trusted, `debug.*` se
 | :--- | :--- | :--- |
 | `command.alias.<name>` | Ex-command alias to built-in command | `"command.alias.ww" = "w"` |
 | `command.user.<name>` | User shell command callable as `:<name>` | `"command.user.build" = "make -j4"` |
-| `keybind.<scope>.<lhs>` | Validated Vim keymap overlay | `"keybind.normal.H" = "^"` |
+| `keybind.<scope>.<lhs>` | Validated profile action or legacy Vim keymap overlay | `"keybind.normal.H" = "^"` |
 | `lsp.<ext>.command` | LSP server command for file type | `"lsp.py.command" = "pyright-langserver"` |
 | `lsp.<ext>.args` | Quoted direct argv text for an LSP server | `"lsp.py.args" = "--stdio"` |
 | `formatter.<ext>.mode` | `lsp`, `external`, or `disabled` formatter selection | `"formatter.py.mode" = "external"` |
@@ -403,13 +403,13 @@ With unsafe project keys enabled and the `.shed.toml` file trusted, `debug.*` se
 | `debug.adapter.<id>.<field>` | User-managed DAP adapter (`command`, `args`, `transport`, `capabilities`) | `"debug.adapter.java.command" = "java-debug-adapter"` |
 | `debug.configuration.<name>.<field>` | DAP launch/attach configuration; a launch chooses exactly one `program`, `module`, or `code` target (`file_extensions` applies only to `program`; `prelaunch_task` normally names a workspace `.shedtasks` task) | `"debug.configuration.main.request" = "launch"` |
 
-Supported keybind scopes: `normal`, `insert`, `visual`, `visual_line`, `replace`, `command`, `search`, `global`.
+Supported keybind scopes: `plain`, `emacs`, `vim`, `normal`, `insert`, `visual`, `visual_line`, `replace`, `command`, `search`, `global`.
 
 Common key tokens: `<esc>`, `<enter>`, `<tab>`, `<space>`, `<bs>`, `<del>`, `<up>`, `<down>`, `<left>`, `<right>`, `<c-x>`, `<lt>`.
 
 Use `<nop>` as RHS to disable a key.
 
-Overlays apply only while `keymap.profile = "vim"`. Scope-specific overlays take precedence over `global` for that mode; `global` remains active in all other Vim modes. Plain and Emacs fixed bindings intentionally bypass these Vim overlays. Invalid scope, LHS token, or RHS token rejects the setting without changing active bindings. Use `:keymap`, `:keymap list [query]`, `:keymap set <scope> <lhs>=<rhs>`, or `:keymap reset <scope> <lhs>` for the searchable GUI/list, persisted edits, and reset.
+Profile and shared global shortcuts accept `action:<name>`, `command:<Ex command>` or `nop`; for example, `"keybind.plain.<mod-s-k>" = "action:find-in-files"`. Mod means Cmd on macOS and Ctrl elsewhere. Profile bindings take precedence over global bindings; Vim mode action bindings take precedence over the Vim profile. Explicit physical modifiers win over Mod aliases in one scope. These overrides apply in the source editor, preserving other text fields and IME composition. Existing Vim key-sequence mappings retain their mode/global precedence and remain inactive in Plain and Emacs. Invalid mappings reject the setting without changing active bindings. Use File → Keyboard Shortcuts, `:keymap`, `:keymap list [query]`, `:keymap set <scope> <lhs>=<rhs>`, or `:keymap reset <scope> <lhs>` to inspect effective bindings/conflicts, persist an override, and restore defaults. See [keybindings](KEYBINDS.md) for supported actions and boundaries.
 
 ## Theme and Palette Keys
 

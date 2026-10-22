@@ -895,6 +895,9 @@ final class PaletteController {
         filterField.setBorder(javax.swing.BorderFactory.createCompoundBorder(
             javax.swing.BorderFactory.createMatteBorder(0, 0, 1, 0, editor.configManager.getCaretColor()),
             javax.swing.BorderFactory.createEmptyBorder(6, 8, 6, 8)));
+        int rowHeight = Math.max(UiZoom.scale(40, editor.configManager.getUiZoom()),
+            filterField.getFontMetrics(uiFont).getHeight() + UiZoom.scale(12, editor.configManager.getUiZoom()));
+        filterField.setPreferredSize(new Dimension(1, rowHeight));
         DefaultListModel<String> model = new DefaultListModel<>();
         for (int index = 0; index < Math.min(PALETTE_RESULT_LIMIT, candidates.size()); index++) {
             model.addElement(candidates.get(index));
@@ -903,6 +906,7 @@ final class PaletteController {
         AccessibilitySupport.describe(list, title + " results", "Matching " + title.toLowerCase(Locale.ROOT) + " entries. Use Up and Down to select, Enter to open, or Escape to dismiss.");
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setFont(uiFont);
+        list.setFixedCellHeight(rowHeight);
         list.setBackground(editor.configManager.getCommandBarBackground());
         list.setForeground(editor.configManager.getCommandBarForeground());
         list.setSelectionBackground(editor.configManager.getSelectionColor());

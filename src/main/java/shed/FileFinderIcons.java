@@ -89,7 +89,8 @@ final class FileFinderIcons {
     static ListCellRenderer<String> renderer(Texteditor editor, Map<String, String> pathsByCandidate) {
         Font textFont = editor.resolveUiFont();
         Font iconFont = availableNerdFont(textFont);
-        return iconFont == null ? null : new Renderer(editor, pathsByCandidate == null ? Map.of() : Map.copyOf(pathsByCandidate), iconFont.getFamily(), iconFont.getStyle());
+        return new Renderer(editor, pathsByCandidate == null ? Map.of() : Map.copyOf(pathsByCandidate),
+            iconFont == null ? null : iconFont.getFamily(), iconFont == null ? Font.PLAIN : iconFont.getStyle());
     }
 
     private static final class Renderer implements ListCellRenderer<String> {
@@ -112,21 +113,29 @@ final class FileFinderIcons {
             Color foreground = selected ? editor.configManager.getSelectionTextColor() : editor.configManager.getCommandBarForeground();
             double zoom = editor.configManager.getUiZoom();
             Font textFont = editor.resolveUiFont();
-            Font iconFont = new Font(iconFamily, iconStyle, Math.max(UiZoom.scale(12, zoom), textFont.getSize()));
             JPanel row = new JPanel(new BorderLayout(UiZoom.scale(8, zoom), 0));
             row.setOpaque(true);
             row.setBackground(background);
             row.setBorder(BorderFactory.createEmptyBorder(0, UiZoom.scale(6, zoom), 0, UiZoom.scale(6, zoom)));
-            JLabel icon = new JLabel(iconFor(path));
-            icon.setFont(iconFont);
-            icon.setForeground(foreground);
-            icon.setHorizontalAlignment(JLabel.CENTER);
-            icon.setPreferredSize(new Dimension(UiZoom.scale(22, zoom), 0));
-            JLabel label = new JLabel(path);
+            if (iconFamily != null) {
+                JLabel icon = new JLabel(iconFor(path));
+                icon.setFont(new Font(iconFamily, iconStyle, Math.max(UiZoom.scale(12, zoom), textFont.getSize())));
+                icon.setForeground(foreground);
+                icon.setHorizontalAlignment(JLabel.CENTER);
+                icon.setPreferredSize(new Dimension(UiZoom.scale(22, zoom), 0));
+                row.add(icon, BorderLayout.WEST);
+            }
+            String display = value == null ? "" : value;
+            java.io.File candidate = new java.io.File(display);
+            if (candidate.isAbsolute()) display = candidate.getName() + " — " + candidate.getParent();
+            JLabel label = new JLabel();
+            label.putClientProperty("html.disable", Boolean.TRUE);
+            label.setText(display);
             label.setFont(textFont);
             label.setForeground(foreground);
-            row.add(icon, BorderLayout.WEST);
             row.add(label, BorderLayout.CENTER);
+            row.setToolTipText(path);
+            row.getAccessibleContext().setAccessibleName(value);
             return row;
         }
     }

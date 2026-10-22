@@ -163,6 +163,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleWindow(args), "window", "win");
         registerCommand((args, range, force) -> handleZoom(args), "zoom", "uizoom");
         registerCommand((args, range, force) -> editor.showGrepFinder(args), "grep", "rg");
+        registerCommand((args, range, force) -> editor.paletteController.promptWorkspaceSearch(), "findinfiles");
         registerCommand((args, range, force) -> handleProject(args), "project");
         registerCommand((args, range, force) -> editor.handleProjectReplace(args), "projectreplace", "preplace");
         registerCommand((args, range, force) -> handleQuickfix(args), "quickfix", "qf");

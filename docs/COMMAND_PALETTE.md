@@ -12,7 +12,7 @@ Each action is unique by visible label and normalized command. The application r
 | Open Folder | `:open folder` | Choose a local folder, activate it as the workspace, and show its file tree. |
 | Toggle File Tree | `:tree toggle` | Open or close the workspace file tree. |
 | File Finder | `:files` | Open the project file finder. |
-| Recent Files | `:recent` | Open the recently used files list. |
+| Recent Files | `:recent` | Search and reopen a recently used file without replacing the source document on cancellation. |
 | Buffer Picker | `:buffers` | Show every open buffer, filter the list, and switch to a selected buffer. |
 | Switch to Next Open Buffer | `:bn` | Switch to the next open buffer. |
 | Switch to Previous Open Buffer | `:bp` | Switch to the previous open buffer. |
@@ -130,6 +130,7 @@ Each action is unique by visible label and normalized command. The application r
 | Workspace Folders | `:workspace folders` | Open the workspace-folder manager. |
 | Workspace Index Status | `:workspace index status` | Show the workspace search index status. |
 | Project Replace | `:project replace` | Open the reviewed project-wide replacement panel. |
+| Find in Files | `:findinfiles` | Prompt for text, then search workspace files and show matching locations. |
 | Tasks | `:task open` | Open the workspace Tasks panel. |
 | Tests | `:test open` | Open the Test Explorer. |
 | Import Coverage Report | `:coverage open` | Open Tests, then use Import Coverage to choose a local coverage report. |

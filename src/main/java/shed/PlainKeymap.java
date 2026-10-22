@@ -12,6 +12,7 @@ final class PlainKeymap {
         OPEN_FOLDER("open folder"),
         FIND_FILE("files"),
         FIND(null),
+        FIND_IN_FILES("findinfiles"),
         FIND_NEXT(null),
         FIND_PREVIOUS(null),
         REPLACE(null),
@@ -82,7 +83,7 @@ final class PlainKeymap {
             case KeyEvent.VK_S -> shift ? Action.SAVE_AS : Action.SAVE;
             case KeyEvent.VK_O -> shift ? Action.OPEN_FOLDER : Action.OPEN;
             case KeyEvent.VK_P -> shift ? Action.COMMANDS : Action.FIND_FILE;
-            case KeyEvent.VK_F -> shift ? Action.NONE : Action.FIND;
+            case KeyEvent.VK_F -> shift ? Action.FIND_IN_FILES : Action.FIND;
             case KeyEvent.VK_H -> shift || event.isMetaDown() ? Action.NONE : Action.REPLACE;
             case KeyEvent.VK_G -> event.isMetaDown() ? (shift ? Action.FIND_PREVIOUS : Action.FIND_NEXT)
                 : shift ? Action.NONE : Action.GO_TO_LINE;

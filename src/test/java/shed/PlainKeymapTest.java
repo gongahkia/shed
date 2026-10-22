@@ -33,6 +33,8 @@ class PlainKeymapTest {
         assertEquals(PlainKeymap.Action.NAVIGATE_FORWARD,
             action(KeyEvent.VK_MINUS, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.FIND, action(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.FIND_IN_FILES, action(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
+        assertEquals(PlainKeymap.Action.FIND_IN_FILES, action(KeyEvent.VK_F, InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.FIND_NEXT, action(KeyEvent.VK_F3, 0));
         assertEquals(PlainKeymap.Action.FIND_PREVIOUS, action(KeyEvent.VK_F3, InputEvent.SHIFT_DOWN_MASK));
         assertEquals(PlainKeymap.Action.REPLACE, action(KeyEvent.VK_F, InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK));

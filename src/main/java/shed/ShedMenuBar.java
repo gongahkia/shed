@@ -48,6 +48,8 @@ final class ShedMenuBar {
         item(edit, "Paste", KeyEvent.VK_V, commandMask, () -> clipboard(KeyEvent.VK_V));
         edit.addSeparator();
         item(edit, "Find…", KeyEvent.VK_F, commandMask, () -> action(PlainKeymap.Action.FIND));
+        item(edit, "Find in Files…", KeyEvent.VK_F, commandMask | InputEvent.SHIFT_DOWN_MASK,
+            () -> action(PlainKeymap.Action.FIND_IN_FILES));
         item(edit, "Find Next", nativeMac ? KeyEvent.VK_G : KeyEvent.VK_F3,
             nativeMac ? commandMask : 0, () -> action(PlainKeymap.Action.FIND_NEXT));
         item(edit, "Find Previous", nativeMac ? KeyEvent.VK_G : KeyEvent.VK_F3,

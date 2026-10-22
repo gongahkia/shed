@@ -117,6 +117,7 @@ final class PaletteController {
         action("Workspace Folders", "workspace folders", "Open the workspace-folder manager."),
         action("Workspace Index Status", "workspace index status", "Show the workspace search index status."),
         action("Project Replace", "project replace", "Open the reviewed project-wide replacement panel."),
+        action("Find in Files", "findinfiles", "Search text across workspace files and open matching locations."),
         action("Tasks", "task open", "Open the workspace Tasks panel."),
         action("Tests", "test open", "Open the Test Explorer."),
         action("Import Coverage Report", "coverage open", "Open Tests, then use Import Coverage to choose a local coverage report."),
@@ -253,6 +254,14 @@ final class PaletteController {
 
     public String showGrepFinder(String pattern) {
         return workspaceSearchCoordinator.search(pattern);
+    }
+
+    String promptWorkspaceSearch() {
+        String selected = editor.writingArea.getSelectedText();
+        String initial = selected == null || selected.contains("\n") || selected.contains("\r") ? "" : selected;
+        Object query = JOptionPane.showInputDialog(editor, "Find text in workspace files:", "Find in Files",
+            JOptionPane.PLAIN_MESSAGE, null, null, initial);
+        return query == null ? "Workspace search cancelled" : showGrepFinder(query.toString());
     }
 
 
@@ -1005,6 +1014,9 @@ final class PaletteController {
         String mod = mac ? "⌘" : "Ctrl+";
         String shift = mac ? "⇧" : "Shift+";
         return switch (label == null ? "" : label) {
+            case "Find in Files" -> shift + mod + "F";
+            case "Go Back" -> mac ? "Ctrl+-" : "Alt+Left";
+            case "Go Forward" -> mac ? "Ctrl+Shift+-" : "Alt+Right";
             case "Open File" -> mod + "O";
             case "Open Folder" -> shift + mod + "O";
             case "File Finder" -> mod + "P";

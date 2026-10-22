@@ -47,7 +47,9 @@ public class HelpService {
                    "  :e file        Edit file\n" +
                    "  :bn / :bp      Next/previous buffer\n" +
                    "  :bd            Delete buffer\n" +
-                   "  :recent        Show recent files\n" +
+                   "  :recent        Search and reopen recent files\n" +
+                   "  :back/:forward Navigate locations across open documents\n" +
+                   "  :findinfiles   Find text across workspace files\n" +
                    "  :settings      Open user settings file\n" +
                    "  :config save   Persist current runtime config to ~/.shed/config.toml\n" +
                    "  :config heal   Persist reviewed deterministic config repairs\n" +
@@ -150,10 +152,12 @@ public class HelpService {
                     + "Text input, arrows, selection, clipboard, and Select All use native text bindings.\n"
                     + "Ctrl/Cmd-N       New document\n"
                     + "Ctrl/Cmd-O       Open file dialog\n"
-                    + "Ctrl/Cmd-P       Quick open file\n"
+                    + "Ctrl/Cmd-P       Quick open file (supports file:line:column)\n"
                     + "Ctrl/Cmd-S       Save (asks for a path on a new document)\n"
                     + "Ctrl/Cmd-Shift-S Save As\n"
                     + "Ctrl/Cmd-F       Find; F3 / Shift-F3 repeat forward/backward\n"
+                    + "Ctrl/Cmd-Shift-F Find text across workspace files\n"
+                    + "Ctrl-minus / Ctrl-Shift-minus Go Back / Forward (also Alt-Left/Right on Windows/Linux)\n"
                     + "Ctrl/Cmd-H       Replace all literal matches\n"
                     + "Ctrl/Cmd-G       Go to line\n"
                     + "Ctrl/Cmd-R       Document symbols; Shift-R searches workspace symbols\n"

@@ -34,7 +34,8 @@ In the `:` prompt, paste with `Cmd`/`Ctrl` + `V` and use Left/Right to move the 
 | `:discard current window` | Close current window without saving changes |
 | `:discard all` | Quit Shed without saving modified buffers |
 | `:buffers`, `:buf` | Open buffer picker |
-| `:recent` | Show recent files |
+| `:recent` | Search and open recent files in a picker |
+| `:back`, `:forward` | Navigate recorded locations across open text buffers; skips closed buffers |
 | `:wa`, `:wall` | Write all modified file-backed buffers |
 | `:qa`, `:qall` | Quit all |
 | `:qa!`, `:qall!` | Force quit all |
@@ -176,6 +177,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:zoom`, `:uizoom` `in [default\|percent]\|out [default\|percent]\|reset` | Adjust UI zoom by the default 10%, or by a specified percentage; `reset` restores 100% |
 | `:open [file\|folder]` | Native file chooser, or workspace-folder chooser that opens its tree |
 | `:files` | Project file finder |
+| `:findinfiles` | Prompt for text to search across workspace files (also Ctrl/Cmd+Shift+F in Plain mode) |
 | `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search; opens quickfix on completion |
 | `:project replace settings`, `:projectreplace settings` | Show persisted project-replace safety controls |
 | `:project replace`, `:projectreplace`, `:projectreplace ui` | Open the docked Project Replace review panel |

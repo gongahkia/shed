@@ -18,6 +18,7 @@ The default `keymap.profile = "plain"` provides non-modal editing. Plain bypasse
 | `Ctrl`/`Cmd` + `S` | Save; prompt for a path on an untitled document |
 | `Ctrl`/`Cmd` + `Shift` + `S` | Save As |
 | `Ctrl`/`Cmd` + `F` | Open inline Find bar; shows live match count |
+| `Ctrl`/`Cmd` + `Shift` + `F` | Find text across workspace files |
 | `F3` / `Shift` + `F3` | Next / previous match; on macOS also `Cmd` + `G` / `Cmd` + `Shift` + `G` |
 | `Ctrl` + `H` (Linux/Windows), `Cmd` + `Alt` + `F` (macOS) | Open inline Replace bar with preview and match count |
 | `Ctrl` + `G` (Linux/Windows) | Open inline Go to Line bar |
@@ -41,6 +42,12 @@ The default `keymap.profile = "plain"` provides non-modal editing. Plain bypasse
 The inline Find and Replace bars accept Enter for the next match, Shift+Enter for the previous match, and Escape to close. Replace All shows the number of matches before applying the edit. The editor shows file position as a percentage in the status bar and opens at its previously saved window size and position.
 
 Switching ordinary text buffers preserves the caret, selection direction, and scroll position separately in each split. Explicit line/symbol jumps override the restored position. Large-file projections retain their existing bounded-view behavior.
+
+Quick Open accepts `Main.java:42` and `Main.java:42:7`. `:42` targets the current file when it is in the picker. Line and column numbers are one-based; columns use UTF-16 offsets, clamp to the selected line, and never split a surrogate pair. Exact filenames containing a numeric colon suffix take precedence over location syntax. Recent project files appear first for an empty query; filename matches rank ahead of incidental directory matches. **File → Recent Files** and `:recent` open a searchable picker. A missing recent file reports an error instead of creating an empty document.
+
+Picker Enter waits for the current filter result if matching is still running. Empty results keep the picker open. Arrow and Page Up/Down keys in the filter keep the selection visible; Enter from the result list opens the selected item, and Escape dismisses the picker from any focus position. Canceling a file picker leaves the current document intact.
+
+**Find in Files** is also available in Edit, the command palette, and `:findinfiles`. It prompts with the current single-line selection and uses the existing ignore-aware workspace text search and quickfix results. `:grep <text>` remains available. Search options and a persistent Search panel are not added by this shortcut.
 
 **Go Back** and **Go Forward** are also in Navigate and the command palette, or available as `:back` / `:forward` in any profile. Vim retains `Ctrl+O` / `Ctrl+I`. History holds up to 100 origins, skips closed buffers, and does not retain closed documents in memory. A new jump after going back clears the forward branch. Large-file projections and terminal/preview surfaces are not recorded.
 

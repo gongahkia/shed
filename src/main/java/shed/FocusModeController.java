@@ -116,6 +116,7 @@ final class FocusModeController {
     }
 
     void syncChrome() {
+        if (editor.openEditorsBar != null) editor.openEditorsBar.setVisible(!editor.goyoModeEnabled && editor.configManager.getOpenEditorsVisible());
         if (editor.footerPanel == null) {
             return;
         }

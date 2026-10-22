@@ -335,6 +335,7 @@ public class ConfigManager {
         defineDefault("shell.command.max.length", DEFAULT_SHELL_COMMAND_MAX_LENGTH);
         defineDefault("scrolloff", DEFAULT_SCROLLOFF);
         defineDefault("editor.scrollbars.visible", DEFAULT_EDITOR_SCROLLBARS_VISIBLE);
+        defineDefault("ui.open_editors.visible", true);
         defineDefault("auto.pairs", DEFAULT_AUTO_PAIRS);
         defineDefault("textwidth", DEFAULT_TEXTWIDTH);
         defineDefault("minimap", DEFAULT_MINIMAP);
@@ -472,6 +473,7 @@ public class ConfigManager {
             case "shell.command.enabled" -> "Enable shell command execution";
             case "shell.command.max.length" -> "Maximum accepted shell command length";
             case "scrolloff" -> "Context lines retained while scrolling";
+            case "ui.open_editors.visible" -> "Show the open document strip with unsaved indicators and close controls";
             case "editor.scrollbars.visible" -> "Show horizontal and vertical scrollbars in editor windows";
             case "auto.pairs" -> "Insert matching brackets and quotes";
             case "textwidth" -> "Paragraph width, zero disables wrapping";
@@ -973,6 +975,8 @@ public class ConfigManager {
     public int getUiFontSize() {
         return getInt("ui.font.size", DEFAULT_UI_FONT_SIZE);
     }
+
+    public boolean getOpenEditorsVisible() { return getBoolean("ui.open_editors.visible", true); }
 
     public double getUiZoom() {
         return UiZoom.clamp(getDouble("ui.zoom", DEFAULT_UI_ZOOM));

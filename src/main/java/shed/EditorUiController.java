@@ -205,7 +205,11 @@ final class EditorUiController {
         editor.editorToolSplit.setBorder(BorderFactory.createEmptyBorder());
         // Add components
         editor.add(editor.editorToolSplit, BorderLayout.CENTER);
-        editor.add(editor.inlineFindBar, BorderLayout.NORTH);
+        JPanel documentHeader = new JPanel(new BorderLayout());
+        editor.openEditorsBar = new OpenEditorsBar(editor);
+        documentHeader.add(editor.openEditorsBar, BorderLayout.NORTH);
+        documentHeader.add(editor.inlineFindBar, BorderLayout.SOUTH);
+        editor.add(documentHeader, BorderLayout.NORTH);
         if (!editor.stagedStartupPending) editor.add(editor.footerPanel, BorderLayout.SOUTH);
 
         // Window close handler
@@ -1430,6 +1434,7 @@ final class EditorUiController {
 
 
     void updateStatusBar() {
+        if (editor.openEditorsBar != null) editor.openEditorsBar.refresh();
         long started = System.nanoTime();
         FileBuffer buffer = editor.getCurrentBuffer();
         StringBuilder status = new StringBuilder();

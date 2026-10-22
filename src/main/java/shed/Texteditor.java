@@ -127,6 +127,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Buffer management
     List<FileBuffer> buffers;
+    OpenEditorsBar openEditorsBar;
     int currentBufferIndex;
     List<EditorPane> editorPanes;
     int activePaneIndex;

@@ -788,6 +788,10 @@ final class PaneBufferController {
         editor.currentBufferIndex = 0;
         editor.persistRecoverySnapshotsSafely();
         openEmptyBuffer();
+        FileBuffer replacement = getCurrentBuffer();
+        for (EditorPane pane : new ArrayList<>(editor.editorPanes)) {
+            if (pane.getBuffer() == buffer) restoreBufferIntoPane(pane, replacement);
+        }
         return "Buffer closed";
     }
 

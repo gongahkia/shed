@@ -43,6 +43,81 @@ public class TexteditorSwingIntegrationTest {
     Path tempDir;
 
     @Test
+    void replacePanelInvalidatesPendingPreviewsAndGuardsDirtyDocuments() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-replace-panel"));
+        Path root = Files.createDirectories(tempDir.resolve("replace-panel-root"));
+        Path file = Files.writeString(root.resolve("notes.txt"), "prefix old old");
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.configManager.set("project.replace.enabled", "true");
+                editor.showToolWindow(ToolWindowHost.Tab.REPLACE);
+                var panel = editor.toolWindowHost.replacePanel();
+                panel.setSearchQuery(WorkspaceSearchQuery.literal("old"));
+                var fields = descendants(panel.component(), javax.swing.JTextField.class);
+                fields.get(1).setText("new");
+                descendants(panel.component(), javax.swing.JButton.class).stream().filter(b -> b.getText().equals("Preview")).findFirst().orElseThrow().doClick();
+                fields.getFirst().setText("other");
+                return null;
+            });
+            assertTrue(awaitUiState(() -> editor.asyncJobService.list().stream().noneMatch(job -> job.getStatus() == AsyncJobService.Status.RUNNING)));
+            assertEquals(null, onEdt(() -> editor.workspaceReplaceCoordinator().planForPanel()));
+            onEdt(() -> { editor.workspaceReplaceCoordinator().previewForPanel(WorkspaceSearchQuery.literal("old"), "new"); return null; });
+            assertTrue(awaitUiState(() -> editor.workspaceReplaceCoordinator().planForPanel() != null));
+            onEdt(() -> {
+                editor.writingArea.append(" unsaved");
+                assertTrue(editor.workspaceReplaceCoordinator().applyForPanel().startsWith("Save or close"));
+                return null;
+            });
+            assertEquals("prefix old old", Files.readString(file));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void openEditorsShowDirtyStatePreserveViewsAndCloseSafelyAcrossSplits() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-open-editors"));
+        Path a = Files.writeString(Files.createDirectories(tempDir.resolve("a")).resolve("same.txt"), "first document");
+        Path b = Files.writeString(Files.createDirectories(tempDir.resolve("b")).resolve("same.txt"), "second document");
+        Texteditor editor = createEditor(home, a, b);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                var bar = editor.openEditorsBar;
+                assertTrue(bar.isVisible());
+                FileBuffer second = editor.getCurrentBuffer();
+                editor.writingArea.select(2, 6);
+                var list = descendants(bar, javax.swing.JList.class).getFirst();
+                assertEquals(2, list.getModel().getSize());
+                assertTrue(list.getModel().getElementAt(0).toString().contains("same.txt —"));
+                list.setSelectedIndex(0);
+                FileBuffer first = editor.getCurrentBuffer();
+                assertTrue(first != second);
+                editor.writingArea.append(" dirty");
+                editor.updateStatusBar();
+                assertTrue(list.getSelectedValue().toString().contains("dirty=true"));
+                assertFalse(bar.closeBuffer(first, false));
+                assertTrue(editor.buffers.contains(first));
+                list.setSelectedIndex(1);
+                assertEquals("cond", editor.writingArea.getSelectedText());
+                assertTrue(bar.closeBuffer(first, true));
+                assertSame(second, editor.getCurrentBuffer());
+                editor.splitWindow(true);
+                assertTrue(bar.closeBuffer(second, false));
+                assertEquals(1, editor.buffers.size());
+                assertTrue(editor.editorPanes.stream().allMatch(pane -> pane.getBuffer() == editor.getCurrentBuffer()));
+                assertTrue(editor.isDisplayable());
+                editor.configManager.set("ui.open_editors.visible", "false");
+                editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                assertFalse(bar.isVisible());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void searchPanelRetainsSourceSharesOptionsAndOpensLocations() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-shared-search"));

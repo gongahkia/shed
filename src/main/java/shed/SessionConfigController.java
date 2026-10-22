@@ -460,6 +460,7 @@ final class SessionConfigController {
             editor.searchManager.clearHighlights();
         }
         editor.applyThemeColors();
+        if (editor.openEditorsBar != null) editor.openEditorsBar.refreshAppearance();
         editor.refreshLineNumberPanel();
         editor.updateCurrentLineHighlight();
         editor.refreshLspDecorations();

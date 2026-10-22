@@ -14,14 +14,15 @@ final class OpenEditorsBar extends JPanel {
     private final Texteditor editor;
     private final DefaultListModel<Entry> model = new DefaultListModel<>();
     private final JList<Entry> list = new JList<>(model);
-    private final JButton close = new JButton("Close");
+    private final JButton close = new JButton(WorkbenchIcons.CLOSE);
+    private final JScrollPane scroll;
     private List<Entry> entries = List.of();
     private boolean refreshing;
 
     OpenEditorsBar(Texteditor editor) {
         super(new BorderLayout(4, 0));
         this.editor = editor;
-        setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 5));
+        setBorder(BorderFactory.createEmptyBorder());
         list.setLayoutOrientation(JList.HORIZONTAL_WRAP);
         list.setVisibleRowCount(1);
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -34,12 +35,23 @@ final class OpenEditorsBar extends JPanel {
                     setToolTipText(entry.path() + (entry.dirty() ? " — Unsaved changes" : ""));
                     getAccessibleContext().setAccessibleName(entry.label() + (entry.dirty() ? ", unsaved changes" : "") + ", " + entry.path());
                 }
-                setBorder(BorderFactory.createCompoundBorder(getBorder(), BorderFactory.createEmptyBorder(0, 10, 0, 10)));
+                var config = editor.configManager;
+                setBackground(selected ? config.getNormalColor() : config.getStatusBarBackground());
+                setForeground(selected ? config.getEditorForeground() : config.getMutedForegroundColor());
+                int zoomLine = UiZoom.scale(2, config.getUiZoom());
+                setBorder(BorderFactory.createCompoundBorder(
+                    focused ? BorderFactory.createLineBorder(config.getFocusColor(), zoomLine)
+                        : BorderFactory.createMatteBorder(0, 0, zoomLine, 0, selected ? config.getFocusColor() : getBackground()),
+                    BorderFactory.createEmptyBorder(0, UiZoom.scale(14, config.getUiZoom()), 0, UiZoom.scale(14, config.getUiZoom()))));
                 return this;
             }
         });
-        JScrollPane scroll = new JScrollPane(list, JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scroll = new JScrollPane(list, JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.getHorizontalScrollBar().addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentShown(java.awt.event.ComponentEvent event) { revalidate(); }
+            @Override public void componentHidden(java.awt.event.ComponentEvent event) { revalidate(); }
+        });
         add(scroll); add(close, BorderLayout.EAST);
         list.addListSelectionListener(event -> {
             if (refreshing || event.getValueIsAdjusting()) return;
@@ -50,6 +62,8 @@ final class OpenEditorsBar extends JPanel {
         bind(KeyEvent.VK_DELETE, "close", this::closeSelected);
         KeyboardFocusSupport.installEscape(this, () -> editor.writingArea.requestFocusInWindow());
         close.addActionListener(event -> closeSelected());
+        WorkbenchStyle.quiet(close);
+        close.setToolTipText("Close selected editor");
         AccessibilitySupport.describe(list, "Open editors", "Left and Right switch documents in the active pane. Enter returns to editing. Delete closes with confirmation for unsaved changes.");
         AccessibilitySupport.describe(close, "Close selected editor", "Close the selected document. Unsaved changes require confirmation; closing the last document keeps Shed open.");
         refreshAppearance();
@@ -74,8 +88,7 @@ final class OpenEditorsBar extends JPanel {
         }
         int height = UiZoom.scale(40, editor.configManager.getUiZoom());
         list.setFixedCellHeight(height);
-        close.setPreferredSize(new Dimension(UiZoom.scale(80, editor.configManager.getUiZoom()), height));
-        setPreferredSize(new Dimension(200, height + UiZoom.scale(14, editor.configManager.getUiZoom())));
+        close.setPreferredSize(new Dimension(height, height));
         setBackground(editor.configManager.getStatusBarBackground());
         list.setBackground(editor.configManager.getStatusBarBackground());
         list.setForeground(editor.configManager.getStatusBarForeground());
@@ -83,6 +96,13 @@ final class OpenEditorsBar extends JPanel {
         list.setSelectionForeground(editor.configManager.getSelectionTextColor());
         setVisible(!editor.goyoModeEnabled && editor.configManager.getOpenEditorsVisible());
         refresh();
+    }
+
+    @Override public Dimension getPreferredSize() {
+        int height = UiZoom.scale(40, editor.configManager.getUiZoom());
+        // Reserve scrolling space only when documents overflow the strip.
+        if (scroll != null && scroll.getHorizontalScrollBar().isVisible()) height += UiZoom.scale(10, editor.configManager.getUiZoom());
+        return new Dimension(200, height);
     }
 
     void refresh() {

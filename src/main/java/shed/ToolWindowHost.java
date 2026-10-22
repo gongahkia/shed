@@ -30,8 +30,19 @@ final class ToolWindowHost extends JPanel {
         setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, editor.configManager.getStatusBarBackground()));
         setMinimumSize(new Dimension(0, 160));
         headerPanel = header();
-        add(headerPanel, BorderLayout.NORTH);
-        add(tabs, BorderLayout.CENTER);
+        // Put dock actions in the tab strip, reserving their space in TabsUI.
+        javax.swing.JLayeredPane body = new javax.swing.JLayeredPane() {
+            @Override public Dimension getPreferredSize() { return tabs.getPreferredSize(); }
+            @Override public void doLayout() {
+                tabs.setBounds(0, 0, getWidth(), getHeight());
+                Dimension actions = headerPanel.getPreferredSize();
+                headerPanel.setBounds(Math.max(0, getWidth() - actions.width), 0, actions.width,
+                    UiZoom.scale(40, editor.configManager.getUiZoom()));
+            }
+        };
+        body.add(tabs, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        body.add(headerPanel, javax.swing.JLayeredPane.PALETTE_LAYER);
+        add(body, BorderLayout.CENTER);
         addSurface(Tab.SEARCH, "Search", new WorkspaceSearchPanel(editor));
         addSurface(Tab.GIT, "Git", new GitChangesToolPanel(editor, this));
         addSurface(Tab.DEBUG, "Debug", new DebugToolPanel(editor, this));
@@ -43,17 +54,16 @@ final class ToolWindowHost extends JPanel {
     }
 
     private JPanel header() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
-        panel.add(new JLabel("Tools"), BorderLayout.WEST);
-        JButton close = new JButton("Hide");
+        JPanel panel = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 0, 0));
+        JButton close = new JButton(WorkbenchIcons.CLOSE);
         close.addActionListener(event -> editor.hideToolWindow());
-        JButton detach = new JButton("Detach");
+        JButton detach = new JButton(WorkbenchIcons.DETACH);
         detach.addActionListener(event -> detachSelected());
-        JPanel actions = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 4, 0));
-        actions.add(detach);
-        actions.add(close);
-        panel.add(actions, BorderLayout.EAST);
+        WorkbenchStyle.quiet(close); WorkbenchStyle.quiet(detach);
+        close.setToolTipText("Hide tools"); detach.setToolTipText("Detach selected tool");
+        AccessibilitySupport.describe(close, "Hide tools", "Hide the docked tool panel.");
+        AccessibilitySupport.describe(detach, "Detach selected tool", "Open this tool in its own window. Closing it returns the tool to this dock.");
+        panel.add(detach); panel.add(close);
         return panel;
     }
 
@@ -74,9 +84,13 @@ final class ToolWindowHost extends JPanel {
         }
         editor.showToolWindow();
         tabs.setSelectedComponent(surface.component());
-        if (tab == Tab.SEARCH || tab == Tab.REPLACE) editor.editorToolSplit.setDividerLocation(
-            Math.max(UiZoom.scale(120, editor.configManager.getUiZoom()), editor.editorToolSplit.getHeight()
-                - UiZoom.scale(tab == Tab.REPLACE ? 520 : 360, editor.configManager.getUiZoom())));
+        int desiredHeight = switch (tab) {
+            case DEBUG, REPLACE -> 520;
+            case GIT, TESTS -> 420;
+            default -> 360;
+        };
+        editor.editorToolSplit.setDividerLocation(Math.max(UiZoom.scale(120, editor.configManager.getUiZoom()),
+            editor.editorToolSplit.getHeight() - UiZoom.scale(desiredHeight, editor.configManager.getUiZoom())));
         surface.refresh();
     }
 
@@ -105,14 +119,13 @@ final class ToolWindowHost extends JPanel {
     }
 
     void refreshAppearance() {
-        SearchControlMetrics.apply(headerPanel, editor);
+        int size = UiZoom.scale(40, editor.configManager.getUiZoom());
+        for (var action : headerPanel.getComponents()) action.setPreferredSize(new Dimension(size, size));
+        headerPanel.setBackground(editor.configManager.getStatusBarBackground());
         tabs.setFont(editor.resolveUiFont());
-        tabs.setUI(new javax.swing.plaf.basic.BasicTabbedPaneUI() {
-            @Override protected void installDefaults() {
-                super.installDefaults();
-                int padding = Math.max(2, (UiZoom.scale(40, editor.configManager.getUiZoom()) - tabs.getFontMetrics(tabs.getFont()).getHeight() + 1) / 2);
-                tabInsets = new java.awt.Insets(padding, UiZoom.scale(10, editor.configManager.getUiZoom()), padding, UiZoom.scale(10, editor.configManager.getUiZoom()));
-                highlight = lightHighlight = shadow = darkShadow = editor.configManager.getSubtleBorderColor();
+        tabs.setUI(new WorkbenchStyle.TabsUI() {
+            @Override protected java.awt.Insets getTabAreaInsets(int placement) {
+                return new java.awt.Insets(0, 0, 0, size * 2);
             }
         });
         for (ToolSurface surface : surfaces.values()) surface.refreshAppearance();

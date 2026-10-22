@@ -64,7 +64,12 @@ final class OpenEditorsBar extends JPanel {
 
     void refreshAppearance() {
         SearchControlMetrics.styleButton(close, editor.configManager);
-        if (!editor.stagedStartupPending) {
+        if (editor.stagedStartupPending) {
+            // Selection/layout can ask the renderer for metrics before prepareStagedWindow.
+            // Keep that first document switch independent of system-font discovery.
+            list.setFont(editor.stagedStartupFont.deriveFont((float) list.getFont().getSize()));
+            close.setFont(editor.stagedStartupFont.deriveFont((float) close.getFont().getSize()));
+        } else {
             list.setFont(editor.resolveUiFont()); close.setFont(editor.resolveUiFont());
         }
         int height = UiZoom.scale(40, editor.configManager.getUiZoom());

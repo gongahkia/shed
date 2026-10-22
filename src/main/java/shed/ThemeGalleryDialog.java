@@ -178,8 +178,9 @@ final class ThemeGalleryDialog extends JDialog {
         public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focused) {
             JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focused);
             if (!(value instanceof ThemePreview preview)) return label;
-            String active = preview.id().equals(editor.configManager.getThemeId()) ? "  • active" : "";
-            label.setText(preview.displayName() + "  " + preview.id() + active);
+            String active = preview.id().equals(editor.configManager.getThemeId()) ? "  · Current" : "";
+            label.setText(preview.displayName() + active);
+            label.setToolTipText(preview.id());
             label.setIcon(new PaletteIcon(preview));
             label.setIconTextGap(9);
             label.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));

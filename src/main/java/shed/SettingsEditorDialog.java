@@ -32,8 +32,6 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.plaf.basic.BasicHTML;
-import javax.swing.plaf.basic.BasicComboBoxUI;
-import javax.swing.plaf.basic.BasicButtonUI;
 import javax.swing.text.View;
 import javax.swing.border.TitledBorder;
 import javax.swing.event.DocumentEvent;
@@ -46,9 +44,8 @@ final class SettingsEditorDialog extends JDialog {
         static DialogTheme from(ConfigManager config) {
             Color surface = config.getNormalColor();
             Color foreground = config.getEditorForeground();
-            return new DialogTheme(surface, blend(surface, foreground, 0.07), config.getCommandBarBackground(),
-                blend(surface, foreground, 0.18), foreground,
-                AccessibilitySupport.readableText(blend(foreground, surface, 0.42), surface), config.getCaretColor(),
+            return new DialogTheme(surface, config.getRaisedSurfaceColor(), config.getFloatingSurfaceColor(),
+                config.getSubtleBorderColor(), foreground, config.getMutedForegroundColor(), config.getFocusColor(),
                 config.getSelectionColor(), config.getSelectionTextColor());
         }
     }
@@ -102,30 +99,20 @@ final class SettingsEditorDialog extends JDialog {
         AccessibilitySupport.describe(search, "Search settings", "Filter settings by name, category, or description.");
         panel.add(searchLabel, BorderLayout.WEST);
         panel.add(search, BorderLayout.CENTER);
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
-        JButton file = new JButton("Open TOML");
-        file.addActionListener(event -> editor.openSettingsBuffer());
-        actions.add(file);
-        JButton snippets = new JButton("Open Snippets");
-        snippets.addActionListener(event -> editor.openSnippetsBuffer());
-        actions.add(snippets);
-        JButton languageServices = new JButton("Language Services");
-        languageServices.addActionListener(event -> editor.showLanguageServices());
-        actions.add(languageServices);
-        panel.add(actions, BorderLayout.EAST);
         return panel;
     }
 
     private JPanel content() {
         categories.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        categories.setFixedCellHeight(uiPixels(40));
         AccessibilitySupport.describe(categories, "Settings categories", "Select a category of typed Shed settings.");
         JScrollPane left = new JScrollPane(categories);
-        left.setBorder(titledBorder("Categories"));
+        left.setBorder(BorderFactory.createEmptyBorder(uiPixels(8), uiPixels(8), uiPixels(8), uiPixels(8)));
         left.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         left.setPreferredSize(new Dimension(uiPixels(180), uiPixels(400)));
         JScrollPane right = new JScrollPane(settings);
         settingsScroll = right;
-        right.setBorder(titledBorder("Settings"));
+        right.setBorder(BorderFactory.createEmptyBorder(uiPixels(8), uiPixels(4), uiPixels(8), uiPixels(12)));
         right.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         right.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override public void componentResized(java.awt.event.ComponentEvent event) { updateDetailWidths(); }
@@ -140,9 +127,20 @@ final class SettingsEditorDialog extends JDialog {
 
     private JPanel actions() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JLabel note = new JLabel("Changes save immediately to ~/.shed/config.toml");
+        JLabel note = new JLabel("Changes save automatically");
+        note.putClientProperty("shed.muted", true);
         note.setHorizontalAlignment(SwingConstants.LEFT);
         panel.add(note);
+        JPanel actions = panel;
+        JButton file = new JButton("Open TOML");
+        file.addActionListener(event -> editor.openSettingsBuffer());
+        actions.add(file);
+        JButton snippets = new JButton("Open Snippets");
+        snippets.addActionListener(event -> editor.openSnippetsBuffer());
+        actions.add(snippets);
+        JButton languageServices = new JButton("Language Services");
+        languageServices.addActionListener(event -> editor.showLanguageServices());
+        actions.add(languageServices);
         JButton reload = new JButton("Reload TOML");
         reload.addActionListener(event -> { editor.reloadConfigFromDisk(); populateCategories(); refresh(); });
         panel.add(reload);
@@ -254,8 +252,8 @@ final class SettingsEditorDialog extends JDialog {
         JPanel panel = new JPanel(new BorderLayout(0, uiPixels(4)));
         panel.setOpaque(true);
         panel.setBackground(theme.surface());
-        panel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, editor.configManager.getStatusBarBackground()),
-            BorderFactory.createEmptyBorder(uiPixels(7), uiPixels(9), uiPixels(7), uiPixels(9))));
+        panel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, editor.configManager.getSubtleBorderColor()),
+            BorderFactory.createEmptyBorder(uiPixels(12), uiPixels(12), uiPixels(12), uiPixels(12))));
         JPanel top = new JPanel(new BorderLayout(0, uiPixels(3)));
         top.setOpaque(false);
         JLabel name = new JLabel(descriptor.key());
@@ -264,12 +262,16 @@ final class SettingsEditorDialog extends JDialog {
         name.setLabelFor(input);
         AccessibilitySupport.describe(input, descriptor.key(), descriptor.description() + " Current value: " + descriptor.currentValue());
         input.putClientProperty("shed.setting.key", descriptor.key());
-        top.add(name, BorderLayout.NORTH);
+        if (input instanceof JCheckBox box) box.setText(descriptor.key());
+        else top.add(name, BorderLayout.NORTH);
         top.add(input, BorderLayout.CENTER);
         panel.add(top, BorderLayout.NORTH);
-        String detailText = descriptor.description() + "  Default: " + descriptor.defaultValue()
-            + "  " + descriptor.allowedValues() + "  " + descriptor.applyBehavior();
-        JLabel detail = new JLabel("<html>" + escape(detailText) + "</html>");
+        String defaultValue = descriptor.defaultValue();
+        String shownDefault = defaultValue.length() > 70 ? defaultValue.substring(0, 67) + "…" : defaultValue;
+        String detailText = descriptor.description() + " Default: " + defaultValue + ". " + descriptor.applyBehavior();
+        JLabel detail = new JLabel("<html>" + escape(descriptor.description()) + "<br>Default: "
+            + escape(shownDefault) + " · " + escape(descriptor.applyBehavior()) + "</html>");
+        detail.setToolTipText(detailText);
         detail.putClientProperty("shed.setting.description", Boolean.TRUE);
         AccessibilitySupport.describe(detail, descriptor.key() + " description", detailText);
         detail.setVerticalAlignment(SwingConstants.TOP);
@@ -357,102 +359,8 @@ final class SettingsEditorDialog extends JDialog {
         return UiZoom.scale(value, editor.configManager.getUiZoom());
     }
 
-    private TitledBorder titledBorder(String title) {
-        TitledBorder border = BorderFactory.createTitledBorder(BorderFactory.createLineBorder(theme.border()), title);
-        border.setTitleColor(theme.foreground());
-        return border;
-    }
-
     private void applyTheme(Component component) {
-        if (component == null) return;
-        if (component instanceof JPanel panel) {
-            panel.setOpaque(true);
-            panel.setBackground(theme.surface());
-            panel.setForeground(theme.foreground());
-        }
-        if (component instanceof JLabel label) label.setForeground(
-            Boolean.TRUE.equals(label.getClientProperty("shed.setting.description")) ? theme.muted() : theme.foreground());
-        if (component instanceof JButton button) {
-            boolean comboArrow = Boolean.TRUE.equals(button.getClientProperty("shed.setting.combo.arrow"));
-            if (comboArrow) button.setUI(new BasicButtonUI());
-            button.setOpaque(true);
-            button.setContentAreaFilled(true);
-            button.setBackground(theme.raised());
-            button.setForeground(theme.foreground());
-            button.setBorder(comboArrow ? BorderFactory.createLineBorder(theme.border())
-                : BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(theme.border()),
-                    BorderFactory.createEmptyBorder(uiPixels(4), uiPixels(9), uiPixels(4), uiPixels(9))));
-        }
-        if (component instanceof JTextField field) {
-            field.setOpaque(true);
-            field.setBackground(theme.field());
-            field.setForeground(theme.foreground());
-            field.setCaretColor(theme.accent());
-            field.setSelectionColor(theme.selection());
-            field.setSelectedTextColor(theme.selectionText());
-            field.setBorder(BorderFactory.createLineBorder(theme.border()));
-        }
-        if (component instanceof JCheckBox box) {
-            box.setOpaque(true);
-            box.setBackground(theme.surface());
-            box.setForeground(theme.foreground());
-        }
-        if (component instanceof JComboBox<?> combo) {
-            combo.setUI(new BasicComboBoxUI() {
-                @Override protected JButton createArrowButton() {
-                    JButton arrow = new JButton() {
-                        @Override protected void paintComponent(java.awt.Graphics graphics) {
-                            super.paintComponent(graphics);
-                            java.awt.Graphics2D brush = (java.awt.Graphics2D) graphics.create();
-                            try {
-                                brush.setColor(getForeground());
-                                int x = getWidth() / 2;
-                                int y = getHeight() / 2;
-                                brush.drawLine(x - 4, y - 2, x, y + 2);
-                                brush.drawLine(x, y + 2, x + 4, y - 2);
-                            } finally {
-                                brush.dispose();
-                            }
-                        }
-                    };
-                    arrow.putClientProperty("shed.setting.combo.arrow", Boolean.TRUE);
-                    arrow.setFocusable(false);
-                    arrow.setPreferredSize(new Dimension(uiPixels(24), uiPixels(24)));
-                    return arrow;
-                }
-            });
-            combo.setOpaque(true);
-            combo.setBackground(theme.field());
-            combo.setForeground(theme.foreground());
-            combo.setBorder(BorderFactory.createLineBorder(theme.border()));
-        }
-        if (component instanceof JList<?> list) {
-            list.setBackground(theme.raised());
-            list.setForeground(theme.foreground());
-            list.setSelectionBackground(theme.selection());
-            list.setSelectionForeground(theme.selectionText());
-        }
-        if (component instanceof JScrollPane scroll) {
-            scroll.setBackground(theme.surface());
-            scroll.getViewport().setBackground(theme.surface());
-            scroll.getHorizontalScrollBar().setBackground(theme.raised());
-            scroll.getVerticalScrollBar().setBackground(theme.raised());
-        }
-        if (component instanceof JSplitPane split) split.setBackground(theme.surface());
-        if (component instanceof JComponent swing && swing.getBorder() instanceof TitledBorder border) {
-            border.setTitleColor(theme.foreground());
-        }
-        if (component instanceof java.awt.Container container) {
-            for (Component child : container.getComponents()) applyTheme(child);
-        }
-        component.repaint();
-    }
-
-    private static Color blend(Color first, Color second, double amount) {
-        double ratio = Math.max(0.0, Math.min(1.0, amount));
-        return new Color((int) Math.round(first.getRed() * (1.0 - ratio) + second.getRed() * ratio),
-            (int) Math.round(first.getGreen() * (1.0 - ratio) + second.getGreen() * ratio),
-            (int) Math.round(first.getBlue() * (1.0 - ratio) + second.getBlue() * ratio));
+        editor.editorUiController.applyUiTheme(component);
     }
 
     private static String escape(String value) {

@@ -59,7 +59,7 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
     @Override public JPanel component() { return panel; }
 
     private JPanel toolbar() {
-        JPanel panel = new JPanel(new BorderLayout(6, 0));
+        JPanel panel = new JPanel(new BorderLayout(6, 4));
         JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         controls.add(new JLabel("Root")); controls.add(roots);
         controls.add(button("Refresh", () -> message(editor.testController.refresh(editor.testController.selectedRoot()).message())));
@@ -75,8 +75,8 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
         controls.add(button("Import Coverage…", this::importCoverage));
         controls.add(button("Clear Coverage", () -> message(editor.testController.clearCoverage(editor.testController.selectedRoot()))));
         controls.add(new JLabel("Show")); controls.add(status); controls.add(filter);
-        panel.add(controls, BorderLayout.WEST);
-        panel.add(state, BorderLayout.CENTER);
+        panel.add(controls, BorderLayout.CENTER);
+        panel.add(state, BorderLayout.SOUTH);
         return panel;
     }
 

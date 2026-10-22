@@ -92,7 +92,7 @@ final class ProblemsToolPanel implements ToolWindowHost.ToolSurface {
         left.add(severity);
         left.add(button("Refresh", this::refresh));
         left.add(button("Open", this::openSelected));
-        toolbar.add(left, BorderLayout.WEST);
+        toolbar.add(left, BorderLayout.CENTER);
         return toolbar;
     }
 

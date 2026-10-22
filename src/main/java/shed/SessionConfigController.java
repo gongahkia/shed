@@ -1388,14 +1388,9 @@ final class SessionConfigController {
             return "No recent files";
         }
 
-        StringBuilder builder = new StringBuilder();
-        builder.append("Recent files\n\n");
-        for (int i = 0; i < editor.recentFiles.size(); i++) {
-            builder.append(i + 1).append(". ").append(editor.recentFiles.get(i)).append("\n");
-        }
-        builder.append("\nuse :e <path> to reopen a file.");
-        openScratchBuffer("[recent files]", builder.toString(), true);
-        return "Showing recent files";
+        Map<String, File> files = new LinkedHashMap<>();
+        for (String path : editor.recentFiles) files.put(path, new File(path));
+        return editor.paletteController.showFilePicker("Recent Files", files);
     }
 
     void handleQuit(boolean force) {

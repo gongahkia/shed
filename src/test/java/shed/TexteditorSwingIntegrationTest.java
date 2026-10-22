@@ -43,6 +43,148 @@ public class TexteditorSwingIntegrationTest {
     Path tempDir;
 
     @Test
+    void quickOpenNavigatesToLocationAndRecentPickerPreservesTheSourceOnCancel() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-quick-open"));
+        Path source = tempDir.resolve("picker-source.txt");
+        Path target = tempDir.resolve("picker-target.txt");
+        Files.writeString(source, "one\ntwo\nthree");
+        Files.writeString(target, "alpha\nbeta\ngamma");
+        Texteditor editor = createEditor(home, source);
+        try {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            while (onEdt(() -> editor.stagedStartupPending) && System.nanoTime() < deadline) Thread.sleep(40);
+            assertFalse(onEdt(() -> editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.writingArea.append(" unsaved");
+                editor.writingArea.setCaretPosition(5);
+                return drivePicker(editor, "Find File", dialog -> {
+                    var field = descendants(dialog, javax.swing.JTextField.class).getFirst();
+                    field.setText("picker-target.txt:2:999");
+                    // Let the normal debounce finish, then accept from the results list.
+                    javax.swing.Timer accept = new javax.swing.Timer(50, event -> {
+                        if (!dialog.isDisplayable()) { ((javax.swing.Timer) event.getSource()).stop(); return; }
+                        var list = descendants(dialog, javax.swing.JList.class).getFirst();
+                        if (list.getSelectedValue() == null) return;
+                        ((javax.swing.Timer) event.getSource()).stop();
+                        list.requestFocusInWindow();
+                        Object key = list.getInputMap().get(javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0));
+                        list.getActionMap().get(key).actionPerformed(new ActionEvent(list, 0, "enter"));
+                    });
+                    accept.start();
+                }, () -> editor.paletteController.showFilePicker("Find File", java.util.Map.of(
+                    "picker-source.txt", source.toFile(), "picker-target.txt", target.toFile())));
+            });
+            assertTrue(awaitCurrentFile(editor, target));
+            assertEquals(10, onEdt(() -> editor.writingArea.getCaretPosition()));
+            onEdt(() -> {
+                editor.commandHandler.execute("back");
+                assertEquals(source.toFile(), editor.getCurrentBuffer().getFile());
+                assertEquals(5, editor.writingArea.getCaretPosition());
+                FileBuffer original = editor.getCurrentBuffer();
+                int count = editor.buffers.size();
+                assertEquals("Recent Files cancelled", drivePicker(editor, "Recent Files", Window::dispose, editor::showRecentFiles));
+                assertSame(original, editor.getCurrentBuffer());
+                assertEquals(count, editor.buffers.size());
+                assertTrue(editor.writingArea.getText().endsWith(" unsaved"));
+                Path missing = tempDir.resolve("deleted-recent.txt");
+                editor.recentFiles.addFirst(missing.toString());
+                String result = drivePicker(editor, "Recent Files", dialog -> {
+                    var field = descendants(dialog, javax.swing.JTextField.class).getFirst();
+                    field.setText("deleted-recent.txt");
+                    field.postActionEvent();
+                }, editor::showRecentFiles);
+                assertTrue(result.startsWith("File is no longer available:"), result);
+                assertSame(original, editor.getCurrentBuffer());
+                assertEquals(count, editor.buffers.size());
+                assertFalse(Files.exists(missing));
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    private static String drivePicker(Texteditor editor, String title,
+                                      java.util.function.Consumer<javax.swing.JDialog> action,
+                                      Callable<String> open) throws Exception {
+        boolean[] timedOut = {false};
+        javax.swing.Timer driver = new javax.swing.Timer(100, event -> {
+            for (Window window : editor.getOwnedWindows()) {
+                if (window instanceof javax.swing.JDialog dialog && dialog.isShowing() && title.equals(dialog.getTitle())) {
+                    ((javax.swing.Timer) event.getSource()).stop();
+                    action.accept(dialog);
+                }
+            }
+        });
+        javax.swing.Timer timeout = new javax.swing.Timer(10000, event -> {
+            timedOut[0] = true;
+            for (Window window : editor.getOwnedWindows()) {
+                if (window instanceof javax.swing.JDialog dialog && title.equals(dialog.getTitle())) dialog.dispose();
+            }
+        });
+        timeout.setRepeats(false);
+        driver.start(); timeout.start();
+        try {
+            String result = open.call();
+            assertFalse(timedOut[0], "Picker interaction timed out: " + title);
+            return result;
+        } finally { driver.stop(); timeout.stop(); }
+    }
+
+    @Test
+    void paletteAcceptsLatestQueryAndCanDismissFromResultsFocus() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEmptyEditor(Files.createDirectories(tempDir.resolve("home-picker")));
+        try {
+            long startupDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            while (onEdt(() -> editor.stagedStartupPending) && System.nanoTime() < startupDeadline) Thread.sleep(40);
+            assertFalse(onEdt(() -> editor.stagedStartupPending));
+            String selected = onEdt(() -> {
+                javax.swing.Timer enter = new javax.swing.Timer(100, event -> {
+                    for (Window window : editor.getOwnedWindows()) {
+                        if (window instanceof javax.swing.JDialog dialog && dialog.isShowing()
+                            && dialog.getTitle().equals("Picker regression")) {
+                            ((javax.swing.Timer) event.getSource()).stop();
+                            var field = descendants(dialog, javax.swing.JTextField.class).getFirst();
+                            field.setText("beta");
+                            field.postActionEvent();
+                        }
+                    }
+                });
+                javax.swing.Timer timeout = new javax.swing.Timer(10000, event -> {
+                    for (Window window : editor.getOwnedWindows()) if (window.isShowing()) {
+                        window.dispose();
+                    }
+                });
+                timeout.setRepeats(false);
+                enter.start(); timeout.start();
+                try { return editor.showPaletteDialog("Picker regression", List.of("alpha", "beta")); }
+                finally { enter.stop(); timeout.stop(); }
+            });
+            assertEquals("beta", selected);
+            String dismissed = onEdt(() -> {
+                javax.swing.Timer escape = new javax.swing.Timer(100, event -> {
+                    for (Window window : editor.getOwnedWindows()) {
+                        if (window instanceof javax.swing.JDialog dialog && dialog.isShowing()
+                            && dialog.getTitle().equals("Picker escape")) {
+                            ((javax.swing.Timer) event.getSource()).stop();
+                            descendants(dialog, javax.swing.JList.class).getFirst().requestFocusInWindow();
+                            var root = dialog.getRootPane();
+                            Object key = root.getInputMap(javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW)
+                                .get(javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0));
+                            if (key == null) { dialog.dispose(); throw new AssertionError("No dialog-wide Escape binding"); }
+                            root.getActionMap().get(key).actionPerformed(new ActionEvent(root, 0, "escape"));
+                        }
+                    }
+                });
+                escape.start();
+                try { return editor.showPaletteDialog("Picker escape", List.of("alpha")); }
+                finally { escape.stop(); }
+            });
+            assertEquals(null, dismissed);
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void navigationHistoryReturnsAcrossDocumentsAndBranchesAfterNewJumps() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-navigation"));

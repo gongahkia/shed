@@ -121,16 +121,7 @@ final class TreeGitController {
     }
 
     private String openFinder(Map<String, File> files) {
-        if (files.isEmpty()) return "No files found";
-        Map<String, String> labels = new LinkedHashMap<>();
-        for (String label : files.keySet()) labels.put(label, files.get(label).getPath());
-        String selected = editor.showPaletteDialog("Find File", new ArrayList<>(files.keySet()),
-            FileFinderIcons.renderer(editor, labels));
-        if (selected == null) return "File finder cancelled";
-        File file = files.get(selected);
-        if (file == null) return "File finder selection is unavailable";
-        editor.openFileAsync(file);
-        return "Opening: " + selected;
+        return editor.paletteController.showFilePicker("Find File", files);
     }
 
 

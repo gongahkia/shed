@@ -1,8 +1,6 @@
 package shed;
 
 import javax.swing.*;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
 import java.awt.*;
 import java.io.*;
@@ -14,6 +12,7 @@ import java.util.List;
 final class PaletteController {
     private static final int PALETTE_RESULT_LIMIT = 200;
     private record PaletteAction(String label, String command, String description) { }
+    private record PaletteSelection(String value, String query) { }
 
     /*
      * Keep surface actions separate from raw Ex commands. A top-level command such as
@@ -823,6 +822,54 @@ final class PaletteController {
 
     private String showPaletteDialog(String title, List<String> candidates, PalettePreviewProvider previewProvider,
                                      ListCellRenderer<? super String> renderer) {
+        PaletteSelection selected = showPicker(title, candidates, previewProvider, renderer,
+            query -> editor.fuzzyMatchService.matchStrings(query, candidates, PALETTE_RESULT_LIMIT), null);
+        return selected == null ? null : selected.value();
+    }
+
+    String showFilePicker(String title, Map<String, File> files) {
+        if (files.isEmpty()) return "No files found";
+        Map<String, String> paths = new LinkedHashMap<>();
+        Map<String, String> labelsByPath = new HashMap<>();
+        files.forEach((label, file) -> {
+            paths.put(label, file.getPath());
+            labelsByPath.put(file.toPath().toAbsolutePath().normalize().toString(), label);
+        });
+        Set<String> ordered = new LinkedHashSet<>();
+        for (String recent : editor.recentFiles) {
+            String label = labelsByPath.get(new File(recent).toPath().toAbsolutePath().normalize().toString());
+            if (label != null) ordered.add(label);
+        }
+        ordered.addAll(files.keySet());
+        List<String> candidates = List.copyOf(ordered);
+        FileBuffer current = editor.getCurrentBuffer();
+        String currentLabel = current == null || current.getFile() == null ? null
+            : labelsByPath.get(current.getFile().toPath().toAbsolutePath().normalize().toString());
+        PaletteSelection selection = showPicker(title, candidates, null, FileFinderIcons.renderer(editor, paths), query -> {
+            // An exact real filename wins over the optional location syntax (valid on POSIX).
+            if (files.containsKey(query)) return List.of(query);
+            QuickOpenQuery parsed = QuickOpenQuery.parse(query);
+            if (parsed.hasLocation() && parsed.fileQuery().isEmpty()) {
+                return currentLabel == null ? List.of() : List.of(currentLabel);
+            }
+            return editor.fuzzyMatchService.matchPathStrings(parsed.fileQuery(), candidates, PALETTE_RESULT_LIMIT);
+        }, "File name · file:line:column · :line for the current file");
+        if (selection == null) return title + " cancelled";
+        File file = files.get(selection.value());
+        if (file == null) return "File selection is unavailable";
+        if (editor.paneBufferController.findBufferByPath(file) == null && !file.isFile()) {
+            return "File is no longer available: " + file.getPath();
+        }
+        QuickOpenQuery query = files.containsKey(selection.query())
+            ? new QuickOpenQuery(selection.query(), 0, 0) : QuickOpenQuery.parse(selection.query());
+        if (query.hasLocation()) return editor.openFileAtAsync(file, query.line(), query.column(), "Opened: " + selection.value());
+        editor.openFileAsync(file);
+        return "Opening: " + selection.value();
+    }
+
+    private PaletteSelection showPicker(String title, List<String> candidates, PalettePreviewProvider previewProvider,
+                                        ListCellRenderer<? super String> renderer,
+                                        java.util.function.Function<String, List<String>> matcher, String hint) {
         // undecorated modal dialog styled as floating picker
         JDialog dialog = new JDialog(editor, title, true);
         dialog.setUndecorated(true);
@@ -885,58 +932,34 @@ final class PaletteController {
             previewArea.setText(preview == null ? "" : preview);
             previewArea.setCaretPosition(0);
         };
-        final long[] filterVersion = { 0 };
-        final SwingWorker<?, ?>[] activeFilter = { null };
-        javax.swing.Timer filterTimer = new javax.swing.Timer(75, event -> {
-            String query = filterField.getText();
-            long version = filterVersion[0];
-            activeFilter[0] = new SwingWorker<List<String>, Void>() {
-                @Override protected List<String> doInBackground() {
-                    return editor.fuzzyMatchService.matchStrings(query, candidates, PALETTE_RESULT_LIMIT);
-                }
-                @Override protected void done() {
-                    if (isCancelled() || version != filterVersion[0] || !dialog.isDisplayable()) return;
-                    try {
-                        model.clear();
-                        for (String match : get()) model.addElement(match);
-                        if (!model.isEmpty()) list.setSelectedIndex(0);
-                        syncPreview.run();
-                    } catch (Exception ignored) { }
-                }
-            };
-            activeFilter[0].execute();
+        list.addListSelectionListener(event -> {
+            if (!event.getValueIsAdjusting()) syncPreview.run();
         });
-        filterTimer.setRepeats(false);
-        filterField.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { refilter(); }
-            public void removeUpdate(DocumentEvent e) { refilter(); }
-            public void changedUpdate(DocumentEvent e) { refilter(); }
-            private void refilter() {
-                filterVersion[0]++;
-                if (activeFilter[0] != null) activeFilter[0].cancel(true);
-                filterTimer.restart();
-            }
+        final PaletteSelection[] selection = new PaletteSelection[1];
+        JLabel status = new JLabel();
+        status.setFont(uiFont);
+        status.setForeground(editor.configManager.getCommandBarForeground());
+        status.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        AccessibilitySupport.describe(status, title + " status", "Current filter progress and result count.");
+        PaletteFilterController filtering = new PaletteFilterController(filterField, list, status,
+            matcher, (value, query) -> { selection[0] = new PaletteSelection(value, query); dialog.dispose(); });
+        dialog.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+            .put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0), "dismiss");
+        dialog.getRootPane().getActionMap().put("dismiss", new AbstractAction() {
+            public void actionPerformed(java.awt.event.ActionEvent event) { dialog.dispose(); }
         });
-        list.addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                syncPreview.run();
-            }
-        });
-        final String[] selection = new String[1];
-        list.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent e) { if (e.getClickCount() == 2) { selection[0] = list.getSelectedValue(); dialog.dispose(); } }
-        });
-        filterField.addActionListener(e -> { selection[0] = list.getSelectedValue(); dialog.dispose(); });
-        filterField.addKeyListener(new java.awt.event.KeyAdapter() {
-            public void keyPressed(java.awt.event.KeyEvent e) {
-                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) dialog.dispose();
-                else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_DOWN) { int idx = list.getSelectedIndex(); if (idx < model.getSize() - 1) list.setSelectedIndex(idx + 1); e.consume(); }
-                else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_UP) { int idx = list.getSelectedIndex(); if (idx > 0) list.setSelectedIndex(idx - 1); e.consume(); }
-            }
-        });
+        dialog.add(status, BorderLayout.SOUTH);
         JPanel header = new JPanel(new BorderLayout());
         header.setOpaque(false);
         header.add(titleLabel, BorderLayout.NORTH);
+        if (hint != null) {
+            JLabel guidance = new JLabel(hint);
+            guidance.setForeground(editor.configManager.getCommandBarForeground());
+            guidance.setFont(uiFont);
+            guidance.setBorder(BorderFactory.createEmptyBorder(2, 8, 4, 8));
+            header.add(guidance, BorderLayout.CENTER);
+            filterField.getAccessibleContext().setAccessibleDescription(hint);
+        }
         header.add(filterField, BorderLayout.SOUTH);
         dialog.add(header, BorderLayout.NORTH);
         JScrollPane sp = new JScrollPane(list) {
@@ -953,8 +976,7 @@ final class PaletteController {
         dialog.pack();
         dialog.setLocationRelativeTo(editor);
         dialog.setVisible(true);
-        filterTimer.stop();
-        if (activeFilter[0] != null) activeFilter[0].cancel(true);
+        filtering.close();
         return selection[0];
     }
 

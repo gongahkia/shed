@@ -30,6 +30,7 @@ final class ShedMenuBar {
         item(file, "New File", KeyEvent.VK_N, commandMask, () -> action(PlainKeymap.Action.NEW));
         item(file, "Open File…", KeyEvent.VK_O, commandMask, editor::openFileChooser);
         item(file, "Open Folder…", KeyEvent.VK_O, commandMask | InputEvent.SHIFT_DOWN_MASK, () -> show(editor.openFolder()));
+        item(file, "Recent Files…", -1, 0, () -> show(editor.showRecentFiles()));
         file.addSeparator();
         item(file, "Save", KeyEvent.VK_S, commandMask, () -> action(PlainKeymap.Action.SAVE));
         item(file, "Save As…", KeyEvent.VK_S, commandMask | InputEvent.SHIFT_DOWN_MASK, () -> action(PlainKeymap.Action.SAVE_AS));

@@ -1,13 +1,17 @@
 package shed;
 
+import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Rectangle;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import javax.swing.AbstractAction;
@@ -50,7 +54,7 @@ final class GitGraphDialog extends JDialog {
         super(editor, "Git Graph", false);
         this.editor = editor;
         this.loader = loader;
-        this.graph = new GraphCanvas(editor, this::showCommit);
+        this.graph = new GraphCanvas(editor.configManager, editor::resolveUiFont, this::showCommit);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));
@@ -161,33 +165,33 @@ final class GitGraphDialog extends JDialog {
         return area;
     }
 
-    private static final class GraphCanvas extends JComponent {
-        private static final int ROW_HEIGHT = 30;
-        private static final int LANE_SPACING = 19;
-        private static final int GRAPH_LEFT = 16;
-        private static final Color[] LANE_COLORS = {
-            new Color(235, 97, 97), new Color(79, 190, 229), new Color(116, 207, 109), new Color(243, 190, 74),
-            new Color(186, 117, 232), new Color(242, 137, 185), new Color(101, 205, 187), new Color(221, 141, 69)
-        };
-
-        private final Texteditor editor;
+    static final class GraphCanvas extends JComponent {
+        private final ConfigManager config;
+        private final java.util.function.Supplier<Font> fontSupplier;
         private final java.util.function.Consumer<GitGraphModel.Commit> selectionListener;
-        private final Font textFont = new Font(Font.MONOSPACED, Font.PLAIN, 14);
-        private final Font hashFont = new Font(Font.MONOSPACED, Font.BOLD, 14);
+        private Font textFont() { return fontSupplier.get(); }
+        private int px(int value) { return UiZoom.scale(value, config.getUiZoom()); }
+        private int rowHeight() { return Math.max(px(40), getFontMetrics(textFont()).getHeight() + px(12)); }
         private GitGraphModel.Snapshot snapshot = GitGraphModel.unavailable("");
         private int selected = -1;
 
-        GraphCanvas(Texteditor editor, java.util.function.Consumer<GitGraphModel.Commit> selectionListener) {
-            this.editor = editor;
+        GraphCanvas(ConfigManager config, java.util.function.Supplier<Font> fontSupplier,
+                    java.util.function.Consumer<GitGraphModel.Commit> selectionListener) {
+            this.config = config;
+            this.fontSupplier = fontSupplier;
             this.selectionListener = selectionListener;
             setFocusable(true);
             setOpaque(true);
-            setBackground(editor.configManager.getNormalColor());
+            setBackground(config.getNormalColor());
             AccessibilitySupport.describe(this, "Git commit graph", "Colored local Git commit topology. Arrow keys select commits.");
+            addFocusListener(new FocusAdapter() {
+                @Override public void focusGained(FocusEvent event) { repaint(); }
+                @Override public void focusLost(FocusEvent event) { repaint(); }
+            });
             addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent event) {
-                    select(event.getY() / ROW_HEIGHT);
+                    select(event.getY() / rowHeight());
                     requestFocusInWindow();
                 }
             });
@@ -204,7 +208,7 @@ final class GitGraphDialog extends JDialog {
         void setSnapshot(GitGraphModel.Snapshot snapshot) {
             this.snapshot = snapshot == null ? GitGraphModel.unavailable("") : snapshot;
             selected = -1;
-            setBackground(editor.configManager.getNormalColor());
+            setBackground(config.getNormalColor());
             revalidate();
             repaint();
         }
@@ -213,6 +217,7 @@ final class GitGraphDialog extends JDialog {
             if (index < 0 || index >= snapshot.rows().size()) return;
             selected = index;
             selectionListener.accept(snapshot.rows().get(index).commit());
+            scrollRectToVisible(new Rectangle(getVisibleRect().x, index * rowHeight(), 1, rowHeight()));
             repaint();
         }
 
@@ -220,12 +225,17 @@ final class GitGraphDialog extends JDialog {
         public Dimension getPreferredSize() {
             int graphWidth = graphWidth();
             int widest = 0;
-            FontMetrics metrics = getFontMetrics(textFont);
+            Font font = textFont();
+            FontMetrics metrics = getFontMetrics(font);
+            FontMetrics hashMetrics = getFontMetrics(font.deriveFont(Font.BOLD));
             for (GitGraphModel.Row row : snapshot.rows()) {
-                String text = row.commit().timestamp() + "  " + row.commit().decorations() + "  " + row.commit().shortHash() + "  " + row.commit().subject();
-                widest = Math.max(widest, metrics.stringWidth(text));
+                GitGraphModel.Commit commit = row.commit();
+                int width = metrics.stringWidth(commit.timestamp()) + px(16)
+                    + hashMetrics.stringWidth(commit.shortHash()) + px(16) + metrics.stringWidth(commit.subject());
+                if (!commit.decorations().isBlank()) width += metrics.stringWidth(commit.decorations()) + px(16);
+                widest = Math.max(widest, width);
             }
-            return new Dimension(Math.max(760, graphWidth + widest + 36), Math.max(1, snapshot.rows().size()) * ROW_HEIGHT);
+            return new Dimension(Math.max(px(760), graphWidth + widest + px(36)), Math.max(1, snapshot.rows().size()) * rowHeight());
         }
 
         @Override
@@ -233,20 +243,31 @@ final class GitGraphDialog extends JDialog {
             super.paintComponent(graphics);
             Graphics2D g = (Graphics2D) graphics.create();
             try {
+                g.setColor(config.getNormalColor());
+                g.fillRect(0, 0, getWidth(), getHeight());
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                for (int index = 0; index < snapshot.rows().size(); index++) drawRow(g, snapshot.rows().get(index), index);
+                g.setStroke(new BasicStroke(Math.max(1f, (float) config.getUiZoom())));
+                int rowHeight = rowHeight();
+                Font font = textFont();
+                Rectangle clip = g.getClipBounds();
+                int first = clip == null ? 0 : Math.max(0, clip.y / rowHeight);
+                int last = clip == null ? snapshot.rows().size() : Math.min(snapshot.rows().size(), (clip.y + clip.height) / rowHeight + 1);
+                for (int index = first; index < last; index++) drawRow(g, snapshot.rows().get(index), index, rowHeight, font);
             } finally {
                 g.dispose();
             }
         }
 
-        private void drawRow(Graphics2D g, GitGraphModel.Row row, int index) {
-            int top = index * ROW_HEIGHT;
-            int middle = top + ROW_HEIGHT / 2;
-            int bottom = top + ROW_HEIGHT;
+        private void drawRow(Graphics2D g, GitGraphModel.Row row, int index, int rowHeight, Font font) {
+            int top = index * rowHeight;
+            int middle = top + rowHeight / 2;
+            int bottom = top + rowHeight;
             if (index == selected) {
-                g.setColor(editor.configManager.getCurrentLineHighlightColor());
-                g.fillRect(0, top, getWidth(), ROW_HEIGHT);
+                g.setColor(config.getCurrentLineHighlightColor());
+                g.fillRect(0, top, getWidth(), rowHeight);
+                g.setColor(config.getFocusColor());
+                g.fillRect(0, top, px(3), rowHeight);
+                if (hasFocus()) g.drawRect(0, top, getWidth() - 1, rowHeight - 1);
             }
             for (int lane = 0; lane < row.beforeLanes().size(); lane++) {
                 int x = laneX(lane);
@@ -262,28 +283,30 @@ final class GitGraphDialog extends JDialog {
                 if (target >= 0) drawLine(g, laneX(row.lane()), middle, laneX(target), bottom, target);
             }
             g.setColor(laneColor(row.lane()));
-            g.fillOval(laneX(row.lane()) - 5, middle - 5, 10, 10);
-            drawMetadata(g, row.commit(), graphWidth() + 8, middle + 5);
+            g.fillOval(laneX(row.lane()) - px(5), middle - px(5), px(10), px(10));
+            FontMetrics metrics = g.getFontMetrics(font);
+            int baseline = top + (rowHeight - metrics.getHeight()) / 2 + metrics.getAscent();
+            drawMetadata(g, row.commit(), graphWidth() + px(8), baseline, font);
         }
 
-        private void drawMetadata(Graphics2D g, GitGraphModel.Commit commit, int x, int baseline) {
-            g.setFont(textFont);
+        private void drawMetadata(Graphics2D g, GitGraphModel.Commit commit, int x, int baseline, Font font) {
+            g.setFont(font);
             FontMetrics metrics = g.getFontMetrics();
-            g.setColor(mutedColor());
+            g.setColor(config.getMutedForegroundColor());
             g.drawString(commit.timestamp(), x, baseline);
-            x += metrics.stringWidth(commit.timestamp()) + 16;
+            x += metrics.stringWidth(commit.timestamp()) + px(16);
             if (!commit.decorations().isBlank()) {
-                g.setColor(new Color(117, 207, 133));
+                g.setColor(config.getSyntaxStringColor());
                 g.drawString(commit.decorations(), x, baseline);
-                x += metrics.stringWidth(commit.decorations()) + 16;
+                x += metrics.stringWidth(commit.decorations()) + px(16);
             }
-            g.setFont(hashFont);
+            g.setFont(font.deriveFont(Font.BOLD));
             metrics = g.getFontMetrics();
-            g.setColor(editor.configManager.getCaretColor());
+            g.setColor(config.getCaretColor());
             g.drawString(commit.shortHash(), x, baseline);
-            x += metrics.stringWidth(commit.shortHash()) + 16;
-            g.setFont(textFont);
-            g.setColor(editor.configManager.getEditorForeground());
+            x += metrics.stringWidth(commit.shortHash()) + px(16);
+            g.setFont(font);
+            g.setColor(config.getEditorForeground());
             g.drawString(commit.subject(), x, baseline);
         }
 
@@ -293,22 +316,23 @@ final class GitGraphDialog extends JDialog {
         }
 
         private int graphWidth() {
-            return GRAPH_LEFT + Math.max(1, snapshot.laneCount()) * LANE_SPACING + 12;
+            return px(16) + Math.max(1, snapshot.laneCount()) * px(19) + px(12);
         }
 
         private int laneX(int lane) {
-            return GRAPH_LEFT + lane * LANE_SPACING;
+            return px(16) + lane * px(19);
         }
 
         private Color laneColor(int lane) {
-            return LANE_COLORS[Math.floorMod(lane, LANE_COLORS.length)];
-        }
-
-        private Color mutedColor() {
-            Color foreground = editor.configManager.getEditorForeground();
-            Color background = editor.configManager.getNormalColor();
-            return new Color((foreground.getRed() + background.getRed()) / 2, (foreground.getGreen() + background.getGreen()) / 2,
-                (foreground.getBlue() + background.getBlue()) / 2);
+            return switch (Math.floorMod(lane, 7)) {
+                case 0 -> config.getSyntaxKeywordColor();
+                case 1 -> config.getSyntaxTypeColor();
+                case 2 -> config.getSyntaxStringColor();
+                case 3 -> config.getSyntaxNumberColor();
+                case 4 -> config.getSyntaxFunctionColor();
+                case 5 -> config.getSyntaxAnnotationColor();
+                default -> config.getSyntaxConstantColor();
+            };
         }
     }
 }

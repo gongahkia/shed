@@ -16,6 +16,35 @@ public class WorkspaceReplaceServiceTest {
     Path tempDir;
 
     @Test
+    void appliesLongPrefixAndDifferentLengthReplacement() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("prefix"));
+        Path file = root.resolve("test.txt");
+        Files.writeString(file, "long prefix old old");
+        var service = new WorkspaceReplaceService(new WorkspaceIndexService(tempDir.resolve("index"), (r, p) -> false));
+        var preview = service.preview(false, root, "old", "x", WorkspaceIndexService.Cancellation.NONE);
+        service.apply(preview.plan(), WorkspaceIndexService.Cancellation.NONE);
+        assertEquals("long prefix x x", Files.readString(file));
+    }
+
+    @Test
+    void filteredRegexPreviewExpandsEachMatchAndHonorsSelection() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("regex"));
+        Path file = root.resolve("test.txt");
+        Files.writeString(file, "prefix A=1 bb=22");
+        Files.writeString(root.resolve("skip.java"), "c=3");
+        var service = new WorkspaceReplaceService(new WorkspaceIndexService(tempDir.resolve("index"), (r, p) -> false), 2);
+        var query = new WorkspaceSearchQuery(new SearchPattern("([a-z]+)=(\\d+)", false, true, true), "*.txt", "");
+        var preview = service.preview(false, List.of(root, root), query, "$2:$1", null, WorkspaceIndexService.Cancellation.NONE);
+        assertEquals(WorkspaceReplaceService.State.READY, preview.state());
+        assertFalse(preview.plan().truncated());
+        assertEquals(2, preview.plan().selectedMatchCount());
+        preview.plan().selectMatch(1, WorkspaceReplaceService.Selection.OFF);
+        service.apply(preview.plan(), WorkspaceIndexService.Cancellation.NONE);
+        assertEquals("prefix A=1 22:bb", Files.readString(file));
+        assertEquals("c=3", Files.readString(root.resolve("skip.java")));
+    }
+
+    @Test
     void previewsWithoutWritingAndAppliesSelectedFilesAndMatches() throws Exception {
         Path root = Files.createDirectory(tempDir.resolve("workspace"));
         Path first = root.resolve("first.txt");

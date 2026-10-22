@@ -17,6 +17,24 @@ public class WorkspaceTextSearchServiceTest {
     Path tempDir;
 
     @Test
+    void filtersAndDeduplicatesOverlappingRootsWithSharedMatchingOptions() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("options"));
+        Path nested = Files.createDirectory(root.resolve("nested"));
+        Files.writeString(nested.resolve("one.txt"), "CAT catapult cat_ cat\n");
+        Files.writeString(nested.resolve("skip.txt"), "cat");
+        Files.writeString(root.resolve("other.java"), "cat");
+        var index = new WorkspaceIndexService(tempDir.resolve("index"), (r, p) -> false);
+        var service = new WorkspaceTextSearchService(index, 2, 1);
+        var query = new WorkspaceSearchQuery(new SearchPattern("c.t", false, true, true), "**/*.txt", "skip.txt");
+        var result = service.search(false, List.of(root, nested), query, WorkspaceIndexService.Cancellation.NONE, null);
+        assertEquals(WorkspaceTextSearchService.State.COMPLETE, result.state());
+        assertEquals(List.of(1, 19), result.matches().stream().map(WorkspaceTextSearchService.Match::column).toList());
+        assertFalse(result.truncated());
+        Files.writeString(nested.resolve("one.txt"), "cat cat cat");
+        assertTrue(service.search(false, List.of(root), query, WorkspaceIndexService.Cancellation.NONE, null).truncated());
+    }
+
+    @Test
     void searchesAdHocGitIgnoreVisibleFilesIncrementallyWithExactLocations() throws Exception {
         Path root = Files.createDirectory(tempDir.resolve("workspace"));
         Files.writeString(root.resolve("visible.txt"), "alpha\nprefix needle needle\n", StandardCharsets.UTF_8);

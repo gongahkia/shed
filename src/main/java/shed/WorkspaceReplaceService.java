@@ -84,6 +84,63 @@ final class WorkspaceReplaceService {
         return new Preview(source, State.READY, new Plan(source, find, replace, files, nextMatchId - 1 >= maxMatches), "preview ready");
     }
 
+    Preview preview(boolean persistent, List<Path> roots, WorkspaceSearchQuery query, String replacement, Path scopeFile,
+                    WorkspaceIndexService.Cancellation cancellation) {
+        WorkspaceIndexService.Cancellation stop = cancellation == null ? WorkspaceIndexService.Cancellation.NONE : cancellation;
+        Source source = persistent ? Source.PERSISTENT_INDEX : Source.AD_HOC;
+        List<FilePlan> files = new ArrayList<>();
+        java.util.Set<Path> visited = new java.util.HashSet<>();
+        SearchFileFilter filter = new SearchFileFilter(query.include(), query.exclude());
+        java.util.regex.Pattern compiled = query.pattern().compile();
+        int nextMatch = 1;
+        boolean truncated = false;
+        try {
+            outer: for (Path workspace : roots) {
+                WorkspaceIndexService.BuildResult indexed = persistent
+                    ? indexService.recover(true, workspace, stop, WorkspaceIndexService.Observer.NO_OP)
+                    : indexService.scan(workspace, stop, WorkspaceIndexService.Observer.NO_OP);
+                if (stop.isCancelled()) throw new java.util.concurrent.CancellationException();
+                if (indexed.status().state() != WorkspaceIndexService.State.READY || indexed.index() == null)
+                    return new Preview(source, State.FAILED, null, indexed.status().message());
+                Path root = Path.of(indexed.index().root()).toAbsolutePath().normalize();
+                for (WorkspaceIndexService.Entry entry : indexed.index().entries()) {
+                    if (stop.isCancelled()) throw new java.util.concurrent.CancellationException();
+                    Path relative = Path.of(entry.relativePath());
+                    Path file = root.resolve(relative).normalize();
+                    if (!filter.accepts(relative) || !file.startsWith(root) || !readableRegularFile(file)
+                        || scopeFile != null && !WorkspaceRootResolver.normalizedIdentity(file).equals(WorkspaceRootResolver.normalizedIdentity(scopeFile))
+                        || !visited.add(WorkspaceRootResolver.normalizedIdentity(file))) continue;
+                    String content;
+                    try { content = Files.readString(file, StandardCharsets.UTF_8); }
+                    catch (IOException | SecurityException error) { continue; }
+                    if (content.indexOf('\0') >= 0) continue;
+                    java.util.regex.Matcher matcher = query.pattern().matcher(compiled, content, stop::isCancelled);
+                    List<MatchPlan> matches = new ArrayList<>();
+                    int previousEnd = 0;
+                    while (matcher.find()) {
+                        if (stop.isCancelled()) throw new java.util.concurrent.CancellationException();
+                        if (nextMatch > maxMatches) {
+                            if (!matches.isEmpty()) files.add(new FilePlan(files.size() + 1, file, content, matches));
+                            truncated = true; break outer;
+                        }
+                        StringBuilder expanded = new StringBuilder();
+                        matcher.appendReplacement(expanded, query.pattern().regex() ? replacement : java.util.regex.Matcher.quoteReplacement(replacement));
+                        String value = expanded.substring(matcher.start() - previousEnd);
+                        previousEnd = matcher.end();
+                        LineColumn location = lineColumn(content, matcher.start());
+                        matches.add(new MatchPlan(nextMatch++, matcher.start(), matcher.end() - matcher.start(), location.line(), location.column(),
+                            previewLine(content, matcher.start()) + " → " + value.replace('\n', ' '), true, value));
+                    }
+                    if (!matches.isEmpty()) files.add(new FilePlan(files.size() + 1, file, content, matches));
+                }
+            }
+        } catch (java.util.concurrent.CancellationException cancelled) { return new Preview(source, State.CANCELLED, null, "preview cancelled"); }
+        catch (IllegalArgumentException | IndexOutOfBoundsException | StackOverflowError error) {
+            return new Preview(source, State.FAILED, null, error instanceof StackOverflowError ? "Expression is too complex" : error.getMessage());
+        }
+        return new Preview(source, State.READY, new Plan(source, query.pattern().query(), replacement, files, truncated), "preview ready");
+    }
+
     ApplyResult apply(Plan plan, WorkspaceIndexService.Cancellation cancellation) {
         return apply(plan, cancellation, ApplyOptions.NO_BACKUP);
     }
@@ -155,7 +212,8 @@ final class WorkspaceReplaceService {
         int offset = 0;
         for (MatchPlan match : file.matches()) {
             updated.append(file.originalContent(), offset, match.offset());
-            updated.append(match.selected() ? replacement : file.originalContent(), match.offset(), match.offset() + match.length());
+            if (match.selected()) updated.append(match.replacement() == null ? replacement : match.replacement());
+            else updated.append(file.originalContent(), match.offset(), match.offset() + match.length());
             offset = match.offset() + match.length();
         }
         updated.append(file.originalContent(), offset, file.originalContent().length());
@@ -344,8 +402,13 @@ final class WorkspaceReplaceService {
         private final int column;
         private final String preview;
         private boolean selected;
+        private final String replacement;
 
         MatchPlan(int matchId, int offset, int length, int line, int column, String preview, boolean selected) {
+            this(matchId, offset, length, line, column, preview, selected, null);
+        }
+        MatchPlan(int matchId, int offset, int length, int line, int column, String preview, boolean selected, String replacement) {
+            this.replacement = replacement;
             this.matchId = matchId;
             this.offset = offset;
             this.length = length;
@@ -362,6 +425,7 @@ final class WorkspaceReplaceService {
         int column() { return column; }
         String preview() { return preview; }
         boolean selected() { return selected; }
+        String replacement() { return replacement; }
         void select(Selection selection) {
             selected = switch (selection) {
                 case ON -> true;
@@ -369,6 +433,6 @@ final class WorkspaceReplaceService {
                 case TOGGLE -> !selected;
             };
         }
-        MatchPlan copy() { return new MatchPlan(matchId, offset, length, line, column, preview, selected); }
+        MatchPlan copy() { return new MatchPlan(matchId, offset, length, line, column, preview, selected, replacement); }
     }
 }

@@ -29,125 +29,79 @@ final class WorkspaceTextSearchService {
         this.batchSize = positive(batchSize, "batchSize");
     }
 
-    SearchResult search(boolean persistentIndexEnabled, Path workspaceRoot, String query, WorkspaceIndexService.Cancellation cancellation,
-                        Observer observer) {
-        String needle = requireQuery(query);
-        WorkspaceIndexService.Cancellation effectiveCancellation = cancellation == null ? WorkspaceIndexService.Cancellation.NONE : cancellation;
-        Observer effectiveObserver = observer == null ? Observer.NO_OP : observer;
-        Source source = persistentIndexEnabled ? Source.PERSISTENT_INDEX : Source.AD_HOC;
-        WorkspaceIndexService.BuildResult indexed = persistentIndexEnabled
-            ? indexService.recover(true, workspaceRoot, effectiveCancellation, WorkspaceIndexService.Observer.NO_OP)
-            : indexService.scan(workspaceRoot, effectiveCancellation, WorkspaceIndexService.Observer.NO_OP);
-        if (indexed.status().state() == WorkspaceIndexService.State.CANCELLED) {
-            return new SearchResult(source, State.CANCELLED, List.of(), false, 0, 0, 0, indexed.status().message());
-        }
-        if (indexed.status().state() != WorkspaceIndexService.State.READY || indexed.index() == null) {
-            return new SearchResult(source, State.FAILED, List.of(), false, 0, 0, 0, indexed.status().message());
-        }
-
-        Path root = Path.of(indexed.index().root()).toAbsolutePath().normalize();
-        List<Match> matches = new ArrayList<>();
-        List<Match> batch = new ArrayList<>();
-        int filesRead = 0;
-        int unreadableFiles = 0;
-        boolean truncated = false;
-        for (WorkspaceIndexService.Entry entry : indexed.index().entries()) {
-            if (effectiveCancellation.isCancelled()) {
-                publish(batch, effectiveObserver);
-                return new SearchResult(source, State.CANCELLED, matches, false, filesRead, unreadableFiles, indexed.index().entries().size(),
-                    "search cancelled");
-            }
-            Path file = root.resolve(entry.relativePath()).normalize();
-            if (!file.startsWith(root) || !readableRegularFile(file)) {
-                unreadableFiles++;
-                continue;
-            }
-            try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-                filesRead++;
-                int lineNumber = 0;
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    lineNumber++;
-                    int offset = 0;
-                    while (offset < line.length()) {
-                        if (effectiveCancellation.isCancelled()) {
-                            publish(batch, effectiveObserver);
-                            return new SearchResult(source, State.CANCELLED, matches, false, filesRead, unreadableFiles,
-                                indexed.index().entries().size(), "search cancelled");
-                        }
-                        int matchOffset = line.indexOf(needle, offset);
-                        if (matchOffset < 0) {
-                            break;
-                        }
-                        if (matches.size() >= maxResults) {
-                            truncated = true;
-                            break;
-                        }
-                        Match match = new Match(file.toString(), lineNumber, matchOffset + 1, preview(line));
-                        matches.add(match);
-                        batch.add(match);
-                        if (batch.size() >= batchSize) {
-                            publish(batch, effectiveObserver);
-                        }
-                        offset = matchOffset + needle.length();
-                    }
-                    if (truncated) {
-                        break;
-                    }
-                }
-            } catch (IOException | SecurityException error) {
-                unreadableFiles++;
-            }
-            if (truncated) {
-                break;
-            }
-        }
-        publish(batch, effectiveObserver);
-        String message = matches.isEmpty() ? "no matches" : truncated ? "result limit reached" : "search complete";
-        return new SearchResult(source, State.COMPLETE, matches, truncated, filesRead, unreadableFiles, indexed.index().entries().size(), message);
+    SearchResult search(boolean persistentIndexEnabled, Path root, String query, WorkspaceIndexService.Cancellation cancellation, Observer observer) {
+        return search(persistentIndexEnabled, List.of(root), WorkspaceSearchQuery.literal(query), cancellation, observer);
     }
 
-    SearchResult search(boolean persistentIndexEnabled, List<Path> workspaceRoots, String query, WorkspaceIndexService.Cancellation cancellation,
-                        Observer observer) {
-        String needle = requireQuery(query);
-        WorkspaceIndexService.Cancellation effectiveCancellation = cancellation == null ? WorkspaceIndexService.Cancellation.NONE : cancellation;
-        Observer effectiveObserver = observer == null ? Observer.NO_OP : observer;
+    SearchResult search(boolean persistentIndexEnabled, List<Path> roots, String query, WorkspaceIndexService.Cancellation cancellation, Observer observer) {
+        return search(persistentIndexEnabled, roots, WorkspaceSearchQuery.literal(query), cancellation, observer);
+    }
+
+    SearchResult search(boolean persistentIndexEnabled, List<Path> workspaceRoots, WorkspaceSearchQuery query,
+                        WorkspaceIndexService.Cancellation cancellation, Observer observer) {
+        WorkspaceIndexService.Cancellation stop = cancellation == null ? WorkspaceIndexService.Cancellation.NONE : cancellation;
+        Observer updates = observer == null ? Observer.NO_OP : observer;
+        Source source = persistentIndexEnabled ? Source.PERSISTENT_INDEX : Source.AD_HOC;
         List<Path> roots = workspaceRoots == null ? List.of() : workspaceRoots.stream().filter(Objects::nonNull).distinct().toList();
-        if (roots.isEmpty()) {
-            return new SearchResult(persistentIndexEnabled ? Source.PERSISTENT_INDEX : Source.AD_HOC, State.FAILED, List.of(), false, 0, 0, 0,
-                "no workspace folders");
-        }
         List<Match> matches = new ArrayList<>();
-        int filesRead = 0;
-        int unreadableFiles = 0;
-        int indexedFiles = 0;
-        for (Path root : roots) {
-            if (effectiveCancellation.isCancelled()) {
-                return new SearchResult(persistentIndexEnabled ? Source.PERSISTENT_INDEX : Source.AD_HOC, State.CANCELLED, matches, false,
-                    filesRead, unreadableFiles, indexedFiles, "search cancelled");
+        List<Match> batch = new ArrayList<>();
+        java.util.Set<Path> visited = new java.util.HashSet<>();
+        SearchFileFilter filter = new SearchFileFilter(query.include(), query.exclude());
+        java.util.regex.Pattern compiled = query.pattern().compile();
+        int filesRead = 0, unreadable = 0, indexedFiles = 0;
+        boolean truncated = false;
+        try {
+            outer: for (Path workspace : roots) {
+                WorkspaceIndexService.BuildResult indexed = persistentIndexEnabled
+                    ? indexService.recover(true, workspace, stop, WorkspaceIndexService.Observer.NO_OP)
+                    : indexService.scan(workspace, stop, WorkspaceIndexService.Observer.NO_OP);
+                if (stop.isCancelled() || indexed.status().state() == WorkspaceIndexService.State.CANCELLED)
+                    throw new java.util.concurrent.CancellationException();
+                if (indexed.status().state() != WorkspaceIndexService.State.READY || indexed.index() == null)
+                    return new SearchResult(source, State.FAILED, matches, false, filesRead, unreadable, indexedFiles, indexed.status().message());
+                Path root = Path.of(indexed.index().root()).toAbsolutePath().normalize();
+                indexedFiles += indexed.index().entries().size();
+                for (WorkspaceIndexService.Entry entry : indexed.index().entries()) {
+                    if (stop.isCancelled()) throw new java.util.concurrent.CancellationException();
+                    Path relative = Path.of(entry.relativePath());
+                    if (!filter.accepts(relative)) continue;
+                    Path file = root.resolve(relative).normalize();
+                    if (!file.startsWith(root) || !readableRegularFile(file)) { unreadable++; continue; }
+                    if (!visited.add(WorkspaceRootResolver.normalizedIdentity(file))) continue;
+                    try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+                        filesRead++;
+                        int lineNumber = 0;
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            if (stop.isCancelled()) throw new java.util.concurrent.CancellationException();
+                            if (line.indexOf('\0') >= 0) break;
+                            lineNumber++;
+                            java.util.regex.Matcher matcher = query.pattern().matcher(compiled, line, stop::isCancelled);
+                            while (matcher.find()) {
+                                if (stop.isCancelled()) throw new java.util.concurrent.CancellationException();
+                                if (matches.size() == maxResults) { truncated = true; break outer; }
+                                Match match = new Match(file.toString(), lineNumber, matcher.start() + 1, preview(line));
+                                matches.add(match);
+                                batch.add(match);
+                                if (batch.size() >= batchSize) publish(batch, updates);
+                            }
+                        }
+                    } catch (IOException | SecurityException error) { unreadable++; }
+                    updates.onProgress(filesRead, indexedFiles);
+                }
             }
-            int remaining = maxResults - matches.size();
-            if (remaining <= 0) {
-                return new SearchResult(persistentIndexEnabled ? Source.PERSISTENT_INDEX : Source.AD_HOC, State.COMPLETE, matches, true,
-                    filesRead, unreadableFiles, indexedFiles, "result limit reached");
-            }
-            SearchResult result = new WorkspaceTextSearchService(indexService, remaining, batchSize)
-                .search(persistentIndexEnabled, root, needle, effectiveCancellation, effectiveObserver);
-            matches.addAll(result.matches());
-            filesRead += result.filesRead();
-            unreadableFiles += result.unreadableFiles();
-            indexedFiles += result.indexedFiles();
-            if (result.state() != State.COMPLETE) {
-                return new SearchResult(result.source(), result.state(), matches, false, filesRead, unreadableFiles, indexedFiles,
-                    root + ": " + result.message());
-            }
-            if (result.truncated()) {
-                return new SearchResult(result.source(), State.COMPLETE, matches, true, filesRead, unreadableFiles, indexedFiles,
-                    "result limit reached");
-            }
+        } catch (java.util.concurrent.CancellationException cancelled) {
+            publish(batch, updates);
+            return new SearchResult(source, State.CANCELLED, matches, false, filesRead, unreadable, indexedFiles, "search cancelled");
+        } catch (IllegalArgumentException | StackOverflowError error) {
+            publish(batch, updates);
+            return new SearchResult(source, State.FAILED, matches, false, filesRead, unreadable, indexedFiles,
+                error instanceof StackOverflowError ? "Expression is too complex; simplify the regular expression" : error.getMessage());
         }
-        return new SearchResult(persistentIndexEnabled ? Source.PERSISTENT_INDEX : Source.AD_HOC, State.COMPLETE, matches, false,
-            filesRead, unreadableFiles, indexedFiles, matches.isEmpty() ? "no matches" : "search complete");
+        publish(batch, updates);
+        return new SearchResult(source, roots.isEmpty() ? State.FAILED : State.COMPLETE, matches, truncated,
+            filesRead, unreadable, indexedFiles, roots.isEmpty() ? "no workspace folders"
+                : truncated ? "result limit reached" : matches.isEmpty() ? "no matches" : "search complete");
     }
 
     private static boolean readableRegularFile(Path file) {
@@ -191,6 +145,7 @@ final class WorkspaceTextSearchService {
         Observer NO_OP = matches -> { };
 
         void onMatches(List<Match> matches);
+        default void onProgress(int filesRead, int indexedFiles) { }
     }
 
     enum Source {

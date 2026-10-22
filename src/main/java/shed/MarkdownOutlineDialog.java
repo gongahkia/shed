@@ -76,7 +76,10 @@ final class MarkdownOutlineDialog extends JDialog {
         JLabel title = new JLabel("Table of Contents");
         title.setFont(title.getFont().deriveFont(Font.BOLD, title.getFont().getSize2D() + 7f));
         panel.add(title, BorderLayout.NORTH);
-        search.putClientProperty("JTextField.placeholderText", "Filter headings");
+        JPanel searchPanel = new JPanel(new BorderLayout(0, 4));
+        JLabel searchLabel = new JLabel("Filter headings");
+        searchLabel.setLabelFor(search);
+        searchPanel.add(searchLabel, BorderLayout.NORTH);
         AccessibilitySupport.describe(search, "Filter headings", "Search headings in the current Markdown document.");
         search.getDocument().addDocumentListener(new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent event) { filter(); }
@@ -84,7 +87,8 @@ final class MarkdownOutlineDialog extends JDialog {
             @Override public void changedUpdate(DocumentEvent event) { filter(); }
         });
         search.addActionListener(event -> goToSelection());
-        panel.add(search, BorderLayout.SOUTH);
+        searchPanel.add(search, BorderLayout.CENTER);
+        panel.add(searchPanel, BorderLayout.SOUTH);
         return panel;
     }
 

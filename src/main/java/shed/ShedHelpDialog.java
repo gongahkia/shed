@@ -120,17 +120,21 @@ final class ShedHelpDialog extends JDialog {
         title.setFont(title.getFont().deriveFont(Font.BOLD, title.getFont().getSize2D() + 6f));
         identity.add(title, BorderLayout.NORTH);
         identity.add(new JLabel("Guides, shortcuts, and command reference"), BorderLayout.SOUTH);
-        panel.add(identity, BorderLayout.WEST);
-        search.putClientProperty("JTextField.placeholderText", "Search help");
+        panel.add(identity, BorderLayout.CENTER);
+        JPanel searchPanel = new JPanel(new BorderLayout(0, 4));
+        JLabel searchLabel = new JLabel("Search help");
+        searchLabel.setLabelFor(search);
+        searchPanel.add(searchLabel, BorderLayout.NORTH);
         search.setToolTipText("Search topics and their contents (Ctrl/Cmd+F)");
         AccessibilitySupport.describe(search, "Search help", "Filter help topics by title, summary, or content.");
-        search.setPreferredSize(new Dimension(300, 34));
+        search.setColumns(24);
         search.getDocument().addDocumentListener(new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent event) { filterTopics(); }
             @Override public void removeUpdate(DocumentEvent event) { filterTopics(); }
             @Override public void changedUpdate(DocumentEvent event) { filterTopics(); }
         });
-        panel.add(search, BorderLayout.EAST);
+        searchPanel.add(search, BorderLayout.CENTER);
+        panel.add(searchPanel, BorderLayout.EAST);
         return panel;
     }
 

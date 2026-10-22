@@ -1499,7 +1499,10 @@ final class DebugSessionController {
         Path source = activeFile();
         if (source == null) return null;
         try {
-            List<BreakpointStore.Breakpoint> values = breakpoints.sources(workspace()).get(source.toAbsolutePath().normalize());
+            Path root = workspace();
+            Path storedSource = WorkspaceRootResolver.pathWithinRoot(source, root);
+            if (storedSource == null) return null;
+            List<BreakpointStore.Breakpoint> values = breakpoints.sources(root).get(storedSource);
             if (values == null) return null;
             return values.stream().filter(breakpoint -> breakpoint.line() == line || breakpoint.displayLine() == line).findFirst().orElse(null);
         } catch (IOException | IllegalArgumentException error) {

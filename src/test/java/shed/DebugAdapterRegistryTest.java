@@ -5,11 +5,42 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.io.TempDir;
 
 public class DebugAdapterRegistryTest {
+    @Test
+    void launchPathsAcceptWorkspaceAliasesAndRejectLinksOutsideTheWorkspace(@TempDir Path directory) throws Exception {
+        Path root = Files.createDirectory(directory.resolve("workspace"));
+        Path alias = directory.resolve("alias");
+        Path outside = Files.createDirectory(directory.resolve("outside"));
+        try {
+            Files.createSymbolicLink(alias, root);
+            Files.createSymbolicLink(root.resolve("escape"), outside);
+        } catch (UnsupportedOperationException | java.nio.file.FileSystemException error) {
+            Assumptions.assumeTrue(false, "symbolic links unavailable: " + error.getMessage());
+            return;
+        }
+        Map<String, Object> values = configuration("launch");
+        values.put("debug.configuration.main.args", "${file} ${relativeFile} ${testFile}");
+        DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.validate(values);
+        Path source = alias.resolve("src/Main.java");
+        DebugAdapterRegistry.PlanResult plan = DebugAdapterRegistry.plan(validation, "main", root,
+            new DebugAdapterRegistry.LaunchContext(source, "", source));
+        assertTrue(plan.launchable(), plan.error());
+        assertEquals(root.resolve("src/Main.java"), plan.plan().program());
+        assertEquals(java.util.List.of(root.resolve("src/Main.java").toString(), Path.of("src/Main.java").toString(),
+            root.resolve("src/Main.java").toString()), plan.plan().args());
+        assertFalse(DebugAdapterRegistry.plan(validation, "main", root, alias.resolve("escape/Main.java")).launchable());
+
+        values.put("debug.configuration.main.program", "${workspaceFolder}/escape/Main.java");
+        assertFalse(DebugAdapterRegistry.plan(DebugAdapterRegistry.validate(values), "main", root, source).launchable());
+    }
+
     @Test
     void validatesAdapterCapabilitiesAndCreatesWorkspaceScopedPlansWithoutLaunching() {
         DebugAdapterRegistry.Validation validation = DebugAdapterRegistry.validate(configuration("launch"));

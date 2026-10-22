@@ -279,8 +279,8 @@ final class BreakpointStore {
     }
     private static Path source(Path workspace, Path source) {
         if (source == null) throw new IllegalArgumentException("source file is required");
-        Path file = source.toAbsolutePath().normalize();
-        if (!file.startsWith(workspace)) throw new IllegalArgumentException("source breakpoint escapes the workspace");
+        Path file = WorkspaceRootResolver.pathWithinRoot(source, workspace);
+        if (file == null) throw new IllegalArgumentException("source breakpoint escapes the workspace");
         return file;
     }
     private static Integer positiveInteger(Object value) {

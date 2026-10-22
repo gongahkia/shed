@@ -3,6 +3,7 @@ package shed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,10 +11,36 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
 
 public class BreakpointStoreTest {
     @TempDir Path tempDir;
+
+    @Test
+    void sourceAliasesReferToOnePersistedBreakpoint() throws Exception {
+        Path workspace = Files.createDirectory(tempDir.resolve("workspace"));
+        Path alias = tempDir.resolve("alias");
+        Path outside = Files.createDirectory(tempDir.resolve("outside"));
+        try {
+            Files.createSymbolicLink(alias, workspace);
+            Files.createSymbolicLink(workspace.resolve("escape"), outside);
+        } catch (UnsupportedOperationException | java.nio.file.FileSystemException error) {
+            Assumptions.assumeTrue(false, "symbolic links unavailable: " + error.getMessage());
+            return;
+        }
+        Path source = workspace.resolve("Main.java");
+        Files.writeString(source, "class Main {}\n");
+        Path storage = tempDir.resolve("state");
+        BreakpointStore store = new BreakpointStore(storage);
+        assertTrue(store.toggle(workspace, alias.resolve("Main.java"), 1).added());
+        BreakpointStore reopened = new BreakpointStore(storage);
+        assertEquals(1, reopened.sources(workspace).get(source).size());
+        reopened.configure(workspace, source.toRealPath(), 1, false, "value > 0", "", "");
+        assertFalse(reopened.markers(workspace, alias.resolve("Main.java")).get(0).enabled());
+        assertFalse(reopened.toggle(workspace, source, 1).added());
+        assertThrows(IllegalArgumentException.class, () -> reopened.toggle(workspace, alias.resolve("escape/Main.java"), 1));
+    }
 
     @Test
     void persistsWorkspaceBreakpointsWithoutChangingSourceFiles() throws Exception {

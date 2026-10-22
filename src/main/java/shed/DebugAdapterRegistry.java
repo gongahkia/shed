@@ -704,13 +704,11 @@ final class DebugAdapterRegistry {
     private static Path resolveWorkspacePath(Path workspace, String configured, LaunchContext context) {
         if ("${file}".equals(configured) || "${testFile}".equals(configured)) {
             Path selected = "${file}".equals(configured) ? context.activeFile() : context.testFile();
-            if (selected == null) return null;
-            Path file = selected.toAbsolutePath().normalize();
-            return file.startsWith(workspace) ? file : null;
+            return workspaceFilePath(workspace, selected);
         }
         String suffix = configured.substring("${workspaceFolder}".length());
         Path resolved = suffix.isEmpty() ? workspace : workspace.resolve(suffix.substring(1).replace('\\', '/')).normalize();
-        return resolved.startsWith(workspace) ? resolved : null;
+        return workspaceFilePath(workspace, resolved);
     }
 
     private record InputValues(Map<String, String> values, String error) {
@@ -815,9 +813,7 @@ final class DebugAdapterRegistry {
     }
 
     private static Path workspaceFilePath(Path workspace, Path file) {
-        if (file == null) return null;
-        Path normalized = file.toAbsolutePath().normalize();
-        return normalized.startsWith(workspace) ? normalized : null;
+        return WorkspaceRootResolver.pathWithinRoot(file, workspace);
     }
 
     private static boolean safeTestId(String value) {

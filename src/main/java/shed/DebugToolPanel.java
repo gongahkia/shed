@@ -102,7 +102,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
     @Override public JPanel component() { return panel; }
 
     private JPanel toolbar() {
-        JPanel panel = new JPanel(new BorderLayout(6, 0));
+        JPanel panel = new JPanel(new BorderLayout(6, 4));
         JPanel controls = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         controls.add(new JLabel("Configuration"));
         configurations.addActionListener(event -> {
@@ -130,8 +130,8 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         JButton runToCursor = button("Run to Cursor", () -> message(editor.debugSessionController.runToCursorForPanel()));
         JButton inspect = button("Refresh", () -> message(editor.debugSessionController.refreshInspectionForPanel()));
         controls.add(start); controls.add(stop); controls.add(restart); controls.add(restartAdapter); controls.add(resume); controls.add(next); controls.add(stepIn); controls.add(stepOut); controls.add(pause); controls.add(reverseContinue); controls.add(stepBack); controls.add(restartFrame); controls.add(runToCursor); controls.add(inspect);
-        panel.add(controls, BorderLayout.WEST);
-        panel.add(state, BorderLayout.CENTER);
+        panel.add(controls, BorderLayout.CENTER);
+        panel.add(state, BorderLayout.SOUTH);
         return panel;
     }
 

@@ -99,15 +99,15 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
     @Override public JPanel component() { return panel; }
 
     private JPanel toolbar() {
-        JPanel controls = new JPanel(new GridLayout(3, 1, 4, 4));
+        JPanel controls = new JPanel(new BorderLayout(4, 4));
         JPanel fields = new JPanel(new GridLayout(1, 2, 8, 0));
         fields.add(field("Find", find)); fields.add(field("Replace", replacement));
-        controls.add(fields);
+        controls.add(fields, BorderLayout.NORTH);
         JPanel options = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         for (var option : List.of(matchCase, regex, wholeWord, enabled)) options.add(option);
-        options.add(scope); options.add(button("Preview", this::preview)); controls.add(options);
+        options.add(scope); options.add(button("Preview", this::preview)); controls.add(options, BorderLayout.CENTER);
         JPanel filters = new JPanel(new GridLayout(1, 2, 8, 0));
-        filters.add(field("Include", include)); filters.add(field("Exclude", exclude)); controls.add(filters);
+        filters.add(field("Include", include)); filters.add(field("Exclude", exclude)); controls.add(filters, BorderLayout.SOUTH);
         return controls;
     }
 

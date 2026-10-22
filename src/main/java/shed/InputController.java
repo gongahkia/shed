@@ -41,6 +41,7 @@ final class InputController {
     private String macroIndentAfterNewline;
     private long lastKeyPressNanos;
     private long completionInputNanos;
+    private boolean composingText;
     private JSplitPane completionSplit;
     private JScrollPane completionDocumentationScroll;
 
@@ -68,6 +69,69 @@ final class InputController {
         this.emacsPrefix = EmacsKeymap.Prefix.NONE;
         this.macroAutoPairAfterText = null;
         this.macroIndentAfterNewline = null;
+    }
+
+    void installShortcutDispatch() {
+        KeyEventDispatcher dispatcher = event -> event.getID() == KeyEvent.KEY_PRESSED
+            && !editor.closingDown && editor.isActive() && handleActionBinding(event);
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(dispatcher);
+        editor.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosed(java.awt.event.WindowEvent event) {
+                KeyboardFocusManager.getCurrentKeyboardFocusManager().removeKeyEventDispatcher(dispatcher);
+            }
+        });
+    }
+
+    void watchComposition(JTextArea area) {
+        area.addInputMethodListener(new java.awt.event.InputMethodListener() {
+            @Override public void inputMethodTextChanged(java.awt.event.InputMethodEvent event) {
+                java.text.AttributedCharacterIterator text = event.getText();
+                composingText = text != null && text.getEndIndex() - text.getBeginIndex() > event.getCommittedCharacterCount();
+            }
+            @Override public void caretPositionChanged(java.awt.event.InputMethodEvent event) { }
+        });
+        area.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override public void focusLost(java.awt.event.FocusEvent event) { composingText = false; }
+        });
+    }
+
+    private boolean handleActionBinding(KeyEvent event) {
+        if (event == null || event.isConsumed() || event.getComponent() != editor.writingArea || composingText
+            || event.isAltGraphDown() || event.isControlDown() && event.isAltDown()) return false;
+        String mapping = editor.configManager.actionKeybinding(modeKey(editor.editorState.mode), event);
+        if (mapping == null) return false;
+        event.consume();
+        emacsPrefix = EmacsKeymap.Prefix.NONE;
+        if (event.getKeyChar() != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(event.getKeyChar()))
+            editor.suppressNextTypedChar = true;
+        if (mapping.startsWith("command:")) editor.showMessage(editor.commandHandler.execute(mapping.substring(8).trim()));
+        else if (mapping.startsWith("action:")) performBoundAction(mapping.substring(7));
+        editor.requestStatusBarRefresh();
+        return true;
+    }
+
+    void performBoundAction(String name) {
+        if (!editor.writingArea.isEditable() && Set.of("delete-forward", "kill-line", "kill-region", "yank").contains(name)) return;
+        switch (name) {
+            case "copy", "cut", "paste" -> {
+                int code = name.equals("copy") ? KeyEvent.VK_C : name.equals("cut") ? KeyEvent.VK_X : KeyEvent.VK_V;
+                if (!editor.extraSelections.isEmpty() && performPlainMultiSelectionClipboard(code)) return;
+                if (name.equals("copy")) editor.writingArea.copy();
+                else if (editor.writingArea.isEditable()) {
+                    if (name.equals("cut")) editor.writingArea.cut(); else editor.writingArea.paste();
+                }
+            }
+            case "select-all" -> editor.writingArea.selectAll();
+            case "settings" -> editor.showMessage(editor.showSettingsInspector());
+            case "zoom-in" -> editor.showMessage(editor.adjustUiZoom(1));
+            case "zoom-out" -> editor.showMessage(editor.adjustUiZoom(-1));
+            case "zoom-reset" -> editor.showMessage(editor.resetUiZoom());
+            default -> {
+                String action = name.toUpperCase(Locale.ROOT).replace('-', '_');
+                try { performMenuAction(PlainKeymap.Action.valueOf(action)); }
+                catch (IllegalArgumentException ignored) { executeEmacsAction(EmacsKeymap.Action.valueOf(action)); }
+            }
+        }
     }
 
     void onDocumentChanged(DocumentEvent event, FileBuffer.DocumentTextChange change) {
@@ -178,7 +242,10 @@ final class InputController {
     }
 
     public void keyPressed(KeyEvent e) {
-        if (e != null && e.getComponent() == editor.writingArea) lastKeyPressNanos = System.nanoTime();
+        if (e == null || e.isConsumed()) return;
+        editor.suppressNextTypedChar = false;
+        if (e.getComponent() == editor.writingArea) lastKeyPressNanos = System.nanoTime();
+        if (handleActionBinding(e)) return;
         if (e != null && isCompletionPopupVisible() && e.getKeyCode() == KeyEvent.VK_F6
             && !e.isAltDown() && !e.isControlDown() && !e.isMetaDown()) {
             editor.completionList.requestFocusInWindow();
@@ -271,7 +338,7 @@ final class InputController {
     }
 
     static int uiZoomDirection(KeyEvent event) {
-        if (event == null || event.isAltDown() || !(event.isControlDown() || event.isMetaDown())) {
+        if (event == null || event.isAltDown() || (ShortcutKey.isMac() ? !event.isMetaDown() : !event.isControlDown())) {
             return 0;
         }
         return switch (event.getKeyCode()) {
@@ -784,6 +851,7 @@ final class InputController {
         if (keyCode == KeyEvent.VK_DELETE) {
             return "del";
         }
+        if (keyCode >= KeyEvent.VK_A && keyCode <= KeyEvent.VK_Z) return String.valueOf((char) ('a' + keyCode - KeyEvent.VK_A));
         if (keyChar != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(keyChar)) {
             return String.valueOf(Character.toLowerCase(keyChar));
         }
@@ -3023,6 +3091,11 @@ final class InputController {
 
 
     public void keyTyped(KeyEvent e) {
+        if (editor.suppressNextTypedChar) {
+            editor.suppressNextTypedChar = false;
+            e.consume();
+            return;
+        }
         if (editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN) {
             char typed = e.getKeyChar();
             if (!editor.extraSelections.isEmpty() && editor.writingArea.isEditable()

@@ -7,6 +7,7 @@ import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JDialog;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -20,7 +21,7 @@ import javax.swing.table.DefaultTableModel;
 final class KeymapInspectorDialog extends JDialog {
     private final Texteditor editor;
     private final JTextField searchField;
-    private final JTextField scopeField;
+    private final JComboBox<String> scopeField;
     private final JTextField lhsField;
     private final JTextField rhsField;
     private final DefaultTableModel tableModel;
@@ -36,12 +37,13 @@ final class KeymapInspectorDialog extends JDialog {
         this.editor = editor;
         this.searchField = new JTextField();
         AccessibilitySupport.describe(searchField, "Keymap search", "Search effective keybindings by scope, key, mapping, source, or status.");
-        this.scopeField = new JTextField("normal");
-        AccessibilitySupport.describe(scopeField, "Keybinding scope", "Vim keybinding scope: normal, insert, visual, visual_line, replace, command, search, or global.");
+        this.scopeField = new JComboBox<>(new String[] {"plain", "emacs", "vim", "global", "normal", "insert", "visual", "visual_line", "replace", "command", "search"});
+        scopeField.setSelectedItem(editor.configManager.getKeymapProfile().configValue());
+        AccessibilitySupport.describe(scopeField, "Keybinding scope", "Choose a keymap profile, global fallback, or a Vim mode.");
         this.lhsField = new JTextField();
         AccessibilitySupport.describe(lhsField, "Keybinding key", "Key or supported key token to override.");
         this.rhsField = new JTextField();
-        AccessibilitySupport.describe(rhsField, "Keybinding mapping", "Replacement key sequence or nop.");
+        AccessibilitySupport.describe(rhsField, "Keybinding mapping", "action:name, command:Ex command, nop, or a legacy Vim key sequence.");
         this.tableModel = new DefaultTableModel(new Object[] {"Scope", "Key", "Mapping", "Source", "Status"}, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -49,7 +51,7 @@ final class KeymapInspectorDialog extends JDialog {
             }
         };
         this.table = new JTable(tableModel);
-        AccessibilitySupport.describe(table, "Effective keybindings", "Searchable active profile bindings and Vim overlays, including precedence status.");
+        AccessibilitySupport.describe(table, "Effective keybindings", "Searchable active profile bindings and user overlays, including override and shadowing status.");
         this.visibleBindings = List.of();
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
@@ -65,6 +67,7 @@ final class KeymapInspectorDialog extends JDialog {
             @Override public void removeUpdate(DocumentEvent event) { refreshTable(); }
             @Override public void changedUpdate(DocumentEvent event) { refreshTable(); }
         });
+        table.setRowHeight(Math.max(table.getRowHeight(), UiZoom.scale(40, editor.configManager.getUiZoom())));
         refreshTable();
     }
 
@@ -85,7 +88,16 @@ final class KeymapInspectorDialog extends JDialog {
         JPanel panel = new JPanel(new BorderLayout(0, 4));
         panel.setBorder(BorderFactory.createEmptyBorder(4, 4, 0, 4));
         panel.add(search, BorderLayout.NORTH);
-        panel.add(binding, BorderLayout.SOUTH);
+        JPanel lower = new JPanel(new BorderLayout(0, 5));
+        lower.add(binding, BorderLayout.NORTH);
+        JComboBox<String> actions = new JComboBox<>(KeymapOverlay.actionNames().toArray(String[]::new));
+        AccessibilitySupport.describe(actions, "Available editor actions", "Choose an action to populate the mapping field.");
+        actions.addActionListener(event -> rhsField.setText("action:" + actions.getSelectedItem()));
+        JPanel hint = new JPanel(new BorderLayout(8, 0));
+        hint.add(new JLabel("One shortcut, e.g. <mod-s-k>. Mod means Cmd on macOS, Ctrl elsewhere."), BorderLayout.CENTER);
+        hint.add(actions, BorderLayout.EAST);
+        lower.add(hint, BorderLayout.SOUTH);
+        panel.add(lower, BorderLayout.SOUTH);
         return panel;
     }
 
@@ -124,21 +136,21 @@ final class KeymapInspectorDialog extends JDialog {
     private void editSelected() {
         int row = table.getSelectedRow();
         if (row < 0 || row >= visibleBindings.size()) {
-            JOptionPane.showMessageDialog(this, "Select a user overlay to edit", "Keymap Inspector", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Select a binding to customize", "Keymap Inspector", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
         KeymapOverlay.Binding binding = visibleBindings.get(row);
         if (binding.configKey() == null) {
-            JOptionPane.showMessageDialog(this, "Profile bindings are fixed; create a user overlay instead", "Keymap Inspector", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "This is a built-in key sequence. Create a single shortcut using an action or command.", "Keymap Inspector", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
-        scopeField.setText(binding.scope());
+        scopeField.setSelectedItem(binding.scope());
         lhsField.setText(binding.lhs());
         rhsField.setText(binding.mapping());
     }
 
     private void saveOverlay() {
-        String result = editor.setKeybindingPersistent(scopeField.getText(), lhsField.getText(), rhsField.getText());
+        String result = editor.setKeybindingPersistent(String.valueOf(scopeField.getSelectedItem()), lhsField.getText(), rhsField.getText());
         if (result.startsWith("Error")) {
             JOptionPane.showMessageDialog(this, result, "Keymap Inspector", JOptionPane.ERROR_MESSAGE);
             return;
@@ -153,8 +165,8 @@ final class KeymapInspectorDialog extends JDialog {
             return;
         }
         KeymapOverlay.Binding binding = visibleBindings.get(row);
-        if (binding.configKey() == null) {
-            JOptionPane.showMessageDialog(this, "Profile bindings have no resettable overlay", "Keymap Inspector", JOptionPane.INFORMATION_MESSAGE);
+        if (!binding.source().equals("User overlay")) {
+            JOptionPane.showMessageDialog(this, "Select a user overlay to reset", "Keymap Inspector", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
         String result = editor.resetKeybindingPersistent(binding.scope(), binding.lhs());

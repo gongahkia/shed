@@ -401,6 +401,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Initialize UI
         editorUiController.initializeUI(startupProfile);
+        inputController.installShortcutDispatch();
         // Set initial mode before any status rendering hooks
         setMode(configManager.getKeymapProfile().usesVimModeHandling() ? EditorMode.NORMAL : EditorMode.INSERT);
         applyThemeColors();

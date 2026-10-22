@@ -421,6 +421,7 @@ final class EditorUiController {
             }
         };
         textArea.addKeyListener(editor);
+        editor.inputController.watchComposition(textArea);
         AccessibilitySupport.describe(textArea, "Editor", "Active source editor. Use keyboard navigation and configured keymap commands to edit the current buffer.");
         textArea.setFont(resolveEditorFont());
         textArea.setTabSize(editor.configManager.getTabSize());

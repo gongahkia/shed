@@ -272,3 +272,21 @@ Multi-selection is enabled by default; set ``multi.selection.enabled = false`` t
 | `ENTER` | Execute command |
 | `ESC` | Cancel command |
 | `BACKSPACE` | Delete character |
+
+## Custom shortcuts in every profile
+
+Open **File → Keyboard Shortcuts…**, or `:keymap ui`. The inspector lists the active profile's built-in shortcuts alongside user overrides, identifies shadowed/overridden bindings, and supports editing and resetting overlays. Choose an action from its action list, or use `command:<Ex command>`.
+
+```toml
+"keybind.plain.<mod-s-k>" = "action:find-in-files"
+"keybind.emacs.<f2>" = "action:buffers"
+"keybind.vim.<mod-s>" = "action:save"
+"keybind.global.<f4>" = "command:recent"
+"keybind.plain.<f3>" = "nop"
+```
+
+`mod` means Command on macOS and Control elsewhere. Explicit modifiers are `c`/`ctrl`, `meta`/`cmd`, `a`/`alt`, and `s`/`shift`; named keys include `f1`–`f12`, arrows, `pageup`, `pagedown`, `minus`, and `comma`. Each overlay binds one shortcut; existing Emacs prefix sequences remain available. Profile actions use `action:<name>` (for example `save`, `find`, `replace`, `undo`, `select-all`, or `forward-word`). Empty legacy Vim mappings and `nop` disable a binding; reset an overlay to restore the built-in shortcut.
+
+Precedence for action bindings is Vim mode, active profile, then global. Within one scope, explicit physical modifiers take precedence over a portable Mod alias. Legacy Vim key-sequence mappings retain their existing mode/global behavior and remain Vim-only. Modified action bindings run before built-in editor shortcuts and menu accelerators. Menus omit an accelerator that has been reassigned in the editor and explain it in a tooltip.
+
+Overrides apply only to the active source editor. Search/settings fields, terminals and IME composition are unaffected. Ctrl+Alt/AltGr is reserved for international text input; Plain/global action mappings cannot replace ordinary printable keys or Option-letter input. On macOS, Command-minus changes zoom while Control-minus navigates Back.

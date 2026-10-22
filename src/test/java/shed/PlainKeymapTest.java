@@ -102,10 +102,11 @@ class PlainKeymapTest {
     }
 
     @Test
-    void recognizesControlAndCommandUiZoomShortcuts() {
-        assertEquals(1, InputController.uiZoomDirection(keyEvent(KeyEvent.VK_EQUALS, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK)));
-        assertEquals(1, InputController.uiZoomDirection(keyEvent(KeyEvent.VK_ADD, InputEvent.META_DOWN_MASK)));
-        assertEquals(-1, InputController.uiZoomDirection(keyEvent(KeyEvent.VK_MINUS, InputEvent.CTRL_DOWN_MASK)));
+    void recognizesPlatformZoomWithoutStealingMacNavigation() {
+        int primary = ShortcutKey.primaryMask();
+        assertEquals(1, InputController.uiZoomDirection(keyEvent(KeyEvent.VK_EQUALS, primary | InputEvent.SHIFT_DOWN_MASK)));
+        assertEquals(-1, InputController.uiZoomDirection(keyEvent(KeyEvent.VK_MINUS, primary)));
+        if (ShortcutKey.isMac()) assertEquals(0, InputController.uiZoomDirection(keyEvent(KeyEvent.VK_MINUS, InputEvent.CTRL_DOWN_MASK)));
         assertEquals(0, InputController.uiZoomDirection(keyEvent(KeyEvent.VK_MINUS, InputEvent.ALT_DOWN_MASK)));
     }
 

@@ -37,6 +37,7 @@ final class ShedMenuBar {
         item(file, "Close Buffer", KeyEvent.VK_W, commandMask, () -> action(PlainKeymap.Action.CLOSE));
         file.addSeparator();
         item(file, "Settings…", KeyEvent.VK_COMMA, commandMask, () -> show(editor.showSettingsInspector()));
+        item(file, "Keyboard Shortcuts…", -1, 0, () -> show(editor.showKeymapInspector()));
         item(file, "Quit Shed", KeyEvent.VK_Q, commandMask, () -> editor.handleQuit(false));
 
         JMenu edit = menu("Edit");
@@ -98,8 +99,12 @@ final class ShedMenuBar {
 
     private void item(JMenu menu, String label, int key, int modifiers, Runnable run) {
         JMenuItem item = new JMenuItem(label);
-        if (key >= 0 && (nativeMac || editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN
-            || key == KeyEvent.VK_F1)) item.setAccelerator(KeyStroke.getKeyStroke(key, modifiers));
+        if (key >= 0 && (nativeMac || editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN || key == KeyEvent.VK_F1)) {
+            String custom = editor.configManager.actionKeybinding(editor.modeKey(editor.editorState.mode),
+                new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, modifiers, key, KeyEvent.CHAR_UNDEFINED));
+            if (custom == null) item.setAccelerator(KeyStroke.getKeyStroke(key, modifiers));
+            else item.setToolTipText("Editor shortcut customized: " + custom + " — see Keyboard Shortcuts");
+        }
         item.addActionListener(event -> run.run());
         menu.add(item);
     }

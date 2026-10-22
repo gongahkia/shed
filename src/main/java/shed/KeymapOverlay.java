@@ -1,5 +1,6 @@
 package shed;
 
+import java.awt.event.InputEvent;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -9,8 +10,9 @@ import java.util.Map;
 import java.util.Set;
 
 final class KeymapOverlay {
+    private static final java.awt.Component KEY_SOURCE = new java.awt.Component() { };
     private static final String PREFIX = "keybind.";
-    private static final Set<String> SCOPES = Set.of("normal", "insert", "visual", "visual_line", "replace", "command", "search", "global");
+    private static final Set<String> SCOPES = Set.of("normal", "insert", "visual", "visual_line", "replace", "command", "search", "global", "plain", "emacs", "vim");
 
     record Key(String scope, String lhs) {
         String configKey() {
@@ -34,7 +36,16 @@ final class KeymapOverlay {
 
     static String validate(String rawKey, String rawMapping) {
         try {
-            parseKey(rawKey);
+            Key key = parseKey(rawKey);
+            if (key.lhs().length() == 1 && !Set.of("plain", "emacs", "vim").contains(key.scope())
+                && ("nop".equalsIgnoreCase(rawMapping) || "<nop>".equalsIgnoreCase(rawMapping))) return null;
+            if (isActionMapping(rawMapping) || Set.of("plain", "emacs", "vim").contains(key.scope())) {
+                ShortcutKey shortcut = ShortcutKey.parse(key.lhs());
+                if (!shortcut.safeForTextInput() && !Set.of("emacs", "vim").contains(key.scope()))
+                    return "use a modified shortcut or function key so ordinary text input remains available";
+                if (!isActionMapping(rawMapping)) return "profile overlays require action:<name>, command:<Ex command>, or nop";
+                return validateActionMapping(rawMapping);
+            }
         } catch (IllegalArgumentException error) {
             return error.getMessage();
         }
@@ -57,9 +68,17 @@ final class KeymapOverlay {
         }
         String scope = tail.substring(0, separator).trim().toLowerCase(Locale.ROOT);
         if (!SCOPES.contains(scope)) {
-            throw new IllegalArgumentException("keybinding scope must be normal, insert, visual, visual_line, replace, command, search, or global");
+            throw new IllegalArgumentException("keybinding scope must be plain, emacs, vim, global, or a Vim mode");
         }
-        return new Key(scope, normalizeToken(tail.substring(separator + 1), "keybinding lhs"));
+        String lhs = tail.substring(separator + 1).trim();
+        if (lhs.startsWith("<")) {
+            try { lhs = ShortcutKey.parse(lhs).token(); }
+            catch (IllegalArgumentException error) {
+                if (Set.of("plain", "emacs", "vim").contains(scope)) throw error;
+                lhs = normalizeToken(lhs, "keybinding lhs");
+            }
+        } else lhs = normalizeToken(lhs, "keybinding lhs");
+        return new Key(scope, lhs);
     }
 
     static List<Binding> effectiveBindings(Map<String, String> config, KeymapProfile profile) {
@@ -70,7 +89,7 @@ final class KeymapOverlay {
             }
             try {
                 Key key = parseKey(entry.getKey());
-                if (validateMapping(entry.getValue()) == null) {
+                if (validate(entry.getKey(), entry.getValue()) == null) {
                     overlays.put(key, entry.getValue().trim());
                 }
             } catch (IllegalArgumentException ignored) {
@@ -79,10 +98,19 @@ final class KeymapOverlay {
         List<Binding> bindings = new ArrayList<>();
         for (Map.Entry<Key, String> entry : overlays.entrySet()) {
             Key key = entry.getKey();
-            String status = overlayStatus(key, overlays, profile);
+            String status = key.lhs().startsWith("<") && isActionMapping(entry.getValue()) ? actionStatus(key, overlays, config, profile)
+                : overlayStatus(key, overlays, profile);
             bindings.add(new Binding(key.configKey(), key.scope(), key.lhs(), entry.getValue(), "User overlay", status));
         }
-        bindings.addAll(profileBindings(profile));
+        for (Binding binding : profileBindings(profile)) {
+            String status = binding.status();
+            try {
+                ShortcutKey shortcut = ShortcutKey.parse(binding.lhs());
+                String override = resolveAction(config, profile, "normal", event(shortcut));
+                if (override != null) status = "Overridden in editor: " + override;
+            } catch (IllegalArgumentException ignored) { }
+            bindings.add(new Binding(binding.configKey(), binding.scope(), binding.lhs(), binding.mapping(), binding.source(), status));
+        }
         bindings.sort(Comparator.comparing(Binding::source).thenComparing(Binding::scope).thenComparing(Binding::lhs));
         return List.copyOf(bindings);
     }
@@ -99,8 +127,9 @@ final class KeymapOverlay {
         if (text.toString().equals("Effective keybindings\n\n")) {
             text.append("No matching bindings.\n");
         }
-        return text.append("\nPrecedence: scope-specific user overlay, then global user overlay, then the active profile binding.\n")
-            .append("Vim dispatch applies user overlays; Plain and Emacs fixed bindings intentionally bypass them.\n").toString();
+        return text.append("\nPrecedence: Vim mode action, profile action, global action, then built-in bindings (legacy Vim overlays retain their mode/global precedence).\n")
+            .append("Profile action bindings work in the editor only. Physical modifiers win over Mod aliases in the same scope.\n")
+            .append("Legacy key sequences remain Vim-only; menu actions and other text fields keep their normal behavior.\n").toString();
     }
 
     static boolean matches(Binding binding, String query) {
@@ -122,7 +151,7 @@ final class KeymapOverlay {
 
     private static String overlayStatus(Key key, Map<Key, String> overlays, KeymapProfile profile) {
         if (profile != KeymapProfile.VIM) {
-            return "Inactive: " + profile.configValue() + " uses fixed profile bindings";
+            return "Inactive: legacy key sequences require Vim";
         }
         if (key.scope().equals("global")) {
             List<String> shadowing = new ArrayList<>();
@@ -138,28 +167,36 @@ final class KeymapOverlay {
     }
 
     private static List<Binding> profileBindings(KeymapProfile profile) {
-        if (profile == KeymapProfile.PLAIN) {
-            return List.of(
-                fixed("Ctrl/Cmd-N", "New document"), fixed("Ctrl/Cmd-O", "Open file dialog"),
-                fixed("Ctrl/Cmd-P", "Quick open file"), fixed("Ctrl/Cmd-S", "Save"),
-                fixed("Ctrl/Cmd-Shift-S", "Save As"), fixed("Ctrl/Cmd-F", "Find"),
-                fixed("F3/Shift-F3", "Next/previous match"), fixed("Ctrl/Cmd-H", "Replace all"),
-                fixed("Ctrl/Cmd-G", "Go to line"), fixed("Ctrl/Cmd-Z", "Undo"),
-                fixed("Ctrl/Cmd-R", "Document symbols"), fixed("Ctrl/Cmd-Shift-R", "Workspace symbols"),
-                fixed("Ctrl/Cmd-Shift-Z/Y", "Redo"), fixed("Ctrl/Cmd-PageDown", "Next buffer"),
-                fixed("Ctrl/Cmd-PageUp", "Previous buffer"),
-                fixed("Ctrl/Cmd-Shift-P", "Command palette"), fixed("Ctrl/Cmd-B", "Buffer picker"),
-                fixed("Ctrl/Cmd-D", "Add next matching selection"),
-                fixed("Alt-Up/Down", "Add cursor above/below"),
-                fixed("Ctrl/Cmd-W", "Close active split"), fixed("Ctrl/Cmd-Q", "Quit"),
-                fixed("F1", "Plain keymap help")
-            );
-        }
-        if (profile == KeymapProfile.EMACS) {
-            return List.of(
-                fixed("C-f/C-b/C-n/C-p", "Character and line navigation"), fixed("C-x C-s/C-f/C-b", "Save, find file, buffers"),
-                fixed("C-x b/k/C-c", "Buffers, kill buffer, quit"), fixed("M-x", "Command palette"), fixed("C-g", "Cancel prefix"), fixed("C-h/F1", "Emacs keymap help")
-            );
+        if (profile != KeymapProfile.VIM) {
+            List<Binding> result = new ArrayList<>();
+            List<Integer> codes = new ArrayList<>();
+            for (int code = java.awt.event.KeyEvent.VK_A; code <= java.awt.event.KeyEvent.VK_Z; code++) codes.add(code);
+            codes.addAll(List.of(java.awt.event.KeyEvent.VK_F1, java.awt.event.KeyEvent.VK_F3,
+                java.awt.event.KeyEvent.VK_PAGE_UP, java.awt.event.KeyEvent.VK_PAGE_DOWN,
+                java.awt.event.KeyEvent.VK_UP, java.awt.event.KeyEvent.VK_DOWN,
+                java.awt.event.KeyEvent.VK_LEFT, java.awt.event.KeyEvent.VK_RIGHT, java.awt.event.KeyEvent.VK_MINUS));
+            for (int code : codes) for (int modifiers : List.of(0, InputEvent.SHIFT_DOWN_MASK, InputEvent.CTRL_DOWN_MASK, InputEvent.META_DOWN_MASK,
+                InputEvent.ALT_DOWN_MASK, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK,
+                InputEvent.META_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK, InputEvent.ALT_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK,
+                InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK)) {
+                ShortcutKey shortcut = new ShortcutKey(code, modifiers, false);
+                java.awt.event.KeyEvent event = event(shortcut);
+                String action;
+                if (profile == KeymapProfile.PLAIN) {
+                    PlainKeymap.Action resolved = PlainKeymap.actionFor(event);
+                    if (resolved == PlainKeymap.Action.NONE) continue;
+                    action = resolved.name();
+                } else {
+                    EmacsKeymap.Resolution resolved = EmacsKeymap.resolve(EmacsKeymap.Prefix.NONE, event);
+                    if (resolved.action() == EmacsKeymap.Action.NONE) continue;
+                    action = resolved.action().name();
+                }
+                String name = action.toLowerCase(Locale.ROOT).replace('_', '-');
+                result.add(new Binding("keybind." + profile.configValue() + "." + shortcut.token(), profile.configValue(),
+                    shortcut.token(), "action:" + name, "Profile", "Active built-in binding"));
+            }
+            if (profile == KeymapProfile.EMACS) result.add(fixed("<c-x> …", "Emacs prefix: C-s save, C-f find file, b buffers, k close buffer, C-c quit"));
+            return List.copyOf(result);
         }
         return List.of(
             fixed("Ctrl/Cmd-Shift-P", "Command palette"), fixed("Cmd-D", "Horizontal split"),
@@ -170,6 +207,52 @@ final class KeymapOverlay {
 
     private static Binding fixed(String lhs, String mapping) {
         return new Binding(null, "profile", lhs, mapping, "Profile", "Active fixed binding");
+    }
+
+    static boolean isActionMapping(String value) {
+        String mapping = value == null ? "" : value.trim();
+        return mapping.startsWith("action:") || mapping.startsWith("command:") || mapping.equalsIgnoreCase("nop") || mapping.equalsIgnoreCase("<nop>");
+    }
+
+    static List<String> actionNames() {
+        java.util.TreeSet<String> names = new java.util.TreeSet<>(List.of("copy", "cut", "paste", "select-all", "settings", "zoom-in", "zoom-out", "zoom-reset"));
+        for (PlainKeymap.Action action : PlainKeymap.Action.values()) if (action != PlainKeymap.Action.NONE)
+            names.add(action.name().toLowerCase(Locale.ROOT).replace('_', '-'));
+        for (EmacsKeymap.Action action : EmacsKeymap.Action.values()) if (action != EmacsKeymap.Action.NONE)
+            names.add(action.name().toLowerCase(Locale.ROOT).replace('_', '-'));
+        return List.copyOf(names);
+    }
+
+    private static String validateActionMapping(String value) {
+        String mapping = value.trim();
+        if (mapping.indexOf('\n') >= 0 || mapping.indexOf('\r') >= 0 || mapping.indexOf('\0') >= 0) return "mapping must be a single line";
+        if (mapping.startsWith("command:")) return mapping.substring(8).isBlank() ? "command is required" : null;
+        if (mapping.startsWith("action:") && !actionNames().contains(mapping.substring(7))) return "unknown editor action: " + mapping.substring(7);
+        return null;
+    }
+
+    static String resolveAction(Map<String, String> config, KeymapProfile profile, String mode, java.awt.event.KeyEvent event) {
+        List<String> scopes = profile == KeymapProfile.VIM ? List.of(mode, "vim", "global") : List.of(profile.configValue(), "global");
+        for (String scope : scopes) for (String token : ShortcutKey.tokens(event)) {
+            String value = config.get("keybind." + scope + "." + token);
+            if (value != null && isActionMapping(value)) return value.trim();
+        }
+        return null;
+    }
+
+    private static java.awt.event.KeyEvent event(ShortcutKey key) {
+        return new java.awt.event.KeyEvent(KEY_SOURCE, java.awt.event.KeyEvent.KEY_PRESSED,
+            0, key.physicalModifiers(), key.code(), java.awt.event.KeyEvent.CHAR_UNDEFINED);
+    }
+
+    private static String actionStatus(Key key, Map<Key, String> overlays, Map<String, String> config, KeymapProfile profile) {
+        boolean applicable = key.scope().equals("global") || key.scope().equals(profile.configValue())
+            || profile == KeymapProfile.VIM && !Set.of("plain", "emacs").contains(key.scope());
+        if (!applicable) return "Inactive in " + profile.configValue();
+        String mode = SCOPES.contains(key.scope()) && !Set.of("plain", "emacs", "vim", "global").contains(key.scope()) ? key.scope() : "normal";
+        String resolved = resolveAction(config, profile, mode, event(ShortcutKey.parse(key.lhs())));
+        if (!java.util.Objects.equals(resolved, overlays.get(key))) return "Shadowed by a more specific binding or physical modifier";
+        return "Active in " + key.scope() + "; overrides built-in shortcut";
     }
 
     private static String validateMapping(String rawMapping) {

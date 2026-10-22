@@ -1750,6 +1750,10 @@ public class ConfigManager {
         return servers;
     }
 
+    String actionKeybinding(String mode, java.awt.event.KeyEvent event) {
+        return KeymapOverlay.resolveAction(config, getKeymapProfile(), mode, event);
+    }
+
     public String getKeybinding(String mode, String keySpec) {
         if (keySpec == null || keySpec.isEmpty()) {
             return null;

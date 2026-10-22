@@ -43,6 +43,47 @@ public class TexteditorSwingIntegrationTest {
     Path tempDir;
 
     @Test
+    void customActionsWorkInEachProfileWithoutInterceptingOtherFieldsOrComposition() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-keymap-actions"));
+        Path file = Files.writeString(tempDir.resolve("bindings.txt"), "original");
+        Texteditor editor = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                for (String profile : List.of("plain", "emacs", "vim")) {
+                    editor.configManager.set("keymap.profile", profile);
+                    editor.configManager.set("keybind." + profile + ".<f2>", "action:select-all");
+                    editor.writingArea.setCaretPosition(0);
+                    KeyEvent event = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_F2, KeyEvent.CHAR_UNDEFINED);
+                    editor.keyPressed(event);
+                    assertTrue(event.isConsumed());
+                    assertEquals("original", editor.writingArea.getSelectedText());
+                }
+                editor.configManager.set("keymap.profile", "plain");
+                editor.writingArea.setCaretPosition(0);
+                javax.swing.JTextField other = new javax.swing.JTextField();
+                KeyEvent otherEvent = new KeyEvent(other, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_F2, KeyEvent.CHAR_UNDEFINED);
+                editor.keyPressed(otherEvent);
+                assertFalse(otherEvent.isConsumed());
+                java.awt.event.InputMethodEvent composing = new java.awt.event.InputMethodEvent(editor.writingArea,
+                    java.awt.event.InputMethodEvent.INPUT_METHOD_TEXT_CHANGED, new java.text.AttributedString("あ").getIterator(), 0, null, null);
+                for (java.awt.event.InputMethodListener listener : editor.writingArea.getInputMethodListeners()) listener.inputMethodTextChanged(composing);
+                KeyEvent ignored = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_F2, KeyEvent.CHAR_UNDEFINED);
+                editor.keyPressed(ignored);
+                assertFalse(ignored.isConsumed());
+                assertEquals(0, editor.writingArea.getSelectionEnd());
+                return null;
+            });
+            assertTrue(onEdt(() -> editor.setKeybindingPersistent("plain", "<mod-s>", "action:find")).startsWith("Set"));
+            String previousHome = System.getProperty("user.home");
+            try {
+                System.setProperty("user.home", home.toString());
+                assertTrue(new ConfigManager().effectiveKeybindingsText("").contains("action:find"));
+            } finally { System.setProperty("user.home", previousHome); }
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void quickOpenNavigatesToLocationAndRecentPickerPreservesTheSourceOnCancel() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-quick-open"));

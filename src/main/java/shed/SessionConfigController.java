@@ -257,6 +257,7 @@ final class SessionConfigController {
     String resetKeybindingPersistent(String scope, String lhs) {
         try {
             editor.configManager.resetKeybindingAndPersist(scope, lhs);
+            applyRuntimeConfigFromSettings();
             return "Reset keybinding keybind." + scope + "." + lhs;
         } catch (IOException e) {
             return "Error resetting keybinding: " + e.getMessage();
@@ -427,6 +428,7 @@ final class SessionConfigController {
 
 
     void applyRuntimeConfigFromSettings() {
+        if (!editor.stagedStartupPending) editor.setJMenuBar(ShedMenuBar.create(editor));
         editor.snippetService.loadFromConfig(editor.configManager);
         MultiSelectionPolicy multiSelection = editor.configManager.getMultiSelectionPolicy();
         if (!multiSelection.enabled()) {

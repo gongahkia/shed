@@ -9,6 +9,25 @@ import java.util.List;
 
 class FuzzyMatchServiceTest {
 
+    @Test
+    void fileRankingPrefersNamesOverIncidentalParentDirectoryMatches() {
+        List<String> files = List.of("Main.java/notes.txt", "src/deep/Main.java", "src/OtherMain.java", "src/Main.java");
+        FuzzyMatchService matcher = new FuzzyMatchService();
+        assertEquals("src/Main.java", matcher.matchPathStrings("Main.java", files, 10).getFirst());
+        assertEquals("src/deep/Main.java", matcher.matchPathStrings("deep/Main", files, 10).getFirst());
+        assertEquals(files, matcher.matchPathStrings("", files, 10));
+        assertEquals(List.of("src\\Main.java"), matcher.matchPathStrings("main", List.of("src\\Main.java"), 10));
+    }
+
+    @Test
+    void matchingDoesNotDependOnTheUsersLocale() {
+        java.util.Locale original = java.util.Locale.getDefault();
+        try {
+            java.util.Locale.setDefault(java.util.Locale.forLanguageTag("tr-TR"));
+            assertTrue(new FuzzyMatchService().score("index", "INDEX") > 0);
+        } finally { java.util.Locale.setDefault(original); }
+    }
+
     private FuzzyMatchService service;
 
     @BeforeEach

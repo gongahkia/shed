@@ -180,8 +180,6 @@ public class Texteditor extends JFrame implements KeyListener {
     Color syntaxStringColor;
     Color syntaxCommentColor;
     Color syntaxNumberColor;
-    List<Integer> jumpList;
-    int jumpIndex;
     List<Integer> changeList;
     int changeIndex;
     char lastFindChar;
@@ -334,8 +332,6 @@ public class Texteditor extends JFrame implements KeyListener {
         syntaxStringColor = configManager.getSyntaxStringColor();
         syntaxCommentColor = configManager.getSyntaxCommentColor();
         syntaxNumberColor = configManager.getSyntaxNumberColor();
-        jumpList = new ArrayList<>();
-        jumpIndex = -1;
         changeList = new ArrayList<>();
         changeIndex = -1;
         lastFindChar = '\0';
@@ -2765,6 +2761,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     String openFileAtAsync(File file, int line, int column, String successMessage) {
         if (file == null) return "File path is unavailable";
+        recordJumpPosition();
         openFileAsync(file, error -> {
             if (error != null) return;
             FileBuffer active = getCurrentBuffer();
@@ -2773,15 +2770,12 @@ public class Texteditor extends JFrame implements KeyListener {
                 showMessage("File opened in another window; select it to navigate to line " + line);
                 return;
             }
-            String result = gotoLine(line);
-            if (result.startsWith("Error") || result.startsWith("Invalid")) {
-                showMessage(result);
+            if (active.isLargeFile()) {
+                showMessage("File opened in large-file mode; location navigation is unavailable");
                 return;
             }
             try {
-                int lineIndex = Math.min(Math.max(0, line - 1), Math.max(0, writingArea.getLineCount() - 1));
-                int lineStart = writingArea.getLineStartOffset(lineIndex);
-                writingArea.setCaretPosition(Math.min(lineStart + Math.max(0, column - 1), writingArea.getText().length()));
+                writingArea.setCaretPosition(EditorLocation.offset(writingArea, line, column));
                 showMessage(successMessage);
             } catch (javax.swing.text.BadLocationException errorAtPosition) {
                 showMessage("File opened, but its requested position is unavailable");

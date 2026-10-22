@@ -17,6 +17,11 @@ import java.util.List;
 final class EditActionController {
     private final Texteditor editor;
     private final MotionService motionService = new MotionService();
+    private record JumpLocation(long bufferId, int offset) { }
+    private final NavigationHistory<JumpLocation> navigationHistory = new NavigationHistory<>(100);
+    private final Map<FileBuffer, Long> navigationBufferIds = new WeakHashMap<>();
+    private long nextNavigationBufferId;
+    private boolean restoringNavigation;
 
     EditActionController(Texteditor editor) {
         this.editor = editor;
@@ -1473,34 +1478,44 @@ final class EditActionController {
 
 
     void recordJumpPosition() {
-        int position = editor.writingArea.getCaretPosition();
-        if (editor.jumpList.isEmpty() || editor.jumpList.get(editor.jumpList.size() - 1) != position) {
-            if (editor.jumpIndex >= 0 && editor.jumpIndex < editor.jumpList.size() - 1) {
-                editor.jumpList = new ArrayList<>(editor.jumpList.subList(0, editor.jumpIndex + 1));
-            }
-            editor.jumpList.add(position);
-            editor.jumpIndex = editor.jumpList.size() - 1;
-        }
+        if (!restoringNavigation) navigationHistory.record(currentJumpLocation());
     }
 
-
-    void jumpBack() {
-        if (editor.jumpList.isEmpty() || editor.jumpIndex <= 0) {
-            editor.showMessage("At oldest jump");
-            return;
-        }
-        editor.jumpIndex--;
-        editor.writingArea.setCaretPosition(Math.min(editor.jumpList.get(editor.jumpIndex), editor.writingArea.getText().length()));
+    private JumpLocation currentJumpLocation() {
+        EditorPane pane = editor.getActivePane();
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (pane == null || buffer == null || buffer.isLargeFile() || pane.getTerminalPane() != null
+            || pane.isMarkdownPreview() || pane.getAlternateComponent() != null) return null;
+        long id = navigationBufferIds.computeIfAbsent(buffer, ignored -> ++nextNavigationBufferId);
+        return new JumpLocation(id, editor.writingArea.getCaretPosition());
     }
 
-
-    void jumpForward() {
-        if (editor.jumpList.isEmpty() || editor.jumpIndex >= editor.jumpList.size() - 1) {
-            editor.showMessage("At newest jump");
-            return;
+    private FileBuffer bufferForJump(JumpLocation location) {
+        for (FileBuffer buffer : editor.buffers) {
+            if (Objects.equals(navigationBufferIds.get(buffer), location.bufferId())) return buffer;
         }
-        editor.jumpIndex++;
-        editor.writingArea.setCaretPosition(Math.min(editor.jumpList.get(editor.jumpIndex), editor.writingArea.getText().length()));
+        return null;
+    }
+
+    void jumpBack() { editor.showMessage(navigateHistory(false)); }
+    void jumpForward() { editor.showMessage(navigateHistory(true)); }
+
+    String navigateHistory(boolean forward) {
+        JumpLocation current = currentJumpLocation();
+        JumpLocation target = forward
+            ? navigationHistory.forward(current, location -> bufferForJump(location) != null)
+            : navigationHistory.back(current, location -> bufferForJump(location) != null);
+        if (target == null) return forward ? "At newest jump" : "At oldest jump";
+        FileBuffer buffer = bufferForJump(target);
+        restoringNavigation = true;
+        try {
+            if (buffer != editor.getCurrentBuffer()) editor.switchToBuffer(editor.buffers.indexOf(buffer));
+            editor.writingArea.setCaretPosition(Math.min(target.offset(), editor.writingArea.getDocument().getLength()));
+            editor.writingArea.requestFocusInWindow();
+        } finally {
+            restoringNavigation = false;
+        }
+        return (forward ? "Forward: " : "Back: ") + buffer.getDisplayName();
     }
 
 

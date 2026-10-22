@@ -16,6 +16,8 @@ Each action is unique by visible label and normalized command. The application r
 | Buffer Picker | `:buffers` | Show every open buffer, filter the list, and switch to a selected buffer. |
 | Switch to Next Open Buffer | `:bn` | Switch to the next open buffer. |
 | Switch to Previous Open Buffer | `:bp` | Switch to the previous open buffer. |
+| Go Back | `:back` | Return to the previous location in an open document. |
+| Go Forward | `:forward` | Return to the next location in navigation history. |
 | Close Current Buffer | `:bdelete` | Close the current buffer, prompting when needed. |
 | Discard Current Buffer | `:discard current buffer` | Close the current buffer without saving its changes. |
 | Save Current Buffer | `:write` | Write the current buffer. |

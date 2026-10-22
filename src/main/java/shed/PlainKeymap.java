@@ -25,6 +25,8 @@ final class PlainKeymap {
         CURSOR_BELOW(null),
         NEXT_BUFFER("bn"),
         PREVIOUS_BUFFER("bp"),
+        NAVIGATE_BACK("back"),
+        NAVIGATE_FORWARD("forward"),
         COMMANDS("palette"),
         BUFFERS("buffers"),
         CLOSE("close"),
@@ -52,6 +54,9 @@ final class PlainKeymap {
         if (event.isControlDown() && event.isMetaDown()) {
             return Action.NONE;
         }
+        if (event.isControlDown() && !event.isAltDown() && event.getKeyCode() == KeyEvent.VK_MINUS) {
+            return event.isShiftDown() ? Action.NAVIGATE_FORWARD : Action.NAVIGATE_BACK;
+        }
         if (event.isAltDown()) {
             if (event.isMetaDown() && !event.isControlDown() && !event.isShiftDown()
                 && event.getKeyCode() == KeyEvent.VK_F) return Action.REPLACE;
@@ -59,6 +64,8 @@ final class PlainKeymap {
             return switch (event.getKeyCode()) {
                 case KeyEvent.VK_UP -> Action.CURSOR_ABOVE;
                 case KeyEvent.VK_DOWN -> Action.CURSOR_BELOW;
+                case KeyEvent.VK_LEFT -> isMac() ? Action.NONE : Action.NAVIGATE_BACK;
+                case KeyEvent.VK_RIGHT -> isMac() ? Action.NONE : Action.NAVIGATE_FORWARD;
                 default -> Action.NONE;
             };
         }
@@ -90,5 +97,9 @@ final class PlainKeymap {
             case KeyEvent.VK_Q -> shift ? Action.NONE : Action.QUIT;
             default -> Action.NONE;
         };
+    }
+
+    private static boolean isMac() {
+        return System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac");
     }
 }

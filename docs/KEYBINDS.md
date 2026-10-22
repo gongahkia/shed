@@ -26,6 +26,7 @@ The default `keymap.profile = "plain"` provides non-modal editing. Plain bypasse
 | `Ctrl`/`Cmd` + `Z` | Undo |
 | `Ctrl`/`Cmd` + `Shift` + `Z` or `Ctrl`/`Cmd` + `Y` | Redo |
 | `Ctrl`/`Cmd` + `Page Down` / `Ctrl`/`Cmd` + `Page Up` | Next / previous buffer |
+| `Alt` + `Left` / `Right` (Linux/Windows), `Ctrl` + `-` / `Ctrl` + `Shift` + `-` (macOS) | Go Back / Go Forward across open documents |
 | `Ctrl`/`Cmd` + `Shift` + `P` | Command palette |
 | `Ctrl`/`Cmd` + `D` | Add next matching selection |
 | `Alt` + `Up` / `Alt` + `Down` | Add cursor above / below |
@@ -38,6 +39,10 @@ The default `keymap.profile = "plain"` provides non-modal editing. Plain bypasse
 | `F1` | Plain-keymap help |
 
 The inline Find and Replace bars accept Enter for the next match, Shift+Enter for the previous match, and Escape to close. Replace All shows the number of matches before applying the edit. The editor shows file position as a percentage in the status bar and opens at its previously saved window size and position.
+
+Switching ordinary text buffers preserves the caret, selection direction, and scroll position separately in each split. Explicit line/symbol jumps override the restored position. Large-file projections retain their existing bounded-view behavior.
+
+**Go Back** and **Go Forward** are also in Navigate and the command palette, or available as `:back` / `:forward` in any profile. Vim retains `Ctrl+O` / `Ctrl+I`. History holds up to 100 origins, skips closed buffers, and does not retain closed documents in memory. A new jump after going back clears the forward branch. Large-file projections and terminal/preview surfaces are not recorded.
 
 When a completion popup is open, press `F6` to focus its suggestion list for screen reader navigation. Use the arrow keys to choose a suggestion, Enter to insert it, or Escape to close the popup.
 

@@ -74,14 +74,31 @@ final class PaneBufferController {
 
 
     void loadBufferIntoEditor(FileBuffer buffer) {
-        loadBufferIntoPane(editor.getActivePane(), buffer, 0);
+        restoreBufferIntoPane(editor.getActivePane(), buffer);
     }
 
+    private void restoreBufferIntoPane(EditorPane pane, FileBuffer buffer) {
+        if (pane == null || buffer == null) return;
+        pane.rememberBufferView();
+        BufferViewState view = pane.rememberedView(buffer);
+        loadBufferIntoPane(pane, buffer, 0);
+        if (view == null) return;
+        view.restoreSelection(pane.getTextArea());
+        int dot = pane.getTextArea().getCaret().getDot();
+        int mark = pane.getTextArea().getCaret().getMark();
+        SwingUtilities.invokeLater(() -> {
+            // An explicit jump or another switch before layout must win over this restoration.
+            if (pane.getBuffer() != buffer || pane.getTextArea().getCaret().getDot() != dot
+                || pane.getTextArea().getCaret().getMark() != mark) return;
+            view.restoreViewport(pane.getScrollPane());
+        });
+    }
 
     void loadBufferIntoPane(EditorPane pane, FileBuffer buffer, int caretPosition) {
         if (pane == null || buffer == null) {
             return;
         }
+        pane.rememberBufferView();
         if (pane.isMarkdownPreview()) {
             editor.detachMarkdownPreview(pane);
             pane.clearMarkdownPreviewComponent();
@@ -152,6 +169,7 @@ final class PaneBufferController {
     void persistCurrentBufferState() {
         EditorPane pane = editor.getActivePane();
         if (pane != null) {
+            pane.rememberBufferView();
             pane.setBuffer(getCurrentBuffer());
         }
     }
@@ -428,6 +446,7 @@ final class PaneBufferController {
 
 
     public void openFile(File file) throws IOException {
+        if (findBufferByPath(file) != getCurrentBuffer()) editor.recordJumpPosition();
         EditorPane activePane = editor.getActivePane();
         if (activePane != null) openRequests.put(activePane, ++openRequestSequence);
         persistCurrentBufferState();
@@ -458,6 +477,7 @@ final class PaneBufferController {
     }
 
     void openFileAsync(File file, java.util.function.Consumer<IOException> completion) {
+        if (findBufferByPath(file) != getCurrentBuffer()) editor.recordJumpPosition();
         persistCurrentBufferState();
         EditorPane targetPane = editor.getActivePane();
         long request = ++openRequestSequence;
@@ -507,7 +527,7 @@ final class PaneBufferController {
         } else if (alreadyOpen == null) {
             editor.buffers.add(buffer);
         }
-        loadBufferIntoPane(pane, buffer, 0);
+        restoreBufferIntoPane(pane, buffer);
         editor.showAlternateSurfaceIfAvailable(pane, buffer);
         editor.addToRecentFiles(file.getAbsolutePath());
         editor.registerFileWatch(buffer);
@@ -680,7 +700,7 @@ final class PaneBufferController {
         for (EditorPane pane : new ArrayList<>(editor.editorPanes)) {
             if (pane.getBuffer() == buffer) {
                 if (!editor.editorPanes.contains(pane)) continue;
-                loadBufferIntoPane(pane, replacement, 0);
+                restoreBufferIntoPane(pane, replacement);
             }
         }
         return "Buffer deleted";
@@ -691,10 +711,12 @@ final class PaneBufferController {
         if (index < 0 || index >= editor.buffers.size()) {
             return;
         }
-
-        persistCurrentBufferState();
+        EditorPane pane = editor.getActivePane();
+        if (pane != null) openRequests.put(pane, ++openRequestSequence);
 
         FileBuffer newBuffer = editor.buffers.get(index);
+        if (newBuffer != getCurrentBuffer()) editor.recordJumpPosition();
+        persistCurrentBufferState();
         loadBufferIntoEditor(newBuffer);
     }
 

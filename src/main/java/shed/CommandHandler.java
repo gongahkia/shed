@@ -119,6 +119,8 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleEdit(args), "e", "edit");
         registerCommand((args, range, force) -> editor.nextBuffer(), "bn", "bnext");
         registerCommand((args, range, force) -> editor.prevBuffer(), "bp", "bprev");
+        registerCommand((args, range, force) -> editor.editActionController.navigateHistory(false), "back");
+        registerCommand((args, range, force) -> editor.editActionController.navigateHistory(true), "forward");
         registerCommand((args, range, force) -> editor.deleteBuffer(force), "bd", "bdelete");
         registerCommand((args, range, force) -> handleDiscard(args), "discard");
         registerCommand((args, range, force) -> handleSet(args, force), "set");

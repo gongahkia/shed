@@ -5,6 +5,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
 public class EditorPane {
+    private final java.util.Map<FileBuffer, BufferViewState> bufferViews = new java.util.WeakHashMap<>();
     private final JTextArea textArea;
     private final LineNumberPanel lineNumberPanel;
     private final JScrollPane scrollPane;
@@ -51,6 +52,18 @@ public class EditorPane {
 
     public void setBuffer(FileBuffer buffer) {
         this.buffer = buffer;
+    }
+
+    void rememberBufferView() {
+        // A large-file document is only a movable projection, not stable document coordinates.
+        if (buffer != null && !buffer.isLargeFile() && textArea.getDocument() == buffer.getDocument()
+            && terminalPane == null && alternateComponent == null && markdownPreviewComponent == null) {
+            bufferViews.put(buffer, BufferViewState.capture(textArea, scrollPane));
+        }
+    }
+
+    BufferViewState rememberedView(FileBuffer target) {
+        return bufferViews.get(target);
     }
 
     LargeFileProjection getLargeFileProjection() {

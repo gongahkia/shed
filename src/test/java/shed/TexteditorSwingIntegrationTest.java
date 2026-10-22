@@ -43,6 +43,101 @@ public class TexteditorSwingIntegrationTest {
     Path tempDir;
 
     @Test
+    void navigationHistoryReturnsAcrossDocumentsAndBranchesAfterNewJumps() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-navigation"));
+        Path first = tempDir.resolve("navigation-first.txt");
+        Path second = tempDir.resolve("navigation-second.txt");
+        Files.writeString(first, "one\ntwo\nthree");
+        Files.writeString(second, "alpha\nbeta\ngamma");
+        Texteditor editor = createEditor(home, first);
+        try {
+            onEdt(() -> {
+                editor.writingArea.setCaretPosition(5);
+                editor.openFileAtAsync(second.toFile(), 2, 1000, "Opened target");
+                return null;
+            });
+            assertTrue(awaitCurrentFile(editor, second));
+            assertEquals(10, onEdt(() -> editor.writingArea.getCaretPosition()));
+            onEdt(() -> {
+                assertTrue(editor.commandHandler.execute("back").startsWith("Back:"));
+                assertEquals(first.toFile(), editor.getCurrentBuffer().getFile());
+                assertEquals(5, editor.writingArea.getCaretPosition());
+                assertTrue(editor.commandHandler.execute("forward").startsWith("Forward:"));
+                assertEquals(second.toFile(), editor.getCurrentBuffer().getFile());
+                assertEquals(10, editor.writingArea.getCaretPosition());
+                editor.commandHandler.execute("back");
+                editor.gotoLine(3);
+                assertEquals("At newest jump", editor.commandHandler.execute("forward"));
+                editor.commandHandler.execute("back");
+                assertEquals(5, editor.writingArea.getCaretPosition());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void bufferSwitchRestoresSelectionAndViewportWithoutLosingEdits() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-buffer-view"));
+        Path first = tempDir.resolve("first.txt");
+        Path second = tempDir.resolve("second.txt");
+        Files.writeString(first, "first line\n".repeat(500));
+        Files.writeString(second, "other file");
+        Texteditor editor = createEditor(home, first);
+        try {
+            FileBuffer source = onEdt(editor::getCurrentBuffer);
+            onEdt(() -> {
+                editor.writingArea.append("unsaved");
+                editor.writingArea.setCaretPosition(1200);
+                editor.writingArea.moveCaretPosition(1150);
+                return null;
+            });
+            java.awt.Point position = onEdt(() -> {
+                var viewport = editor.getActivePane().getScrollPane().getViewport();
+                viewport.setViewPosition(new java.awt.Point(0, 900));
+                var saved = viewport.getViewPosition();
+                editor.openFile(second.toFile());
+                editor.switchToBuffer(editor.buffers.indexOf(source));
+                assertEquals(1150, editor.writingArea.getCaret().getDot());
+                assertEquals(1200, editor.writingArea.getCaret().getMark());
+                return saved;
+            });
+            assertEquals(position, onEdt(() -> editor.getActivePane().getScrollPane().getViewport().getViewPosition()));
+            assertTrue(onEdt(() -> source.isModified() && editor.writingArea.getText().endsWith("unsaved")));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void bufferViewsAreIndependentAcrossSplitsAndExplicitJumpsWin() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-split-view"));
+        Path first = tempDir.resolve("split-first.txt");
+        Path second = tempDir.resolve("split-second.txt");
+        Files.writeString(first, "one\ntwo\nthree\nfour\n");
+        Files.writeString(second, "other");
+        Texteditor editor = createEditor(home, first);
+        try {
+            onEdt(() -> {
+                FileBuffer source = editor.getCurrentBuffer();
+                EditorPane left = editor.getActivePane();
+                editor.writingArea.setCaretPosition(5);
+                editor.splitWindow(true);
+                EditorPane right = editor.getActivePane();
+                editor.writingArea.setCaretPosition(10);
+                editor.openFile(second.toFile());
+                editor.switchToBuffer(editor.buffers.indexOf(source));
+                assertEquals(10, right.getTextArea().getCaretPosition());
+                assertEquals(5, left.getTextArea().getCaretPosition());
+                editor.gotoLine(4);
+                assertEquals(14, right.getTextArea().getCaretPosition());
+                return null;
+            });
+            assertEquals(14, onEdt(() -> editor.writingArea.getCaretPosition()));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void paletteInformationAndMarkdownOutlineOpenWindowsWithoutReplacingTheDocument() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-information-pages");

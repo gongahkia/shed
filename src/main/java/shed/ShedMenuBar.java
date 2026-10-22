@@ -66,6 +66,12 @@ final class ShedMenuBar {
         item(view, "Tests", -1, 0, () -> editor.showToolWindow(ToolWindowHost.Tab.TESTS));
 
         JMenu navigate = menu("Navigate");
+        item(navigate, "Go Back", nativeMac ? KeyEvent.VK_MINUS : KeyEvent.VK_LEFT,
+            nativeMac ? InputEvent.CTRL_DOWN_MASK : InputEvent.ALT_DOWN_MASK, () -> action(PlainKeymap.Action.NAVIGATE_BACK));
+        item(navigate, "Go Forward", nativeMac ? KeyEvent.VK_MINUS : KeyEvent.VK_RIGHT,
+            nativeMac ? InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK : InputEvent.ALT_DOWN_MASK,
+            () -> action(PlainKeymap.Action.NAVIGATE_FORWARD));
+        navigate.addSeparator();
         item(navigate, "Find File…", KeyEvent.VK_P, commandMask, () -> show(editor.showFileFinder()));
         item(navigate, "Switch Buffer…", KeyEvent.VK_B, commandMask, () -> show(editor.showBufferFinder()));
         item(navigate, "Go to Line…", nativeMac ? -1 : KeyEvent.VK_G,

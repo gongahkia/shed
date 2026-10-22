@@ -75,7 +75,8 @@ final class ToolWindowHost extends JPanel {
         editor.showToolWindow();
         tabs.setSelectedComponent(surface.component());
         if (tab == Tab.SEARCH || tab == Tab.REPLACE) editor.editorToolSplit.setDividerLocation(
-            Math.max(UiZoom.scale(120, editor.configManager.getUiZoom()), editor.editorToolSplit.getHeight() - UiZoom.scale(360, editor.configManager.getUiZoom())));
+            Math.max(UiZoom.scale(120, editor.configManager.getUiZoom()), editor.editorToolSplit.getHeight()
+                - UiZoom.scale(tab == Tab.REPLACE ? 520 : 360, editor.configManager.getUiZoom())));
         surface.refresh();
     }
 

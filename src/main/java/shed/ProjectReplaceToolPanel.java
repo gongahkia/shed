@@ -39,7 +39,12 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
         @Override public boolean isCellEditable(int row, int column) { return column == 0; }
         @Override public Class<?> getColumnClass(int column) { return column == 0 ? Boolean.class : String.class; }
     };
-    private final JTable fileTable = new JTable(files);
+    private final JTable fileTable = new JTable(files) {
+        @Override public String getToolTipText(java.awt.event.MouseEvent event) {
+            int row = rowAtPoint(event.getPoint());
+            return row >= 0 && row < visibleFiles.size() ? visibleFiles.get(row).path().toString() : null;
+        }
+    };
     private final JTable matchTable = new JTable(matches);
     private final JTextArea detail = new JTextArea();
     private WorkspaceReplaceService.Plan plan;
@@ -63,6 +68,13 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
             });
         }
         for (JCheckBox option : List.of(matchCase, regex, wholeWord)) option.addActionListener(event -> invalidatePreview());
+        matchTable.getSelectionModel().addListSelectionListener(event -> {
+            if (!refreshing && !event.getValueIsAdjusting() && matchTable.getSelectedRow() >= 0 && matchTable.getSelectedRow() < visibleMatches.size()) {
+                var match = visibleMatches.get(matchTable.getSelectedRow());
+                String path = fileTable.getSelectedRow() >= 0 ? visibleFiles.get(fileTable.getSelectedRow()).path() + "\n\n" : "";
+                detail.setText(path + "Line " + match.line() + ", column " + match.column() + "\n\n" + match.preview()); detail.setCaretPosition(0);
+            }
+        });
         fileTable.getSelectionModel().addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) refreshMatches(); });
         files.addTableModelListener(event -> { if (!refreshing && event.getColumn() == 0) updateFile(event.getFirstRow()); });
         matches.addTableModelListener(event -> { if (!refreshing && event.getColumn() == 0) updateMatch(event.getFirstRow()); });
@@ -74,6 +86,13 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
         SearchControlMetrics.apply(panel, editor);
         fileTable.setRowHeight(UiZoom.scale(40, editor.configManager.getUiZoom()));
         matchTable.setRowHeight(UiZoom.scale(40, editor.configManager.getUiZoom()));
+        for (JTable table : List.of(fileTable, matchTable)) {
+            table.setFont(editor.resolveUiFont()); table.getTableHeader().setFont(editor.resolveUiFont());
+            table.getColumnModel().getColumn(0).setMaxWidth(UiZoom.scale(60, editor.configManager.getUiZoom()));
+        }
+        fileTable.getColumnModel().getColumn(2).setMaxWidth(UiZoom.scale(75, editor.configManager.getUiZoom()));
+        detail.setFont(editor.resolveUiFont());
+        detail.setLineWrap(true); detail.setWrapStyleWord(true);
     }
     @Override public JPanel component() { return panel; }
 
@@ -116,9 +135,9 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
     private java.awt.Component content() {
         JScrollPane filePane = new JScrollPane(fileTable); filePane.setBorder(BorderFactory.createTitledBorder("Files"));
         JScrollPane matchPane = new JScrollPane(matchTable); matchPane.setBorder(BorderFactory.createTitledBorder("Matches"));
-        JSplitPane left = new JSplitPane(JSplitPane.VERTICAL_SPLIT, filePane, matchPane); left.setResizeWeight(0.48);
+        JSplitPane left = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, filePane, matchPane); left.setResizeWeight(0.40);
         JScrollPane result = new JScrollPane(detail); result.setBorder(BorderFactory.createTitledBorder("Preview / Apply Result"));
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, result); split.setResizeWeight(0.54);
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, result); split.setResizeWeight(0.68);
         return split;
     }
 
@@ -130,6 +149,10 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     @Override public void refresh() {
+        int selectedFile = fileTable.getSelectedRow() >= 0 && fileTable.getSelectedRow() < visibleFiles.size()
+            ? visibleFiles.get(fileTable.getSelectedRow()).fileId() : -1;
+        int selectedMatch = matchTable.getSelectedRow() >= 0 && matchTable.getSelectedRow() < visibleMatches.size()
+            ? visibleMatches.get(matchTable.getSelectedRow()).matchId() : -1;
         refreshing = true;
         try {
             WorkspaceReplaceCoordinator controller = editor.workspaceReplaceCoordinator();
@@ -137,19 +160,35 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
             enabled.setSelected(policy.enabled()); scope.setSelectedItem(policy.scope());
             plan = controller.planForPanel();
             files.setRowCount(0); visibleFiles = plan == null ? List.of() : plan.files();
-            for (WorkspaceReplaceService.FilePlan file : visibleFiles) files.addRow(new Object[] {file.selectedMatchCount() > 0, file.path().toString(), file.selectedMatchCount()});
+            for (WorkspaceReplaceService.FilePlan file : visibleFiles) {
+                String label = file.path().getFileName().toString();
+                if (visibleFiles.stream().filter(other -> other.path().getFileName().equals(file.path().getFileName())).count() > 1)
+                    label += " — " + file.path().getParent();
+                files.addRow(new Object[] {file.selectedMatchCount() > 0, label, file.selectedMatchCount()});
+            }
+            int fileRow = 0;
+            for (int index = 0; index < visibleFiles.size(); index++) if (visibleFiles.get(index).fileId() == selectedFile) fileRow = index;
+            if (!visibleFiles.isEmpty()) fileTable.setRowSelectionInterval(fileRow, fileRow);
             renderMatches();
+            for (int index = 0; index < visibleMatches.size(); index++)
+                if (visibleMatches.get(index).matchId() == selectedMatch) matchTable.setRowSelectionInterval(index, index);
             WorkspaceReplaceService.ApplyResult result = controller.lastApplyResultForPanel();
             if (result != null) detail.setText(renderResult(result));
             else if (plan == null) detail.setText(policy.enabled() ? "Enter a find/replacement pair, then Preview. Regex replacements support $1 and ${name}." : "Enable project replace before previewing.");
-            else detail.setText(renderPlan(plan));
+            else detail.setText((visibleFiles.isEmpty() ? "" : visibleFiles.get(fileRow).path() + "\n\n") + renderPlan(plan));
+            detail.setCaretPosition(0);
         } finally { refreshing = false; }
     }
 
     private void refreshMatches() {
         if (refreshing) return;
         refreshing = true;
-        try { renderMatches(); } finally { refreshing = false; }
+        try {
+            renderMatches();
+            if (plan != null && fileTable.getSelectedRow() >= 0) {
+                detail.setText(visibleFiles.get(fileTable.getSelectedRow()).path() + "\n\n" + renderPlan(plan)); detail.setCaretPosition(0);
+            }
+        } finally { refreshing = false; }
     }
 
     private void renderMatches() {

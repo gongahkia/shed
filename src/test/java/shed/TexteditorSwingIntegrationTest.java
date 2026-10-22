@@ -67,6 +67,13 @@ public class TexteditorSwingIntegrationTest {
             onEdt(() -> { editor.workspaceReplaceCoordinator().previewForPanel(WorkspaceSearchQuery.literal("old"), "new"); return null; });
             assertTrue(awaitUiState(() -> editor.workspaceReplaceCoordinator().planForPanel() != null));
             onEdt(() -> {
+                var tables = descendants(editor.toolWindowHost.replacePanel().component(), javax.swing.JTable.class);
+                assertEquals("notes.txt", tables.get(0).getValueAt(0, 1));
+                assertEquals(2, tables.get(1).getRowCount());
+                tables.get(1).setRowSelectionInterval(1, 1);
+                tables.get(1).setValueAt(false, 1, 0);
+                assertEquals(1, tables.get(1).getSelectedRow());
+                assertEquals(1, editor.workspaceReplaceCoordinator().planForPanel().selectedMatchCount());
                 editor.writingArea.append(" unsaved");
                 assertTrue(editor.workspaceReplaceCoordinator().applyForPanel().startsWith("Save or close"));
                 return null;

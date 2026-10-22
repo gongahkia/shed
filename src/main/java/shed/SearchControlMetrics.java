@@ -26,6 +26,9 @@ final class SearchControlMetrics {
             } else if (child instanceof JTextField field) {
                 field.setPreferredSize(new Dimension(UiZoom.scale(180, zoom), height));
             } else if (child instanceof JComboBox<?> combo) {
+                combo.setUI(new javax.swing.plaf.basic.BasicComboBoxUI());
+                combo.setBackground(editor.configManager.getRaisedSurfaceColor());
+                combo.setForeground(editor.configManager.getEditorForeground());
                 combo.setPreferredSize(new Dimension(UiZoom.scale(145, zoom), height));
             } else if (child instanceof Container nested) apply(nested, editor);
         }

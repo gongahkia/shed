@@ -24,3 +24,20 @@ java -cp target/shed-2.0.0.jar shed.EditorResponsivenessBenchmark
 It creates a deterministic Java-like 500,000-line fixture and takes 25 warm samples. Exit status is non-zero when either edit or caret p95 exceeds 16 ms, or when deferred visual convergence p95 exceeds 250 ms. The measurement is intentionally outside Maven's normal test suite because it is hardware-sensitive.
 
 The convergence sample covers virtualized syntax tokens, symbols, open-buffer completion words, and diff markers. It reports the slowest independent background task, as those jobs run concurrently. It measures model and background-work time, not Swing painting or language-server network latency.
+
+## Repeatable desktop workflow benchmark
+
+After `make build`, run:
+
+```sh
+python3 scripts/benchmark-editor.py --jar target/shed-2.0.0.jar \
+  --label my-revision --runs 5 --output /tmp/shed-workflow-performance.json
+```
+
+The runner compiles one independent probe against the supplied JAR, so an older JAR can use the same harness. It creates an isolated home/configuration and a deterministic 20,000-line text fixture, starts five fresh JVMs, and captures raw samples and JAR/probe hashes in JSON. The fixture uses no external language server or user extensions. Heap bounds are 64–512 MiB for every process. Python 3, Java 21, `javac` and a working desktop display are required; RSS is obtained through `ps` when available.
+
+Three launch milestones are separate: the visible window, the requested source document installed and painted, and the complete UI with menus/tool surfaces painted. These include JVM launch time but not probe compilation or fixture creation. Every run is a fresh process and a fresh configuration; OS filesystem/font caches are **not** purged. The first run and later runs are retained individually, without describing them as controlled cold-cache measurements.
+
+After full readiness and a one-second settling interval, the probe records used/committed Java heap without forcing GC and resident process memory. Each JVM then performs 10 warmups and 25 measured document insertions followed by synchronous painting of the visible source area, and the same number of fuzzy-ranking operations over 50,000 synthetic paths. Edit measurements exclude input-device, event-queue and monitor latency, asynchronous syntax convergence, and the cost of resetting the fixture after a sample. Picker measurements cover ranking rather than file discovery or result-window painting. Use `:perf` and the large-file benchmark above for those separate dimensions.
+
+The runner exits nonzero if p95 exceeds any initial target: visible window 2 s, painted source 3 s, complete UI 10 s, edit-to-paint 16 ms, picker ranking 50 ms, used heap 384 MiB, or RSS 768 MiB. These are diagnostic targets, not CI promises or competitor rankings. Missing RSS is reported as unavailable. Raw samples matter: five startup/memory runs provide only a small local sample; the 125 edit/picker samples are pooled across those five processes. Keep the machine, JDK, heap, fixture and harness unchanged when comparing builds, and run without other builds/tests competing for resources.

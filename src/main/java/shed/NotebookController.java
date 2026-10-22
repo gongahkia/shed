@@ -46,6 +46,11 @@ final class NotebookController {
                 updated -> run(pane, buffer, updated),
                 (updated, cellCount) -> runThrough(pane, buffer, updated, cellCount), buffer.getFile(),
                 () -> editor.showMessage(chooseKernel(pane, buffer))));
+            if (pane.getAlternateComponent() instanceof NotebookPanel notebook) {
+                editor.editorUiController.applyUiTheme(notebook);
+                notebook.refreshAppearance(editor.configManager, editor.resolveEditorFont(), editor.resolveUiFont(),
+                    component -> editor.editorUiController.applyUiTheme(component));
+            }
             editor.renderWindowLayout();
             editor.showMessage("Opened Jupyter notebook");
             return true;

@@ -492,6 +492,9 @@ final class SyntaxUiController {
             area.setSelectionColor(selectionColor);
             area.setSelectedTextColor(selectionTextColor);
             if (pane.getAlternateComponent() instanceof FileTreePanel explorer) explorer.refreshAppearance();
+            if (pane.getAlternateComponent() instanceof NotebookPanel notebook)
+                notebook.refreshAppearance(editor.configManager, editor.resolveEditorFont(), editor.resolveUiFont(),
+                    component -> editor.editorUiController.applyUiTheme(component));
         }
 
         editor.refreshMarkdownPreviews();

@@ -48,6 +48,10 @@ final class NotebookPanel extends JPanel {
     private final BiConsumer<NotebookDocument, Integer> runThroughAction;
     private final File sourceFile;
     private final JButton kernelButton;
+    private ConfigManager appearanceConfig;
+    private Font codeFont;
+    private Font uiFont;
+    private Consumer<Component> styleChanged = ignored -> { };
 
     NotebookPanel(NotebookDocument document, Consumer<NotebookDocument> saveAction, Consumer<NotebookDocument> runAction,
         BiConsumer<NotebookDocument, Integer> runThroughAction, File sourceFile, Runnable chooseKernelAction) {
@@ -75,7 +79,7 @@ final class NotebookPanel extends JPanel {
         toolbar.add(kernelButton);
         toolbar.add(addCode);
         toolbar.add(addMarkdown);
-        toolbar.add(new JLabel("Execution uses an installed Jupyter CLI and is explicit."));
+        runAll.setToolTipText("Run all cells using the selected Jupyter kernel");
         add(toolbar, BorderLayout.NORTH);
 
         cellsPanel.setLayout(new BoxLayout(cellsPanel, BoxLayout.Y_AXIS));
@@ -91,8 +95,22 @@ final class NotebookPanel extends JPanel {
         cells.add(editor);
         cellsPanel.add(editor);
         cellsPanel.add(Box.createVerticalStrut(8));
+        if (appearanceConfig != null) {
+            styleChanged.accept(editor);
+            editor.refreshAppearance(appearanceConfig, codeFont, uiFont);
+        }
         cellsPanel.revalidate();
         cellsPanel.repaint();
+    }
+
+    void refreshAppearance(ConfigManager config, Font font, Font uiFont, Consumer<Component> styleChanged) {
+        this.appearanceConfig = config;
+        this.codeFont = font;
+        this.uiFont = uiFont;
+        this.styleChanged = styleChanged == null ? ignored -> { } : styleChanged;
+        for (CellEditor cell : cells) cell.refreshAppearance(config, font, uiFont);
+        revalidate();
+        repaint();
     }
 
     private NotebookDocument document() {
@@ -118,11 +136,17 @@ final class NotebookPanel extends JPanel {
     private static final class CellEditor extends JPanel {
         private final NotebookDocument.Cell original;
         private final JTextArea source;
+        private final List<JTextArea> plainOutputs = new ArrayList<>();
+        private final File sourceFile;
+        private ConfigManager appearanceConfig;
+        private Font previewFont;
+        private final java.util.Map<JEditorPane, java.util.function.Supplier<String>> previews = new java.util.LinkedHashMap<>();
 
         private CellEditor(NotebookDocument.Cell cell, int index, Runnable runThrough, File sourceFile) {
             super(new BorderLayout(0, 4));
             this.original = cell;
-            setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(java.awt.Color.GRAY),
+            this.sourceFile = sourceFile;
+            setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(javax.swing.UIManager.getColor("Separator.foreground")),
                 BorderFactory.createEmptyBorder(5, 5, 5, 5)));
             JPanel header = new JPanel(new FlowLayout(FlowLayout.LEADING, 5, 0));
             header.add(new JLabel("Cell " + index + " · " + cell.type()));
@@ -142,6 +166,7 @@ final class NotebookPanel extends JPanel {
                 preview.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE);
                 preview.getAccessibleContext().setAccessibleName("Notebook Markdown Preview");
                 content.add(new JScrollPane(preview), "preview");
+                previews.put(preview, source::getText);
                 JToggleButton render = new JToggleButton("Preview");
                 render.addActionListener(event -> {
                     if (render.isSelected()) {
@@ -179,6 +204,7 @@ final class NotebookPanel extends JPanel {
                     outputs.setEditable(false);
                     outputs.setLineWrap(true);
                     outputs.setWrapStyleWord(true);
+                    plainOutputs.add(outputs);
                     contents.add(new JScrollPane(outputs));
                 }
                 for (NotebookDocument.MarkdownOutput value : markdown) {
@@ -188,6 +214,7 @@ final class NotebookPanel extends JPanel {
                     preview.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE);
                     preview.getAccessibleContext().setAccessibleName("Notebook Markdown Output");
                     preview.setText(markdownPreview(value.markdown(), sourceFile));
+                    previews.put(preview, value::markdown);
                     JScrollPane rendered = new JScrollPane(preview);
                     rendered.setAlignmentX(Component.LEFT_ALIGNMENT);
                     rendered.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE, 360));
@@ -218,9 +245,40 @@ final class NotebookPanel extends JPanel {
             return new NotebookDocument.Cell(original.type(), source.getText(), original.fields());
         }
 
-        private static String markdownPreview(String markdown, File sourceFile) {
-            return MarkdownPreviewRenderer.renderBasic(markdown, "Notebook Markdown", new Font(Font.MONOSPACED, Font.PLAIN, 13),
-                Color.WHITE, Color.BLACK, sourceFile);
+        private void refreshAppearance(ConfigManager config, Font font, Font uiFont) {
+            appearanceConfig = config;
+            previewFont = uiFont;
+            source.setFont(font);
+            source.setBackground(config.getNormalColor());
+            source.setForeground(config.getEditorForeground());
+            source.setCaretColor(config.getCaretColor());
+            source.setSelectionColor(config.getSelectionColor());
+            source.setSelectedTextColor(config.getSelectionTextColor());
+            for (JTextArea output : plainOutputs) {
+                output.setFont(font);
+                output.setBackground(config.getNormalColor());
+                output.setForeground(config.getEditorForeground());
+                output.setSelectionColor(config.getSelectionColor());
+                output.setSelectedTextColor(config.getSelectionTextColor());
+            }
+            setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(config.getSubtleBorderColor()),
+                BorderFactory.createEmptyBorder(UiZoom.scale(12, config.getUiZoom()), UiZoom.scale(12, config.getUiZoom()),
+                    UiZoom.scale(12, config.getUiZoom()), UiZoom.scale(12, config.getUiZoom()))));
+            previews.forEach((preview, text) -> {
+                preview.setFont(uiFont);
+                preview.setBackground(config.getNormalColor());
+                preview.setForeground(config.getEditorForeground());
+                int caret = preview.getCaretPosition();
+                preview.setText(markdownPreview(text.get(), sourceFile));
+                preview.setCaretPosition(Math.min(caret, preview.getDocument().getLength()));
+            });
+        }
+
+        private String markdownPreview(String markdown, File sourceFile) {
+            Font font = previewFont == null ? javax.swing.UIManager.getFont("Label.font") : previewFont;
+            Color background = appearanceConfig == null ? javax.swing.UIManager.getColor("Panel.background") : appearanceConfig.getNormalColor();
+            Color foreground = appearanceConfig == null ? javax.swing.UIManager.getColor("Label.foreground") : appearanceConfig.getEditorForeground();
+            return MarkdownPreviewRenderer.renderBasic(markdown, "Notebook Markdown", font, background, foreground, sourceFile);
         }
     }
 

@@ -42,6 +42,8 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
         panel.add(toolbar(), BorderLayout.NORTH);
         panel.add(content(), BorderLayout.CENTER);
         output.setEditable(false);
+        WorkbenchStyle.emptyText(tasks, "Save a task above to get started");
+        WorkbenchStyle.emptyText(jobTable, "Run a task to see its progress");
         jobTable.getSelectionModel().addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) showOutput(); });
         tasks.addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) loadTask(); });
     }
@@ -49,10 +51,21 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
     @Override public JPanel component() { return panel; }
 
     private JPanel toolbar() {
-        JPanel panel = new JPanel(new GridLayout(1, 6, 5, 0));
-        panel.add(new JLabel("Name")); panel.add(name); panel.add(new JLabel("Command")); panel.add(command);
-        panel.add(button("Save Task", this::saveTask));
-        panel.add(button("Remove", this::removeTask));
+        JPanel panel = new JPanel(new BorderLayout(12, 0));
+        JPanel fields = new JPanel(new GridLayout(1, 2, 12, 0));
+        fields.add(field("Name", name)); fields.add(field("Command", command));
+        panel.add(fields, BorderLayout.CENTER);
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        actions.add(button("Save Task", this::saveTask));
+        actions.add(button("Remove", this::removeTask));
+        panel.add(actions, BorderLayout.EAST);
+        return panel;
+    }
+
+    private JPanel field(String title, JTextField input) {
+        JPanel panel = new JPanel(new BorderLayout(6, 0));
+        JLabel label = new JLabel(title); label.setLabelFor(input);
+        panel.add(label, BorderLayout.WEST); panel.add(input, BorderLayout.CENTER);
         return panel;
     }
 

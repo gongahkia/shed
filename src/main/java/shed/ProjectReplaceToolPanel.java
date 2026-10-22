@@ -54,6 +54,8 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
 
     ProjectReplaceToolPanel(Texteditor editor, ToolWindowHost host) {
         this.editor = editor;
+        WorkbenchStyle.emptyText(fileTable, "Preview a replacement to review files");
+        WorkbenchStyle.emptyText(matchTable, "Select a file to review its matches");
         panel.setBorder(BorderFactory.createEmptyBorder(5, 7, 7, 7));
         panel.add(toolbar(), BorderLayout.NORTH);
         panel.add(content(), BorderLayout.CENTER);

@@ -43,6 +43,7 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
 
     GitChangesToolPanel(Texteditor editor, ToolWindowHost host) {
         this.editor = editor;
+        WorkbenchStyle.emptyText(changeTable, "No changes to display");
         this.host = host;
         panel.setBorder(BorderFactory.createEmptyBorder(5, 7, 7, 7));
         panel.add(header(), BorderLayout.NORTH);

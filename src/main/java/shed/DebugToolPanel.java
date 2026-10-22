@@ -198,8 +198,13 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         exceptionBreakpointActions.add(button("Apply", this::applyExceptionBreakpoint));
         exceptionBreakpointPanel.add(exceptionBreakpointActions, BorderLayout.SOUTH);
 
-        JPanel left = new JPanel(new GridLayout(5, 1, 4, 4));
-        left.add(framesPanel); left.add(watchPanel); left.add(breakpointPanel); left.add(functionBreakpointPanel); left.add(exceptionBreakpointPanel);
+        javax.swing.JTabbedPane left = new javax.swing.JTabbedPane();
+        left.addTab("Stack", framesPanel);
+        left.addTab("Watches", watchPanel);
+        left.addTab("Source", breakpointPanel);
+        left.addTab("Functions", functionBreakpointPanel);
+        left.addTab("Exceptions", exceptionBreakpointPanel);
+        left.setMinimumSize(new java.awt.Dimension(0, 0));
         JPanel variablesPanel = new JPanel(new BorderLayout());
         variablesPanel.setBorder(BorderFactory.createTitledBorder("Variables and Scopes"));
         variablesPanel.add(new JScrollPane(variableTree), BorderLayout.CENTER);

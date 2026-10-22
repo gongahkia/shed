@@ -28,6 +28,7 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
 
     WorkspaceSearchPanel(Texteditor editor) {
         this.editor = editor;
+        WorkbenchStyle.emptyText(results, "Search your workspace to see matching lines");
         debounce.setRepeats(false);
         panel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
         JPanel controls = new JPanel(new BorderLayout(6, 4));

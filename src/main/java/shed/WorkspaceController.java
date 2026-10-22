@@ -35,7 +35,7 @@ final class WorkspaceController {
 
     String displayRoot(Path root) {
         if (root == null) return "";
-        String name = importedFolderNames.get(root.toAbsolutePath().normalize());
+        String name = importedFolderNames.get(WorkspaceRootResolver.normalizedIdentity(root));
         return name == null ? root.toString() : name + " — " + root;
     }
 

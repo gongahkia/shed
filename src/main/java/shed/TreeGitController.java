@@ -400,7 +400,8 @@ final class TreeGitController {
         if (!root.exists()) {
             return "Path not found: " + root.getPath();
         }
-        setWorkspaceTreeRoot(root.getAbsoluteFile(), false);
+        root = WorkspaceRootResolver.normalizedIdentity(root.toPath()).toFile();
+        setWorkspaceTreeRoot(root, false);
 
         String titleSuffix = treeTitleSuffix(root);
         FileBuffer tree = createOrReplaceTreeBuffer(titleSuffix, "File tree: " + root.getAbsolutePath() + "\n", List.of());
@@ -422,7 +423,7 @@ final class TreeGitController {
     }
 
     void setWorkspaceTreeRoot(File root, boolean showTree) {
-        editor.treeRoot = root == null ? null : root.getAbsoluteFile();
+        editor.treeRoot = root == null ? null : WorkspaceRootResolver.normalizedIdentity(root.toPath()).toFile();
         cachedGitRoot = null;
         cachedGitWorkingDirectory = null;
         cachedGitRootResolved = false;

@@ -2582,7 +2582,8 @@ public class TexteditorSwingIntegrationTest {
             assertTrue(awaitSearchCompletion(editor, jobId));
 
             List<QuickfixService.Entry> entries = onEdt(() -> editor.quickfixService.entries());
-            assertEquals(List.of(visible.toString()), entries.stream().map(QuickfixService.Entry::getFilePath).toList());
+            assertEquals(1, entries.size());
+            assertEquals(visible.toRealPath(), Path.of(entries.getFirst().getFilePath()).toRealPath());
         } finally {
             disposeEditor(editor);
         }

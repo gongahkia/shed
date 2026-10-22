@@ -41,3 +41,12 @@ Three launch milestones are separate: the visible window, the requested source d
 After full readiness and a one-second settling interval, the probe records used/committed Java heap without forcing GC and resident process memory. Each JVM then performs 10 warmups and 25 measured document insertions followed by synchronous painting of the visible source area, and the same number of fuzzy-ranking operations over 50,000 synthetic paths. Edit measurements exclude input-device, event-queue and monitor latency, asynchronous syntax convergence, and the cost of resetting the fixture after a sample. Picker measurements cover ranking rather than file discovery or result-window painting. Use `:perf` and the large-file benchmark above for those separate dimensions.
 
 The runner exits nonzero if p95 exceeds any initial target: visible window 2 s, painted source 3 s, complete UI 10 s, edit-to-paint 16 ms, picker ranking 50 ms, used heap 384 MiB, or RSS 768 MiB. These are diagnostic targets, not CI promises or competitor rankings. Missing RSS is reported as unavailable. Raw samples matter: five startup/memory runs provide only a small local sample; the 125 edit/picker samples are pooled across those five processes. Keep the machine, JDK, heap, fixture and harness unchanged when comparing builds, and run without other builds/tests competing for resources.
+
+To isolate changes to fuzzy ranking from UI/background activity, compare two JARs in one JVM:
+
+```sh
+java -Xms64m -Xmx512m src/benchmark/java/shed/PickerComparisonProbe.java \
+  /path/to/baseline.jar target/shed-2.0.0.jar > /tmp/picker-comparison.json
+```
+
+This loads each ranker through an independent classloader, alternates their order, warms each for 30 iterations, and records 50 wall-clock and current-thread CPU samples per version over identical 50,000-path inputs. Every result list must be identical. CPU time excludes other threads and scheduler waits; the wall-clock desktop measurements above remain the measure of user-visible responsiveness. See [recorded results](PERFORMANCE_RESULTS.md).

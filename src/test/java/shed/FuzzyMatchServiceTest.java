@@ -90,6 +90,8 @@ class FuzzyMatchServiceTest {
             .mapToObj(index -> "src/package/Item" + index + ".java").toList();
         assertEquals(service.matchStrings("itm", candidates, 0).subList(0, 100),
             service.matchStrings("itm", candidates, 100));
+        assertEquals(service.matchPathStrings("itm", candidates, 0).subList(0, 100),
+            service.matchPathStrings("itm", candidates, 100));
     }
 
     @Test

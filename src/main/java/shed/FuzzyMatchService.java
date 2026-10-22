@@ -20,18 +20,21 @@ public class FuzzyMatchService {
     public int score(String query, String candidate) {
         if (query == null || candidate == null) return 0;
         if (query.isEmpty()) return 1;
-        String lowerQuery = query.toLowerCase(Locale.ROOT);
-        String lowerCandidate = candidate.toLowerCase(Locale.ROOT);
+        return scoreLower(query.toLowerCase(Locale.ROOT), candidate.toLowerCase(Locale.ROOT), 0);
+    }
 
-        if (lowerCandidate.equals(lowerQuery)) return 10000;
-        if (lowerCandidate.startsWith(lowerQuery)) return 5000 + (1000 - candidate.length());
+    private int scoreLower(String lowerQuery, String lowerCandidate, int start) {
+        int length = lowerCandidate.length() - start;
+        if (lowerQuery.isEmpty()) return 1;
+        if (length >= lowerQuery.length() && lowerCandidate.regionMatches(start, lowerQuery, 0, lowerQuery.length()))
+            return length == lowerQuery.length() ? 10000 : 5000 + (1000 - length);
 
         int qi = 0;
         int score = 0;
         int consecutiveBonus = 0;
         boolean lastMatched = false;
 
-        for (int ci = 0; ci < lowerCandidate.length() && qi < lowerQuery.length(); ci++) {
+        for (int ci = start; ci < lowerCandidate.length() && qi < lowerQuery.length(); ci++) {
             if (lowerCandidate.charAt(ci) == lowerQuery.charAt(qi)) {
                 qi++;
                 score += 100;
@@ -41,7 +44,7 @@ public class FuzzyMatchService {
                 } else {
                     consecutiveBonus = 0;
                 }
-                if (ci == 0 || !Character.isLetterOrDigit(lowerCandidate.charAt(ci - 1))) {
+                if (ci == start || !Character.isLetterOrDigit(lowerCandidate.charAt(ci - 1))) {
                     score += 75;
                 }
                 lastMatched = true;
@@ -53,7 +56,7 @@ public class FuzzyMatchService {
 
         if (qi < lowerQuery.length()) return 0;
 
-        score -= candidate.length();
+        score -= length;
         return Math.max(1, score);
     }
 
@@ -61,16 +64,19 @@ public class FuzzyMatchService {
         return match(query, candidates, maxResults, false);
     }
 
-    private int scorePath(String query, String candidate) {
-        int pathScore = score(query, candidate);
-        if (query.isEmpty() || candidate == null || query.indexOf('/') >= 0 || query.indexOf('\\') >= 0) return pathScore;
-        int start = Math.max(candidate.lastIndexOf('/'), candidate.lastIndexOf('\\')) + 1;
-        int nameScore = score(query, candidate.substring(start));
+    private int scoreCandidate(String query, String candidate, boolean paths) {
+        if (candidate == null) return 0;
+        String lower = candidate.toLowerCase(Locale.ROOT);
+        int pathScore = scoreLower(query, lower, 0);
+        if (!paths || query.isEmpty() || query.indexOf('/') >= 0 || query.indexOf('\\') >= 0) return pathScore;
+        int start = Math.max(lower.lastIndexOf('/'), lower.lastIndexOf('\\')) + 1;
+        int nameScore = scoreLower(query, lower, start);
         return nameScore == 0 ? pathScore : Math.max(pathScore, nameScore + 500 - Math.min(400, start));
     }
 
     private List<Match> match(String query, List<String> candidates, int maxResults, boolean paths) {
         if (query == null || candidates == null) return Collections.emptyList();
+        String lowerQuery = query.toLowerCase(Locale.ROOT);
         if (maxResults > 0) {
             record Ranked(Match match, int index) { }
             PriorityQueue<Ranked> best = new PriorityQueue<>((left, right) -> {
@@ -80,8 +86,8 @@ public class FuzzyMatchService {
             for (int index = 0; index < candidates.size(); index++) {
                 if (Thread.currentThread().isInterrupted()) return List.of();
                 String candidate = candidates.get(index);
-                int candidateScore = paths ? scorePath(query, candidate) : score(query, candidate);
-                if (candidateScore <= 0) continue;
+                int candidateScore = scoreCandidate(lowerQuery, candidate, paths);
+                if (candidateScore <= 0 || best.size() == maxResults && candidateScore <= best.peek().match().score) continue;
                 Ranked ranked = new Ranked(new Match(candidate, candidateScore), index);
                 if (best.size() < maxResults) best.add(ranked);
                 else if (best.comparator().compare(ranked, best.peek()) > 0) {
@@ -99,7 +105,7 @@ public class FuzzyMatchService {
         List<Match> matches = new ArrayList<>();
         for (String candidate : candidates) {
             if (Thread.currentThread().isInterrupted()) return List.of();
-            int s = paths ? scorePath(query, candidate) : score(query, candidate);
+            int s = scoreCandidate(lowerQuery, candidate, paths);
             if (s > 0) {
                 matches.add(new Match(candidate, s));
             }

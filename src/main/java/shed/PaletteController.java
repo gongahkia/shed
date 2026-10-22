@@ -23,7 +23,7 @@ final class PaletteController {
         action("Open Folder", "open folder", "Choose a local folder, activate it as the workspace, and show its file tree."),
         action("Toggle File Tree", "tree toggle", "Open or close the workspace file tree."),
         action("File Finder", "files", "Open the project file finder."),
-        action("Recent Files", "recent", "Open the recently used files list."),
+        action("Recent Files", "recent", "Search and open recently used files."),
         action("Buffer Picker", "buffers", "Show every open buffer, filter the list, and switch to a selected buffer."),
         action("Switch to Next Open Buffer", "bn", "Switch to the next open buffer."),
         action("Switch to Previous Open Buffer", "bp", "Switch to the previous open buffer."),
@@ -651,7 +651,7 @@ final class PaletteController {
             case "wordcount":
                 return "Show line/word/character counts.";
             case "recent":
-                return "Show recent files scratch buffer.";
+                return "Search and open recently used files.";
             case "d":
             case "delete":
                 return "Delete current line or a range.";

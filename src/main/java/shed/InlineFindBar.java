@@ -27,12 +27,16 @@ import javax.swing.text.Highlighter;
 final class InlineFindBar extends JPanel {
     private static final int MAX_MATCHES = 200_000;
     private enum Mode { FIND, REPLACE, GO_TO_LINE }
-    private record Scan(FileBuffer buffer, VersionedTextSnapshot text, String query, int[] positions, boolean truncated) { }
+    private record Scan(FileBuffer buffer, VersionedTextSnapshot text, SearchPattern pattern, List<SearchPattern.Range> ranges, boolean truncated) { }
 
     private final Texteditor editor;
     private final JLabel title = new JLabel();
     private final JTextField query = new JTextField();
     private final JTextField replacement = new JTextField();
+    private final javax.swing.JCheckBox matchCase = new javax.swing.JCheckBox("Match case", true);
+    private final javax.swing.JCheckBox regex = new javax.swing.JCheckBox("Regex");
+    private final javax.swing.JCheckBox wholeWord = new javax.swing.JCheckBox("Whole word");
+    private final JPanel optionsRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
     private final JLabel feedback = new JLabel(" ");
     private final JPanel replaceRow = new JPanel(new BorderLayout(8, 0));
     private final JButton previous = button("Previous", this::previous);
@@ -83,11 +87,25 @@ final class InlineFindBar extends JPanel {
         JPanel lower = new JPanel(new BorderLayout());
         lower.setOpaque(false);
         lower.add(replaceRow, BorderLayout.NORTH);
-        lower.add(feedback, BorderLayout.SOUTH);
+        for (javax.swing.JCheckBox option : List.of(matchCase, regex, wholeWord)) {
+            optionsRow.add(option);
+            option.addActionListener(event -> queryChanged());
+            option.setOpaque(false);
+        }
+        optionsRow.setOpaque(false);
+        optionsRow.add(button("In Files", () -> {
+            try { editor.paletteController.showWorkspaceSearch(searchPattern()); }
+            catch (IllegalArgumentException error) { feedback.setText(error.getMessage()); }
+        }));
+        JPanel optionsAndFeedback = new JPanel(new BorderLayout());
+        optionsAndFeedback.setOpaque(false);
+        optionsAndFeedback.add(optionsRow, BorderLayout.NORTH);
+        optionsAndFeedback.add(feedback, BorderLayout.SOUTH);
+        lower.add(optionsAndFeedback, BorderLayout.SOUTH);
         add(lower, BorderLayout.CENTER);
 
         AccessibilitySupport.describe(query, "Find text", "Search the active editor without closing the editor.");
-        AccessibilitySupport.describe(replacement, "Replacement text", "Preview and replace literal matches in the active editor.");
+        AccessibilitySupport.describe(replacement, "Replacement text", "Replace matches in the active editor. Regex replacements support $1 and ${name} groups.");
         scanTimer = new Timer(90, event -> submitScan());
         scanTimer.setRepeats(false);
         query.getDocument().addDocumentListener(new SimpleDocumentListener(this::queryChanged));
@@ -100,6 +118,11 @@ final class InlineFindBar extends JPanel {
         refreshAppearance();
     }
 
+    SearchPattern searchPattern() { return new SearchPattern(query.getText(), matchCase.isSelected(), regex.isSelected(), wholeWord.isSelected()); }
+    void showFind(SearchPattern pattern) {
+        matchCase.setSelected(pattern.caseSensitive()); regex.setSelected(pattern.regex()); wholeWord.setSelected(pattern.wholeWord());
+        showMode(Mode.FIND, pattern.query());
+    }
     void showFind(String initial) { showMode(Mode.FIND, initial); }
     void showReplace(String initial) { showMode(Mode.REPLACE, initial); }
     void showGoToLine() { showMode(Mode.GO_TO_LINE, ""); }
@@ -113,9 +136,9 @@ final class InlineFindBar extends JPanel {
             showFind(query.getText());
             return;
         }
-        if (scan.positions().length == 0) { feedback.setText("No matches"); return; }
-        selected = selected < 0 ? 0 : Math.floorMod(selected + (forward ? 1 : -1), scan.positions().length);
-        int position = scan.positions()[selected];
+        if (scan.ranges().size() == 0) { feedback.setText("No matches"); return; }
+        selected = selected < 0 ? 0 : Math.floorMod(selected + (forward ? 1 : -1), scan.ranges().size());
+        int position = scan.ranges().get(selected).start();
         editor.recordJumpPosition();
         editor.writingArea.setCaretPosition(position);
         editor.writingArea.requestFocusInWindow();
@@ -139,6 +162,7 @@ final class InlineFindBar extends JPanel {
         setBackground(editor.configManager.getCommandBarBackground());
         title.setForeground(editor.configManager.getCommandBarForeground());
         feedback.setForeground(editor.configManager.getCommandBarForeground());
+        for (javax.swing.JCheckBox option : List.of(matchCase, regex, wholeWord)) option.setForeground(editor.configManager.getCommandBarForeground());
         for (JTextField field : List.of(query, replacement)) {
             field.setBackground(editor.configManager.getNormalColor());
             field.setForeground(editor.configManager.getEditorForeground());
@@ -168,6 +192,7 @@ final class InlineFindBar extends JPanel {
     private void showMode(Mode nextMode, String initial) {
         mode = nextMode;
         title.setText(nextMode == Mode.GO_TO_LINE ? "Go to line" : "Find");
+        optionsRow.setVisible(nextMode != Mode.GO_TO_LINE);
         replaceRow.setVisible(nextMode == Mode.REPLACE);
         previous.setVisible(nextMode != Mode.GO_TO_LINE);
         next.setVisible(nextMode != Mode.GO_TO_LINE);
@@ -189,6 +214,8 @@ final class InlineFindBar extends JPanel {
         scan = null;
         selected = -1;
         clearHighlights();
+        replaceOne.setEnabled(false);
+        replaceAll.setEnabled(false);
         if (mode == Mode.GO_TO_LINE) {
             feedback.setText("Line 1–" + editor.writingArea.getLineCount());
             return;
@@ -207,33 +234,24 @@ final class InlineFindBar extends JPanel {
         FileBuffer buffer = editor.getCurrentBuffer();
         if (buffer == null || mode == Mode.GO_TO_LINE) return;
         VersionedTextSnapshot text = buffer.textSnapshot();
-        String pattern = query.getText();
+        SearchPattern pattern;
+        try { pattern = searchPattern(); pattern.compile(); }
+        catch (IllegalArgumentException error) { feedback.setText("Invalid search: " + error.getMessage()); return; }
         long generation = scanGeneration;
         scanJobId = editor.asyncJobService.submit("inline find", token -> {
-            String source = text.text();
-            int[] positions = new int[Math.min(256, MAX_MATCHES)];
-            int size = 0;
-            boolean truncated = false;
-            for (int from = 0; from <= source.length() - pattern.length();) {
-                if (token.isCancelled()) return null;
-                int match = source.indexOf(pattern, from);
-                if (match < 0) break;
-                if (size == MAX_MATCHES) { truncated = true; break; }
-                if (size == positions.length) positions = java.util.Arrays.copyOf(positions, Math.min(MAX_MATCHES, positions.length * 2));
-                positions[size++] = match;
-                from = match + Math.max(1, pattern.length());
-            }
-            return new Scan(buffer, text, pattern, java.util.Arrays.copyOf(positions, size), truncated);
+            SearchPattern.Scan result = pattern.scan(text.text(), MAX_MATCHES, token::isCancelled);
+            return new Scan(buffer, text, pattern, result.ranges(), result.truncated());
         }, (job, result, error) -> {
-            if (generation != scanGeneration || !isVisible() || mode == Mode.GO_TO_LINE
-                || result == null || error != null || result.buffer() != editor.getCurrentBuffer()
-                || result.text() != result.buffer().textSnapshot()) return;
+            if (generation != scanGeneration || !isVisible() || mode == Mode.GO_TO_LINE) return;
             scanJobId = -1;
+            if (error != null) { feedback.setText("Search failed: " + error.getMessage()); return; }
+            if (result == null || result.buffer() != editor.getCurrentBuffer() || result.text() != result.buffer().textSnapshot()) return;
             scan = result;
             int caret = editor.writingArea.getCaretPosition();
-            int index = java.util.Arrays.binarySearch(result.positions(), caret);
-            selected = index >= 0 ? index : Math.min(result.positions().length - 1, -index - 1);
-            if (selected < 0) selected = -1;
+            selected = result.ranges().isEmpty() ? -1 : result.ranges().size() - 1;
+            for (int index = 0; index < result.ranges().size(); index++) {
+                if (result.ranges().get(index).start() >= caret) { selected = index; break; }
+            }
             highlight();
             updateFeedback();
         });
@@ -245,11 +263,11 @@ final class InlineFindBar extends JPanel {
         Highlighter highlighter = editor.writingArea.getHighlighter();
         highlightedIn = highlighter;
         int first = Math.max(0, selected - 75);
-        int last = Math.min(scan.positions().length, selected + 76);
+        int last = Math.min(scan.ranges().size(), selected + 76);
         for (int index = first; index < last; index++) {
-            int start = scan.positions()[index];
+            int start = scan.ranges().get(index).start();
             try {
-                highlightTags.add(highlighter.addHighlight(start, start + scan.query().length(),
+                highlightTags.add(highlighter.addHighlight(start, scan.ranges().get(index).end(),
                     new DefaultHighlighter.DefaultHighlightPainter(index == selected
                         ? editor.configManager.getSelectionColor() : editor.configManager.getCurrentLineHighlightColor())));
             } catch (BadLocationException ignored) { }
@@ -267,11 +285,11 @@ final class InlineFindBar extends JPanel {
     private void updateFeedback() {
         if (mode == Mode.GO_TO_LINE) return;
         if (scan == null) return;
-        int count = scan.positions().length;
+        int count = scan.ranges().size();
         String summary = scan.truncated() ? "200,000+ matches; refine search" : count == 1 ? "1 match" : count + " matches";
         if (selected >= 0) summary += " · " + (selected + 1) + " selected";
         if (mode == Mode.REPLACE && count > 0) {
-            String before = scan.query();
+            String before = scan.pattern().query();
             String after = replacement.getText();
             summary += " · Preview: " + compact(before) + " → " + compact(after);
         }
@@ -289,13 +307,26 @@ final class InlineFindBar extends JPanel {
     private void previous() { navigate(false); }
     private void next() { navigate(true); }
 
+    private boolean replacementQueryMatches(SearchPattern expected) {
+        if (!isVisible() || mode != Mode.REPLACE) return false;
+        try { return expected.equals(searchPattern()); }
+        catch (IllegalArgumentException invalid) { return false; }
+    }
+
     private void replaceOne() {
         if (scan == null || selected < 0 || !editor.writingArea.isEditable()
             || scan.buffer() != editor.getCurrentBuffer() || scan.text() != scan.buffer().textSnapshot()) return;
-        int start = scan.positions()[selected];
-        editor.writingArea.replaceRange(replacement.getText(), start, start + scan.query().length());
-        editor.writingArea.setCaretPosition(start + replacement.getText().length());
-        queryChanged();
+        Scan expected = scan;
+        SearchPattern.Range range = scan.ranges().get(selected);
+        String value = replacement.getText();
+        editor.asyncJobService.submit("replace match", token -> expected.pattern().replacementAt(expected.text().text(), range, value),
+            (job, result, error) -> {
+                if (error != null) { feedback.setText("Replacement failed: " + error.getMessage()); return; }
+                if (result == null || expected.buffer() != editor.getCurrentBuffer() || expected.text() != expected.buffer().textSnapshot()
+                    || !replacementQueryMatches(expected.pattern()) || !value.equals(replacement.getText())) return;
+                editor.writingArea.replaceRange(result, range.start(), range.end());
+                queryChanged();
+            });
     }
 
     private void replaceAll() {
@@ -303,15 +334,15 @@ final class InlineFindBar extends JPanel {
             || scan.buffer() != editor.getCurrentBuffer() || scan.text() != scan.buffer().textSnapshot()) return;
         FileBuffer buffer = scan.buffer();
         VersionedTextSnapshot text = scan.text();
-        String pattern = scan.query();
+        SearchPattern pattern = scan.pattern();
         String value = replacement.getText();
         replaceAll.setEnabled(false);
         feedback.setText("Preparing replacement…");
-        editor.asyncJobService.submit("replace all", token -> editor.substituteService.replaceLiteral(text.text(), pattern, value, true),
+        editor.asyncJobService.submit("replace all", token -> pattern.replaceAll(text.text(), value, token::isCancelled),
             (job, result, error) -> {
                 if (error != null || result == null) { feedback.setText("Replacement failed"); return; }
                 if (buffer != editor.getCurrentBuffer() || buffer.textSnapshot() != text
-                    || !pattern.equals(query.getText()) || !value.equals(replacement.getText())) {
+                    || !replacementQueryMatches(pattern) || !value.equals(replacement.getText())) {
                     feedback.setText("Document changed; preview again before replacing");
                     queryChanged();
                     return;
@@ -320,13 +351,13 @@ final class InlineFindBar extends JPanel {
                     BoundedUndoManager history = (BoundedUndoManager) buffer.getUndoManager();
                     history.beginCompoundEdit();
                     try {
-                        buffer.getDocument().replace(0, buffer.getDocument().getLength(), result.getUpdatedText(), null);
+                        buffer.getDocument().replace(0, buffer.getDocument().getLength(), result.text(), null);
                     } finally {
                         history.endCompoundEdit();
                     }
-                    editor.writingArea.setCaretPosition(Math.max(0, result.getFirstMatchOffset()));
+                    editor.writingArea.setCaretPosition(Math.max(0, result.firstOffset()));
                     queryChanged();
-                    editor.showMessage("Replaced " + result.getMatchCount() + " matches");
+                    editor.showMessage("Replaced " + result.count() + " matches");
                 } catch (BadLocationException failure) {
                     feedback.setText("Replacement failed: " + failure.getMessage());
                 }

@@ -47,7 +47,7 @@ Quick Open accepts `Main.java:42` and `Main.java:42:7`. `:42` targets the curren
 
 Picker Enter waits for the current filter result if matching is still running. Empty results keep the picker open. Arrow and Page Up/Down keys in the filter keep the selection visible; Enter from the result list opens the selected item, and Escape dismisses the picker from any focus position. Canceling a file picker leaves the current document intact.
 
-**Find in Files** is also available in Edit, the command palette, and `:findinfiles`. It prompts with the current single-line selection and uses the existing ignore-aware workspace text search and quickfix results. `:grep <text>` remains available. Search options and a persistent Search panel are not added by this shortcut.
+**Find in Files** is also available in Edit, the command palette, and `:findinfiles`. It opens the persistent Search panel, seeded from a single-line selection. Match case, whole word, regex, include/exclude globs, cancellation and result-limit feedback are available there. `:grep <text>` remains available. Inline Find's **In Files** and Search's **Current File** transfer the matching options; **Replace…** transfers them to the preview/apply surface. See [Search workflows](SEARCH_WORKFLOWS.md).
 
 **Go Back** and **Go Forward** are also in Navigate and the command palette, or available as `:back` / `:forward` in any profile. Vim retains `Ctrl+O` / `Ctrl+I`. History holds up to 100 origins, skips closed buffers, and does not retain closed documents in memory. A new jump after going back clears the forward branch. Large-file projections and terminal/preview surfaces are not recorded.
 

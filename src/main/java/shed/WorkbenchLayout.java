@@ -18,6 +18,7 @@ final class WorkbenchLayout {
         TESTS,
         PROBLEMS,
         REPLACE,
+        SEARCH,
         STATUS
     }
 

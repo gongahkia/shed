@@ -9,6 +9,7 @@ final class WorkspaceReplaceCoordinator {
     private WorkspaceReplaceService.Plan plan;
     private WorkspaceReplaceService.ApplyResult lastApplyResult;
     private long activeRequest;
+    private int previewJob = -1;
 
     WorkspaceReplaceCoordinator(Texteditor editor) {
         this.editor = editor;
@@ -48,13 +49,41 @@ final class WorkspaceReplaceCoordinator {
     ProjectReplacePolicy policyForPanel() { return policy(); }
 
     String previewForPanel(String find, String replacement) {
-        if (find == null || find.isEmpty() || find.indexOf('\n') >= 0 || find.indexOf('\r') >= 0
-            || replacement == null || replacement.indexOf('\n') >= 0 || replacement.indexOf('\r') >= 0) {
-            return "Find must be non-empty and both values must be single-line.";
+        try { return previewForPanel(WorkspaceSearchQuery.literal(find), replacement); }
+        catch (IllegalArgumentException error) { return error.getMessage(); }
+    }
+
+    String previewForPanel(WorkspaceSearchQuery query, String replacement) {
+        ProjectReplacePolicy policy = policy();
+        if (!policy.enabled()) return "Enable project replacement before previewing.";
+        java.util.List<Path> roots = editor.workspaceController.roots();
+        if (roots.isEmpty()) {
+            Path root = workspaceRoot();
+            if (root == null) return "Project replace requires a directory";
+            roots = java.util.List.of(root);
         }
-        String escapedFind = find.replace("\\", "\\\\").replace("/", "\\/");
-        String escapedReplacement = replacement.replace("\\", "\\\\").replace("/", "\\/");
-        return preview("/" + escapedFind + "/" + escapedReplacement + "/");
+        Path selected = null;
+        if ("current-file".equals(policy.scope())) {
+            for (Path root : roots) {
+                selected = scopeFile(policy, root);
+                if (selected != null) break;
+            }
+            if (selected == null) return "Current-file scope requires an open workspace file";
+        }
+        cancel();
+        lastApplyResult = null;
+        long request = ++activeRequest;
+        boolean persistent = editor.configManager.getWorkspaceIndexEnabled();
+        var index = workspaceIndexService();
+        var folders = java.util.List.copyOf(roots);
+        Path scope = selected;
+        var cancellation = new WorkspaceIndexService.CancellationSource();
+        previewJob = editor.asyncJobService.submit("project replace preview: " + query.pattern().query(), token -> {
+            token.onCancel(cancellation::cancel);
+            try { return new WorkspaceReplaceService(index).preview(persistent, folders, query, replacement, scope, cancellation); }
+            finally { index.close(); }
+        }, (snapshot, result, error) -> completePreview(request, snapshot, result, error));
+        return "Started project replace preview job " + previewJob;
     }
 
     String selectFileForPanel(int id, boolean selected) {
@@ -197,6 +226,7 @@ final class WorkspaceReplaceCoordinator {
             editor.showMessage("Project replace preview job " + jobId + " failed: " + (message == null ? "" : message));
             return;
         }
+        previewJob = -1;
         plan = preview.plan();
         if (editor.toolWindowHost != null && editor.toolWindowHost.isSelected(ToolWindowHost.Tab.REPLACE)) {
             editor.toolWindowHost.refresh(ToolWindowHost.Tab.REPLACE);
@@ -243,6 +273,15 @@ final class WorkspaceReplaceCoordinator {
             return "Usage: :projectreplace apply";
         }
         WorkspaceReplaceService.Plan applying = plan.snapshot();
+        if (applying.truncated()) return "Preview limit reached; narrow the search before applying";
+        if (applying.selectedMatchCount() == 0) return "Select at least one match before applying";
+        for (FileBuffer buffer : editor.buffers) {
+            if (!buffer.isModified() || !buffer.hasFilePath()) continue;
+            Path identity = WorkspaceRootResolver.normalizedIdentity(Path.of(buffer.getFilePath()));
+            if (applying.files().stream().anyMatch(file -> file.selectedMatchCount() > 0
+                && WorkspaceRootResolver.normalizedIdentity(file.path()).equals(identity)))
+                return "Save or close unsaved changes in " + buffer.getDisplayName() + " before applying replacements";
+        }
         WorkspaceReplaceService.ApplyOptions options = new WorkspaceReplaceService.ApplyOptions(policy.backupEnabled(),
             policy.backupEnabled() ? policy.backupDirectoryPath() : null);
         WorkspaceIndexService.CancellationSource cancellation = new WorkspaceIndexService.CancellationSource();
@@ -283,10 +322,10 @@ final class WorkspaceReplaceCoordinator {
     }
 
     private String cancel() {
-        if (plan == null) {
-            return "No project replace preview";
-        }
+        if (previewJob >= 0) editor.asyncJobService.cancel(previewJob);
+        previewJob = -1;
         plan = null;
+        lastApplyResult = null;
         activeRequest++;
         return "Project replace preview discarded";
     }

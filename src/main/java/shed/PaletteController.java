@@ -256,12 +256,16 @@ final class PaletteController {
         return workspaceSearchCoordinator.search(pattern);
     }
 
+    WorkspaceSearchCoordinator workspaceSearch() { return workspaceSearchCoordinator; }
+
+    void showWorkspaceSearch(SearchPattern pattern) { workspaceSearchCoordinator.show(pattern); }
+
     String promptWorkspaceSearch() {
         String selected = editor.writingArea.getSelectedText();
-        String initial = selected == null || selected.contains("\n") || selected.contains("\r") ? "" : selected;
-        Object query = JOptionPane.showInputDialog(editor, "Find text in workspace files:", "Find in Files",
-            JOptionPane.PLAIN_MESSAGE, null, null, initial);
-        return query == null ? "Workspace search cancelled" : showGrepFinder(query.toString());
+        SearchPattern initial = selected == null || selected.isEmpty() || selected.contains("\n") || selected.contains("\r")
+            ? null : SearchPattern.literal(selected);
+        workspaceSearchCoordinator.show(initial);
+        return "Search panel opened";
     }
 
 

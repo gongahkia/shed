@@ -147,6 +147,7 @@ final class WorkspaceReplaceService {
 
     ApplyResult apply(Plan plan, WorkspaceIndexService.Cancellation cancellation, ApplyOptions options) {
         Plan snapshot = Objects.requireNonNull(plan, "plan").snapshot();
+        if (snapshot.truncated()) return new ApplyResult(State.FAILED, List.of(), "Preview limit reached; narrow the search before applying");
         WorkspaceIndexService.Cancellation effectiveCancellation = cancellation == null ? WorkspaceIndexService.Cancellation.NONE : cancellation;
         ApplyOptions effectiveOptions = options == null ? ApplyOptions.NO_BACKUP : options;
         List<FileResult> results = new ArrayList<>();

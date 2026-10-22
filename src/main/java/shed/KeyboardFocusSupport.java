@@ -13,6 +13,13 @@ final class KeyboardFocusSupport {
     private KeyboardFocusSupport() {
     }
 
+    static void installEscape(JComponent scope, Runnable dismiss) {
+        scope.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke("ESCAPE"), ESCAPE_ACTION);
+        scope.getActionMap().put(ESCAPE_ACTION, new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent event) { dismiss.run(); }
+        });
+    }
+
     static void installEscape(JRootPane rootPane, Runnable dismiss) {
         Objects.requireNonNull(rootPane, "rootPane");
         Objects.requireNonNull(dismiss, "dismiss");

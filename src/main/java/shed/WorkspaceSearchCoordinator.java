@@ -9,82 +9,117 @@ import javax.swing.SwingUtilities;
 final class WorkspaceSearchCoordinator {
     private final Texteditor editor;
     private long activeRequest;
+    private int activeJob = -1;
     private WorkspaceIndexService indexService;
+    private WorkspaceSearchQuery query;
+    private final List<WorkspaceTextSearchService.Match> matches = new ArrayList<>();
+    private boolean running;
+    private String status = "Search workspace files. Ignore rules are respected.";
+    private long version;
 
-    WorkspaceSearchCoordinator(Texteditor editor) {
-        this.editor = editor;
+    record Snapshot(WorkspaceSearchQuery query, List<WorkspaceTextSearchService.Match> matches, boolean running, String status, long version) { }
+
+    WorkspaceSearchCoordinator(Texteditor editor) { this.editor = editor; }
+
+    Snapshot snapshot() { return new Snapshot(query, List.copyOf(matches), running, status, version); }
+
+    void close() { cancel(); if (indexService != null) indexService.close(); }
+
+    void cancel() {
+        activeRequest++;
+        if (activeJob >= 0) editor.asyncJobService.cancel(activeJob);
+        activeJob = -1;
+        if (running) status = "Cancelled · " + matches.size() + " matches retained";
+        running = false;
+        changed();
     }
 
-    void close() {
-        if (indexService != null) indexService.close();
+    void invalidate() {
+        cancel();
+        matches.clear();
+        status = "Query changed — press Enter or Search";
+        changed();
+    }
+
+    void show(SearchPattern initial) {
+        if (initial != null && (query == null || !query.pattern().equals(initial))) {
+            invalidate();
+            query = new WorkspaceSearchQuery(initial, query == null ? "" : query.include(), query == null ? "" : query.exclude());
+        }
+        editor.showToolWindow(ToolWindowHost.Tab.SEARCH);
+        if (editor.toolWindowHost != null && editor.toolWindowHost.searchPanel() != null)
+            editor.toolWindowHost.searchPanel().focusQuery(initial);
     }
 
     String search(String argument) {
-        String query = argument == null ? "" : argument.trim();
-        if (!validQuery(query)) {
-            return "Usage: :grep <text>";
-        }
+        String value = argument == null ? "" : argument.trim();
+        if (!validQuery(value)) return "Usage: :grep <text>";
+        WorkspaceSearchQuery next = WorkspaceSearchQuery.literal(value);
+        show(next.pattern());
+        return search(next);
+    }
+
+    String search(WorkspaceSearchQuery next) {
+        cancel();
+        query = next;
+        matches.clear();
         List<Path> roots = workspaceRoots();
-        if (roots.isEmpty()) {
-            return "Workspace search requires a directory";
-        }
-        String title = "grep " + query + (roots.size() == 1 ? "" : " (" + roots.size() + " folders)");
+        if (roots.isEmpty()) { status = "Workspace search requires a directory"; changed(); return status; }
+        String title = "grep " + next.pattern().query();
         long request = ++activeRequest;
-        boolean persistentIndexEnabled = editor.configManager.getWorkspaceIndexEnabled();
-        List<QuickfixService.Entry> partialEntries = new ArrayList<>();
+        running = true;
+        status = "Discovering files…";
+        changed();
+        boolean persistent = editor.configManager.getWorkspaceIndexEnabled();
         editor.problemsController.clearQuickfixSource("workspace-search");
         editor.updateQuickfixEntries(title, List.of());
         WorkspaceIndexService.CancellationSource cancellation = new WorkspaceIndexService.CancellationSource();
-        int jobId = editor.asyncJobService.submit("workspace search: " + query,
-            token -> {
-                token.onCancel(cancellation::cancel);
-                WorkspaceIndexService index = workspaceIndexService();
-                return new WorkspaceTextSearchService(index).search(persistentIndexEnabled, roots, query, cancellation,
-                    matches -> SwingUtilities.invokeLater(() -> appendMatches(request, title, partialEntries, matches)));
-            },
-            (snapshot, result, error) -> complete(request, title, query, snapshot, result, error));
-        return "Started workspace search job " + jobId;
+        WorkspaceIndexService index = workspaceIndexService();
+        activeJob = editor.asyncJobService.submit("workspace search: " + next.pattern().query(), token -> {
+            token.onCancel(cancellation::cancel);
+            return new WorkspaceTextSearchService(index).search(persistent, roots, next, cancellation, new WorkspaceTextSearchService.Observer() {
+                private long lastProgress;
+                public void onMatches(List<WorkspaceTextSearchService.Match> batch) {
+                    SwingUtilities.invokeLater(() -> {
+                        if (editor.closingDown || request != activeRequest) return;
+                        matches.addAll(batch);
+                        status = "Searching… " + matches.size() + " matches";
+                        editor.updateQuickfixEntries(title, entries(matches));
+                        changed();
+                    });
+                }
+                public void onProgress(int filesRead, int total) {
+                    long now = System.nanoTime();
+                    if (now - lastProgress < 100_000_000L) return;
+                    lastProgress = now;
+                    SwingUtilities.invokeLater(() -> {
+                        if (editor.closingDown || request != activeRequest) return;
+                        status = "Searching… " + filesRead + "/" + total + " files · " + matches.size() + " matches";
+                        changed();
+                    });
+                }
+            });
+        }, (job, result, error) -> {
+            if (editor.closingDown || request != activeRequest) return;
+            running = false;
+            activeJob = -1;
+            if (result != null) { matches.clear(); matches.addAll(result.matches()); }
+            if (job.getStatus() == AsyncJobService.Status.CANCELLED) status = "Cancelled · " + matches.size() + " matches";
+            else if (error != null || result == null) status = "Search failed: " + (error == null ? "unknown error" : error.getMessage());
+            else if (result.state() == WorkspaceTextSearchService.State.FAILED) status = "Search failed: " + result.message();
+            else status = matches.size() + " matches · " + result.filesRead() + " files searched"
+                + (result.truncated() ? " · Result limit reached — narrow your search" : "")
+                + (result.unreadableFiles() > 0 ? " · " + result.unreadableFiles() + " unreadable files" : "");
+            editor.updateQuickfixEntries(title, entries(matches));
+            changed();
+            editor.showMessage(status);
+        });
+        return "Started workspace search job " + activeJob;
     }
 
-    private void appendMatches(long request, String title, List<QuickfixService.Entry> partialEntries,
-                               List<WorkspaceTextSearchService.Match> matches) {
-        if (editor.closingDown || request != activeRequest) {
-            return;
-        }
-        partialEntries.addAll(entries(matches));
-        editor.updateQuickfixEntries(title, partialEntries);
-    }
-
-    private void complete(long request, String title, String query, AsyncJobService.JobSnapshot snapshot,
-                          WorkspaceTextSearchService.SearchResult result, Exception error) {
-        if (editor.closingDown || request != activeRequest) {
-            return;
-        }
-        int jobId = snapshot == null ? -1 : snapshot.getId();
-        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED
-            || result != null && result.state() == WorkspaceTextSearchService.State.CANCELLED) {
-            int matches = result == null ? 0 : result.matches().size();
-            editor.showMessage("Workspace search job " + jobId + " cancelled after " + matches + " match(es)");
-            return;
-        }
-        if (error != null || result == null) {
-            String message = error == null ? "unknown error" : error.getMessage();
-            editor.showMessage("Workspace search job " + jobId + " failed: " + (message == null ? "" : message));
-            return;
-        }
-        if (result.state() == WorkspaceTextSearchService.State.FAILED) {
-            editor.showMessage("Workspace search job " + jobId + " failed: " + result.message());
-            return;
-        }
-        List<QuickfixService.Entry> entries = entries(result.matches());
-        editor.updateQuickfixEntries(title, entries);
-        if (entries.isEmpty()) {
-            editor.showMessage("No matches for: " + query);
-            return;
-        }
-        editor.openQuickfixList();
-        String suffix = result.truncated() ? " (result limit reached)" : "";
-        editor.showMessage("Workspace search job " + jobId + " complete (" + entries.size() + " matches)" + suffix);
+    private void changed() {
+        version++;
+        if (editor.toolWindowHost != null) editor.toolWindowHost.refresh(ToolWindowHost.Tab.SEARCH);
     }
 
     private Path workspaceRoot() {

@@ -43,6 +43,80 @@ public class TexteditorSwingIntegrationTest {
     Path tempDir;
 
     @Test
+    void searchPanelRetainsSourceSharesOptionsAndOpensLocations() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-shared-search"));
+        Path root = Files.createDirectories(tempDir.resolve("search-root"));
+        Path source = Files.writeString(root.resolve("source.txt"), "source");
+        Path target = Files.writeString(root.resolve("target.txt"), "first\nCAT catapult cat\n");
+        Texteditor editor = createEditor(home, source);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            FileBuffer original = onEdt(editor::getCurrentBuffer);
+            onEdt(() -> {
+                editor.inlineFindBar.showFind(new SearchPattern("cat", false, false, true));
+                descendants(editor.inlineFindBar, javax.swing.JButton.class).stream().filter(b -> b.getText().equals("In Files")).findFirst().orElseThrow().doClick();
+                var panel = editor.toolWindowHost.searchPanel().component();
+                assertFalse(descendants(panel, javax.swing.JCheckBox.class).stream().filter(b -> b.getText().equals("Match case")).findFirst().orElseThrow().isSelected());
+                assertTrue(descendants(panel, javax.swing.JCheckBox.class).stream().filter(b -> b.getText().equals("Whole word")).findFirst().orElseThrow().isSelected());
+                descendants(panel, javax.swing.JButton.class).stream().filter(b -> b.getText().equals("Search")).findFirst().orElseThrow().doClick();
+                return null;
+            });
+            assertTrue(awaitUiState(() -> !editor.paletteController.workspaceSearch().snapshot().running()
+                && editor.paletteController.workspaceSearch().snapshot().matches().size() == 2));
+            assertSame(original, onEdt(editor::getCurrentBuffer));
+            onEdt(() -> {
+                var list = descendants(editor.toolWindowHost.searchPanel().component(), javax.swing.JList.class).getFirst();
+                list.setSelectedIndex(1); list.getActionMap().get("open").actionPerformed(new ActionEvent(list, 0, "open"));
+                return null;
+            });
+            assertTrue(awaitCurrentFile(editor, target));
+            assertEquals(19, onEdt(() -> editor.writingArea.getCaretPosition()));
+            assertEquals(2, onEdt(() -> editor.paletteController.workspaceSearch().snapshot().matches().size()));
+            onEdt(() -> {
+                var fields = descendants(editor.toolWindowHost.searchPanel().component(), javax.swing.JTextField.class);
+                fields.getFirst().setText("");
+                assertTrue(editor.paletteController.workspaceSearch().snapshot().matches().isEmpty());
+                assertEquals("", fields.getFirst().getText());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void inlineRegexReplacementSupportsGroupsAndSingleUndo() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-regex-replace"));
+        Path file = Files.writeString(tempDir.resolve("groups.txt"), "a=1 bb=22");
+        Texteditor editor = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                editor.configManager.set("keymap.profile", "plain");
+                editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                editor.inlineFindBar.showFind(new SearchPattern("([a-z]+)=(\\d+)", true, true, false));
+                editor.inlineFindBar.showReplace("([a-z]+)=(\\d+)");
+                descendants(editor.inlineFindBar, javax.swing.JTextField.class).get(1).setText("$2:$1");
+                return null;
+            });
+            assertTrue(awaitUiState(() -> descendants(editor.inlineFindBar, javax.swing.JButton.class).stream()
+                .anyMatch(b -> b.getText().equals("Replace All (2)") && b.isEnabled())));
+            onEdt(() -> { descendants(editor.inlineFindBar, javax.swing.JButton.class).stream().filter(b -> b.getText().startsWith("Replace All")).findFirst().orElseThrow().doClick(); return null; });
+            assertTrue(awaitUiState(() -> editor.getCurrentBuffer().getContent().equals("1:a 22:bb")));
+            onEdt(() -> { editor.undoManager.undo(); return null; });
+            assertEquals("a=1 bb=22", onEdt(() -> editor.getCurrentBuffer().getContent()));
+        } finally { disposeEditor(editor); }
+    }
+
+    private static boolean awaitUiState(Callable<Boolean> condition) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        while (System.nanoTime() < deadline) {
+            if (onEdt(condition)) return true;
+            Thread.sleep(30);
+        }
+        return false;
+    }
+
+    @Test
     void customActionsWorkInEachProfileWithoutInterceptingOtherFieldsOrComposition() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-keymap-actions"));

@@ -24,6 +24,11 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
     private final JPanel panel = new JPanel(new BorderLayout(6, 6));
     private final JTextField find = new JTextField();
     private final JTextField replacement = new JTextField();
+    private final JCheckBox matchCase = new JCheckBox("Match case", true);
+    private final JCheckBox regex = new JCheckBox("Regex");
+    private final JCheckBox wholeWord = new JCheckBox("Whole word");
+    private final JTextField include = new JTextField();
+    private final JTextField exclude = new JTextField();
     private final JCheckBox enabled = new JCheckBox("Enabled");
     private final JComboBox<String> scope = new JComboBox<>(new String[] {"workspace", "current-file"});
     private final DefaultTableModel files = new DefaultTableModel(new Object[] {"Apply", "File", "Matches"}, 0) {
@@ -49,20 +54,57 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
         panel.add(content(), BorderLayout.CENTER);
         panel.add(actions(), BorderLayout.SOUTH);
         detail.setEditable(false);
+        for (JTextField field : List.of(find, replacement, include, exclude)) {
+            field.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                public void insertUpdate(javax.swing.event.DocumentEvent event) { invalidatePreview(); }
+                public void removeUpdate(javax.swing.event.DocumentEvent event) { invalidatePreview(); }
+                public void changedUpdate(javax.swing.event.DocumentEvent event) { invalidatePreview(); }
+            });
+        }
+        for (JCheckBox option : List.of(matchCase, regex, wholeWord)) option.addActionListener(event -> invalidatePreview());
         fileTable.getSelectionModel().addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) refreshMatches(); });
         files.addTableModelListener(event -> { if (!refreshing && event.getColumn() == 0) updateFile(event.getFirstRow()); });
         matches.addTableModelListener(event -> { if (!refreshing && event.getColumn() == 0) updateMatch(event.getFirstRow()); });
         enabled.addActionListener(event -> { if (!refreshing) message(editor.workspaceReplaceCoordinator().setForPanel("project.replace.enabled", Boolean.toString(enabled.isSelected()))); });
-        scope.addActionListener(event -> { if (!refreshing) message(editor.workspaceReplaceCoordinator().setForPanel("project.replace.scope", String.valueOf(scope.getSelectedItem()))); });
+        scope.addActionListener(event -> { if (!refreshing) { invalidatePreview(); message(editor.workspaceReplaceCoordinator().setForPanel("project.replace.scope", String.valueOf(scope.getSelectedItem()))); } });
     }
 
     @Override public JPanel component() { return panel; }
 
     private JPanel toolbar() {
-        JPanel panel = new JPanel(new GridLayout(1, 7, 5, 0));
-        panel.add(new JLabel("Find")); panel.add(find); panel.add(new JLabel("Replace")); panel.add(replacement);
-        panel.add(enabled); panel.add(scope); panel.add(button("Preview", this::preview));
-        return panel;
+        JPanel controls = new JPanel(new GridLayout(3, 1, 4, 4));
+        JPanel fields = new JPanel(new GridLayout(1, 2, 8, 0));
+        fields.add(field("Find", find)); fields.add(field("Replace", replacement));
+        controls.add(fields);
+        JPanel options = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        for (var option : List.of(matchCase, regex, wholeWord, enabled)) options.add(option);
+        options.add(scope); options.add(button("Preview", this::preview)); controls.add(options);
+        JPanel filters = new JPanel(new GridLayout(1, 2, 8, 0));
+        filters.add(field("Include", include)); filters.add(field("Exclude", exclude)); controls.add(filters);
+        return controls;
+    }
+
+    private JPanel field(String name, JTextField input) {
+        JPanel row = new JPanel(new BorderLayout(5, 0));
+        JLabel label = new JLabel(name); label.setLabelFor(input); row.add(label, BorderLayout.WEST); row.add(input);
+        input.getAccessibleContext().setAccessibleName(name);
+        input.setPreferredSize(new java.awt.Dimension(180, UiZoom.scale(40, editor.configManager.getUiZoom())));
+        return row;
+    }
+
+    void setSearchQuery(WorkspaceSearchQuery query) {
+        refreshing = true;
+        try {
+            find.setText(query.pattern().query()); matchCase.setSelected(query.pattern().caseSensitive());
+            regex.setSelected(query.pattern().regex()); wholeWord.setSelected(query.pattern().wholeWord());
+            include.setText(query.include()); exclude.setText(query.exclude());
+        } finally { refreshing = false; }
+        invalidatePreview(); replacement.requestFocusInWindow();
+    }
+
+    private void invalidatePreview() {
+        if (refreshing) return;
+        editor.workspaceReplaceCoordinator().cancelForPanel(); refresh();
     }
 
     private java.awt.Component content() {
@@ -93,7 +135,7 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
             renderMatches();
             WorkspaceReplaceService.ApplyResult result = controller.lastApplyResultForPanel();
             if (result != null) detail.setText(renderResult(result));
-            else if (plan == null) detail.setText(policy.enabled() ? "Enter a literal find/replacement pair, then Preview." : "Enable project replace before previewing.");
+            else if (plan == null) detail.setText(policy.enabled() ? "Enter a find/replacement pair, then Preview. Regex replacements support $1 and ${name}." : "Enable project replace before previewing.");
             else detail.setText(renderPlan(plan));
         } finally { refreshing = false; }
     }
@@ -114,7 +156,11 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
         }
     }
 
-    private void preview() { message(editor.workspaceReplaceCoordinator().previewForPanel(find.getText(), replacement.getText())); }
+    private void preview() {
+        try { message(editor.workspaceReplaceCoordinator().previewForPanel(new WorkspaceSearchQuery(
+            new SearchPattern(find.getText(), matchCase.isSelected(), regex.isSelected(), wholeWord.isSelected()), include.getText(), exclude.getText()), replacement.getText())); }
+        catch (IllegalArgumentException error) { message("Invalid search: " + error.getMessage()); }
+    }
     private void discard() { message(editor.workspaceReplaceCoordinator().cancelForPanel()); }
 
     private void apply() {

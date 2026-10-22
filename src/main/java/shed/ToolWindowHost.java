@@ -15,7 +15,7 @@ import javax.swing.JTabbedPane;
 
 /** Shared docked tool area; controllers remain the source of truth. */
 final class ToolWindowHost extends JPanel {
-    enum Tab { GIT, DEBUG, TASKS, TESTS, PROBLEMS, REPLACE }
+    enum Tab { GIT, DEBUG, TASKS, TESTS, PROBLEMS, REPLACE, SEARCH }
 
     private final Texteditor editor;
     private final JTabbedPane tabs = new JTabbedPane();
@@ -30,6 +30,7 @@ final class ToolWindowHost extends JPanel {
         setMinimumSize(new Dimension(0, 160));
         add(header(), BorderLayout.NORTH);
         add(tabs, BorderLayout.CENTER);
+        addSurface(Tab.SEARCH, "Search", new WorkspaceSearchPanel(editor));
         addSurface(Tab.GIT, "Git", new GitChangesToolPanel(editor, this));
         addSurface(Tab.DEBUG, "Debug", new DebugToolPanel(editor, this));
         addSurface(Tab.TASKS, "Tasks", new TasksToolPanel(editor, this));
@@ -84,6 +85,13 @@ final class ToolWindowHost extends JPanel {
     void refresh(Tab tab) {
         ToolSurface surface = surfaces.get(tab);
         if (surface != null) surface.refresh();
+    }
+
+    ProjectReplaceToolPanel replacePanel() { return (ProjectReplaceToolPanel) surfaces.get(Tab.REPLACE); }
+
+    WorkspaceSearchPanel searchPanel() {
+        ToolSurface surface = surfaces.get(Tab.SEARCH);
+        return surface instanceof WorkspaceSearchPanel panel ? panel : null;
     }
 
     ProblemsToolPanel problemsPanel() {
@@ -164,7 +172,7 @@ final class ToolWindowHost extends JPanel {
     }
 
     private static String title(Tab tab) {
-        return switch (tab) { case GIT -> "Git"; case DEBUG -> "Debug"; case TASKS -> "Tasks"; case TESTS -> "Tests"; case PROBLEMS -> "Problems"; case REPLACE -> "Replace"; };
+        return switch (tab) { case GIT -> "Git"; case DEBUG -> "Debug"; case TASKS -> "Tasks"; case TESTS -> "Tests"; case PROBLEMS -> "Problems"; case REPLACE -> "Replace"; case SEARCH -> "Search"; };
     }
 
     private static WorkbenchLayout.SurfaceType surfaceType(Tab tab) {
@@ -175,6 +183,7 @@ final class ToolWindowHost extends JPanel {
             case TESTS -> WorkbenchLayout.SurfaceType.TESTS;
             case PROBLEMS -> WorkbenchLayout.SurfaceType.PROBLEMS;
             case REPLACE -> WorkbenchLayout.SurfaceType.REPLACE;
+            case SEARCH -> WorkbenchLayout.SurfaceType.SEARCH;
         };
     }
 

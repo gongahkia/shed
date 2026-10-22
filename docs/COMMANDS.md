@@ -178,7 +178,7 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:open [file\|folder]` | Native file chooser, or workspace-folder chooser that opens its tree |
 | `:files` | Project file finder |
 | `:findinfiles` | Prompt for text to search across workspace files (also Ctrl/Cmd+Shift+F in Plain mode) |
-| `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search; opens quickfix on completion |
+| `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search in the Search panel; also populates quickfix navigation |
 | `:project replace settings`, `:projectreplace settings` | Show persisted project-replace safety controls |
 | `:project replace`, `:projectreplace`, `:projectreplace ui` | Open the docked Project Replace review panel |
 | `:projectreplace text <subcommand>` | Run the legacy text workflow |

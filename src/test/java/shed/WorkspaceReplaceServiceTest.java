@@ -16,6 +16,17 @@ public class WorkspaceReplaceServiceTest {
     Path tempDir;
 
     @Test
+    void refusesPartialPreviewWithoutWriting() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("limited"));
+        Path file = Files.writeString(root.resolve("test.txt"), "old old old");
+        var service = new WorkspaceReplaceService(new WorkspaceIndexService(tempDir.resolve("index"), (r, p) -> false), 2);
+        var preview = service.preview(false, List.of(root), WorkspaceSearchQuery.literal("old"), "x", null, WorkspaceIndexService.Cancellation.NONE);
+        assertTrue(preview.plan().truncated());
+        assertEquals(WorkspaceReplaceService.State.FAILED, service.apply(preview.plan(), WorkspaceIndexService.Cancellation.NONE).state());
+        assertEquals("old old old", Files.readString(file));
+    }
+
+    @Test
     void appliesLongPrefixAndDifferentLengthReplacement() throws Exception {
         Path root = Files.createDirectory(tempDir.resolve("prefix"));
         Path file = root.resolve("test.txt");

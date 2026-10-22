@@ -59,7 +59,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `theme` | `nib-dark` | string | Built-in theme id; `nib-light` is the matching light palette |
+| `theme` | `shed-dark` | string | Built-in theme id; `shed-light` is the matching light palette |
 | `font.family` | `Monospaced` | string | Buffer font family; must resolve uniquely to a Java-installed family |
 | `font.size` | `16` | int | Buffer font size |
 | `ui.font.family` | empty | string | UI font family; empty retains the system UI font, otherwise must resolve uniquely to a Java-installed family |
@@ -455,7 +455,7 @@ Configured font families are validated against the Java runtime's installed fami
 
 ## Built-in Themes
 
-`nib-dark`, `nib-light`, `one-dark-pro`, `dracula`, `material-theme`, `night-owl`, `ayu-mirage`, `monokai-pro`, `tokyo-night`, `nord`, `gruvbox-dark`, `shades-of-purple`, `palenight`, `catppuccin-mocha`, `github-dark`, `rose-pine`, `synthwave-84`, `cobalt2`, `andromeda`, `everforest-dark`, `kanagawa`, `poimandres`, `solarized-dark`, `noctis`, `oxocarbon-dark`, `vesper`, `sonokai`, `doom-one`, `horizon`, `papercolor-dark`, `xcode-dark`, `dimmed-monokai`, `fleet-dark`, `nightfox`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `github-light`, `github-dark-dimmed`, `solarized-light`, `gruvbox-light`, `one-light`, `ayu-light`, `ayu-dark`, `material-lighter`, `material-ocean`, `tokyo-night-storm`, `tokyo-night-light`, `duskfox`, `carbonfox`, `dawnfox`, `vscode-dark-modern`, `vscode-light-modern`, `jetbrains-darcula`.
+`shed-dark`, `shed-light`, `nib-dark`, `nib-light`, `one-dark-pro`, `dracula`, `material-theme`, `night-owl`, `ayu-mirage`, `monokai-pro`, `tokyo-night`, `nord`, `gruvbox-dark`, `shades-of-purple`, `palenight`, `catppuccin-mocha`, `github-dark`, `rose-pine`, `synthwave-84`, `cobalt2`, `andromeda`, `everforest-dark`, `kanagawa`, `poimandres`, `solarized-dark`, `noctis`, `oxocarbon-dark`, `vesper`, `sonokai`, `doom-one`, `horizon`, `papercolor-dark`, `xcode-dark`, `dimmed-monokai`, `fleet-dark`, `nightfox`, `catppuccin-latte`, `catppuccin-frappe`, `catppuccin-macchiato`, `github-light`, `github-dark-dimmed`, `solarized-light`, `gruvbox-light`, `one-light`, `ayu-light`, `ayu-dark`, `material-lighter`, `material-ocean`, `tokyo-night-storm`, `tokyo-night-light`, `duskfox`, `carbonfox`, `dawnfox`, `vscode-dark-modern`, `vscode-light-modern`, `jetbrains-darcula`.
 
 The Theme Gallery's **Apply and Save** button changes the palette and writes the complete current configuration to disk.
 
@@ -524,3 +524,5 @@ schema_version = 1
 - `wrap` and `conceallevel` are command-level features (`:set wrap`, `:conceal`) rather than startup-applied TOML defaults.
 - `:config save` persists runtime differences from built-in defaults, not a full expanded template.
 - `.shed.toml` is applied per project root and is cleared automatically when switching out of that project scope. Permitted DAP declarations are separately resolved from the target workspace root, so a Tests action does not depend on whichever file is active in another root.
+
+Shed Dark is the default for new configurations. Shed Light provides the same neutral workbench treatment in light mode. These palettes keep the editor background stable across editing modes; the status bar reports the current mode. Existing explicit theme choices and color overrides are preserved.

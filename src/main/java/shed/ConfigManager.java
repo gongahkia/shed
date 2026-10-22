@@ -46,7 +46,7 @@ public class ConfigManager {
     private DebugAdapterRegistry.Validation debugConfiguration;
 
     // Default configuration values
-    private static final String DEFAULT_THEME = "nib-dark";
+    private static final String DEFAULT_THEME = "shed-dark";
     private static final String DEFAULT_COLOR_NORMAL = "#282C34";
     private static final String DEFAULT_COLOR_INSERT = "#2C323C";
     private static final String DEFAULT_COLOR_COMMAND = "#3A3F4B";
@@ -152,6 +152,12 @@ public class ConfigManager {
     };
 
     static {
+        registerTheme("shed-dark", "Shed Dark",
+            "#24272E", "#24272E", "#24272E", "#24272E", "#24272E", "#D5D9E2", "#82AAFF", "#A6C98B");
+        registerTheme("shed-light", "Shed Light",
+            "#FAFAFC", "#FAFAFC", "#FAFAFC", "#FAFAFC", "#FAFAFC", "#303743", "#365FB5", "#407340");
+        THEMES.get("shed-dark").setOverrides(shedOverrides(false));
+        THEMES.get("shed-light").setOverrides(shedOverrides(true));
         // Nib palette roles from https://github.com/gongahkia/nib (MIT).
         registerTheme("nib-dark", "Nib Dark",
             "#181A19", "#20231F", "#272A25", "#2D302B", "#3A272D", "#DDDCD2", "#83A8BB", "#6FA8A0");
@@ -918,7 +924,7 @@ public class ConfigManager {
 
     public String getThemeDisplayName() {
         ThemePalette theme = activeTheme();
-        return theme == null ? "Nib Dark" : theme.displayName;
+        return theme == null ? "Shed Dark" : theme.displayName;
     }
 
     public String setTheme(String requestedTheme) {
@@ -2241,6 +2247,28 @@ public class ConfigManager {
             return activeTheme().overrides.getOrDefault(key, fallback);
         }
         return decodeColor(value, fallback);
+    }
+
+    private static Map<String, Color> shedOverrides(boolean light) {
+        String[] keys = {
+            "ui.status.background", "ui.command.background", "ui.linenumber.background", "ui.linenumber.foreground",
+            "ui.currentline", "ui.selection", "ui.search.background", "ui.search.current.background",
+            "theme.surface.elevated", "theme.surface.floating", "theme.border.subtle", "theme.foreground.muted",
+            "ui.syntax.keyword", "ui.syntax.string", "ui.syntax.comment", "ui.syntax.type", "ui.syntax.function",
+            "ui.syntax.constant", "ui.syntax.annotation", "ui.syntax.number"
+        };
+        String[] values = light ? new String[] {
+            "#EFF0F4", "#F5F6F9", "#FAFAFC", "#717989", "#F0F2F7", "#DCE6FA", "#E7EACB", "#EBD799",
+            "#EFF0F4", "#FFFFFF", "#D5D9E2", "#626B7B",
+            "#8054A3", "#407340", "#6F7888", "#91672B", "#365FB5", "#AB5447", "#8054A3", "#98622C"
+        } : new String[] {
+            "#1C1F25", "#202329", "#24272E", "#8992A3", "#2B3039", "#374966", "#414B35", "#625431",
+            "#2C3039", "#202329", "#3D4451", "#A0A8B8",
+            "#C6A0E8", "#A6C98B", "#939DAF", "#E3C18B", "#82AAFF", "#E2A08D", "#C6A0E8", "#DAB386"
+        };
+        Map<String, Color> overrides = new HashMap<>();
+        for (int index = 0; index < keys.length; index++) overrides.put(keys[index], Color.decode(values[index]));
+        return Map.copyOf(overrides);
     }
 
     private static Map<String, Color> nibOverrides(boolean light) {

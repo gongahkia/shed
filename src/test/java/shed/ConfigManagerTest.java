@@ -130,7 +130,7 @@ public class ConfigManagerTest {
 
         assertFalse(config.hasConfigLoadFailure());
         assertEquals(4, config.getTabSize());
-        assertEquals("nib-dark", config.getThemeId());
+        assertEquals("shed-dark", config.getThemeId());
     }
 
     @Test
@@ -1046,7 +1046,7 @@ public class ConfigManagerTest {
 
         String cleared = config.applyProjectConfigForFile(fileB);
         assertTrue(cleared.contains("Project config cleared"));
-        assertEquals("nib-dark", config.getThemeId());
+        assertEquals("shed-dark", config.getThemeId());
         assertNull(config.getActiveProjectConfigPath());
     }
 
@@ -1191,6 +1191,6 @@ public class ConfigManagerTest {
 
         config.set("project.config.enabled", "false");
         assertTrue(config.applyProjectConfigForFile(file).contains("Project config disabled"));
-        assertEquals("nib-dark", config.getThemeId());
+        assertEquals("shed-dark", config.getThemeId());
     }
 }

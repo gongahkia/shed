@@ -16,15 +16,15 @@ class ThemePreviewTest {
 
         assertFalse(previews.isEmpty());
         ThemePreview first = previews.getFirst();
-        assertEquals("nib-dark", first.id());
-        assertEquals("Nib Dark", first.displayName());
-        assertEquals("#181A19", hex(first.normal()));
-        assertEquals("#83A8BB", hex(first.accent()));
-        assertEquals("nib-light", previews.get(1).id());
-        assertEquals("#F2F1EC", hex(previews.get(1).normal()));
+        assertEquals("shed-dark", first.id());
+        assertEquals("Shed Dark", first.displayName());
+        assertEquals("#24272E", hex(first.normal()));
+        assertEquals("#82AAFF", hex(first.accent()));
+        assertEquals("shed-light", previews.get(1).id());
+        assertEquals("#FAFAFC", hex(previews.get(1).normal()));
         assertEquals(config.getThemeIds(), previews.stream().map(ThemePreview::id).toList());
         assertTrue(previews.stream().allMatch(preview -> preview.foreground() != null && preview.stringAccent() != null));
-        assertEquals(54, previews.size());
+        assertEquals(56, previews.size());
         for (ThemePreview preview : previews) {
             assertEquals(preview.id(), config.setTheme(preview.displayName()));
             assertEquals(preview.id(), config.getThemeId());
@@ -36,7 +36,7 @@ class ThemePreviewTest {
     @Test
     void nibThemesUseTheirOfficialEditorAndSyntaxRoles() {
         ConfigManager config = new ConfigManager();
-        assertTrue(config.defaultConfigTemplate().contains("nib-dark"));
+        assertTrue(config.defaultConfigTemplate().contains("shed-dark"));
         assertEquals("nib-dark", config.setTheme("Nib Dark"));
         assertEquals("#C9BE83", hex(config.getCaretColor()));
         assertEquals("#3A5550", hex(config.getSelectionColor()));

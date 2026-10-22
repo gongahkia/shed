@@ -53,6 +53,7 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
         panel.add(toolbar(), BorderLayout.NORTH);
         panel.add(content(), BorderLayout.CENTER);
         panel.add(actions(), BorderLayout.SOUTH);
+        refreshAppearance();
         detail.setEditable(false);
         for (JTextField field : List.of(find, replacement, include, exclude)) {
             field.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
@@ -69,6 +70,11 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
         scope.addActionListener(event -> { if (!refreshing) { invalidatePreview(); message(editor.workspaceReplaceCoordinator().setForPanel("project.replace.scope", String.valueOf(scope.getSelectedItem()))); } });
     }
 
+    @Override public void refreshAppearance() {
+        SearchControlMetrics.apply(panel, editor.configManager.getUiZoom());
+        fileTable.setRowHeight(UiZoom.scale(40, editor.configManager.getUiZoom()));
+        matchTable.setRowHeight(UiZoom.scale(40, editor.configManager.getUiZoom()));
+    }
     @Override public JPanel component() { return panel; }
 
     private JPanel toolbar() {

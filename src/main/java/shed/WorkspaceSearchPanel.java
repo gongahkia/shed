@@ -106,6 +106,7 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
         AccessibilitySupport.describe(exclude, "Excluded files", "Comma-separated globs, such as build/**. Ignore rules also apply.");
         AccessibilitySupport.describe(results, "Workspace search results", "Enter or double-click opens the selected file at its matching location.");
         AccessibilitySupport.describe(status, "Search progress", "Progress, cancellation, errors and result limits.");
+        refreshAppearance();
     }
     private static JLabel label(String text, JComponent field) { JLabel label = new JLabel(text); label.setLabelFor(field); return label; }
     private static JPanel field(String name, JTextField field) { JPanel row = new JPanel(new BorderLayout(5, 0)); row.add(label(name, field), BorderLayout.WEST); row.add(field); return row; }
@@ -132,6 +133,10 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
     private void openSelected() {
         WorkspaceTextSearchService.Match selected = results.getSelectedValue();
         if (selected != null) editor.openFileAtAsync(new java.io.File(selected.filePath()), selected.line(), selected.column(), "search");
+    }
+    @Override public void refreshAppearance() {
+        SearchControlMetrics.apply(panel, editor.configManager.getUiZoom());
+        results.setFixedCellHeight(UiZoom.scale(40, editor.configManager.getUiZoom()));
     }
     @Override public JPanel component() { return panel; }
     @Override public void refresh() {

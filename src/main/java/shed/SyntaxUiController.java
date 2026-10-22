@@ -458,6 +458,7 @@ final class SyntaxUiController {
 
     void applyThemeColors() {
         editor.editorUiController.applyUiTheme();
+        if (editor.toolWindowHost != null) editor.toolWindowHost.refreshAppearance();
         if (editor.inlineFindBar != null) editor.inlineFindBar.refreshAppearance();
         Color editorForeground = editor.configManager.getEditorForeground();
         Color caretColor = editor.configManager.getCaretColor();

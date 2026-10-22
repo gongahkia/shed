@@ -72,6 +72,7 @@ final class ToolWindowHost extends JPanel {
         }
         editor.showToolWindow();
         tabs.setSelectedComponent(surface.component());
+        if (tab == Tab.SEARCH || tab == Tab.REPLACE) editor.editorToolSplit.setDividerLocation(0.48);
         surface.refresh();
     }
 
@@ -98,6 +99,8 @@ final class ToolWindowHost extends JPanel {
         ToolSurface surface = surfaces.get(Tab.PROBLEMS);
         return surface instanceof ProblemsToolPanel panel ? panel : null;
     }
+
+    void refreshAppearance() { for (ToolSurface surface : surfaces.values()) surface.refreshAppearance(); }
 
     void refreshActive() {
         for (Map.Entry<Tab, ToolSurface> entry : surfaces.entrySet()) {
@@ -190,6 +193,7 @@ final class ToolWindowHost extends JPanel {
     interface ToolSurface {
         JPanel component();
         void refresh();
+        default void refreshAppearance() { }
     }
 
 

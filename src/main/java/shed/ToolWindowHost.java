@@ -23,6 +23,8 @@ final class ToolWindowHost extends JPanel {
     private final Map<Tab, ToolSurface> surfaces = new EnumMap<>(Tab.class);
     private final Map<Tab, JDialog> detached = new EnumMap<>(Tab.class);
     private final EnumSet<Tab> hiddenDetachedForFocusMode = EnumSet.noneOf(Tab.class);
+    private java.awt.Component selectedSurface;
+    private int automaticDockHeight = -1;
 
     ToolWindowHost(Texteditor editor) {
         super(new BorderLayout());
@@ -50,7 +52,8 @@ final class ToolWindowHost extends JPanel {
         addSurface(Tab.TESTS, "Tests", new TestsToolPanel(editor, this));
         addSurface(Tab.PROBLEMS, "Problems", new ProblemsToolPanel(editor, this));
         addSurface(Tab.REPLACE, "Replace", new ProjectReplaceToolPanel(editor, this));
-        tabs.addChangeListener(event -> refreshActive());
+        selectedSurface = tabs.getSelectedComponent();
+        tabs.addChangeListener(event -> selectedTabChanged());
     }
 
     private JPanel header() {
@@ -84,14 +87,47 @@ final class ToolWindowHost extends JPanel {
         }
         editor.showToolWindow();
         tabs.setSelectedComponent(surface.component());
+        sizeDockAutomatically(tab);
+        surface.refresh();
+    }
+
+    private int preferredDividerLocation(Tab tab) {
         int desiredHeight = switch (tab) {
             case DEBUG, REPLACE -> 520;
             case GIT, TESTS -> 420;
             default -> 360;
         };
-        editor.editorToolSplit.setDividerLocation(Math.max(UiZoom.scale(120, editor.configManager.getUiZoom()),
-            editor.editorToolSplit.getHeight() - UiZoom.scale(desiredHeight, editor.configManager.getUiZoom())));
-        surface.refresh();
+        return Math.max(UiZoom.scale(120, editor.configManager.getUiZoom()),
+            editor.editorToolSplit.getHeight() - UiZoom.scale(desiredHeight, editor.configManager.getUiZoom()));
+    }
+
+    private int dockHeight() {
+        return editor.editorToolSplit.getHeight() - editor.editorToolSplit.getDividerLocation()
+            - editor.editorToolSplit.getDividerSize();
+    }
+
+    private void sizeDockAutomatically(Tab tab) {
+        editor.editorToolSplit.setDividerLocation(preferredDividerLocation(tab));
+        automaticDockHeight = dockHeight();
+    }
+
+    private void selectedTabChanged() {
+        java.awt.Component selected = tabs.getSelectedComponent();
+        boolean changed = selected != selectedSurface;
+        selectedSurface = selected;
+        // Grow a default-sized dock for denser tools, preserving a divider the user moved.
+        // Data refreshes do not enter this path, and selecting a smaller tool never shrinks it.
+        if (changed && isVisible() && editor.editorToolSplit != null && automaticDockHeight >= 0
+            && Math.abs(dockHeight() - automaticDockHeight) <= 2) {
+            for (Map.Entry<Tab, ToolSurface> entry : surfaces.entrySet()) {
+                if (entry.getValue().component() == selected
+                    && preferredDividerLocation(entry.getKey()) < editor.editorToolSplit.getDividerLocation()) {
+                    sizeDockAutomatically(entry.getKey());
+                    break;
+                }
+            }
+        }
+        refreshActive();
     }
 
     boolean isSelected(Tab tab) {

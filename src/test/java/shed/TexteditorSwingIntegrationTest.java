@@ -149,6 +149,46 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void selectingToolTabsGrowsTheDefaultDockButPreservesManualSizing() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-tool-tab-sizing"));
+        Path file = Files.writeString(tempDir.resolve("tool-tab-sizing.txt"), "text\n");
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.setSize(1100, 950);
+                editor.validate();
+                editor.showToolWindow(ToolWindowHost.Tab.SEARCH);
+                editor.validate();
+                var tabs = descendants(editor.toolWindowHost, javax.swing.JTabbedPane.class).stream()
+                    .filter(pane -> pane.indexOfTab("Search") >= 0 && pane.indexOfTab("Replace") >= 0)
+                    .findFirst().orElseThrow();
+                int searchDivider = editor.editorToolSplit.getDividerLocation();
+                // Selecting the tab model follows the same listener as clicking its header.
+                tabs.setSelectedIndex(tabs.indexOfTab("Debug"));
+                editor.validate();
+                int debugDivider = editor.editorToolSplit.getDividerLocation();
+                assertTrue(debugDivider <= searchDivider - 150, "Debug should grow the default Search dock");
+                tabs.setSelectedIndex(tabs.indexOfTab("Search"));
+                assertEquals(debugDivider, editor.editorToolSplit.getDividerLocation(), "Smaller tools should not shrink the dock");
+
+                editor.editorToolSplit.setDividerLocation(editor.editorToolSplit.getHeight() - 300);
+                editor.validate();
+                int manualDivider = editor.editorToolSplit.getDividerLocation();
+                tabs.setSelectedIndex(tabs.indexOfTab("Replace"));
+                editor.validate();
+                assertEquals(manualDivider, editor.editorToolSplit.getDividerLocation(), "Tab changes should preserve a manually sized dock");
+                editor.toolWindowHost.refreshActive();
+                assertEquals(manualDivider, editor.editorToolSplit.getDividerLocation(), "Data refresh should preserve the divider");
+                return null;
+            });
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void replacePanelInvalidatesPendingPreviewsAndGuardsDirtyDocuments() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-replace-panel"));

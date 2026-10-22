@@ -322,9 +322,9 @@ final class InlineFindBar extends JPanel {
         String value = replacement.getText();
         editor.asyncJobService.submit("replace match", token -> expected.pattern().replacementAt(expected.text().text(), range, value),
             (job, result, error) -> {
-                if (error != null) { feedback.setText("Replacement failed: " + error.getMessage()); return; }
-                if (result == null || expected.buffer() != editor.getCurrentBuffer() || expected.text() != expected.buffer().textSnapshot()
+                if (expected.buffer() != editor.getCurrentBuffer() || expected.text() != expected.buffer().textSnapshot()
                     || !replacementQueryMatches(expected.pattern()) || !value.equals(replacement.getText())) return;
+                if (error != null || result == null) { updateFeedback(); feedback.setText("Replacement failed: " + (error == null ? "cancelled" : error.getMessage())); return; }
                 editor.writingArea.replaceRange(result, range.start(), range.end());
                 queryChanged();
             });
@@ -341,12 +341,14 @@ final class InlineFindBar extends JPanel {
         feedback.setText("Preparing replacement…");
         editor.asyncJobService.submit("replace all", token -> pattern.replaceAll(text.text(), value, token::isCancelled),
             (job, result, error) -> {
-                if (error != null || result == null) { feedback.setText("Replacement failed"); return; }
                 if (buffer != editor.getCurrentBuffer() || buffer.textSnapshot() != text
                     || !replacementQueryMatches(pattern) || !value.equals(replacement.getText())) {
                     feedback.setText("Document changed; preview again before replacing");
                     queryChanged();
                     return;
+                }
+                if (error != null || result == null) {
+                    updateFeedback(); feedback.setText("Replacement failed: " + (error == null ? "cancelled" : error.getMessage())); return;
                 }
                 try {
                     BoundedUndoManager history = (BoundedUndoManager) buffer.getUndoManager();

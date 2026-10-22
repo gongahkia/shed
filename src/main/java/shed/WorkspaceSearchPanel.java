@@ -107,6 +107,9 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
         AccessibilitySupport.describe(results, "Workspace search results", "Enter or double-click opens the selected file at its matching location.");
         AccessibilitySupport.describe(status, "Search progress", "Progress, cancellation, errors and result limits.");
         refreshAppearance();
+        editor.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosed(java.awt.event.WindowEvent event) { debounce.stop(); }
+        });
     }
     private static JLabel label(String text, JComponent field) { JLabel label = new JLabel(text); label.setLabelFor(field); return label; }
     private static JPanel field(String name, JTextField field) { JPanel row = new JPanel(new BorderLayout(5, 0)); row.add(label(name, field), BorderLayout.WEST); row.add(field); return row; }
@@ -122,11 +125,12 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
     private void edited() {
         if (changing) return;
         debounce.stop(); coordinator().invalidate();
-        if (!query.getText().isEmpty()) debounce.restart();
+        if (!query.getText().isEmpty()) { debounce.restart(); cancel.setEnabled(true); }
     }
     private void cancel() { debounce.stop(); coordinator().cancel(); }
     private void search() {
         debounce.stop();
+        if (editor.closingDown || !editor.isDisplayable()) return;
         try { coordinator().search(request()); }
         catch (IllegalArgumentException error) { coordinator().invalidate(); status.setText("Invalid search: " + error.getMessage()); }
     }

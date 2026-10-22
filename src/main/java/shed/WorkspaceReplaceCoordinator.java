@@ -375,7 +375,7 @@ final class WorkspaceReplaceCoordinator {
     private String setSetting(String key, String value) {
         try {
             editor.configManager.setAndPersist(key, value);
-            if ("project.replace.enabled".equals(key) && !Boolean.parseBoolean(value)) {
+            if ("project.replace.scope".equals(key) || "project.replace.enabled".equals(key) && !Boolean.parseBoolean(value)) {
                 cancel();
             }
             return "Updated " + key;
@@ -401,7 +401,7 @@ final class WorkspaceReplaceCoordinator {
             return null;
         }
         Path file = Path.of(current.getFilePath()).toAbsolutePath().normalize();
-        return file.startsWith(root) ? file : null;
+        return WorkspaceRootResolver.normalizedIdentity(file).startsWith(WorkspaceRootResolver.normalizedIdentity(root)) ? file : null;
     }
 
     private Path workspaceRoot() {

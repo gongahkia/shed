@@ -59,7 +59,8 @@ record ShortcutKey(int code, int modifiers, boolean primary) {
     boolean safeForTextInput() {
         return primary || (modifiers & (InputEvent.CTRL_DOWN_MASK | InputEvent.META_DOWN_MASK)) != 0
             || (code >= KeyEvent.VK_F1 && code <= KeyEvent.VK_F12)
-            || SPECIAL.containsValue(code) && code != KeyEvent.VK_SPACE;
+            || SPECIAL.containsValue(code) && code != KeyEvent.VK_SPACE && code != KeyEvent.VK_MINUS
+                && code != KeyEvent.VK_EQUALS && code != KeyEvent.VK_COMMA;
     }
     String token() {
         String key = SPECIAL.entrySet().stream().filter(entry -> entry.getValue() == code).map(Map.Entry::getKey).findFirst()

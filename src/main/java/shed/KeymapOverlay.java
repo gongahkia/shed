@@ -98,7 +98,7 @@ final class KeymapOverlay {
         List<Binding> bindings = new ArrayList<>();
         for (Map.Entry<Key, String> entry : overlays.entrySet()) {
             Key key = entry.getKey();
-            String status = key.lhs().startsWith("<") && isActionMapping(entry.getValue()) ? actionStatus(key, overlays, config, profile)
+            String status = key.lhs().startsWith("<") && isActionMapping(entry.getValue()) ? actionStatus(key, config, profile)
                 : overlayStatus(key, overlays, profile);
             bindings.add(new Binding(key.configKey(), key.scope(), key.lhs(), entry.getValue(), "User overlay", status));
         }
@@ -232,10 +232,16 @@ final class KeymapOverlay {
     }
 
     static String resolveAction(Map<String, String> config, KeymapProfile profile, String mode, java.awt.event.KeyEvent event) {
+        String key = winningActionKey(config, profile, mode, event);
+        return key == null ? null : config.get(key).trim();
+    }
+
+    private static String winningActionKey(Map<String, String> config, KeymapProfile profile, String mode, java.awt.event.KeyEvent event) {
         List<String> scopes = profile == KeymapProfile.VIM ? List.of(mode, "vim", "global") : List.of(profile.configValue(), "global");
         for (String scope : scopes) for (String token : ShortcutKey.tokens(event)) {
-            String value = config.get("keybind." + scope + "." + token);
-            if (value != null && isActionMapping(value)) return value.trim();
+            String key = "keybind." + scope + "." + token;
+            String value = config.get(key);
+            if (value != null && isActionMapping(value)) return key;
         }
         return null;
     }
@@ -245,13 +251,13 @@ final class KeymapOverlay {
             0, key.physicalModifiers(), key.code(), java.awt.event.KeyEvent.CHAR_UNDEFINED);
     }
 
-    private static String actionStatus(Key key, Map<Key, String> overlays, Map<String, String> config, KeymapProfile profile) {
+    private static String actionStatus(Key key, Map<String, String> config, KeymapProfile profile) {
         boolean applicable = key.scope().equals("global") || key.scope().equals(profile.configValue())
             || profile == KeymapProfile.VIM && !Set.of("plain", "emacs").contains(key.scope());
         if (!applicable) return "Inactive in " + profile.configValue();
         String mode = SCOPES.contains(key.scope()) && !Set.of("plain", "emacs", "vim", "global").contains(key.scope()) ? key.scope() : "normal";
-        String resolved = resolveAction(config, profile, mode, event(ShortcutKey.parse(key.lhs())));
-        if (!java.util.Objects.equals(resolved, overlays.get(key))) return "Shadowed by a more specific binding or physical modifier";
+        String resolved = winningActionKey(config, profile, mode, event(ShortcutKey.parse(key.lhs())));
+        if (!java.util.Objects.equals(resolved, key.configKey())) return "Shadowed by a more specific binding or physical modifier";
         return "Active in " + key.scope() + "; overrides built-in shortcut";
     }
 

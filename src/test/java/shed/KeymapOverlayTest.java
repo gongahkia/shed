@@ -11,6 +11,16 @@ import org.junit.jupiter.api.Test;
 
 class KeymapOverlayTest {
     @Test
+    void protectsPrintablePunctuationAndReportsIdenticalMappingConflicts() {
+        for (String key : java.util.List.of("<minus>", "<plus>", "<comma>"))
+            org.junit.jupiter.api.Assertions.assertNotNull(KeymapOverlay.validate("keybind.plain." + key, "action:find"));
+        var config = java.util.Map.of("keybind.global.<f2>", "action:find", "keybind.plain.<f2>", "action:find");
+        var fallback = KeymapOverlay.effectiveBindings(config, KeymapProfile.PLAIN).stream()
+            .filter(binding -> "keybind.global.<f2>".equals(binding.configKey())).findFirst().orElseThrow();
+        org.junit.jupiter.api.Assertions.assertTrue(fallback.status().startsWith("Shadowed"));
+    }
+
+    @Test
     void actionBindingsApplyByProfileAndPhysicalModifierBeforePortableFallback() {
         Map<String, String> values = new LinkedHashMap<>();
         values.put("keybind.global.<mod-s>", "action:save");

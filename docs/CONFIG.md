@@ -62,8 +62,8 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `theme` | `shed-dark` | string | Built-in theme id; `shed-light` is the matching light palette |
 | `font.family` | `Monospaced` | string | Buffer font family; must resolve uniquely to a Java-installed family |
 | `font.size` | `16` | int | Buffer font size |
-| `ui.font.family` | empty | string | UI font family; empty retains the system UI font, otherwise must resolve uniquely to a Java-installed family |
-| `ui.font.size` | `0` | int | UI font size; `0` retains each system UI default size |
+| `ui.font.family` | empty | string | UI font family; empty uses the shared sans-serif interface font, otherwise must resolve uniquely to a Java-installed family |
+| `ui.font.size` | `0` | int | UI font size; `0` uses the shared 13-point interface size |
 | `ui.open_editors.visible` | `true` | boolean | Show the open document strip with unsaved indicators and close controls. |
 | `ui.zoom` | `1.0` | number | Interface scale from `0.5` to `4.0`; `Ctrl/Cmd` + `+` or `-` adjusts it live and `Ctrl/Cmd` + `0` resets it |
 | `terminal.font.family` | `Monospaced` | string | Terminal font family; must resolve uniquely to a Java-installed family |

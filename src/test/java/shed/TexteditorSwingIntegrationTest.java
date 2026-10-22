@@ -43,6 +43,112 @@ public class TexteditorSwingIntegrationTest {
     Path tempDir;
 
     @Test
+    void workbenchControlsKeepTheirStyleAndKeyboardBehaviorAcrossThemeAndZoomChanges() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-workbench-style"));
+        Path file = Files.writeString(tempDir.resolve("workbench-style.txt"), "text\n");
+        Texteditor editor = createEditor(home, file);
+        javax.swing.JDialog dialog = null;
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            dialog = onEdt(() -> {
+                var window = new javax.swing.JDialog(editor, "Workbench controls", false);
+                var content = new javax.swing.JPanel(new java.awt.GridLayout(0, 2, 8, 8));
+                content.add(new javax.swing.JButton("Action"));
+                content.add(new javax.swing.JCheckBox("Option"));
+                content.add(new javax.swing.JTextField("Editable text"));
+                content.add(new javax.swing.JComboBox<>(new String[]{"One", "Two"}));
+                content.add(new javax.swing.JScrollPane(new javax.swing.JTable(new Object[][]{{"Row"}}, new Object[]{"Column"})));
+                content.add(new javax.swing.JScrollPane(new javax.swing.JList<>(new String[]{"First", "Second"})));
+                var tabs = new javax.swing.JTabbedPane(); tabs.addTab("Details", new javax.swing.JPanel()); content.add(tabs);
+                content.add(new javax.swing.JSpinner());
+                window.add(content);
+                editor.editorUiController.prepareDialog(window, 720, 420);
+                window.pack(); window.setVisible(true);
+                return window;
+            });
+            var shown = dialog;
+            onEdt(() -> {
+                var button = descendants(shown, javax.swing.JButton.class).stream().filter(b -> "Action".equals(b.getText())).findFirst().orElseThrow();
+                assertTrue(button.getUI() instanceof WorkbenchStyle.ButtonUI);
+                assertTrue(button.getPreferredSize().height >= 40);
+                var box = descendants(shown, javax.swing.JCheckBox.class).getFirst();
+                Object press = box.getInputMap().get(javax.swing.KeyStroke.getKeyStroke("pressed SPACE"));
+                Object release = box.getInputMap().get(javax.swing.KeyStroke.getKeyStroke("released SPACE"));
+                assertNotNull(press); assertNotNull(release);
+                box.getActionMap().get(press).actionPerformed(new ActionEvent(box, 0, "press"));
+                box.getActionMap().get(release).actionPerformed(new ActionEvent(box, 0, "release"));
+                assertTrue(box.isSelected());
+                var combo = descendants(shown, javax.swing.JComboBox.class).getFirst();
+                assertTrue(combo.getUI() instanceof WorkbenchStyle.ComboUI);
+                combo.setSelectedIndex(1);
+                assertEquals("Two", combo.getSelectedItem());
+                return null;
+            });
+            onEdt(() -> {
+                editor.configManager.set("theme", "shed-light");
+                editor.configManager.set("ui.zoom", "1.5");
+                editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                // A second application must not double-scale or restore native painting delegates.
+                editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                var button = descendants(shown, javax.swing.JButton.class).stream().filter(b -> "Action".equals(b.getText())).findFirst().orElseThrow();
+                assertTrue(button.getUI() instanceof WorkbenchStyle.ButtonUI);
+                assertEquals(editor.resolveUiFont().getSize(), button.getFont().getSize());
+                assertTrue(button.getPreferredSize().height >= 60);
+                var field = descendants(shown, javax.swing.JTextField.class).getFirst();
+                assertEquals(editor.configManager.getFloatingSurfaceColor(), field.getBackground());
+                assertEquals("Editable text", field.getText());
+                var table = descendants(shown, javax.swing.JTable.class).getFirst();
+                assertFalse(table.getShowHorizontalLines());
+                assertTrue(table.getRowHeight() >= 60);
+                assertEquals(editor.configManager.getSelectionColor(), table.getSelectionBackground());
+                var tabs = descendants(shown, javax.swing.JTabbedPane.class).getFirst();
+                assertTrue(tabs.getUI() instanceof WorkbenchStyle.TabsUI);
+                var later = new javax.swing.JDialog(editor, "Opened at 150%", false);
+                try {
+                    var content = new javax.swing.JPanel();
+                    var label = new javax.swing.JLabel("Label");
+                    var input = new javax.swing.JTextField("Query", 12);
+                    var action = new javax.swing.JButton("Apply");
+                    content.add(label); content.add(input); content.add(action);
+                    later.add(content);
+                    editor.editorUiController.prepareDialog(later, 500, 200);
+                    assertEquals(editor.resolveUiFont().getSize(), label.getFont().getSize());
+                    assertEquals(editor.resolveUiFont().getSize(), input.getFont().getSize());
+                    assertEquals(editor.resolveUiFont().getSize(), action.getFont().getSize());
+                    editor.editorUiController.applyUiFont(later);
+                    assertEquals(editor.resolveUiFont().getSize(), label.getFont().getSize());
+                } finally { later.dispose(); }
+                for (var scroll : descendants(shown, javax.swing.JScrollBar.class)) {
+                    for (var arrow : descendants(scroll, javax.swing.JButton.class)) assertFalse(arrow.isFocusable());
+                }
+                editor.configManager.set("ui.font.size", "18");
+                editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                var custom = new javax.swing.JDialog(editor, "Custom typography", false);
+                try {
+                    var content = new javax.swing.JPanel();
+                    var body = new javax.swing.JLabel("Body");
+                    var heading = new javax.swing.JLabel("Heading");
+                    heading.setFont(body.getFont().deriveFont(java.awt.Font.BOLD, body.getFont().getSize2D() * 2));
+                    content.add(body); content.add(heading); custom.add(content);
+                    editor.editorUiController.prepareDialog(custom, 500, 200);
+                    assertEquals(editor.resolveUiFont().getSize(), body.getFont().getSize());
+                    assertEquals(body.getFont().getSize() * 2, heading.getFont().getSize());
+                    editor.configManager.set("ui.font.size", "0");
+                    editor.editorUiController.applyUiFont(custom);
+                    assertEquals(editor.resolveUiFont().getSize(), body.getFont().getSize());
+                    assertEquals(body.getFont().getSize() * 2, heading.getFont().getSize());
+                } finally { custom.dispose(); }
+                return null;
+            });
+        } finally {
+            var current = dialog;
+            if (current != null) onEdt(() -> { current.dispose(); return null; });
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void replacePanelInvalidatesPendingPreviewsAndGuardsDirtyDocuments() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-replace-panel"));

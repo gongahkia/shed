@@ -513,7 +513,6 @@ final class DockerWorkbenchDialog extends JDialog {
         JTextArea area = new JTextArea();
         area.setEditable(false);
         area.setLineWrap(false);
-        area.setFont(Font.decode(Font.MONOSPACED));
         AccessibilitySupport.describe(area, "Docker output", "Read-only Docker command output and selected resource inspection.");
         return area;
     }

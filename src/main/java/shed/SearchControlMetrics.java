@@ -17,7 +17,9 @@ final class SearchControlMetrics {
             if (child instanceof javax.swing.JScrollPane) continue;
             if (child instanceof javax.swing.JLabel || child instanceof AbstractButton || child instanceof JTextField || child instanceof JComboBox<?>)
                 child.setFont(editor.resolveUiFont());
-            int height = Math.max(UiZoom.scale(40, zoom), child.getFont() == null ? 0 : child.getFontMetrics(child.getFont()).getHeight() + UiZoom.scale(10, zoom));
+            java.awt.Insets insets = child instanceof javax.swing.JComponent c ? c.getInsets() : new java.awt.Insets(0, 0, 0, 0);
+            int height = Math.max(UiZoom.scale(40, zoom), child.getFont() == null ? 0
+                : child.getFontMetrics(child.getFont()).getHeight() + Math.max(UiZoom.scale(10, zoom), insets.top + insets.bottom));
             if (child instanceof AbstractButton button) {
                 if (button instanceof javax.swing.JButton push) styleButton(push, editor.configManager);
                 int width = button.getFontMetrics(button.getFont()).stringWidth(button.getText() == null ? "" : button.getText())
@@ -26,7 +28,6 @@ final class SearchControlMetrics {
             } else if (child instanceof JTextField field) {
                 field.setPreferredSize(new Dimension(UiZoom.scale(180, zoom), height));
             } else if (child instanceof JComboBox<?> combo) {
-                combo.setUI(new javax.swing.plaf.basic.BasicComboBoxUI());
                 combo.setBackground(editor.configManager.getRaisedSurfaceColor());
                 combo.setForeground(editor.configManager.getEditorForeground());
                 combo.setPreferredSize(new Dimension(UiZoom.scale(145, zoom), height));
@@ -36,24 +37,10 @@ final class SearchControlMetrics {
         if (parent instanceof javax.swing.JComponent component) component.revalidate();
     }
     static void styleButton(javax.swing.JButton button, ConfigManager config) {
-        button.setUI(new javax.swing.plaf.basic.BasicButtonUI() {
-            @Override protected void paintText(java.awt.Graphics graphics, javax.swing.JComponent component,
-                                               java.awt.Rectangle bounds, String text) {
-                if (component.isEnabled()) { super.paintText(graphics, component, bounds, text); return; }
-                graphics.setColor(config.getMutedForegroundColor());
-                javax.swing.plaf.basic.BasicGraphicsUtils.drawStringUnderlineCharAt(graphics, text, -1,
-                    bounds.x, bounds.y + graphics.getFontMetrics().getAscent());
-            }
-            @Override protected void paintFocus(java.awt.Graphics graphics, AbstractButton target,
-                                                java.awt.Rectangle view, java.awt.Rectangle text, java.awt.Rectangle icon) {
-                graphics.setColor(config.getFocusColor());
-                graphics.drawRect(2, 2, target.getWidth() - 5, target.getHeight() - 5);
-            }
-        });
-        button.setOpaque(true); button.setContentAreaFilled(true);
-        button.setBackground(config.getRaisedSurfaceColor()); button.setForeground(config.getEditorForeground());
-        button.setBorder(javax.swing.BorderFactory.createCompoundBorder(
-            javax.swing.BorderFactory.createLineBorder(config.getSubtleBorderColor()),
-            javax.swing.BorderFactory.createEmptyBorder(4, 9, 4, 9)));
+        button.setUI(new WorkbenchStyle.ButtonUI());
+        button.setOpaque(false);
+        button.setBorder(javax.swing.UIManager.getBorder("Button.border"));
+        button.setBackground(config.getRaisedSurfaceColor());
+        button.setForeground(config.getEditorForeground());
     }
 }

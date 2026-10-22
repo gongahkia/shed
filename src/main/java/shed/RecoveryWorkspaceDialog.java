@@ -170,7 +170,6 @@ final class RecoveryWorkspaceDialog extends JDialog {
     private JTextArea previewArea() {
         JTextArea area = new JTextArea();
         area.setEditable(false);
-        area.setFont(Font.decode(Font.MONOSPACED));
         area.setLineWrap(false);
         return area;
     }

@@ -440,8 +440,8 @@ public class ConfigManager {
             case "theme" -> "Built-in theme identifier";
             case "font.family" -> "Editor font family";
             case "font.size" -> "Editor font size";
-            case "ui.font.family" -> "Application UI font family; empty uses the system UI font";
-            case "ui.font.size" -> "Application UI font size; zero uses each system UI default size";
+            case "ui.font.family" -> "Application UI font family; empty uses the shared sans-serif interface font";
+            case "ui.font.size" -> "Application UI font size; zero uses the shared 13-point interface size";
             case "ui.zoom" -> "Application interface scale; Ctrl/Cmd + and Ctrl/Cmd - adjust it live; Ctrl/Cmd 0 resets it";
             case "terminal.font.family" -> "Terminal font family";
             case "terminal.font.size" -> "Terminal font size";
@@ -2258,7 +2258,7 @@ public class ConfigManager {
             "ui.syntax.constant", "ui.syntax.annotation", "ui.syntax.number"
         };
         String[] values = light ? new String[] {
-            "#EFF0F4", "#F5F6F9", "#FAFAFC", "#717989", "#F0F2F7", "#DCE6FA", "#E7EACB", "#EBD799",
+            "#EFF0F4", "#F5F6F9", "#FAFAFC", "#626B7B", "#F0F2F7", "#DCE6FA", "#E7EACB", "#EBD799",
             "#EFF0F4", "#FFFFFF", "#D5D9E2", "#626B7B",
             "#8054A3", "#407340", "#6F7888", "#91672B", "#365FB5", "#AB5447", "#8054A3", "#98622C"
         } : new String[] {

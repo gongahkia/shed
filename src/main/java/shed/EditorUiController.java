@@ -124,6 +124,7 @@ final class EditorUiController {
     }
 
     void initializeUI(StartupProfile profile) {
+        installUiThemeDefaults();
         editor.setTitle("Shed " + editor.VERSION);
         editor.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setApplicationIcon();
@@ -145,7 +146,7 @@ final class EditorUiController {
             java.nio.file.Path.of(editor.configManager.getShedDirectoryPath(), "window-placement.properties"));
         editor.windowPlacementStore.restore(editor);
         profile.mark("UI window placement");
-        editor.setLayout(new BorderLayout(5, 5));
+        editor.setLayout(new BorderLayout());
         editor.editorHostPanel = new JPanel(new BorderLayout());
         editor.editorHostPanel.addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override public void componentResized(java.awt.event.ComponentEvent event) { renderWindowLayout(); }
@@ -289,6 +290,7 @@ final class EditorUiController {
             return;
         }
         boolean active = mode == EditorMode.COMMAND;
+        if (active) editor.commandBar.setVisible(true);
         editor.commandBar.setEditable(active);
         editor.commandBar.setFocusable(active);
         if (!active) {
@@ -885,16 +887,16 @@ final class EditorUiController {
     Font resolveUiFont(float unscaledSize) {
         Font systemFont = systemUiFonts.getOrDefault("Label.font", new Font(Font.DIALOG, Font.PLAIN, 13));
         Font configuredFamily = resolveInstalledFont(editor.configManager.getUiFontFamily(), Math.max(1, Math.round(unscaledSize)));
-        String family = configuredFamily == null ? systemFont.getFamily() : configuredFamily.getFamily();
-        return new Font(family, systemFont.getStyle(), UiZoom.scale(Math.round(unscaledSize), editor.configManager.getUiZoom()));
+        String family = configuredFamily == null ? Font.DIALOG : configuredFamily.getFamily();
+        return new Font(family, Font.PLAIN, UiZoom.scale(Math.round(unscaledSize), editor.configManager.getUiZoom()));
     }
 
     Font resolveUiFontAtSize(int size) {
         Font systemFont = systemUiFonts.getOrDefault("Label.font", new Font(Font.DIALOG, Font.PLAIN, 13));
         int resolvedSize = Math.max(1, size);
         Font configuredFamily = resolveInstalledFont(editor.configManager.getUiFontFamily(), resolvedSize);
-        String family = configuredFamily == null ? systemFont.getFamily() : configuredFamily.getFamily();
-        return new Font(family, systemFont.getStyle(), resolvedSize);
+        String family = configuredFamily == null ? Font.DIALOG : configuredFamily.getFamily();
+        return new Font(family, Font.PLAIN, resolvedSize);
     }
 
     Font resolveTerminalFont() {
@@ -958,6 +960,11 @@ final class EditorUiController {
     }
 
     private void applyUiFontWithProfile(StartupProfile profile) {
+        FontUIResource interfaceFont = new FontUIResource(resolveUiFont());
+        for (String type : new String[] {"Label", "Button", "ToggleButton", "CheckBox", "RadioButton", "TextField",
+            "PasswordField", "FormattedTextField", "ComboBox", "List", "Tree", "Table", "TableHeader", "TabbedPane",
+            "MenuBar", "Menu", "MenuItem", "CheckBoxMenuItem", "RadioButtonMenuItem", "ToolTip", "OptionPane", "TitledBorder"})
+            UIManager.put(type + ".font", interfaceFont);
         boolean first = true;
         for (Map.Entry<Object, Font> entry : systemUiFonts.entrySet()) {
             UIManager.put(entry.getKey(), new FontUIResource(configuredUiFont(entry.getValue())));
@@ -1036,6 +1043,7 @@ final class EditorUiController {
             "ProgressBar.foreground", "Focus.color");
         putUiColor(colors.border(), "Table.gridColor", "Separator.foreground", "controlShadow", "controlDkShadow");
         putUiColor(colors.muted(), "Label.disabledForeground", "Button.disabledText", "MenuItem.disabledForeground");
+        WorkbenchStyle.install(editor.configManager);
     }
 
     private UiThemeColors uiThemeColors() {
@@ -1058,11 +1066,23 @@ final class EditorUiController {
         if (component instanceof JPanel panel) {
             panel.setBackground(colors.surface());
             panel.setForeground(colors.foreground());
+            if (panel.getLayout() instanceof FlowLayout flow && !(flow instanceof WrappingFlowLayout)) {
+                panel.setLayout(new WrappingFlowLayout(flow));
+                panel.addComponentListener(new java.awt.event.ComponentAdapter() {
+                    @Override public void componentResized(java.awt.event.ComponentEvent event) { panel.revalidate(); }
+                });
+            }
         }
-        if (component instanceof JLabel label) label.setForeground(colors.foreground());
+        if (component instanceof JLabel label) label.setForeground(
+            Boolean.TRUE.equals(label.getClientProperty("shed.setting.description"))
+                || Boolean.TRUE.equals(label.getClientProperty("shed.muted")) ? colors.muted() : colors.foreground());
+        if (!editor.stagedStartupPending && (component instanceof AbstractButton || component instanceof JTextField
+            || component instanceof JComboBox<?> || component instanceof JList<?> || component instanceof JTable || component instanceof JTree))
+            component.setFont(resolveUiFont());
         if (component instanceof AbstractButton button) {
             button.setBackground(colors.raised());
             button.setForeground(colors.foreground());
+            if (button instanceof JCheckBox || button instanceof JRadioButton) button.setOpaque(false);
         }
         if (component instanceof JTextComponent text) {
             text.setBackground(component instanceof JTextField ? colors.field() : colors.surface());
@@ -1080,6 +1100,8 @@ final class EditorUiController {
             list.setForeground(colors.foreground());
             list.setSelectionBackground(colors.selection());
             list.setSelectionForeground(colors.selectionText());
+            if (!editor.stagedStartupPending) list.setFixedCellHeight(Math.max(UiZoom.scale(40, editor.configManager.getUiZoom()),
+                list.getFontMetrics(list.getFont()).getHeight() + UiZoom.scale(12, editor.configManager.getUiZoom())));
         }
         if (component instanceof JTree tree) {
             tree.setBackground(colors.field());
@@ -1091,6 +1113,11 @@ final class EditorUiController {
             table.setSelectionBackground(colors.selection());
             table.setSelectionForeground(colors.selectionText());
             table.setGridColor(colors.border());
+            table.setShowGrid(false);
+            table.setFillsViewportHeight(true);
+            table.setIntercellSpacing(new Dimension(0, 0));
+            table.setRowHeight(Math.max(UiZoom.scale(40, editor.configManager.getUiZoom()),
+                table.getFontMetrics(table.getFont()).getHeight() + UiZoom.scale(12, editor.configManager.getUiZoom())));
             JTableHeader header = table.getTableHeader();
             if (header != null) {
                 header.setBackground(colors.raised());
@@ -1225,7 +1252,6 @@ final class EditorUiController {
 
     void applyUiFont(Component root) {
         if (root == null) return;
-        SwingUtilities.updateComponentTreeUI(root);
         applyUiFontRecursively(root);
         if (root instanceof Container container) {
             container.revalidate();
@@ -1235,11 +1261,15 @@ final class EditorUiController {
 
     private void applyUiFontRecursively(Component component) {
         Font font = component.getFont();
-        if (font != null) {
+        if (component instanceof JTextArea) {
+            // Plain-text previews, diffs and consoles keep code typography.
+            component.setFont(resolveEditorFont().deriveFont((float) resolveUiFont().getSize()));
+        } else if (font != null) {
             component.setFont(resolveUiFont(baseUiFont(component, font)));
         }
         if (component instanceof JTable table) {
-            int minimumRowHeight = table.getFontMetrics(table.getFont()).getHeight() + UiZoom.scale(4, editor.configManager.getUiZoom());
+            int minimumRowHeight = Math.max(UiZoom.scale(40, editor.configManager.getUiZoom()),
+                table.getFontMetrics(table.getFont()).getHeight() + UiZoom.scale(12, editor.configManager.getUiZoom()));
             table.setRowHeight(minimumRowHeight);
         }
         if (component instanceof Container container) {
@@ -1253,28 +1283,30 @@ final class EditorUiController {
         if (component instanceof JComponent swingComponent) {
             Object stored = swingComponent.getClientProperty(BASE_UI_FONT_PROPERTY);
             if (stored instanceof Font font) return font;
-            Font base = matchingSystemUiFont(currentFont);
+            Font base = relativeBaseUiFont(currentFont);
             swingComponent.putClientProperty(BASE_UI_FONT_PROPERTY, base);
             return base;
         }
-        return matchingSystemUiFont(currentFont);
+        return relativeBaseUiFont(currentFont);
     }
 
-    private Font matchingSystemUiFont(Font currentFont) {
-        for (Font systemFont : systemUiFonts.values()) {
-            if (systemFont.getStyle() == currentFont.getStyle()
-                && systemFont.getFamily().equalsIgnoreCase(currentFont.getFamily())
-                && UiZoom.scale(systemFont.getSize(), editor.configManager.getUiZoom()) == currentFont.getSize()) {
-                return systemFont;
-            }
-        }
-        return currentFont;
+    private Font relativeBaseUiFont(Font currentFont) {
+        // Newly created controls already inherit the current zoom from UIDefaults.
+        // Do not infer their base size from the platform's original font family:
+        // our interface font (or a configured family) need not match that family.
+        return currentFont.deriveFont(currentFont.getSize2D() * 13f / scaledUiBodySize());
     }
 
     private Font resolveUiFont(Font unscaledFont) {
         Font configuredFamily = resolveInstalledFont(editor.configManager.getUiFontFamily(), Math.max(1, unscaledFont.getSize()));
-        String family = configuredFamily == null ? unscaledFont.getFamily() : configuredFamily.getFamily();
-        return new Font(family, unscaledFont.getStyle(), UiZoom.scale(unscaledFont.getSize(), editor.configManager.getUiZoom()));
+        String family = configuredFamily == null ? Font.DIALOG : configuredFamily.getFamily();
+        int size = Math.max(1, Math.round(unscaledFont.getSize2D() * scaledUiBodySize() / 13f));
+        return new Font(family, unscaledFont.getStyle(), size);
+    }
+
+    private int scaledUiBodySize() {
+        int requested = editor.configManager.getUiFontSize();
+        return UiZoom.scale(requested == 0 ? 13 : requested, editor.configManager.getUiZoom());
     }
 
     private void applyFooterUiMetrics() {
@@ -1305,17 +1337,35 @@ final class EditorUiController {
     private void installDialogUiScaling() {
         if (dialogUiScalingListenerInstalled) return;
         dialogUiScalingListenerInstalled = true;
-        Toolkit.getDefaultToolkit().addAWTEventListener(event -> {
+        java.awt.event.AWTEventListener listener = event -> {
             if (!(event instanceof WindowEvent windowEvent) || windowEvent.getID() != WindowEvent.WINDOW_OPENED
-                || !(windowEvent.getWindow() instanceof JDialog dialog)) {
+                || !(windowEvent.getWindow() instanceof JDialog dialog) || !isOwnedByEditor(dialog)) {
                 return;
             }
             SwingUtilities.invokeLater(() -> {
-                if (!Boolean.TRUE.equals(dialog.getRootPane().getClientProperty(DIALOG_UI_READY_PROPERTY))) {
+                if (dialog.isDisplayable() && !Boolean.TRUE.equals(dialog.getRootPane().getClientProperty(DIALOG_UI_READY_PROPERTY))) {
+                    applyUiTheme(dialog);
                     applyUiFont(dialog);
+                    dialog.pack();
+                    Dimension size = fitPopupSize(dialog, dialog.getSize());
+                    dialog.setSize(size);
+                    dialog.setLocation(fitPopupLocation(dialog, dialog.getLocation(), size));
+                    markDialogUiReady(dialog);
                 }
             });
-        }, AWTEvent.WINDOW_EVENT_MASK);
+        };
+        Toolkit.getDefaultToolkit().addAWTEventListener(listener, AWTEvent.WINDOW_EVENT_MASK);
+        editor.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosed(WindowEvent event) {
+                Toolkit.getDefaultToolkit().removeAWTEventListener(listener);
+                dialogUiScalingListenerInstalled = false;
+            }
+        });
+    }
+
+    private boolean isOwnedByEditor(Window window) {
+        for (Window owner = window.getOwner(); owner != null; owner = owner.getOwner()) if (owner == editor) return true;
+        return false;
     }
 
     private Map<Object, Font> captureSystemUiFonts() {
@@ -1331,9 +1381,9 @@ final class EditorUiController {
     private Font configuredUiFont(Font systemFont) {
         int requestedSize = editor.configManager.getUiFontSize();
         Font configuredFamily = resolveInstalledFont(editor.configManager.getUiFontFamily(), Math.max(1, requestedSize));
-        String family = configuredFamily == null ? systemFont.getFamily() : configuredFamily.getFamily();
-        int size = requestedSize == 0 ? systemFont.getSize() : requestedSize;
-        return new Font(family, systemFont.getStyle(), UiZoom.scale(size, editor.configManager.getUiZoom()));
+        String family = configuredFamily == null ? Font.DIALOG : configuredFamily.getFamily();
+        int size = requestedSize == 0 ? 13 : requestedSize;
+        return new Font(family, Font.PLAIN, UiZoom.scale(size, editor.configManager.getUiZoom()));
     }
 
     private void installUiZoomShortcuts() {
@@ -1543,6 +1593,11 @@ final class EditorUiController {
             } finally {
                 updatingCommandBar = false;
             }
+        }
+        boolean visible = !value.isBlank() || editor.editorState.mode == EditorMode.COMMAND || editor.editorState.mode == EditorMode.SEARCH;
+        if (editor.commandBar.isVisible() != visible) {
+            editor.commandBar.setVisible(visible);
+            editor.footerPanel.revalidate();
         }
     }
 

@@ -19,6 +19,7 @@ final class ToolWindowHost extends JPanel {
 
     private final Texteditor editor;
     private final JTabbedPane tabs = new JTabbedPane();
+    private JPanel headerPanel;
     private final Map<Tab, ToolSurface> surfaces = new EnumMap<>(Tab.class);
     private final Map<Tab, JDialog> detached = new EnumMap<>(Tab.class);
     private final EnumSet<Tab> hiddenDetachedForFocusMode = EnumSet.noneOf(Tab.class);
@@ -28,7 +29,8 @@ final class ToolWindowHost extends JPanel {
         this.editor = editor;
         setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, editor.configManager.getStatusBarBackground()));
         setMinimumSize(new Dimension(0, 160));
-        add(header(), BorderLayout.NORTH);
+        headerPanel = header();
+        add(headerPanel, BorderLayout.NORTH);
         add(tabs, BorderLayout.CENTER);
         addSurface(Tab.SEARCH, "Search", new WorkspaceSearchPanel(editor));
         addSurface(Tab.GIT, "Git", new GitChangesToolPanel(editor, this));
@@ -72,7 +74,8 @@ final class ToolWindowHost extends JPanel {
         }
         editor.showToolWindow();
         tabs.setSelectedComponent(surface.component());
-        if (tab == Tab.SEARCH || tab == Tab.REPLACE) editor.editorToolSplit.setDividerLocation(0.48);
+        if (tab == Tab.SEARCH || tab == Tab.REPLACE) editor.editorToolSplit.setDividerLocation(
+            Math.max(UiZoom.scale(120, editor.configManager.getUiZoom()), editor.editorToolSplit.getHeight() - UiZoom.scale(360, editor.configManager.getUiZoom())));
         surface.refresh();
     }
 
@@ -100,7 +103,19 @@ final class ToolWindowHost extends JPanel {
         return surface instanceof ProblemsToolPanel panel ? panel : null;
     }
 
-    void refreshAppearance() { for (ToolSurface surface : surfaces.values()) surface.refreshAppearance(); }
+    void refreshAppearance() {
+        SearchControlMetrics.apply(headerPanel, editor);
+        tabs.setFont(editor.resolveUiFont());
+        tabs.setUI(new javax.swing.plaf.basic.BasicTabbedPaneUI() {
+            @Override protected void installDefaults() {
+                super.installDefaults();
+                int padding = Math.max(2, (UiZoom.scale(40, editor.configManager.getUiZoom()) - tabs.getFontMetrics(tabs.getFont()).getHeight() + 1) / 2);
+                tabInsets = new java.awt.Insets(padding, UiZoom.scale(10, editor.configManager.getUiZoom()), padding, UiZoom.scale(10, editor.configManager.getUiZoom()));
+                highlight = lightHighlight = shadow = darkShadow = editor.configManager.getSubtleBorderColor();
+            }
+        });
+        for (ToolSurface surface : surfaces.values()) surface.refreshAppearance();
+    }
 
     void refreshActive() {
         for (Map.Entry<Tab, ToolSurface> entry : surfaces.entrySet()) {

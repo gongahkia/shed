@@ -62,7 +62,7 @@ final class ShedMenuBar {
         item(view, "Command Palette…", KeyEvent.VK_P, commandMask | InputEvent.SHIFT_DOWN_MASK,
             () -> show(editor.showCommandPalette()));
         item(view, "Focus Open Editors", -1, 0, () -> editor.openEditorsBar.focusEditors());
-        item(view, "Toggle Open Editors", -1, 0, () -> show(editor.sessionConfigController.setConfigOption(
+        item(view, "Toggle Open Editors", -1, 0, () -> show(editor.sessionConfigController.setConfigOptionPersistent(
             "ui.open_editors.visible", Boolean.toString(!editor.configManager.getOpenEditorsVisible()))));
         item(view, "Toggle File Tree", -1, 0, () -> command("tree toggle"));
         item(view, "Toggle Minimap", -1, 0, () -> command("minimap toggle"));

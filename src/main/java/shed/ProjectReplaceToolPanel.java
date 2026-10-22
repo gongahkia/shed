@@ -71,7 +71,7 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     @Override public void refreshAppearance() {
-        SearchControlMetrics.apply(panel, editor.configManager.getUiZoom());
+        SearchControlMetrics.apply(panel, editor);
         fileTable.setRowHeight(UiZoom.scale(40, editor.configManager.getUiZoom()));
         matchTable.setRowHeight(UiZoom.scale(40, editor.configManager.getUiZoom()));
     }

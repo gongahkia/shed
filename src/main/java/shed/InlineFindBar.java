@@ -171,7 +171,7 @@ final class InlineFindBar extends JPanel {
             field.setSelectedTextColor(editor.configManager.getSelectionTextColor());
         }
         styleButtons(this);
-        if (!editor.stagedStartupPending) SearchControlMetrics.apply(this, editor.configManager.getUiZoom());
+        if (!editor.stagedStartupPending) SearchControlMetrics.apply(this, editor);
         repaint();
     }
 

@@ -63,6 +63,10 @@ final class OpenEditorsBar extends JPanel {
     }
 
     void refreshAppearance() {
+        SearchControlMetrics.styleButton(close, editor.configManager);
+        if (!editor.stagedStartupPending) {
+            list.setFont(editor.resolveUiFont()); close.setFont(editor.resolveUiFont());
+        }
         int height = UiZoom.scale(40, editor.configManager.getUiZoom());
         list.setFixedCellHeight(height);
         close.setPreferredSize(new Dimension(UiZoom.scale(80, editor.configManager.getUiZoom()), height));

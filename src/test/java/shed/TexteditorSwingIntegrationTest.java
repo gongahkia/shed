@@ -91,13 +91,18 @@ public class TexteditorSwingIntegrationTest {
                 editor.writingArea.select(2, 6);
                 var list = descendants(bar, javax.swing.JList.class).getFirst();
                 assertEquals(2, list.getModel().getSize());
-                assertTrue(list.getModel().getElementAt(0).toString().contains("same.txt —"));
+                javax.swing.JLabel firstLabel = (javax.swing.JLabel) list.getCellRenderer().getListCellRendererComponent(
+                    list, list.getModel().getElementAt(0), 0, false, false);
+                assertTrue(firstLabel.getText().contains("same.txt —"));
                 list.setSelectedIndex(0);
                 FileBuffer first = editor.getCurrentBuffer();
                 assertTrue(first != second);
                 editor.writingArea.append(" dirty");
                 editor.updateStatusBar();
-                assertTrue(list.getSelectedValue().toString().contains("dirty=true"));
+                javax.swing.JLabel dirtyLabel = (javax.swing.JLabel) list.getCellRenderer().getListCellRendererComponent(
+                    list, list.getSelectedValue(), list.getSelectedIndex(), true, true);
+                assertTrue(dirtyLabel.getText().startsWith("● "));
+                assertTrue(dirtyLabel.getAccessibleContext().getAccessibleName().contains("unsaved changes"));
                 assertFalse(bar.closeBuffer(first, false));
                 assertTrue(editor.buffers.contains(first));
                 list.setSelectedIndex(1);

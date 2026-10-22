@@ -62,6 +62,7 @@ final class WorkspaceSearchCoordinator {
     String search(WorkspaceSearchQuery next) {
         cancel();
         query = next;
+        if (editor.toolWindowHost != null) editor.toolWindowHost.searchPanel().setQuery(next);
         matches.clear();
         List<Path> roots = workspaceRoots();
         if (roots.isEmpty()) { status = "Workspace search requires a directory"; changed(); return status; }

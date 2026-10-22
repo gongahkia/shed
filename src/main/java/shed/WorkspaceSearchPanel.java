@@ -139,8 +139,19 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
         if (selected != null) editor.openFileAtAsync(new java.io.File(selected.filePath()), selected.line(), selected.column(), "search");
     }
     @Override public void refreshAppearance() {
-        SearchControlMetrics.apply(panel, editor.configManager.getUiZoom());
+        SearchControlMetrics.apply(panel, editor);
         results.setFixedCellHeight(UiZoom.scale(40, editor.configManager.getUiZoom()));
+        results.setFont(editor.resolveUiFont());
+    }
+    void setQuery(WorkspaceSearchQuery value) {
+        changing = true;
+        try {
+            if (!query.getText().equals(value.pattern().query())) query.setText(value.pattern().query());
+            matchCase.setSelected(value.pattern().caseSensitive());
+            regex.setSelected(value.pattern().regex()); wholeWord.setSelected(value.pattern().wholeWord());
+            if (!include.getText().equals(value.include())) include.setText(value.include());
+            if (!exclude.getText().equals(value.exclude())) exclude.setText(value.exclude());
+        } finally { changing = false; }
     }
     @Override public JPanel component() { return panel; }
     @Override public void refresh() {

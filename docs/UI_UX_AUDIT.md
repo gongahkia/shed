@@ -42,4 +42,4 @@ This is a local desktop UI. The design choices align with [Apple's macOS guidanc
 
 ## Verdict
 
-The seven reviewed UI issues are addressed in the Swing app. The remaining full-suite failures reproduce on the original revision and are outside this UI work.
+The seven reviewed UI issues are addressed in the Swing app. The nine baseline failures recorded above were subsequently resolved during the 2026-10-22–23 editor review. The follow-up complete display-backed suite reports 945 tests, zero failures/errors and three environment-dependent skips; see the [editor comparison and validation report](EDITOR_COMPARISON.md) for the fixes, current scope and remaining product work.

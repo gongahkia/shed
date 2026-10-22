@@ -27,6 +27,10 @@ The supported entry seams are:
 
 All current `*Controller` classes are package-private. Each is constructed with exactly one `Texteditor` reference; no controller directly holds another controller. `Texteditor` owns controllers while they retain their owner reference, so that composition cycle already exists and is a migration boundary rather than a pattern to extend.
 
+`PaletteFilterSession` is a per-dialog UI helper owned by `PaletteController`. It takes picker widgets, a background matcher and an acceptance callback; it has no application or feature-controller reference. It owns query generations, debounce, selection acceptance and cancellation. `NavigationHistory` is a bounded, UI-independent history model; `EditActionController` resolves its buffer identifiers against currently open documents. `BufferViewState` belongs to each `EditorPane`, so switching buffers preserves each split's selection and viewport independently.
+
+`WorkspaceRootResolver.normalizedIdentity` resolves filesystem aliases through an existing parent, including for files that have not been created yet. `pathWithinRoot` checks that identity and returns a contained path using the configured root's spelling. Remote/container session lookups, debugger source paths and workspace labels use these helpers so a path alias cannot silently select a different execution context. Display labels and persisted root strings need not all adopt the same spelling.
+
 ## Controller inventory
 
 | Controller | Ownership | Primary collaborators through `Texteditor` |

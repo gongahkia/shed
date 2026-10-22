@@ -217,27 +217,35 @@ final class ThemeGalleryDialog extends JDialog {
             if (theme == null) return;
             Graphics2D g = (Graphics2D) graphics.create();
             try {
+                var insets = getInsets();
+                int width = Math.max(0, getWidth() - insets.left - insets.right);
+                int height = Math.max(0, getHeight() - insets.top - insets.bottom);
+                g.translate(insets.left, insets.top);
+                g.clipRect(0, 0, width, height);
                 g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
                 g.setColor(theme.normal());
-                g.fillRect(0, 0, getWidth(), getHeight());
-                int gutter = Math.min(62, Math.max(46, getWidth() / 11));
+                g.fillRect(0, 0, width, height);
+                int gutter = Math.min(WorkbenchStyle.px(62), Math.max(WorkbenchStyle.px(46), width / 11));
                 g.setColor(theme.command());
-                g.fillRect(0, 0, gutter, getHeight());
-                Font font = new Font(Font.MONOSPACED, Font.PLAIN, Math.max(13, getFont().getSize()));
+                g.fillRect(0, 0, gutter, height);
+                Font font = new Font(Font.MONOSPACED, Font.PLAIN, getFont().getSize());
                 g.setFont(font);
                 FontMetrics metrics = g.getFontMetrics();
-                int line = metrics.getHeight() + 7;
-                drawLine(g, metrics, gutter, line, "1", "public ", theme.accent(), "class ", theme.stringAccent(), "ThemePreview {", theme.foreground());
-                drawLine(g, metrics, gutter, line * 2, "2", "    ", theme.foreground(), "String ", theme.stringAccent(), "name = ", theme.foreground(), "\"" + theme.displayName() + "\";", theme.stringAccent());
+                int line = metrics.getHeight() + WorkbenchStyle.px(7);
+                int firstBaseline = WorkbenchStyle.px(8) + metrics.getAscent();
+                drawLine(g, metrics, gutter, firstBaseline, "1", "public ", theme.accent(), "class ", theme.stringAccent(), "ThemePreview {", theme.foreground());
+                drawLine(g, metrics, gutter, firstBaseline + line, "2", "    ", theme.foreground(), "String ", theme.stringAccent(), "name = ", theme.foreground(), "\"" + theme.displayName() + "\";", theme.stringAccent());
                 g.setColor(theme.visual());
-                g.fillRect(gutter, line * 2 + 5, getWidth() - gutter, line + 3);
-                drawLine(g, metrics, gutter, line * 3, "3", "    ", theme.foreground(), "int ", theme.stringAccent(), "themes = ", theme.foreground(), "32", theme.accent(), ";", theme.foreground());
-                drawLine(g, metrics, gutter, line * 4, "4", "    ", theme.foreground(), "// selected theme preview", blend(theme.foreground(), theme.normal(), 0.48));
-                drawLine(g, metrics, gutter, line * 5, "5", "}", theme.foreground());
+                g.fillRect(gutter, firstBaseline + line * 2 - metrics.getAscent(), width - gutter, line);
+                drawLine(g, metrics, gutter, firstBaseline + line * 2, "3", "    ", theme.foreground(), "int ", theme.stringAccent(), "themes = ", theme.foreground(), "32", theme.accent(), ";", theme.foreground());
+                drawLine(g, metrics, gutter, firstBaseline + line * 3, "4", "    ", theme.foreground(), "// selected theme preview", blend(theme.foreground(), theme.normal(), 0.48));
+                drawLine(g, metrics, gutter, firstBaseline + line * 4, "5", "}", theme.foreground());
+                int footerHeight = Math.max(WorkbenchStyle.px(30), line);
                 g.setColor(theme.insert());
-                g.fillRect(gutter, getHeight() - Math.max(30, line), getWidth() - gutter, Math.max(30, line));
+                g.fillRect(gutter, height - footerHeight, width - gutter, footerHeight);
                 g.setColor(readable(theme.insert()));
-                g.drawString("INSERT  Preview palette — apply to use", gutter + 12, getHeight() - 11);
+                g.drawString("INSERT  Preview palette — apply to use", gutter + WorkbenchStyle.px(12),
+                    height - footerHeight + (footerHeight - metrics.getHeight()) / 2 + metrics.getAscent());
             } finally {
                 g.dispose();
             }
@@ -246,8 +254,8 @@ final class ThemeGalleryDialog extends JDialog {
         private void drawLine(Graphics2D g, FontMetrics metrics, int gutter, int baseline, String number, Object... segments) {
             g.setColor(blend(theme.foreground(), theme.normal(), 0.45));
             int numberWidth = metrics.stringWidth(number);
-            g.drawString(number, gutter - numberWidth - 10, baseline);
-            int x = gutter + 12;
+            g.drawString(number, gutter - numberWidth - WorkbenchStyle.px(10), baseline);
+            int x = gutter + WorkbenchStyle.px(12);
             for (int index = 0; index < segments.length; index += 2) {
                 String text = (String) segments[index];
                 g.setColor((Color) segments[index + 1]);
@@ -267,8 +275,15 @@ final class ThemeGalleryDialog extends JDialog {
     private static final class ThemeSwatchGrid extends JPanel {
         private ThemePreview theme;
 
-        private ThemeSwatchGrid() { setPreferredSize(new Dimension(610, 180)); }
         private void setTheme(ThemePreview theme) { this.theme = theme; repaint(); }
+
+        @Override public Dimension getPreferredSize() {
+            var insets = getInsets();
+            int textHeight = getFontMetrics(getFont().deriveFont(Font.BOLD)).getHeight()
+                + getFontMetrics(getFont().deriveFont(Font.PLAIN)).getHeight();
+            int rowsHeight = 2 * (textHeight + WorkbenchStyle.px(26));
+            return new Dimension(WorkbenchStyle.px(610), Math.max(WorkbenchStyle.px(180), rowsHeight + insets.top + insets.bottom));
+        }
 
         @Override
         protected void paintComponent(Graphics graphics) {
@@ -276,23 +291,34 @@ final class ThemeGalleryDialog extends JDialog {
             if (theme == null) return;
             int columns = 4;
             int rows = 2;
-            int width = Math.max(1, getWidth() / columns);
-            int height = Math.max(1, getHeight() / rows);
+            var insets = getInsets();
+            int contentWidth = Math.max(0, getWidth() - insets.left - insets.right);
+            int contentHeight = Math.max(0, getHeight() - insets.top - insets.bottom);
             Graphics2D g = (Graphics2D) graphics.create();
             try {
-                g.setFont(getFont().deriveFont(Font.BOLD));
+                g.translate(insets.left, insets.top);
+                g.clipRect(0, 0, contentWidth, contentHeight);
+                g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                Font headingFont = getFont().deriveFont(Font.BOLD);
+                Font valueFont = getFont().deriveFont(Font.PLAIN);
+                FontMetrics headingMetrics = g.getFontMetrics(headingFont);
+                FontMetrics valueMetrics = g.getFontMetrics(valueFont);
+                int padding = WorkbenchStyle.px(10);
                 for (int index = 0; index < SWATCHES.size(); index++) {
-                    int x = (index % columns) * width;
-                    int y = (index / columns) * height;
+                    int column = index % columns, row = index / columns;
+                    int x = column * contentWidth / columns, y = row * contentHeight / rows;
+                    int width = (column + 1) * contentWidth / columns - x;
+                    int height = (row + 1) * contentHeight / rows - y;
                     Color color = SWATCHES.get(index).color().apply(theme);
                     Color text = readable(color);
                     g.setColor(color);
                     g.fillRect(x, y, width, height);
                     g.setColor(text);
-                    g.drawString(SWATCHES.get(index).label(), x + 10, y + 24);
-                    g.setFont(getFont().deriveFont(Font.PLAIN));
-                    g.drawString(hex(color), x + 10, y + 46);
-                    g.setFont(getFont().deriveFont(Font.BOLD));
+                    g.setFont(headingFont);
+                    g.drawString(SWATCHES.get(index).label(), x + padding, y + padding + headingMetrics.getAscent());
+                    g.setFont(valueFont);
+                    g.drawString(hex(color), x + padding,
+                        y + padding + headingMetrics.getHeight() + WorkbenchStyle.px(6) + valueMetrics.getAscent());
                     g.setColor(blend(text, color, 0.50));
                     g.drawRect(x, y, width - 1, height - 1);
                 }

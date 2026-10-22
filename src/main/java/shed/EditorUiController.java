@@ -1261,8 +1261,8 @@ final class EditorUiController {
 
     private void applyUiFontRecursively(Component component) {
         Font font = component.getFont();
-        if (component instanceof JTextArea) {
-            // Plain-text previews, diffs and consoles keep code typography.
+        if (component instanceof JTextArea && font != null && usesCodeTypography(font)) {
+            // Preserve explicit code fonts without turning prose descriptions into code.
             component.setFont(resolveEditorFont().deriveFont((float) resolveUiFont().getSize()));
         } else if (font != null) {
             component.setFont(resolveUiFont(baseUiFont(component, font)));
@@ -1277,6 +1277,12 @@ final class EditorUiController {
                 applyUiFontRecursively(child);
             }
         }
+    }
+
+    private boolean usesCodeTypography(Font font) {
+        String family = font.getFamily();
+        return Font.MONOSPACED.equals(family)
+            || family.equals(resolveEditorFont().getFamily()) && !family.equals(resolveUiFont().getFamily());
     }
 
     private Font baseUiFont(Component component, Font currentFont) {

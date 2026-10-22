@@ -62,6 +62,9 @@ public class TexteditorSwingIntegrationTest {
                 content.add(new javax.swing.JScrollPane(new javax.swing.JList<>(new String[]{"First", "Second"})));
                 var tabs = new javax.swing.JTabbedPane(); tabs.addTab("Details", new javax.swing.JPanel()); content.add(tabs);
                 content.add(new javax.swing.JSpinner());
+                var prose = new JTextArea("Command description");
+                prose.setFont(editor.resolveUiFont());
+                content.add(prose);
                 window.add(content);
                 editor.editorUiController.prepareDialog(window, 720, 420);
                 window.pack(); window.setVisible(true);
@@ -98,6 +101,9 @@ public class TexteditorSwingIntegrationTest {
                 var field = descendants(shown, javax.swing.JTextField.class).getFirst();
                 assertEquals(editor.configManager.getFloatingSurfaceColor(), field.getBackground());
                 assertEquals("Editable text", field.getText());
+                var prose = descendants(shown, JTextArea.class).getFirst();
+                assertEquals(editor.resolveUiFont().getFamily(), prose.getFont().getFamily());
+                assertEquals(editor.resolveUiFont().getSize(), prose.getFont().getSize());
                 var table = descendants(shown, javax.swing.JTable.class).getFirst();
                 assertFalse(table.getShowHorizontalLines());
                 assertTrue(table.getRowHeight() >= 60);

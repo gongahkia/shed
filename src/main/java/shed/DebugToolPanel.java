@@ -157,7 +157,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         watchActions.add(buttons, BorderLayout.EAST);
         watchPanel.add(watchActions, BorderLayout.SOUTH);
 
-        JPanel breakpointPanel = new JPanel(new BorderLayout(3, 3));
+        JPanel breakpointPanel = new ScrollableDetails();
         breakpointPanel.setBorder(BorderFactory.createTitledBorder("Source Breakpoints"));
         breakpointPanel.add(new JScrollPane(breakpointList), BorderLayout.CENTER);
         JPanel breakpointForm = new JPanel(new GridLayout(4, 2, 3, 3));
@@ -173,7 +173,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         breakpointBottom.add(breakpointActions, BorderLayout.SOUTH);
         breakpointPanel.add(breakpointBottom, BorderLayout.SOUTH);
 
-        JPanel functionBreakpointPanel = new JPanel(new BorderLayout(3, 3));
+        JPanel functionBreakpointPanel = new ScrollableDetails();
         functionBreakpointPanel.setBorder(BorderFactory.createTitledBorder("Function Breakpoints"));
         functionBreakpointPanel.add(new JScrollPane(functionBreakpointList), BorderLayout.CENTER);
         JPanel functionBreakpointForm = new JPanel(new GridLayout(4, 2, 3, 3));
@@ -190,7 +190,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         functionBreakpointBottom.add(functionBreakpointActions, BorderLayout.SOUTH);
         functionBreakpointPanel.add(functionBreakpointBottom, BorderLayout.SOUTH);
 
-        JPanel exceptionBreakpointPanel = new JPanel(new BorderLayout(3, 3));
+        JPanel exceptionBreakpointPanel = new ScrollableDetails();
         exceptionBreakpointPanel.setBorder(BorderFactory.createTitledBorder("Exception Breakpoints"));
         exceptionBreakpointPanel.add(new JScrollPane(exceptionBreakpointList), BorderLayout.CENTER);
         JPanel exceptionBreakpointActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 3, 0));
@@ -201,9 +201,9 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         javax.swing.JTabbedPane left = new javax.swing.JTabbedPane();
         left.addTab("Stack", framesPanel);
         left.addTab("Watches", watchPanel);
-        left.addTab("Source", breakpointPanel);
-        left.addTab("Functions", functionBreakpointPanel);
-        left.addTab("Exceptions", exceptionBreakpointPanel);
+        left.addTab("Source", new JScrollPane(breakpointPanel));
+        left.addTab("Functions", new JScrollPane(functionBreakpointPanel));
+        left.addTab("Exceptions", new JScrollPane(exceptionBreakpointPanel));
         left.setMinimumSize(new java.awt.Dimension(0, 0));
         JPanel variablesPanel = new JPanel(new BorderLayout());
         variablesPanel.setBorder(BorderFactory.createTitledBorder("Variables and Scopes"));
@@ -224,6 +224,22 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
         split.setResizeWeight(0.28);
         return split;
+    }
+
+    /** Keep configuration forms reachable when a small dock cannot show every row. */
+    private static final class ScrollableDetails extends JPanel implements javax.swing.Scrollable {
+        ScrollableDetails() { super(new BorderLayout(3, 3)); }
+        @Override public java.awt.Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() {
+            return getParent() instanceof javax.swing.JViewport viewport && viewport.getHeight() >= getPreferredSize().height;
+        }
+        @Override public int getScrollableUnitIncrement(java.awt.Rectangle visible, int orientation, int direction) {
+            return WorkbenchStyle.px(24);
+        }
+        @Override public int getScrollableBlockIncrement(java.awt.Rectangle visible, int orientation, int direction) {
+            return Math.max(WorkbenchStyle.px(24), visible.height - WorkbenchStyle.px(24));
+        }
     }
 
     @Override public void refresh() {

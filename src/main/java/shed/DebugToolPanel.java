@@ -201,9 +201,9 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         javax.swing.JTabbedPane left = new javax.swing.JTabbedPane();
         left.addTab("Stack", framesPanel);
         left.addTab("Watches", watchPanel);
-        left.addTab("Source", new JScrollPane(breakpointPanel));
-        left.addTab("Functions", new JScrollPane(functionBreakpointPanel));
-        left.addTab("Exceptions", new JScrollPane(exceptionBreakpointPanel));
+        left.addTab("Source", scrollableDetails(breakpointPanel));
+        left.addTab("Functions", scrollableDetails(functionBreakpointPanel));
+        left.addTab("Exceptions", scrollableDetails(exceptionBreakpointPanel));
         left.setMinimumSize(new java.awt.Dimension(0, 0));
         JPanel variablesPanel = new JPanel(new BorderLayout());
         variablesPanel.setBorder(BorderFactory.createTitledBorder("Variables and Scopes"));
@@ -224,6 +224,27 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
         split.setResizeWeight(0.28);
         return split;
+    }
+
+    private static JScrollPane scrollableDetails(JPanel section) {
+        revealFocusedControls(section);
+        return new JScrollPane(section);
+    }
+
+    private static void revealFocusedControls(java.awt.Container parent) {
+        for (java.awt.Component child : parent.getComponents()) {
+            if (child instanceof javax.swing.JComponent control
+                && (control instanceof JTextField || control instanceof javax.swing.AbstractButton)) {
+                control.addFocusListener(new java.awt.event.FocusAdapter() {
+                    @Override public void focusGained(java.awt.event.FocusEvent event) {
+                        // JTextField scrolls its own text horizontally; reveal its enclosing form too.
+                        if (control.getParent() instanceof javax.swing.JComponent container)
+                            container.scrollRectToVisible(control.getBounds());
+                    }
+                });
+            }
+            if (child instanceof java.awt.Container container) revealFocusedControls(container);
+        }
     }
 
     /** Keep configuration forms reachable when a small dock cannot show every row. */

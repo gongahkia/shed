@@ -57,7 +57,7 @@ final class ToolWindowHost extends JPanel {
     }
 
     private JPanel header() {
-        JPanel panel = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 0, 0));
+        JPanel panel = new JPanel(new java.awt.GridLayout(1, 2, 0, 0));
         JButton close = new JButton(WorkbenchIcons.CLOSE);
         close.addActionListener(event -> editor.hideToolWindow());
         JButton detach = new JButton(WorkbenchIcons.DETACH);

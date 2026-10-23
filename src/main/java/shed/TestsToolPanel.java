@@ -31,7 +31,13 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
     private record Node(String label, TestService.TestCase test) { @Override public String toString() { return label; } }
     private final Texteditor editor;
     private final JPanel panel = new JPanel(new BorderLayout(6, 6));
-    private final JComboBox<String> roots = new JComboBox<>();
+    private final JComboBox<String> roots = new JComboBox<>() {
+        @Override public java.awt.Dimension getPreferredSize() {
+            java.awt.Dimension size = super.getPreferredSize();
+            size.width = Math.min(size.width, UiZoom.scale(240, editor.configManager.getUiZoom()));
+            return size;
+        }
+    };
     private final JComboBox<String> status = new JComboBox<>(new String[] {"All", "Unknown", "Passed", "Failed", "Skipped", "Errored"});
     private final JTextField filter = new JTextField(16);
     private final JLabel state = new JLabel("Refresh to discover tests.");
@@ -54,6 +60,7 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
         split.setResizeWeight(0.47);
         panel.add(split, BorderLayout.CENTER);
         AccessibilitySupport.describe(tree, "Tests", "Discovered tests grouped by adapter and suite. Double-click to open source.");
+        AccessibilitySupport.describe(roots, "Test workspace folder", "Select the workspace folder whose tests to discover or run. The full path is available in the tooltip.");
     }
 
     @Override public JPanel component() { return panel; }
@@ -90,6 +97,7 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
             for (Path root : editor.testController.rootsForPanel()) roots.addItem(root.toString());
             roots.setSelectedItem(selected.toString());
             if (roots.getSelectedIndex() < 0 && !previous.isBlank()) roots.setSelectedItem(previous);
+            roots.setToolTipText(String.valueOf(roots.getSelectedItem()));
             TestController.Snapshot snapshot = editor.testController.snapshot(selected);
             state.setText((snapshot.runningJobs() > 0 ? "running " + snapshot.runningJobs() + " — " : "") + (snapshot.diagnostics().isEmpty() ? summary(snapshot) : snapshot.diagnostics().getFirst()));
             output.setText(snapshot.output());

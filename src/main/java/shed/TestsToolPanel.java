@@ -34,7 +34,7 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
     private final JComboBox<String> roots = new JComboBox<>() {
         @Override public java.awt.Dimension getPreferredSize() {
             java.awt.Dimension size = super.getPreferredSize();
-            size.width = Math.min(size.width, UiZoom.scale(240, editor.configManager.getUiZoom()));
+            size.width = Math.min(size.width, WorkbenchStyle.px(240));
             return size;
         }
     };

@@ -51,3 +51,21 @@ Next performance work should profile the full-UI/font interval and event-thread/
 ## Large editable-file model
 
 The existing 500,000-line `EditorResponsivenessBenchmark` also ran against the measured build, with 25 samples and the same 64–512 MiB heap bounds. [Raw output](performance/large-editing-ea9ac59b.txt): edit p95 **1.368 ms**, caret p95 **6.623 ms**, deferred convergence p95 **562.607 ms**. Edit and caret passed their 16 ms targets; convergence missed its 250 ms target, with completion indexing the slowest measured independent task. This model/background benchmark does not measure Swing painting. It returned exit status 1 for that budget miss.
+
+## Interface refresh, 2026-10-23
+
+The shared interface refresh at production commit `d990d019` was measured separately after its clean package, desktop tests, and visual captures. [Raw results](performance/interface-d990d019.json) retain five fresh-process startup/memory samples and 125 warmed edit/picker samples. The workflow probe, fixture, heap bounds, temporary configuration, and percentile method match the earlier desktop experiment. Builds and tests were not running during the measurements; OS caches and unrelated host activity were not controlled. All five runs observed zero language servers.
+
+These values describe the refreshed interface on this host. The earlier runs were taken at a different time and are not a controlled comparison, so this pass does not establish a speed improvement or parity with another editor. Startup/memory p95 is the maximum of only five samples.
+
+| Measurement | p50 | p95 | p95 target | Result |
+| --- | ---: | ---: | ---: | --- |
+| Visible window (ms) | 1996.2 | 3540.2 | 2000 | Miss |
+| Source installed and painted (ms) | 2520.4 | 4521.2 | 3000 | Miss |
+| Full UI painted (ms) | 9776.4 | 25323.2 | 10000 | Miss |
+| Document edit → synchronous paint (ms) | 3.79 | 6.37 | 16 | Pass |
+| 50,000-path ranking in desktop process (ms) | 27.51 | 64.94 | 50 | Miss |
+| Idle used heap (MiB) | 45.76 | 47.80 | 384 | Pass |
+| Idle RSS (MiB) | 456.79 | 487.07 | 768 | Pass |
+
+Editing/paint latency and memory met their budgets in this run. Startup and picker tail latency remain above their targets. The benchmark completed all five runs and returned exit status 1 for those budget misses. The raw artifact and the [interface gallery manifest](images/interface/gallery.json) record the same packaged JAR SHA-256; see [INTERFACE_DESIGN.md](INTERFACE_DESIGN.md) for the visual review and verification boundaries.

@@ -35,7 +35,10 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
         JPanel queryRow = new JPanel(new BorderLayout(6, 0));
         queryRow.add(label("Find", query), BorderLayout.WEST);
         queryRow.add(query, BorderLayout.CENTER);
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        for (JCheckBox option : List.of(matchCase, regex, wholeWord)) {
+            actions.add(option); option.addActionListener(event -> edited());
+        }
         actions.add(button("Search", this::search)); actions.add(cancel);
         actions.add(button("Current File", () -> {
             try { editor.inlineFindBar.showFind(request().pattern()); editor.hideToolWindow(); }
@@ -48,13 +51,8 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
                 editor.toolWindowHost.replacePanel().setSearchQuery(value);
             } catch (IllegalArgumentException error) { status.setText(error.getMessage()); }
         }));
-        queryRow.add(actions, BorderLayout.EAST);
         controls.add(queryRow, BorderLayout.NORTH);
-        JPanel options = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
-        for (JCheckBox option : List.of(matchCase, regex, wholeWord)) {
-            options.add(option); option.addActionListener(event -> edited());
-        }
-        controls.add(options, BorderLayout.CENTER);
+        controls.add(actions, BorderLayout.CENTER);
         JPanel filters = new JPanel(new GridLayout(1, 2, 8, 0));
         filters.add(field("Include", include)); filters.add(field("Exclude", exclude));
         controls.add(filters, BorderLayout.SOUTH);

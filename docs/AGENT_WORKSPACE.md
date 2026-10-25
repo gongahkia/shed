@@ -133,6 +133,8 @@ The editor mutation port can adopt a worker-captured disk binding together with 
 
 Focused headless adapter, save-model, proposal and architecture checks pass. New cases exercise restoration followed by an ordinary save, rename followed by a save without recreating the old path, multi-buffer failure restoring the original binding, and preserved human newline settings. Native desktop interaction remains unverified.
 
+The same editor batch now supports detaching a removed file into an explicitly unsaved buffer. Its text, format, document identity and originating workspace survive; ordinary Save requires a new path, and a late save completion cannot reattach it. Failed batches restore the old binding. Destination validation includes untouched tabs and rejects duplicate file ownership while allowing an explicitly coordinated swap. Headless adapter tests cover these behaviors. These are resource-operation prerequisites; create/rename/delete proposals are not yet exposed through the review service.
+
 ## Guarded restoration after interruption
 
 The Recovery tab now offers Restore pre-operation, backed by proposals/restore. It restores the snapshots from before the interrupted apply or undo. Restoring an interrupted apply leaves that proposal FAILED for explicit rebase/review; restoring an interrupted undo returns it to APPLIED with its original application evidence. The operation requires APPLY permission, the reviewed journal revision and an unchanged inspection fingerprint. Identical retries return the recorded outcome.

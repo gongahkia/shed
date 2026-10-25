@@ -13,6 +13,69 @@ import org.junit.jupiter.api.io.TempDir;
 class EditorWorkspaceDocumentsTest {
     @TempDir Path root;
 
+    @Test void detachingKeepsHumanTextFormatIdentityAndWorkspaceButRequiresSaveAs() throws Exception {
+        Path other = Files.createDirectory(root.resolve("other"));
+        Path file = Files.writeString(root.resolve("source"), "saved\r\n");
+        FileBuffer buffer = new FileBuffer(file.toFile());
+        try (var source = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root, other), () -> other, root)) {
+            SwingUtilities.invokeAndWait(() -> buffer.replaceContentUndoably("human draft\n"));
+            var before = source.snapshots().getFirst();
+            Files.delete(file);
+            var after = source.applyTexts(List.of(WorkspaceDocumentEditor.TextChange.detach(before))).getFirst();
+            assertEquals(before.documentId(), after.documentId()); assertNotEquals(before.version(), after.version());
+            assertEquals(before.workspaceId(), source.snapshots().getFirst().workspaceId());
+            assertNull(after.uri()); assertTrue(after.dirty()); assertEquals("human draft\n", after.content());
+            assertEquals("source", buffer.getDisplayName()); assertEquals("CRLF", buffer.getLineEndingLabel());
+            assertThrows(java.io.IOException.class, buffer::save); assertFalse(Files.exists(file));
+            Path rescued = root.resolve("rescued"); buffer.saveAs(rescued.toFile());
+            assertEquals("human draft\r\n", Files.readString(rescued));
+        }
+    }
+
+    @Test void detachRollbackRestoresBindingsAndLateSaveCompletionCannotReattachADeletedFile() throws Exception {
+        Path file = Files.writeString(root.resolve("source"), "saved\n");
+        FileBuffer first = new FileBuffer(file.toFile());
+        FileBuffer second = FileBuffer.createScratch("Other", "before");
+        second.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent event) { throw new IllegalStateException("fixture failure"); }
+            public void removeUpdate(javax.swing.event.DocumentEvent event) { }
+            public void changedUpdate(javax.swing.event.DocumentEvent event) { }
+        });
+        try (var source = new EditorWorkspaceDocuments(() -> List.of(first, second), () -> List.of(root), () -> root, root)) {
+            var before = source.snapshots();
+            assertThrows(WorkspaceApiException.class, () -> source.applyTexts(List.of(
+                WorkspaceDocumentEditor.TextChange.detach(before.getFirst()),
+                new WorkspaceDocumentEditor.TextChange(before.get(1), "changed"))));
+            assertEquals(file.toFile(), first.getFile()); assertFalse(first.isScratch()); assertFalse(first.isModified());
+            assertEquals("saved\n", first.getSavedContent());
+            var pending = first.captureSaveSnapshot(null); first.writeSaveSnapshot(pending);
+            Files.delete(file);
+            source.applyTexts(List.of(WorkspaceDocumentEditor.TextChange.detach(source.snapshots().getFirst())));
+            SwingUtilities.invokeAndWait(() -> first.completeSaveSnapshot(pending));
+            assertNull(first.getFile()); assertTrue(first.isScratch()); assertTrue(first.isModified());
+            assertEquals("saved\n", first.getContent()); assertFalse(Files.exists(file));
+        }
+    }
+
+    @Test void retargetingRejectsOccupiedTabsAndAllowsAnAtomicSwap() throws Exception {
+        Path firstPath = Files.writeString(root.resolve("first"), "one");
+        Path secondPath = Files.writeString(root.resolve("second"), "two");
+        FileBuffer first = new FileBuffer(firstPath.toFile()), second = new FileBuffer(secondPath.toFile());
+        try (var source = new EditorWorkspaceDocuments(() -> List.of(first, second), () -> List.of(root), () -> root, root)) {
+            var before = source.snapshots();
+            var secondBinding = WorkspaceDiskBinding.capture(before.getFirst().workspaceId(), secondPath);
+            assertEquals(WorkspaceApiException.Code.CONFLICT, assertThrows(WorkspaceApiException.class, () -> source.applyTexts(List.of(
+                new WorkspaceDocumentEditor.TextChange(before.getFirst(), "two", secondBinding)))).code());
+            assertEquals("one", first.getContent()); assertEquals(firstPath.toFile(), first.getFile());
+            var firstBinding = WorkspaceDiskBinding.capture(before.getFirst().workspaceId(), firstPath);
+            var swapped = source.applyTexts(List.of(new WorkspaceDocumentEditor.TextChange(before.getFirst(), "two", secondBinding),
+                new WorkspaceDocumentEditor.TextChange(before.get(1), "one", firstBinding)));
+            assertEquals(secondPath.toUri().toString(), swapped.getFirst().uri());
+            assertEquals(firstPath.toUri().toString(), swapped.get(1).uri());
+            assertFalse(first.isModified()); assertFalse(second.isModified());
+        }
+    }
+
     @Test void anEarlierAsyncSaveCompletionCannotReplaceARestoredDiskBinding() throws Exception {
         Path file = Files.writeString(root.resolve("source"), "old\r\n"); FileBuffer buffer = new FileBuffer(file.toFile());
         try (var source = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {

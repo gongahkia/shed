@@ -100,6 +100,19 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
                     .map(java.util.Map.Entry::getKey).findFirst().orElseThrow();
                 targets.put(target, change);
             }
+            // Validate the resulting registry, including untouched tabs. Swaps are valid when both
+            // participants move in this batch; binding a second tab to an occupied path is not.
+            var destinations = new java.util.HashSet<Path>();
+            var detachedRoots = new java.util.HashMap<String, Path>();
+            for (Captured item : before) {
+                TextChange change = requested.stream().filter(candidate -> candidate.expected().documentId().equals(item.id())).findFirst().orElse(null);
+                Path destination = change != null && change.detach() ? null
+                    : change != null && change.diskBinding() != null ? change.diskBinding().file() : item.path();
+                if (destination != null && !destinations.add(destination))
+                    throw new WorkspaceApiException(WorkspaceApiException.Code.CONFLICT, "An open document already owns the destination path");
+                if (change != null && change.detach() && item.path() != null)
+                    detachedRoots.put(item.id(), owningRoot(item.path(), item.roots()));
+            }
             batch.accept(() -> {
                 var transactions = new ArrayList<FileBuffer.TextTransaction>();
                 try {
@@ -109,6 +122,7 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
                         var transaction = transactions.get(index++);
                         transaction.replace(change.text());
                         if (change.diskBinding() != null) transaction.bind(change.diskBinding());
+                        else if (change.detach()) transaction.detach();
                     }
                     for (var transaction : transactions) transaction.commit();
                 } finally {
@@ -119,6 +133,10 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
                     if (failed != null) throw new WorkspaceApiException(WorkspaceApiException.Code.RECOVERY_REQUIRED, "Editor rollback requires recovery");
                 }
             });
+            for (var target : targets.entrySet()) if (target.getValue().detach()) {
+                Path root = detachedRoots.get(target.getValue().expected().documentId());
+                if (root != null) identities.get(target.getKey()).scratchRoot = root;
+            }
             var after = new java.util.HashMap<String, Captured>();
             for (Captured item : capture()) after.put(item.id(), item);
             List<WorkspaceDocument> result = new ArrayList<>();
@@ -198,7 +216,7 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
 
     private static final class Identity {
         final String id = "buffer-" + UUID.randomUUID();
-        final Path scratchRoot;
+        Path scratchRoot;
         VersionedTextSnapshot text;
         String signature;
         long revision;

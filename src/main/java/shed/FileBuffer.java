@@ -578,6 +578,15 @@ public class FileBuffer {
                 || byteOrderMark != binding.image().bom()
                 || explicitLineEnding && !applyLineEndings(savedContent, lineEnding).equals(binding.image().rawText());
         }
+        /** A removed file remains an explicitly unsaved document; Save must ask for a new path. */
+        void detach() {
+            if (finished) throw new IllegalStateException("Text transaction is closed");
+            documentRevision++; diskBindingRevision++;
+            scratchName = getDisplayName(); file = null; scratch = true; backupFile = null;
+            savedContent = ""; savedDiskDigest = null; externalFileStamp = observeExternalFile(null);
+            lastKnownModifiedTime = 0; fileSizeBytes = 0; modified = true;
+            // Keep the text image and format preferences for a subsequent Save As.
+        }
         @Override public void close() {
             if (finished) return;
             finished = true;

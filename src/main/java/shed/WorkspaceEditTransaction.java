@@ -100,15 +100,22 @@ final class WorkspaceEditTransaction implements AutoCloseable {
     }
 
     void replace(Path target, Path staged) throws IOException {
+        replace(target, staged, exists(target) ? resourceIdentity(target) : null);
+    }
+
+    /** Null means the target must still be absent; a map pins the reviewed resource identity. */
+    void replace(Path target, Path staged, Map<String, Object> expectedTarget) throws IOException {
         requireOpen();
+        Fingerprint original = requireIdentity(target, expectedTarget);
         Fingerprint expected = temps.get(staged);
         if (expected == null || !expected.equals(fingerprint(staged))) throw new IOException("Staged edit is unavailable or changed");
+        if (original == null) { create(target, staged); return; }
         if (Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) throw new IOException("Write target is a directory: " + target);
-        if (exists(target)) {
+        if (original != null) {
             AtomicFileWriter.copyMetadata(target, staged);
             expected = fingerprint(staged); temps.put(staged, expected);
         }
-        if (exists(target)) backup(target);
+        if (original != null) backup(target, original);
         Fingerprint applied = expected;
         addRollback("remove applied text " + target, () -> {
             if (!exists(target)) return;
@@ -117,19 +124,46 @@ final class WorkspaceEditTransaction implements AutoCloseable {
         });
         if (exists(target)) throw new IOException("Write target changed before replacement: " + target);
         prepared("REPLACE", staged, target, applied);
+        requireMatching(staged, applied);
         move(staged, target, false);
+    }
+
+    /** Publishes a regular staged file without ever replacing a concurrently created target. */
+    void create(Path target, Path staged) throws IOException {
+        requireOpen(); requireIdentity(target, null);
+        Fingerprint expected = temps.get(staged);
+        if (expected == null) throw new IOException("Staged edit is unavailable");
+        requireMatching(staged, expected);
+        prepared("CREATE", staged, target, expected);
+        requireMatching(staged, expected);
+        // ATOMIC_MOVE may replace an existing destination even without REPLACE_EXISTING.
+        // A hard link gives regular files an atomic absent-target precondition on this volume.
+        // Unsupported filesystems fail explicitly; do not fall back to an overwriting move.
+        Files.createLink(target, staged);
+        addRollback("remove created file " + target, () -> {
+            if (!exists(target)) return;
+            requireMatching(target, expected); Files.delete(target);
+        });
+        requireMatching(staged, expected); Files.delete(staged);
     }
 
     void rename(Path source, Path target, boolean overwrite) throws IOException {
         requireOpen();
         if (source.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())) return;
+        rename(source, target, resourceIdentity(source), overwrite && exists(target) ? resourceIdentity(target) : null);
+    }
+
+    void rename(Path source, Path target, Map<String, Object> expectedSource, Map<String, Object> expectedTarget) throws IOException {
+        requireOpen();
+        Fingerprint expected = requireIdentity(source, Objects.requireNonNull(expectedSource));
+        if (source.toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize())) return;
+        if (expected.directory() && target.toAbsolutePath().normalize().startsWith(source.toAbsolutePath().normalize()))
+            throw new IOException("Cannot move a directory into itself: " + source);
+        Fingerprint destination = requireIdentity(target, expectedTarget);
         createParents(target);
-        if (exists(target)) {
-            if (!overwrite) throw new IOException("Rename target already exists: " + target);
-            backup(target);
-        }
-        Fingerprint expected = fingerprint(source);
+        if (destination != null) backup(target, destination);
         prepared("RENAME", source, target, expected);
+        requireMatching(source, expected);
         move(source, target, false);
         addRollback("restore renamed resource " + source, () -> {
             if (exists(source)) throw new IOException("Original rename path is now occupied: " + source);
@@ -138,14 +172,21 @@ final class WorkspaceEditTransaction implements AutoCloseable {
         });
     }
 
-    void delete(Path target) throws IOException { requireOpen(); backup(target); }
+    void delete(Path target) throws IOException { delete(target, resourceIdentity(target)); }
 
-    private void backup(Path target) throws IOException {
-        Fingerprint expected = fingerprint(target);
+    void delete(Path target, Map<String, Object> expected) throws IOException {
+        requireOpen(); backup(target, requireIdentity(target, Objects.requireNonNull(expected)));
+    }
+
+    private void backup(Path target, Fingerprint expected) throws IOException {
+        requireMatching(target, expected);
         Path directory = Files.createTempDirectory(target.toAbsolutePath().getParent(), ".shed-edit-backup-");
         Path original = directory.resolve("original");
-        try { prepared("BACKUP", target, original, expected); move(target, original, false); }
-        catch (IOException failed) { Files.deleteIfExists(directory); throw failed; }
+        try { prepared("BACKUP", target, original, expected); requireMatching(target, expected); move(target, original, false); }
+        catch (IOException | RuntimeException failed) {
+            try { Files.deleteIfExists(directory); } catch (IOException cleanup) { failed.addSuppressed(cleanup); }
+            throw failed;
+        }
         backups.add(new Backup(directory, original, expected));
         addRollback("restore original " + target, () -> {
             if (exists(target)) throw new IOException("Restore target now contains newer data: " + target);
@@ -257,6 +298,16 @@ final class WorkspaceEditTransaction implements AutoCloseable {
     private static String message(Throwable failure) { return failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage(); }
     private static void requireMatching(Path path, Fingerprint expected) throws IOException {
         if (!expected.equals(fingerprint(path))) throw new IOException("Resource changed during workspace edit: " + path);
+    }
+
+    private static Fingerprint requireIdentity(Path path, Map<String, Object> expected) throws IOException {
+        if (expected == null) {
+            if (exists(path)) throw new IOException("Expected an absent resource: " + path);
+            return null;
+        }
+        Fingerprint actual = fingerprint(path);
+        if (!describe(actual).equals(expected)) throw new IOException("Resource changed since review: " + path);
+        return actual;
     }
 
     private static Fingerprint fingerprint(Path path) throws IOException { return fingerprint(path, true); }

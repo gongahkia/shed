@@ -13,6 +13,82 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkspaceEditTransactionTest {
     @TempDir Path root;
 
+    @Test void createHasAnAtomicAbsentTargetPreconditionEvenAfterItsIntentWasRecorded() throws Exception {
+        Path target = root.resolve("new");
+        try (var transaction = new WorkspaceEditTransaction(step -> {
+            if (step.kind().equals("CREATE")) Files.writeString(target, "concurrent human file");
+        })) {
+            Path staged = transaction.stage(target, "agent".getBytes(StandardCharsets.UTF_8));
+            assertThrows(IOException.class, () -> transaction.create(target, staged));
+            assertEquals(WorkspaceEditTransaction.State.ROLLED_BACK, transaction.rollback().state());
+            assertTrue(transaction.cleanup().failures().isEmpty());
+        }
+        assertEquals("concurrent human file", Files.readString(target));
+    }
+
+    @Test void createdFilesParticipateInRollbackAndCommitWithoutLeavingTemporaryLinks() throws Exception {
+        Path target = root.resolve("new/nested/source");
+        try (var transaction = new WorkspaceEditTransaction()) {
+            transaction.create(target, transaction.stage(target, "agent".getBytes(StandardCharsets.UTF_8)));
+            assertEquals("agent", Files.readString(target));
+            assertEquals(WorkspaceEditTransaction.State.ROLLED_BACK, transaction.rollback().state());
+            assertTrue(transaction.cleanup().failures().isEmpty());
+            assertFalse(Files.exists(root.resolve("new")));
+        }
+        try (var transaction = new WorkspaceEditTransaction()) {
+            // An absent-target replacement uses the same strict creation path.
+            transaction.replace(target, transaction.stage(target, "accepted".getBytes(StandardCharsets.UTF_8)), null);
+            transaction.commit(); assertTrue(transaction.cleanup().failures().isEmpty());
+            assertTrue(transaction.report().recoveryPaths().isEmpty());
+        }
+        assertEquals("accepted", Files.readString(target));
+    }
+
+    @Test void reviewedResourceIdentitiesGuardWritesRenamesAndDeletion() throws Exception {
+        Path source = Files.writeString(root.resolve("source"), "reviewed");
+        Path target = Files.writeString(root.resolve("target"), "old destination");
+        var sourceIdentity = WorkspaceEditTransaction.resourceIdentity(source);
+        var targetIdentity = WorkspaceEditTransaction.resourceIdentity(target);
+        Files.writeString(source, "newer human text");
+        try (var transaction = new WorkspaceEditTransaction()) {
+            Path staged = transaction.stage(source, "agent".getBytes(StandardCharsets.UTF_8));
+            assertThrows(IOException.class, () -> transaction.replace(source, staged, sourceIdentity));
+            assertThrows(IOException.class, () -> transaction.delete(source, sourceIdentity));
+            assertThrows(IOException.class, () -> transaction.rename(source, target, sourceIdentity, targetIdentity));
+            var current = WorkspaceEditTransaction.resourceIdentity(source);
+            Files.writeString(target, "new destination");
+            assertThrows(IOException.class, () -> transaction.rename(source, target, current, targetIdentity));
+            assertThrows(IOException.class, () -> transaction.rename(source, target, current, null));
+        }
+        assertEquals("newer human text", Files.readString(source)); assertEquals("new destination", Files.readString(target));
+        try (var transaction = new WorkspaceEditTransaction()) {
+            transaction.rename(source, target, WorkspaceEditTransaction.resourceIdentity(source), WorkspaceEditTransaction.resourceIdentity(target));
+            transaction.commit(); assertTrue(transaction.cleanup().failures().isEmpty());
+        }
+        assertFalse(Files.exists(source)); assertEquals("newer human text", Files.readString(target));
+    }
+
+    @Test void changesDuringIntentPersistenceAreRecheckedBeforeMovingReviewedResources() throws Exception {
+        Path source = Files.writeString(root.resolve("source"), "reviewed");
+        var expected = WorkspaceEditTransaction.resourceIdentity(source);
+        try (var transaction = new WorkspaceEditTransaction(step -> {
+            if (step.kind().equals("BACKUP")) Files.writeString(source, "changed while journaling");
+        })) {
+            assertThrows(IOException.class, () -> transaction.delete(source, expected));
+            assertEquals(WorkspaceEditTransaction.State.ROLLED_BACK, transaction.rollback().state());
+            assertTrue(transaction.cleanup().failures().isEmpty());
+        }
+        assertEquals("changed while journaling", Files.readString(source));
+        try (var paths = Files.list(root)) { assertEquals(java.util.List.of(source), paths.toList()); }
+        Path destination = root.resolve("renamed"); var next = WorkspaceEditTransaction.resourceIdentity(source);
+        try (var transaction = new WorkspaceEditTransaction(step -> {
+            if (step.kind().equals("RENAME")) Files.writeString(source, "changed before rename");
+        })) {
+            assertThrows(IOException.class, () -> transaction.rename(source, destination, next, null));
+        }
+        assertFalse(Files.exists(destination)); assertEquals("changed before rename", Files.readString(source));
+    }
+
     @Test void preparedStepsDescribeResourcesBeforeMovingOriginalsAndObserverFailureRollsBack() throws Exception {
         Path file = Files.writeString(root.resolve("source"), "original");
         var steps = new java.util.ArrayList<WorkspaceEditTransaction.Step>();

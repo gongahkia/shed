@@ -10,6 +10,7 @@ import java.util.Objects;
 public final class WorkspaceQueryService {
     public static final int MAX_PAGE_SIZE = 1000;
     public static final int MAX_READ_CHARACTERS = 1024 * 1024;
+    public static final List<String> OPERATIONS = List.of("workspace/info", "documents/list", "documents/read");
     private final Path root;
     private final String workspaceId;
     private final AgentPolicy policy;
@@ -30,7 +31,7 @@ public final class WorkspaceQueryService {
         policy.require(AgentPolicy.Capability.READ);
         return Map.of("schemaVersion", 1, "workspaceId", workspaceId, "root", root.toUri().toString(),
             "editorConnected", documents.connected(), "policy", policy.toMap(),
-            "operations", List.of("workspace/info", "documents/list", "documents/read"));
+            "operations", OPERATIONS);
     }
 
     public Map<String, Object> listDocuments(String requestedWorkspace, int offset, int limit) {

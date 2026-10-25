@@ -1,0 +1,99 @@
+package shed;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Version-one workspace JSON-RPC adapter. Advertises only implemented operations. */
+public final class WorkspaceRpc {
+    public static final int MAX_READ_CHARACTERS = 65_536;
+    private final WorkspaceQueryService workspace;
+
+    public WorkspaceRpc(WorkspaceQueryService workspace) { this.workspace = Objects.requireNonNull(workspace); }
+
+    /** Null is a valid notification's no-response result. */
+    public String handle(String json) {
+        Object decoded;
+        try { decoded = MiniJson.parseStrict(json); }
+        catch (IllegalArgumentException error) { return error(null, -32700, "Invalid JSON", Map.of("code", "INVALID_REQUEST")); }
+        Map<String, Object> request = MiniJson.asObject(decoded);
+        if (request == null) return error(null, -32600, "Expected one JSON-RPC request object", Map.of("code", "INVALID_REQUEST"));
+        Object id = request.get("id");
+        if (!validId(id)) return error(null, -32600, "Request ID must be a bounded string, integer or null", Map.of("code", "INVALID_REQUEST"));
+        boolean notification = !request.containsKey("id");
+        if (!Set.of("jsonrpc", "id", "method", "params").containsAll(request.keySet())
+            || !"2.0".equals(request.get("jsonrpc")) || !(request.get("method") instanceof String method)
+            || method.isBlank() || method.length() > 128)
+            return error(id, -32600, "Expected a supported JSON-RPC 2.0 request envelope", Map.of("code", "INVALID_REQUEST"));
+        if (!WorkspaceQueryService.OPERATIONS.contains(method)) return notification ? null
+            : error(id, -32601, "Workspace operation is not supported", Map.of("code", "UNSUPPORTED", "method", method));
+        try {
+            Map<String, Object> params = request.containsKey("params") ? MiniJson.asObject(request.get("params")) : Map.of();
+            if (params == null) throw invalid("Parameters must be an object");
+            Object result = dispatch(method, params);
+            return notification ? null : MiniJson.stringify(response(id, "result", result));
+        } catch (WorkspaceApiException failure) {
+            int code = failure.code() == WorkspaceApiException.Code.INVALID_REQUEST ? -32602 : -32000;
+            return notification ? null : error(id, code, failure.getMessage(), failure.toMap());
+        } catch (RuntimeException failure) {
+            return notification ? null : error(id, -32603, "Internal workspace error", Map.of("code", "IO_ERROR"));
+        }
+    }
+
+    private Object dispatch(String method, Map<String, Object> params) {
+        return switch (method) {
+            case "workspace/info" -> {
+                fields(params, Set.of("workspaceId", "schemaVersion"));
+                int version = integer(params, "schemaVersion", 1, 1, Integer.MAX_VALUE);
+                if (version != 1) throw new WorkspaceApiException(WorkspaceApiException.Code.UNSUPPORTED, "Unsupported workspace API schema version");
+                String requested = string(params, "workspaceId", false, 256);
+                if (requested != null && !requested.equals(workspace.workspaceId()))
+                    throw new WorkspaceApiException(WorkspaceApiException.Code.NOT_FOUND, "Workspace identity does not match this connection");
+                yield workspace.info();
+            }
+            case "documents/list" -> {
+                fields(params, Set.of("workspaceId", "offset", "limit"));
+                yield workspace.listDocuments(string(params, "workspaceId", true, 256),
+                    integer(params, "offset", 0, 0, Integer.MAX_VALUE), integer(params, "limit", 100, 1, WorkspaceQueryService.MAX_PAGE_SIZE));
+            }
+            case "documents/read" -> {
+                fields(params, Set.of("workspaceId", "document", "expectedVersion", "offset", "limit"));
+                yield workspace.read(string(params, "workspaceId", true, 256), string(params, "document", true, 8192),
+                    string(params, "expectedVersion", false, 512), integer(params, "offset", 0, 0, Integer.MAX_VALUE),
+                    integer(params, "limit", MAX_READ_CHARACTERS, 1, MAX_READ_CHARACTERS));
+            }
+            default -> throw new WorkspaceApiException(WorkspaceApiException.Code.UNSUPPORTED, "Workspace operation is not supported", Map.of("method", method));
+        };
+    }
+
+    static String error(Object id, int code, String message, Map<String, Object> data) {
+        return MiniJson.stringify(response(id, "error", Map.of("code", code, "message", message, "data", data)));
+    }
+    private static Map<String, Object> response(Object id, String key, Object value) {
+        Map<String, Object> result = new LinkedHashMap<>(); result.put("jsonrpc", "2.0"); result.put("id", id); result.put(key, value); return result;
+    }
+    private static boolean validId(Object id) { return id == null || id instanceof Long || id instanceof String value && value.length() <= 256; }
+    private static void fields(Map<String, Object> params, Set<String> allowed) {
+        if (!allowed.containsAll(params.keySet())) throw invalid("Unsupported parameter fields");
+    }
+    private static String string(Map<String, Object> params, String key, boolean required, int max) {
+        Object value = params.get(key);
+        if (value == null && !required && !params.containsKey(key)) return null;
+        if (!(value instanceof String text) || text.isBlank() || text.length() > max) throw invalid("Invalid " + key);
+        return text;
+    }
+    private static int integer(Map<String, Object> params, String key, int fallback, int minimum, int maximum) {
+        if (!params.containsKey(key)) return fallback;
+        Object value = params.get(key);
+        long number;
+        try {
+            if (value instanceof Long integral) number = integral;
+            else if (value instanceof java.math.BigDecimal decimal) number = decimal.longValueExact();
+            else throw invalid("Invalid " + key);
+        } catch (ArithmeticException error) { throw invalid("Invalid " + key); }
+        if (number < minimum || number > maximum) throw invalid("Invalid " + key);
+        return (int) number;
+    }
+    private static WorkspaceApiException invalid(String message) { return new WorkspaceApiException(WorkspaceApiException.Code.INVALID_REQUEST, message); }
+}

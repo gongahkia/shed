@@ -3439,6 +3439,12 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Main method
     public static void main(String[] args) {
+        if (WorkspaceCli.handles(args)) {
+            System.setProperty("java.awt.headless", "true");
+            int status = WorkspaceCli.run(args, System.in, System.out, System.err);
+            if (status != 0) System.exit(status);
+            return;
+        }
         System.setProperty("apple.laf.useScreenMenuBar", "true");
         ApplicationErrorReporter reporter = new ApplicationErrorReporter();
         reporter.install();

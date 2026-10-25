@@ -15,7 +15,7 @@ import javax.swing.JTabbedPane;
 
 /** Shared docked tool area; controllers remain the source of truth. */
 final class ToolWindowHost extends JPanel {
-    enum Tab { GIT, DEBUG, TASKS, TESTS, PROBLEMS, REPLACE, SEARCH }
+    enum Tab { GIT, DEBUG, TASKS, TESTS, PROBLEMS, REPLACE, SEARCH, AGENT }
 
     private final Texteditor editor;
     private final JTabbedPane tabs = new JTabbedPane();
@@ -52,6 +52,7 @@ final class ToolWindowHost extends JPanel {
         addSurface(Tab.TESTS, "Tests", new TestsToolPanel(editor, this));
         addSurface(Tab.PROBLEMS, "Problems", new ProblemsToolPanel(editor, this));
         addSurface(Tab.REPLACE, "Replace", new ProjectReplaceToolPanel(editor, this));
+        addSurface(Tab.AGENT, "Agents", new AgentReviewPanel(editor));
         selectedSurface = tabs.getSelectedComponent();
         tabs.addChangeListener(event -> selectedTabChanged());
     }
@@ -93,7 +94,7 @@ final class ToolWindowHost extends JPanel {
 
     private int preferredDividerLocation(Tab tab) {
         int desiredHeight = switch (tab) {
-            case DEBUG, REPLACE -> 520;
+            case DEBUG, REPLACE, AGENT -> 520;
             case GIT, TESTS -> 420;
             default -> 360;
         };
@@ -240,7 +241,7 @@ final class ToolWindowHost extends JPanel {
     }
 
     private static String title(Tab tab) {
-        return switch (tab) { case GIT -> "Git"; case DEBUG -> "Debug"; case TASKS -> "Tasks"; case TESTS -> "Tests"; case PROBLEMS -> "Problems"; case REPLACE -> "Replace"; case SEARCH -> "Search"; };
+        return switch (tab) { case GIT -> "Git"; case DEBUG -> "Debug"; case TASKS -> "Tasks"; case TESTS -> "Tests"; case PROBLEMS -> "Problems"; case REPLACE -> "Replace"; case SEARCH -> "Search"; case AGENT -> "Agents"; };
     }
 
     private static WorkbenchLayout.SurfaceType surfaceType(Tab tab) {
@@ -252,6 +253,7 @@ final class ToolWindowHost extends JPanel {
             case PROBLEMS -> WorkbenchLayout.SurfaceType.PROBLEMS;
             case REPLACE -> WorkbenchLayout.SurfaceType.REPLACE;
             case SEARCH -> WorkbenchLayout.SurfaceType.SEARCH;
+            case AGENT -> WorkbenchLayout.SurfaceType.AGENT;
         };
     }
 

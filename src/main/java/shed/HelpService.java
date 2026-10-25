@@ -136,6 +136,7 @@ public class HelpService {
         switch (normalizedTopic) {
             case "agent":
                 return "Help: agent workspace API\n\n"
+                    + ":agent opens the Agents review panel (also View > Agent Review). Incoming proposals never take focus.\n"
                     + ":agent api start enables read-only access to the selected workspace, including unsaved editor buffers.\n"
                     + ":agent api start propose additionally allows durable proposals; it never grants permission to apply them.\n"
                     + ":agent api status shows the private connection descriptor path; :agent api stop revokes its clients.\n"
@@ -145,6 +146,9 @@ public class HelpService {
                     + "Start with workspace/info, then documents/list or documents/read using the returned workspaceId.\n"
                     + "Descriptors contain credentials and must remain owner-only, outside the exposed workspace.\n"
                     + "proposals/list and proposals/read inspect persisted reviews. Proposal mode adds propose/revise/reject.\n"
+                    + "In Agents, select a proposal and review every document. Edit text or select hunks, then Save review.\n"
+                    + "Apply proposal accepts all saved selections. Open buffers stay unsaved; closed files are written.\n"
+                    + "Rebase for review preserves disjoint human edits; Undo proposal refuses overlapping later edits.\n"
                     + "Search, ACP/MCP and agent sessions remain unavailable through this initial API.\n";
             case "keymap":
             case "keymaps":

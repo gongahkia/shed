@@ -19,6 +19,7 @@ final class WorkbenchLayout {
         PROBLEMS,
         REPLACE,
         SEARCH,
+        AGENT,
         STATUS
     }
 

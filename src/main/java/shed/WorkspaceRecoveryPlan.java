@@ -16,7 +16,7 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
                              String verifiedOutcome, boolean restorable, List<Object> resources) {
     record Artifact(Path path, Map<String, Object> identity) { }
     record Action(Map<String, Object> effect, WorkspaceDocument current, WorkspaceTextFile.Snapshot disk,
-                  String text, byte[] bytes, boolean restoreDisk, Artifact artifact) {
+                  String text, byte[] bytes, boolean restoreDisk, Artifact artifact, boolean removeDisk) {
         Action { bytes = bytes == null ? null : bytes.clone(); }
         @Override public byte[] bytes() { return bytes == null ? null : bytes.clone(); }
         String document() { return effect.get("uri") instanceof String uri ? uri : (String) effect.get("document"); }
@@ -35,6 +35,13 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
         boolean allBefore = true, allAfter = true, restorable = true;
         for (Object item : operation) {
             var effect = object(item);
+            if ("CREATE".equals(effect.get("kind")) || "DELETE".equals(effect.get("kind"))) {
+                var presence = presence(workspace, lease, effect, resources);
+                observations.add(presence.observation());
+                if (presence.action() != null) actions.add(presence.action());
+                allBefore &= presence.before(); allAfter &= presence.after(); restorable &= presence.restorable();
+                continue;
+            }
             String before = lease.getText(text(effect, "before")), after = lease.getText(text(effect, "after"));
             byte[] beforeBytes = effect.get("diskBefore") == null ? null : lease.get(text(effect, "diskBefore"));
             if (beforeBytes != null) lease.get(text(effect, "diskAfter"));
@@ -77,7 +84,7 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
             observation.put("state", combined); observation.put("bufferState", state); observation.put("restoreReason", reason);
             observation.put("canRestore", reason == null); observations.add(observation);
             allBefore &= alreadyBefore; allAfter &= alreadyAfter; restorable &= reason == null;
-            if (!alreadyBefore && reason == null) actions.add(new Action(effect, current, disk, before, beforeBytes, needsDisk, artifact));
+            if (!alreadyBefore && reason == null) actions.add(new Action(effect, current, disk, before, beforeBytes, needsDisk, artifact, false));
         }
         String kind = Objects.toString(entry.data().get("operationKind"), ""); boolean undo = kind.equals("UNDO");
         if (!kind.equals("APPLY") && !undo) restorable = false;
@@ -87,6 +94,75 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
         if (undo && "APPLIED".equals(outcome) && MiniJson.asArray(entry.data().get("appliedOperation")) == null) outcome = null;
         String proof = WorkspacePaths.hash(WorkspaceChangeJournal.canonical(map("id", entry.id(), "revision", entry.revision(), "observations", observations)));
         return new WorkspaceRecoveryPlan(List.copyOf(observations), List.copyOf(actions), proof, outcome, restorable, List.copyOf(resources));
+    }
+
+    private record Presence(Map<String, Object> observation, Action action, boolean before, boolean after, boolean restorable) { }
+
+    /** File presence is evidence: a missing created file is BEFORE, a missing deleted file is AFTER. */
+    private static Presence presence(WorkspaceQueryService workspace, WorkspaceChangeJournal.Lease lease,
+                                     Map<String, Object> effect, List<Object> resources) throws IOException {
+        boolean create = "CREATE".equals(effect.get("kind"));
+        String uri = text(effect, "uri"), before = lease.getText(text(effect, "before")), after = lease.getText(text(effect, "after"));
+        byte[] bytes = lease.get(text(effect, create ? "diskAfter" : "diskBefore"));
+        String expectedText = create ? after : before, digest = WorkspacePaths.hash(bytes);
+        var observation = map("document", effect.get("document"), "uri", uri, "kind", effect.get("kind"), "originalSource", effect.get("source"));
+        WorkspaceDocument current = null; WorkspaceTextFile.Snapshot disk = null;
+        String reason = null, diskState;
+        try {
+            if ("EDITOR".equals(effect.get("source"))) {
+                for (WorkspaceDocument open : workspace.visibleDocuments()) if (open.documentId().equals(effect.get("document"))) current = open;
+            }
+            if (current == null) current = workspace.snapshot(workspace.workspaceId(), uri);
+            observation.put("current", current.metadata());
+        } catch (WorkspaceApiException unavailable) {
+            if (unavailable.code() != WorkspaceApiException.Code.NOT_FOUND) {
+                unreadable(unavailable); reason = "The current document is unavailable"; observation.put("error", unavailable.toMap());
+            }
+        }
+        Path path = WorkspacePaths.resolve(workspace.root(), uri);
+        workspace.policy().checkPath(workspace.root().relativize(path), AgentPolicy.Capability.READ);
+        try {
+            disk = WorkspaceTextFile.capture(workspace.workspaceId(), path, true);
+            observation.put("diskVersion", disk.document().version());
+            diskState = WorkspacePaths.hash(disk.bytes()).equals(digest) ? create ? "AFTER" : "BEFORE" : "DIVERGED";
+            if (known(diskState)) {
+                Map<String, Object> identity = create ? null : MiniJson.asObject(effect.get("diskIdentity"));
+                if (create) for (Object item : resources) {
+                    var step = object(item);
+                    if ("CREATE".equals(step.get("kind")) && uri.equals(step.get("target"))) identity = object(step.get("fingerprint"));
+                }
+                var actual = WorkspaceEditTransaction.resourceIdentity(path); observation.put("diskIdentity", actual);
+                if (identity == null || !identity.equals(actual)) diskState = "DIVERGED";
+            }
+        } catch (WorkspaceApiException unavailable) {
+            diskState = unreadable(unavailable);
+            if (diskState.equals("MISSING")) diskState = create ? "BEFORE" : "AFTER";
+            else observation.put("diskError", unavailable.toMap());
+        }
+        boolean open = current != null && current.source() == WorkspaceDocument.Source.EDITOR;
+        boolean boundHere = open && current.uri() != null && WorkspacePaths.resolve(workspace.root(), current.uri()).equals(path);
+        if (open && (!current.complete() || current.readOnly() || !current.content().equals(expectedText)
+            || current.uri() != null && (!boundHere || current.dirty())))
+            reason = "The open document changed; preserve its contents and binding";
+        if (!known(diskState)) reason = "The disk resource differs from the recorded creation/deletion or is unavailable";
+        boolean consistent = reason == null;
+        Artifact artifact = null;
+        if (!create && !before(diskState)) {
+            var candidates = candidates(workspace, resources, uri, digest);
+            artifact = candidates.available(); observation.put("artifacts", candidates.observations());
+            if (artifact == null || candidates.changedOriginal()) reason = "The retained original is missing or changed";
+        }
+        boolean beforeBinding = !open || (create ? current.uri() == null : boundHere);
+        boolean afterBinding = !open || (create ? boundHere : current.uri() == null);
+        boolean alreadyBefore = consistent && before(diskState) && beforeBinding;
+        boolean alreadyAfter = consistent && after(diskState) && afterBinding;
+        observation.put("diskState", diskState);
+        observation.put("state", alreadyBefore ? "BEFORE" : alreadyAfter ? "AFTER" : reason == null ? "MIXED" : "DIVERGED");
+        observation.put("bufferState", open ? current.uri() == null ? "DETACHED" : "BOUND" : "CLOSED");
+        observation.put("restoreReason", reason); observation.put("canRestore", reason == null);
+        Action action = alreadyBefore || reason != null ? null : new Action(effect, current, disk, expectedText,
+            create ? null : bytes, !before(diskState), artifact, create);
+        return new Presence(observation, action, alreadyBefore, alreadyAfter, reason == null);
     }
 
     private record Candidates(Artifact available, List<Object> observations, boolean changedOriginal) { }

@@ -18,4 +18,10 @@ interface WorkspaceDocumentEditor extends WorkspaceDocumentSource {
         if (changes.isEmpty()) return List.of();
         throw new WorkspaceApiException(WorkspaceApiException.Code.NOT_CONNECTED, "Live document mutation is unavailable");
     }
+
+    /** The resulting registry must not bind any tab to these paths; validate on the mutation thread. */
+    default List<WorkspaceDocument> applyTexts(List<TextChange> changes, List<java.nio.file.Path> unboundPaths) {
+        if (unboundPaths.isEmpty()) return applyTexts(changes);
+        throw new WorkspaceApiException(WorkspaceApiException.Code.NOT_CONNECTED, "Atomic editor path validation is unavailable");
+    }
 }

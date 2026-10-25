@@ -26,6 +26,26 @@ class AgentReviewPanelTest {
 
     @AfterEach void close() { if (jobs != null) jobs.shutdownNow(); }
 
+    @Test void newFilesAreClearlyLabeledAndCanBeReviewedAppliedAndUndoneWithoutAFrame() throws Exception {
+        var base = scope("project");
+        try (var editor = new EditorWorkspaceDocuments(List::of, () -> List.of(base.root()), base::root, base.root())) {
+            var scope = new AgentReviewPanel.Scope(base.root(), base.sessions(), editor); current.set(scope);
+            scope.service().propose("new", "task", "turn", List.of(WorkspaceProposalService.Input.create("new.txt", "draft\n")));
+            open(); ready();
+            edt(() -> {
+                assertEquals("Create · new.txt", combo().getSelectedItem());
+                assertTrue(text("details").getText().contains("Creates a new file"));
+                assertEquals("", text("before").getText());
+                text("proposed").setText("reviewed\n"); button("save").doClick();
+            });
+            ready(); assertFalse(Files.exists(scope.root().resolve("new.txt")));
+            edt(() -> button("apply").doClick()); await(() -> button("undo").isEnabled());
+            assertEquals("reviewed\n", Files.readString(scope.root().resolve("new.txt")));
+            edt(() -> button("undo").doClick()); await(() -> text("details").getText().contains("UNDONE"));
+            assertFalse(Files.exists(scope.root().resolve("new.txt")));
+        }
+    }
+
     @Test void partiallyAppliedChangesCanBeRestoredThroughTheRecoveryControls() throws Exception {
         var scope = scope("project"); current.set(scope);
         Path first = Files.writeString(scope.root().resolve("a"), "old\r\n"), second = Files.writeString(scope.root().resolve("b"), "old\r\n");

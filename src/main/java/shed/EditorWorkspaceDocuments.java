@@ -79,7 +79,29 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
     }
 
     @Override public List<WorkspaceDocument> applyTexts(List<TextChange> changes) {
+        return applyTexts(changes, List.of());
+    }
+
+    @Override public List<WorkspaceDocument> applyTexts(List<TextChange> changes, List<Path> unboundPaths) {
         List<TextChange> requested = List.copyOf(changes);
+        boolean resourceBatch = !unboundPaths.isEmpty() || requested.stream().anyMatch(change -> change.detach() || change.diskBinding() != null);
+        // Resolve aliases on the worker, then validate that the EDT still has this registry.
+        // A new path appearing after capture requires a retry instead of a filesystem lookup on the EDT.
+        var canonicalPaths = new java.util.HashMap<Path, Path>();
+        var detachedWorkspaces = new java.util.HashMap<String, Path>();
+        if (resourceBatch) {
+            if (SwingUtilities.isEventDispatchThread()) throw new WorkspaceApiException(WorkspaceApiException.Code.INVALID_REQUEST,
+                "Resource binding batches must be prepared off the event thread");
+            for (Captured item : onEdt(this::capture)) if (item.path() != null) {
+                canonicalPaths.put(item.path(), canonical(item.path()));
+                detachedWorkspaces.put(item.id(), WorkspacePaths.root(owningRoot(item.path(), item.roots())));
+            }
+            for (TextChange change : requested) if (change.diskBinding() != null)
+                canonicalPaths.put(change.diskBinding().file(), canonical(change.diskBinding().file()));
+            for (Path path : unboundPaths) canonicalPaths.put(path.toAbsolutePath().normalize(), canonical(path));
+        }
+        var unbound = unboundPaths.stream().map(path -> canonicalPaths.get(path.toAbsolutePath().normalize()))
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
         return onEdtMutation(() -> {
             List<Captured> before = capture();
             var current = new java.util.HashMap<String, Captured>();
@@ -108,10 +130,17 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
                 TextChange change = requested.stream().filter(candidate -> candidate.expected().documentId().equals(item.id())).findFirst().orElse(null);
                 Path destination = change != null && change.detach() ? null
                     : change != null && change.diskBinding() != null ? change.diskBinding().file() : item.path();
+                if (destination != null && resourceBatch) {
+                    destination = canonicalPaths.get(destination);
+                    if (destination == null) throw new WorkspaceApiException(WorkspaceApiException.Code.STALE_VERSION,
+                        "Editor paths changed during resource preflight");
+                }
                 if (destination != null && !destinations.add(destination))
                     throw new WorkspaceApiException(WorkspaceApiException.Code.CONFLICT, "An open document already owns the destination path");
+                if (destination != null && unbound.contains(destination))
+                    throw new WorkspaceApiException(WorkspaceApiException.Code.STALE_VERSION, "A document opened at a resource-operation path; review it again");
                 if (change != null && change.detach() && item.path() != null)
-                    detachedRoots.put(item.id(), owningRoot(item.path(), item.roots()));
+                    detachedRoots.put(item.id(), detachedWorkspaces.get(item.id()));
             }
             batch.accept(() -> {
                 var transactions = new ArrayList<FileBuffer.TextTransaction>();
@@ -156,6 +185,11 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
         for (Path parent = file.getParent(); parent != null; parent = parent.getParent())
             if (Files.exists(parent.resolve(".git"))) return parent;
         return file.getParent();
+    }
+
+    private static Path canonical(Path path) {
+        Path absolute = path.toAbsolutePath().normalize();
+        return WorkspacePaths.resolve(WorkspacePaths.root(absolute.getRoot()), absolute.toString());
     }
 
     private static <T> T onEdt(Callable<T> capture) {

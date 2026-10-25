@@ -52,9 +52,15 @@ final class WorkspaceProposalRpc {
                 for (Object value : values) {
                     var change = MiniJson.asObject(value);
                     if (change == null) throw invalid("Invalid change");
-                    fields(change, Set.of("document", "expectedVersion", "text"));
-                    inputs.add(new WorkspaceProposalService.Input(string(change, "document", true, 8192),
-                        string(change, "expectedVersion", true, 512), content(change, true)));
+                    String kind = string(change, "kind", false, 16);
+                    if (kind == null || kind.equals("text")) {
+                        fields(change, Set.of("kind", "document", "expectedVersion", "text"));
+                        inputs.add(new WorkspaceProposalService.Input(string(change, "document", true, 8192),
+                            string(change, "expectedVersion", true, 512), content(change, true)));
+                    } else if (kind.equals("create")) {
+                        fields(change, Set.of("kind", "document", "text"));
+                        inputs.add(WorkspaceProposalService.Input.create(string(change, "document", true, 8192), content(change, true)));
+                    } else throw invalid("Unknown proposal operation");
                 }
                 yield proposals.propose(string(params, "requestId", true, 256), string(params, "taskId", true, 256),
                     string(params, "turnId", true, 256), inputs);

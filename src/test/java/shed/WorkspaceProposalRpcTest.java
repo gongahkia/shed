@@ -13,6 +13,26 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkspaceProposalRpcTest {
     @TempDir Path temporary;
 
+    @Test void creationIsExplicitStrictlyDecodedAndRequiresHumanApplyPermission() throws Exception {
+        Path root = Files.createDirectory(temporary.resolve("project")), storage = temporary.resolve("history");
+        var queries = queries(root, false); var service = new WorkspaceProposalService(queries, null, storage, "agent");
+        var rpc = new WorkspaceRpc(queries, service);
+        var params = new LinkedHashMap<String, Object>(Map.of("workspaceId", queries.workspaceId(), "requestId", "create", "taskId", "t", "turnId", "u",
+            "changes", List.of(Map.of("kind", "create", "document", "new", "text", "created\n"))));
+        var proposal = result(call(rpc, "proposals/propose", params)); String id = (String) proposal.get("id");
+        assertEquals("CREATE", MiniJson.asObject(MiniJson.asArray(proposal.get("documents")).getFirst()).get("kind"));
+        assertFalse(Files.exists(root.resolve("new")));
+        assertEquals("PERMISSION_DENIED", code(call(rpc, "proposals/apply", Map.of("workspaceId", queries.workspaceId(), "id", id, "revision", 0))));
+        var read = result(call(rpc, "proposals/read", Map.of("workspaceId", queries.workspaceId(), "id", id)));
+        assertEquals("created\n", read.get("content"));
+        params.put("changes", List.of(Map.of("kind", "create", "document", "new", "expectedVersion", "replace", "text", "created\n")));
+        assertEquals("INVALID_REQUEST", code(call(rpc, "proposals/propose", params)));
+        params.put("changes", List.of(Map.of("kind", "delete", "document", "new", "text", "")));
+        assertEquals("INVALID_REQUEST", code(call(rpc, "proposals/propose", params)));
+        new WorkspaceProposalService(queries(root, true), null, storage, "human").apply(id, 0);
+        assertEquals("created\n", Files.readString(root.resolve("new")));
+    }
+
     @Test void restorationUsesTheInspectedEvidenceAndNeverGrantsProposalClientsApplyPermission() throws Exception {
         Path root = Files.createDirectory(temporary.resolve("project")), storage = temporary.resolve("history");
         Files.writeString(root.resolve("a"), "old\r\n"); Files.writeString(root.resolve("b"), "old\r\n");

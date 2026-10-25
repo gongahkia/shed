@@ -180,7 +180,10 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         try {
             documents.removeAllItems(); clearPreview();
             if (selected != null) for (Object item : MiniJson.asArray(selected.get("documents"))) {
-                var document = MiniJson.asObject(item); documents.addItem(document.get("uri") == null ? "Unsaved · " + document.get("document") : pathLabel((String) document.get("uri")));
+                var document = MiniJson.asObject(item);
+                String label = document.get("uri") == null ? "Unsaved · " + document.get("document")
+                    : Objects.toString(document.get("path"), Objects.toString(document.get("uri")));
+                documents.addItem("CREATE".equals(document.get("kind")) ? "Create · " + label : label);
             }
         } finally { rendering = false; }
         if (selected != null) loadPreview(); else controls();
@@ -214,13 +217,16 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
                 + " · reviewed by " + Objects.toString(metadata.get("reviewedBy"), "nobody yet") + "\n"
                 + metadata.get("taskId") + " / " + metadata.get("turnId") + " · revision " + metadata.get("revision") + "\n"
                 + value.document().get("encoding") + " · " + value.document().get("lineEnding")
-                + (Boolean.TRUE.equals(metadata.get("pendingSaveAtApplication")) ? " · Applied to open buffers; saving is separate." : " · Open buffers stay unsaved; closed files are written on apply."));
+                + ("CREATE".equals(value.document().get("kind")) ? " · Creates a new file on apply; an existing path is never overwritten."
+                    : Boolean.TRUE.equals(metadata.get("pendingSaveAtApplication")) ? " · Applied to open buffers; saving is separate." : " · Open buffers stay unsaved; closed files are written on apply."));
             for (int i = 0; i < proposals.size(); i++) if (Objects.equals(metadata.get("id"), proposals.get(i).get("id"))) proposals.set(i, metadata);
             message(metadata.get("error") != null ? "Previous operation: " + metadata.get("error")
                 : Set.of("APPLYING", "UNDOING", "RECOVERY_REQUIRED").contains(metadata.get("status"))
                     ? "An interrupted operation needs recovery. Its snapshots are retained; automatic application is disabled."
                     : metadata.get("recovery") != null ? (String) metadata.get("recovery")
-                    : "Review each document. Apply accepts the saved hunk selections across the whole proposal.");
+                    : "CREATE".equals(value.document().get("kind")) && "PROPOSED".equals(metadata.get("status"))
+                        ? "Apply creates this file even when all text hunks are deselected. Reject the proposal to skip creation."
+                        : "Review each document. Apply accepts the saved hunk selections across the whole proposal.");
         } finally { rendering = false; }
         controls();
     }
@@ -337,7 +343,6 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         reviewTabs.setSelectedIndex(0); before.setText(""); proposed.setText(""); details.setText(""); hunks.setRowCount(0);
     }
     private void message(String text) { status.setText(text); status.setToolTipText(text); status.getAccessibleContext().setAccessibleDescription(text); }
-    private String pathLabel(String uri) { try { return scope.root().relativize(Path.of(java.net.URI.create(uri))).toString(); } catch (RuntimeException invalid) { return uri; } }
     private static JPanel textPane(String title, JTextArea text) {
         JPanel pane = new JPanel(new BorderLayout(4, 4)); JLabel label = new JLabel(title); label.setLabelFor(text);
         pane.add(label, BorderLayout.NORTH); pane.add(new JScrollPane(text)); pane.setMinimumSize(new Dimension(80, 80)); return pane;

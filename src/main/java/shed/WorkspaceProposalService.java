@@ -241,10 +241,16 @@ final class WorkspaceProposalService {
             "before", lease.putText(effect.before().content()), "after", lease.putText(effect.after()),
             "diskBefore", effect.diskBefore() == null ? null : lease.put(effect.diskBefore()),
             "diskAfter", effect.diskAfter() == null ? null : lease.put(effect.diskAfter())));
-        data.put("operation", operation); data.put("status", undo ? "UNDOING" : "APPLYING");
+        if (undo) data.put("appliedOperation", initial.data().get("operation"));
+        data.put("operation", operation); data.put("operationKind", undo ? "UNDO" : "APPLY");
+        data.put("resourceSteps", List.of()); data.put("status", undo ? "UNDOING" : "APPLYING");
         data.put(undo ? "undoApprovedRevision" : "approvedRevision", approvedRevision); data.put("reviewedBy", actor);
-        var pending = lease.append(initial.id(), initial.revision(), undo ? "UNDOING" : "APPLYING", data);
-        WorkspaceEditTransaction transaction = new WorkspaceEditTransaction();
+        var pending = new java.util.concurrent.atomic.AtomicReference<>(lease.append(initial.id(), initial.revision(), undo ? "UNDOING" : "APPLYING", data));
+        List<Object> resourceSteps = new ArrayList<>();
+        WorkspaceEditTransaction transaction = new WorkspaceEditTransaction(step -> {
+            resourceSteps.add(step.toMap()); data.put("resourceSteps", List.copyOf(resourceSteps));
+            pending.set(lease.append(initial.id(), pending.get().revision(), "RESOURCE_PREPARED", data));
+        });
         boolean committed = false, interrupted = false;
         try {
             List<Path> staged = new ArrayList<>();
@@ -269,7 +275,7 @@ final class WorkspaceProposalService {
             data.put("status", undo ? "UNDONE" : "APPLIED");
             data.put("editorResults", after.stream().map(WorkspaceDocument::metadata).toList());
             data.put("pendingSaveAtApplication", !after.isEmpty()); data.remove("error");
-            var completed = lease.append(initial.id(), pending.revision(), undo ? "UNDONE" : "APPLIED", data);
+            var completed = lease.append(initial.id(), pending.get().revision(), undo ? "UNDONE" : "APPLIED", data);
             var report = transaction.cleanup();
             Map<String, Object> result = summary(completed);
             if (!report.failures().isEmpty()) {
@@ -287,7 +293,7 @@ final class WorkspaceProposalService {
             data.put("error", failure instanceof WorkspaceApiException domain ? domain.toMap()
                 : map("code", "IO_ERROR", "message", "Workspace edit failed"));
             data.put("recovery", transaction.report().notice());
-            lease.append(initial.id(), pending.revision(), recovery ? "RECOVERY_REQUIRED" : "FAILED", data);
+            lease.append(initial.id(), pending.get().revision(), recovery ? "RECOVERY_REQUIRED" : "FAILED", data);
             if (recovery) throw failure(WorkspaceApiException.Code.RECOVERY_REQUIRED, "Workspace edit needs recovery; its preimages were retained");
             if (failure instanceof WorkspaceApiException domain) throw domain;
             throw failure(WorkspaceApiException.Code.IO_ERROR, "Workspace edit failed and was rolled back");

@@ -28,6 +28,19 @@ import java.util.Objects;
 final class WorkspaceEditTransaction implements AutoCloseable {
     enum State { OPEN, PREPARED, COMMITTED, ROLLED_BACK, RECOVERY_REQUIRED }
     @FunctionalInterface interface IoAction { void run() throws IOException; }
+    @FunctionalInterface interface StepObserver {
+        StepObserver NONE = step -> { };
+        void prepared(Step step) throws IOException;
+    }
+    /** A durable intent is published before moving originals or installing their replacements. */
+    record Step(String kind, Path source, Path target, Map<String, Object> fingerprint) {
+        Map<String, Object> toMap() {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("kind", kind); result.put("source", source == null ? null : source.toUri().toString());
+            result.put("target", target.toUri().toString()); result.put("fingerprint", fingerprint);
+            return result;
+        }
+    }
     record Failure(String phase, String operation, String message) { }
     record Report(State state, List<Failure> failures, List<Path> recoveryPaths) {
         Report { failures = List.copyOf(failures); recoveryPaths = List.copyOf(recoveryPaths); }
@@ -50,6 +63,10 @@ final class WorkspaceEditTransaction implements AutoCloseable {
     private final Map<Path, Fingerprint> temps = new LinkedHashMap<>();
     private final List<Backup> backups = new ArrayList<>();
     private final List<Failure> failures = new ArrayList<>();
+    private final StepObserver observer;
+
+    WorkspaceEditTransaction() { this(StepObserver.NONE); }
+    WorkspaceEditTransaction(StepObserver observer) { this.observer = Objects.requireNonNull(observer); }
 
     State state() { return state; }
 
@@ -66,10 +83,16 @@ final class WorkspaceEditTransaction implements AutoCloseable {
                 while (bytes.hasRemaining()) output.write(bytes);
                 output.force(true);
             }
-            temps.put(temporary, fingerprint(temporary));
+            Fingerprint expected = fingerprint(temporary);
+            temps.put(temporary, expected);
+            prepared("STAGED", temporary, target, expected);
             return temporary;
         } catch (IOException | RuntimeException failure) {
-            try { Files.deleteIfExists(temporary); } catch (IOException cleanup) { failure.addSuppressed(cleanup); }
+            try {
+                Fingerprint expected = temps.get(temporary);
+                if (expected != null) requireMatching(temporary, expected);
+                Files.deleteIfExists(temporary);
+            } catch (IOException cleanup) { failure.addSuppressed(cleanup); }
             throw failure;
         }
     }
@@ -91,6 +114,7 @@ final class WorkspaceEditTransaction implements AutoCloseable {
             Files.delete(target);
         });
         if (exists(target)) throw new IOException("Write target changed before replacement: " + target);
+        prepared("REPLACE", staged, target, applied);
         move(staged, target, false);
     }
 
@@ -103,6 +127,7 @@ final class WorkspaceEditTransaction implements AutoCloseable {
             backup(target);
         }
         Fingerprint expected = fingerprint(source);
+        prepared("RENAME", source, target, expected);
         move(source, target, false);
         addRollback("restore renamed resource " + source, () -> {
             if (exists(source)) throw new IOException("Original rename path is now occupied: " + source);
@@ -117,7 +142,7 @@ final class WorkspaceEditTransaction implements AutoCloseable {
         Fingerprint expected = fingerprint(target);
         Path directory = Files.createTempDirectory(target.toAbsolutePath().getParent(), ".shed-edit-backup-");
         Path original = directory.resolve("original");
-        try { move(target, original, false); }
+        try { prepared("BACKUP", target, original, expected); move(target, original, false); }
         catch (IOException failed) { Files.deleteIfExists(directory); throw failed; }
         backups.add(new Backup(directory, original, expected));
         addRollback("restore original " + target, () -> {
@@ -199,6 +224,7 @@ final class WorkspaceEditTransaction implements AutoCloseable {
         for (int i = missing.size() - 1; i >= 0; i--) {
             Path path = missing.get(i);
             try {
+                prepared("CREATE_DIRECTORY", null, path, null);
                 Files.createDirectory(path);
                 Object directoryKey = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS).fileKey();
                 addRollback("remove created directory " + path, () -> {
@@ -216,6 +242,15 @@ final class WorkspaceEditTransaction implements AutoCloseable {
     }
 
     private void requireOpen() { if (state != State.OPEN) throw new IllegalStateException("Workspace transaction is already " + state); }
+    private void prepared(String kind, Path source, Path target, Fingerprint fingerprint) throws IOException {
+        if (observer != StepObserver.NONE) observer.prepared(new Step(kind, source, target, fingerprint == null ? Map.of() : describe(fingerprint)));
+    }
+    private static Map<String, Object> describe(Fingerprint fingerprint) {
+        Map<String, Object> children = new LinkedHashMap<>();
+        fingerprint.children().forEach((path, child) -> children.put(path, describe(child)));
+        return Map.of("key", Objects.toString(fingerprint.key(), ""), "directory", fingerprint.directory(), "link", fingerprint.link(),
+            "size", fingerprint.size(), "modified", fingerprint.modified().toString(), "digest", fingerprint.digest(), "children", children);
+    }
     private static boolean exists(Path path) { return Files.exists(path, LinkOption.NOFOLLOW_LINKS); }
     private static String message(Throwable failure) { return failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage(); }
     private static void requireMatching(Path path, Fingerprint expected) throws IOException {

@@ -13,6 +13,32 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkspaceProposalServiceTest {
     @TempDir Path temporary;
 
+    @Test void persistedResourceIntentsRetainBackupIdentityAndUndoKeepsTheOriginalApplicationRecord() throws Exception {
+        Path root = Files.createDirectory(temporary.resolve("project")), storage = temporary.resolve("state");
+        Files.writeString(root.resolve("source"), "original\n");
+        var queries = new WorkspaceQueryService(root, policy(true), WorkspaceDocumentSource.diskOnly());
+        var service = new WorkspaceProposalService(queries, null, storage, "human");
+        String id = (String) service.propose("r", "task", "turn", List.of(new WorkspaceProposalService.Input("source",
+            queries.snapshot(queries.workspaceId(), "source").version(), "agent\n"))).get("id");
+        var applied = service.apply(id, 0);
+        List<Object> operation;
+        try (var lease = new WorkspaceChangeJournal(storage).open(false)) {
+            var record = lease.read(id);
+            assertEquals("APPLY", record.data().get("operationKind"));
+            var steps = MiniJson.asArray(record.data().get("resourceSteps"));
+            assertEquals(List.of("STAGED", "BACKUP", "REPLACE"), steps.stream().map(step -> MiniJson.asObject(step).get("kind")).toList());
+            var backup = MiniJson.asObject(steps.get(1));
+            assertEquals(WorkspacePaths.hash("original\n"), MiniJson.asObject(backup.get("fingerprint")).get("digest"));
+            operation = MiniJson.asArray(record.data().get("operation"));
+        }
+        service.undo(id, revision(applied));
+        try (var lease = new WorkspaceChangeJournal(storage).open(false)) {
+            var record = lease.read(id);
+            assertEquals("UNDO", record.data().get("operationKind"));
+            assertEquals(operation, MiniJson.asArray(record.data().get("appliedOperation")));
+        }
+    }
+
     @Test void persistentProposalsSupportHunkReviewIdempotentApplyAndUndoWithLaterHumanEdits() throws Exception {
         Path root = Files.createDirectory(temporary.resolve("project")), storage = temporary.resolve("state");
         Path file = root.resolve("source");

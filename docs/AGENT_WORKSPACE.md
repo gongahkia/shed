@@ -110,3 +110,9 @@ Filesystem/journal work runs in workers. Review requests capture their workspace
 Four headless component workflows exercise real Swing controls and the durable service without a frame: multiple-document text/hunk review through apply/undo, stale human changes followed by explicit rebase, preservation of unsaved review edits across refresh/workspace changes, and delayed old-workspace results. Native window layout, keyboard traversal and desktop rendering remain unverified under the no-app-launch restriction.
 
 Verification after API and review-surface integration: clean headless package passed 1,041 tests with zero failures/errors and 83 headless skips. This verifies the implemented proposal slice; the remaining numbered requirements are still active work.
+
+## Resource intent tracing
+
+The common transaction now publishes resource intents before backup, replacement, rename or parent-directory creation. Staged content is forced before its identity/digest is recorded. Proposal journals persist each intent before allowing the corresponding move, including exact staging/backup paths and resource fingerprints. An observer/journal failure prevents that step; prior steps use the existing guarded rollback. Undo retains the original application record separately, so interrupted undo does not erase the evidence needed to explain the accepted change.
+
+A headless child-process fixture halts abruptly after backup and before replacement, without running cleanup. The parent reopens the private journal, locates the recorded original and staged file, and verifies their bytes/digests. Focused transaction, proposal, transport, review, LSP-format and architecture checks pass. This demonstrates process-interruption evidence retention; it does not yet provide automatic recovery for every mixed resource operation or establish power-loss guarantees.

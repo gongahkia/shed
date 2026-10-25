@@ -13,6 +13,53 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkspaceEditTransactionTest {
     @TempDir Path root;
 
+    @Test void preparedStepsDescribeResourcesBeforeMovingOriginalsAndObserverFailureRollsBack() throws Exception {
+        Path file = Files.writeString(root.resolve("source"), "original");
+        var steps = new java.util.ArrayList<WorkspaceEditTransaction.Step>();
+        try (var transaction = new WorkspaceEditTransaction(step -> {
+            steps.add(step);
+            assertEquals(WorkspacePaths.hash(Files.readAllBytes(step.source())), step.fingerprint().get("digest"));
+            if (step.kind().equals("BACKUP")) {
+                assertEquals(file, step.source()); assertFalse(Files.exists(step.target()));
+                assertEquals("original", Files.readString(file));
+            } else if (step.kind().equals("REPLACE")) {
+                assertFalse(Files.exists(file));
+                assertEquals("original", Files.readString(steps.get(1).target()));
+                throw new IOException("Journal cannot publish the replacement intent");
+            }
+        })) {
+            Path staged = transaction.stage(file, "agent".getBytes(StandardCharsets.UTF_8));
+            assertThrows(IOException.class, () -> transaction.replace(file, staged));
+        }
+        assertEquals(java.util.List.of("STAGED", "BACKUP", "REPLACE"), steps.stream().map(WorkspaceEditTransaction.Step::kind).toList());
+        assertEquals("original", Files.readString(file));
+    }
+
+    @Test void abruptWorkerExitLeavesJournaledOriginalAndStagedBytesDiscoverable() throws Exception {
+        Path workspace = Files.createDirectory(root.resolve("project"));
+        Files.writeString(workspace.resolve("source"), "original");
+        Path history = root.resolve("private");
+        String javaExecutable = Path.of(System.getProperty("java.home"), "bin", System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString();
+        Process process = new ProcessBuilder(javaExecutable, "-Djava.awt.headless=true", "-cp", System.getProperty("java.class.path"),
+            "shed.WorkspaceEditCrashFixture", workspace.toString(), history.toString()).redirectErrorStream(true).start();
+        try {
+            assertTrue(process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals(77, process.exitValue(), new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8));
+        } finally { if (process.isAlive()) process.destroyForcibly(); }
+        try (var lease = new WorkspaceChangeJournal(history).open(false)) {
+            var entry = lease.read(WorkspaceEditCrashFixture.ID);
+            assertEquals("RESOURCE_PREPARED", entry.kind());
+            var steps = MiniJson.asArray(entry.data().get("steps"));
+            assertEquals(3, steps.size());
+            var backup = MiniJson.asObject(steps.get(1)); var replace = MiniJson.asObject(steps.get(2));
+            Path original = Path.of(java.net.URI.create((String) backup.get("target")));
+            Path staged = Path.of(java.net.URI.create((String) replace.get("source")));
+            assertFalse(Files.exists(workspace.resolve("source")));
+            assertEquals("original", Files.readString(original)); assertEquals("agent", Files.readString(staged));
+            assertEquals(WorkspacePaths.hash(Files.readAllBytes(original)), MiniJson.asObject(backup.get("fingerprint")).get("digest"));
+        }
+    }
+
     @Test void mixedResourceEditsCommitPreservePermissionsAndRemoveOwnedArtifacts() throws Exception {
         Path source = Files.writeString(root.resolve("source"), "original source");
         Path target = Files.writeString(root.resolve("target"), "overwritten target");

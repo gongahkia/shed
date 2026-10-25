@@ -526,11 +526,14 @@ public class FileBuffer {
         private final VersionedTextSnapshot before;
         private final boolean wasModified;
         private final FileType beforeType;
+        private final BindingState bindingBefore;
         private boolean finished;
         private TextTransaction() {
             if (largeFile) throw new IllegalStateException("Large-file editing is unavailable");
             reconcileDocumentText();
             before = textSnapshot; wasModified = modified; beforeType = fileType;
+            bindingBefore = new BindingState(file, scratchName, scratch, backupFile, diskTextImage, savedContent,
+                externalFileStamp, savedDiskDigest, lastKnownModifiedTime, fileSizeBytes);
             undoManager.beginCompoundEdit();
         }
         void replace(String value) {
@@ -552,14 +555,31 @@ public class FileBuffer {
             if (finished) throw new IllegalStateException("Text transaction is closed");
             undoManager.endCompoundEdit(); finished = true;
         }
+        void bind(WorkspaceDiskBinding binding) {
+            if (finished) throw new IllegalStateException("Text transaction is closed");
+            file = binding.file().toFile(); scratch = false; scratchName = file.getName(); backupFile = null;
+            diskTextImage = binding.image(); savedContent = binding.image().text(); savedDiskDigest = binding.digest();
+            externalFileStamp = new ExternalFileStamp(ExternalFileKind.REGULAR, binding.fileKey(), binding.created(), binding.modified(), binding.size(), null);
+            lastKnownModifiedTime = binding.modified().toMillis(); fileSizeBytes = binding.size();
+            fileType = FileType.detect(file, getContent());
+            modified = !getContent().equals(savedContent) || !encodingName.equals(binding.image().encoding())
+                || byteOrderMark != binding.image().bom()
+                || explicitLineEnding && !applyLineEndings(savedContent, lineEnding).equals(binding.image().rawText());
+        }
         @Override public void close() {
             if (finished) return;
             finished = true;
             undoManager.cancelCompoundEdit();
             if (!getContent().equals(before.text())) throw new IllegalStateException("Document rollback was incomplete");
+            file = bindingBefore.file(); scratchName = bindingBefore.name(); scratch = bindingBefore.scratch(); backupFile = bindingBefore.backup();
+            diskTextImage = bindingBefore.image(); savedContent = bindingBefore.saved(); externalFileStamp = bindingBefore.stamp();
+            savedDiskDigest = bindingBefore.digest(); lastKnownModifiedTime = bindingBefore.modified(); fileSizeBytes = bindingBefore.size();
             textSnapshot = before; modified = wasModified; fileType = beforeType; updateLineCount();
         }
     }
+
+    private record BindingState(File file, String name, boolean scratch, File backup, TextFileCodec.Image image,
+                                String saved, ExternalFileStamp stamp, byte[] digest, long modified, long size) { }
 
     public String getContent() {
         try {

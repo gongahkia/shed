@@ -126,3 +126,9 @@ Record verified outcome changes history only. It requires APPLY permission, the 
 The same contract is available as proposals/recovery and proposals/reconcile. Proposal-only clients can inspect evidence but cannot reconcile it. The human panel presents the evidence in its Recovery tab and enables reconciliation only for an interrupted operation with a verified outcome. Service, transport and headless component checks cover unchanged files on reconciliation, stale inspections, partial/missing effects, raw-format differences, corrupt preimages, interrupted undo followed by another undo, and the actual human controls.
 
 Verification after resource tracing and recovery inspection: clean headless package passed 1,050 tests with zero failures/errors and 83 headless skips. README.md remains unchanged. No editor/browser/native test window was launched.
+
+## Atomic editor disk bindings
+
+The editor mutation port can adopt a worker-captured disk binding together with a text batch. It updates the saved-content reference, disk identity/digest and file path without filesystem reads on the EDT. This supports restoring a disk-backed file that is currently open and preserving save guards after resource moves. A rejected batch restores both text and prior bindings; adopting a disk image does not clear an unsaved human encoding/newline preference. File-backed buffers retain their document identity through retargeting.
+
+Focused headless adapter, save-model, proposal and architecture checks pass. New cases exercise restoration followed by an ordinary save, rename followed by a save without recreating the old path, multi-buffer failure restoring the original binding, and preserved human newline settings. Native desktop interaction remains unverified.

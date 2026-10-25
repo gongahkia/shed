@@ -13,7 +13,7 @@ import java.util.Objects;
 
 /** Bounded disk snapshots for requests that have no open editor document. */
 final class WorkspaceTextFile {
-    record Snapshot(WorkspaceDocument document, byte[] bytes, TextFileCodec.Image image) {
+    record Snapshot(WorkspaceDocument document, byte[] bytes, TextFileCodec.Image image, BasicFileAttributes attributes) {
         Snapshot { bytes = bytes.clone(); }
         @Override public byte[] bytes() { return bytes.clone(); }
     }
@@ -51,7 +51,7 @@ final class WorkspaceTextFile {
             WorkspaceDocument document = new WorkspaceDocument(workspaceId, file.toUri().toString(), file.toUri().toString(),
                 "disk-" + WorkspacePaths.hash(identity), text, false, !Files.isWritable(file), true, decoded.encoding(), decoded.lineEnding(), decoded.bom(),
                 WorkspaceDocument.Source.DISK);
-            return new Snapshot(document, bytes, decoded);
+            return new Snapshot(document, bytes, decoded, after);
         } catch (java.nio.file.NoSuchFileException error) {
             throw new WorkspaceApiException(WorkspaceApiException.Code.NOT_FOUND, "Document does not exist");
         } catch (CharacterCodingException error) {

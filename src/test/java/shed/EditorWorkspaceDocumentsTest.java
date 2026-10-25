@@ -13,6 +13,50 @@ import org.junit.jupiter.api.io.TempDir;
 class EditorWorkspaceDocumentsTest {
     @TempDir Path root;
 
+    @Test void diskBindingAdoptionKeepsRestoredBuffersSaveableAndRetargetsWithoutLosingIdentity() throws Exception {
+        Path file = Files.writeString(root.resolve("source"), "agent\r\n");
+        FileBuffer buffer = new FileBuffer(file.toFile());
+        try (var source = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
+            var before = source.snapshots().getFirst();
+            Files.writeString(file, "original\r\n");
+            var binding = WorkspaceDiskBinding.capture(before.workspaceId(), file);
+            var restored = source.applyTexts(List.of(new WorkspaceDocumentEditor.TextChange(before, "original\n", binding))).getFirst();
+            assertFalse(restored.dirty()); assertEquals("original\n", buffer.getSavedContent());
+            assertEquals(FileBuffer.ExternalFileState.UNCHANGED, buffer.getExternalFileState());
+            SwingUtilities.invokeAndWait(() -> buffer.replaceContentUndoably("human\n")); buffer.save();
+            assertEquals("human\r\n", Files.readString(file));
+            var current = source.snapshots().getFirst(); Path renamed = root.resolve("renamed"); Files.move(file, renamed);
+            var moved = source.applyTexts(List.of(new WorkspaceDocumentEditor.TextChange(current, current.content(),
+                WorkspaceDiskBinding.capture(current.workspaceId(), renamed)))).getFirst();
+            assertEquals(before.documentId(), moved.documentId()); assertEquals(renamed.toUri().toString(), moved.uri());
+            assertEquals(FileBuffer.ExternalFileState.UNCHANGED, buffer.getExternalFileState());
+            SwingUtilities.invokeAndWait(() -> buffer.replaceContentUndoably("next\n")); buffer.save();
+            assertEquals("next\r\n", Files.readString(renamed)); assertFalse(Files.exists(file));
+        }
+    }
+
+    @Test void aFailedBatchRestoresBindingsAsWellAsTextAndPreservesHumanFormatChoices() throws Exception {
+        Path original = Files.writeString(root.resolve("original"), "old\n"), target = Files.writeString(root.resolve("target"), "new\n");
+        FileBuffer first = new FileBuffer(original.toFile()), second = FileBuffer.createScratch("Other", "two");
+        try (var source = new EditorWorkspaceDocuments(() -> List.of(first, second), () -> List.of(root), () -> root, root)) {
+            var before = source.snapshots();
+            SwingUtilities.invokeAndWait(() -> second.getDocument().setDocumentFilter(new javax.swing.text.DocumentFilter() {
+                @Override public void insertString(FilterBypass bypass, int offset, String text, javax.swing.text.AttributeSet attributes)
+                    throws javax.swing.text.BadLocationException { throw new javax.swing.text.BadLocationException("fixture failure", offset); }
+            }));
+            assertThrows(WorkspaceApiException.class, () -> source.applyTexts(List.of(
+                new WorkspaceDocumentEditor.TextChange(before.get(0), "new\n", WorkspaceDiskBinding.capture(before.get(0).workspaceId(), target)),
+                new WorkspaceDocumentEditor.TextChange(before.get(1), "changed"))));
+            assertEquals(original.toFile(), first.getFile()); assertEquals("old\n", first.getSavedContent());
+            assertEquals("old\n", first.getContent()); assertFalse(first.isModified());
+            assertEquals(FileBuffer.ExternalFileState.UNCHANGED, first.getExternalFileState());
+            SwingUtilities.invokeAndWait(() -> first.setLineEnding("\r\n"));
+            var current = source.snapshots().getFirst();
+            source.applyTexts(List.of(new WorkspaceDocumentEditor.TextChange(current, current.content(), WorkspaceDiskBinding.capture(current.workspaceId(), original))));
+            assertTrue(first.isModified(), "Adoption must not clear an unsaved human newline preference");
+        }
+    }
+
     @Test void capturesActualUnsavedFileBuffersOnEdtAndKeepsVersionsStableUntilStateChanges() throws Exception {
         Path file = Files.writeString(root.resolve("source.txt"), "saved\r\n");
         AtomicReference<FileBuffer> buffer = new AtomicReference<>();

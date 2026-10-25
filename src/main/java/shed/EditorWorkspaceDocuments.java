@@ -105,7 +105,11 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
                 try {
                     for (FileBuffer buffer : targets.keySet()) transactions.add(buffer.beginTextTransaction());
                     int index = 0;
-                    for (TextChange change : targets.values()) transactions.get(index++).replace(change.text());
+                    for (TextChange change : targets.values()) {
+                        var transaction = transactions.get(index++);
+                        transaction.replace(change.text());
+                        if (change.diskBinding() != null) transaction.bind(change.diskBinding());
+                    }
                     for (var transaction : transactions) transaction.commit();
                 } finally {
                     RuntimeException failed = null;
@@ -120,7 +124,7 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
             List<WorkspaceDocument> result = new ArrayList<>();
             for (TextChange change : requested) {
                 WorkspaceDocument expected = change.expected(); Captured actual = after.get(expected.documentId());
-                result.add(new WorkspaceDocument(expected.workspaceId(), actual.id(), expected.uri(), actual.version(),
+                result.add(new WorkspaceDocument(expected.workspaceId(), actual.id(), actual.path() == null ? null : actual.path().toUri().toString(), actual.version(),
                     actual.text().text(), actual.dirty(), false, true, actual.encoding(), actual.lineEnding(), actual.byteOrderMark(), WorkspaceDocument.Source.EDITOR));
             }
             return List.copyOf(result);

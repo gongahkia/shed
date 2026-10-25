@@ -277,7 +277,8 @@ public class Texteditor extends JFrame implements KeyListener {
         try {
             for (FileBuffer buffer : buffers) if (before.get(buffer) != buffer.textSnapshot()) syncLspChange(buffer);
             if (getCurrentBuffer() != null && before.get(getCurrentBuffer()) != getCurrentBuffer().textSnapshot()) {
-                markModified(); scheduleSyntaxHighlighting();
+                boolean modified = getCurrentBuffer().isModified();
+                markModified(); getCurrentBuffer().setModified(modified); scheduleSyntaxHighlighting();
             }
             requestStatusBarRefresh(); scheduleRecoverySnapshotCapture();
         } catch (RuntimeException presentationFailure) {

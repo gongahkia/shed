@@ -22,6 +22,11 @@ public final class ReferenceDocumentHighlightLanguageServer {
             String method = MiniJson.asString(request.get("method"));
             if (method == null) continue;
             switch (method) {
+                case "textDocument/didOpen", "textDocument/didClose" -> {
+                    if (arguments.length == 2 && arguments[0].equals("--record-lifecycle"))
+                        java.nio.file.Files.writeString(java.nio.file.Path.of(arguments[1]), MiniJson.stringify(request) + "\n",
+                            java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+                }
                 case "initialize" -> {
                     if (List.of(arguments).contains("--slow-init")) Thread.sleep(1500L);
                     respond(System.out, request.get("id"), Map.of(

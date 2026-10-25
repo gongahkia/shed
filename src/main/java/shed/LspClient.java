@@ -770,6 +770,11 @@ public class LspClient {
         sendNotification("textDocument/didSave", params);
     }
 
+    public void didClose(String uri) {
+        sendNotification("textDocument/didClose", Map.of("textDocument", Map.of("uri", uri)));
+        diagnostics.remove(uri); pullDiagnosticResultIds.remove(uri);
+    }
+
     public List<CompletionItem> completion(String uri, int line, int character) {
         return completion(uri, line, character, CompletionTriggerKind.INVOKED, null);
     }

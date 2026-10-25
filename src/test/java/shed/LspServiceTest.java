@@ -17,6 +17,22 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 public class LspServiceTest {
+    @Test void closingADetachedDocumentNotifiesItsExistingLanguageServer() throws Exception {
+        Path workspace = Files.createTempDirectory("shed-lsp-close-");
+        Path log = workspace.resolve("lifecycle.jsonl");
+        String uri = workspace.resolve("created.java").toUri().toString();
+        LspClient client = new LspClient(List.of(Path.of(System.getProperty("java.home"), "bin", javaExecutable()).toString(),
+            "-Djava.awt.headless=true", "-cp", System.getProperty("java.class.path"), ReferenceDocumentHighlightLanguageServer.class.getName(),
+            "--record-lifecycle", log.toString()), workspace, workspace.toUri().toString(), LspFeatureSettings.defaults());
+        try {
+            client.didOpen(uri, "java", "class Created {}\n"); client.didClose(uri);
+            client.documentHighlights(uri, 0, 0); // A response is a barrier after the preceding notifications.
+            var messages = Files.readAllLines(log).stream().map(MiniJson::parseStrict).map(MiniJson::asObject).toList();
+            assertEquals(List.of("textDocument/didOpen", "textDocument/didClose"), messages.stream().map(message -> message.get("method")).toList());
+            assertEquals(Map.of("textDocument", Map.of("uri", uri)), messages.getLast().get("params"));
+        } finally { client.stop(); Files.deleteIfExists(log); Files.deleteIfExists(workspace); }
+    }
+
     @Test
     void negotiatesAdvertisedDisabledAndUnsupportedCapabilities() {
         Map<String, Object> response = MiniJson.asObject(MiniJson.parse(

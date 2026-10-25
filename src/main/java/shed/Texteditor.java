@@ -256,7 +256,10 @@ public class Texteditor extends JFrame implements KeyListener {
     private void applyWorkspaceTextBatch(Runnable mutation) {
         Map<EditorPane, BufferViewState> views = new IdentityHashMap<>();
         Map<FileBuffer, VersionedTextSnapshot> before = new IdentityHashMap<>();
-        for (FileBuffer buffer : buffers) before.put(buffer, buffer.textSnapshot());
+        Map<FileBuffer, LspController.DocumentBinding> bindings = new IdentityHashMap<>();
+        for (FileBuffer buffer : buffers) {
+            before.put(buffer, buffer.textSnapshot()); bindings.put(buffer, lspController.captureDocumentBinding(buffer));
+        }
         for (EditorPane pane : editorPanes) {
             FileBuffer buffer = pane.getBuffer();
             if (buffer != null && !buffer.isLargeFile() && pane.getTextArea().getDocument() == buffer.getDocument())
@@ -275,8 +278,13 @@ public class Texteditor extends JFrame implements KeyListener {
             }
         }
         try {
-            for (FileBuffer buffer : buffers) if (before.get(buffer) != buffer.textSnapshot()) syncLspChange(buffer);
-            if (getCurrentBuffer() != null && before.get(getCurrentBuffer()) != getCurrentBuffer().textSnapshot()) {
+            boolean currentBindingChanged = false;
+            for (FileBuffer buffer : buffers) {
+                boolean bindingChanged = lspController.syncDocumentBinding(buffer, bindings.get(buffer));
+                if (buffer == getCurrentBuffer()) currentBindingChanged = bindingChanged;
+                if (!bindingChanged && before.get(buffer) != buffer.textSnapshot()) syncLspChange(buffer);
+            }
+            if (getCurrentBuffer() != null && (currentBindingChanged || before.get(getCurrentBuffer()) != getCurrentBuffer().textSnapshot())) {
                 boolean modified = getCurrentBuffer().isModified();
                 markModified(); getCurrentBuffer().setModified(modified); scheduleSyntaxHighlighting();
             }

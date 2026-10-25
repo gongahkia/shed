@@ -2373,6 +2373,30 @@ final class LspController {
     }
 
 
+    record DocumentBinding(File file, String uri, LspClient client) { }
+
+    DocumentBinding captureDocumentBinding(FileBuffer buffer) {
+        return buffer.hasFilePath() ? new DocumentBinding(buffer.getFile(), bufferUri(buffer), existingLspClient(buffer))
+            : new DocumentBinding(null, null, null);
+    }
+
+    boolean syncDocumentBinding(FileBuffer buffer, DocumentBinding previous) {
+        File current = buffer.hasFilePath() ? buffer.getFile() : null;
+        if (Objects.equals(previous.file(), current)) return false;
+        if (previous.uri() != null) {
+            boolean wasOpen = editor.lspDocumentVersions.remove(previous.uri()) != null;
+            documentSyncStates.remove(previous.uri());
+            if (wasOpen && previous.client() != null && previous.client().isAlive()) previous.client().didClose(previous.uri());
+        }
+        if (pendingLspChange == buffer) pendingLspChange = null;
+        if (pendingLspDecoration == buffer) pendingLspDecoration = null;
+        if (buffer == editor.getCurrentBuffer()) clearLspDecorations();
+        // Resource acceptance may notify an existing server, but does not start a project process.
+        LspClient next = existingLspClient(buffer);
+        if (next != null && next.isAlive()) syncLspOpen(buffer);
+        return true;
+    }
+
     void syncLspOpen(FileBuffer buffer) {
         if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
             return;

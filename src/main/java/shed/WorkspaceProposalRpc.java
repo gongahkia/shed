@@ -10,7 +10,7 @@ import java.util.Set;
 /** Transport validation and bounded review pages; never supplies the authenticated actor. */
 final class WorkspaceProposalRpc {
     static final List<String> OPERATIONS = List.of("proposals/list", "proposals/read", "proposals/propose", "proposals/revise",
-        "proposals/reject", "proposals/apply", "proposals/undo", "proposals/rebase", "proposals/recovery", "proposals/reconcile");
+        "proposals/reject", "proposals/apply", "proposals/undo", "proposals/rebase", "proposals/recovery", "proposals/reconcile", "proposals/restore");
     private final WorkspaceQueryService workspace;
     private final WorkspaceProposalService proposals;
 
@@ -39,9 +39,10 @@ final class WorkspaceProposalRpc {
             case "proposals/recovery" -> {
                 fields(params, Set.of("workspaceId", "id")); yield proposals.recovery(id(params));
             }
-            case "proposals/reconcile" -> {
+            case "proposals/reconcile", "proposals/restore" -> {
                 fields(params, Set.of("workspaceId", "id", "revision", "fingerprint"));
-                yield proposals.reconcile(id(params), revision(params), string(params, "fingerprint", true, 64));
+                yield method.equals("proposals/restore") ? proposals.restore(id(params), revision(params), string(params, "fingerprint", true, 64))
+                    : proposals.reconcile(id(params), revision(params), string(params, "fingerprint", true, 64));
             }
             case "proposals/propose" -> {
                 fields(params, Set.of("workspaceId", "requestId", "taskId", "turnId", "changes"));

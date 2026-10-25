@@ -54,6 +54,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     private final JButton rebase = button("Rebase for review", "rebase", () -> mutate("Rebasing proposal…", WorkspaceProposalService::rebase));
     private final JButton inspect = button("Inspect recovery", "inspect", this::inspectRecovery);
     private final JButton reconcile = button("Record verified outcome", "reconcile", this::reconcile);
+    private final JButton restore = button("Restore pre-operation", "restore", this::restore);
     private Scope scope;
     private WorkspaceProposalService.Preview preview;
     private Map<String, Object> recovery;
@@ -107,7 +108,8 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         reviewTabs.addTab("Changes", changes); reviewTabs.addTab("Recovery", new JScrollPane(recoveryDetails));
         review.add(reviewTabs);
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
-        for (JButton action : List.of(save, discard, rebase, reject, undo, apply, inspect, reconcile)) actions.add(action);
+        for (JButton action : List.of(save, discard, rebase, reject, undo, apply, inspect, reconcile, restore)) actions.add(action);
+        restore.setToolTipText("Restore the snapshots from before this interrupted apply or undo. Requires the inspected versions and intact recorded originals.");
         // A horizontal scroller keeps every action reachable in a narrow dock or at larger UI zoom.
         JScrollPane actionScroll = new JScrollPane(actions, JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         review.add(actionScroll, BorderLayout.SOUTH);
@@ -217,6 +219,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
             message(metadata.get("error") != null ? "Previous operation: " + metadata.get("error")
                 : Set.of("APPLYING", "UNDOING", "RECOVERY_REQUIRED").contains(metadata.get("status"))
                     ? "An interrupted operation needs recovery. Its snapshots are retained; automatic application is disabled."
+                    : metadata.get("recovery") != null ? (String) metadata.get("recovery")
                     : "Review each document. Apply accepts the saved hunk selections across the whole proposal.");
         } finally { rendering = false; }
         controls();
@@ -247,11 +250,12 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         run("Inspecting recovery…", service -> service.recovery(id), result -> {
             recovery = result;
             StringBuilder detail = new StringBuilder("Observed outcome: ").append(Objects.toString(result.get("verifiedOutcome"), "Unresolved — mixed, missing or changed contents"))
-                .append("\nRecording a verified outcome updates history only. Files, buffers and retained artifacts stay as they are.\n\n");
+                .append("\nRecording a verified outcome updates history only.\nRestore pre-operation returns every document to its snapshot before the interrupted apply or undo. It requires intact evidence and refuses diverged contents.\n\n");
             for (Object item : MiniJson.asArray(result.get("documents"))) {
                 var document = MiniJson.asObject(item);
                 detail.append(Objects.toString(document.get("uri"), Objects.toString(document.get("document"))))
-                    .append("\n  ").append(document.get("state")).append("\n");
+                    .append("\n  ").append(document.get("state"))
+                    .append(document.get("restoreReason") == null ? "" : " · " + document.get("restoreReason")).append("\n");
             }
             detail.append("\nRecorded resource intents (a listed path may already have been cleaned up):\n");
             for (Object item : MiniJson.asArray(result.get("resourceSteps"))) {
@@ -268,6 +272,13 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         String id = (String) inspected.get("id"), fingerprint = (String) recovery.get("fingerprint");
         int revision = ((Number) inspected.get("revision")).intValue();
         run("Recording verified outcome…", service -> service.reconcile(id, revision, fingerprint), ignored -> loadPreview());
+    }
+    private void restore() {
+        if (busy || dirty || preview == null || recovery == null) return;
+        var inspected = MiniJson.asObject(recovery.get("proposal"));
+        String id = (String) inspected.get("id"), fingerprint = (String) recovery.get("fingerprint");
+        int revision = ((Number) inspected.get("revision")).intValue();
+        run("Restoring pre-operation snapshots…", service -> service.restore(id, revision, fingerprint), ignored -> loadPreview());
     }
     private void mutate(String message, Mutation mutation) {
         if (busy || dirty || preview == null || !Objects.equals(scope, scopeSupplier.get())) return;
@@ -316,6 +327,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         boolean interrupted = Set.of("APPLYING", "UNDOING", "RECOVERY_REQUIRED").contains(state);
         inspect.setEnabled(ready && interrupted);
         reconcile.setEnabled(ready && interrupted && recovery != null && recovery.get("verifiedOutcome") != null);
+        restore.setEnabled(ready && interrupted && recovery != null && Boolean.TRUE.equals(recovery.get("restoreAvailable")));
         apply.setText(preview == null ? "Apply proposal" : "Apply proposal (" + preview.proposal().get("files") + ")");
         sizeButton(apply);
     }
@@ -340,7 +352,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         proposalList.setFixedCellHeight(Math.max(WorkbenchStyle.px(40), uiFont.get().getSize() + WorkbenchStyle.px(18)));
         hunkTable.setRowHeight(proposalList.getFixedCellHeight());
         documents.setPreferredSize(new Dimension(240, Math.max(WorkbenchStyle.px(40), uiFont.get().getSize() + WorkbenchStyle.px(18))));
-        for (JButton action : List.of(refresh, more, save, discard, apply, reject, undo, rebase, inspect, reconcile)) sizeButton(action);
+        for (JButton action : List.of(refresh, more, save, discard, apply, reject, undo, rebase, inspect, reconcile, restore)) sizeButton(action);
     }
     private static void sizeButton(JButton action) {
         action.setPreferredSize(null); Dimension preferred = action.getPreferredSize();

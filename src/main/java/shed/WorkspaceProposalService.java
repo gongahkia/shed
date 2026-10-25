@@ -222,50 +222,125 @@ final class WorkspaceProposalService {
     }
 
     private Map<String, Object> recovery(WorkspaceChangeJournal.Lease lease, WorkspaceChangeJournal.Entry entry) throws IOException {
-        List<Object> operation = MiniJson.asArray(entry.data().get("operation"));
-        if (operation == null || operation.size() > MAX_FILES) throw failure(WorkspaceApiException.Code.RECOVERY_REQUIRED, "Operation evidence is unavailable");
-        List<Object> observations = new ArrayList<>();
-        boolean allBefore = true, allAfter = true;
-        for (Object item : operation) {
-            var effect = object(item);
-            String before = lease.getText(text(effect, "before")), after = lease.getText(text(effect, "after"));
-            Map<String, Object> observation = map("document", effect.get("document"), "uri", effect.get("uri"), "originalSource", effect.get("source"));
-            String state;
-            try {
-                WorkspaceDocument current = resolve(effect);
-                observation.put("current", current.metadata());
-                state = current.complete() ? classify(current.content(), before, after) : "INCOMPLETE";
-                if (effect.get("diskBefore") != null) {
-                    lease.get(text(effect, "diskBefore")); lease.get(text(effect, "diskAfter"));
-                    var disk = WorkspaceTextFile.capture(workspace.workspaceId(), WorkspacePaths.resolve(workspace.root(), text(effect, "uri")), true);
-                    String diskState = classify(WorkspacePaths.hash(disk.bytes()), text(effect, "diskBefore"), text(effect, "diskAfter"));
-                    observation.put("diskVersion", disk.document().version()); observation.put("diskState", diskState);
-                    if (!state.equals(diskState)) state = "DIVERGED";
-                }
-            } catch (WorkspaceApiException unavailable) {
-                if (!Set.of(WorkspaceApiException.Code.NOT_FOUND, WorkspaceApiException.Code.UNSUPPORTED, WorkspaceApiException.Code.IO_ERROR).contains(unavailable.code())) throw unavailable;
-                state = unavailable.code() == WorkspaceApiException.Code.NOT_FOUND ? "MISSING" : "UNREADABLE";
-                observation.put("error", unavailable.toMap());
-            }
-            observation.put("state", state); observations.add(observation);
-            allBefore &= state.equals("BEFORE") || state.equals("UNCHANGED");
-            allAfter &= state.equals("AFTER") || state.equals("UNCHANGED");
-        }
-        String kind = (String) entry.data().get("operationKind");
-        boolean undo = "UNDO".equals(kind);
-        String outcome = !Set.of("APPLY", "UNDO").contains(Objects.toString(kind, "")) ? null
-            : allAfter ? (undo ? "UNDONE" : "APPLIED") : allBefore ? (undo ? "APPLIED" : "FAILED") : null;
-        if (undo && "APPLIED".equals(outcome) && MiniJson.asArray(entry.data().get("appliedOperation")) == null) outcome = null;
-        String fingerprint = WorkspacePaths.hash(WorkspaceChangeJournal.canonical(map("id", entry.id(), "revision", entry.revision(), "observations", observations)));
-        List<Object> resources = MiniJson.asArray(entry.data().get("resourceSteps"));
-        return map("proposal", summary(entry), "documents", observations, "fingerprint", fingerprint,
-            "verifiedOutcome", outcome, "resourceSteps", resources == null ? List.of() : resources,
+        var plan = WorkspaceRecoveryPlan.capture(workspace, lease, entry);
+        return map("proposal", summary(entry), "documents", plan.observations(), "fingerprint", plan.fingerprint(),
+            "verifiedOutcome", plan.verifiedOutcome(), "restoreAvailable", plan.restorable(), "resourceSteps", plan.resources(),
             "changesWorkspaceFiles", false);
     }
 
-    private static String classify(String current, String before, String after) {
-        if (current.equals(before) && current.equals(after)) return "UNCHANGED";
-        return current.equals(after) ? "AFTER" : current.equals(before) ? "BEFORE" : "DIVERGED";
+    Map<String, Object> restore(String id, int revision, String fingerprint) {
+        workspace.policy().require(AgentPolicy.Capability.APPLY);
+        required(fingerprint, "fingerprint", 64);
+        if (Thread.currentThread().isInterrupted()) throw failure(WorkspaceApiException.Code.CANCELLED, "Restoration was cancelled before application");
+        try (var lease = journal.open(false)) {
+            var entry = entry(lease, id);
+            if (Long.valueOf(revision).equals(entry.data().get("restoredRevision")) && fingerprint.equals(entry.data().get("restoredFingerprint"))) return summary(entry);
+            if (entry.revision() != revision || !Set.of("APPLYING", "UNDOING", "RECOVERY_REQUIRED").contains(entry.data().get("status")))
+                throw failure(WorkspaceApiException.Code.CONFLICT, "Only an inspected interrupted revision can be restored");
+            var plan = WorkspaceRecoveryPlan.capture(workspace, lease, entry);
+            if (!fingerprint.equals(plan.fingerprint())) throw failure(WorkspaceApiException.Code.STALE_VERSION, "Recovery evidence changed; inspect it again");
+            if (!plan.restorable()) throw failure(WorkspaceApiException.Code.CONFLICT, "Restoration would overwrite changed or unavailable contents; inspect the recovery details");
+            for (var action : plan.actions()) validateRestore(action, entry.data());
+            return restore(lease, entry, plan, fingerprint);
+        } catch (IOException unavailable) { throw storageFailure(id); }
+    }
+
+    private void validateRestore(WorkspaceRecoveryPlan.Action action, Map<String, Object> proposal) throws IOException {
+        if (action.current() == null) {
+            Path path = WorkspacePaths.resolve(workspace.root(), action.document());
+            // Authorize missing targets through a synthetic snapshot; no text or version is inferred from it.
+            authorize(new WorkspaceDocument(workspace.workspaceId(), action.document(), path.toUri().toString(), "missing", "", false,
+                false, true, "UTF-8", "LF", false, WorkspaceDocument.Source.DISK), AgentPolicy.Capability.APPLY, proposal);
+            try {
+                workspace.snapshot(workspace.workspaceId(), action.document());
+                throw failure(WorkspaceApiException.Code.STALE_VERSION, "A missing recovery document reappeared");
+            } catch (WorkspaceApiException missing) { if (missing.code() != WorkspaceApiException.Code.NOT_FOUND) throw missing; }
+        } else {
+            authorize(action.current(), AgentPolicy.Capability.APPLY, proposal);
+            var current = workspace.snapshot(workspace.workspaceId(), action.document());
+            if (!current.version().equals(action.current().version())) throw failure(WorkspaceApiException.Code.STALE_VERSION, "Recovery document changed before restoration");
+            if (current.source() == WorkspaceDocument.Source.EDITOR && (editor == null || !editor.connected()))
+                throw failure(WorkspaceApiException.Code.NOT_CONNECTED, "Editor recovery connection is unavailable");
+        }
+        if (action.restoreDisk()) {
+            Path path = WorkspacePaths.resolve(workspace.root(), action.document());
+            if (action.disk() == null) {
+                if (java.nio.file.Files.exists(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)) throw failure(WorkspaceApiException.Code.STALE_VERSION, "Recovery target is no longer missing");
+            } else if (!WorkspaceTextFile.capture(workspace.workspaceId(), path, true).document().version().equals(action.disk().document().version()))
+                throw failure(WorkspaceApiException.Code.STALE_VERSION, "Recovery disk contents changed");
+            if (action.artifact() != null && !WorkspaceEditTransaction.resourceIdentity(action.artifact().path()).equals(action.artifact().identity()))
+                throw failure(WorkspaceApiException.Code.STALE_VERSION, "Retained original changed before restoration");
+        }
+    }
+
+    private Map<String, Object> restore(WorkspaceChangeJournal.Lease lease, WorkspaceChangeJournal.Entry initial,
+                                        WorkspaceRecoveryPlan plan, String fingerprint) throws IOException {
+        var data = new LinkedHashMap<>(initial.data());
+        var previousSteps = MiniJson.asArray(data.get("restoreSteps"));
+        List<Object> steps = previousSteps == null ? new ArrayList<>() : new ArrayList<>(previousSteps);
+        data.put("status", "RECOVERY_REQUIRED"); data.put("restoreApprovedRevision", initial.revision()); data.put("reviewedBy", actor);
+        var pending = new java.util.concurrent.atomic.AtomicReference<>(lease.append(initial.id(), initial.revision(), "RESTORING", data));
+        WorkspaceEditTransaction transaction = new WorkspaceEditTransaction(step -> {
+            steps.add(step.toMap()); data.put("restoreSteps", List.copyOf(steps));
+            pending.set(lease.append(initial.id(), pending.get().revision(), "RESTORE_PREPARED", data));
+        });
+        boolean committed = false, interrupted = false;
+        try {
+            List<Path> staged = new ArrayList<>();
+            for (var action : plan.actions()) staged.add(action.restoreDisk() && action.artifact() == null
+                ? transaction.stage(WorkspacePaths.resolve(workspace.root(), action.document()), action.bytes()) : null);
+            for (int i = 0; i < plan.actions().size(); i++) {
+                var action = plan.actions().get(i); validateRestore(action, data);
+                if (!action.restoreDisk()) continue;
+                Path path = WorkspacePaths.resolve(workspace.root(), action.document());
+                if (action.artifact() != null) {
+                    if (action.disk() != null) transaction.delete(path);
+                    transaction.rename(action.artifact().path(), path, false);
+                } else transaction.replace(path, staged.get(i));
+            }
+            List<WorkspaceDocumentEditor.TextChange> open = new ArrayList<>();
+            for (var action : plan.actions()) {
+                WorkspaceDocument current = action.current(); WorkspaceDiskBinding binding = null;
+                if (action.restoreDisk() || action.effect().get("diskBefore") != null && current != null && current.source() == WorkspaceDocument.Source.EDITOR) {
+                    Path path = WorkspacePaths.resolve(workspace.root(), action.document());
+                    binding = WorkspaceDiskBinding.capture(workspace.workspaceId(), path);
+                    if (!java.util.Arrays.equals(binding.digest(), java.util.HexFormat.of().parseHex(WorkspacePaths.hash(action.bytes()))))
+                        throw failure(WorkspaceApiException.Code.STALE_VERSION, "Restored disk contents changed before editor adoption");
+                    var observed = workspace.snapshot(workspace.workspaceId(), action.document());
+                    if (observed.source() == WorkspaceDocument.Source.EDITOR && (current == null || current.source() != WorkspaceDocument.Source.EDITOR)) {
+                        if (!observed.content().equals(action.text())) throw failure(WorkspaceApiException.Code.STALE_VERSION, "A document opened during restoration needs inspection");
+                        current = observed;
+                    }
+                }
+                if (current != null && current.source() == WorkspaceDocument.Source.EDITOR) {
+                    if (editor == null || !editor.connected()) throw failure(WorkspaceApiException.Code.NOT_CONNECTED, "Editor recovery connection is unavailable");
+                    open.add(new WorkspaceDocumentEditor.TextChange(current, action.text(), binding));
+                }
+            }
+            transaction.prepareCommit();
+            List<WorkspaceDocument> after = open.isEmpty() ? List.of() : editor.applyTexts(open);
+            interrupted = Thread.interrupted(); transaction.commit(); committed = true;
+            boolean undo = "UNDO".equals(data.get("operationKind"));
+            data.put("status", undo ? "APPLIED" : "FAILED"); data.put("restoredRevision", initial.revision()); data.put("restoredFingerprint", fingerprint);
+            data.put("restoredAt", Instant.now().toString()); data.put("editorResults", after.stream().map(WorkspaceDocument::metadata).toList());
+            if (undo) { data.put("operation", data.get("appliedOperation")); data.put("operationKind", "APPLY"); data.put("resourceSteps", data.getOrDefault("appliedResourceSteps", List.of())); }
+            data.remove("error"); data.put("recovery", "Original snapshots restored. Unused recovery artifacts were retained.");
+            var completed = lease.append(initial.id(), pending.get().revision(), "RESTORED", data);
+            var cleanup = transaction.cleanup();
+            if (!cleanup.failures().isEmpty()) {
+                data.put("recovery", cleanup.notice()); completed = lease.append(initial.id(), completed.revision(), "CLEANUP_NOTICE", data);
+            }
+            return summary(completed);
+        } catch (IOException | RuntimeException failed) {
+            interrupted |= Thread.interrupted();
+            if (committed) throw storageFailure(initial.id());
+            transaction.rollback(); transaction.cleanup();
+            data.put("status", "RECOVERY_REQUIRED"); data.put("recovery", transaction.report().notice());
+            data.put("error", failed instanceof WorkspaceApiException domain ? domain.toMap() : map("code", "IO_ERROR", "message", "Snapshot restoration failed"));
+            lease.append(initial.id(), pending.get().revision(), "RESTORE_FAILED", data);
+            if (failed instanceof WorkspaceApiException domain) throw domain;
+            throw failure(WorkspaceApiException.Code.RECOVERY_REQUIRED, "Restoration did not finish; retained snapshots and artifacts remain available");
+        } finally { transaction.close(); if (interrupted) Thread.currentThread().interrupt(); }
     }
 
     private Map<String, Object> applyOrUndo(String id, int revision, boolean undo) {
@@ -338,7 +413,7 @@ final class WorkspaceProposalService {
             "diskAfter", effect.diskAfter() == null ? null : lease.put(effect.diskAfter())));
         if (undo) { data.put("appliedOperation", initial.data().get("operation")); data.put("appliedResourceSteps", initial.data().get("resourceSteps")); }
         data.put("operation", operation); data.put("operationKind", undo ? "UNDO" : "APPLY");
-        data.put("resourceSteps", List.of()); data.put("status", undo ? "UNDOING" : "APPLYING");
+        data.put("resourceSteps", List.of()); data.put("restoreSteps", List.of()); data.put("status", undo ? "UNDOING" : "APPLYING");
         data.put(undo ? "undoApprovedRevision" : "approvedRevision", approvedRevision); data.put("reviewedBy", actor);
         var pending = new java.util.concurrent.atomic.AtomicReference<>(lease.append(initial.id(), initial.revision(), undo ? "UNDOING" : "APPLYING", data));
         List<Object> resourceSteps = new ArrayList<>();

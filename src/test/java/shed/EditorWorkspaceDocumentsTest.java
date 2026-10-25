@@ -13,6 +13,22 @@ import org.junit.jupiter.api.io.TempDir;
 class EditorWorkspaceDocumentsTest {
     @TempDir Path root;
 
+    @Test void anEarlierAsyncSaveCompletionCannotReplaceARestoredDiskBinding() throws Exception {
+        Path file = Files.writeString(root.resolve("source"), "old\r\n"); FileBuffer buffer = new FileBuffer(file.toFile());
+        try (var source = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
+            SwingUtilities.invokeAndWait(() -> buffer.replaceContentUndoably("saved first\n"));
+            var pending = buffer.captureSaveSnapshot(null); buffer.writeSaveSnapshot(pending);
+            var before = source.snapshots().getFirst();
+            Files.writeString(file, "restored\r\n");
+            source.applyTexts(List.of(new WorkspaceDocumentEditor.TextChange(before, "restored\n", WorkspaceDiskBinding.capture(before.workspaceId(), file))));
+            SwingUtilities.invokeAndWait(() -> buffer.completeSaveSnapshot(pending));
+            assertEquals("restored\n", buffer.getSavedContent()); assertFalse(buffer.isModified());
+            assertEquals(FileBuffer.ExternalFileState.UNCHANGED, buffer.getExternalFileState());
+            SwingUtilities.invokeAndWait(() -> buffer.replaceContentUndoably("human next\n")); buffer.save();
+            assertEquals("human next\r\n", Files.readString(file));
+        }
+    }
+
     @Test void diskBindingAdoptionKeepsRestoredBuffersSaveableAndRetargetsWithoutLosingIdentity() throws Exception {
         Path file = Files.writeString(root.resolve("source"), "agent\r\n");
         FileBuffer buffer = new FileBuffer(file.toFile());

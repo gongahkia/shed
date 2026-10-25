@@ -26,6 +26,20 @@ class AgentReviewPanelTest {
 
     @AfterEach void close() { if (jobs != null) jobs.shutdownNow(); }
 
+    @Test void partiallyAppliedChangesCanBeRestoredThroughTheRecoveryControls() throws Exception {
+        var scope = scope("project"); current.set(scope);
+        Path first = Files.writeString(scope.root().resolve("a"), "old\r\n"), second = Files.writeString(scope.root().resolve("b"), "old\r\n");
+        Path storage = scope.sessions().resolve("agent-workspace").resolve(WorkspacePaths.id(scope.root().toRealPath()));
+        WorkspaceProposalRecoveryTest.interruptedApply(scope.root(), storage, scope.service(), List.of("a", "b"));
+        Files.writeString(first, "new\r\n");
+        open(); await(() -> button("inspect").isEnabled());
+        edt(() -> button("inspect").doClick()); await(() -> button("restore").isEnabled());
+        edt(() -> { assertFalse(button("reconcile").isEnabled()); button("restore").doClick(); });
+        await(() -> label().getText().contains("Original snapshots restored"));
+        assertEquals("old\r\n", Files.readString(first)); assertEquals("old\r\n", Files.readString(second));
+        edt(() -> { assertFalse(button("apply").isEnabled()); assertTrue(button("rebase").isEnabled()); });
+    }
+
     @Test void interruptedProposalCanBeInspectedAndItsVerifiedOutcomeRecordedThroughHumanControls() throws Exception {
         var scope = scope("project"); current.set(scope);
         Path file = Files.writeString(scope.root().resolve("source"), "old\r\n");

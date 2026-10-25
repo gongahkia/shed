@@ -13,6 +13,23 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkspaceProposalRpcTest {
     @TempDir Path temporary;
 
+    @Test void restorationUsesTheInspectedEvidenceAndNeverGrantsProposalClientsApplyPermission() throws Exception {
+        Path root = Files.createDirectory(temporary.resolve("project")), storage = temporary.resolve("history");
+        Files.writeString(root.resolve("a"), "old\r\n"); Files.writeString(root.resolve("b"), "old\r\n");
+        var queries = queries(root, true); var service = new WorkspaceProposalService(queries, null, storage, "human");
+        String id = WorkspaceProposalRecoveryTest.interruptedApply(root, storage, service, List.of("a", "b"));
+        Files.writeString(root.resolve("a"), "new\r\n");
+        var reviewer = new WorkspaceRpc(queries, service);
+        var evidence = result(call(reviewer, "proposals/recovery", Map.of("workspaceId", queries.workspaceId(), "id", id)));
+        assertEquals(true, evidence.get("restoreAvailable")); assertNull(evidence.get("verifiedOutcome"));
+        var params = Map.<String, Object>of("workspaceId", queries.workspaceId(), "id", id, "revision", 1, "fingerprint", evidence.get("fingerprint"));
+        var agentQueries = queries(root, false);
+        var agent = new WorkspaceRpc(agentQueries, new WorkspaceProposalService(agentQueries, null, storage, "agent"));
+        assertEquals("PERMISSION_DENIED", code(call(agent, "proposals/restore", params)));
+        assertEquals("FAILED", result(call(reviewer, "proposals/restore", params)).get("status"));
+        assertEquals("old\r\n", Files.readString(root.resolve("a"))); assertEquals("old\r\n", Files.readString(root.resolve("b")));
+    }
+
     @Test void recoveryEvidenceIsReadableButReconciliationRequiresAnInspectedRevisionAndApplyPermission() throws Exception {
         Path root = Files.createDirectory(temporary.resolve("project")), storage = temporary.resolve("history");
         Files.writeString(root.resolve("a.txt"), "old\r\n");

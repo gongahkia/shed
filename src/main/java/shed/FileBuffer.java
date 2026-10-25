@@ -63,6 +63,7 @@ public class FileBuffer {
     private ConfigManager configManager;
     private ExternalFileStamp externalFileStamp;
     private byte[] savedDiskDigest;
+    private long diskBindingRevision;
 
     // Constructor for existing file
     public FileBuffer(File file) throws IOException {
@@ -197,6 +198,7 @@ public class FileBuffer {
         if (loaded == null || file == null || !file.equals(loaded.file)) {
             throw new IllegalArgumentException("Reloaded buffer must refer to the same file");
         }
+        diskBindingRevision++;
         this.encodingName = loaded.encodingName;
         this.byteOrderMark = loaded.byteOrderMark;
         this.diskTextImage = loaded.diskTextImage;
@@ -362,6 +364,8 @@ public class FileBuffer {
         FileType previousFileType = this.fileType;
         ExternalFileStamp previousExternalFileStamp = this.externalFileStamp;
         byte[] previousSavedDiskDigest = this.savedDiskDigest;
+        long previousBindingRevision = diskBindingRevision;
+        diskBindingRevision++;
         this.file = newFile;
         this.scratch = false;
         this.scratchName = newFile == null ? "[No Name]" : newFile.getName();
@@ -379,6 +383,7 @@ public class FileBuffer {
             this.fileType = previousFileType;
             this.externalFileStamp = previousExternalFileStamp;
             this.savedDiskDigest = previousSavedDiskDigest;
+            diskBindingRevision = previousBindingRevision;
             throw error;
         }
     }
@@ -392,7 +397,7 @@ public class FileBuffer {
         String content = getFullContent();
         ExternalFileStamp expected = requestedTarget == null ? externalFileStamp : observeExternalFile(target);
         return new SaveSnapshot(target, requestedTarget != null, content, encodingName, lineEnding, byteOrderMark, diskTextImage, explicitLineEnding,
-            expected, requestedTarget == null ? savedDiskDigest : null);
+            expected, requestedTarget == null ? savedDiskDigest : null, diskBindingRevision);
     }
 
     void writeSaveSnapshot(SaveSnapshot snapshot) throws IOException {
@@ -414,7 +419,10 @@ public class FileBuffer {
     }
 
     void completeSaveSnapshot(SaveSnapshot snapshot) {
+        // A later restore/reload/rename owns the binding, even if this earlier write just completed.
+        if (snapshot.bindingRevision != diskBindingRevision) return;
         if (snapshot.saveAs) {
+            diskBindingRevision++;
             this.file = snapshot.target;
             this.scratch = false;
             this.scratchName = snapshot.target.getName();
@@ -448,9 +456,10 @@ public class FileBuffer {
         private final byte[] expectedDigest;
         private volatile byte[] writtenDigest;
         private volatile TextFileCodec.Image writtenImage;
+        private final long bindingRevision;
 
         private SaveSnapshot(File target, boolean saveAs, String content, String encodingName, String lineEnding, boolean byteOrderMark, TextFileCodec.Image diskTextImage, boolean explicitLineEnding,
-                             ExternalFileStamp expectedStamp, byte[] expectedDigest) {
+                             ExternalFileStamp expectedStamp, byte[] expectedDigest, long bindingRevision) {
             this.target = target;
             this.saveAs = saveAs;
             this.content = content;
@@ -461,6 +470,7 @@ public class FileBuffer {
             this.explicitLineEnding = explicitLineEnding;
             this.expectedStamp = expectedStamp;
             this.expectedDigest = expectedDigest == null ? null : expectedDigest.clone();
+            this.bindingRevision = bindingRevision;
         }
     }
 
@@ -533,7 +543,7 @@ public class FileBuffer {
             reconcileDocumentText();
             before = textSnapshot; wasModified = modified; beforeType = fileType;
             bindingBefore = new BindingState(file, scratchName, scratch, backupFile, diskTextImage, savedContent,
-                externalFileStamp, savedDiskDigest, lastKnownModifiedTime, fileSizeBytes);
+                externalFileStamp, savedDiskDigest, lastKnownModifiedTime, fileSizeBytes, diskBindingRevision);
             undoManager.beginCompoundEdit();
         }
         void replace(String value) {
@@ -557,6 +567,8 @@ public class FileBuffer {
         }
         void bind(WorkspaceDiskBinding binding) {
             if (finished) throw new IllegalStateException("Text transaction is closed");
+            documentRevision++;
+            diskBindingRevision++;
             file = binding.file().toFile(); scratch = false; scratchName = file.getName(); backupFile = null;
             diskTextImage = binding.image(); savedContent = binding.image().text(); savedDiskDigest = binding.digest();
             externalFileStamp = new ExternalFileStamp(ExternalFileKind.REGULAR, binding.fileKey(), binding.created(), binding.modified(), binding.size(), null);
@@ -574,12 +586,13 @@ public class FileBuffer {
             file = bindingBefore.file(); scratchName = bindingBefore.name(); scratch = bindingBefore.scratch(); backupFile = bindingBefore.backup();
             diskTextImage = bindingBefore.image(); savedContent = bindingBefore.saved(); externalFileStamp = bindingBefore.stamp();
             savedDiskDigest = bindingBefore.digest(); lastKnownModifiedTime = bindingBefore.modified(); fileSizeBytes = bindingBefore.size();
+            diskBindingRevision = bindingBefore.revision();
             textSnapshot = before; modified = wasModified; fileType = beforeType; updateLineCount();
         }
     }
 
     private record BindingState(File file, String name, boolean scratch, File backup, TextFileCodec.Image image,
-                                String saved, ExternalFileStamp stamp, byte[] digest, long modified, long size) { }
+                                String saved, ExternalFileStamp stamp, byte[] digest, long modified, long size, long revision) { }
 
     public String getContent() {
         try {
@@ -699,6 +712,7 @@ public class FileBuffer {
     }
 
     void retargetFile(File newFile) {
+        diskBindingRevision++;
         this.file = newFile;
         this.scratch = false;
         this.scratchName = newFile == null ? "[No Name]" : newFile.getName();

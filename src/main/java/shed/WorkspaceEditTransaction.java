@@ -70,6 +70,8 @@ final class WorkspaceEditTransaction implements AutoCloseable {
 
     State state() { return state; }
 
+    static Map<String, Object> resourceIdentity(Path path) throws IOException { return describe(fingerprint(path)); }
+
     void addRollback(String label, IoAction action) { requireOpen(); undo.add(new Action(label, Objects.requireNonNull(action))); }
     void addRollback(IoAction action) { addRollback("restore editor state", action); }
     void addCommit(IoAction action) { requireOpen(); commits.add(new Action("finalize editor state", Objects.requireNonNull(action))); }

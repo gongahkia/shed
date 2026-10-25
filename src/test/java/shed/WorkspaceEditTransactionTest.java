@@ -49,7 +49,7 @@ class WorkspaceEditTransactionTest {
         try (var lease = new WorkspaceChangeJournal(history).open(false)) {
             var entry = lease.read(WorkspaceEditCrashFixture.ID);
             assertEquals("RESOURCE_PREPARED", entry.kind());
-            var steps = MiniJson.asArray(entry.data().get("steps"));
+            var steps = MiniJson.asArray(entry.data().get("resourceSteps"));
             assertEquals(3, steps.size());
             var backup = MiniJson.asObject(steps.get(1)); var replace = MiniJson.asObject(steps.get(2));
             Path original = Path.of(java.net.URI.create((String) backup.get("target")));

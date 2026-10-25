@@ -43,6 +43,7 @@ public class FileBuffer {
     private String scratchName;
     private volatile boolean modified;
     private String encodingName;
+    private boolean byteOrderMark;
     private int lineCount;
     private final BoundedUndoManager undoManager;
     private final PlainDocument document;
@@ -172,6 +173,7 @@ public class FileBuffer {
         this.fileSizeBytes = bytes.length;
         DecodedContent decoded = decode(bytes);
         this.encodingName = decoded.charsetName;
+        this.byteOrderMark = decoded.byteOrderMark;
         this.lineEnding = detectLineEnding(decoded.content);
         this.fileType = FileType.detect(file, decoded.content);
         this.backupFile = null;
@@ -195,6 +197,7 @@ public class FileBuffer {
             throw new IllegalArgumentException("Reloaded buffer must refer to the same file");
         }
         this.encodingName = loaded.encodingName;
+        this.byteOrderMark = loaded.byteOrderMark;
         this.lineEnding = loaded.lineEnding;
         this.largeFile = loaded.largeFile;
         this.largeFileTail = loaded.largeFileTail;
@@ -217,11 +220,17 @@ public class FileBuffer {
         this.largeFile = true;
         this.showingPreviewOnly = true;
         this.largeFileTail = null;
+        this.byteOrderMark = false;
         LargeFileStore.OpenResult result = LargeFileStore.open(source, policy.previewLineCount);
         if (result.opened()) {
             this.largeFileStore = result.store();
             this.largeFileError = null;
             this.encodingName = StandardCharsets.UTF_8.name();
+            try (var input = Files.newInputStream(source)) {
+                byte[] prefix = input.readNBytes(3);
+                this.byteOrderMark = prefix.length == 3 && prefix[0] == (byte) 0xef
+                    && prefix[1] == (byte) 0xbb && prefix[2] == (byte) 0xbf;
+            } catch (IOException ignored) { /* The projection is already marked incomplete/unavailable on source errors. */ }
             this.lineEnding = largeFileStore.lineEnding();
             this.fileType = FileType.detect(file, largeFileStore.preview());
             String preview = largeFileStore.preview();
@@ -286,20 +295,20 @@ public class FileBuffer {
         return "\n";
     }
 
-    private static DecodedContent decode(byte[] bytes) {
+    private static DecodedContent decode(byte[] bytes) throws CharacterCodingException {
         if (bytes.length >= 3
             && bytes[0] == (byte) 0xEF
             && bytes[1] == (byte) 0xBB
             && bytes[2] == (byte) 0xBF) {
-            return new DecodedContent(new String(bytes, 3, bytes.length - 3, StandardCharsets.UTF_8), StandardCharsets.UTF_8.name());
+            return decodeMarked(bytes, 3, StandardCharsets.UTF_8);
         }
 
         if (bytes.length >= 2) {
             if (bytes[0] == (byte) 0xFE && bytes[1] == (byte) 0xFF) {
-                return new DecodedContent(new String(bytes, StandardCharsets.UTF_16BE), StandardCharsets.UTF_16BE.name());
+                return decodeMarked(bytes, 2, StandardCharsets.UTF_16BE);
             }
             if (bytes[0] == (byte) 0xFF && bytes[1] == (byte) 0xFE) {
-                return new DecodedContent(new String(bytes, StandardCharsets.UTF_16LE), StandardCharsets.UTF_16LE.name());
+                return decodeMarked(bytes, 2, StandardCharsets.UTF_16LE);
             }
         }
 
@@ -308,10 +317,16 @@ public class FileBuffer {
                 .onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT)
                 .decode(ByteBuffer.wrap(bytes));
-            return new DecodedContent(decoded.toString(), StandardCharsets.UTF_8.name());
+            return new DecodedContent(decoded.toString(), StandardCharsets.UTF_8.name(), false);
         } catch (CharacterCodingException ignored) {
-            return new DecodedContent(new String(bytes, StandardCharsets.ISO_8859_1), StandardCharsets.ISO_8859_1.name());
+            return new DecodedContent(new String(bytes, StandardCharsets.ISO_8859_1), StandardCharsets.ISO_8859_1.name(), false);
         }
+    }
+
+    private static DecodedContent decodeMarked(byte[] bytes, int prefix, Charset charset) throws CharacterCodingException {
+        String text = charset.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes, prefix, bytes.length - prefix)).toString();
+        return new DecodedContent(text, charset.name(), true);
     }
 
     private static int countLines(String text) {
@@ -407,13 +422,13 @@ public class FileBuffer {
         }
         String content = getFullContent();
         ExternalFileStamp expected = requestedTarget == null ? externalFileStamp : observeExternalFile(target);
-        return new SaveSnapshot(target, requestedTarget != null, content, encodingName, lineEnding,
+        return new SaveSnapshot(target, requestedTarget != null, content, encodingName, lineEnding, byteOrderMark,
             expected, requestedTarget == null ? savedDiskDigest : null);
     }
 
     void writeSaveSnapshot(SaveSnapshot snapshot) throws IOException {
         if (snapshot == null) throw new IOException("Save snapshot is required");
-        byte[] bytes = encode(applyLineEndings(snapshot.content, snapshot.lineEnding), snapshot.encodingName);
+        byte[] bytes = encode(applyLineEndings(snapshot.content, snapshot.lineEnding), snapshot.encodingName, snapshot.byteOrderMark);
         AtomicFileWriter.write(snapshot.target.toPath(), bytes, () -> {
             ExternalFileStamp actual = observeExternalFile(snapshot.target);
             if (!actual.equals(snapshot.expectedStamp)) {
@@ -434,7 +449,8 @@ public class FileBuffer {
             this.backupFile = null;
         }
         this.savedContent = snapshot.content;
-        this.modified = !snapshot.content.equals(getContent());
+        this.modified = !snapshot.content.equals(getContent()) || !snapshot.encodingName.equals(encodingName)
+            || !snapshot.lineEnding.equals(lineEnding) || snapshot.byteOrderMark != byteOrderMark;
         this.lastKnownModifiedTime = snapshot.target.lastModified();
         this.fileSizeBytes = snapshot.bytes.length;
         this.fileType = FileType.detect(snapshot.target, snapshot.content);
@@ -449,27 +465,29 @@ public class FileBuffer {
         private volatile byte[] bytes;
         private final String encodingName;
         private final String lineEnding;
+        private final boolean byteOrderMark;
         private final ExternalFileStamp expectedStamp;
         private final byte[] expectedDigest;
         private volatile byte[] writtenDigest;
 
-        private SaveSnapshot(File target, boolean saveAs, String content, String encodingName, String lineEnding,
+        private SaveSnapshot(File target, boolean saveAs, String content, String encodingName, String lineEnding, boolean byteOrderMark,
                              ExternalFileStamp expectedStamp, byte[] expectedDigest) {
             this.target = target;
             this.saveAs = saveAs;
             this.content = content;
             this.encodingName = encodingName;
             this.lineEnding = lineEnding;
+            this.byteOrderMark = byteOrderMark;
             this.expectedStamp = expectedStamp;
             this.expectedDigest = expectedDigest == null ? null : expectedDigest.clone();
         }
     }
 
     private byte[] encode(String content) throws IOException {
-        return encode(content, encodingName);
+        return encode(content, encodingName, byteOrderMark);
     }
 
-    private static byte[] encode(String content, String encodingName) throws IOException {
+    private static byte[] encode(String content, String encodingName, boolean byteOrderMark) throws IOException {
         try {
             Charset charset = Charset.forName(encodingName);
             ByteBuffer encoded = charset.newEncoder()
@@ -478,6 +496,20 @@ public class FileBuffer {
                 .encode(CharBuffer.wrap(content));
             byte[] bytes = new byte[encoded.remaining()];
             encoded.get(bytes);
+            if (byteOrderMark) {
+                byte[] prefix = charset.equals(StandardCharsets.UTF_8) ? new byte[]{(byte) 0xef, (byte) 0xbb, (byte) 0xbf}
+                    : charset.equals(StandardCharsets.UTF_16LE) ? new byte[]{(byte) 0xff, (byte) 0xfe}
+                    : charset.equals(StandardCharsets.UTF_16BE) || charset.equals(StandardCharsets.UTF_16) ? new byte[]{(byte) 0xfe, (byte) 0xff} : new byte[0];
+                // UTF-16's generic encoder emits its own mark for nonempty input.
+                boolean alreadyMarked = charset.equals(StandardCharsets.UTF_16) && bytes.length >= 2
+                    && bytes[0] == (byte) 0xfe && bytes[1] == (byte) 0xff;
+                if (!alreadyMarked && prefix.length > 0) {
+                    byte[] marked = new byte[prefix.length + bytes.length];
+                    System.arraycopy(prefix, 0, marked, 0, prefix.length);
+                    System.arraycopy(bytes, 0, marked, prefix.length, bytes.length);
+                    bytes = marked;
+                }
+            }
             return bytes;
         } catch (CharacterCodingException error) {
             throw new IOException("Content contains characters that cannot be encoded as " + encodingName, error);
@@ -688,8 +720,18 @@ public class FileBuffer {
     }
 
     public void setEncoding(String encodingName) {
-        this.encodingName = encodingName == null || encodingName.isEmpty() ? StandardCharsets.UTF_8.name() : encodingName;
+        String requested = encodingName == null || encodingName.isEmpty() ? StandardCharsets.UTF_8.name() : encodingName;
+        try { requested = Charset.forName(requested).name(); }
+        catch (IllegalArgumentException unsupported) { /* Retain the existing explicit save-time encoding error. */ }
+        String normalized = requested.toUpperCase(java.util.Locale.ROOT);
+        boolean marked = normalized.equals("UTF-16") || byteOrderMark
+            && (normalized.equals("UTF-8") || normalized.equals("UTF-16LE") || normalized.equals("UTF-16BE"));
+        if (!requested.equals(this.encodingName) || marked != byteOrderMark) modified = true;
+        this.encodingName = requested;
+        byteOrderMark = marked;
     }
+
+    public boolean hasByteOrderMark() { return byteOrderMark; }
 
     public UndoManager getUndoManager() {
         return undoManager;
@@ -743,6 +785,7 @@ public class FileBuffer {
 
     public void setLineEnding(String lineEnding) {
         if ("\r\n".equals(lineEnding) || "\r".equals(lineEnding) || "\n".equals(lineEnding)) {
+            if (!lineEnding.equals(this.lineEnding)) modified = true;
             this.lineEnding = lineEnding;
         }
     }
@@ -1104,9 +1147,12 @@ public class FileBuffer {
         private final String content;
         private final String charsetName;
 
-        private DecodedContent(String content, String charsetName) {
+        private final boolean byteOrderMark;
+
+        private DecodedContent(String content, String charsetName, boolean byteOrderMark) {
             this.content = content;
             this.charsetName = charsetName;
+            this.byteOrderMark = byteOrderMark;
         }
     }
 }

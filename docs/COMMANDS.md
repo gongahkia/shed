@@ -200,6 +200,16 @@ The Tests panel supports root selection, status/text filtering, Refresh, Run All
 | `:minimap toggle`, `:minimap` | Toggle minimap panel |
 | `:terminal open`, `:term`, `:terminal` | Open the configured default integrated terminal in a bottom split; terminal input owns focus, uses the system clipboard (`Cmd-C`/`Cmd-V` on macOS, `Ctrl-Shift-C`/`Ctrl-Shift-V` elsewhere), recognizes existing local `path:line[:column]` and HTTP(S) output links, and ignores zero-size resize events |
 
+## Agent Workspace API
+
+| Command | Action |
+| :--- | :--- |
+| `:agent api start` | Explicitly start a read-only loopback API for the selected workspace and its unsaved editor documents |
+| `:agent api status`, `:agent` | Report API lifecycle and its private connection descriptor path |
+| `:agent api stop` | Revoke owned connections and remove the owned descriptor asynchronously |
+
+The API is disabled until explicitly started. From a terminal, use `shed --workspace-api --root <same-folder> --connect <descriptor-path> --stdio` or `--request '<JSON>'`. The CLI never opens an editor window. Descriptors contain credentials, must remain owner-only, and cannot be inside the exposed workspace. See [Agent workspace API](AGENT_WORKSPACE.md) for limits, errors and current operation coverage. This does not start an agent process or grant write/execution access.
+
 ## Workspace Index Commands
 
 | Command | Action |

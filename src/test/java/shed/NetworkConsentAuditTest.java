@@ -73,7 +73,8 @@ public class NetworkConsentAuditTest {
     void appOwnedOutboundPrimitivesRemainDocumented() throws IOException {
         assertEquals(Set.of("ManagedLanguageSupportService.java"), sourcesContaining("openConnection("));
         assertEquals(Set.of("MarkdownPreviewAssets.java", "UpdateMetadataTransport.java"), sourcesContaining("HttpClient.newBuilder("));
-        assertEquals(Set.of("DebugAdapterTransport.java"), sourcesContaining("new Socket("));
+        assertEquals(Set.of("DebugAdapterTransport.java", "WorkspaceBridgeClient.java"), sourcesContaining("new Socket("));
+        assertEquals(Set.of("WorkspaceBridgeServer.java"), sourcesContaining("new ServerSocket("));
         assertEquals(Set.of("EditActionController.java", "LspController.java", "MarkdownController.java", "TerminalController.java", "UpdateController.java"), sourcesContaining(".browse("));
         assertEquals(Set.of(
             "BackgroundTaskProcess.java", "BuiltInRemoteWorkspaceProviders.java", "BuiltInScmContributions.java", "DebugAdapterTransport.java", "DevContainerController.java", "DevContainerRuntime.java", "ExternalFormatter.java",
@@ -83,7 +84,7 @@ public class NetworkConsentAuditTest {
         assertEquals(Set.of("PtyTerminalPane.java"), sourcesContaining("PtyProcessBuilder"));
 
         String audit = Files.readString(Path.of("docs/NETWORK_PRIVACY.md"));
-        for (String source : Set.of("DebugAdapterTransport", "DevContainerController", "DevContainerRuntime", "DockerController", "DockerRuntime", "GitHub", "UpdateMetadataTransport", "MarkdownPreviewAssets", "ManagedLanguageCatalog", "ManagedLanguageSupportService", "Notebook", "Remote workspace", "SshPortForwardService", "browser", "child processes")) {
+        for (String source : Set.of("DebugAdapterTransport", "DevContainerController", "DevContainerRuntime", "DockerController", "DockerRuntime", "GitHub", "UpdateMetadataTransport", "MarkdownPreviewAssets", "ManagedLanguageCatalog", "ManagedLanguageSupportService", "Notebook", "Remote workspace", "SshPortForwardService", "WorkspaceBridgeServer", "WorkspaceBridgeClient", "browser", "child processes")) {
             assertTrue(audit.contains(source), "audit missing " + source);
         }
     }

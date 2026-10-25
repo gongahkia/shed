@@ -58,6 +58,7 @@ public class HelpService {
                    "  :log           Open command log file\n" +
                    "  :session ...   Session save/load/list\n" +
                    "  :workspace ... Workspace profiles or index status/controls\n" +
+                   "  :agent api ... Explicit local read-only API start/status/stop\n" +
                    "  :clean         Remove Shed data files\n" +
                    "  :version       Show local version and support metadata\n" +
                    "  :drop cmd      Run async command with current file path\n" +
@@ -133,6 +134,16 @@ public class HelpService {
         }
 
         switch (normalizedTopic) {
+            case "agent":
+                return "Help: agent workspace API\n\n"
+                    + ":agent api start enables read-only access to the selected workspace, including unsaved editor buffers.\n"
+                    + ":agent api status shows the private connection descriptor path; :agent api stop revokes its clients.\n"
+                    + "Nothing starts automatically. No agent process or provider connection is launched.\n"
+                    + "From a terminal: shed --workspace-api --root <folder> --connect <descriptor> --stdio\n"
+                    + "Use --request '<JSON>' for a single request. Both CLI modes stay headless.\n"
+                    + "Start with workspace/info, then documents/list or documents/read using the returned workspaceId.\n"
+                    + "Descriptors contain credentials and must remain owner-only, outside the exposed workspace.\n"
+                    + "Search, edits, ACP/MCP and agent sessions remain unavailable through this initial API.\n";
             case "keymap":
             case "keymaps":
                 return "Help: keymaps\n\n"

@@ -241,11 +241,14 @@ public class Texteditor extends JFrame implements KeyListener {
     static final String WORKSPACE_PROFILE_PREFIX = "workspace-";
 
     private EditorWorkspaceDocuments workspaceDocumentSource;
+    private AgentWorkspaceController agentWorkspaceController;
 
     /** Composition seam for explicitly enabled machine/agent adapters; constructing it opens no surface. */
     WorkspaceQueryService workspaceQueries(Path root, AgentPolicy policy) {
         return new WorkspaceQueryService(root, policy, workspaceDocumentSource);
     }
+
+    String handleAgentCommand(String argument) { return agentWorkspaceController.handle(argument); }
 
     // Constructor
     public Texteditor(String[] args) {
@@ -302,8 +305,11 @@ public class Texteditor extends JFrame implements KeyListener {
         editorPanes = new ArrayList<>();
         workspaceDocumentSource = new EditorWorkspaceDocuments(() -> List.copyOf(buffers), workspaceController::roots,
             workspaceController::activeRoot, Path.of("."));
+        agentWorkspaceController = new AgentWorkspaceController(this);
         addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override public void windowClosed(java.awt.event.WindowEvent event) { workspaceDocumentSource.close(); }
+            @Override public void windowClosed(java.awt.event.WindowEvent event) {
+                workspaceDocumentSource.close(); agentWorkspaceController.close();
+            }
         });
         activePaneIndex = -1;
         lastCommand = "";
@@ -3395,6 +3401,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         closingDown = true;
         if (workspaceDocumentSource != null) workspaceDocumentSource.close();
+        if (agentWorkspaceController != null) agentWorkspaceController.close();
         if (windowPlacementStore != null) windowPlacementStore.save(this);
         disposeMarkdownPreviews();
         if (recoverySnapshotTimer != null) {

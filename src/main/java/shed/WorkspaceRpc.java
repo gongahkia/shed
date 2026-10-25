@@ -22,10 +22,9 @@ public final class WorkspaceRpc {
         Object id = request.get("id");
         if (!validId(id)) return error(null, -32600, "Request ID must be a bounded string, integer or null", Map.of("code", "INVALID_REQUEST"));
         boolean notification = !request.containsKey("id");
-        if (!Set.of("jsonrpc", "id", "method", "params").containsAll(request.keySet())
-            || !"2.0".equals(request.get("jsonrpc")) || !(request.get("method") instanceof String method)
-            || method.isBlank() || method.length() > 128)
+        if (!validEnvelope(request))
             return error(id, -32600, "Expected a supported JSON-RPC 2.0 request envelope", Map.of("code", "INVALID_REQUEST"));
+        String method = (String) request.get("method");
         if (!WorkspaceQueryService.OPERATIONS.contains(method)) return notification ? null
             : error(id, -32601, "Workspace operation is not supported", Map.of("code", "UNSUPPORTED", "method", method));
         try {
@@ -39,6 +38,19 @@ public final class WorkspaceRpc {
         } catch (RuntimeException failure) {
             return notification ? null : error(id, -32603, "Internal workspace error", Map.of("code", "IO_ERROR"));
         }
+    }
+
+    static boolean expectsResponse(String json) {
+        try {
+            Map<String, Object> request = MiniJson.asObject(MiniJson.parseStrict(json));
+            return request == null || request.containsKey("id") || !validEnvelope(request);
+        } catch (IllegalArgumentException invalid) { return true; }
+    }
+
+    private static boolean validEnvelope(Map<String, Object> request) {
+        return Set.of("jsonrpc", "id", "method", "params").containsAll(request.keySet())
+            && "2.0".equals(request.get("jsonrpc")) && request.get("method") instanceof String method
+            && !method.isBlank() && method.length() <= 128;
     }
 
     private Object dispatch(String method, Map<String, Object> params) {

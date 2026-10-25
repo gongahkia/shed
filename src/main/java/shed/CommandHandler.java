@@ -129,6 +129,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleCommand(args), "command");
         registerCommand((args, range, force) -> handleCommand("log"), "log", "commandlog");
         registerCommand((args, range, force) -> editor.handleSessionCommand(args), "session", "sessions");
+        registerCommand((args, range, force) -> editor.handleAgentCommand(args), "agent");
         registerCommand((args, range, force) -> editor.handleWorkspaceProfileCommand(args), "workspace", "ws");
         registerCommand((args, range, force) -> editor.showPerfReport(args), "perf");
         registerCommand((args, range, force) -> handleApp(args), "app");

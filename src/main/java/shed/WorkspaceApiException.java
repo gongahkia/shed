@@ -15,6 +15,8 @@ public final class WorkspaceApiException extends RuntimeException {
 
     public WorkspaceApiException(Code code, String message) { this(code, message, Map.of()); }
 
+    static WorkspaceApiException invalidRequest(String message) { return new WorkspaceApiException(Code.INVALID_REQUEST, message); }
+
     public WorkspaceApiException(Code code, String message, Map<String, Object> details) {
         super(message);
         this.code = java.util.Objects.requireNonNull(code);

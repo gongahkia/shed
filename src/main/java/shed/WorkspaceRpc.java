@@ -62,6 +62,7 @@ public final class WorkspaceRpc {
     private Object dispatch(String method, Map<String, Object> params) {
         if (proposals != null && WorkspaceProposalRpc.OPERATIONS.contains(method)) return proposals.dispatch(method, params);
         return switch (method) {
+            case "files/list", "search/text" -> search(method, params);
             case "workspace/info" -> {
                 fields(params, Set.of("workspaceId", "schemaVersion"));
                 int version = integer(params, "schemaVersion", 1, 1, Integer.MAX_VALUE);
@@ -92,6 +93,38 @@ public final class WorkspaceRpc {
         };
     }
 
+    private Object search(String method, Map<String, Object> params) {
+        boolean files = method.equals("files/list");
+        fields(params, files ? Set.of("workspaceId", "include", "exclude", "includeIgnored", "scope", "offset", "limit", "expectedListingVersion", "timeoutMillis")
+            : Set.of("workspaceId", "include", "exclude", "includeIgnored", "scope", "query", "caseSensitive", "regex", "wholeWord", "limit", "maxFiles", "maxFileBytes", "timeoutMillis"));
+        String workspaceId = string(params, "workspaceId", true, 256);
+        String scope = string(params, "scope", false, 32);
+        if (scope != null && !scope.equals("workspace") && !scope.equals("open")) throw invalid("scope must be workspace or open");
+        var filters = new WorkspaceDiscoveryService.Filters(filter(params, "include"), filter(params, "exclude"), bool(params, "includeIgnored", false));
+        int timeout = integer(params, "timeoutMillis", 5000, 1, 10_000);
+        int limit = integer(params, "limit", 200, 1, 1000);
+        var service = new WorkspaceSearchQueryService(workspace);
+        if (files) return service.files(workspaceId, filters, "open".equals(scope), integer(params, "offset", 0, 0, WorkspaceQueryBudget.MAX_ENTRIES),
+            limit, string(params, "expectedListingVersion", false, 512), timeout, () -> false);
+        SearchPattern pattern;
+        try { pattern = new SearchPattern(filter(params, "query"), bool(params, "caseSensitive", true), bool(params, "regex", false), bool(params, "wholeWord", false)); }
+        catch (IllegalArgumentException invalid) { throw invalid(invalid.getMessage()); }
+        return service.search(workspaceId, filters, "open".equals(scope), pattern, limit,
+            integer(params, "maxFiles", 10_000, 1, WorkspaceQueryBudget.MAX_ENTRIES),
+            integer(params, "maxFileBytes", WorkspaceSearchQueryService.DEFAULT_FILE_BYTES, 1, WorkspaceTextFile.MAX_BYTES), timeout, () -> false);
+    }
+
+    private static String filter(Map<String, Object> params, String key) {
+        if (!params.containsKey(key)) return "";
+        if (!(params.get(key) instanceof String value) || value.length() > 4096 || value.indexOf('\0') >= 0) throw invalid("Invalid " + key);
+        return value;
+    }
+    private static boolean bool(Map<String, Object> params, String key, boolean fallback) {
+        if (!params.containsKey(key)) return fallback;
+        if (!(params.get(key) instanceof Boolean value)) throw invalid("Invalid " + key);
+        return value;
+    }
+
     static String error(Object id, int code, String message, Map<String, Object> data) {
         return MiniJson.stringify(response(id, "error", Map.of("code", code, "message", message, "data", data)));
     }
@@ -120,5 +153,5 @@ public final class WorkspaceRpc {
         if (number < minimum || number > maximum) throw invalid("Invalid " + key);
         return (int) number;
     }
-    static WorkspaceApiException invalid(String message) { return new WorkspaceApiException(WorkspaceApiException.Code.INVALID_REQUEST, message); }
+    static WorkspaceApiException invalid(String message) { return WorkspaceApiException.invalidRequest(message); }
 }

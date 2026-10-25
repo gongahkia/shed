@@ -48,4 +48,14 @@ class AgentPolicyTest {
         for (String pattern : List.of("/absolute", "../escape", "a/../b", "C:/windows", "a\\b", ""))
             assertThrows(IllegalArgumentException.class, () -> new AgentPolicy(Set.of(), List.of(pattern), List.of(), false));
     }
+
+    @Test void protectedAndExcludedDirectoryMatchesAlsoGuardTheirDescendants() {
+        var policy = new AgentPolicy(EnumSet.allOf(AgentPolicy.Capability.class), List.of("generated"), List.of("secrets"), false);
+        assertEquals(WorkspaceApiException.Code.EXCLUDED_PATH, assertThrows(WorkspaceApiException.class,
+            () -> policy.checkPath(Path.of("secrets/nested/token"), AgentPolicy.Capability.READ)).code());
+        assertEquals(WorkspaceApiException.Code.PROTECTED_PATH, assertThrows(WorkspaceApiException.class,
+            () -> policy.checkPath(Path.of("generated/nested/source"), AgentPolicy.Capability.APPLY)).code());
+        policy.checkPath(Path.of("generated/nested/source"), AgentPolicy.Capability.READ);
+        policy.checkPath(Path.of("other/secrets/token"), AgentPolicy.Capability.READ);
+    }
 }

@@ -39,6 +39,13 @@ class WorkspaceBridgeTest {
             var result = result(output.toString(StandardCharsets.UTF_8));
             assertEquals("unsaved 👩‍💻\n", result.get("content")); assertEquals("EDITOR", result.get("source")); assertEquals(true, result.get("dirty"));
             assertEquals("", errors.toString(StandardCharsets.UTF_8)); assertEquals("disk\n", Files.readString(file));
+            output.reset();
+            String searchRequest = WorkspaceRpcTest.request(3, "search/text", Map.of("workspaceId", server.workspaceId(), "query", "unsaved"));
+            assertEquals(0, WorkspaceCli.run(args(root, server.descriptor(), searchRequest), new ByteArrayInputStream(new byte[0]), output, errors));
+            var matches = WorkspaceSearchQueryServiceTest.matches(result(output.toString(StandardCharsets.UTF_8)));
+            assertEquals(1, matches.size()); assertEquals(snapshot.documentId(), matches.getFirst().get("documentId"));
+            assertEquals(snapshot.version(), matches.getFirst().get("version")); assertEquals("EDITOR", matches.getFirst().get("source"));
+            assertEquals("disk\n", Files.readString(file));
             SwingUtilities.invokeAndWait(() -> buffer.get().replaceContentUndoably("newer human text\n"));
             output.reset();
             assertEquals(65, WorkspaceCli.run(args(root, server.descriptor(), request), new ByteArrayInputStream(new byte[0]), output, errors));

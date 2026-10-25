@@ -25,21 +25,30 @@ final class WorkspaceTextFile {
     }
 
     static Snapshot capture(String workspaceId, Path file, boolean allowLatin1) {
+        return capture(workspaceId, file, allowLatin1, MAX_BYTES, () -> false);
+    }
+
+    static Snapshot capture(String workspaceId, Path file, boolean allowLatin1, int maximumBytes,
+                            java.util.function.BooleanSupplier cancelled) {
+        if (maximumBytes < 1 || maximumBytes > MAX_BYTES) throw new IllegalArgumentException("Invalid snapshot byte limit");
         try {
+            checkCancelled(cancelled);
             BasicFileAttributes before = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             if (!before.isRegularFile()) throw new WorkspaceApiException(WorkspaceApiException.Code.UNSUPPORTED, "Only regular text files are supported");
-            if (before.size() > MAX_BYTES) throw new WorkspaceApiException(WorkspaceApiException.Code.LIMIT_EXCEEDED, "File exceeds the machine snapshot limit");
+            if (before.size() > maximumBytes) throw new WorkspaceApiException(WorkspaceApiException.Code.LIMIT_EXCEEDED, "File exceeds the machine snapshot limit");
             ByteArrayOutputStream output = new ByteArrayOutputStream((int) before.size());
             try (var channel = Files.newByteChannel(file, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS)) {
                 ByteBuffer buffer = ByteBuffer.allocate(8192);
                 while (channel.read(buffer) != -1) {
+                    checkCancelled(cancelled);
                     buffer.flip();
-                    if ((long) output.size() + buffer.remaining() > MAX_BYTES)
+                    if ((long) output.size() + buffer.remaining() > maximumBytes)
                         throw new WorkspaceApiException(WorkspaceApiException.Code.LIMIT_EXCEEDED, "File grew beyond the machine snapshot limit");
                     output.write(buffer.array(), 0, buffer.remaining()); buffer.clear();
                 }
             }
             BasicFileAttributes after = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            checkCancelled(cancelled);
             if (!after.isRegularFile() || before.size() != after.size() || !before.lastModifiedTime().equals(after.lastModifiedTime())
                 || !Objects.equals(before.fileKey(), after.fileKey()))
                 throw new WorkspaceApiException(WorkspaceApiException.Code.STALE_VERSION, "File changed while its snapshot was read");
@@ -59,6 +68,11 @@ final class WorkspaceTextFile {
         } catch (IOException | SecurityException error) {
             throw new WorkspaceApiException(WorkspaceApiException.Code.IO_ERROR, "Document could not be read");
         }
+    }
+
+    private static void checkCancelled(java.util.function.BooleanSupplier cancelled) {
+        if (Thread.currentThread().isInterrupted() || cancelled.getAsBoolean())
+            throw new WorkspaceApiException(WorkspaceApiException.Code.CANCELLED, "Workspace snapshot cancelled");
     }
 
     static String lineEnding(String text) { return TextFileCodec.lineEnding(text); }

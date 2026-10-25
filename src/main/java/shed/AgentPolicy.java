@@ -66,7 +66,10 @@ public record AgentPolicy(Set<Capability> capabilities, List<String> protectedPa
 
     private static boolean matches(List<String> patterns, Path path) {
         for (String pattern : patterns) {
-            if (match(pattern, path) || pattern.startsWith("**/") && match(pattern.substring(3), path)) return true;
+            for (int end = 1; end <= path.getNameCount(); end++) {
+                Path candidate = path.subpath(0, end);
+                if (match(pattern, candidate) || pattern.startsWith("**/") && match(pattern.substring(3), candidate)) return true;
+            }
         }
         return false;
     }

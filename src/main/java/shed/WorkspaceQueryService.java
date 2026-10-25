@@ -10,7 +10,7 @@ import java.util.Objects;
 public final class WorkspaceQueryService {
     public static final int MAX_PAGE_SIZE = 1000;
     public static final int MAX_READ_CHARACTERS = 1024 * 1024;
-    public static final List<String> OPERATIONS = List.of("workspace/info", "documents/list", "documents/read");
+    public static final List<String> OPERATIONS = List.of("workspace/info", "documents/list", "documents/read", "files/list", "search/text");
     private final Path root;
     private final String workspaceId;
     private final AgentPolicy policy;
@@ -75,7 +75,7 @@ public final class WorkspaceQueryService {
         return java.util.Collections.unmodifiableMap(result);
     }
 
-    private List<WorkspaceDocument> visibleDocuments() {
+    List<WorkspaceDocument> visibleDocuments() {
         policy.require(AgentPolicy.Capability.READ);
         List<WorkspaceDocument> captured = List.copyOf(documents.snapshots());
         List<WorkspaceDocument> visible = new ArrayList<>();
@@ -96,7 +96,7 @@ public final class WorkspaceQueryService {
         return List.copyOf(visible);
     }
 
-    private void checkWorkspace(String requested) {
+    void checkWorkspace(String requested) {
         policy.require(AgentPolicy.Capability.READ);
         if (!workspaceId.equals(requested)) throw new WorkspaceApiException(WorkspaceApiException.Code.NOT_FOUND, "Workspace identity does not match this connection");
     }

@@ -50,11 +50,12 @@ final class PaneBufferController {
 
 
     void withSuppressedDocumentEvents(Runnable action) {
+        boolean previous = editor.suppressDocumentEvents;
         editor.suppressDocumentEvents = true;
         try {
             action.run();
         } finally {
-            editor.suppressDocumentEvents = false;
+            editor.suppressDocumentEvents = previous;
         }
     }
 

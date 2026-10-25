@@ -45,6 +45,7 @@ public class FileBuffer {
     private final BoundedUndoManager undoManager;
     private final PlainDocument document;
     private VersionedTextSnapshot textSnapshot;
+    private long documentRevision;
     private String lineEnding;
     private FileType fileType;
     private final Map<Character, Integer> marks;
@@ -72,6 +73,7 @@ public class FileBuffer {
         this.undoManager = new BoundedUndoManager(configManager == null
             ? UndoHistoryPolicy.defaults() : configManager.getUndoHistoryPolicy());
         this.document = new PlainDocument();
+        trackDocumentRevisions();
         this.document.addUndoableEditListener(undoManager);
         this.textSnapshot = VersionedTextSnapshot.empty();
         this.marks = new LinkedHashMap<>();
@@ -99,6 +101,7 @@ public class FileBuffer {
         this.undoManager = new BoundedUndoManager(configManager == null
             ? UndoHistoryPolicy.defaults() : configManager.getUndoHistoryPolicy());
         this.document = new PlainDocument();
+        trackDocumentRevisions();
         this.document.addUndoableEditListener(undoManager);
         this.textSnapshot = VersionedTextSnapshot.empty();
         this.marks = new LinkedHashMap<>();
@@ -504,19 +507,58 @@ public class FileBuffer {
         if (largeFile) throw new IllegalStateException("Large-file editing is unavailable");
         String value = content == null ? "" : content;
         if (value.equals(getContent())) return;
-        undoManager.beginCompoundEdit();
-        try {
-            document.remove(0, document.getLength());
-            document.insertString(0, value, null);
-        } catch (BadLocationException error) {
-            throw new IllegalStateException("Unable to update buffer document", error);
-        } finally {
-            undoManager.endCompoundEdit();
+        try (TextTransaction transaction = beginTextTransaction()) { transaction.replace(value); transaction.commit(); }
+    }
+
+    TextTransaction beginTextTransaction() { return new TextTransaction(); }
+
+    long documentRevision() { return documentRevision; }
+
+    private void trackDocumentRevisions() {
+        document.addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(DocumentEvent event) { documentRevision++; }
+            public void removeUpdate(DocumentEvent event) { documentRevision++; }
+            public void changedUpdate(DocumentEvent event) { documentRevision++; }
+        });
+    }
+
+    final class TextTransaction implements AutoCloseable {
+        private final VersionedTextSnapshot before;
+        private final boolean wasModified;
+        private final FileType beforeType;
+        private boolean finished;
+        private TextTransaction() {
+            if (largeFile) throw new IllegalStateException("Large-file editing is unavailable");
+            reconcileDocumentText();
+            before = textSnapshot; wasModified = modified; beforeType = fileType;
+            undoManager.beginCompoundEdit();
         }
-        textSnapshot = VersionedTextSnapshot.of(value);
-        modified = true;
-        fileType = FileType.detect(file, value);
-        updateLineCount();
+        void replace(String value) {
+            if (finished) throw new IllegalStateException("Text transaction is closed");
+            var hunks = WorkspaceTextEdits.diff(getContent(), value);
+            try {
+                for (int i = hunks.size() - 1; i >= 0; i--) {
+                    var change = hunks.get(i);
+                    if (change.end() > change.start()) document.remove(change.start(), change.end() - change.start());
+                    if (!change.replacement().isEmpty()) document.insertString(change.start(), change.replacement(), null);
+                }
+            } catch (BadLocationException failure) { throw new IllegalStateException("Unable to update buffer document", failure); }
+            if (!hunks.isEmpty()) {
+                textSnapshot = VersionedTextSnapshot.of(value); modified = true;
+                fileType = FileType.detect(file, value); updateLineCount();
+            }
+        }
+        void commit() {
+            if (finished) throw new IllegalStateException("Text transaction is closed");
+            undoManager.endCompoundEdit(); finished = true;
+        }
+        @Override public void close() {
+            if (finished) return;
+            finished = true;
+            undoManager.cancelCompoundEdit();
+            if (!getContent().equals(before.text())) throw new IllegalStateException("Document rollback was incomplete");
+            textSnapshot = before; modified = wasModified; fileType = beforeType; updateLineCount();
+        }
     }
 
     public String getContent() {

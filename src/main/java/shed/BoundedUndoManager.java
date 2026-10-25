@@ -48,6 +48,15 @@ final class BoundedUndoManager extends UndoManager {
         if (completed.editCount > 0) addEdit(completed);
     }
 
+    synchronized void cancelCompoundEdit() {
+        SizedCompoundEdit cancelled = pendingCompound;
+        if (cancelled == null) throw new IllegalStateException("No compound edit active");
+        pendingCompound = null;
+        cancelled.end();
+        try { if (cancelled.canUndo()) cancelled.undo(); }
+        finally { cancelled.die(); }
+    }
+
     @Override
     public synchronized boolean addEdit(UndoableEdit edit) {
         if (pendingCompound != null) {

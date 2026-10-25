@@ -63,4 +63,124 @@ class EditorWorkspaceDocumentsTest {
         });
         source.close();
     }
+
+    @Test void batchesKeepSelectionAndNativeUndoWhileTargetingTheNamedDocument() throws Exception {
+        FileBuffer buffer = FileBuffer.createScratch("Notes", "first\nmiddle\nlast\n");
+        var area = new javax.swing.JTextArea();
+        var scroll = new javax.swing.JScrollPane(area);
+        SwingUtilities.invokeAndWait(() -> { area.setDocument(buffer.getDocument()); area.select(13, 17); });
+        try (var source = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root, action -> {
+            var view = BufferViewState.capture(area, scroll);
+            String original = area.getText();
+            try { action.run(); } finally { view.restoreSelectionAfterChanges(area, original, area.getText()); view.restoreViewport(scroll); }
+        })) {
+            var before = source.snapshots().getFirst();
+            var after = source.applyTexts(List.of(new WorkspaceDocumentEditor.TextChange(before, "FIRST longer\nmiddle\nLAST\n"))).getFirst();
+            assertEquals("FIRST longer\nmiddle\nLAST\n", after.content()); assertTrue(after.dirty());
+            SwingUtilities.invokeAndWait(() -> {
+                assertEquals(20, area.getSelectionStart()); assertEquals(24, area.getSelectionEnd());
+                buffer.getUndoManager().undo();
+                assertEquals("first\nmiddle\nlast\n", buffer.getContent());
+            });
+        }
+    }
+
+    @Test void rawDocumentEditsAndUndoneChangesStillInvalidateOpaqueVersions() throws Exception {
+        FileBuffer buffer = FileBuffer.createScratch("Notes", "abc");
+        try (var source = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
+            var before = source.snapshots().getFirst();
+            SwingUtilities.invokeAndWait(() -> {
+                try { buffer.getDocument().remove(1, 1); buffer.getDocument().insertString(1, "Z", null); }
+                catch (Exception failure) { throw new RuntimeException(failure); }
+            });
+            var changed = source.snapshots().getFirst();
+            assertEquals("aZc", changed.content()); assertNotEquals(before.version(), changed.version());
+            SwingUtilities.invokeAndWait(() -> {
+                try { buffer.getDocument().remove(1, 1); buffer.getDocument().insertString(1, "b", null); }
+                catch (Exception failure) { throw new RuntimeException(failure); }
+            });
+            assertEquals("abc", source.snapshots().getFirst().content());
+            assertNotEquals(before.version(), source.snapshots().getFirst().version());
+            assertEquals(WorkspaceApiException.Code.STALE_VERSION, assertThrows(WorkspaceApiException.class,
+                () -> source.applyTexts(List.of(new WorkspaceDocumentEditor.TextChange(before, "agent")))).code());
+        }
+    }
+
+    @Test void staleBatchHasNoEffectsAndFailedBatchPreservesEarlierHumanUndoHistory() throws Exception {
+        FileBuffer first = FileBuffer.createScratch("First", "first"), second = FileBuffer.createScratch("Second", "second");
+        SwingUtilities.invokeAndWait(() -> first.replaceContentUndoably("human first"));
+        try (var source = new EditorWorkspaceDocuments(() -> List.of(first, second), () -> List.of(root), () -> root, root)) {
+            var before = source.snapshots();
+            SwingUtilities.invokeAndWait(() -> second.replaceContentUndoably("human second"));
+            assertEquals(WorkspaceApiException.Code.STALE_VERSION, assertThrows(WorkspaceApiException.class, () -> source.applyTexts(List.of(
+                new WorkspaceDocumentEditor.TextChange(before.get(0), "agent first"),
+                new WorkspaceDocumentEditor.TextChange(before.get(1), "agent second")))).code());
+            assertEquals("human first", first.getContent());
+            var current = source.snapshots();
+            SwingUtilities.invokeAndWait(() -> second.getDocument().setDocumentFilter(new javax.swing.text.DocumentFilter() {
+                @Override public void insertString(FilterBypass bypass, int offset, String text, javax.swing.text.AttributeSet attributes)
+                    throws javax.swing.text.BadLocationException { throw new javax.swing.text.BadLocationException("fixture failure", offset); }
+            }));
+            assertThrows(WorkspaceApiException.class, () -> source.applyTexts(List.of(
+                new WorkspaceDocumentEditor.TextChange(current.get(0), "agent first"),
+                new WorkspaceDocumentEditor.TextChange(current.get(1), "agent second"))));
+            assertEquals("human first", first.getContent()); assertEquals("human second", second.getContent());
+            SwingUtilities.invokeAndWait(() -> {
+                first.getUndoManager().undo(); assertEquals("first", first.getContent());
+                first.getUndoManager().redo(); assertEquals("human first", first.getContent());
+            });
+        }
+    }
+
+    @Test void cancellationOfAQueuedBatchCannotMutateLaterWhenTheEventThreadBecomesAvailable() throws Exception {
+        FileBuffer buffer = FileBuffer.createScratch("Notes", "before");
+        var blocked = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        try (var source = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
+            var before = source.snapshots().getFirst();
+            SwingUtilities.invokeLater(() -> {
+                blocked.countDown();
+                try { release.await(5, java.util.concurrent.TimeUnit.SECONDS); }
+                catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+            });
+            assertTrue(blocked.await(2, java.util.concurrent.TimeUnit.SECONDS));
+            var outcome = new java.util.concurrent.CompletableFuture<WorkspaceApiException.Code>();
+            Thread caller = Thread.ofVirtual().start(() -> {
+                try { source.applyTexts(List.of(new WorkspaceDocumentEditor.TextChange(before, "late edit"))); outcome.complete(null); }
+                catch (WorkspaceApiException failure) { outcome.complete(failure.code()); }
+            });
+            try {
+                caller.interrupt();
+                assertEquals(WorkspaceApiException.Code.CANCELLED, outcome.get(2, java.util.concurrent.TimeUnit.SECONDS));
+            } finally { release.countDown(); }
+            SwingUtilities.invokeAndWait(() -> { });
+            assertEquals("before", buffer.getContent());
+        } finally { release.countDown(); }
+    }
+
+    @Test void anExecutingBatchReturnsItsActualOutcomeAndRestoresTheCallersInterruptStatus() throws Exception {
+        FileBuffer buffer = FileBuffer.createScratch("Notes", "before");
+        var started = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        try (var source = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root, action -> {
+            started.countDown();
+            try { release.await(5, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (InterruptedException interrupted) { throw new RuntimeException(interrupted); }
+            action.run();
+        })) {
+            var before = source.snapshots().getFirst();
+            var outcome = new java.util.concurrent.CompletableFuture<Boolean>();
+            Thread caller = Thread.ofVirtual().start(() -> {
+                try {
+                    source.applyTexts(List.of(new WorkspaceDocumentEditor.TextChange(before, "accepted")));
+                    outcome.complete(Thread.currentThread().isInterrupted());
+                } catch (Throwable failure) { outcome.completeExceptionally(failure); }
+            });
+            try {
+                assertTrue(started.await(2, java.util.concurrent.TimeUnit.SECONDS)); caller.interrupt();
+            } finally { release.countDown(); }
+            assertTrue(outcome.get(2, java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals("accepted", buffer.getContent());
+        } finally { release.countDown(); }
+    }
 }

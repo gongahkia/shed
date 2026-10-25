@@ -45,6 +45,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.IdentityHashMap;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -250,6 +251,38 @@ public class Texteditor extends JFrame implements KeyListener {
 
     String handleAgentCommand(String argument) { return agentWorkspaceController.handle(argument); }
 
+    private void applyWorkspaceTextBatch(Runnable mutation) {
+        Map<EditorPane, BufferViewState> views = new IdentityHashMap<>();
+        Map<FileBuffer, VersionedTextSnapshot> before = new IdentityHashMap<>();
+        for (FileBuffer buffer : buffers) before.put(buffer, buffer.textSnapshot());
+        for (EditorPane pane : editorPanes) {
+            FileBuffer buffer = pane.getBuffer();
+            if (buffer != null && !buffer.isLargeFile() && pane.getTextArea().getDocument() == buffer.getDocument())
+                views.put(pane, BufferViewState.capture(pane.getTextArea(), pane.getScrollPane()));
+        }
+        try { withSuppressedDocumentEvents(mutation); }
+        finally {
+            for (var entry : views.entrySet()) {
+                try {
+                    FileBuffer buffer = entry.getKey().getBuffer();
+                    entry.getValue().restoreSelectionAfterChanges(entry.getKey().getTextArea(), before.get(buffer).text(), buffer.getContent());
+                    entry.getValue().restoreViewport(entry.getKey().getScrollPane());
+                } catch (RuntimeException presentationFailure) {
+                    System.getLogger("shed.workspace").log(System.Logger.Level.WARNING, "Workspace edit view restoration was incomplete.");
+                }
+            }
+        }
+        try {
+            for (FileBuffer buffer : buffers) if (before.get(buffer) != buffer.textSnapshot()) syncLspChange(buffer);
+            if (getCurrentBuffer() != null && before.get(getCurrentBuffer()) != getCurrentBuffer().textSnapshot()) {
+                markModified(); scheduleSyntaxHighlighting();
+            }
+            requestStatusBarRefresh(); scheduleRecoverySnapshotCapture();
+        } catch (RuntimeException presentationFailure) {
+            System.getLogger("shed.workspace").log(System.Logger.Level.WARNING, "Workspace edit applied; a background refresh was incomplete.");
+        }
+    }
+
     // Constructor
     public Texteditor(String[] args) {
         this(args, new ApplicationErrorReporter());
@@ -304,7 +337,7 @@ public class Texteditor extends JFrame implements KeyListener {
         currentBufferIndex = -1;
         editorPanes = new ArrayList<>();
         workspaceDocumentSource = new EditorWorkspaceDocuments(() -> List.copyOf(buffers), workspaceController::roots,
-            workspaceController::activeRoot, Path.of("."));
+            workspaceController::activeRoot, Path.of("."), this::applyWorkspaceTextBatch);
         agentWorkspaceController = new AgentWorkspaceController(this);
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override public void windowClosed(java.awt.event.WindowEvent event) {

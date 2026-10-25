@@ -26,7 +26,7 @@ import java.util.Objects;
  * preflight and thread affinity of editor callbacks. This is not yet a durable task journal.
  */
 final class WorkspaceEditTransaction implements AutoCloseable {
-    enum State { OPEN, COMMITTED, ROLLED_BACK, RECOVERY_REQUIRED }
+    enum State { OPEN, PREPARED, COMMITTED, ROLLED_BACK, RECOVERY_REQUIRED }
     @FunctionalInterface interface IoAction { void run() throws IOException; }
     record Failure(String phase, String operation, String message) { }
     record Report(State state, List<Failure> failures, List<Path> recoveryPaths) {
@@ -127,20 +127,26 @@ final class WorkspaceEditTransaction implements AutoCloseable {
         });
     }
 
-    void commit() throws IOException {
+    void prepareCommit() throws IOException {
         requireOpen();
         try {
             for (Backup backup : backups) requireMatching(backup.original(), backup.expected());
             for (Action action : commits) action.action().run();
-            state = State.COMMITTED;
+            state = State.PREPARED;
         } catch (IOException | RuntimeException failure) {
             failures.add(new Failure("commit", "finalize workspace edit", message(failure)));
             throw failure;
         }
     }
 
+    void commit() throws IOException {
+        if (state == State.OPEN) prepareCommit();
+        if (state != State.PREPARED) throw new IllegalStateException("Workspace transaction cannot commit from " + state);
+        state = State.COMMITTED;
+    }
+
     Report rollback() {
-        if (state != State.OPEN) return report();
+        if (state != State.OPEN && state != State.PREPARED) return report();
         boolean failed = false;
         for (int i = undo.size() - 1; i >= 0; i--) {
             Action action = undo.get(i);
@@ -154,7 +160,7 @@ final class WorkspaceEditTransaction implements AutoCloseable {
     }
 
     Report cleanup() {
-        if (state == State.OPEN || state == State.RECOVERY_REQUIRED) return report();
+        if (state == State.OPEN || state == State.PREPARED || state == State.RECOVERY_REQUIRED) return report();
         if (cleanupAttempted) return report();
         cleanupAttempted = true;
         for (Map.Entry<Path, Fingerprint> entry : temps.entrySet()) {
@@ -184,7 +190,7 @@ final class WorkspaceEditTransaction implements AutoCloseable {
         return new Report(state, failures, retained);
     }
 
-    @Override public void close() { if (state == State.OPEN) rollback(); cleanup(); }
+    @Override public void close() { if (state == State.OPEN || state == State.PREPARED) rollback(); cleanup(); }
 
     private void createParents(Path target) throws IOException {
         List<Path> missing = new ArrayList<>();

@@ -11,11 +11,15 @@ final class BufferViewState {
     private final Position dot;
     private final Position mark;
     private final Point viewport;
+    private final int originalDot;
+    private final int originalMark;
 
     private BufferViewState(Position dot, Position mark, Point viewport) {
         this.dot = dot;
         this.mark = mark;
         this.viewport = viewport;
+        this.originalDot = dot.getOffset();
+        this.originalMark = mark.getOffset();
     }
 
     static BufferViewState capture(JTextArea area, JScrollPane scroll) {
@@ -31,6 +35,22 @@ final class BufferViewState {
         int length = area.getDocument().getLength();
         area.setCaretPosition(Math.min(mark.getOffset(), length));
         area.moveCaretPosition(Math.min(dot.getOffset(), length));
+    }
+
+    void restoreSelectionAfterChanges(JTextArea area, String before, String after) {
+        var changes = WorkspaceTextEdits.diff(before, after);
+        area.setCaretPosition(Math.min(mapOffset(originalMark, changes), after.length()));
+        area.moveCaretPosition(Math.min(mapOffset(originalDot, changes), after.length()));
+    }
+
+    private static int mapOffset(int offset, java.util.List<WorkspaceTextEdits.Hunk> changes) {
+        int shift = 0;
+        for (var change : changes) {
+            if (offset < change.start()) break;
+            if (offset >= change.end()) shift += change.replacement().length() - change.before().length();
+            else return change.start() + shift + Math.min(offset - change.start(), change.replacement().length());
+        }
+        return offset + shift;
     }
 
     void restoreViewport(JScrollPane scroll) {

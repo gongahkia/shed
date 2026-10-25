@@ -58,7 +58,7 @@ public class HelpService {
                    "  :log           Open command log file\n" +
                    "  :session ...   Session save/load/list\n" +
                    "  :workspace ... Workspace profiles or index status/controls\n" +
-                   "  :agent api ... Explicit local read-only API start/status/stop\n" +
+                   "  :agent api ... Local workspace API start [propose]/status/stop\n" +
                    "  :clean         Remove Shed data files\n" +
                    "  :version       Show local version and support metadata\n" +
                    "  :drop cmd      Run async command with current file path\n" +
@@ -137,13 +137,15 @@ public class HelpService {
             case "agent":
                 return "Help: agent workspace API\n\n"
                     + ":agent api start enables read-only access to the selected workspace, including unsaved editor buffers.\n"
+                    + ":agent api start propose additionally allows durable proposals; it never grants permission to apply them.\n"
                     + ":agent api status shows the private connection descriptor path; :agent api stop revokes its clients.\n"
                     + "Nothing starts automatically. No agent process or provider connection is launched.\n"
                     + "From a terminal: shed --workspace-api --root <folder> --connect <descriptor> --stdio\n"
                     + "Use --request '<JSON>' for a single request. Both CLI modes stay headless.\n"
                     + "Start with workspace/info, then documents/list or documents/read using the returned workspaceId.\n"
                     + "Descriptors contain credentials and must remain owner-only, outside the exposed workspace.\n"
-                    + "Search, edits, ACP/MCP and agent sessions remain unavailable through this initial API.\n";
+                    + "proposals/list and proposals/read inspect persisted reviews. Proposal mode adds propose/revise/reject.\n"
+                    + "Search, ACP/MCP and agent sessions remain unavailable through this initial API.\n";
             case "keymap":
             case "keymaps":
                 return "Help: keymaps\n\n"

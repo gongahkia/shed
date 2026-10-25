@@ -18,6 +18,7 @@ final class AgentWorkspaceController implements AutoCloseable {
     private WorkspaceBridgeServer active;
     private int startingJob = -1;
     private boolean stopping;
+    private boolean proposalMode;
     private String status = "Agent API is stopped; no listener is running.";
 
     AgentWorkspaceController(Texteditor editor) { this.editor = editor; }
@@ -27,24 +28,34 @@ final class AgentWorkspaceController implements AutoCloseable {
         String value = argument == null ? "" : argument.trim();
         return switch (value) {
             case "", "status", "api", "api status" -> status;
-            case "api start" -> start();
+            case "api start" -> start(false);
+            case "api start propose" -> start(true);
             case "api stop" -> stop();
-            default -> "Usage: :agent api start|status|stop";
+            default -> "Usage: :agent api start [propose]|status|stop";
         };
     }
 
-    private String start() {
+    private String start(boolean allowProposals) {
         if (disposed.get()) return "Agent API is unavailable while the editor closes.";
-        if (active != null && active.running()) return status;
+        if (active != null && active.running()) return proposalMode == allowProposals ? status
+            : "Stop the current API before starting it with different permissions.";
         if (startingJob >= 0) return "Agent API startup is already running.";
         Path root = editor.workspaceController.activeRoot();
         if (root == null) return "Select a workspace folder before starting the agent API.";
         long request = generation.incrementAndGet();
         stopping = false;
         Path directory = Path.of(editor.configManager.getSessionDirectory(), "agent-api");
-        status = "Starting read-only agent API…";
+        proposalMode = allowProposals;
+        String mode = allowProposals ? "Proposal-only" : "Read-only";
+        AgentPolicy policy = allowProposals ? new AgentPolicy(Set.of(AgentPolicy.Capability.READ, AgentPolicy.Capability.PROPOSE),
+            java.util.List.of("**/README.md"), java.util.List.of(), true) : AgentPolicy.readOnly();
+        Path sessions = Path.of(editor.configManager.getSessionDirectory());
+        status = "Starting " + mode.toLowerCase(java.util.Locale.ROOT) + " agent API…";
         startingJob = editor.asyncJobService.submit("Start local agent API", token -> {
-            WorkspaceBridgeServer server = new WorkspaceBridgeServer(editor.workspaceQueries(root, AgentPolicy.readOnly()), directory);
+            var workspace = editor.workspaceQueries(root, policy);
+            var proposals = new WorkspaceProposalService(workspace, editor.workspaceDocuments(),
+                sessions.resolve("agent-workspace").resolve(workspace.workspaceId()), "workspace-api");
+            WorkspaceBridgeServer server = new WorkspaceBridgeServer(workspace, proposals, directory);
             owned.add(server);
             token.onCancel(() -> release(server));
             if (disposed.get() || generation.get() != request || token.isCancelled()) { release(server); return null; }
@@ -57,7 +68,7 @@ final class AgentWorkspaceController implements AutoCloseable {
                 status = "Agent API could not start. Check local diagnostics and owner-only session directory permissions.";
             } else {
                 active = server;
-                status = "Read-only agent API for " + root + ". Connection descriptor: " + server.descriptor();
+                status = mode + " agent API for " + root + ". Connection descriptor: " + server.descriptor();
             }
             editor.showMessage(status);
         });

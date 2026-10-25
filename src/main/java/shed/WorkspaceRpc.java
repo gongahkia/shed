@@ -9,8 +9,14 @@ import java.util.Set;
 public final class WorkspaceRpc {
     public static final int MAX_READ_CHARACTERS = 65_536;
     private final WorkspaceQueryService workspace;
+    private final WorkspaceProposalRpc proposals;
 
-    public WorkspaceRpc(WorkspaceQueryService workspace) { this.workspace = Objects.requireNonNull(workspace); }
+    public WorkspaceRpc(WorkspaceQueryService workspace) { this(workspace, null); }
+
+    WorkspaceRpc(WorkspaceQueryService workspace, WorkspaceProposalService proposals) {
+        this.workspace = Objects.requireNonNull(workspace);
+        this.proposals = proposals == null ? null : new WorkspaceProposalRpc(workspace, proposals);
+    }
 
     /** Null is a valid notification's no-response result. */
     public String handle(String json) {
@@ -25,7 +31,7 @@ public final class WorkspaceRpc {
         if (!validEnvelope(request))
             return error(id, -32600, "Expected a supported JSON-RPC 2.0 request envelope", Map.of("code", "INVALID_REQUEST"));
         String method = (String) request.get("method");
-        if (!WorkspaceQueryService.OPERATIONS.contains(method)) return notification ? null
+        if (!WorkspaceQueryService.OPERATIONS.contains(method) && (proposals == null || !WorkspaceProposalRpc.OPERATIONS.contains(method))) return notification ? null
             : error(id, -32601, "Workspace operation is not supported", Map.of("code", "UNSUPPORTED", "method", method));
         try {
             Map<String, Object> params = request.containsKey("params") ? MiniJson.asObject(request.get("params")) : Map.of();
@@ -54,6 +60,7 @@ public final class WorkspaceRpc {
     }
 
     private Object dispatch(String method, Map<String, Object> params) {
+        if (proposals != null && WorkspaceProposalRpc.OPERATIONS.contains(method)) return proposals.dispatch(method, params);
         return switch (method) {
             case "workspace/info" -> {
                 fields(params, Set.of("workspaceId", "schemaVersion"));
@@ -62,7 +69,13 @@ public final class WorkspaceRpc {
                 String requested = string(params, "workspaceId", false, 256);
                 if (requested != null && !requested.equals(workspace.workspaceId()))
                     throw new WorkspaceApiException(WorkspaceApiException.Code.NOT_FOUND, "Workspace identity does not match this connection");
-                yield workspace.info();
+                var info = new LinkedHashMap<>(workspace.info());
+                if (proposals != null) {
+                    var operations = new java.util.ArrayList<>(WorkspaceQueryService.OPERATIONS);
+                    operations.addAll(proposals.advertised());
+                    info.put("operations", operations);
+                }
+                yield info;
             }
             case "documents/list" -> {
                 fields(params, Set.of("workspaceId", "offset", "limit"));
@@ -86,16 +99,16 @@ public final class WorkspaceRpc {
         Map<String, Object> result = new LinkedHashMap<>(); result.put("jsonrpc", "2.0"); result.put("id", id); result.put(key, value); return result;
     }
     private static boolean validId(Object id) { return id == null || id instanceof Long || id instanceof String value && value.length() <= 256; }
-    private static void fields(Map<String, Object> params, Set<String> allowed) {
+    static void fields(Map<String, Object> params, Set<String> allowed) {
         if (!allowed.containsAll(params.keySet())) throw invalid("Unsupported parameter fields");
     }
-    private static String string(Map<String, Object> params, String key, boolean required, int max) {
+    static String string(Map<String, Object> params, String key, boolean required, int max) {
         Object value = params.get(key);
         if (value == null && !required && !params.containsKey(key)) return null;
         if (!(value instanceof String text) || text.isBlank() || text.length() > max) throw invalid("Invalid " + key);
         return text;
     }
-    private static int integer(Map<String, Object> params, String key, int fallback, int minimum, int maximum) {
+    static int integer(Map<String, Object> params, String key, int fallback, int minimum, int maximum) {
         if (!params.containsKey(key)) return fallback;
         Object value = params.get(key);
         long number;
@@ -107,5 +120,5 @@ public final class WorkspaceRpc {
         if (number < minimum || number > maximum) throw invalid("Invalid " + key);
         return (int) number;
     }
-    private static WorkspaceApiException invalid(String message) { return new WorkspaceApiException(WorkspaceApiException.Code.INVALID_REQUEST, message); }
+    static WorkspaceApiException invalid(String message) { return new WorkspaceApiException(WorkspaceApiException.Code.INVALID_REQUEST, message); }
 }

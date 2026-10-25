@@ -19,6 +19,7 @@ final class WorkspaceProposalService {
     private final String actor;
 
     record Input(String document, String expectedVersion, String text) { }
+    record Page(List<Map<String, Object>> proposals, int offset, Integer nextOffset, boolean truncated) { }
     record Preview(Map<String, Object> proposal, Map<String, Object> document, String before, String proposed,
                    String selected, List<WorkspaceTextEdits.Hunk> hunks) { }
     private record Effect(WorkspaceDocument before, String after, byte[] diskBefore, byte[] diskAfter) { }
@@ -60,7 +61,8 @@ final class WorkspaceProposalService {
                 authorize(document, AgentPolicy.Capability.PROPOSE, null);
                 if (!document.complete()) throw failure(WorkspaceApiException.Code.UNSUPPORTED, "Projected documents cannot be proposed as complete text");
                 if (!document.version().equals(input.expectedVersion())) throw failure(WorkspaceApiException.Code.STALE_VERSION, "Document changed before proposal");
-                if (!seen.add(document.documentId())) throw failure(WorkspaceApiException.Code.INVALID_REQUEST, "Duplicate proposal document");
+                if (!seen.add(document.uri() == null ? document.documentId() : document.uri()))
+                    throw failure(WorkspaceApiException.Code.INVALID_REQUEST, "Duplicate proposal document");
                 validText(document.content());
                 String base = lease.putText(document.content()), desired = lease.putText(input.text());
                 changes.add(map("document", document.documentId(), "uri", document.uri(), "version", document.version(),
@@ -75,20 +77,25 @@ final class WorkspaceProposalService {
     }
 
     List<Map<String, Object>> list(int offset, int limit) {
+        return page(offset, limit).proposals();
+    }
+
+    Page page(int offset, int limit) {
         workspace.policy().require(AgentPolicy.Capability.READ);
         if (offset < 0 || limit < 1 || limit > 100) throw failure(WorkspaceApiException.Code.INVALID_REQUEST, "Invalid proposal page");
         try (var lease = journal.open(false)) {
-            if (lease == null) return List.of();
+            if (lease == null) return new Page(List.of(), 0, null, false);
             List<String> ids = lease.list().stream().filter(id -> id.startsWith("proposal-")).toList();
             List<Map<String, Object>> result = new ArrayList<>();
-            for (int i = Math.min(offset, ids.size()); i < ids.size() && result.size() < limit; i++) {
-                var entry = lease.read(ids.get(i));
+            int start = Math.min(offset, ids.size()), cursor = start;
+            while (cursor < ids.size() && result.size() < limit) {
+                var entry = lease.read(ids.get(cursor++));
                 try { checkRecord(entry); result.add(summary(entry)); }
                 catch (WorkspaceApiException denied) {
                     if (denied.code() != WorkspaceApiException.Code.EXCLUDED_PATH && denied.code() != WorkspaceApiException.Code.PROTECTED_PATH) throw denied;
                 }
             }
-            return List.copyOf(result);
+            return new Page(List.copyOf(result), start, cursor < ids.size() ? cursor : null, cursor < ids.size());
         } catch (IOException unavailable) { throw storageFailure(null); }
     }
 
@@ -117,6 +124,8 @@ final class WorkspaceProposalService {
             validText(proposed);
             String desired = selectedHunks == null ? proposed : WorkspaceTextEdits.selected(before, proposed, selectedHunks);
             change.put("proposed", lease.putText(proposed)); change.put("desired", lease.putText(desired));
+            if (selectedHunks == null) change.remove("selectedHunks");
+            else change.put("selectedHunks", selectedHunks.stream().sorted().toList());
             changes.set(index, change);
             var data = new LinkedHashMap<>(entry.data()); data.put("changes", changes); data.put("reviewedBy", actor);
             return summary(lease.append(id, revision, "REVISED", data));
@@ -139,6 +148,7 @@ final class WorkspaceProposalService {
                 change.put("document", current.documentId()); change.put("version", current.version());
                 change.put("before", lease.putText(current.content()));
                 change.put("proposed", lease.putText(desired)); change.put("desired", change.get("proposed"));
+                change.remove("selectedHunks");
                 change.put("source", current.source().name()); change.put("encoding", current.encoding());
                 change.put("lineEnding", current.lineEnding()); change.put("bom", current.byteOrderMark()); updated.add(change);
             }
@@ -175,8 +185,11 @@ final class WorkspaceProposalService {
             if (entry.revision() != revision || !(undo ? "APPLIED" : "PROPOSED").equals(entry.data().get("status")))
                 throw failure(WorkspaceApiException.Code.CONFLICT, "Proposal revision/state changed; review it again");
             List<Effect> effects = new ArrayList<>();
+            Set<String> seen = new java.util.HashSet<>();
             for (var change : changes(entry.data())) {
                 WorkspaceDocument current = resolve(change);
+                if (!seen.add(current.uri() == null ? current.documentId() : current.uri()))
+                    throw failure(WorkspaceApiException.Code.CONFLICT, "Proposal documents now resolve to the same document");
                 authorize(current, AgentPolicy.Capability.APPLY, entry.data());
                 if (!current.complete() || current.readOnly()) throw failure(WorkspaceApiException.Code.PERMISSION_DENIED, "Document cannot be edited");
                 String before = lease.getText(text(change, "before")), desired = lease.getText(text(change, "desired"));
@@ -285,6 +298,7 @@ final class WorkspaceProposalService {
     }
 
     private WorkspaceChangeJournal.Entry entry(WorkspaceChangeJournal.Lease lease, String id) throws IOException {
+        if (id == null || !id.matches("proposal-[a-f0-9]{32}")) throw failure(WorkspaceApiException.Code.INVALID_REQUEST, "Invalid proposal ID");
         if (lease == null) throw failure(WorkspaceApiException.Code.NOT_FOUND, "Proposal not found");
         var entry = lease.read(id);
         if (entry == null) throw failure(WorkspaceApiException.Code.NOT_FOUND, "Proposal not found");
@@ -322,6 +336,7 @@ final class WorkspaceProposalService {
         return map("id", entry.id(), "revision", entry.revision(), "status", data.get("status"), "workspaceId", data.get("workspaceId"),
             "actor", data.get("actor"), "reviewedBy", data.get("reviewedBy"), "taskId", data.get("taskId"), "turnId", data.get("turnId"),
             "requestId", data.get("requestId"), "createdAt", data.get("createdAt"), "files", changes(data).size(),
+            "documents", changes(data).stream().map(change -> map("document", change.get("document"), "uri", change.get("uri"))).toList(),
             "pendingSaveAtApplication", data.get("pendingSaveAtApplication"), "error", data.get("error"), "recovery", data.get("recovery"));
     }
     private static List<Map<String, Object>> changes(Map<String, Object> data) {

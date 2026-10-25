@@ -249,6 +249,8 @@ public class Texteditor extends JFrame implements KeyListener {
         return new WorkspaceQueryService(root, policy, workspaceDocumentSource);
     }
 
+    WorkspaceDocumentEditor workspaceDocuments() { return workspaceDocumentSource; }
+
     String handleAgentCommand(String argument) { return agentWorkspaceController.handle(argument); }
 
     private void applyWorkspaceTextBatch(Runnable mutation) {

@@ -38,10 +38,18 @@ final class WorkspaceBridgeServer implements AutoCloseable {
     }
 
     WorkspaceBridgeServer(WorkspaceQueryService workspace, Path privateDirectory, int authenticationTimeoutMillis) throws IOException {
+        this(workspace, null, privateDirectory, authenticationTimeoutMillis);
+    }
+
+    WorkspaceBridgeServer(WorkspaceQueryService workspace, WorkspaceProposalService proposals, Path privateDirectory) throws IOException {
+        this(workspace, proposals, privateDirectory, 3000);
+    }
+
+    private WorkspaceBridgeServer(WorkspaceQueryService workspace, WorkspaceProposalService proposals, Path privateDirectory, int authenticationTimeoutMillis) throws IOException {
         if (authenticationTimeoutMillis < 1 || authenticationTimeoutMillis > 3000) throw new IllegalArgumentException("Invalid authentication deadline");
         this.authenticationTimeoutMillis = authenticationTimeoutMillis;
         deadlines.setRemoveOnCancelPolicy(true);
-        this.rpc = new WorkspaceRpc(workspace);
+        this.rpc = new WorkspaceRpc(workspace, proposals);
         this.listener = new ServerSocket(0, MAX_CLIENTS, loopback());
         try {
             Path directory = PrivateWorkspaceFiles.directory(privateDirectory);

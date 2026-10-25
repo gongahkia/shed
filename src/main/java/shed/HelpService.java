@@ -151,6 +151,7 @@ public class HelpService {
                     + "Rebase for review preserves disjoint human edits; Undo proposal refuses overlapping later edits.\n"
                     + "For interrupted operations, Inspect recovery compares recorded and current contents.\n"
                     + "Record verified outcome updates history only when the inspected evidence is still exact. Mixed or missing results need further recovery.\n"
+                    + "Restore pre-operation restores intact recorded snapshots after an interrupted apply or undo; changed contents remain conflicts.\n"
                     + "Search, ACP/MCP and agent sessions remain unavailable through this initial API.\n";
             case "keymap":
             case "keymaps":

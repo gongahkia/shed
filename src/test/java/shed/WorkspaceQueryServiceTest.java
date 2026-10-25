@@ -15,6 +15,23 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkspaceQueryServiceTest {
     @TempDir Path root;
 
+    @Test void retainedTransactionContentsCannotBypassSourceExclusionsThroughArtifactNamesOrAliases() throws Exception {
+        Path retained = Files.createDirectories(root.resolve(".shed-edit-backup-fixture")).resolve("original");
+        Files.writeString(retained, "previous excluded contents");
+        Path staged = Files.writeString(root.resolve(".shed-edit-fixture.tmp"), "pending contents");
+        String workspace = WorkspacePaths.id(root.toRealPath());
+        var service = new WorkspaceQueryService(root, AgentPolicy.readOnly(), () -> List.of(buffer(workspace, "retained-buffer", retained, "v1", "secret")));
+        assertEquals(List.of(), service.listDocuments(workspace, 0, 100).get("documents"));
+        for (Path path : List.of(retained, staged)) assertEquals(WorkspaceApiException.Code.PROTECTED_PATH,
+            assertThrows(WorkspaceApiException.class, () -> service.read(workspace, path.toString(), null, 0, 100)).code());
+        try {
+            Path alias = root.resolve("alias.txt"); Files.createSymbolicLink(alias, retained);
+            assertEquals(WorkspaceApiException.Code.PROTECTED_PATH,
+                assertThrows(WorkspaceApiException.class, () -> service.read(workspace, alias.toString(), null, 0, 100)).code());
+        } catch (UnsupportedOperationException | java.io.IOException unavailable) { /* Filesystem link support is optional. */ }
+        assertEquals("previous excluded contents", Files.readString(retained));
+    }
+
     @Test void unsavedSnapshotWinsOverDiskAndIsCapturedOnceWithoutDependingOnActiveTab() throws Exception {
         Path file = Files.writeString(root.resolve("source.java"), "saved");
         String workspace = WorkspacePaths.id(root.toRealPath());

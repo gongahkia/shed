@@ -67,7 +67,7 @@ final class ProjectFileScanner {
     }
 
     private static boolean excluded(String name, boolean directory) {
-        return name.equals(".DS_Store") || directory && (name.equals(".git") || name.equals(".hg")
+        return WorkspaceInternalPaths.recoveryArtifactName(name) || name.equals(".DS_Store") || directory && (name.equals(".git") || name.equals(".hg")
             || name.equals(".svn") || name.equals(".venv") || name.equals(".gradle") || name.equals(".idea")
             || name.equals("node_modules") || name.equals("target") || name.equals("build")
             || name.equals("__pycache__"));

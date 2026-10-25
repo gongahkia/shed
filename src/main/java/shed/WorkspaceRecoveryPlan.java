@@ -101,10 +101,13 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
             String reference = text(step, backup ? "target" : "source");
             Path path = WorkspacePaths.resolve(workspace.root(), reference);
             if (!path.toUri().toString().equals(reference)) throw invalid("Recovery artifact identity changed through an alias");
-            workspace.policy().checkPath(workspace.root().relativize(path), AgentPolicy.Capability.READ);
+            Path original = WorkspacePaths.resolve(workspace.root(), uri);
+            workspace.policy().checkPath(workspace.root().relativize(original), AgentPolicy.Capability.READ);
             boolean shape = backup ? path.getFileName().toString().equals("original") && path.getParent().getFileName().toString().startsWith(".shed-edit-backup-")
                 : path.getFileName().toString().startsWith(".shed-edit-") && path.getFileName().toString().endsWith(".tmp");
             if (!shape) throw invalid("Unexpected recovery artifact path");
+            Path artifactParent = backup ? path.getParent().getParent() : path.getParent();
+            if (!artifactParent.equals(original.getParent())) throw invalid("Recovery artifact is outside its original document directory");
             String state; Map<String, Object> identity = null;
             try {
                 BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);

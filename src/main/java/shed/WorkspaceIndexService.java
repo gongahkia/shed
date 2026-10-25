@@ -27,7 +27,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 final class WorkspaceIndexService implements AutoCloseable {
-    static final int VERSION = 1;
+    static final int VERSION = 2;
 
     private final Path storageDirectory;
     private final IgnoreMatcher ignoreMatcher;
@@ -101,7 +101,7 @@ final class WorkspaceIndexService implements AutoCloseable {
                         progress.excludedDirectories++;
                         return FileVisitResult.SKIP_SUBTREE;
                     }
-                    if (!directory.equals(root) && ".git".equals(directory.getFileName().toString())) {
+                    if (!directory.equals(root) && (".git".equals(directory.getFileName().toString()) || WorkspaceInternalPaths.recoveryArtifactName(directory.getFileName().toString()))) {
                         progress.excludedDirectories++;
                         publish(progress.status(State.BUILDING, activity), effectiveObserver);
                         return FileVisitResult.SKIP_SUBTREE;
@@ -115,7 +115,7 @@ final class WorkspaceIndexService implements AutoCloseable {
                         return FileVisitResult.TERMINATE;
                     }
                     Path normalized = file.toAbsolutePath().normalize();
-                    if (".git".equals(normalized.getFileName().toString())) {
+                    if (".git".equals(normalized.getFileName().toString()) || WorkspaceInternalPaths.recoveryArtifactName(normalized.getFileName().toString())) {
                         progress.skipped++;
                     } else if (!normalized.startsWith(root)) {
                         progress.outsideBoundary++;
@@ -261,6 +261,7 @@ final class WorkspaceIndexService implements AutoCloseable {
                     Path file = directory.resolve(name).normalize();
                     if (!file.startsWith(watchedRoot)) return null;
                     Path relative = watchedRoot.relativize(file);
+                    if (WorkspaceInternalPaths.containsRecoveryArtifact(relative)) continue;
                     if (relative.getNameCount() == 0 || ".gitignore".equals(name.toString())
                         || ".git".equals(name.toString()) || Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS)) return null;
                     String relativeName = relativePath(relative);
@@ -300,7 +301,7 @@ final class WorkspaceIndexService implements AutoCloseable {
                 Files.walkFileTree(root, new SimpleFileVisitor<>() {
                     @Override public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException {
                         if (directory.startsWith(storageDirectory)) return FileVisitResult.SKIP_SUBTREE;
-                        if (!directory.equals(root) && ".git".equals(directory.getFileName().toString())) {
+                        if (!directory.equals(root) && (".git".equals(directory.getFileName().toString()) || WorkspaceInternalPaths.recoveryArtifactName(directory.getFileName().toString()))) {
                             return FileVisitResult.SKIP_SUBTREE;
                         }
                         WatchKey key = directory.register(newWatcher, StandardWatchEventKinds.ENTRY_CREATE,
@@ -481,7 +482,7 @@ final class WorkspaceIndexService implements AutoCloseable {
                 return false;
             }
             for (String segment : value.split("/")) {
-                if (segment.isEmpty() || segment.equals(".") || segment.equals("..")) {
+                if (segment.isEmpty() || segment.equals(".") || segment.equals("..") || WorkspaceInternalPaths.recoveryArtifactName(segment)) {
                     return false;
                 }
             }

@@ -25,6 +25,9 @@ public class ProjectFileScannerTest {
         write(".github/workflow.yml");
         write("node_modules/package.js");
         write("target/output.class");
+        write(".shed-edit-fixture.tmp");
+        write(".shed-edit-backup-fixture/original");
+        write("dir/.SHED-EDIT-backup-fixture/original");
         ProjectFileScanner scanner = new ProjectFileScanner();
 
         ProjectFileScanner.ScanResult full = scanner.scan(tempDir, tempDir, 10, ProjectFileScanner.Cancellation.NONE);

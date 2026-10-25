@@ -37,8 +37,8 @@ public record AgentPolicy(Set<Capability> capabilities, List<String> protectedPa
         if (relative == null || relative.isAbsolute() || relative.normalize().startsWith(".."))
             throw new WorkspaceApiException(WorkspaceApiException.Code.OUTSIDE_WORKSPACE, "Path is outside the workspace");
         for (Path segment : relative) {
-            if (segment.toString().equalsIgnoreCase(".git"))
-                throw new WorkspaceApiException(WorkspaceApiException.Code.PROTECTED_PATH, "Git administration is not exposed through file access");
+            if (segment.toString().equalsIgnoreCase(".git") || WorkspaceInternalPaths.recoveryArtifactName(segment.toString()))
+                throw new WorkspaceApiException(WorkspaceApiException.Code.PROTECTED_PATH, "Git administration and internal recovery resources are not exposed through ordinary file access");
         }
         if (matches(excludedPaths, relative))
             throw new WorkspaceApiException(WorkspaceApiException.Code.EXCLUDED_PATH, "Path is excluded from agent access");

@@ -142,3 +142,9 @@ The planner compares current editor text and raw disk bytes independently. It ca
 Open disk-backed documents adopt the restored saved-file reference together with their text, so later ordinary saves retain the correct external-change guards. Previously unsaved editor-only edits stay unsaved. Binding changes invalidate an older asynchronous save completion; that completion cannot replace the newer restored/reloaded/renamed binding. Failed batches restore the previous binding generation as well as text and metadata.
 
 Headless subprocess fixtures abruptly exit during application and during restoration. Reopening their journal and invoking restoration recovers exact UTF-16/BOM/mixed-newline bytes and preserves request idempotency. Further checks cover protected paths, modified retained originals, stale inspection evidence, mixed disk/editor rollback, subsequent saves, human-text conflicts, actual recovery-panel controls, and transport permissions. The clean headless package passed 1,059 tests with zero failures/errors and 83 skips. Native desktop interactions remain unverified, and README.md remains unchanged.
+
+## Recovery artifact boundary
+
+The `.shed-edit-*` namespace is reserved for internal staging and retained originals. Ordinary agent document access, project discovery, workspace indexing and index watches exclude it, including case variants and aliases resolved through the document boundary. This prevents an excluded source file from becoming readable under its temporary recovery name. Index schema version 2 rejects old caches and reserved entries.
+
+Recovery reads use a separate internal path: they authorize the original document and verify the recorded artifact name, original directory, exact identity and digest. Ordinary exclusion does not prevent authorized inspection or restoration. The focused headless query, policy, scanner, index, restoration, recovery, RPC and architecture run passed 41 tests with no failures, errors or skips.

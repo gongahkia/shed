@@ -18,6 +18,24 @@ public class WorkspaceIndexServiceTest {
     @TempDir
     Path tempDir;
 
+    @Test void recoveryArtifactsAreExcludedFromScansWatchesAndStoredIndexes() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("project"));
+        write(root.resolve("source.txt"), "source");
+        write(root.resolve(".shed-edit-fixture.tmp"), "staged");
+        write(root.resolve(".shed-edit-backup-fixture/original"), "original");
+        try (var index = new WorkspaceIndexService(tempDir.resolve("history"), WorkspaceIndexService.IgnoreMatcher.NONE)) {
+            var first = index.build(true, root, WorkspaceIndexService.Observer.NO_OP);
+            assertEquals(List.of("source.txt"), first.index().entries().stream().map(WorkspaceIndexService.Entry::relativePath).toList());
+            write(root.resolve(".shed-edit-later.tmp"), "later staged");
+            var refreshed = index.recover(true, root, WorkspaceIndexService.Cancellation.NONE, WorkspaceIndexService.Observer.NO_OP);
+            assertEquals(List.of("source.txt"), refreshed.index().entries().stream().map(WorkspaceIndexService.Entry::relativePath).toList());
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new WorkspaceIndexService.Entry("sub/.shed-edit-backup-fixture/original", 1, 1));
+            var previous = new java.util.LinkedHashMap<>(first.index().toMap()); previous.put("version", 1);
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> WorkspaceIndexService.WorkspaceIndex.fromMap(previous, root));
+        }
+    }
+
     @Test
     void staysDisabledWithoutCreatingPersistentIndex() throws Exception {
         Path root = Files.createDirectory(tempDir.resolve("workspace"));

@@ -240,6 +240,13 @@ public class Texteditor extends JFrame implements KeyListener {
     static final Pattern HEX_COLOR_VALUE_PATTERN = Pattern.compile("^#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?$");
     static final String WORKSPACE_PROFILE_PREFIX = "workspace-";
 
+    private EditorWorkspaceDocuments workspaceDocumentSource;
+
+    /** Composition seam for explicitly enabled machine/agent adapters; constructing it opens no surface. */
+    WorkspaceQueryService workspaceQueries(Path root, AgentPolicy policy) {
+        return new WorkspaceQueryService(root, policy, workspaceDocumentSource);
+    }
+
     // Constructor
     public Texteditor(String[] args) {
         this(args, new ApplicationErrorReporter());
@@ -293,6 +300,11 @@ public class Texteditor extends JFrame implements KeyListener {
         buffers = new ArrayList<>();
         currentBufferIndex = -1;
         editorPanes = new ArrayList<>();
+        workspaceDocumentSource = new EditorWorkspaceDocuments(() -> List.copyOf(buffers), workspaceController::roots,
+            workspaceController::activeRoot, Path.of("."));
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosed(java.awt.event.WindowEvent event) { workspaceDocumentSource.close(); }
+        });
         activePaneIndex = -1;
         lastCommand = "";
         suppressDocumentEvents = false;
@@ -3382,6 +3394,7 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
         closingDown = true;
+        if (workspaceDocumentSource != null) workspaceDocumentSource.close();
         if (windowPlacementStore != null) windowPlacementStore.save(this);
         disposeMarkdownPreviews();
         if (recoverySnapshotTimer != null) {

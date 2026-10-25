@@ -74,6 +74,35 @@ class DocumentFormatPreservationTest {
         }
     }
 
+    @Test void mixedNewlinesSurviveEditorSavesAndExplicitNormalizationRemainsDirtyDuringAnOlderSave() throws Exception {
+        Path file = Files.writeString(root.resolve("mixed.txt"), "first\r\nmiddle\nlast\r");
+        FileBuffer buffer = new FileBuffer(file.toFile());
+        assertEquals("MIXED", buffer.getLineEndingLabel());
+        buffer.replaceContentUndoably("first\nMIDDLE\nlast\n"); buffer.save();
+        assertEquals("first\r\nMIDDLE\nlast\r", Files.readString(file));
+        buffer.replaceContentUndoably("first\nPENDING\nlast\n");
+        var pending = buffer.captureSaveSnapshot(null);
+        // The preferred style already is CRLF; requesting it explicitly still means normalization.
+        buffer.setLineEnding("\r\n");
+        buffer.writeSaveSnapshot(pending); buffer.completeSaveSnapshot(pending);
+        assertTrue(buffer.isModified()); assertEquals("CRLF", buffer.getLineEndingLabel());
+        buffer.save();
+        assertEquals("first\r\nPENDING\r\nlast\r\n", Files.readString(file));
+        assertFalse(buffer.isModified());
+    }
+
+    @Test void repeatedSavesUseTheSelectedCharsetRatherThanGuessingItFromWrittenBytes() throws Exception {
+        for (String name : List.of("windows-1252", "UTF-32BE")) {
+            Path file = Files.writeString(root.resolve(name + ".txt"), "first\r\nmiddle\nlast\r");
+            var charset = Charset.forName(name);
+            FileBuffer buffer = new FileBuffer(file.toFile());
+            buffer.setEncoding(name); buffer.replaceContentUndoably("first\n€ middle\nlast\n"); buffer.save();
+            buffer.replaceContentUndoably("first\n€ newer\nlast\n");
+            var pending = buffer.captureSaveSnapshot(null); buffer.writeSaveSnapshot(pending); buffer.completeSaveSnapshot(pending);
+            assertEquals("first\r\n€ newer\nlast\r", new String(Files.readAllBytes(file), charset));
+        }
+    }
+
     private static byte[] marked(String text, Charset charset) {
         byte[] prefix = charset.equals(StandardCharsets.UTF_8) ? new byte[]{(byte) 0xef, (byte) 0xbb, (byte) 0xbf}
             : charset.equals(StandardCharsets.UTF_16LE) ? new byte[]{(byte) 0xff, (byte) 0xfe} : new byte[]{(byte) 0xfe, (byte) 0xff};

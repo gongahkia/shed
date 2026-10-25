@@ -1435,7 +1435,11 @@ final class LspController {
         }
         WorkspaceEditTransaction transaction = new WorkspaceEditTransaction();
         try {
-            List<StagedTextWrite> stagedWrites = prepareStagedTextWrites(plan.stagedTextByPath, transaction);
+            for (Map.Entry<Path, String> expected : plan.diskVersions.entrySet()) {
+                var current = WorkspaceTextFile.capture(WorkspacePaths.id(expected.getKey().getParent()), expected.getKey(), true);
+                if (!expected.getValue().equals(current.document().version())) throw new IOException("File changed since preflight: " + expected.getKey());
+            }
+            List<StagedTextWrite> stagedWrites = prepareStagedTextWrites(plan, transaction);
             applyResourceActions(plan.resourceActions, transaction);
             applyStagedTextWrites(stagedWrites, transaction);
             transaction.commit();
@@ -1488,7 +1492,7 @@ final class LspController {
                     String pathKey = path.toString();
                     String currentText = plan.stagedTextByPath.containsKey(pathKey)
                         ? plan.stagedTextByPath.get(pathKey)
-                        : readWorkspaceTextForEdit(path);
+                        : readWorkspaceTextForEdit(path, plan);
                     if (currentText == null) {
                         failWorkspacePreflight(result, "text edit target missing: " + path);
                         return null;
@@ -1549,13 +1553,11 @@ final class LspController {
                         if (plan.stagedTextByPath.containsKey(oldKey)) {
                             plan.stagedTextByPath.put(newKey, plan.stagedTextByPath.remove(oldKey));
                         } else if (Files.isRegularFile(oldPath)) {
-                            try {
-                                plan.stagedTextByPath.put(newKey, Files.readString(oldPath, StandardCharsets.UTF_8));
-                            } catch (IOException e) {
-                                failWorkspacePreflight(result, "rename source unreadable: " + oldPath);
-                                return null;
-                            }
+                            String original = readWorkspaceTextForEdit(oldPath, plan);
+                            // Resource-only renames also support binary/non-text files.
+                            if (original != null) plan.stagedTextByPath.put(newKey, original);
                         }
+                        if (plan.diskImages.containsKey(oldKey)) plan.diskImages.put(newKey, plan.diskImages.remove(oldKey));
                         plan.resourceActions.add(ResourceAction.rename(oldPath, newPath, operation.isOverwrite()));
                         plan.touchedPaths.add(oldKey);
                         plan.touchedPaths.add(newKey);
@@ -1611,7 +1613,7 @@ final class LspController {
     }
 
 
-    private String readWorkspaceTextForEdit(Path path) {
+    private String readWorkspaceTextForEdit(Path path, WorkspaceEditPlan plan) {
         if (editor != null) {
             FileBuffer buffer = editor.findBufferByPath(path.toFile());
             if (buffer != null) {
@@ -1622,8 +1624,11 @@ final class LspController {
             return null;
         }
         try {
-            return Files.readString(path, StandardCharsets.UTF_8);
-        } catch (IOException e) {
+            var snapshot = WorkspaceTextFile.capture(WorkspacePaths.id(path.getParent()), path, true);
+            plan.diskImages.put(path.toString(), snapshot.image());
+            plan.diskVersions.put(path, snapshot.document().version());
+            return snapshot.document().content();
+        } catch (WorkspaceApiException e) {
             return null;
         }
     }
@@ -1647,7 +1652,7 @@ final class LspController {
 
 
     private void renameWorkspaceFile(Path oldPath, Path newPath, boolean overwrite, WorkspaceEditTransaction transaction) throws IOException {
-        FileBuffer buffer = editor.findBufferByPath(oldPath.toFile());
+        FileBuffer buffer = editor == null ? null : editor.findBufferByPath(oldPath.toFile());
         transaction.rename(oldPath, newPath, overwrite);
         if (buffer != null) transaction.addRollback("restore buffer path " + oldPath, () -> buffer.retargetFile(oldPath.toFile()));
         if (buffer != null) {
@@ -1657,7 +1662,7 @@ final class LspController {
 
 
     private void deleteWorkspacePath(Path path, boolean recursive, WorkspaceEditTransaction transaction) throws IOException {
-        FileBuffer buffer = editor.findBufferByPath(path.toFile());
+        FileBuffer buffer = editor == null ? null : editor.findBufferByPath(path.toFile());
         transaction.delete(path);
         if (buffer != null) {
             transaction.addCommit(() -> removeDeletedBuffer(buffer));
@@ -1665,11 +1670,13 @@ final class LspController {
     }
 
 
-    private List<StagedTextWrite> prepareStagedTextWrites(Map<String, String> stagedTextByPath, WorkspaceEditTransaction transaction) throws IOException {
+    private List<StagedTextWrite> prepareStagedTextWrites(WorkspaceEditPlan plan, WorkspaceEditTransaction transaction) throws IOException {
         List<StagedTextWrite> writes = new ArrayList<>();
-        for (Map.Entry<String, String> entry : stagedTextByPath.entrySet()) {
+        for (Map.Entry<String, String> entry : plan.stagedTextByPath.entrySet()) {
             Path path = Path.of(entry.getKey());
-            Path temp = transaction.stage(path, entry.getValue().getBytes(StandardCharsets.UTF_8));
+            TextFileCodec.Image image = plan.diskImages.get(entry.getKey());
+            byte[] bytes = image == null ? TextFileCodec.encodeRaw(entry.getValue(), "UTF-8", false) : image.encode(entry.getValue());
+            Path temp = transaction.stage(path, bytes);
             writes.add(new StagedTextWrite(path, entry.getValue(), temp));
         }
         return writes;
@@ -1678,7 +1685,7 @@ final class LspController {
 
     private void applyStagedTextWrites(List<StagedTextWrite> writes, WorkspaceEditTransaction transaction) throws IOException {
         for (StagedTextWrite write : writes) {
-            FileBuffer buffer = editor.findBufferByPath(write.path.toFile());
+            FileBuffer buffer = editor == null ? null : editor.findBufferByPath(write.path.toFile());
             if (buffer != null) {
                 applyStagedTextToBuffer(buffer, write.text, transaction);
             } else {
@@ -2772,6 +2779,8 @@ final class LspController {
 
     static final class WorkspaceEditPlan {
         final Map<String, String> stagedTextByPath = new LinkedHashMap<>();
+        final Map<String, TextFileCodec.Image> diskImages = new LinkedHashMap<>();
+        final Map<Path, String> diskVersions = new LinkedHashMap<>();
         final List<ResourceAction> resourceActions = new ArrayList<>();
         final Set<String> touchedPaths = new LinkedHashSet<>();
         int appliedEditCount;

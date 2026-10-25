@@ -29,6 +29,9 @@ record SearchPattern(String query, boolean caseSensitive, boolean regex, boolean
         return matcher(compile(), text, cancelled);
     }
     Matcher matcher(Pattern compiled, String text, BooleanSupplier cancelled) {
+        return checkedMatcher(compiled, text, cancelled);
+    }
+    static Matcher checkedMatcher(Pattern compiled, String text, BooleanSupplier cancelled) {
         check(cancelled);
         return compiled.matcher(new CheckedText(text, cancelled, System.nanoTime() + 1_000_000_000L));
     }

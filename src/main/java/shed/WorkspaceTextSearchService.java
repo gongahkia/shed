@@ -64,7 +64,7 @@ final class WorkspaceTextSearchService {
                 for (WorkspaceIndexService.Entry entry : indexed.index().entries()) {
                     if (stop.isCancelled()) throw new java.util.concurrent.CancellationException();
                     Path relative = Path.of(entry.relativePath());
-                    if (!filter.accepts(relative)) continue;
+                    if (!filter.accepts(relative, stop::isCancelled)) continue;
                     Path file = root.resolve(relative).normalize();
                     if (!file.startsWith(root) || !readableRegularFile(file)) { unreadable++; continue; }
                     if (!visited.add(WorkspaceRootResolver.normalizedIdentity(file))) continue;

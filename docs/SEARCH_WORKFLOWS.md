@@ -8,6 +8,8 @@ Workspace Search streams UTF-8 files line by line, so regexes that consume newli
 
 Include and Exclude accept comma-separated root-relative globs. `**/*.{java,kt}` includes Java and Kotlin at any depth, including the workspace root. `build/**,**/generated/**` excludes generated directories. A pattern without `/` also matches basenames. Exclusions win, and includes cannot override workspace ignore rules.
 
+Path filters use the same cancellable matching guard as text expressions, including a one-second budget per match. Cancellation can interrupt a complex glob while it is backtracking, rather than waiting for the next file. Invalid glob syntax remains an error.
+
 **In Files** transfers the inline query and options to Search; **Current File** transfers them back. **Replace…** also carries the include/exclude filters to Replace. Enable project replacement explicitly, enter replacement text, then Preview. Literal mode preserves `$` and backslashes; regex mode supports `$1` and `${name}` groups. Review each expanded replacement and deselect individual files/matches before Apply Selected. Changing any query, replacement, filter or scope invalidates the previous preview. Discard also invalidates an in-flight preview.
 
 Apply requires a complete preview and confirmation. Selected files with unsaved editor changes block application; files changed on disk since preview are skipped. Existing atomic writes and configured backups remain in use. A workspace replacement updates disk files; existing external-change handling reconciles open documents. It is not one global editor undo transaction. Current-file Replace All remains a single undo operation.

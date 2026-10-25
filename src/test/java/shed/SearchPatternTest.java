@@ -41,4 +41,28 @@ class SearchPatternTest {
         assertFalse(filters.accepts(Path.of("notes.txt")));
         assertThrows(IllegalArgumentException.class, () -> new SearchFileFilter("[", ""));
     }
+
+    @Test void cancellableGlobsRetainNativeSyntaxAcrossGroupsRangesAndLiteralMetacharacters() {
+        var filesystem = java.nio.file.FileSystems.getDefault();
+        for (String glob : List.of("**/*.java", "*.{java,kt}", "a?*.txt", "src/[a-z]*.java", "src/[!A-Z]*.java",
+            "[[]literal].txt", "foo}", "{src,lib}/**", "a+b.*", "**/generated/**", "[^x].txt", "[a-c&].txt", "[!a-c].txt", "[-ab].txt", "[a-].txt", "{x,y,}.*")) {
+            var nativePattern = filesystem.getPathMatcher("glob:" + glob);
+            var rootPattern = glob.startsWith("**/") ? filesystem.getPathMatcher("glob:" + glob.substring(3)) : null;
+            var filter = new SearchFileFilter(glob, "");
+            for (String name : List.of("Main.java", "main.kt", "src/Main.java", "src/main.java", "src/a/b.java", "ab.txt", "abc.txt", "lib/a.txt",
+                "[literal].txt", "foo}", "a+b.txt", "generated/a.java", "src/generated/a.java", "^.txt", "&.txt", "-.txt", "x.txt", ".txt", "é.txt")) {
+                Path path = Path.of(name);
+                boolean expected = nativePattern.matches(path) || !glob.contains("/") && nativePattern.matches(path.getFileName())
+                    || rootPattern != null && rootPattern.matches(path);
+                assertEquals(expected, filter.accepts(path), glob + " against " + name);
+            }
+        }
+    }
+
+    @Test void pathologicalPathGlobsCanBeCancelledDuringBacktracking() {
+        AtomicInteger checks = new AtomicInteger();
+        var filter = new SearchFileFilter("*a".repeat(64) + "b", "");
+        assertThrows(CancellationException.class,
+            () -> filter.accepts(Path.of("a".repeat(20_000) + "c"), () -> checks.incrementAndGet() > 5));
+    }
 }

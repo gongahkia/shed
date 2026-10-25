@@ -107,7 +107,7 @@ final class WorkspaceReplaceService {
                     if (stop.isCancelled()) throw new java.util.concurrent.CancellationException();
                     Path relative = Path.of(entry.relativePath());
                     Path file = root.resolve(relative).normalize();
-                    if (!filter.accepts(relative) || !file.startsWith(root) || !readableRegularFile(file)
+                    if (!filter.accepts(relative, stop::isCancelled) || !file.startsWith(root) || !readableRegularFile(file)
                         || scopeFile != null && !WorkspaceRootResolver.normalizedIdentity(file).equals(WorkspaceRootResolver.normalizedIdentity(scopeFile))
                         || !visited.add(WorkspaceRootResolver.normalizedIdentity(file))) continue;
                     String content;

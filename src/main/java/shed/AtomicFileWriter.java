@@ -169,7 +169,7 @@ final class AtomicFileWriter {
         return path;
     }
 
-    private static void copyMetadata(Path source, Path target) throws IOException {
+    static void copyMetadata(Path source, Path target) throws IOException {
         if (!Files.exists(source, LinkOption.NOFOLLOW_LINKS)) return;
         java.nio.file.attribute.PosixFileAttributeView posix = Files.getFileAttributeView(
             source, java.nio.file.attribute.PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);

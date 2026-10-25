@@ -2320,18 +2320,6 @@ public class Texteditor extends JFrame implements KeyListener {
         return lspController.applyWorkspaceTextEdits(edits);
     }
 
-    int applyTextEditsToCurrentArea(List<LspClient.TextEdit> edits) {
-        return lspController.applyTextEditsToCurrentArea(edits);
-    }
-
-    int applyTextEditsToBuffer(FileBuffer buffer, List<LspClient.TextEdit> edits) {
-        return lspController.applyTextEditsToBuffer(buffer, edits);
-    }
-
-    int applyTextEditsToFile(String filePath, List<LspClient.TextEdit> edits) {
-        return lspController.applyTextEditsToFile(filePath, edits);
-    }
-
     String applyResolvedTextEdits(String text, List<ResolvedTextEdit> resolvedEdits) {
         return lspController.applyResolvedTextEdits(text, resolvedEdits);
     }

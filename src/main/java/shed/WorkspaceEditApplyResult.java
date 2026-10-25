@@ -6,6 +6,7 @@ final class WorkspaceEditApplyResult {
     int touchedFiles;
     int failedFiles;
     String failureReason;
+    String recoveryNotice = "";
 
     WorkspaceEditApplyResult() {
         this.appliedEditCount = 0;

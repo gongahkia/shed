@@ -10,11 +10,8 @@ import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.List;
 
@@ -884,7 +881,8 @@ final class LspController {
         if (edits.isEmpty()) return "No formatting edits";
         WorkspaceEditApplyResult result = applyWorkspaceTextEdits(edits);
         if (result.appliedEditCount <= 0) return result.failureReason == null ? "Formatting produced no applicable edits" : "Formatting failed: " + result.failureReason;
-        return "Applied " + result.appliedEditCount + " formatting edit" + (result.appliedEditCount == 1 ? "" : "s");
+        return "Applied " + result.appliedEditCount + " formatting edit" + (result.appliedEditCount == 1 ? "" : "s")
+            + (result.recoveryNotice.isEmpty() ? "" : "; " + result.recoveryNotice);
     }
 
 
@@ -1046,7 +1044,8 @@ final class LspController {
         if (applyResult.appliedEditCount <= 0) {
             editor.pendingLspRenameEdits = null;
             editor.pendingLspRenameTarget = null;
-            return "Pending rename had no applicable edits";
+            return applyResult.failureReason == null || applyResult.failureReason.isBlank()
+                ? "Pending rename had no applicable edits" : "Rename failed: " + applyResult.failureReason;
         }
         StringBuilder message = new StringBuilder();
         message.append("Applied ")
@@ -1060,6 +1059,7 @@ final class LspController {
         if (applyResult.failedFiles > 0) {
             message.append(" (").append(applyResult.failedFiles).append(" file failures)");
         }
+        if (!applyResult.recoveryNotice.isEmpty()) message.append("; ").append(applyResult.recoveryNotice);
         editor.pendingLspRenameEdits = null;
         editor.pendingLspRenameTarget = null;
         return message.toString();
@@ -1211,7 +1211,8 @@ final class LspController {
         if (applyResult.appliedEditCount == 0 && applyResult.appliedResourceOperationCount == 0) {
             return applyResult.failureReason == null || applyResult.failureReason.isBlank() ? "Code action produced no applicable edit" : "Code action failed: " + applyResult.failureReason;
         }
-        return "Applied code action: " + action.getTitle();
+        return "Applied code action: " + action.getTitle()
+            + (applyResult.recoveryNotice.isEmpty() ? "" : "; " + applyResult.recoveryNotice);
     }
 
 
@@ -1442,11 +1443,14 @@ final class LspController {
             result.appliedResourceOperationCount = plan.resourceActions.size();
             result.touchedFiles = plan.touchedPaths.size();
         } catch (IOException | RuntimeException e) {
-            transaction.rollbackQuietly();
+            transaction.rollback();
             result.failedFiles++;
             result.failureReason = e.getMessage();
         } finally {
-            transaction.cleanupTempsQuietly();
+            WorkspaceEditTransaction.Report report = transaction.cleanup();
+            result.recoveryNotice = report.notice();
+            if (!result.recoveryNotice.isEmpty() && result.failedFiles > 0)
+                result.failureReason = Objects.toString(result.failureReason, "Workspace edit failed") + "; " + result.recoveryNotice;
         }
         return result;
     }
@@ -1629,7 +1633,7 @@ final class LspController {
         for (ResourceAction action : actions) {
             switch (action.kind) {
                 case CREATE:
-                    createWorkspaceFile(action.path);
+                    // New-file content and parent directories are already staged by the transaction.
                     break;
                 case RENAME:
                     renameWorkspaceFile(action.path, action.targetPath, action.overwrite, transaction);
@@ -1642,43 +1646,10 @@ final class LspController {
     }
 
 
-    private void createWorkspaceFile(Path path) throws IOException {
-        Path parent = path.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-    }
-
-
     private void renameWorkspaceFile(Path oldPath, Path newPath, boolean overwrite, WorkspaceEditTransaction transaction) throws IOException {
         FileBuffer buffer = editor.findBufferByPath(oldPath.toFile());
-        Path parent = newPath.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-        Path overwrittenBackup = null;
-        if (overwrite && Files.exists(newPath)) {
-            overwrittenBackup = moveToBackup(newPath);
-            transaction.trackBackup(overwrittenBackup);
-        }
-        Path overwrittenBackupRef = overwrittenBackup;
-        if (overwrittenBackupRef != null) {
-            transaction.addRollback(() -> {
-                if (Files.exists(overwrittenBackupRef)) {
-                    movePath(overwrittenBackupRef, newPath, true);
-                }
-            });
-        }
-        movePath(oldPath, newPath, false);
-        transaction.addRollback(() -> {
-            movePath(newPath, oldPath, true);
-            if (overwrittenBackupRef != null && Files.exists(overwrittenBackupRef)) {
-                movePath(overwrittenBackupRef, newPath, true);
-            }
-            if (buffer != null) {
-                buffer.retargetFile(oldPath.toFile());
-            }
-        });
+        transaction.rename(oldPath, newPath, overwrite);
+        if (buffer != null) transaction.addRollback("restore buffer path " + oldPath, () -> buffer.retargetFile(oldPath.toFile()));
         if (buffer != null) {
             buffer.retargetFile(newPath.toFile());
         }
@@ -1687,9 +1658,7 @@ final class LspController {
 
     private void deleteWorkspacePath(Path path, boolean recursive, WorkspaceEditTransaction transaction) throws IOException {
         FileBuffer buffer = editor.findBufferByPath(path.toFile());
-        Path backup = moveToBackup(path);
-        transaction.trackBackup(backup);
-        transaction.addRollback(() -> movePath(backup, path, true));
+        transaction.delete(path);
         if (buffer != null) {
             transaction.addCommit(() -> removeDeletedBuffer(buffer));
         }
@@ -1700,8 +1669,7 @@ final class LspController {
         List<StagedTextWrite> writes = new ArrayList<>();
         for (Map.Entry<String, String> entry : stagedTextByPath.entrySet()) {
             Path path = Path.of(entry.getKey());
-            Path temp = writeTempFileFor(path, entry.getValue());
-            transaction.trackTemp(temp);
+            Path temp = transaction.stage(path, entry.getValue().getBytes(StandardCharsets.UTF_8));
             writes.add(new StagedTextWrite(path, entry.getValue(), temp));
         }
         return writes;
@@ -1744,86 +1712,8 @@ final class LspController {
     }
 
 
-    private Path writeTempFileFor(Path path, String text) throws IOException {
-        Path parent = path.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-        Path temp = Files.createTempFile(parent == null ? Path.of(".") : parent, "shed-lsp-", ".tmp");
-        Files.writeString(temp, text == null ? "" : text, StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING);
-        return temp;
-    }
-
-
     private void writeFileAtomically(Path path, Path temp, WorkspaceEditTransaction transaction) throws IOException {
-        if (Files.isDirectory(path)) {
-            throw new IOException("write target is directory: " + path);
-        }
-        Path backup = null;
-        boolean existed = Files.exists(path);
-        if (existed) {
-            backup = moveToBackup(path);
-            transaction.trackBackup(backup);
-        }
-        Path backupRef = backup;
-        transaction.addRollback(() -> {
-            Files.deleteIfExists(path);
-            if (backupRef != null && Files.exists(backupRef)) {
-                movePath(backupRef, path, true);
-            }
-        });
-        movePath(temp, path, true);
-    }
-
-
-    private Path moveToBackup(Path path) throws IOException {
-        Path parent = path.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-        Path backup = Files.isDirectory(path)
-            ? Files.createTempDirectory(parent == null ? Path.of(".") : parent, "shed-lsp-backup-")
-            : Files.createTempFile(parent == null ? Path.of(".") : parent, "shed-lsp-backup-", ".tmp");
-        if (Files.exists(backup)) {
-            deletePathRecursively(backup);
-        }
-        movePath(path, backup, true);
-        return backup;
-    }
-
-
-    private void movePath(Path from, Path to, boolean replace) throws IOException {
-        Path parent = to.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-        List<StandardCopyOption> options = new ArrayList<>();
-        if (replace) {
-            options.add(StandardCopyOption.REPLACE_EXISTING);
-        }
-        options.add(StandardCopyOption.ATOMIC_MOVE);
-        try {
-            Files.move(from, to, options.toArray(new StandardCopyOption[0]));
-        } catch (AtomicMoveNotSupportedException e) {
-            options.remove(StandardCopyOption.ATOMIC_MOVE);
-            Files.move(from, to, options.toArray(new StandardCopyOption[0]));
-        }
-    }
-
-
-    private void deletePathRecursively(Path path) throws IOException {
-        if (!Files.exists(path)) {
-            return;
-        }
-        if (Files.isDirectory(path)) {
-            try (java.util.stream.Stream<Path> paths = Files.walk(path)) {
-                for (Path candidate : paths.sorted(Comparator.reverseOrder()).toList()) {
-                    Files.deleteIfExists(candidate);
-                }
-            }
-            return;
-        }
-        Files.deleteIfExists(path);
+        transaction.replace(path, temp);
     }
 
 
@@ -1989,59 +1879,6 @@ final class LspController {
             }
         }
         return false;
-    }
-
-
-    int applyTextEditsToCurrentArea(List<LspClient.TextEdit> edits) {
-        List<ResolvedTextEdit> resolved = resolveTextEdits(editor.writingArea.getText(), edits);
-        if (resolved.isEmpty()) {
-            return 0;
-        }
-        for (ResolvedTextEdit edit : resolved) {
-            editor.writingArea.replaceRange(edit.newText, edit.startOffset, edit.endOffset);
-        }
-        editor.markModified();
-        return resolved.size();
-    }
-
-
-    int applyTextEditsToBuffer(FileBuffer buffer, List<LspClient.TextEdit> edits) {
-        if (buffer == null) {
-            return 0;
-        }
-        String currentText = buffer == editor.getCurrentBuffer() ? editor.writingArea.getText() : buffer.getContent();
-        List<ResolvedTextEdit> resolved = resolveTextEdits(currentText, edits);
-        if (resolved.isEmpty()) {
-            return 0;
-        }
-        String updated = applyResolvedTextEdits(currentText, resolved);
-        if (buffer == editor.getCurrentBuffer()) {
-            editor.writingArea.setText(updated);
-            editor.markModified();
-        } else {
-            buffer.setContent(updated, true);
-        }
-        return resolved.size();
-    }
-
-
-    int applyTextEditsToFile(String filePath, List<LspClient.TextEdit> edits) {
-        try {
-            File file = new File(filePath);
-            if (!file.exists() || !file.isFile()) {
-                return 0;
-            }
-            String currentText = Files.readString(file.toPath(), StandardCharsets.UTF_8);
-            List<ResolvedTextEdit> resolved = resolveTextEdits(currentText, edits);
-            if (resolved.isEmpty()) {
-                return 0;
-            }
-            String updated = applyResolvedTextEdits(currentText, resolved);
-            Files.writeString(file.toPath(), updated, StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING);
-            return resolved.size();
-        } catch (IOException e) {
-            return 0;
-        }
     }
 
 
@@ -2941,11 +2778,6 @@ final class LspController {
     }
 
 
-    interface WorkspaceEditIoAction {
-        void run() throws IOException;
-    }
-
-
     static final class StagedTextWrite {
         final Path path;
         final String text;
@@ -2955,75 +2787,6 @@ final class LspController {
             this.path = path;
             this.text = text;
             this.tempPath = tempPath;
-        }
-    }
-
-
-    final class WorkspaceEditTransaction {
-        private final List<WorkspaceEditIoAction> rollbackActions = new ArrayList<>();
-        private final List<WorkspaceEditIoAction> commitActions = new ArrayList<>();
-        private final List<Path> temps = new ArrayList<>();
-        private final List<Path> backups = new ArrayList<>();
-        private boolean committed;
-
-        void addRollback(WorkspaceEditIoAction action) {
-            if (action != null) {
-                rollbackActions.add(action);
-            }
-        }
-
-        void addCommit(WorkspaceEditIoAction action) {
-            if (action != null) {
-                commitActions.add(action);
-            }
-        }
-
-        void trackTemp(Path path) {
-            if (path != null) {
-                temps.add(path);
-            }
-        }
-
-        void trackBackup(Path path) {
-            if (path != null) {
-                backups.add(path);
-            }
-        }
-
-        void commit() throws IOException {
-            for (WorkspaceEditIoAction action : commitActions) {
-                action.run();
-            }
-            committed = true;
-        }
-
-        void rollbackQuietly() {
-            if (committed) {
-                return;
-            }
-            for (int i = rollbackActions.size() - 1; i >= 0; i--) {
-                try {
-                    rollbackActions.get(i).run();
-                } catch (IOException ignored) {
-                }
-            }
-        }
-
-        void cleanupTempsQuietly() {
-            for (Path temp : temps) {
-                try {
-                    deletePathRecursively(temp);
-                } catch (IOException ignored) {
-                }
-            }
-            if (committed) {
-                for (Path backup : backups) {
-                    try {
-                        deletePathRecursively(backup);
-                    } catch (IOException ignored) {
-                    }
-                }
-            }
         }
     }
 

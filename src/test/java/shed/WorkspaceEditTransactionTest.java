@@ -13,6 +13,16 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkspaceEditTransactionTest {
     @TempDir Path root;
 
+    @Test void abandoningUninstalledStagingAlsoRemovesItsNewEmptyParentDirectories() throws Exception {
+        Path target = root.resolve("new/nested/file");
+        try (var transaction = new WorkspaceEditTransaction()) {
+            transaction.stage(target, "unaccepted".getBytes(StandardCharsets.UTF_8));
+            assertEquals(WorkspaceEditTransaction.State.ROLLED_BACK, transaction.rollback().state());
+            assertTrue(transaction.cleanup().failures().isEmpty());
+        }
+        assertFalse(Files.exists(root.resolve("new")));
+    }
+
     @Test void createHasAnAtomicAbsentTargetPreconditionEvenAfterItsIntentWasRecorded() throws Exception {
         Path target = root.resolve("new");
         try (var transaction = new WorkspaceEditTransaction(step -> {

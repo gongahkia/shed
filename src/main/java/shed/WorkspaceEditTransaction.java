@@ -216,6 +216,14 @@ final class WorkspaceEditTransaction implements AutoCloseable {
     Report rollback() {
         if (state != State.OPEN && state != State.PREPARED) return report();
         boolean failed = false;
+        // Uninstalled staging files otherwise keep newly created parent directories nonempty.
+        for (var temporary : temps.entrySet()) {
+            if (!exists(temporary.getKey())) continue;
+            try { requireMatching(temporary.getKey(), temporary.getValue()); Files.delete(temporary.getKey()); }
+            catch (IOException | RuntimeException failure) {
+                failed = true; failures.add(new Failure("rollback", "remove staged text " + temporary.getKey(), message(failure)));
+            }
+        }
         for (int i = undo.size() - 1; i >= 0; i--) {
             Action action = undo.get(i);
             try { action.action().run(); }

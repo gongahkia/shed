@@ -149,6 +149,8 @@ public class HelpService {
                     + "In Agents, select a proposal and review every document. Edit text or select hunks, then Save review.\n"
                     + "Apply proposal accepts all saved selections. Open buffers stay unsaved; closed files are written.\n"
                     + "Rebase for review preserves disjoint human edits; Undo proposal refuses overlapping later edits.\n"
+                    + "For interrupted operations, Inspect recovery compares recorded and current contents.\n"
+                    + "Record verified outcome updates history only when the inspected evidence is still exact. Mixed or missing results need further recovery.\n"
                     + "Search, ACP/MCP and agent sessions remain unavailable through this initial API.\n";
             case "keymap":
             case "keymaps":

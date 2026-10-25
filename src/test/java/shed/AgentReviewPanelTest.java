@@ -26,6 +26,21 @@ class AgentReviewPanelTest {
 
     @AfterEach void close() { if (jobs != null) jobs.shutdownNow(); }
 
+    @Test void interruptedProposalCanBeInspectedAndItsVerifiedOutcomeRecordedThroughHumanControls() throws Exception {
+        var scope = scope("project"); current.set(scope);
+        Path file = Files.writeString(scope.root().resolve("source"), "old\r\n");
+        String workspaceId = WorkspacePaths.id(scope.root().toRealPath());
+        Path storage = scope.sessions().resolve("agent-workspace").resolve(workspaceId);
+        WorkspaceProposalRecoveryTest.interruptedApply(scope.root(), storage, scope.service(), List.of("source"));
+        Files.writeString(file, "new\r\n");
+        open(); await(() -> button("inspect").isEnabled());
+        edt(() -> { assertFalse(button("apply").isEnabled()); assertFalse(button("reconcile").isEnabled()); button("inspect").doClick(); });
+        await(() -> button("reconcile").isEnabled());
+        edt(() -> { assertTrue(text("recoveryDetails").getText().contains("APPLIED")); button("reconcile").doClick(); });
+        await(() -> button("undo").isEnabled());
+        assertEquals("new\r\n", Files.readString(file));
+    }
+
     @Test void humanCanSelectHunksEditTextApplyEveryDocumentAndUndoWithoutAFrame() throws Exception {
         var scope = scope("project"); current.set(scope);
         Path file = Files.writeString(scope.root().resolve("first"), "first\nmiddle\nlast\n");

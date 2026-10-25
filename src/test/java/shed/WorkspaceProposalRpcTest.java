@@ -13,6 +13,22 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkspaceProposalRpcTest {
     @TempDir Path temporary;
 
+    @Test void recoveryEvidenceIsReadableButReconciliationRequiresAnInspectedRevisionAndApplyPermission() throws Exception {
+        Path root = Files.createDirectory(temporary.resolve("project")), storage = temporary.resolve("history");
+        Files.writeString(root.resolve("a.txt"), "old\r\n");
+        var queries = queries(root, true); var service = new WorkspaceProposalService(queries, null, storage, "human");
+        String id = WorkspaceProposalRecoveryTest.interruptedApply(root, storage, service, List.of("a.txt"));
+        Files.writeString(root.resolve("a.txt"), "new\r\n");
+        var readerQueries = queries(root, false);
+        var reader = new WorkspaceRpc(readerQueries, new WorkspaceProposalService(readerQueries, null, storage, "agent"));
+        var evidence = result(call(reader, "proposals/recovery", Map.of("workspaceId", queries.workspaceId(), "id", id)));
+        var params = Map.<String, Object>of("workspaceId", queries.workspaceId(), "id", id, "revision", 1, "fingerprint", evidence.get("fingerprint"));
+        assertEquals("PERMISSION_DENIED", code(call(reader, "proposals/reconcile", params)));
+        var reviewer = new WorkspaceRpc(queries, service);
+        assertEquals("APPLIED", result(call(reviewer, "proposals/reconcile", params)).get("status"));
+        assertEquals("new\r\n", Files.readString(root.resolve("a.txt")));
+    }
+
     @Test void connectedProposalWorkflowPersistsReviewAndNeverGrantsTheClientApply() throws Exception {
         Path root = Files.createDirectory(temporary.resolve("project")), storage = temporary.resolve("history");
         Path file = Files.writeString(root.resolve("a.txt"), "first\nmiddle\nlast\n");

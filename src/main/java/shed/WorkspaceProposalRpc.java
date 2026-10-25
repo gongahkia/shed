@@ -10,7 +10,7 @@ import java.util.Set;
 /** Transport validation and bounded review pages; never supplies the authenticated actor. */
 final class WorkspaceProposalRpc {
     static final List<String> OPERATIONS = List.of("proposals/list", "proposals/read", "proposals/propose", "proposals/revise",
-        "proposals/reject", "proposals/apply", "proposals/undo", "proposals/rebase");
+        "proposals/reject", "proposals/apply", "proposals/undo", "proposals/rebase", "proposals/recovery", "proposals/reconcile");
     private final WorkspaceQueryService workspace;
     private final WorkspaceProposalService proposals;
 
@@ -36,6 +36,13 @@ final class WorkspaceProposalRpc {
                 yield result;
             }
             case "proposals/read" -> read(params);
+            case "proposals/recovery" -> {
+                fields(params, Set.of("workspaceId", "id")); yield proposals.recovery(id(params));
+            }
+            case "proposals/reconcile" -> {
+                fields(params, Set.of("workspaceId", "id", "revision", "fingerprint"));
+                yield proposals.reconcile(id(params), revision(params), string(params, "fingerprint", true, 64));
+            }
             case "proposals/propose" -> {
                 fields(params, Set.of("workspaceId", "requestId", "taskId", "turnId", "changes"));
                 var values = MiniJson.asArray(params.get("changes"));
@@ -120,7 +127,7 @@ final class WorkspaceProposalRpc {
 
     private static AgentPolicy.Capability capability(String method) {
         return switch (method) {
-            case "proposals/list", "proposals/read" -> AgentPolicy.Capability.READ;
+            case "proposals/list", "proposals/read", "proposals/recovery" -> AgentPolicy.Capability.READ;
             case "proposals/propose", "proposals/revise", "proposals/reject" -> AgentPolicy.Capability.PROPOSE;
             default -> AgentPolicy.Capability.APPLY;
         };

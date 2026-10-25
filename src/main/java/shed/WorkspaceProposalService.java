@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /** Durable, versioned text proposals. UI and transports share this application path. */
@@ -173,6 +174,100 @@ final class WorkspaceProposalService {
     Map<String, Object> apply(String id, int revision) { return applyOrUndo(id, revision, false); }
     Map<String, Object> undo(String id, int revision) { return applyOrUndo(id, revision, true); }
 
+    Map<String, Object> recovery(String id) {
+        workspace.policy().require(AgentPolicy.Capability.READ);
+        try (var lease = journal.open(false)) {
+            var entry = entry(lease, id);
+            return recovery(lease, entry);
+        } catch (IOException unavailable) { throw storageFailure(id); }
+    }
+
+    /** Reconciles evidence only; never rewrites a file or an editor buffer. */
+    Map<String, Object> reconcile(String id, int revision, String fingerprint) {
+        workspace.policy().require(AgentPolicy.Capability.APPLY);
+        required(fingerprint, "fingerprint", 64);
+        try (var lease = journal.open(false)) {
+            var entry = entry(lease, id);
+            if (Long.valueOf(revision).equals(entry.data().get("reconciledRevision")) && fingerprint.equals(entry.data().get("reconciledFingerprint"))) return summary(entry);
+            if (entry.revision() != revision || !Set.of("APPLYING", "UNDOING", "RECOVERY_REQUIRED").contains(entry.data().get("status")))
+                throw failure(WorkspaceApiException.Code.CONFLICT, "Only the inspected interrupted revision can be reconciled");
+            for (var change : changes(entry.data())) {
+                Object uri = change.get("uri");
+                if (uri != null) {
+                    Path relative = workspace.root().relativize(WorkspacePaths.resolve(workspace.root(), (String) uri));
+                    workspace.policy().checkPath(relative, AgentPolicy.Capability.APPLY);
+                    var constraints = object(entry.data().get("constraints"));
+                    new AgentPolicy(workspace.policy().capabilities(), strings(constraints.get("protectedPaths")),
+                        strings(constraints.get("excludedPaths")), workspace.policy().backgroundOnly()).checkPath(relative, AgentPolicy.Capability.APPLY);
+                }
+            }
+            var inspection = recovery(lease, entry);
+            if (!fingerprint.equals(inspection.get("fingerprint"))) throw failure(WorkspaceApiException.Code.STALE_VERSION, "Recovery evidence changed; inspect it again");
+            String outcome = (String) inspection.get("verifiedOutcome");
+            if (outcome == null) throw failure(WorkspaceApiException.Code.CONFLICT, "The interrupted operation has mixed, missing or changed contents; manual recovery is still required");
+            boolean undo = "UNDO".equals(entry.data().get("operationKind"));
+            var data = new LinkedHashMap<>(entry.data());
+            data.put("status", outcome); data.put("reviewedBy", actor); data.put("reconciledRevision", revision);
+            data.put("reconciledFingerprint", fingerprint); data.put("reconciledAt", Instant.now().toString());
+            data.put("recoveryEvidence", inspection.get("documents")); data.remove("error");
+            if (!data.containsKey("pendingSaveAtApplication")) data.put("pendingSaveAtApplication",
+                MiniJson.asArray(data.get("operation")).stream().anyMatch(item -> "EDITOR".equals(object(item).get("source"))));
+            if (undo && "APPLIED".equals(outcome)) {
+                data.put("operation", data.get("appliedOperation")); data.put("operationKind", "APPLY");
+                data.put("resourceSteps", data.getOrDefault("appliedResourceSteps", List.of()));
+            }
+            data.put("recovery", "Outcome reconciled from inspected contents. Retained filesystem artifacts were not removed.");
+            return summary(lease.append(id, revision, "RECONCILED", data));
+        } catch (IOException unavailable) { throw storageFailure(id); }
+    }
+
+    private Map<String, Object> recovery(WorkspaceChangeJournal.Lease lease, WorkspaceChangeJournal.Entry entry) throws IOException {
+        List<Object> operation = MiniJson.asArray(entry.data().get("operation"));
+        if (operation == null || operation.size() > MAX_FILES) throw failure(WorkspaceApiException.Code.RECOVERY_REQUIRED, "Operation evidence is unavailable");
+        List<Object> observations = new ArrayList<>();
+        boolean allBefore = true, allAfter = true;
+        for (Object item : operation) {
+            var effect = object(item);
+            String before = lease.getText(text(effect, "before")), after = lease.getText(text(effect, "after"));
+            Map<String, Object> observation = map("document", effect.get("document"), "uri", effect.get("uri"), "originalSource", effect.get("source"));
+            String state;
+            try {
+                WorkspaceDocument current = resolve(effect);
+                observation.put("current", current.metadata());
+                state = current.complete() ? classify(current.content(), before, after) : "INCOMPLETE";
+                if (effect.get("diskBefore") != null) {
+                    lease.get(text(effect, "diskBefore")); lease.get(text(effect, "diskAfter"));
+                    var disk = WorkspaceTextFile.capture(workspace.workspaceId(), WorkspacePaths.resolve(workspace.root(), text(effect, "uri")), true);
+                    String diskState = classify(WorkspacePaths.hash(disk.bytes()), text(effect, "diskBefore"), text(effect, "diskAfter"));
+                    observation.put("diskVersion", disk.document().version()); observation.put("diskState", diskState);
+                    if (!state.equals(diskState)) state = "DIVERGED";
+                }
+            } catch (WorkspaceApiException unavailable) {
+                if (!Set.of(WorkspaceApiException.Code.NOT_FOUND, WorkspaceApiException.Code.UNSUPPORTED, WorkspaceApiException.Code.IO_ERROR).contains(unavailable.code())) throw unavailable;
+                state = unavailable.code() == WorkspaceApiException.Code.NOT_FOUND ? "MISSING" : "UNREADABLE";
+                observation.put("error", unavailable.toMap());
+            }
+            observation.put("state", state); observations.add(observation);
+            allBefore &= state.equals("BEFORE") || state.equals("UNCHANGED");
+            allAfter &= state.equals("AFTER") || state.equals("UNCHANGED");
+        }
+        String kind = (String) entry.data().get("operationKind");
+        boolean undo = "UNDO".equals(kind);
+        String outcome = !Set.of("APPLY", "UNDO").contains(Objects.toString(kind, "")) ? null
+            : allAfter ? (undo ? "UNDONE" : "APPLIED") : allBefore ? (undo ? "APPLIED" : "FAILED") : null;
+        if (undo && "APPLIED".equals(outcome) && MiniJson.asArray(entry.data().get("appliedOperation")) == null) outcome = null;
+        String fingerprint = WorkspacePaths.hash(WorkspaceChangeJournal.canonical(map("id", entry.id(), "revision", entry.revision(), "observations", observations)));
+        List<Object> resources = MiniJson.asArray(entry.data().get("resourceSteps"));
+        return map("proposal", summary(entry), "documents", observations, "fingerprint", fingerprint,
+            "verifiedOutcome", outcome, "resourceSteps", resources == null ? List.of() : resources,
+            "changesWorkspaceFiles", false);
+    }
+
+    private static String classify(String current, String before, String after) {
+        if (current.equals(before) && current.equals(after)) return "UNCHANGED";
+        return current.equals(after) ? "AFTER" : current.equals(before) ? "BEFORE" : "DIVERGED";
+    }
+
     private Map<String, Object> applyOrUndo(String id, int revision, boolean undo) {
         workspace.policy().require(AgentPolicy.Capability.APPLY);
         if (Thread.currentThread().isInterrupted()) throw failure(WorkspaceApiException.Code.CANCELLED, "Edit was cancelled before application");
@@ -202,22 +297,22 @@ final class WorkspaceProposalService {
                     var disk = WorkspaceTextFile.capture(workspace.workspaceId(), WorkspacePaths.resolve(workspace.root(), current.uri()), true);
                     if (!disk.document().version().equals(current.version())) throw failure(WorkspaceApiException.Code.STALE_VERSION, "Disk changed during preflight");
                     byte[] encoded;
-                    try {
-                        encoded = disk.image().encode(desired);
-                        if (undo) {
-                            List<Object> original = MiniJson.asArray(entry.data().get("operation"));
-                            if (original == null) throw failure(WorkspaceApiException.Code.RECOVERY_REQUIRED, "Applied operation record is missing");
-                            for (Object item : original) {
-                                var effect = object(item);
-                                if (!java.util.Objects.equals(current.uri(), effect.get("uri")) || effect.get("diskBefore") == null) continue;
-                                var beforeImage = TextFileCodec.decode(lease.get(text(effect, "diskBefore")), true);
-                                var afterImage = TextFileCodec.decode(lease.get(text(effect, "diskAfter")), true);
-                                String raw = WorkspaceTextEdits.rebase(afterImage.rawText(), beforeImage.rawText(), disk.image().rawText());
-                                if (!TextFileCodec.image(raw, current.encoding(), current.byteOrderMark()).text().equals(desired))
-                                    throw failure(WorkspaceApiException.Code.CONFLICT, "Newline changes overlap; review is required");
-                                encoded = TextFileCodec.encodeRaw(raw, current.encoding(), current.byteOrderMark());
-                            }
+                    String rawUndo = null;
+                    if (undo) {
+                        List<Object> original = MiniJson.asArray(entry.data().get("operation"));
+                        if (original == null) throw failure(WorkspaceApiException.Code.RECOVERY_REQUIRED, "Applied operation record is missing");
+                        for (Object item : original) {
+                            var effect = object(item);
+                            if (!Objects.equals(current.uri(), effect.get("uri")) || effect.get("diskBefore") == null) continue;
+                            var beforeImage = TextFileCodec.decode(lease.get(text(effect, "diskBefore")), true);
+                            var afterImage = TextFileCodec.decode(lease.get(text(effect, "diskAfter")), true);
+                            rawUndo = WorkspaceTextEdits.rebase(afterImage.rawText(), beforeImage.rawText(), disk.image().rawText());
+                            if (!TextFileCodec.image(rawUndo, current.encoding(), current.byteOrderMark()).text().equals(desired))
+                                throw failure(WorkspaceApiException.Code.CONFLICT, "Newline changes overlap; review is required");
                         }
+                    }
+                    try {
+                        encoded = rawUndo == null ? disk.image().encode(desired) : TextFileCodec.encodeRaw(rawUndo, current.encoding(), current.byteOrderMark());
                     } catch (IOException encoding) { throw failure(WorkspaceApiException.Code.UNSUPPORTED, "Proposed text cannot be encoded in the document format"); }
                     effects.add(new Effect(current, desired, disk.bytes(), encoded));
                 } else {
@@ -241,7 +336,7 @@ final class WorkspaceProposalService {
             "before", lease.putText(effect.before().content()), "after", lease.putText(effect.after()),
             "diskBefore", effect.diskBefore() == null ? null : lease.put(effect.diskBefore()),
             "diskAfter", effect.diskAfter() == null ? null : lease.put(effect.diskAfter())));
-        if (undo) data.put("appliedOperation", initial.data().get("operation"));
+        if (undo) { data.put("appliedOperation", initial.data().get("operation")); data.put("appliedResourceSteps", initial.data().get("resourceSteps")); }
         data.put("operation", operation); data.put("operationKind", undo ? "UNDO" : "APPLY");
         data.put("resourceSteps", List.of()); data.put("status", undo ? "UNDOING" : "APPLYING");
         data.put(undo ? "undoApprovedRevision" : "approvedRevision", approvedRevision); data.put("reviewedBy", actor);

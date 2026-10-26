@@ -13,6 +13,7 @@ final class InlineCompletionController implements AutoCloseable {
     private InlineCompletionSettings settings;
     private OpenCodeCompletionClient client;
     private String lastError = "";
+    private long cancellationEpoch;
 
     InlineCompletionController(Texteditor editor) { this.editor = editor; }
 
@@ -83,21 +84,23 @@ final class InlineCompletionController implements AutoCloseable {
         if (session == null || buffer == null || buffer.isLargeFile() || area.getDocument() != buffer.getDocument()
             || area.getSelectionStart() != area.getSelectionEnd() || !editor.extraSelections.isEmpty())
             return "Inline suggestions require a source buffer without a selection.";
-        var document = area.getDocument();
+        var document = area.getDocument(); long epoch = cancellationEpoch;
         // Ex commands leave command mode after dispatch. Request on the next EDT turn so that
         // transition cannot cancel the explicit request or leave its target non-editable.
         javax.swing.SwingUtilities.invokeLater(() -> {
-            if (editor.writingArea != area || area.getDocument() != document || !sessions.containsKey(area)) return;
+            if (epoch != cancellationEpoch || editor.writingArea != area || area.getDocument() != document || !sessions.containsKey(area)) return;
             editor.setMode(EditorMode.INSERT); editor.dismissCompletionPopup(); area.requestFocusInWindow();
-            javax.swing.SwingUtilities.invokeLater(() -> { if (editor.writingArea == area && area.getDocument() == document) session.request(); });
+            javax.swing.SwingUtilities.invokeLater(() -> { if (epoch == cancellationEpoch && editor.writingArea == area && area.getDocument() == document) session.request(); });
         });
         return "Requesting inline suggestion… Tab accepts; Escape dismisses.";
     }
 
+    void stopRequests() { cancellationEpoch++; dismiss(); if (client != null) { client.close(); client = null; } }
     void dismiss() { sessions.values().forEach(InlineCompletionSession::dismiss); }
     boolean visible(JTextArea area) { var session = sessions.get(area); return session != null && session.visible(); }
     void remove(JTextArea area) { var session = sessions.remove(area); if (session != null) session.close(); }
     @Override public void close() {
+        cancellationEpoch++;
         sessions.values().forEach(InlineCompletionSession::close); sessions.clear();
         if (client != null) { client.close(); client = null; }
     }

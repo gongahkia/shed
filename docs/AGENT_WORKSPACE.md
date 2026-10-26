@@ -49,7 +49,7 @@ Authenticate your model provider through OpenCode, then opt into completion with
 
 Current evidence and reproduction commands are recorded in [AI acceptance](AI_ACCEPTANCE.md). Deterministic tests cover all four workflows, transport failure/cancellation, malformed and stale proposals, review/apply/undo, bounded context and navigable references. Native fixture checks exercise the actual editor without invoking a model. A valid schema and matching document versions do not establish semantic correctness: users must review proposed code, and model answers can still be wrong. Hosted-model quality and provider credits are intentionally outside the final engineering sign-off.
 
-After connecting, the Model selector lists the models advertised by OpenCode. **Use model** applies the selection between turns and saves `agent.opencode.model` for future sessions and Complete. Merely selecting a list item sends nothing. Both ACP config options (including grouped model lists) and legacy model metadata are supported. Provider refusal retains the previous model; a persistence failure explicitly reports that only the current conversation changed. No inference runtime or model download is involved.
+After connecting, the Model selector in Connection lists the models advertised by OpenCode. **Use model** applies the selection between turns and saves `agent.opencode.model` for future sessions and Complete. Merely selecting a list item sends nothing. Both ACP config options (including grouped model lists) and legacy model metadata are supported. Provider refusal retains the previous model; a persistence failure explicitly reports that only the current conversation changed. No inference runtime or model download is involved.
 
 ## Approved checks and follow-up fixes
 
@@ -58,6 +58,12 @@ Ask/search and Run task may return a structured command request instead of their
 Disk-based checks require the workspace's open buffers to be saved; Shed never silently saves them. The agent receives actual exit codes, output, truncation and timeout/error results, then continues the original request. Source edits still use proposals with captured-version checks. If a check or a human changes captured source, a stale proposal fails rather than silently rebasing.
 
 After applying a proposal in Review changes, **Check & continue** starts a new Run task against fresh code and asks for relevant checks and remaining fixes. It verifies that the prior proposal is actually applied. Any follow-up changes require another review. Native OpenCode edits/bash remain denied, so command approval cannot be bypassed through the provider's native tool permission controls.
+
+## Independent conversations
+
+New conversation creates another Assistant tab without starting a process; Connect explicitly starts that conversation's OpenCode connection. Up to eight conversations can run overlapping actions. Each retains its own workspace, prompt, context, cancellation, history and proposal link. Working labels identify active conversations. Review changes stays bound to the conversation that opened the proposal, even if another workspace becomes active.
+
+Close conversation cancels only that conversation. Stop all stops every Assistant connection and approved command, cancels pending approvals, and dismisses/cancels inline suggestions (including requests queued for a later UI turn). It does not permanently disable completion. Editor shutdown closes all conversation panels and their pending jobs. Concurrent proposals retain exact-version checks; temporary journal contention is retried with the same idempotency key, not treated as permission to overwrite newer code.
 
 ## Context, previous results and current work
 

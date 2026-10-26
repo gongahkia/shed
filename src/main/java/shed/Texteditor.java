@@ -250,6 +250,7 @@ public class Texteditor extends JFrame implements KeyListener {
     boolean hasAiCompletion(JTextArea area) { return inlineCompletionController != null && inlineCompletionController.visible(area); }
     boolean handleAiCompletionKey(KeyEvent event) { return inlineCompletionController != null && inlineCompletionController.keyPressed(event); }
     boolean allowsAiCompletion() { return inputController != null && inputController.allowsAiCompletion(); }
+    void stopAiCompletionRequests() { if (inlineCompletionController != null) inlineCompletionController.stopRequests(); }
     void dismissAiCompletion() { if (inlineCompletionController != null) inlineCompletionController.dismiss(); }
     String requestAiCompletion() { return inlineCompletionController == null ? "Inline completion is unavailable." : inlineCompletionController.request(); }
 
@@ -374,6 +375,7 @@ public class Texteditor extends JFrame implements KeyListener {
         inlineCompletionController = new InlineCompletionController(this);
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override public void windowClosed(java.awt.event.WindowEvent event) {
+                if (toolWindowHost != null) toolWindowHost.closeAgentWorkbench();
                 workspaceDocumentSource.close(); agentWorkspaceController.close(); inlineCompletionController.close();
             }
         });

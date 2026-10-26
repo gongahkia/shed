@@ -50,7 +50,7 @@ class AgentSessionPanelTest {
             assertTrue(scroll.getViewport().getExtentSize().height > 0);
             assertTrue(content.getHeight() > scroll.getViewport().getExtentSize().height);
             assertEquals(scroll.getViewport().getExtentSize().width, content.getWidth());
-            for (String name : List.of("resume", "reviewWrites", "foreground", "authMethods", "authenticate", "begin", "diagnostics")) {
+            for (String name : List.of("model", "useModel", "resume", "reviewWrites", "foreground", "authMethods", "authenticate", "begin", "diagnostics")) {
                 var control = (JComponent) find(panel.component(), "agent.session." + name);
                 var bounds = SwingUtilities.convertRectangle(control.getParent(), control.getBounds(), content);
                 assertTrue(bounds.width > 0 && bounds.height > 0, name);

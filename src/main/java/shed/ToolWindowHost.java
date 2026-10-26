@@ -267,6 +267,8 @@ final class ToolWindowHost extends JPanel {
         };
     }
 
+    void closeAgentWorkbench() { if (surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents) agents.close(); }
+
     interface ToolSurface {
         JPanel component();
         void refresh();

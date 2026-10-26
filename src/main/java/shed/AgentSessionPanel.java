@@ -32,6 +32,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private final JButton useModel = button("Use model", "useModel", this::useModel);
     private AgentModelOptions shownModels = AgentModelOptions.empty();
     private Consumer<String> persistModel = ignored -> { };
+    private Consumer<Boolean> activity = ignored -> { };
     private final JComboBox<AgentAction> actionChoice = named(new JComboBox<>(AgentAction.values()), "action");
     private final JLabel selectionLabel = named(new JLabel("Ask about the project and jump to relevant code."), "selection");
     private final JButton captureSelection = button("Use current selection", "captureSelection", this::captureSelection);
@@ -122,7 +123,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         top.add(scrollRow(connection), BorderLayout.NORTH); top.add(workspace, BorderLayout.CENTER);
         modelChoice.setRenderer(plainRenderer()); modelChoice.setPreferredSize(new Dimension(WorkbenchStyle.px(230), modelChoice.getPreferredSize().height));
         modelChoice.setToolTipText("Models advertised by OpenCode. Use model updates this conversation and future completion requests.");
-        top.add(scrollRow(row(new JLabel("Model"), modelChoice, useModel)), BorderLayout.SOUTH); panel.add(top, BorderLayout.NORTH);
+        panel.add(top, BorderLayout.NORTH);
         JPanel activity = new JPanel(new BorderLayout(6, 6)); activity.add(conversation, BorderLayout.CENTER);
         locationList.setCellRenderer(new DefaultListCellRenderer() {
             @Override public java.awt.Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {
@@ -169,6 +170,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             + "Complete uses the same OpenCode settings; enable ai.completion.enabled to opt in.\n"
             + "The preset reads/searches and returns proposals for review. Commands are proposed separately and run only after explicit approval.\n"
             + "Connect starts the local program in this workspace. It retains its operating-system access; Shed does not sandbox it."));
+        setup.addRow(scrollRow(row(new JLabel("Model"), modelChoice, useModel)));
         setup.addRow(new JLabel("Resume session ID (optional)")); setup.addRow(resume);
         setup.addRow(reviewWrites); setup.addRow(foreground);
         reviewWrites.setToolTipText("Enable Edit selection and Run task. Proposed changes need your approval in Review changes. Disable before connecting to use Ask/search only.");
@@ -412,10 +414,12 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                         if (action == AgentAction.ASK) return new ActionResult("", AgentAnswer.parse(reply.text(), queries), "");
                         String id, summary;
                         if (task != null) {
-                            var result = task.propose(proposalOwner.get(), java.util.UUID.randomUUID().toString(), reply.turnId(), reply.text());
+                            String proposalRequest = java.util.UUID.randomUUID().toString();
+                            var result = retryJournal(() -> task.propose(proposalOwner.get(), proposalRequest, reply.turnId(), reply.text()), token::isCancelled);
                             id = result.proposal(); summary = result.summary();
                         } else {
-                            var proposal = target.propose(proposalOwner.get(), java.util.UUID.randomUUID().toString(), reply.turnId(), reply.text());
+                            String proposalRequest = java.util.UUID.randomUUID().toString();
+                            var proposal = retryJournal(() -> target.propose(proposalOwner.get(), proposalRequest, reply.turnId(), reply.text()), token::isCancelled);
                             id = (String) proposal.get("id"); summary = "Selection change proposed.";
                         }
                         proposalId.set(id);
@@ -477,6 +481,17 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         controls(session.snapshot());
     }
 
+    private static <T> T retryJournal(Supplier<T> operation, java.util.function.BooleanSupplier cancelled) throws InterruptedException {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        while (true) {
+            if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
+            try { return operation.get(); }
+            catch (WorkspaceApiException busy) {
+                if (!Boolean.TRUE.equals(busy.details().get("retryable")) || System.nanoTime() >= deadline) throw busy;
+                Thread.sleep(50);
+            }
+        }
+    }
     private static void awaitApplied(WorkspaceProposalService service, String proposal, java.util.function.BooleanSupplier cancelled) throws InterruptedException {
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
         while (true) {
@@ -541,6 +556,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         shownModels = models; modelChoice.removeAllItems(); models.choices().forEach(modelChoice::addItem);
         models.choices().stream().filter(choice -> choice.value().equals(models.current())).findFirst().ifPresent(modelChoice::setSelectedItem);
     }
+    void onActivity(Consumer<Boolean> listener) { activity = listener; }
     void onModelSelected(Consumer<String> persist) { persistModel = persist; }
 
     private void clearHistory() { if (boundRoot != null) history.clear(boundRoot); refreshHistory(); }
@@ -632,6 +648,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             notice = error == null ? "" : failure(error); refresh();
         });
     }
+    void stopRequests() { stop(); }
     private void stop() {
         clearCommandRequest(); ++generation;
         if (actionJob >= 0) jobs.cancel(actionJob);
@@ -778,7 +795,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                 case READY -> "Agent connected. Start a conversation or choose a sign-in method in Connection.";
                 default -> "Agent " + state.name().toLowerCase(java.util.Locale.ROOT);
             };
-        status.setText(text); status.setToolTipText(text);
+        status.setText(text); status.setToolTipText(text); activity.accept(busy || submitting || stopping);
     }
     private void message(String value) { notice = Objects.toString(value, "Agent operation failed"); controls(active == null ? null : active.snapshot()); }
     private static boolean inactive(AgentSessionService.State state) { return state == AgentSessionService.State.CLOSED || state == AgentSessionService.State.FAILED; }

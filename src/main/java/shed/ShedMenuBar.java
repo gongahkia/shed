@@ -105,7 +105,7 @@ final class ShedMenuBar {
         JMenuItem item = new JMenuItem(label);
         if (key >= 0 && (nativeMac || editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN || key == KeyEvent.VK_F1)) {
             String custom = editor.configManager.actionKeybinding(editor.modeKey(editor.editorState.mode),
-                new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, modifiers, key, KeyEvent.CHAR_UNDEFINED));
+                new KeyEvent(item, KeyEvent.KEY_PRESSED, 0, modifiers, key, KeyEvent.CHAR_UNDEFINED));
             if (custom == null) item.setAccelerator(KeyStroke.getKeyStroke(key, modifiers));
             else item.setToolTipText("Editor shortcut customized: " + custom + " — see Keyboard Shortcuts");
         }

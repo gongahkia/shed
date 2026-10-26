@@ -16,6 +16,26 @@ import org.junit.jupiter.api.Test;
 
 public class WindowLayoutNodeResponsiveTest {
     @Test
+    void ordinaryResizingKeepsNestedEditorComponentsAttached() {
+        EditorPane first = pane(), second = pane(), third = pane();
+        WindowLayoutNode root = WindowLayoutNode.split(WindowLayoutNode.Orientation.HORIZONTAL, 0.5,
+            WindowLayoutNode.leaf(first), WindowLayoutNode.split(WindowLayoutNode.Orientation.VERTICAL, 0.5,
+                WindowLayoutNode.leaf(second), WindowLayoutNode.leaf(third)));
+        Component rendered = root.render(first, 1000, 900);
+        var firstParent = first.getComponent().getParent();
+        var secondParent = second.getComponent().getParent();
+        var removed = new java.util.concurrent.atomic.AtomicInteger();
+        var listener = new java.awt.event.ContainerAdapter() {
+            @Override public void componentRemoved(java.awt.event.ContainerEvent event) { removed.incrementAndGet(); }
+        };
+        firstParent.addContainerListener(listener); secondParent.addContainerListener(listener);
+        assertSame(rendered, root.render(first, 1100, 950));
+        assertSame(firstParent, first.getComponent().getParent());
+        assertSame(secondParent, second.getComponent().getParent());
+        assertEquals(0, removed.get());
+    }
+
+    @Test
     void collapsesToActiveBranchAndRestoresSplitWhenWidthReturns() {
         EditorPane first = pane();
         EditorPane second = pane();

@@ -809,17 +809,16 @@ final class EditorUiController {
 
 
     void renderWindowLayout() {
-        if (editor.renderedLayoutComponent != null) {
-            editor.editorHostPanel.remove(editor.renderedLayoutComponent);
-        }
         int width = Math.max(editor.editorHostPanel.getWidth(), editor.getWidth());
         int height = Math.max(editor.editorHostPanel.getHeight(), editor.getHeight());
-        editor.renderedLayoutComponent = editor.windowLayoutRoot == null ? new JPanel()
+        Component next = editor.windowLayoutRoot == null ? new JPanel()
             : editor.windowLayoutRoot.render(getActivePane(), width, height);
-        if (editor.renderedLayoutComponent == null) {
-            editor.renderedLayoutComponent = new JPanel();
+        if (next == null) next = new JPanel();
+        if (editor.renderedLayoutComponent != next) {
+            if (editor.renderedLayoutComponent != null) editor.editorHostPanel.remove(editor.renderedLayoutComponent);
+            editor.renderedLayoutComponent = next;
+            editor.editorHostPanel.add(next, BorderLayout.CENTER);
         }
-        editor.editorHostPanel.add(editor.renderedLayoutComponent, BorderLayout.CENTER);
         editor.updateZenModeLayout();
         editor.editorHostPanel.revalidate();
         editor.editorHostPanel.repaint();

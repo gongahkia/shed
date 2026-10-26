@@ -32,6 +32,7 @@ public class WindowLayoutNode {
     private double ratio;
     private WindowLayoutNode first;
     private WindowLayoutNode second;
+    private JSplitPane renderedSplit;
 
     private WindowLayoutNode(EditorPane pane, Orientation orientation, double ratio, WindowLayoutNode first, WindowLayoutNode second) {
         this.pane = pane;
@@ -104,7 +105,13 @@ public class WindowLayoutNode {
         Component secondComponent = second == null ? null : second.render(activePane, secondWidth, secondHeight);
         if (firstComponent == null) return secondComponent;
         if (secondComponent == null) return firstComponent;
-        JSplitPane splitPane = new ThemedSplitPane(splitOrientation, firstComponent, secondComponent);
+        if (renderedSplit == null || renderedSplit.getOrientation() != splitOrientation)
+            renderedSplit = new ThemedSplitPane(splitOrientation, null, null);
+        JSplitPane splitPane = renderedSplit;
+        // Reparenting a focused editor makes Swing transfer focus and cancels inline requests.
+        // Ordinary resizing must retain the component hierarchy.
+        if (splitPane.getLeftComponent() != firstComponent) splitPane.setLeftComponent(firstComponent);
+        if (splitPane.getRightComponent() != secondComponent) splitPane.setRightComponent(secondComponent);
         firstComponent.setMinimumSize(new Dimension(childMinimumWidth(first), childMinimumHeight(first)));
         secondComponent.setMinimumSize(new Dimension(childMinimumWidth(second), childMinimumHeight(second)));
         Color surface = firstComponent.getBackground();

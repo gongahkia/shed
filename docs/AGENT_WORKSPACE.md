@@ -61,6 +61,8 @@ After applying a proposal in Review changes, **Check & continue** starts a new R
 
 ## Independent conversations
 
+Review changes also offers **Open source** for the selected original hunk, or the first actual change after applying. It checks current contents against the reviewed snapshot before navigating. Renames follow the destination after apply; newly created files become navigable after apply, and deleted files cannot be reopened through this action. Unsaved review edits must be saved or discarded first.
+
 New conversation creates another Assistant tab without starting a process; Connect explicitly starts that conversation's OpenCode connection. Up to eight conversations can run overlapping actions. Each retains its own workspace, prompt, context, cancellation, history and proposal link. Working labels identify active conversations. Review changes stays bound to the conversation that opened the proposal, even if another workspace becomes active.
 
 Close conversation cancels only that conversation. Stop all stops every Assistant connection and approved command, cancels pending approvals, and dismisses/cancels inline suggestions (including requests queued for a later UI turn). It does not permanently disable completion. Editor shutdown closes all conversation panels and their pending jobs. Concurrent proposals retain exact-version checks; temporary journal contention is retried with the same idempotency key, not treated as permission to overwrite newer code.

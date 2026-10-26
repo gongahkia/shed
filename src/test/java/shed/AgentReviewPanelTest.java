@@ -26,6 +26,30 @@ class AgentReviewPanelTest {
 
     @AfterEach void close() { if (jobs != null) jobs.shutdownNow(); }
 
+    @Test void sourceNavigationUsesReviewedHunksAndRejectsChangedFiles() throws Exception {
+        var base = scope("project"); current.set(base);
+        Path file = Files.writeString(base.root().resolve("source"), "first\nmiddle\nlast\n");
+        base.service().propose("navigation", "task", "turn", List.of(input(base, "source", "FIRST\nmiddle\nLAST\n")));
+        var location = new AtomicReference<AgentAnswer.Location>();
+        open(); ready();
+        edt(() -> {
+            assertFalse(button("openSource").isEnabled());
+            panel.onNavigate(location::set); table().setRowSelectionInterval(1, 1); button("openSource").doClick();
+        });
+        await(() -> location.get() != null && button("openSource").isEnabled());
+        assertEquals(file.toRealPath(), location.get().path()); assertEquals(3, location.get().line()); assertEquals(1, location.get().column());
+        edt(() -> { table().setValueAt(false, 0, 0); assertFalse(button("openSource").isEnabled()); button("save").doClick(); });
+        ready(); edt(() -> button("apply").doClick()); await(() -> button("undo").isEnabled());
+        assertEquals("first\nmiddle\nLAST\n", Files.readString(file));
+        location.set(null); edt(() -> button("openSource").doClick());
+        await(() -> location.get() != null && button("openSource").isEnabled());
+        assertEquals(3, location.get().line());
+        AgentAnswer.validateNavigation(location.get(), new WorkspaceQueryService(base.root(), AgentPolicy.readOnly(), base.documents()));
+        Files.writeString(file, "human changed this file\n"); location.set(null);
+        edt(() -> button("openSource").doClick()); await(() -> label().getText().startsWith("STALE_VERSION"));
+        assertNull(location.get()); assertEquals("human changed this file\n", Files.readString(file));
+    }
+
     @Test void explicitProposalNavigationPreservesAnUnfinishedReviewBeforeSwitching() throws Exception {
         var base = scope("project"); current.set(base);
         Files.writeString(base.root().resolve("first"), "first original\n"); Files.writeString(base.root().resolve("second"), "second original\n");
@@ -63,6 +87,10 @@ class AgentReviewPanelTest {
             var before = editor.snapshots().getFirst();
             scope.service().propose("rename", "task", "turn", List.of(WorkspaceProposalService.Input.rename(before.documentId(), before.version(), "renamed")));
             open(); ready();
+            var location = new AtomicReference<AgentAnswer.Location>();
+            edt(() -> { panel.onNavigate(location::set); button("openSource").doClick(); });
+            await(() -> location.get() != null && button("apply").isEnabled());
+            assertEquals(file.toRealPath(), location.get().path());
             edt(() -> {
                 assertEquals("Rename · source → renamed", combo().getSelectedItem());
                 assertEquals("saved\n", text("before").getText()); assertEquals("saved\n", text("proposed").getText());
@@ -73,6 +101,9 @@ class AgentReviewPanelTest {
             });
             await(() -> button("undo").isEnabled()); assertFalse(Files.exists(file));
             assertEquals(base.root().resolve("renamed").toRealPath().toFile(), buffer.getFile());
+            location.set(null); edt(() -> button("openSource").doClick());
+            await(() -> location.get() != null && button("undo").isEnabled());
+            assertEquals(base.root().resolve("renamed").toRealPath(), location.get().path());
             edt(() -> { buffer.replaceContentUndoably("later human work\n"); button("undo").doClick(); });
             await(() -> text("details").getText().contains("UNDONE"));
             assertEquals(file.toRealPath().toFile(), buffer.getFile()); assertEquals("later human work\n", buffer.getContent());
@@ -89,6 +120,10 @@ class AgentReviewPanelTest {
             var before = editor.snapshots().getFirst();
             scope.service().propose("delete", "task", "turn", List.of(WorkspaceProposalService.Input.delete(before.documentId(), before.version())));
             open(); ready();
+            var location = new AtomicReference<AgentAnswer.Location>();
+            edt(() -> { panel.onNavigate(location::set); button("openSource").doClick(); });
+            await(() -> location.get() != null && button("apply").isEnabled());
+            assertEquals(file.toRealPath(), location.get().path());
             edt(() -> {
                 assertEquals("Delete · source", combo().getSelectedItem());
                 assertEquals("saved\n", text("before").getText()); assertEquals("human draft\n", text("preservedDraft").getText());
@@ -97,6 +132,7 @@ class AgentReviewPanelTest {
                 assertEquals(0, table().getRowCount()); button("apply").doClick();
             });
             await(() -> button("undo").isEnabled()); assertFalse(Files.exists(file)); assertTrue(buffer.isScratch());
+            edt(() -> assertFalse(button("openSource").isEnabled()));
             edt(() -> { buffer.replaceContentUndoably("later human work\n"); button("undo").doClick(); });
             await(() -> text("details").getText().contains("UNDONE"));
             assertFalse(buffer.isScratch()); assertEquals("later human work\n", buffer.getContent()); assertTrue(buffer.isModified());
@@ -110,7 +146,9 @@ class AgentReviewPanelTest {
             var scope = new AgentReviewPanel.Scope(base.root(), base.sessions(), editor); current.set(scope);
             scope.service().propose("new", "task", "turn", List.of(WorkspaceProposalService.Input.create("new.txt", "draft\n")));
             open(); ready();
+            var location = new AtomicReference<AgentAnswer.Location>();
             edt(() -> {
+                panel.onNavigate(location::set); assertFalse(button("openSource").isEnabled());
                 assertEquals("Create · new.txt", combo().getSelectedItem());
                 assertTrue(text("details").getText().contains("Creates a new file"));
                 assertEquals("", text("before").getText());
@@ -119,6 +157,9 @@ class AgentReviewPanelTest {
             ready(); assertFalse(Files.exists(scope.root().resolve("new.txt")));
             edt(() -> button("apply").doClick()); await(() -> button("undo").isEnabled());
             assertEquals("reviewed\n", Files.readString(scope.root().resolve("new.txt")));
+            edt(() -> button("openSource").doClick());
+            await(() -> location.get() != null && button("undo").isEnabled());
+            assertEquals(scope.root().resolve("new.txt").toRealPath(), location.get().path()); assertEquals(1, location.get().line());
             edt(() -> button("undo").doClick()); await(() -> text("details").getText().contains("UNDONE"));
             assertFalse(Files.exists(scope.root().resolve("new.txt")));
         }

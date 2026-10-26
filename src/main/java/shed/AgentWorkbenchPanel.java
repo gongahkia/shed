@@ -28,6 +28,7 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
             var storage = owner == null || owner.boundSessions() == null ? java.nio.file.Path.of(editor.configManager.getSessionDirectory()) : owner.boundSessions();
             return root == null ? null : new AgentReviewPanel.Scope(root, storage, editor.workspaceDocuments());
         }, editor.asyncJobService, editor::resolveUiFont, editor::resolveEditorFont, editor::stopAiCompletionRequests);
+        review.onNavigate(location -> editor.showMessage(editor.openFileAtAsync(location.path().toFile(), location.line(), location.column(), "Agent change")));
     }
 
     AgentWorkbenchPanel(Supplier<AgentSessionPanel> factory, Function<AgentSessionPanel, AgentReviewPanel.Scope> reviewScope,

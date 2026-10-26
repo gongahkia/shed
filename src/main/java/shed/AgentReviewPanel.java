@@ -47,6 +47,8 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         @Override public boolean isCellEditable(int row, int column) { return column == 0 && canEdit() && !textChanged(); }
     };
     private final JTable hunkTable = named(new JTable(hunks), "agent.hunks");
+    private Consumer<AgentAnswer.Location> navigation;
+    private final JButton openSource = button("Open source", "openSource", this::openSource);
     private final JButton refresh = button("Refresh", "refresh", () -> reload(false));
     private final JButton more = button("Load more", "more", () -> reload(true));
     private final JButton save = button("Save review", "save", this::saveReview);
@@ -71,6 +73,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
             Path root = editor.workspaceController.activeRoot();
             return root == null ? null : new Scope(root, Path.of(editor.configManager.getSessionDirectory()), editor.workspaceDocuments());
         }, editor::resolveUiFont, editor::resolveEditorFont);
+        onNavigate(location -> editor.showMessage(editor.openFileAtAsync(location.path().toFile(), location.line(), location.column(), "Agent change")));
     }
 
     AgentReviewPanel(AsyncJobService jobs, Supplier<Scope> scopeSupplier, Supplier<Font> uiFont, Supplier<Font> codeFont) {
@@ -115,7 +118,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         reviewTabs.addTab("Preserved draft", new JScrollPane(preservedDraft)); reviewTabs.setEnabledAt(2, false);
         review.add(reviewTabs);
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
-        for (JButton action : List.of(save, discard, rebase, reject, undo, apply, inspect, reconcile, restore)) actions.add(action);
+        for (JButton action : List.of(openSource, save, discard, rebase, reject, undo, apply, inspect, reconcile, restore)) actions.add(action);
         restore.setToolTipText("Restore the snapshots from before this interrupted apply or undo. Requires the inspected versions and intact recorded originals.");
         // A horizontal scroller keeps every action reachable in a narrow dock or at larger UI zoom.
         JScrollPane actionScroll = new JScrollPane(actions, JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
@@ -279,6 +282,38 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         controls();
     }
 
+    void onNavigate(Consumer<AgentAnswer.Location> listener) { navigation = listener; controls(); }
+    private void openSource() {
+        if (!openSource.isEnabled()) return;
+        var captured = preview; Scope capturedScope = scope; int selectedHunk = hunkTable.getSelectedRow();
+        run("Checking source location…", service -> sourceLocation(capturedScope, captured, selectedHunk), location -> {
+            navigation.accept(location); message("Opened source at line " + location.line() + ".");
+        });
+    }
+    static AgentAnswer.Location sourceLocation(Scope scope, WorkspaceProposalService.Preview preview, int selectedHunk) {
+        boolean applied = "APPLIED".equals(preview.proposal().get("status"));
+        String kind = Objects.toString(preview.document().get("kind"), "TEXT");
+        String uri = Objects.toString(preview.document().get(applied && kind.equals("RENAME") ? "destination" : "uri"), "");
+        if (uri.isBlank() || applied && kind.equals("DELETE") || !applied && kind.equals("CREATE"))
+            throw WorkspaceApiException.invalidRequest("This proposal has no existing source file at this stage");
+        var queries = new WorkspaceQueryService(scope.root(), AgentPolicy.readOnly(), scope.documents());
+        var source = queries.snapshot(queries.workspaceId(), uri);
+        String expected = applied ? preview.selected() : preview.before();
+        if ((kind.equals("RENAME") || kind.equals("DELETE")) && preview.preservedDraft() != null) expected = preview.preservedDraft();
+        if (!source.complete() || !source.content().equals(expected))
+            throw new WorkspaceApiException(WorkspaceApiException.Code.STALE_VERSION,
+                "Source changed since this review; inspect the current file before jumping to a change");
+        var changes = applied ? WorkspaceTextEdits.diff(preview.before(), preview.selected()) : preview.hunks();
+        // After apply, the original hunk rows may include changes the reviewer excluded.
+        // Navigate to the first actual applied change instead of mapping those rows incorrectly.
+        int index = applied || selectedHunk < 0 ? 0 : Math.min(selectedHunk, changes.size() - 1);
+        int offset = changes.isEmpty() ? 0 : changes.get(index).start();
+        offset = Math.max(0, Math.min(offset, source.content().length()));
+        int line = 1, lineStart = 0;
+        for (int i = 0; i < offset; i++) if (source.content().charAt(i) == '\n') { line++; lineStart = i + 1; }
+        return new AgentAnswer.Location(WorkspacePaths.resolve(queries.root(), uri), line, offset - lineStart + 1, "Reviewed change", source.version());
+    }
+
     private void saveReview() {
         if (!canEdit() || !dirty) return;
         String id = selectedId(), replacement = textChanged() ? proposed.getText() : null;
@@ -390,6 +425,11 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         apply.setEnabled(ready && state.equals("PROPOSED")); reject.setEnabled(ready && state.equals("PROPOSED"));
         undo.setEnabled(ready && state.equals("APPLIED")); rebase.setEnabled(ready && Set.of("PROPOSED", "FAILED").contains(state));
         boolean interrupted = Set.of("APPLYING", "UNDOING", "RECOVERY_REQUIRED").contains(state);
+        String kind = preview == null ? "" : Objects.toString(preview.document().get("kind"), "TEXT");
+        openSource.setEnabled(ready && navigation != null && !interrupted
+            && !(kind.equals("CREATE") && !state.equals("APPLIED")) && !(kind.equals("DELETE") && state.equals("APPLIED")));
+        openSource.setToolTipText(state.equals("APPLIED") ? "Open the first applied change in this file, if its contents still match."
+            : "Open the selected change in the source file, if its contents still match.");
         inspect.setEnabled(ready && interrupted);
         reconcile.setEnabled(ready && interrupted && recovery != null && recovery.get("verifiedOutcome") != null);
         restore.setEnabled(ready && interrupted && recovery != null && Boolean.TRUE.equals(recovery.get("restoreAvailable")));
@@ -417,7 +457,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         proposalList.setFixedCellHeight(Math.max(WorkbenchStyle.px(40), uiFont.get().getSize() + WorkbenchStyle.px(18)));
         hunkTable.setRowHeight(proposalList.getFixedCellHeight());
         documents.setPreferredSize(new Dimension(240, Math.max(WorkbenchStyle.px(40), uiFont.get().getSize() + WorkbenchStyle.px(18))));
-        for (JButton action : List.of(refresh, more, save, discard, apply, reject, undo, rebase, inspect, reconcile, restore)) sizeButton(action);
+        for (JButton action : List.of(openSource, refresh, more, save, discard, apply, reject, undo, rebase, inspect, reconcile, restore)) sizeButton(action);
     }
     private static void sizeButton(JButton action) {
         action.setPreferredSize(null); Dimension preferred = action.getPreferredSize();

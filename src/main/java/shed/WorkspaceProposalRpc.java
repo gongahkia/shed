@@ -60,6 +60,10 @@ final class WorkspaceProposalRpc {
                     } else if (kind.equals("create")) {
                         fields(change, Set.of("kind", "document", "text"));
                         inputs.add(WorkspaceProposalService.Input.create(string(change, "document", true, 8192), content(change, true)));
+                    } else if (kind.equals("delete")) {
+                        fields(change, Set.of("kind", "document", "expectedVersion"));
+                        inputs.add(WorkspaceProposalService.Input.delete(string(change, "document", true, 8192),
+                            string(change, "expectedVersion", true, 512)));
                     } else throw invalid("Unknown proposal operation");
                 }
                 yield proposals.propose(string(params, "requestId", true, 256), string(params, "taskId", true, 256),
@@ -106,6 +110,10 @@ final class WorkspaceProposalRpc {
         if (variant == null) variant = "selected";
         String text = switch (variant) {
             case "before" -> preview.before(); case "proposed" -> preview.proposed(); case "selected" -> preview.selected();
+            case "draft" -> {
+                if (preview.preservedDraft() == null) throw invalid("This operation has no preserved editor draft");
+                yield preview.preservedDraft();
+            }
             default -> throw invalid("Unknown proposal text variant");
         };
         int offset = integer(params, "offset", 0, 0, text.length());

@@ -13,6 +13,34 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkspaceProposalRpcTest {
     @TempDir Path temporary;
 
+    @Test void connectedDeletionShowsDiskAndPreservedDraftSeparatelyAndNeverGrantsTheAgentApply() throws Exception {
+        Path root = Files.createDirectory(temporary.resolve("project")), history = temporary.resolve("history");
+        Path file = Files.writeString(root.resolve("source"), "disk\r\n"); FileBuffer buffer = new FileBuffer(file.toFile());
+        try (var editor = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
+            javax.swing.SwingUtilities.invokeAndWait(() -> buffer.replaceContentUndoably("human draft\n"));
+            var queries = new WorkspaceQueryService(root, queries(root, false).policy(), editor);
+            var service = new WorkspaceProposalService(queries, editor, history, "agent");
+            try (var server = new WorkspaceBridgeServer(queries, service, temporary.resolve("connections"));
+                 var client = new WorkspaceBridgeClient(server.descriptor(), root)) {
+                var before = editor.snapshots().getFirst();
+                var params = new LinkedHashMap<String, Object>(Map.of("workspaceId", queries.workspaceId(), "requestId", "delete", "taskId", "t", "turnId", "u",
+                    "changes", List.of(Map.of("kind", "delete", "document", before.documentId(), "expectedVersion", before.version()))));
+                var proposal = result(client.exchange(WorkspaceRpcTest.request(1, "proposals/propose", params))); String id = (String) proposal.get("id");
+                assertEquals("DELETE", MiniJson.asObject(MiniJson.asArray(proposal.get("documents")).getFirst()).get("kind"));
+                var read = new LinkedHashMap<String, Object>(Map.of("workspaceId", queries.workspaceId(), "id", id, "text", "before"));
+                assertEquals("disk\n", result(client.exchange(WorkspaceRpcTest.request(2, "proposals/read", read))).get("content"));
+                read.put("text", "draft"); assertEquals("human draft\n", result(client.exchange(WorkspaceRpcTest.request(3, "proposals/read", read))).get("content"));
+                var approval = Map.<String, Object>of("workspaceId", queries.workspaceId(), "id", id, "revision", 0);
+                assertEquals("PERMISSION_DENIED", code(client.exchange(WorkspaceRpcTest.request(4, "proposals/apply", approval))));
+                params.put("changes", List.of(Map.of("kind", "delete", "document", before.documentId(), "expectedVersion", before.version(), "text", "")));
+                assertEquals("INVALID_REQUEST", code(client.exchange(WorkspaceRpcTest.request(5, "proposals/propose", params))));
+                var reviewer = new WorkspaceProposalService(new WorkspaceQueryService(root, queries(root, true).policy(), editor), editor, history, "human");
+                var applied = reviewer.apply(id, 0); assertFalse(Files.exists(file)); assertEquals("human draft\n", buffer.getContent());
+                reviewer.undo(id, ((Number) applied.get("revision")).intValue()); assertEquals("disk\r\n", Files.readString(file));
+            }
+        }
+    }
+
     @Test void creationIsExplicitStrictlyDecodedAndRequiresHumanApplyPermission() throws Exception {
         Path root = Files.createDirectory(temporary.resolve("project")), storage = temporary.resolve("history");
         var queries = queries(root, false); var service = new WorkspaceProposalService(queries, null, storage, "agent");

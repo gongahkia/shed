@@ -26,6 +26,30 @@ class AgentReviewPanelTest {
 
     @AfterEach void close() { if (jobs != null) jobs.shutdownNow(); }
 
+    @Test void deletionReviewShowsTheDiskFileAndPreservedDraftAndSupportsApplyAndUndo() throws Exception {
+        var base = scope("project"); Path file = Files.writeString(base.root().resolve("source"), "saved\r\n");
+        FileBuffer buffer = new FileBuffer(file.toFile());
+        try (var editor = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(base.root()), base::root, base.root())) {
+            edt(() -> buffer.replaceContentUndoably("human draft\n"));
+            var scope = new AgentReviewPanel.Scope(base.root(), base.sessions(), editor); current.set(scope);
+            var before = editor.snapshots().getFirst();
+            scope.service().propose("delete", "task", "turn", List.of(WorkspaceProposalService.Input.delete(before.documentId(), before.version())));
+            open(); ready();
+            edt(() -> {
+                assertEquals("Delete · source", combo().getSelectedItem());
+                assertEquals("saved\n", text("before").getText()); assertEquals("human draft\n", text("preservedDraft").getText());
+                assertTrue(text("details").getText().contains("Deletes the disk file"));
+                assertFalse(text("proposed").isEditable()); assertFalse(button("save").isEnabled());
+                assertEquals(0, table().getRowCount()); button("apply").doClick();
+            });
+            await(() -> button("undo").isEnabled()); assertFalse(Files.exists(file)); assertTrue(buffer.isScratch());
+            edt(() -> { buffer.replaceContentUndoably("later human work\n"); button("undo").doClick(); });
+            await(() -> text("details").getText().contains("UNDONE"));
+            assertFalse(buffer.isScratch()); assertEquals("later human work\n", buffer.getContent()); assertTrue(buffer.isModified());
+            assertEquals("saved\r\n", Files.readString(file));
+        }
+    }
+
     @Test void newFilesAreClearlyLabeledAndCanBeReviewedAppliedAndUndoneWithoutAFrame() throws Exception {
         var base = scope("project");
         try (var editor = new EditorWorkspaceDocuments(List::of, () -> List.of(base.root()), base::root, base.root())) {

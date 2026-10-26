@@ -11,12 +11,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Immutable inspection and guarded restoration plan for an interrupted text operation. */
+/** Immutable inspection and guarded restoration plan for interrupted text and file-presence operations. */
 record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, String fingerprint,
                              String verifiedOutcome, boolean restorable, List<Object> resources) {
     record Artifact(Path path, Map<String, Object> identity) { }
     record Action(Map<String, Object> effect, WorkspaceDocument current, WorkspaceTextFile.Snapshot disk,
-                  String text, byte[] bytes, boolean restoreDisk, Artifact artifact, boolean removeDisk) {
+                  String text, byte[] bytes, boolean restoreDisk, Artifact artifact, boolean removeDisk, Artifact returnTo) {
         Action { bytes = bytes == null ? null : bytes.clone(); }
         @Override public byte[] bytes() { return bytes == null ? null : bytes.clone(); }
         String document() { return effect.get("uri") instanceof String uri ? uri : (String) effect.get("document"); }
@@ -68,7 +68,7 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
             boolean needsDisk = diskState != null && !before(diskState);
             Artifact artifact = null;
             if (needsDisk && beforeBytes != null) {
-                var candidates = candidates(workspace, resources, text(effect, "uri"), WorkspacePaths.hash(beforeBytes));
+                var candidates = candidates(workspace, lease, resources, text(effect, "uri"), WorkspacePaths.hash(beforeBytes));
                 observation.put("artifacts", candidates.observations()); artifact = candidates.available();
                 if (candidates.changedOriginal()) reason = "A retained original changed; preserve and inspect its newer contents";
             }
@@ -84,7 +84,7 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
             observation.put("state", combined); observation.put("bufferState", state); observation.put("restoreReason", reason);
             observation.put("canRestore", reason == null); observations.add(observation);
             allBefore &= alreadyBefore; allAfter &= alreadyAfter; restorable &= reason == null;
-            if (!alreadyBefore && reason == null) actions.add(new Action(effect, current, disk, before, beforeBytes, needsDisk, artifact, false));
+            if (!alreadyBefore && reason == null) actions.add(new Action(effect, current, disk, before, beforeBytes, needsDisk, artifact, false, null));
         }
         String kind = Objects.toString(entry.data().get("operationKind"), ""); boolean undo = kind.equals("UNDO");
         if (!kind.equals("APPLY") && !undo) restorable = false;
@@ -121,12 +121,20 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
         }
         Path path = WorkspacePaths.resolve(workspace.root(), uri);
         workspace.policy().checkPath(workspace.root().relativize(path), AgentPolicy.Capability.READ);
+        Artifact returnTo = effect.get("retainedOriginal") == null ? null : originalReference(workspace, lease, uri, object(effect.get("retainedOriginal")));
+        String retainedState = null;
+        if (returnTo != null) {
+            Map<String, Object> actual = null;
+            try { actual = WorkspaceEditTransaction.resourceIdentity(returnTo.path()); retainedState = actual.equals(returnTo.identity()) ? "INTACT" : "CHANGED"; }
+            catch (java.nio.file.NoSuchFileException missing) { retainedState = "MISSING"; }
+            observation.put("retainedOriginal", map("uri", returnTo.path().toUri().toString(), "state", retainedState, "identity", actual));
+        }
         try {
             disk = WorkspaceTextFile.capture(workspace.workspaceId(), path, true);
             observation.put("diskVersion", disk.document().version());
             diskState = WorkspacePaths.hash(disk.bytes()).equals(digest) ? create ? "AFTER" : "BEFORE" : "DIVERGED";
             if (known(diskState)) {
-                Map<String, Object> identity = create ? null : MiniJson.asObject(effect.get("diskIdentity"));
+                Map<String, Object> identity = create ? returnTo == null ? null : returnTo.identity() : MiniJson.asObject(effect.get("diskIdentity"));
                 if (create) for (Object item : resources) {
                     var step = object(item);
                     if ("CREATE".equals(step.get("kind")) && uri.equals(step.get("target"))) identity = object(step.get("fingerprint"));
@@ -141,14 +149,20 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
         }
         boolean open = current != null && current.source() == WorkspaceDocument.Source.EDITOR;
         boolean boundHere = open && current.uri() != null && WorkspacePaths.resolve(workspace.root(), current.uri()).equals(path);
+        var format = MiniJson.asObject(effect.get("editorFormat"));
+        boolean formatMatches = !open || (format == null ? current.uri() == null || !current.dirty()
+            : current.encoding().equals(format.get("encoding")) && current.lineEnding().equals(format.get("lineEnding"))
+                && Objects.equals(current.byteOrderMark(), format.get("bom")));
         if (open && (!current.complete() || current.readOnly() || !current.content().equals(expectedText)
-            || current.uri() != null && (!boundHere || current.dirty())))
+            || current.uri() != null && !boundHere || !formatMatches))
             reason = "The open document changed; preserve its contents and binding";
         if (!known(diskState)) reason = "The disk resource differs from the recorded creation/deletion or is unavailable";
+        if (returnTo != null && !(before(diskState) && "INTACT".equals(retainedState) || after(diskState) && "MISSING".equals(retainedState)))
+            reason = "The retained original and restored file do not match a complete before/after move";
         boolean consistent = reason == null;
         Artifact artifact = null;
         if (!create && !before(diskState)) {
-            var candidates = candidates(workspace, resources, uri, digest);
+            var candidates = candidates(workspace, lease, resources, uri, digest);
             artifact = candidates.available(); observation.put("artifacts", candidates.observations());
             if (artifact == null || candidates.changedOriginal()) reason = "The retained original is missing or changed";
         }
@@ -161,12 +175,38 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
         observation.put("bufferState", open ? current.uri() == null ? "DETACHED" : "BOUND" : "CLOSED");
         observation.put("restoreReason", reason); observation.put("canRestore", reason == null);
         Action action = alreadyBefore || reason != null ? null : new Action(effect, current, disk, expectedText,
-            create ? null : bytes, !before(diskState), artifact, create);
+            create ? null : bytes, !before(diskState), artifact, create, returnTo);
         return new Presence(observation, action, alreadyBefore, alreadyAfter, reason == null);
     }
 
+    static Artifact retainedOriginal(WorkspaceQueryService workspace, WorkspaceChangeJournal.Lease lease, WorkspaceChangeJournal.Entry entry, String uri,
+                                     String digest, Map<String, Object> identity) throws IOException {
+        var steps = MiniJson.asArray(entry.data().get("resourceSteps"));
+        if (steps == null) throw invalid("Deletion resource evidence is unavailable");
+        var originals = steps.stream().filter(item -> {
+            var step = object(item);
+            return "BACKUP".equals(step.get("kind")) && uri.equals(step.get("source")) && identity.equals(step.get("fingerprint"));
+        }).toList();
+        var result = candidates(workspace, lease, originals, uri, digest);
+        if (result.available() == null || result.changedOriginal())
+            throw new WorkspaceApiException(WorkspaceApiException.Code.CONFLICT, "The retained deletion original is missing or changed; inspect recovery evidence");
+        return result.available();
+    }
+
+    private static Artifact originalReference(WorkspaceQueryService workspace, WorkspaceChangeJournal.Lease lease, String uri, Map<String, Object> reference) throws IOException {
+        String name = text(reference, "uri"); Path path = lease.retainedPath(name);
+        Path target = WorkspacePaths.resolve(workspace.root(), uri);
+        workspace.policy().checkPath(workspace.root().relativize(target), AgentPolicy.Capability.READ);
+        if (path != null) return new Artifact(path, object(reference.get("identity")));
+        path = WorkspacePaths.resolve(workspace.root(), name);
+        if (!name.equals(path.toUri().toString()) || !path.getFileName().toString().equals("original")
+            || path.getParent() == null || path.getParent().getFileName() == null || !path.getParent().getFileName().toString().startsWith(".shed-edit-backup-")
+            || !Objects.equals(path.getParent().getParent(), target.getParent())) throw invalid("Invalid retained-original reference");
+        return new Artifact(path, object(reference.get("identity")));
+    }
+
     private record Candidates(Artifact available, List<Object> observations, boolean changedOriginal) { }
-    private static Candidates candidates(WorkspaceQueryService workspace, List<Object> resources, String uri, String digest) throws IOException {
+    private static Candidates candidates(WorkspaceQueryService workspace, WorkspaceChangeJournal.Lease lease, List<Object> resources, String uri, String digest) throws IOException {
         List<Object> observed = new ArrayList<>(); Artifact available = null; boolean changed = false;
         for (Object item : resources) {
             var step = object(item); boolean backup = "BACKUP".equals(step.get("kind")) && uri.equals(step.get("source"));
@@ -175,15 +215,17 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
             var expected = object(step.get("fingerprint"));
             if (!digest.equals(expected.get("digest"))) continue;
             String reference = text(step, backup ? "target" : "source");
-            Path path = WorkspacePaths.resolve(workspace.root(), reference);
+            Path path = backup ? originalReference(workspace, lease, uri, map("uri", reference, "identity", expected)).path()
+                : WorkspacePaths.resolve(workspace.root(), reference);
             if (!path.toUri().toString().equals(reference)) throw invalid("Recovery artifact identity changed through an alias");
             Path original = WorkspacePaths.resolve(workspace.root(), uri);
             workspace.policy().checkPath(workspace.root().relativize(original), AgentPolicy.Capability.READ);
-            boolean shape = backup ? path.getFileName().toString().equals("original") && path.getParent().getFileName().toString().startsWith(".shed-edit-backup-")
+            boolean privateOriginal = backup && lease.retainedPath(reference) != null;
+            boolean shape = backup ? privateOriginal || path.getFileName().toString().equals("original") && path.getParent().getFileName().toString().startsWith(".shed-edit-backup-")
                 : path.getFileName().toString().startsWith(".shed-edit-") && path.getFileName().toString().endsWith(".tmp");
             if (!shape) throw invalid("Unexpected recovery artifact path");
             Path artifactParent = backup ? path.getParent().getParent() : path.getParent();
-            if (!artifactParent.equals(original.getParent())) throw invalid("Recovery artifact is outside its original document directory");
+            if (!privateOriginal && !artifactParent.equals(original.getParent())) throw invalid("Recovery artifact is outside its original document directory");
             String state; Map<String, Object> identity = null;
             try {
                 BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);

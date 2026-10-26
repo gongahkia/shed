@@ -135,12 +135,23 @@ public class HelpService {
 
         switch (normalizedTopic) {
             case "agent":
-                return "Help: agent workspace API\n\n"
-                    + ":agent opens the Agents review panel (also View > Agent Review). Incoming proposals never take focus.\n"
+                return "Help: AI assistance\n\n"
+                    + "The command palette exposes AI: Complete, Edit Selection, Ask/Search and Run Task.\n"
+                    + ":agent opens the Assistant and Review changes tabs (also View > AI Assistant).\n"
+                    + ":agent complete requests inline ghost text; Tab accepts and Escape dismisses.\n"
+                    + "Set ai.completion.model to an installed Ollama fill-in-the-middle model and ai.completion.enabled=true.\n"
+                    + "Completion is opt-in and independent of the agent connection. Existing completion and keymap bindings take priority.\n"
+                    + ":agent edit captures selected code. Describe the change, then review the proposed replacement.\n"
+                    + ":agent ask answers project questions; choose a returned code location to navigate.\n"
+                    + ":agent run proposes changes across files. Cancel turn stops preparation or a running action.\n"
+                    + "Install and sign in to OpenCode separately, choose opencode, then Connect. Nothing starts automatically.\n"
+                    + "The OpenCode preset reads/searches and returns changes for human review; it does not execute shell commands.\n"
+                    + "Incoming activity never takes focus or applies changes. :agent proposals opens Review changes.\n\n"
+                    + "Advanced workspace API\n"
                     + ":agent api start enables read-only access to the selected workspace, including unsaved editor buffers.\n"
                     + ":agent api start propose additionally allows durable proposals; it never grants permission to apply them.\n"
                     + ":agent api status shows the private connection descriptor path; :agent api stop revokes its clients.\n"
-                    + "Nothing starts automatically. No agent process or provider connection is launched.\n"
+                    + "Starting the workspace API does not launch an agent process or provider connection.\n"
                     + "From a terminal: shed --workspace-api --root <folder> --connect <descriptor> --stdio\n"
                     + "Use --request '<JSON>' for a single request. Both CLI modes stay headless.\n"
                     + "Start with workspace/info, then documents/list or documents/read using the returned workspaceId.\n"
@@ -152,7 +163,7 @@ public class HelpService {
                     + "For interrupted operations, Inspect recovery compares recorded and current contents.\n"
                     + "Record verified outcome updates history only when the inspected evidence is still exact. Mixed or missing results need further recovery.\n"
                     + "Restore pre-operation restores intact recorded snapshots after an interrupted apply or undo; changed contents remain conflicts.\n"
-                    + "Search, ACP/MCP and agent sessions remain unavailable through this initial API.\n";
+                    + "The workspace API includes file/text search; ACP sessions use the separate Assistant connection.\n";
             case "keymap":
             case "keymaps":
                 return "Help: keymaps\n\n"

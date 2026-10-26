@@ -101,6 +101,10 @@ final class PaletteController {
 
         action("Language Services", "lsp manage", "Open the local Language Services panel."),
         action("Show Completions", "lsp completion", "Request completion candidates at the caret."),
+        action("AI: Complete", "agent complete", "Request an inline suggestion from the configured local model. Tab accepts; Escape dismisses."),
+        action("AI: Edit Selection", "agent edit", "Describe a change to selected code, then review the proposal before applying."),
+        action("AI: Ask/Search", "agent ask", "Ask about the project and navigate to referenced code."),
+        action("AI: Run Task", "agent run", "Request changes across files and review the proposed changes."),
         action("Go to Definition", "lsp definition", "Go to the definition at the caret."),
         action("Go to Type Definition", "lsp type definition", "Go to the type definition at the caret."),
         action("Go to Implementation", "lsp implementation", "Go to the implementation at the caret."),

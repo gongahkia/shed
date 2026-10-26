@@ -108,6 +108,22 @@ class AgentSessionServiceTest {
         } finally { Files.deleteIfExists(outside); }
     }
 
+    @Test void advertisedModernAndLegacyModelsCanChangeBetweenTurnsWithoutRestart() throws Exception {
+        for (String mode : List.of("models", "legacy-models")) try (var service = new AgentSessionService(provider(mode), queries(WorkspaceDocumentSource.diskOnly()))) {
+            service.initialize().get(10, TimeUnit.SECONDS); service.newSession().get(10, TimeUnit.SECONDS);
+            assertEquals("provider/fast", service.models().current());
+            assertThrows(AcpException.class, () -> service.selectModel("not-advertised"));
+            service.selectModel("provider/careful").get(10, TimeUnit.SECONDS);
+            assertEquals("provider/careful", service.models().current());
+            var result = service.actionPrompt("question", "question", false).get(10, TimeUnit.SECONDS);
+            assertTrue(result.text().contains("provider/careful"));
+            if (mode.equals("models")) {
+                assertThrows(ExecutionException.class, () -> service.selectModel("provider/unavailable").get(10, TimeUnit.SECONDS));
+                assertEquals(AgentSessionService.State.IDLE, service.snapshot().state()); assertEquals("provider/careful", service.models().current());
+            }
+        }
+    }
+
     private AgentProvider sdk(Path file) { return new AgentProvider("sdk", AcpConnectionTest.javaCommand(AcpSdkAgentFixture.class.getName(), file.toAbsolutePath().toString()), Map.of(), Duration.ofSeconds(15), Duration.ofSeconds(20)); }
     private AgentProvider provider(String mode) { return new AgentProvider("fixture", AcpConnectionTest.command(mode), Map.of(), Duration.ofSeconds(10), Duration.ofSeconds(20)); }
     private WorkspaceQueryService queries(WorkspaceDocumentSource documents) {

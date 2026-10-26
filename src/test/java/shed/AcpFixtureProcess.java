@@ -23,6 +23,7 @@ public final class AcpFixtureProcess {
         var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
         Object prompt = null;
         boolean authenticated = false;
+        String currentModel = "provider/fast";
         for (String line; (line = reader.readLine()) != null;) {
             var request = MiniJson.asObject(MiniJson.parseStrict(line)); String method = MiniJson.asString(request.get("method"));
             if (mode.equals("hang")) continue;
@@ -54,10 +55,27 @@ public final class AcpFixtureProcess {
             } else if (method.equals("session/new")) {
                 if (mode.equals("auth") && !authenticated) send(Map.of("jsonrpc", "2.0", "id", request.get("id"),
                     "error", Map.of("code", -32000, "message", "Authentication required")));
+                else if (mode.equals("models")) reply(request.get("id"), Map.of("sessionId", "fixture-session", "configOptions", modelOptions(currentModel)));
+                else if (mode.equals("legacy-models")) reply(request.get("id"), Map.of("sessionId", "fixture-session", "models", Map.of("currentModelId", currentModel,
+                    "availableModels", List.of(Map.of("modelId", "provider/fast", "name", "Fast"), Map.of("modelId", "provider/careful", "name", "Careful")))));
                 else reply(request.get("id"), Map.of("sessionId", "fixture-session"));
             }
             else if (method.equals("session/load")) reply(request.get("id"), Map.of());
+            else if (method.equals("session/set_config_option") || method.equals("session/set_model")) {
+                var parameters = MiniJson.asObject(request.get("params"));
+                String selected = (String) parameters.get(method.equals("session/set_model") ? "modelId" : "value");
+                if ("provider/unavailable".equals(selected)) send(Map.of("jsonrpc", "2.0", "id", request.get("id"), "error", Map.of("code", -32602, "message", "Model unavailable")));
+                else {
+                    currentModel = selected;
+                    reply(request.get("id"), method.equals("session/set_model") ? Map.of() : Map.of("configOptions", modelOptions(currentModel)));
+                }
+            }
             else if (method.equals("session/prompt")) {
+                if (mode.equals("models") || mode.equals("legacy-models")) {
+                    send(Map.of("jsonrpc", "2.0", "method", "session/update", "params", Map.of("sessionId", "fixture-session", "update",
+                        Map.of("sessionUpdate", "agent_message_chunk", "content", Map.of("type", "text", "text", MiniJson.stringify(Map.of("answer", currentModel, "locations", List.of())))))));
+                    reply(request.get("id"), Map.of("stopReason", "end_turn")); continue;
+                }
                 prompt = request.get("id");
                 if (mode.equals("early-write-cancel")) send(Map.of("jsonrpc", "2.0", "id", "write", "method", "fs/write_text_file",
                     "params", Map.of("sessionId", "fixture-session", "path", args[1], "content", "agent\n")));
@@ -70,6 +88,11 @@ public final class AcpFixtureProcess {
             } else if (method.equals("error")) send(Map.of("jsonrpc", "2.0", "id", request.get("id"), "error", Map.of("code", -32000, "message", "Authentication required", "data", Map.of("method", "login"))));
             else if (request.containsKey("id")) reply(request.get("id"), Map.of("method", method));
         }
+    }
+    private static List<Map<String, Object>> modelOptions(String current) {
+        return List.of(Map.of("id", "model-picker", "category", "model", "type", "select", "currentValue", current, "options", List.of(
+            Map.of("group", "provider", "name", "Provider", "options", List.of(
+                Map.of("value", "provider/fast", "name", "Fast"), Map.of("value", "provider/careful", "name", "Careful"), Map.of("value", "provider/unavailable", "name", "Unavailable"))))));
     }
     private static void reply(Object id, Map<String, Object> value) { send(Map.of("jsonrpc", "2.0", "id", id, "result", value)); }
     private static void send(Map<String, Object> value) { System.out.println(MiniJson.stringify(value)); System.out.flush(); }

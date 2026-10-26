@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 
 /** One explicitly owned ACP connection/session, independent of Swing and the active editor tab. */
 final class AgentSessionService implements AcpConnection.Handler, AutoCloseable {
-    enum State { NEW, INITIALIZING, READY, AUTHENTICATING, CREATING, LOADING, IDLE, PROMPTING, CANCELLING, FAILED, CLOSED }
+    enum State { NEW, INITIALIZING, READY, AUTHENTICATING, CREATING, LOADING, CONFIGURING, IDLE, PROMPTING, CANCELLING, FAILED, CLOSED }
     record Event(long sequence, String type, Map<String, Object> data, int characters) { }
     record Permission(String id, Map<String, Object> tool, List<Map<String, Object>> options) { }
     record Reply(String turnId, String stopReason, String text) { }
@@ -38,6 +38,7 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
     private String sessionId, turnId, error = "";
     private Map<String, Object> capabilities = Map.of();
     private List<Map<String, Object>> authMethods = List.of();
+    private AgentModelOptions models = AgentModelOptions.empty();
     private long sequence, droppedEvents;
     private int eventCharacters;
     private boolean allowTurnWrites = true;
@@ -115,7 +116,7 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
     synchronized CompletableFuture<Map<String, Object>> newSession() {
         transition(State.READY, State.CREATING);
         return finish(connection.request("session/new", Map.of("cwd", workspace.root().toString(), "mcpServers", List.of()), provider.startupTimeout()), State.IDLE,
-            response -> { sessionId = text(response, "sessionId", 1024); record("session_created", Map.of("sessionId", sessionId)); });
+            response -> { sessionId = text(response, "sessionId", 1024); models = AgentModelOptions.parse(response); record("session_created", Map.of("sessionId", sessionId)); });
     }
 
     /** A dedicated completion connection reuses its process, never its previous prompt history. */
@@ -131,7 +132,21 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
         if (id == null || id.isBlank() || id.length() > 1024) throw invalid("Invalid session ID");
         transition(State.READY, State.LOADING); sessionId = id;
         return finish(connection.request("session/load", Map.of("sessionId", id, "cwd", workspace.root().toString(), "mcpServers", List.of()), provider.startupTimeout()), State.IDLE,
-            response -> record("session_loaded", Map.of("sessionId", id)));
+            response -> { models = AgentModelOptions.parse(response); record("session_loaded", Map.of("sessionId", id)); });
+    }
+
+    synchronized AgentModelOptions models() { return models; }
+    synchronized CompletableFuture<Map<String, Object>> selectModel(String value) {
+        if (models.choices().stream().noneMatch(choice -> choice.value().equals(value))) throw invalid("Choose a model advertised by the agent");
+        transition(State.IDLE, State.CONFIGURING);
+        boolean legacy = models.legacy();
+        var parameters = legacy ? Map.<String, Object>of("sessionId", sessionId, "modelId", value)
+            : Map.<String, Object>of("sessionId", sessionId, "configId", models.configId(), "value", value);
+        return finish(connection.request(legacy ? "session/set_model" : "session/set_config_option", parameters, provider.startupTimeout()), State.IDLE,
+            response -> {
+                models = response.containsKey("configOptions") || response.containsKey("models") ? AgentModelOptions.parse(response) : models.withCurrent(value);
+                record("model_changed", Map.of("model", models.current()));
+            });
     }
 
     synchronized CompletableFuture<Map<String, Object>> prompt(String text) {
@@ -239,6 +254,8 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
         // ID on those events; never retarget them to a later session or an active editor tab.
         if (state != State.CREATING && !Objects.equals(id, sessionId)) throw invalid("Update belongs to another session");
         var update = object(params.get("update")); text(update, "sessionUpdate", 128);
+        if ("config_option_update".equals(update.get("sessionUpdate"))) models = AgentModelOptions.parse(update);
+        else if ("current_model_update".equals(update.get("sessionUpdate"))) models = models.withCurrent(text(update, "currentModelId", 256));
         if (state == State.PROMPTING && output != null && "agent_message_chunk".equals(update.get("sessionUpdate"))) {
             var content = MiniJson.asObject(update.get("content"));
             if (content != null && "text".equals(content.get("type")) && content.get("text") instanceof String chunk) {

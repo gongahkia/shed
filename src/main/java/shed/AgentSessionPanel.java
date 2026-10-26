@@ -28,6 +28,10 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private final Supplier<Font> uiFont, codeFont;
     private final JPanel panel = new JPanel(new BorderLayout(8, 8));
     private final JComboBox<String> providerChoice = named(new JComboBox<>(), "provider");
+    private final JComboBox<AgentModelOptions.Choice> modelChoice = named(new JComboBox<>(), "model");
+    private final JButton useModel = button("Use model", "useModel", this::useModel);
+    private AgentModelOptions shownModels = AgentModelOptions.empty();
+    private Consumer<String> persistModel = ignored -> { };
     private final JComboBox<AgentAction> actionChoice = named(new JComboBox<>(AgentAction.values()), "action");
     private final JLabel selectionLabel = named(new JLabel("Ask about the project and jump to relevant code."), "selection");
     private final JButton captureSelection = button("Use current selection", "captureSelection", this::captureSelection);
@@ -97,6 +101,8 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             editor::ownAgentSession, editor::resolveUiFont, editor::resolveEditorFont);
         selectionSource = editor::captureAgentSelection;
         performance = editor.perfService;
+        persistModel = value -> { try { editor.configManager.setAndPersist("agent.opencode.model", value); }
+            catch (java.io.IOException failed) { throw new java.io.UncheckedIOException(failed); } };
         contextSettings = () -> AgentPromptContext.Settings.configured(editor.configManager);
         contextFile = () -> editor.getCurrentBuffer() == null || editor.getCurrentBuffer().getFilePath() == null ? null : Path.of(editor.getCurrentBuffer().getFilePath());
         navigation = location -> editor.showMessage(editor.openFileAtAsync(location.path().toFile(), location.line(), location.column(), "Agent reference"));
@@ -112,7 +118,10 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         status.putClientProperty("html.disable", true); workspace.putClientProperty("html.disable", true);
         JPanel top = new JPanel(new BorderLayout(8, 5));
         JPanel connection = row(new JLabel("Agent"), providerChoice, connect, stop);
-        top.add(scrollRow(connection), BorderLayout.NORTH); top.add(workspace, BorderLayout.CENTER); panel.add(top, BorderLayout.NORTH);
+        top.add(scrollRow(connection), BorderLayout.NORTH); top.add(workspace, BorderLayout.CENTER);
+        modelChoice.setRenderer(plainRenderer()); modelChoice.setPreferredSize(new Dimension(WorkbenchStyle.px(230), modelChoice.getPreferredSize().height));
+        modelChoice.setToolTipText("Models advertised by OpenCode. Use model updates this conversation and future completion requests.");
+        top.add(scrollRow(row(new JLabel("Model"), modelChoice, useModel)), BorderLayout.SOUTH); panel.add(top, BorderLayout.NORTH);
         JPanel activity = new JPanel(new BorderLayout(6, 6)); activity.add(conversation, BorderLayout.CENTER);
         locationList.setCellRenderer(new DefaultListCellRenderer() {
             @Override public java.awt.Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {
@@ -509,6 +518,29 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         commandApproval = null; commandPanel.setVisible(false);
     }
 
+    private void useModel() {
+        if (active == null || busy || submitting || stopping || active.snapshot().state() != AgentSessionService.State.IDLE) return;
+        var selected = (AgentModelOptions.Choice) modelChoice.getSelectedItem(); if (selected == null) return;
+        AgentSessionService session = active; long request = generation; busy = true; controls(session.snapshot());
+        jobs.submitLongRunning("Select OpenCode model", token -> {
+            token.onCancel(() -> background(session::close));
+            session.selectModel(selected.value()).get();
+            String current = session.models().current();
+            try { persistModel.accept(current); return "Model selected: " + current; }
+            catch (RuntimeException failed) { return "Model active for this conversation, but could not save it for completion/future sessions: " + failure(failed); }
+        }, (job, result, error) -> {
+            if (request != generation || active != session || disposed) return;
+            busy = false; notice = error == null ? result : failure(error); refresh();
+        });
+    }
+    private void refreshModels() {
+        var models = active == null ? AgentModelOptions.empty() : active.models();
+        if (models.equals(shownModels)) return;
+        shownModels = models; modelChoice.removeAllItems(); models.choices().forEach(modelChoice::addItem);
+        models.choices().stream().filter(choice -> choice.value().equals(models.current())).findFirst().ifPresent(modelChoice::setSelectedItem);
+    }
+    void onModelSelected(Consumer<String> persist) { persistModel = persist; }
+
     private void clearHistory() { if (boundRoot != null) history.clear(boundRoot); refreshHistory(); }
     private void refreshHistory() {
         pastResults.clear(); if (boundRoot != null) history.entries(boundRoot).forEach(pastResults::addElement);
@@ -712,6 +744,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         }
     }
     private void controls(AgentSessionService.Snapshot snapshot) {
+        refreshModels();
         var state = snapshot == null ? null : snapshot.state(); boolean disconnected = snapshot == null || inactive(state);
         connect.setEnabled(!busy && !stopping && disconnected); providerChoice.setEnabled(connect.isEnabled()); foreground.setEnabled(connect.isEnabled());
         Scope available = scopes.get(); reviewWrites.setEnabled(connect.isEnabled() && available != null && available.sessions() != null);
@@ -719,6 +752,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         actionChoice.setEnabled(!busy && !submitting && !stopping); captureSelection.setEnabled(actionChoice.isEnabled());
         approveCommands.setEnabled(commandApproval != null && !commandApproval.isDone()); rejectCommands.setEnabled(approveCommands.isEnabled());
         boolean idleUi = !busy && !submitting && !stopping;
+        modelChoice.setEnabled(idleUi && state == AgentSessionService.State.IDLE && modelChoice.getItemCount() > 0); useModel.setEnabled(modelChoice.isEnabled());
         continueReviewed.setEnabled(idleUi && state == AgentSessionService.State.IDLE && !resultProposal.isEmpty());
         openResult.setEnabled(idleUi && historyList.getSelectedValue() != null); reuseRequest.setEnabled(openResult.isEnabled());
         clearHistory.setEnabled(idleUi && !pastResults.isEmpty());

@@ -410,6 +410,21 @@ class AgentSessionPanelTest {
         }
     }
 
+    @Test void modelPickerUsesAdvertisedModelsAndPersistsOnlyAfterSuccessfulSelection() throws Exception {
+        prepare("models"); provider.set(new AgentProvider("fixture", AcpConnectionTest.command("models"), Map.of(), Duration.ofSeconds(10), Duration.ofSeconds(20)));
+        open(); var persisted = new AtomicReference<String>(); edt(() -> panel.onModelSelected(persisted::set)); connect();
+        edt(() -> {
+            assertTrue(button("useModel").isEnabled());
+            combo("model").setSelectedIndex(1); assertNull(persisted.get()); button("useModel").doClick();
+        });
+        await(() -> button("send").isEnabled() && "provider/careful".equals(persisted.get()));
+        edt(() -> { panel.prepare(AgentAction.ASK); }); send("question");
+        await(() -> button("send").isEnabled() && text("transcript").getText().contains("provider/careful"));
+        edt(() -> { combo("model").setSelectedIndex(2); button("useModel").doClick(); });
+        await(() -> status().getText().contains("Model unavailable"));
+        assertEquals("provider/careful", persisted.get());
+    }
+
     private Path prepare(String name) throws Exception {
         Path root = Files.createDirectory(temporary.resolve(name)); scope.set(new AgentSessionPanel.Scope(root, WorkspaceDocumentSource.diskOnly(), temporary.resolve("sessions")));
         provider.set(new AgentProvider("fixture", AcpConnectionTest.javaCommand(AcpSdkAgentFixture.class.getName(), root.resolve("source").toString()),

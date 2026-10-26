@@ -76,6 +76,11 @@ final class PrivateWorkspaceFiles {
         return result.toByteArray();
     }
 
+    static void checkFile(Path path) throws IOException {
+        check(path.getParent(), true);
+        check(path, false);
+    }
+
     static void deleteIfMatching(Path path, byte[] expected) throws IOException {
         if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) return;
         if (!java.security.MessageDigest.isEqual(read(path, expected.length), expected))

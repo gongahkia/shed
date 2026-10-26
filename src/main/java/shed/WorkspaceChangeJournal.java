@@ -43,15 +43,19 @@ final class WorkspaceChangeJournal {
             try { PrivateWorkspaceFiles.create(root, "journal.lock", new byte[]{1}); }
             catch (java.nio.file.FileAlreadyExistsException concurrent) { }
         }
-        if (!java.util.Arrays.equals(new byte[]{1}, PrivateWorkspaceFiles.read(lockPath, 16)))
-            throw new IOException("Invalid workspace journal lock");
+        PrivateWorkspaceFiles.checkFile(lockPath);
         if (!ACTIVE_LEASES.add(lockPath)) throw busy();
         FileChannel channel;
-        try { channel = FileChannel.open(lockPath, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS); }
+        try { channel = FileChannel.open(lockPath, StandardOpenOption.READ, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS); }
         catch (IOException | RuntimeException failure) { ACTIVE_LEASES.remove(lockPath); throw failure; }
         try {
             FileLock lock = channel.tryLock();
             if (lock == null) throw busy();
+            // Windows byte-range locks are mandatory: validate through the handle that
+            // owns the lock, after contention has been classified as retryable.
+            ByteBuffer marker = ByteBuffer.allocate(2);
+            while (marker.hasRemaining() && channel.read(marker) > 0) { }
+            if (marker.position() != 1 || marker.get(0) != 1) throw new IOException("Invalid workspace journal lock");
             return new Lease(root, lockPath, channel, lock);
         } catch (IOException | RuntimeException failure) {
             try { channel.close(); } finally { ACTIVE_LEASES.remove(lockPath); }

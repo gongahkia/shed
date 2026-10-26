@@ -51,6 +51,10 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
             decisions.values().stream().map(Decision::permission).toList(), error, connection.diagnostics());
     }
 
+    Path root() { return workspace.root(); }
+    AgentPolicy policy() { return workspace.policy(); }
+    CompletableFuture<Void> termination() { return connection.termination(); }
+
     synchronized CompletableFuture<Map<String, Object>> initialize() {
         transition(State.NEW, State.INITIALIZING);
         boolean read = workspace.policy().capabilities().contains(AgentPolicy.Capability.READ);
@@ -119,16 +123,22 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
         });
     }
 
-    synchronized void decide(String id, String optionId) {
-        Decision decision = decisions.get(id);
-        if (decision == null || state != State.PROMPTING) throw invalid("Permission request is no longer pending");
+    void decide(String id, String optionId) {
+        Decision decision;
+        synchronized (this) {
+            decision = decisions.get(id);
+            if (decision == null || state != State.PROMPTING) throw invalid("Permission request is no longer pending");
+        }
         var selected = decision.permission().options().stream().filter(option -> optionId.equals(option.get("optionId"))).findFirst()
             .orElseThrow(() -> invalid("Unknown permission option"));
         String kind = text(selected, "kind", 32);
         if (kind.equals("allow_always")) throw invalid("Persistent grants require task policy support; choose allow once");
         if (kind.equals("allow_once")) authorizeTool(decision.permission().tool());
-        decisions.remove(id); decision.result().complete(Map.of("outcome", Map.of("outcome", "selected", "optionId", optionId)));
-        record("permission_decided", Map.of("id", id, "optionId", optionId, "kind", kind));
+        synchronized (this) {
+            if (decisions.get(id) != decision || state != State.PROMPTING) throw invalid("Permission request changed during authorization");
+            decisions.remove(id); decision.result().complete(Map.of("outcome", Map.of("outcome", "selected", "optionId", optionId)));
+            record("permission_decided", Map.of("id", id, "optionId", optionId, "kind", kind));
+        }
     }
 
     @Override public CompletionStage<Map<String, Object>> request(String method, Map<String, Object> params) {
@@ -231,7 +241,7 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
         if (sessionId == null || !sessionId.equals(text(params, "sessionId", 1024)) || !Set.of(State.IDLE, State.PROMPTING, State.CANCELLING, State.LOADING).contains(state))
             throw invalid("Request does not name the active session");
     }
-    private void transition(State expected, State next) { if (state != expected) throw invalid("Agent is " + state + "; expected " + expected); state = next; }
+    private void transition(State expected, State next) { if (state != expected) throw invalid("Agent is " + state + "; expected " + expected); state = next; error = ""; }
     private void cancelPermissions() { for (Decision decision : new ArrayList<>(decisions.values())) decision.result().complete(cancelled()); decisions.clear(); }
     private static Map<String, Object> cancelled() { return Map.of("outcome", Map.of("outcome", "cancelled")); }
     private void record(String type, Map<String, Object> data) {
@@ -239,7 +249,10 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
         events.addLast(new Event(++sequence, type, value, size)); eventCharacters += size;
         while (events.size() > 1000 || eventCharacters > 2 * 1024 * 1024) { eventCharacters -= events.removeFirst().characters(); droppedEvents++; }
     }
-    @Override public synchronized void close() { if (state == State.CLOSED) return; state = State.CLOSED; cancelPermissions(); connection.close(); }
+    @Override public void close() {
+        synchronized (this) { if (state == State.CLOSED) return; state = State.CLOSED; cancelPermissions(); }
+        connection.close();
+    }
     private static AcpException invalid(String message) { return new AcpException(-32602, message); }
     private static String text(Map<String, Object> value, String key, int max) {
         if (!(value.get(key) instanceof String text) || text.isBlank() || text.length() > max) throw invalid("Invalid " + key); return text;

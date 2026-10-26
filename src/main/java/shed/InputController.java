@@ -100,6 +100,7 @@ final class InputController {
             || event.isAltGraphDown() || event.isControlDown() && event.isAltDown()) return false;
         String mapping = editor.configManager.actionKeybinding(modeKey(editor.editorState.mode), event);
         if (mapping == null) return false;
+        editor.dismissAiCompletion();
         event.consume();
         emacsPrefix = EmacsKeymap.Prefix.NONE;
         if (event.getKeyChar() != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(event.getKeyChar()))
@@ -245,7 +246,7 @@ final class InputController {
         if (e == null || e.isConsumed()) return;
         editor.suppressNextTypedChar = false;
         if (e.getComponent() == editor.writingArea) lastKeyPressNanos = System.nanoTime();
-        if (handleActionBinding(e)) { editor.dismissAiCompletion(); return; }
+        if (handleActionBinding(e)) return;
         if (editor.handleAiCompletionKey(e)) return;
         if (e != null && isCompletionPopupVisible() && e.getKeyCode() == KeyEvent.VK_F6
             && !e.isAltDown() && !e.isControlDown() && !e.isMetaDown()) {

@@ -52,17 +52,36 @@ final class InlineCompletionController implements AutoCloseable {
     boolean keyPressed(KeyEvent event) {
         InlineCompletionSession session = sessions.get(editor.writingArea);
         if (session == null || event.getComponent() != editor.writingArea) return false;
-        boolean handled = session.keyPressed(event, !editor.allowsAiCompletion());
+        boolean handled = session.keyPressed(event, !editor.allowsAiCompletion()
+            || hasLegacyMapping(editor.configManager, editor.editorState.mode, event));
         if (handled && event.getKeyCode() == KeyEvent.VK_TAB) editor.suppressNextTypedChar = true;
         return handled;
+    }
+
+    static boolean hasLegacyMapping(ConfigManager config, EditorMode mode, KeyEvent event) {
+        if (!config.getKeymapProfile().usesVimModeHandling() || mode == null) return false;
+        String key = switch (event.getKeyCode()) { case KeyEvent.VK_TAB -> "<tab>"; case KeyEvent.VK_ESCAPE -> "<esc>"; default -> null; };
+        return key != null && config.getKeybinding(mode.name().toLowerCase(java.util.Locale.ROOT), key) != null;
     }
 
     String request() {
         if (!Boolean.parseBoolean(editor.configManager.get("ai.completion.enabled", "false")))
             return "Configure ai.completion.model and enable ai.completion.enabled in user settings first.";
         InlineCompletionSession session = sessions.get(editor.writingArea);
-        if (session == null || !eligible(editor.writingArea)) return "Inline suggestions require an editable focused buffer without a selection or completion popup.";
-        session.request(); return "Requesting inline suggestion… Tab accepts; Escape dismisses.";
+        JTextArea area = editor.writingArea;
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (session == null || buffer == null || buffer.isLargeFile() || area.getDocument() != buffer.getDocument()
+            || area.getSelectionStart() != area.getSelectionEnd() || !editor.extraSelections.isEmpty())
+            return "Inline suggestions require a source buffer without a selection.";
+        var document = area.getDocument();
+        // Ex commands leave command mode after dispatch. Request on the next EDT turn so that
+        // transition cannot cancel the explicit request or leave its target non-editable.
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            if (editor.writingArea != area || area.getDocument() != document || !sessions.containsKey(area)) return;
+            editor.setMode(EditorMode.INSERT); editor.dismissCompletionPopup(); area.requestFocusInWindow();
+            javax.swing.SwingUtilities.invokeLater(() -> { if (editor.writingArea == area && area.getDocument() == document) session.request(); });
+        });
+        return "Requesting inline suggestion… Tab accepts; Escape dismisses.";
     }
 
     void dismiss() { sessions.values().forEach(InlineCompletionSession::dismiss); }

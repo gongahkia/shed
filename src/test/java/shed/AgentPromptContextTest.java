@@ -73,6 +73,10 @@ class AgentPromptContextTest {
         assertNull(AgentContextCompletion.token("me@example.com", 14));
         var token = AgentContextCompletion.token("fix @\"src/some f", 16);
         assertNotNull(token); assertEquals("src/some f", token.query());
+        var middle = AgentContextCompletion.token("fix @src/old.java next", 8);
+        assertNotNull(middle); assertEquals(17, middle.end());
+        var quoted = AgentContextCompletion.token("fix @\"some file\" next", 10);
+        assertNotNull(quoted); assertEquals(16, quoted.end());
         var item = new AgentPromptContext.Item('@', "src/some file.java", Path.of("source"));
         assertEquals("@\"src/some file.java\"", item.token());
         assertEquals(List.of(item), AgentContextCompletion.matches(List.of(item), new AgentContextCompletion.Token(0, 3, '@', "ssf")));

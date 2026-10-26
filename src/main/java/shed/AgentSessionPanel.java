@@ -48,6 +48,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private CompletableFuture<Boolean> commandApproval;
     private final JTextArea commandDetails = area("commandDetails", false);
     private final JPanel commandPanel = new JPanel(new BorderLayout(6, 4));
+    private final JPanel requestCards = new JPanel(new java.awt.CardLayout());
     private final JButton approveCommands = button("Run these commands once", "approveCommands", () -> decideCommands(true));
     private final JButton rejectCommands = button("Reject commands", "rejectCommands", () -> decideCommands(false));
     private final JButton continueReviewed = button("Check & continue", "continueReviewed", this::continueReviewed);
@@ -104,7 +105,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         persistModel = value -> { try { editor.configManager.setAndPersist("agent.opencode.model", value); }
             catch (java.io.IOException failed) { throw new java.io.UncheckedIOException(failed); } };
         contextSettings = () -> AgentPromptContext.Settings.configured(editor.configManager);
-        contextFile = () -> editor.getCurrentBuffer() == null || editor.getCurrentBuffer().getFilePath() == null ? null : Path.of(editor.getCurrentBuffer().getFilePath());
+        contextFile = () -> editor.getCurrentBuffer() == null || editor.getCurrentBuffer().getFilePath() == null || editor.getCurrentBuffer().getFilePath().isBlank() ? null : Path.of(editor.getCurrentBuffer().getFilePath());
         navigation = location -> editor.showMessage(editor.openFileAtAsync(location.path().toFile(), location.line(), location.column(), "Agent reference"));
     }
 
@@ -160,8 +161,8 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         commandDetails.setRows(8); commandDetails.setLineWrap(true); commandDetails.setWrapStyleWord(true);
         commandPanel.add(new JScrollPane(commandDetails), BorderLayout.CENTER);
         commandPanel.add(scrollRow(row(rejectCommands, approveCommands)), BorderLayout.SOUTH); commandPanel.setVisible(false);
-        permission.add(commandPanel, BorderLayout.NORTH);
-        views.addTab("Requests", permission);
+        requestCards.add(permission, "agent"); requestCards.add(commandPanel, "commands");
+        views.addTab("Requests", requestCards);
         ConnectionDetails setup = new ConnectionDetails();
         setup.addRow(help("OpenCode: install and sign in with its CLI, then Connect.\n"
             + "User settings: agent.opencode.command, .args and optional .model.\n"
@@ -349,7 +350,8 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             var queries = new WorkspaceQueryService(root, session.policy(), () -> capturedDocuments);
             AgentSelection target = action == AgentAction.EDIT ? selection.get() : null;
             Path contextOrigin = target != null && target.document().uri() != null ? WorkspacePaths.resolve(root, target.document().uri()) : origin;
-            if (contextOrigin != null && !contextOrigin.toAbsolutePath().normalize().startsWith(queries.root())) contextOrigin = null;
+            if (contextOrigin != null) try { contextOrigin = WorkspacePaths.resolve(queries.root(), contextOrigin.toString()); }
+            catch (WorkspaceApiException outside) { if (outside.code() != WorkspaceApiException.Code.OUTSIDE_WORKSPACE) throw outside; contextOrigin = null; }
             var requestedContext = AgentPromptContext.resolve(queries, settings, contextOrigin, instruction, token::isCancelled);
             try (var context = session.context(queries.visibleDocuments(), token::isCancelled);
                  var references = session.referenceContext(requestedContext.documents(), token::isCancelled)) {
@@ -503,19 +505,19 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         token.onCancel(() -> decision.cancel(false));
         SwingUtilities.invokeLater(() -> {
             if (disposed || request != generation || active != session || token.isCancelled()) { decision.cancel(false); return; }
-            commandApproval = decision; commandDetails.setText(plan.describe()); commandDetails.setCaretPosition(0); commandPanel.setVisible(true);
+            commandApproval = decision; commandDetails.setText(plan.describe()); commandDetails.setCaretPosition(0); ((java.awt.CardLayout) requestCards.getLayout()).show(requestCards, "commands");
             notice = "Commands await approval in Requests. Nothing has run."; refresh();
         });
         return decision;
     }
     private void decideCommands(boolean allow) {
         if (commandApproval == null) return;
-        var pending = commandApproval; commandApproval = null; commandPanel.setVisible(false);
+        var pending = commandApproval; commandApproval = null; ((java.awt.CardLayout) requestCards.getLayout()).show(requestCards, "agent");
         pending.complete(allow); notice = allow ? "Running approved checks…" : "Commands rejected; continuing without execution…"; refresh();
     }
     private void clearCommandRequest() {
         if (commandApproval != null) commandApproval.cancel(false);
-        commandApproval = null; commandPanel.setVisible(false);
+        commandApproval = null; ((java.awt.CardLayout) requestCards.getLayout()).show(requestCards, "agent");
     }
 
     private void useModel() {
@@ -792,11 +794,12 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private static void background(Runnable action) { Thread.ofVirtual().name("shed-agent-panel-cancel").start(action); }
     @Override public void close() { disposed = true; contextCompletion.close(); refreshTimer.stop(); stop(); }
     @Override public void refreshAppearance() {
-        fonts(panel, uiFont.get()); transcript.setFont(codeFont.get()); prompt.setFont(codeFont.get()); diagnostics.setFont(codeFont.get());
-        for (JButton button : List.of(connect, stop, send, cancel, respond, authenticate, begin, review, captureSelection, openLocation)) {
+        fonts(panel, uiFont.get()); transcript.setFont(codeFont.get()); prompt.setFont(codeFont.get()); diagnostics.setFont(codeFont.get()); commandDetails.setFont(codeFont.get());
+        for (JButton button : List.of(connect, stop, send, cancel, respond, authenticate, begin, review, captureSelection, openLocation, useModel, approveCommands, rejectCommands, continueReviewed, openResult, reuseRequest, clearHistory, saveWork, findRemaining, continueWork)) {
             WorkbenchStyle.quiet(button); button.setPreferredSize(null); var size = button.getPreferredSize();
             button.setPreferredSize(new Dimension(size.width, Math.max(WorkbenchStyle.px(40), size.height)));
         }
+        modelChoice.setPreferredSize(new Dimension(WorkbenchStyle.px(230), WorkbenchStyle.px(40))); historyList.setFixedCellHeight(WorkbenchStyle.px(40));
         providerChoice.setPreferredSize(new Dimension(WorkbenchStyle.px(170), WorkbenchStyle.px(40)));
         resume.setPreferredSize(new Dimension(WorkbenchStyle.px(240), WorkbenchStyle.px(40))); requestList.setFixedCellHeight(WorkbenchStyle.px(40));
         actionChoice.setPreferredSize(new Dimension(WorkbenchStyle.px(160), WorkbenchStyle.px(40))); locationList.setFixedCellHeight(WorkbenchStyle.px(40));

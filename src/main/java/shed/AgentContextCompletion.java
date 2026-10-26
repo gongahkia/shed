@@ -24,6 +24,7 @@ final class AgentContextCompletion implements AutoCloseable {
     private int job = -1;
     private long revision;
     private boolean closed, inserting;
+    private Token queryToken;
     private final DocumentListener listener = new DocumentListener() {
         public void insertUpdate(DocumentEvent e) { changed(); }
         public void removeUpdate(DocumentEvent e) { changed(); }
@@ -46,7 +47,12 @@ final class AgentContextCompletion implements AutoCloseable {
         list.addMouseListener(new java.awt.event.MouseAdapter() { public void mouseClicked(java.awt.event.MouseEvent e) { if (e.getClickCount() == 2) accept(); } });
         debounce = new Timer(200, e -> refresh()); debounce.setRepeats(false);
         prompt.getDocument().addDocumentListener(listener);
-        prompt.addCaretListener(e -> { if (!inserting && token(prompt.getText(), prompt.getCaretPosition()) == null) dismiss(); });
+        prompt.addCaretListener(e -> {
+            if (closed || inserting) return;
+            Token current = token(prompt.getText(), prompt.getCaretPosition());
+            if (current == null) dismiss();
+            else if (!java.util.Objects.equals(current, queryToken)) changed();
+        });
         bind("TAB", "contextAccept", this::accept);
         bind("ENTER", "contextAcceptEnter", this::accept);
         bind("DOWN", "contextNext", () -> move(1)); bind("UP", "contextPrevious", () -> move(-1));
@@ -62,7 +68,7 @@ final class AgentContextCompletion implements AutoCloseable {
             if (!handled.getAsBoolean() && previous != null) previous.actionPerformed(e);
         } });
     }
-    private void changed() { if (closed || inserting) return; revision++; if (job >= 0) jobs.cancel(job); items.clear(); panel.setVisible(false); debounce.restart(); }
+    private void changed() { if (closed || inserting) return; queryToken = token(prompt.getText(), prompt.getCaretPosition()); revision++; if (job >= 0) jobs.cancel(job); items.clear(); panel.setVisible(false); debounce.restart(); }
     private void dismiss() { revision++; debounce.stop(); if (job >= 0) jobs.cancel(job); job = -1; panel.setVisible(false); }
     private void refresh() {
         if (closed) return;
@@ -97,7 +103,11 @@ final class AgentContextCompletion implements AutoCloseable {
                 String query = text.substring(i + 1, caret);
                 if (query.startsWith("\"")) { if (query.substring(1).contains("\"")) return null; query = query.substring(1); }
                 else if (query.chars().anyMatch(Character::isWhitespace)) return null;
-                return new Token(i, caret, c, query);
+                int end = caret;
+                if (text.charAt(i + 1 < text.length() ? i + 1 : i) == '"') {
+                    int closing = text.indexOf('"', caret); if (closing >= 0) end = closing + 1;
+                } else while (end < text.length() && !Character.isWhitespace(text.charAt(end))) end++;
+                return new Token(i, end, c, query);
             }
             if (c == '\n') return null;
         }

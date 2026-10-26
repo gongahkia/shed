@@ -59,7 +59,7 @@ final class AgentPromptContext {
         var items = new ArrayList<Item>();
         for (var entry : entries) {
             if (items.size() >= 5000) { budget.incomplete("FILE_LIMIT"); break; }
-            if (entry.diskBytes() > FILE_LIMIT || entry.open() != null && entry.open().content().length() > FILE_LIMIT) continue;
+            if (entry.open() == null ? entry.diskBytes() > FILE_LIMIT : entry.open().content().length() > FILE_LIMIT) continue;
             items.add(new Item('@', WorkspaceIgnoreRules.path(workspace.root().relativize(entry.path())), entry.path()));
         }
         var names = new LinkedHashMap<String, Path>();

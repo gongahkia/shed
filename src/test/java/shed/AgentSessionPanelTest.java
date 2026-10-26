@@ -367,7 +367,12 @@ class AgentSessionPanelTest {
         edt(() -> {
             assertEquals(0, tabs().getSelectedIndex()); assertTrue(button("cancel").isEnabled()); assertFalse(button("send").isEnabled());
             assertTrue(text("commandDetails").getText().contains("Arguments:")); assertTrue(text("commandDetails").getText().contains("not sandboxed"));
-            assertFalse(text("transcript").getText().contains("Synthetic check failed")); button("approveCommands").doClick();
+            assertFalse(text("transcript").getText().contains("Synthetic check failed"));
+            tabs().setSelectedIndex(1); panel.component().setSize(480, 480);
+            for (int pass = 0; pass < 4; pass++) layout(panel.component());
+            assertTrue(text("commandDetails").getParent().getHeight() > 0, "Command details need a visible scroll viewport in a narrow dock");
+            assertTrue(button("approveCommands").isVisible());
+            tabs().setSelectedIndex(0); button("approveCommands").doClick();
         });
         await(() -> button("send").isEnabled() && text("transcript").getText().contains("Check failed with exit code 7"));
         edt(() -> assertTrue(text("transcript").getText().contains("Synthetic check failed")));

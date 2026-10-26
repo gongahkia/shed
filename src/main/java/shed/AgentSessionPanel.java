@@ -126,7 +126,9 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         permission.add(split, BorderLayout.CENTER); permission.add(scrollRow(row(options, respond)), BorderLayout.SOUTH);
         views.addTab("Requests", permission);
         JPanel setup = new JPanel(); setup.setLayout(new BoxLayout(setup, BoxLayout.Y_AXIS));
-        setup.add(new JLabel("Configure agent.<name>.command and optional .args in your settings."));
+        setup.add(new JLabel("OpenCode: install and sign in with its CLI, then choose opencode and Connect."));
+        setup.add(new JLabel("User settings: agent.opencode.command, .args and optional .model."));
+        setup.add(new JLabel("The OpenCode preset allows reading/searching and returns proposals for review."));
         setup.add(new JLabel("Connect starts that local program in the workspace shown above."));
         setup.add(new JLabel("The program retains its operating-system access; Shed does not sandbox it."));
         setup.add(row(new JLabel("Resume session ID (optional)"), resume)); setup.add(reviewWrites); setup.add(foreground);

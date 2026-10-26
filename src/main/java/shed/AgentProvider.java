@@ -27,7 +27,8 @@ record AgentProvider(String id, List<String> command, Map<String, String> enviro
         if (executable == null || executable.isBlank()) throw new IllegalArgumentException("Configure " + prefix + "command before connecting");
         List<String> command = new ArrayList<>(ShellCommand.directCommand(executable));
         String args = config.get(prefix + "args"); if (args != null && !args.isBlank()) command.addAll(ShellCommand.directCommand(args));
-        return new AgentProvider(id, command, Map.of(), Duration.ofMillis(timeout(config, prefix + "startup.timeout.ms", 15000)),
+        Map<String, String> environment = id.equals("opencode") ? OpenCodePreset.environment(config.get(prefix + "model", "")) : Map.of();
+        return new AgentProvider(id, command, environment, Duration.ofMillis(timeout(config, prefix + "startup.timeout.ms", 15000)),
             Duration.ofMillis(timeout(config, prefix + "turn.timeout.ms", 600000)));
     }
     private static long timeout(ConfigManager config, String key, long fallback) {

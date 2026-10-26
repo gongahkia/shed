@@ -59,6 +59,8 @@ public final class AcpFixtureProcess {
             else if (method.equals("session/load")) reply(request.get("id"), Map.of());
             else if (method.equals("session/prompt")) {
                 prompt = request.get("id");
+                if (mode.equals("early-write-cancel")) send(Map.of("jsonrpc", "2.0", "id", "write", "method", "fs/write_text_file",
+                    "params", Map.of("sessionId", "fixture-session", "path", args[1], "content", "agent\n")));
                 if (!mode.equals("ignore-cancel")) {
                     send(Map.of("jsonrpc", "2.0", "method", "session/update", "params", Map.of("sessionId", "fixture-session",
                         "update", Map.of("sessionUpdate", "agent_message_chunk", "content", Map.of("type", "text", "text", "streamed")))));

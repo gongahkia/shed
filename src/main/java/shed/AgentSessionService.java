@@ -20,11 +20,13 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
     record Event(long sequence, String type, Map<String, Object> data, int characters) { }
     record Permission(String id, Map<String, Object> tool, List<Map<String, Object>> options) { }
     record Snapshot(String provider, State state, String sessionId, Map<String, Object> capabilities, List<Map<String, Object>> authMethods,
-                    List<Event> events, long droppedEvents, List<Permission> permissions, String error, AcpConnection.Diagnostics diagnostics) { }
+                    List<Event> events, long droppedEvents, List<Permission> permissions, List<AgentWriteReview.Pending> writes,
+                    String error, AcpConnection.Diagnostics diagnostics) { }
     private record Decision(Permission permission, CompletableFuture<Map<String, Object>> result) { }
     private final AgentProvider provider;
     private final WorkspaceQueryService workspace;
     private final AcpConnection connection;
+    private final AgentWriteReview writes;
     private final ArrayDeque<Event> events = new ArrayDeque<>();
     private final Map<String, Decision> decisions = new LinkedHashMap<>();
     private State state = State.NEW;
@@ -35,20 +37,27 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
     private int eventCharacters;
 
     AgentSessionService(AgentProvider provider, WorkspaceQueryService workspace) throws IOException {
+        this(provider, workspace, null, null);
+    }
+
+    AgentSessionService(AgentProvider provider, WorkspaceQueryService workspace, WorkspaceDocumentEditor editor, Path proposalStorage) throws IOException {
         workspace.policy().require(AgentPolicy.Capability.START_AGENT);
         this.provider = provider; this.workspace = workspace;
+        writes = proposalStorage == null ? null : new AgentWriteReview(workspace, editor, proposalStorage,
+            "acp:" + provider.id() + ":" + UUID.randomUUID(), (type, data) -> { synchronized (this) { record(type, data); } });
         connection = AcpConnection.start(provider.command(), workspace.root(), provider.environment(), this);
         connection.termination().thenRun(() -> {
             synchronized (this) {
                 if (state != State.CLOSED) { state = State.FAILED; error = connection.diagnostics().failure(); }
-                cancelPermissions(); record("connection_closed", Map.of("reason", connection.diagnostics().failure()));
+                if (writes != null) writes.close();
+                cancelPendingRequests(); record("connection_closed", Map.of("reason", connection.diagnostics().failure()));
             }
         });
     }
 
     synchronized Snapshot snapshot() {
         return new Snapshot(provider.id(), state, sessionId, capabilities, authMethods, List.copyOf(events), droppedEvents,
-            decisions.values().stream().map(Decision::permission).toList(), error, connection.diagnostics());
+            decisions.values().stream().map(Decision::permission).toList(), writes == null ? List.of() : writes.pending(), error, connection.diagnostics());
     }
 
     Path root() { return workspace.root(); }
@@ -60,7 +69,7 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
         boolean read = workspace.policy().capabilities().contains(AgentPolicy.Capability.READ);
         return finish(connection.request("initialize", Map.of("protocolVersion", 1,
             "clientInfo", Map.of("name", "shed", "title", "Shed", "version", "2.0.0"),
-            "clientCapabilities", Map.of("fs", Map.of("readTextFile", read, "writeTextFile", false), "terminal", false)), provider.startupTimeout()), State.READY,
+            "clientCapabilities", Map.of("fs", Map.of("readTextFile", read, "writeTextFile", writes != null), "terminal", false)), provider.startupTimeout()), State.READY,
             response -> {
                 if (!Long.valueOf(1).equals(response.get("protocolVersion"))) {
                     connection.abort("Agent negotiated an unsupported protocol version"); throw new AcpException(-32600, "Agent negotiated an unsupported protocol version");
@@ -97,20 +106,21 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
 
     synchronized CompletableFuture<Map<String, Object>> prompt(String text) {
         if (text == null || text.isBlank() || text.length() > 65536) throw invalid("A prompt must contain 1–65,536 characters");
+        if (writes != null && !writes.pending().isEmpty()) throw invalid("Previous file reviews are still finishing");
         transition(State.IDLE, State.PROMPTING); turnId = UUID.randomUUID().toString();
         record("user_prompt", Map.of("sessionId", sessionId, "turnId", turnId, "text", text));
         return finish(connection.request("session/prompt", Map.of("sessionId", sessionId, "prompt", List.of(Map.of("type", "text", "text", text))), provider.turnTimeout()), State.IDLE,
             response -> {
                 String reason = text(response, "stopReason", 64);
                 if (!Set.of("end_turn", "max_tokens", "max_turn_requests", "refusal", "cancelled").contains(reason)) throw invalid("Unknown agent stop reason");
-                cancelPermissions(); record("turn_finished", Map.of("sessionId", sessionId, "turnId", turnId, "stopReason", reason));
+                cancelPendingRequests(); record("turn_finished", Map.of("sessionId", sessionId, "turnId", turnId, "stopReason", reason));
             });
     }
 
     synchronized void cancel() {
         if (state == State.CANCELLING) return;
         if (state != State.PROMPTING) throw invalid("No prompt is running");
-        state = State.CANCELLING; cancelPermissions();
+        state = State.CANCELLING; cancelPendingRequests();
         record("cancel_requested", Map.of("sessionId", sessionId, "turnId", turnId));
         connection.notify("session/cancel", Map.of("sessionId", sessionId));
         String cancelledTurn = turnId;
@@ -146,6 +156,7 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
             synchronized (this) { requireSession(params); }
             return switch (method) {
                 case "fs/read_text_file" -> CompletableFuture.completedFuture(read(params));
+                case "fs/write_text_file" -> write(params);
                 case "session/request_permission" -> permission(params);
                 default -> CompletableFuture.failedFuture(new AcpException(-32601, "Client method is unavailable: " + method));
             };
@@ -153,6 +164,14 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
             return CompletableFuture.failedFuture(new AcpException(domain.code() == WorkspaceApiException.Code.NOT_FOUND ? -32002 : -32602,
                 domain.getMessage(), domain.toMap()));
         } catch (RuntimeException error) { return CompletableFuture.failedFuture(error); }
+    }
+
+    private synchronized CompletableFuture<Map<String, Object>> write(Map<String, Object> params) {
+        if (writes == null) throw new AcpException(-32601, "Reviewed file writes are unavailable for this connection");
+        requireSession(params);
+        if (state != State.PROMPTING) throw new AcpException(-32800, "File writes require an active prompt");
+        if (!(params.get("content") instanceof String content)) throw invalid("Invalid write content");
+        return writes.write(text(params, "path", 8192), content, turnId);
     }
 
     @Override public synchronized void notification(String method, Map<String, Object> params) {
@@ -226,7 +245,7 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
                 if (failure == null) try { accept.accept(result); state = success; error = ""; return result; }
                 catch (RuntimeException malformed) { state = State.FAILED; error = malformed.getMessage(); connection.abort(error); throw malformed; }
                 Throwable cause = failure instanceof java.util.concurrent.CompletionException ? failure.getCause() : failure;
-                error = cause.getMessage(); cancelPermissions();
+                error = cause.getMessage(); cancelPendingRequests();
                 if (operation == State.INITIALIZING) { state = State.FAILED; connection.close(); }
                 else if (!connection.diagnostics().running()) state = State.FAILED;
                 else if (operation == State.CREATING || operation == State.LOADING || operation == State.AUTHENTICATING) {
@@ -242,7 +261,10 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
             throw invalid("Request does not name the active session");
     }
     private void transition(State expected, State next) { if (state != expected) throw invalid("Agent is " + state + "; expected " + expected); state = next; error = ""; }
-    private void cancelPermissions() { for (Decision decision : new ArrayList<>(decisions.values())) decision.result().complete(cancelled()); decisions.clear(); }
+    private void cancelPendingRequests() {
+        for (Decision decision : new ArrayList<>(decisions.values())) decision.result().complete(cancelled()); decisions.clear();
+        if (writes != null) writes.cancelTurn(turnId);
+    }
     private static Map<String, Object> cancelled() { return Map.of("outcome", Map.of("outcome", "cancelled")); }
     private void record(String type, Map<String, Object> data) {
         var value = frozen(data); int size = MiniJson.stringify(value).length();
@@ -250,7 +272,7 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
         while (events.size() > 1000 || eventCharacters > 2 * 1024 * 1024) { eventCharacters -= events.removeFirst().characters(); droppedEvents++; }
     }
     @Override public void close() {
-        synchronized (this) { if (state == State.CLOSED) return; state = State.CLOSED; cancelPermissions(); }
+        synchronized (this) { if (state == State.CLOSED) return; state = State.CLOSED; cancelPendingRequests(); if (writes != null) writes.close(); }
         connection.close();
     }
     private static AcpException invalid(String message) { return new AcpException(-32602, message); }

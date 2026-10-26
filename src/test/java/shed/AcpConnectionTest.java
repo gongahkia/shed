@@ -15,11 +15,20 @@ import org.junit.jupiter.api.io.TempDir;
 
 class AcpConnectionTest {
     @TempDir Path root;
+    private final List<AcpConnection> connections = new ArrayList<>();
+    @org.junit.jupiter.api.AfterEach void closeProcesses() throws Exception {
+        for (var connection : connections) { connection.close(); connection.termination().get(10, TimeUnit.SECONDS); }
+        FixtureCleanup.deleteEventually(root);
+    }
+    private AcpConnection start(List<String> command, Path directory, Map<String, String> environment, AcpConnection.Handler handler) throws java.io.IOException {
+        var connection = AcpConnection.start(command, directory, environment, handler);
+        connections.add(connection); return connection;
+    }
     static final Duration TIMEOUT = Duration.ofSeconds(10);
 
     @Test void pendingPeerRequestDoesNotBlockOtherRequestsOrStructuredErrors() throws Exception {
         var permission = new CompletableFuture<Map<String, Object>>(); var entered = new CompletableFuture<Void>();
-        try (var connection = AcpConnection.start(command("multiplex"), root, Map.of(), new AcpConnection.Handler() {
+        try (var connection = start(command("multiplex"), root, Map.of(), new AcpConnection.Handler() {
             public CompletableFuture<Map<String, Object>> request(String method, Map<String, Object> params) { entered.complete(null); return permission; }
             public void notification(String method, Map<String, Object> params) { }
         })) {
@@ -35,7 +44,7 @@ class AcpConnectionTest {
 
     @Test void genericCancellationReleasesAnOutstandingPeerRequest() throws Exception {
         var permission = new CompletableFuture<Map<String, Object>>(); var entered = new CompletableFuture<Void>();
-        try (var connection = AcpConnection.start(command("echo"), root, Map.of(), new AcpConnection.Handler() {
+        try (var connection = start(command("echo"), root, Map.of(), new AcpConnection.Handler() {
             public CompletableFuture<Map<String, Object>> request(String method, Map<String, Object> params) { entered.complete(null); return permission; }
             public void notification(String method, Map<String, Object> params) { }
         })) {
@@ -46,7 +55,7 @@ class AcpConnectionTest {
     }
 
     @Test void invalidOrOversizedFramesStopTheProcessAndFailPendingWork() throws Exception {
-        for (String mode : List.of("malformed", "oversized", "utf8")) try (var connection = AcpConnection.start(command(mode), root, Map.of(), empty())) {
+        for (String mode : List.of("malformed", "oversized", "utf8")) try (var connection = start(command(mode), root, Map.of(), empty())) {
             var pending = connection.request("echo", Map.of(), TIMEOUT);
             assertThrows(java.util.concurrent.ExecutionException.class, () -> pending.get(10, TimeUnit.SECONDS));
             connection.termination().get(10, TimeUnit.SECONDS);
@@ -56,7 +65,7 @@ class AcpConnectionTest {
     }
 
     @Test void deadlinesStopUnresponsiveAgentsAndBoundPendingRequests() throws Exception {
-        try (var connection = AcpConnection.start(command("hang"), root, Map.of(), empty())) {
+        try (var connection = start(command("hang"), root, Map.of(), empty())) {
             List<CompletableFuture<Map<String, Object>>> pending = new ArrayList<>();
             for (int i = 0; i < AcpConnection.MAX_PENDING; i++) pending.add(connection.request("hang", Map.of(), Duration.ofSeconds(2)));
             assertThrows(java.util.concurrent.ExecutionException.class, () -> connection.request("overflow", Map.of(), TIMEOUT).get());
@@ -66,12 +75,12 @@ class AcpConnectionTest {
     }
 
     @Test void diagnosticsAreBoundedAndClosingStopsObservedChildren() throws Exception {
-        try (var connection = AcpConnection.start(command("stderr"), root, Map.of(), empty())) {
+        try (var connection = start(command("stderr"), root, Map.of(), empty())) {
             connection.request("echo", Map.of(), TIMEOUT).get(10, TimeUnit.SECONDS);
             await(() -> connection.diagnostics().truncated()); assertTrue(connection.diagnostics().stderr().length() <= AcpConnection.MAX_DIAGNOSTICS);
         }
         var child = new CompletableFuture<Long>();
-        var connection = AcpConnection.start(command("descendant"), root, Map.of(), new AcpConnection.Handler() {
+        var connection = start(command("descendant"), root, Map.of(), new AcpConnection.Handler() {
             public CompletableFuture<Map<String, Object>> request(String method, Map<String, Object> params) { return CompletableFuture.failedFuture(new AcpException(-32601, "unsupported")); }
             public void notification(String method, Map<String, Object> params) { child.complete((Long) params.get("pid")); }
         });
@@ -84,7 +93,7 @@ class AcpConnectionTest {
 
     @Test void peerCancellationCannotCreateUnboundedBlockedHandlerThreads() throws Exception {
         var release = new java.util.concurrent.CountDownLatch(1); var started = new java.util.concurrent.atomic.AtomicInteger();
-        try (var connection = AcpConnection.start(command("echo"), root, Map.of(), new AcpConnection.Handler() {
+        try (var connection = start(command("echo"), root, Map.of(), new AcpConnection.Handler() {
             public CompletableFuture<Map<String, Object>> request(String method, Map<String, Object> params) {
                 started.incrementAndGet();
                 while (release.getCount() != 0) try { release.await(); } catch (InterruptedException ignored) { /* Deliberately uncooperative fixture. */ }

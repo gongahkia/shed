@@ -54,8 +54,11 @@ class WorkspaceBridgeTest {
             String executable = Path.of(System.getProperty("java.home"), "bin", System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString();
             Process process = new ProcessBuilder(executable, "-Djava.awt.headless=true", "-cp", System.getProperty("java.class.path"),
                 "shed.Texteditor", "--workspace-api", "--root", root.toString(), "--connect", server.descriptor().toString(),
-                "--request", WorkspaceRpcTest.request(2, "documents/read", Map.of("workspaceId", server.workspaceId(), "document", snapshot.documentId()))).start();
+                "--stdio").start();
             try {
+                try (var input = process.getOutputStream()) {
+                    input.write((WorkspaceRpcTest.request(2, "documents/read", Map.of("workspaceId", server.workspaceId(), "document", snapshot.documentId())) + "\n").getBytes(StandardCharsets.UTF_8));
+                }
                 assertTrue(process.waitFor(30, TimeUnit.SECONDS), "Headless connected CLI must exit");
                 assertEquals(0, process.exitValue(), new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8));
                 assertEquals("newer human text\n", result(new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8)).get("content"));

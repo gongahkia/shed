@@ -137,7 +137,15 @@ class WorkspaceRenameProposalTest {
         var reviewer = new WorkspaceProposalService(tightened, null, temporary.resolve("history"), "human");
         assertEquals(WorkspaceApiException.Code.PROTECTED_PATH, assertThrows(WorkspaceApiException.class, () -> reviewer.apply(id, revision(rebased))).code());
         var applied = service.apply(id, revision(rebased)); Files.writeString(root.resolve("renamed"), "later in-place update");
-        service.undo(id, revision(applied)); assertEquals("later in-place update", Files.readString(source));
+        if (WorkspaceEditTransaction.resourceIdentity(root.resolve("renamed")).get("key").equals("")) {
+            // Java's Windows provider does not expose a stable file key. Without an editor
+            // binding, changed bytes cannot be proven to belong to the original file.
+            assertEquals(WorkspaceApiException.Code.CONFLICT, assertThrows(WorkspaceApiException.class,
+                () -> service.undo(id, revision(applied))).code());
+            assertFalse(Files.exists(source)); assertEquals("later in-place update", Files.readString(root.resolve("renamed")));
+        } else {
+            service.undo(id, revision(applied)); assertEquals("later in-place update", Files.readString(source));
+        }
     }
 
     @Test void uncertainEditorOutcomeRestoresTheBindingInBothDirections() throws Exception {

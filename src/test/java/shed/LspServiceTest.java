@@ -35,7 +35,7 @@ public class LspServiceTest {
             long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
             while (client.isAlive() && System.nanoTime() < deadline) Thread.sleep(10);
             assertFalse(client.isAlive(), "Language server must exit before deleting its Windows working directory");
-            Files.deleteIfExists(log); Files.deleteIfExists(workspace);
+            FixtureCleanup.deleteEventually(log); FixtureCleanup.deleteEventually(workspace);
         }
     }
 

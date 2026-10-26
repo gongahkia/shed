@@ -19,6 +19,7 @@ import javax.swing.text.Document;
 
 /** EDT-owned preview. Model output never enters the document until explicit acceptance. */
 final class InlineCompletionSession implements AutoCloseable {
+    static final int MAX_PREVIEW_CHARACTERS = 1_000_000, MAX_WRAPPED_PREVIEW_CHARACTERS = 100_000;
     private final JTextArea area;
     private final InlineCompletionDisplay display;
     private final BooleanSupplier eligible;
@@ -27,7 +28,7 @@ final class InlineCompletionSession implements AutoCloseable {
     private final IntSupplier delay;
     private final Timer timer;
     private Document document;
-    private long revision, generation, automaticEpoch;
+    private long revision, generation, automaticEpoch, retryAfter;
     private CompletableFuture<String> pending;
     private Suggestion suggestion;
     private boolean closed, accepting;
@@ -54,7 +55,7 @@ final class InlineCompletionSession implements AutoCloseable {
         this.area = area; this.eligible = eligible; this.delay = delay; this.provider = provider;
         this.insertion = insertion; this.errors = errors;
         display = new InlineCompletionDisplay(area);
-        timer = new Timer(500, event -> request()); timer.setRepeats(false);
+        timer = new Timer(500, event -> { if (System.nanoTime() >= retryAfter) request(); }); timer.setRepeats(false);
         bind(); area.addCaretListener(caret); area.addFocusListener(focus); area.addPropertyChangeListener(binding);
     }
 
@@ -77,7 +78,11 @@ final class InlineCompletionSession implements AutoCloseable {
     }
 
     private boolean canRequest() {
-        return !closed && area.isEditable() && area.isEnabled() && area.getSelectionStart() == area.getSelectionEnd() && eligible.getAsBoolean();
+        return !closed && area.isEditable() && area.isEnabled() && area.getSelectionStart() == area.getSelectionEnd()
+            && sizeSupported(area) && eligible.getAsBoolean();
+    }
+    static boolean sizeSupported(JTextArea area) {
+        return area.getDocument().getLength() <= (area.getLineWrap() ? MAX_WRAPPED_PREVIEW_CHARACTERS : MAX_PREVIEW_CHARACTERS);
     }
     void onTiming(java.util.function.BiConsumer<String, Long> listener) { timings = java.util.Objects.requireNonNull(listener); }
 
@@ -101,7 +106,14 @@ final class InlineCompletionSession implements AutoCloseable {
                 if (closed || request != generation || capturedDocument != document || capturedRevision != revision
                     || offset != area.getCaretPosition() || !canRequest()) return;
                 pending = null;
-                if (error != null) { if (!(error instanceof java.util.concurrent.CancellationException)) errors.accept("Inline suggestion unavailable. Check OpenCode authentication, credits and model settings."); return; }
+                if (error != null) {
+                    if (!(error instanceof java.util.concurrent.CancellationException)) {
+                        retryAfter = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30);
+                        errors.accept("Inline suggestion unavailable. Check OpenCode authentication, credits and model settings. AI: Complete retries immediately.");
+                    }
+                    return;
+                }
+                retryAfter = 0;
                 if (text == null || text.isEmpty() || text.length() > OpenCodeCompletionClient.MAX_COMPLETION) return;
                 try {
                     long layoutStarted = System.nanoTime();

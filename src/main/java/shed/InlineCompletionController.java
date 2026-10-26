@@ -78,6 +78,8 @@ final class InlineCompletionController implements AutoCloseable {
         InlineCompletionSession session = sessions.get(editor.writingArea);
         JTextArea area = editor.writingArea;
         FileBuffer buffer = editor.getCurrentBuffer();
+        if (!InlineCompletionSession.sizeSupported(area))
+            return "Inline suggestions are limited to 1,000,000 characters, or 100,000 with line wrapping, to keep editing responsive.";
         if (session == null || buffer == null || buffer.isLargeFile() || area.getDocument() != buffer.getDocument()
             || area.getSelectionStart() != area.getSelectionEnd() || !editor.extraSelections.isEmpty())
             return "Inline suggestions require a source buffer without a selection.";

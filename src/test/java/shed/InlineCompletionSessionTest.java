@@ -141,6 +141,28 @@ class InlineCompletionSessionTest {
         Thread.sleep(250); edt(() -> assertTrue(requests.isEmpty()));
     }
 
+    @Test void expensivePreviewSizesDoNotRequestOrDisplaySuggestions() throws Exception {
+        open("x".repeat(100001), 1);
+        edt(() -> {
+            area.setLineWrap(true); session.request(); assertTrue(requests.isEmpty());
+            area.setLineWrap(false); session.request(); assertEquals(1, requests.size());
+            area.setLineWrap(true);
+        });
+        requests.getFirst().complete("ghost"); flush();
+        edt(() -> {
+            assertFalse(session.visible());
+            area.setLineWrap(false); area.setText("x".repeat(1000001)); session.request();
+            assertEquals(1, requests.size());
+        });
+    }
+
+    @Test void automaticFailuresBackOffButManualRetryRemainsAvailable() throws Exception {
+        open("code", 4); delay.set(100);
+        edt(session::request); requests.getFirst().completeExceptionally(new java.io.IOException("provider unavailable")); flush();
+        edt(() -> { area.append("1"); area.setCaretPosition(5); }); Thread.sleep(250);
+        edt(() -> { assertEquals(1, requests.size()); session.request(); assertEquals(2, requests.size()); });
+    }
+
     private java.awt.event.KeyEvent key(int code, int modifiers) {
         return new java.awt.event.KeyEvent(area, java.awt.event.KeyEvent.KEY_PRESSED, 0, modifiers, code, java.awt.event.KeyEvent.CHAR_UNDEFINED);
     }

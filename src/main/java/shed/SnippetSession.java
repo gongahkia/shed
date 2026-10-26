@@ -53,6 +53,8 @@ final class SnippetSession {
         index = -1;
     }
 
+    boolean active(JTextArea area) { return area != null && area.getDocument() == document && !placeholders.isEmpty(); }
+
     private void select(JTextArea area) {
         Placeholder placeholder = placeholders.get(index);
         int start = placeholder.start().getOffset();

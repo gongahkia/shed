@@ -243,6 +243,15 @@ public class Texteditor extends JFrame implements KeyListener {
 
     private EditorWorkspaceDocuments workspaceDocumentSource;
     private AgentWorkspaceController agentWorkspaceController;
+    private InlineCompletionController inlineCompletionController;
+
+    void installAiCompletion(JTextArea area) { if (inlineCompletionController != null) inlineCompletionController.install(area); }
+    void disposeAiCompletion(JTextArea area) { if (inlineCompletionController != null) inlineCompletionController.remove(area); }
+    void paintAiCompletion(Graphics graphics, JTextArea area) { if (inlineCompletionController != null) inlineCompletionController.paint(graphics, area); }
+    boolean handleAiCompletionKey(KeyEvent event) { return inlineCompletionController != null && inlineCompletionController.keyPressed(event); }
+    boolean allowsAiCompletion() { return inputController != null && inputController.allowsAiCompletion(); }
+    void dismissAiCompletion() { if (inlineCompletionController != null) inlineCompletionController.dismiss(); }
+    String requestAiCompletion() { return inlineCompletionController == null ? "Inline completion is unavailable." : inlineCompletionController.request(); }
 
     /** Composition seam for explicitly enabled machine/agent adapters; constructing it opens no surface. */
     WorkspaceQueryService workspaceQueries(Path root, AgentPolicy policy) {
@@ -352,9 +361,10 @@ public class Texteditor extends JFrame implements KeyListener {
         workspaceDocumentSource = new EditorWorkspaceDocuments(() -> List.copyOf(buffers), workspaceController::roots,
             workspaceController::activeRoot, Path.of("."), this::applyWorkspaceTextBatch);
         agentWorkspaceController = new AgentWorkspaceController(this);
+        inlineCompletionController = new InlineCompletionController(this);
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override public void windowClosed(java.awt.event.WindowEvent event) {
-                workspaceDocumentSource.close(); agentWorkspaceController.close();
+                workspaceDocumentSource.close(); agentWorkspaceController.close(); inlineCompletionController.close();
             }
         });
         activePaneIndex = -1;
@@ -2673,6 +2683,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Mode management
     void setMode(EditorMode mode) {
+        dismissAiCompletion();
         editorUiController.setMode(mode);
     }
 

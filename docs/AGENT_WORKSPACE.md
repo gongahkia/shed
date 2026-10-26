@@ -10,14 +10,16 @@ Initial backends: [OpenCode through ACP](https://opencode.ai/docs/acp/) (`openco
 
 | Workflow | Acceptance | Current evidence |
 | --- | --- | --- |
-| Complete | Ghost text, Tab acceptance, Escape dismissal, existing keymap/completion compatibility; cancellation and exact-document/caret freshness. | Local bounded transport and opt-in settings implemented; editor presentation/integration pending. |
+| Complete | Ghost text, Tab acceptance, Escape dismissal, existing keymap/completion compatibility; cancellation and exact-document/caret freshness. | Local transport, opt-in settings, per-pane previews, debounced typing, Tab/Escape and stale-result guards implemented. Headless component/key-routing tests; live-model and native desktop verification remain outstanding. |
 | Edit selection | Capture a specific selection and its document version, request a replacement, review/apply through shared proposals; preserve later human changes. | Proposal infrastructure exists; focused action pending. |
 | Ask/search | Useful project answers with validated navigable file/line results; clear empty/error states. | Workspace queries and ACP exist; focused action and result presentation pending. |
 | Run task | Prompted changes across files, progress, cancellation, human review. | ACP conversations and reviewed writes exist; focused action and provider-specific verification pending. |
 
 No new task dashboards, worktrees, MCP integration, or unrelated platform features are part of this scope. The unfinished, uncommitted structured-question UI was deferred rather than added as another screen. Existing committed protocol and review foundations remain available.
 
-Completion settings (user settings, not trusted project defaults): `ai.completion.enabled=false`, `ai.completion.endpoint=http://127.0.0.1:11434/api/generate`, `ai.completion.model=` (choose an installed model supporting prefix/suffix generation), `ai.completion.delay.ms=500`, `ai.completion.timeout.ms=5000`. No request is made while disabled. This transport does not itself complete the editor workflow.
+Completion settings (user settings, not trusted project defaults): `ai.completion.enabled=false`, `ai.completion.endpoint=http://127.0.0.1:11434/api/generate`, `ai.completion.model=` (choose an installed model supporting prefix/suffix generation), `ai.completion.delay.ms=500`, `ai.completion.timeout.ms=5000`. No request is made while disabled. While enabled, typing in a focused editable buffer schedules an inline preview after the idle delay. Tab accepts it as one insertion; Escape dismisses it. Existing completion popups, snippet navigation, custom action bindings and multi-selection take precedence. Focus loss, buffer replacement, caret movement, later edits and pane closure discard pending suggestions. Plain and Emacs profiles use their existing insert-mode behavior; Vim requires Insert mode.
+
+Ghost text is painted as a temporary insertion preview; it does not modify document text, selection, undo history or scroll geometry. Multi-line previews temporarily cover the affected displayed rows and are clipped to the viewport. Acceptance inserts the full returned suggestion, up to 4,096 UTF-16 units. Native visual checks, including soft wrapping and long previews, remain outstanding while the no-window constraint applies.
 
 ## Historical roadmap (superseded)
 

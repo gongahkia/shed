@@ -245,7 +245,8 @@ final class InputController {
         if (e == null || e.isConsumed()) return;
         editor.suppressNextTypedChar = false;
         if (e.getComponent() == editor.writingArea) lastKeyPressNanos = System.nanoTime();
-        if (handleActionBinding(e)) return;
+        if (handleActionBinding(e)) { editor.dismissAiCompletion(); return; }
+        if (editor.handleAiCompletionKey(e)) return;
         if (e != null && isCompletionPopupVisible() && e.getKeyCode() == KeyEvent.VK_F6
             && !e.isAltDown() && !e.isControlDown() && !e.isMetaDown()) {
             editor.completionList.requestFocusInWindow();
@@ -2932,6 +2933,8 @@ final class InputController {
     private boolean moveSnippetPlaceholder(int direction) {
         return snippetSession.move(editor.writingArea, direction);
     }
+
+    boolean allowsAiCompletion() { return !composingText && !isCompletionPopupVisible() && !snippetSession.active(editor.writingArea); }
 
     String expandNativeSnippetAtCursor() {
         FileBuffer buffer = editor.getCurrentBuffer();

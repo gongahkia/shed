@@ -423,10 +423,12 @@ final class EditorUiController {
                 if (getLineWrap()) paintWrapIndicators(g, this);
                 paintColorPreviews(g, this);
                 paintExplorerFileDropPreview(g, this);
+                editor.paintAiCompletion(g, this);
                 editorPainted(this, paintStartedAt);
             }
         };
         textArea.addKeyListener(editor);
+        editor.installAiCompletion(textArea);
         editor.inputController.watchComposition(textArea);
         AccessibilitySupport.describe(textArea, "Editor", "Active source editor. Use keyboard navigation and configured keymap commands to edit the current buffer.");
         textArea.setFont(resolveEditorFont());

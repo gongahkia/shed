@@ -30,6 +30,7 @@ final class AgentWorkspaceController implements AutoCloseable {
         if (active != null && !active.running()) { active = null; status = "Agent API connection has stopped."; }
         String value = argument == null ? "" : argument.trim();
         return switch (value) {
+            case "complete" -> editor.requestAiCompletion();
             case "" -> { editor.showToolWindow(ToolWindowHost.Tab.AGENT); yield "Connect an agent or review proposals in the Agents panel."; }
             case "proposals" -> { if (editor.toolWindowHost != null) editor.toolWindowHost.showAgentReview(); yield "Review proposals in the Agents panel."; }
             case "status", "api", "api status" -> status;

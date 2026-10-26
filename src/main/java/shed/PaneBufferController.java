@@ -829,6 +829,7 @@ final class PaneBufferController {
 
         detachActiveDocumentListener();
         editor.editorPanes.remove(paneToClose);
+        editor.disposeAiCompletion(paneToClose.getTextArea());
         editor.windowLayoutRoot = editor.windowLayoutRoot == null ? null : editor.windowLayoutRoot.removeLeaf(paneToClose);
         if (editor.windowLayoutRoot == null && !editor.editorPanes.isEmpty()) {
             editor.windowLayoutRoot = WindowLayoutNode.leaf(editor.editorPanes.get(0));

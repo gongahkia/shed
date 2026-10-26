@@ -268,7 +268,11 @@ class AgentSessionPanelTest {
         });
         send("malformed always");
         await(() -> button("send").isEnabled() && status().getText().contains("adjust and retry"));
-        edt(() -> { assertEquals("malformed always", text("prompt").getText()); assertFalse(button("review").isEnabled()); });
+        edt(() -> {
+            assertEquals("malformed always", text("prompt").getText()); assertFalse(button("review").isEnabled());
+            assertTrue(text("transcript").getText().contains("Unusable reply (not applied)"));
+            assertTrue(text("transcript").getText().contains("still not JSON"));
+        });
         assertEquals(4, owned.getFirst().snapshot().events().stream().filter(event -> event.type().equals("user_prompt")).count());
     }
 

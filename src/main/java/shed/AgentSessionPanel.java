@@ -278,6 +278,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         locations.clear(); resultProposal = ""; referencesPanel.setVisible(false); controls(session.snapshot());
         var proposalOwner = new java.util.concurrent.atomic.AtomicReference<WorkspaceProposalService>();
         var proposalId = new java.util.concurrent.atomic.AtomicReference<String>("");
+        var unusableReply = new java.util.concurrent.atomic.AtomicReference<String>("");
         long started = System.nanoTime(); String metric = "ai." + action.name().toLowerCase(java.util.Locale.ROOT);
         actionJob = jobs.submitLongRunning(action.toString(), token -> {
             var capturedDocuments = List.copyOf(documents.snapshots());
@@ -295,6 +296,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                     storage.resolve("agent-workspace").resolve(queries.workspaceId()), "focused:" + java.util.UUID.randomUUID()));
                 String wire = task != null ? task.prompt(instruction) : target == null ? AgentAnswer.prompt(instruction, queries, token::isCancelled) : target.prompt(instruction);
                 if (context != null) wire += context.instruction();
+                String originalWire = wire;
                 performance.recordDuration(metric + ".prepare", started, "context and baseline");
                 for (int attempt = 0; ; attempt++) {
                     if (token.isCancelled()) throw new java.util.concurrent.CancellationException();
@@ -331,8 +333,10 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                         if (token.isCancelled()) { withdraw(proposalOwner.get(), id); throw new java.util.concurrent.CancellationException(); }
                         return new ActionResult(id, null, summary);
                     } catch (AgentReplyFormatException malformed) {
+                        int end = GraphemeBoundary.floor(reply.text(), Math.min(2048, reply.text().length()));
+                        unusableReply.set(reply.text().substring(0, end) + (end < reply.text().length() ? "\n[Reply shortened]" : ""));
                         if (attempt >= 1) throw malformed;
-                        wire = malformed.correction(action);
+                        wire = malformed.correction(action, originalWire);
                         SwingUtilities.invokeLater(() -> {
                             if (generation != request || active != session || disposed) return;
                             notice = "Correcting the agent response format once…";
@@ -359,6 +363,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                     : stale ? ". Retry to capture the current files."
                     : ". Your request is available to adjust and retry; check Connection diagnostics for provider errors.");
                 append("\nAction not completed\n" + notice + "\n");
+                if (!unusableReply.get().isBlank()) append("\nUnusable reply (not applied)\n" + unusableReply.get() + "\n");
             }
             else if (result != null && !result.proposal().isEmpty()) {
                 resultProposal = result.proposal(); notice = "Proposed changes are ready in Review changes.";

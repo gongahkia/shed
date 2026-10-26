@@ -70,6 +70,18 @@ public class NetworkConsentAuditTest {
     }
 
     @Test
+    void agentInvocationSettingsAreNotAutomaticallyTrustedFromAProject() {
+        System.setProperty("user.home", tempDir.resolve("home-agents").toString());
+        ConfigManager config = new ConfigManager();
+        assertFalse(config.isProjectConfigKeyAllowed("agent.example.command"));
+        assertFalse(config.isProjectConfigKeyAllowed("agent.example.args"));
+        assertFalse(config.isProjectConfigKeyAllowed("agent.example.startup.timeout.ms"));
+        config.set("agent.example.command", "example-agent");
+        config.set("agent.example.args", "--acp 'literal $HOME; echo no-shell'");
+        assertEquals(java.util.List.of("example-agent", "--acp", "literal $HOME; echo no-shell"), AgentProvider.configured(config, "example").command());
+    }
+
+    @Test
     void appOwnedOutboundPrimitivesRemainDocumented() throws IOException {
         assertEquals(Set.of("ManagedLanguageSupportService.java"), sourcesContaining("openConnection("));
         assertEquals(Set.of("MarkdownPreviewAssets.java", "UpdateMetadataTransport.java"), sourcesContaining("HttpClient.newBuilder("));
@@ -77,14 +89,14 @@ public class NetworkConsentAuditTest {
         assertEquals(Set.of("WorkspaceBridgeServer.java"), sourcesContaining("new ServerSocket("));
         assertEquals(Set.of("EditActionController.java", "LspController.java", "MarkdownController.java", "TerminalController.java", "UpdateController.java"), sourcesContaining(".browse("));
         assertEquals(Set.of(
-            "BackgroundTaskProcess.java", "BuiltInRemoteWorkspaceProviders.java", "BuiltInScmContributions.java", "DebugAdapterTransport.java", "DevContainerController.java", "DevContainerRuntime.java", "ExternalFormatter.java",
+            "AcpConnection.java", "BackgroundTaskProcess.java", "BuiltInRemoteWorkspaceProviders.java", "BuiltInScmContributions.java", "DebugAdapterTransport.java", "DevContainerController.java", "DevContainerRuntime.java", "ExternalFormatter.java",
             "DockerRuntime.java", "JobQuickfixController.java", "LanguageServerDetector.java", "LspClient.java", "NotebookController.java",
             "NpmManagedLanguageInstaller.java", "PaletteController.java", "SshPortForwardService.java", "SyntaxUiController.java", "WorkspaceIndexService.java", "GitProjectFileListing.java"
         ), sourcesContaining("new ProcessBuilder("));
         assertEquals(Set.of("PtyTerminalPane.java"), sourcesContaining("PtyProcessBuilder"));
 
         String audit = Files.readString(Path.of("docs/NETWORK_PRIVACY.md"));
-        for (String source : Set.of("DebugAdapterTransport", "DevContainerController", "DevContainerRuntime", "DockerController", "DockerRuntime", "GitHub", "UpdateMetadataTransport", "MarkdownPreviewAssets", "ManagedLanguageCatalog", "ManagedLanguageSupportService", "Notebook", "Remote workspace", "SshPortForwardService", "WorkspaceBridgeServer", "WorkspaceBridgeClient", "browser", "child processes")) {
+        for (String source : Set.of("AcpConnection", "DebugAdapterTransport", "DevContainerController", "DevContainerRuntime", "DockerController", "DockerRuntime", "GitHub", "UpdateMetadataTransport", "MarkdownPreviewAssets", "ManagedLanguageCatalog", "ManagedLanguageSupportService", "Notebook", "Remote workspace", "SshPortForwardService", "WorkspaceBridgeServer", "WorkspaceBridgeClient", "browser", "child processes")) {
             assertTrue(audit.contains(source), "audit missing " + source);
         }
     }

@@ -37,6 +37,16 @@ The preset supplies [inline OpenCode configuration](https://opencode.ai/docs/con
 
 Install/start Ollama separately and choose an already installed fill-in-the-middle model using `ai.completion.model`, then enable `ai.completion.enabled`. These settings are independent of the agent connection. No model is downloaded automatically. Native visual checks and live OpenCode/Ollama model quality are not established by the SDK/local HTTP fixtures.
 
+## Focused workflow verification
+
+The final Java 21 `-Djava.awt.headless=true clean package` run passed: **1,209 tests reported, 1,126 passed, 83 skipped, zero failures/errors**, across 220 test reports. Skips comprise 80 native Swing integration cases, one display-dependent window-placement case, one unavailable Fish-shell case, and one unavailable DOS-attribute case. No native windows or browser windows were opened. The packaged JAR includes the focused workflow classes and excludes the SDK test peer and test classes.
+
+All 48 focused tests ran without skips: `InlineCompletionSessionTest` (9), `InlineCompletionKeymapTest` (1), `OllamaCompletionClientTest` (6), `AgentSelectionTest` (4), `AgentAnswerTest` (3), `AgentTaskPlanTest` (5), `AgentActionReplyTest` (4), `AgentSessionPanelTest` (14), and `OpenCodePresetTest` (2). These cover stale/cancelled completion results and undo, loopback transport limits, unsaved selection proposals, location validation, multi-file proposal/apply/undo, delayed cancellation across turns, actual panel-to-SDK-peer review flows, and explicit backend configuration. The broader clean suite also checks the shared proposal/resource transaction, keymap, configuration, network consent and architecture boundaries.
+
+Offscreen Swing renders inspected the Assistant at 720- and 480-pixel widths without constructing a window. The resulting connection-layout fix has a headless reachability test for resume, permissions, authentication and diagnostics in a short dock. This establishes component layout, not native desktop focus or appearance parity. No new animation system or separate color palette was introduced; the panel uses the existing workbench styling.
+
+Remaining validation: neither `opencode` nor `ollama` was available on PATH. Real-provider authentication, model-specific response quality/format adherence, and native keyboard/focus/painting behavior remain unverified. Ghost previews retain the clipping/scroll-geometry limitation described above. The historical roadmap below remains superseded; dashboards, durable worktrees and MCP were not added.
+
 ## Historical roadmap (superseded)
 
 The following ledger records the previous implementation scope and the foundations it produced. Pending entries are historical, not commitments for the focused AI goal.

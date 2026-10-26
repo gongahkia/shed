@@ -1,8 +1,19 @@
-name: Shed CI
+name: Shed CI/CD on Push
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SHED_BUILD_COMMIT: ${{ github.sha }}
 
 jobs:
   java-desktop:
@@ -10,23 +21,45 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+    timeout-minutes: 20
     runs-on: ${{ matrix.os }}
     env:
       JAVA_TOOL_OPTIONS: -Djava.awt.headless=true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
       - name: Test and package portable JAR
-        run: mvn -B clean package
+        run: mvn -B -ntp -Djava.awt.headless=true clean package
+      - name: Retain test reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shed-tests-${{ matrix.os }}
+          path: target/surefire-reports/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Deliver portable JAR
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shed-portable-jar
+          path: target/shed-*.jar
+          retention-days: 14
+          if-no-files-found: error
   swing-integration:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
@@ -38,14 +71,27 @@ jobs:
           xvfb-run -a -s "-screen 0 2560x1600x24" bash -c '
             openbox >/tmp/shed-openbox.log 2>&1 &
             sleep 1
-            mvn -B -Djava.awt.headless=false -Dtest=TexteditorSwingIntegrationTest test
+            mvn -B -Djava.awt.headless=false -Dshed.ai.native=true -Dtest=TexteditorSwingIntegrationTest,FocusedAiNativeAcceptanceTest test
           '
+      - name: Retain desktop test reports and rendered captures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shed-swing-reports
+          path: |
+            target/surefire-reports/
+            target/ai-acceptance/
+          retention-days: 14
+          if-no-files-found: warn
   package-linux:
     needs: [java-desktop, swing-integration]
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
@@ -54,34 +100,40 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y fakeroot
       - name: Build and verify Debian installer
         run: bash scripts/package-linux.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: shed-linux-x64
+          name: shed-installer-linux-x64
           path: target/linux-package/dist/*
           if-no-files-found: error
   package-macos:
     needs: [java-desktop, swing-integration]
+    timeout-minutes: 30
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
       - name: Build and verify macOS installer
         run: bash scripts/package-macos.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: shed-macos-arm64
+          name: shed-installer-macos-arm64
           path: target/macos-package/dist/*
           if-no-files-found: error
   package-windows:
     needs: [java-desktop, swing-integration]
+    timeout-minutes: 30
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
@@ -89,24 +141,27 @@ jobs:
       - name: Build and verify Windows installer
         shell: pwsh
         run: ./scripts/package-windows.ps1
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: shed-windows-x64
+          name: shed-installer-windows-x64
           path: target/windows-package/dist/*
           if-no-files-found: error
   release-verify:
     needs: [package-linux, package-macos, package-windows]
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: shed-*
+          pattern: shed-installer-*
           path: target/release-artifacts
           merge-multiple: true
       - name: Verify release artifacts
@@ -115,10 +170,9 @@ jobs:
           bash scripts/verify-release-artifacts.sh --artifacts target/release-artifacts --version "$version"
           cd target/release-artifacts
           sha256sum -c SHA256SUMS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: shed-release-verification
-          path: |
-            target/release-artifacts/SHA256SUMS
-            target/release-artifacts/RELEASE_VERIFICATION.txt
+          name: shed-verified-release-bundle
+          path: target/release-artifacts/*
+          retention-days: 30
           if-no-files-found: error

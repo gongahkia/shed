@@ -352,6 +352,11 @@ public class ConfigManager {
         defineDefault("multi.selection.max.cursors", MultiSelectionPolicy.DEFAULT_MAX_CURSORS);
         defineDefault("markdown.preview.scroll.sync", DEFAULT_MARKDOWN_PREVIEW_SCROLL_SYNC);
         defineDefault("markdown.preview.remote.images", DEFAULT_MARKDOWN_PREVIEW_REMOTE_IMAGES);
+        defineDefault("ai.completion.enabled", false);
+        defineDefault("ai.completion.endpoint", "http://127.0.0.1:11434/api/generate");
+        defineDefault("ai.completion.model", "");
+        defineDefault("ai.completion.delay.ms", 500);
+        defineDefault("ai.completion.timeout.ms", 5000);
         LspFeatureSettings lspFeatures = LspFeatureSettings.defaults();
         defineDefault("lsp.completion.enabled", lspFeatures.completion());
         defineDefault("lsp.snippets.enabled", lspFeatures.snippets());
@@ -491,6 +496,11 @@ public class ConfigManager {
             case "multi.selection.max.cursors" -> "Maximum total cursors for multi-selection";
             case "markdown.preview.scroll.sync" -> "Synchronize Markdown preview position with its source cursor and scroll position";
             case "markdown.preview.remote.images" -> "Load bounded HTTPS images after a Markdown preview is explicitly opened";
+            case "ai.completion.enabled" -> "Send bounded editor context to local Ollama for inline suggestions";
+            case "ai.completion.endpoint" -> "Local Ollama /api/generate endpoint; remote addresses are unsupported";
+            case "ai.completion.model" -> "Installed fill-in-the-middle model used for inline suggestions";
+            case "ai.completion.delay.ms" -> "Idle delay before an inline AI suggestion (100–5000 ms)";
+            case "ai.completion.timeout.ms" -> "Deadline for an inline AI suggestion (100–30000 ms)";
             case "lsp.completion.enabled" -> "Enable LSP completion requests";
             case "lsp.snippets.enabled" -> "Advertise LSP snippet-completion support";
             case "lsp.completion.auto.show" -> "Show completion suggestions while typing";

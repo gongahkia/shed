@@ -13,6 +13,7 @@ This is a source-level audit of Shed's app-owned outbound-capable paths. Shed ha
 
 | Path | Authorization and behavior | Data boundary |
 | :--- | :--- | :--- |
+| Inline AI completion | `OllamaCompletionClient` requires `ai.completion.enabled=true` and an explicitly configured installed model. The endpoint must be local HTTP loopback at `/api/generate`; proxies and redirects are disabled. It never installs models or starts Ollama. | At most 8,192 UTF-16 units before the caret and 4,096 after it, plus model/generation settings. No file paths, other buffers or credentials. Responses are bounded to 64 KiB, suggestions to 4,096 units, and requests have a cancellable whole-response deadline. The configured local service owns model execution. |
 | GitHub review | `:github consent` gates every review operation; `:github status` only probes local CLI capability. | The user-installed `gh` CLI owns GitHub requests. |
 | Signed update metadata | `UpdateMetadataTransport` runs only after consent. It uses a configured HTTPS endpoint, bounded data, no redirects, and Ed25519 verification before surfacing an update. | Shed sends only the metadata request; it never installs or replaces itself. |
 | Markdown preview images | `MarkdownPreviewAssets` fetches only bounded validated HTTPS images after the user explicitly opens a normal Markdown preview and leaves `markdown.preview.remote.images` enabled. | Images are held in a disposable per-preview cache; notebooks remain local-image-only. |

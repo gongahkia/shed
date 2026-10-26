@@ -1,6 +1,27 @@
 # Agent and human workspace implementation
 
-This work implements the eight agent-workflow requirements identified in the repository audit. Startup/performance optimization is outside this implementation goal. README.md must remain unchanged. Verification during the current work stays headless: no tested editor, browser, or GUI fixture is launched.
+The active product scope is four workflows: **Complete**, **Edit selection**, **Ask/search**, and **Run task**. This replaces the earlier eight-area roadmap below. README.md files must remain unchanged. Verification stays headless: no tested editor, browser, or GUI fixture is launched.
+
+## Focused AI implementation
+
+The reference is [ThePrimeagen/99](https://github.com/ThePrimeagen/99): deliberate selection edits, natural-language search with navigable locations, and prompted project changes. Inline code completion is a separate Shed workflow; 99's prompt completion resolves file/rule references.
+
+Initial backends: [OpenCode through ACP](https://opencode.ai/docs/acp/) (`opencode acp`) for editor actions, and [local Ollama generation](https://docs.ollama.com/api/generate) with a configured fill-in-the-middle model for completion. Existing explicit ACP provider configuration remains reusable. Neither backend is installed or launched automatically.
+
+| Workflow | Acceptance | Current evidence |
+| --- | --- | --- |
+| Complete | Ghost text, Tab acceptance, Escape dismissal, existing keymap/completion compatibility; cancellation and exact-document/caret freshness. | Local bounded transport and opt-in settings implemented; editor presentation/integration pending. |
+| Edit selection | Capture a specific selection and its document version, request a replacement, review/apply through shared proposals; preserve later human changes. | Proposal infrastructure exists; focused action pending. |
+| Ask/search | Useful project answers with validated navigable file/line results; clear empty/error states. | Workspace queries and ACP exist; focused action and result presentation pending. |
+| Run task | Prompted changes across files, progress, cancellation, human review. | ACP conversations and reviewed writes exist; focused action and provider-specific verification pending. |
+
+No new task dashboards, worktrees, MCP integration, or unrelated platform features are part of this scope. The unfinished, uncommitted structured-question UI was deferred rather than added as another screen. Existing committed protocol and review foundations remain available.
+
+Completion settings (user settings, not trusted project defaults): `ai.completion.enabled=false`, `ai.completion.endpoint=http://127.0.0.1:11434/api/generate`, `ai.completion.model=` (choose an installed model supporting prefix/suffix generation), `ai.completion.delay.ms=500`, `ai.completion.timeout.ms=5000`. No request is made while disabled. This transport does not itself complete the editor workflow.
+
+## Historical roadmap (superseded)
+
+The following ledger records the previous implementation scope and the foundations it produced. Pending entries are historical, not commitments for the focused AI goal.
 
 ## Scope and acceptance ledger
 

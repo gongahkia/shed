@@ -12,6 +12,25 @@ import org.junit.jupiter.api.Test;
 
 class BlockCaretTest {
     @Test
+    void virtualInsertionUsesANarrowCaretWithoutCoveringTheSuggestion() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            try {
+                JTextArea area = new JTextArea("return ;"); area.setSize(400, 100);
+                area.setCaretColor(Color.BLUE);
+                var preview = new InlineCompletionDisplay(area); preview.show(7, "value + other");
+                var image = new BufferedImage(200, 30, BufferedImage.TYPE_INT_ARGB);
+                var graphics = image.createGraphics();
+                try {
+                    BlockCaret.paintBlockCaret(graphics, area, new Rectangle(4, 4, 100, 19), 100, 7);
+                    assertEquals(Color.BLUE.getRGB(), image.getRGB(5, 5));
+                    assertEquals(0, image.getRGB(6, 5));
+                    assertEquals(0, image.getRGB(13, 15));
+                } finally { graphics.dispose(); }
+            } catch (Exception error) { throw new RuntimeException(error); }
+        });
+    }
+
+    @Test
     void paintsASolidCaretInsteadOfXorInvertingTheUnderlyingGlyph() throws Exception {
         JTextArea area = new JTextArea("A");
         area.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 16));

@@ -38,6 +38,7 @@ final class SyntaxUiController {
     private VersionedTextSnapshot runningSymbolText;
     private int bracketJobId = -1;
     private long bracketGeneration;
+    private boolean bracketRefreshQueued;
     private final Highlighter.HighlightPainter trailingWhitespacePainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x80FF4444, true));
     private final Map<GitBlameKey, String> gitBlameCache = new LinkedHashMap<>(GIT_BLAME_CACHE_LIMIT, 0.75f, true) {
         @Override
@@ -362,6 +363,19 @@ final class SyntaxUiController {
         if (buffer == null) return;
         VersionedTextSnapshot text = buffer.textSnapshot();
         int length = text.length();
+        // Swing can notify the caret before the buffer's document listener updates its
+        // immutable snapshot. Never index that older snapshot with the new caret offset.
+        if (length != editor.writingArea.getDocument().getLength()) {
+            if (!bracketRefreshQueued) {
+                bracketRefreshQueued = true;
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    bracketRefreshQueued = false;
+                    if (buffer == editor.getCurrentBuffer() && buffer.textSnapshot().length() == editor.writingArea.getDocument().getLength())
+                        updateMatchingBracketHighlight();
+                });
+            }
+            return;
+        }
         if (length == 0) return;
 
         // Check char at caret and before caret

@@ -41,6 +41,12 @@ final class BlockCaret extends DefaultCaret {
             EditorUiController.applyEditorTextRenderingHints(caretGraphics);
             Color caretColor = component.getCaretColor();
             caretGraphics.setColor(caretColor == null ? component.getForeground() : caretColor);
+            if (component.getUI() instanceof InlineCompletionDisplay preview && preview.showing()) {
+                // A source offset can span the entire virtual suggestion. Keep the caret at
+                // its insertion boundary without hiding the ghost or redrawing a source glyph.
+                caretGraphics.fillRect(bounds.x, bounds.y, 2, bounds.height);
+                return;
+            }
             caretGraphics.fillRect(bounds.x, bounds.y, caretWidth, bounds.height);
             if (dot < 0 || dot >= component.getDocument().getLength()) {
                 return;
@@ -72,6 +78,7 @@ final class BlockCaret extends DefaultCaret {
     }
 
     private int blockWidth(JTextComponent component, int dot) {
+        if (component.getUI() instanceof InlineCompletionDisplay preview && preview.showing()) return 2;
         try {
             int length = component.getDocument().getLength();
             if (dot < length) {

@@ -44,6 +44,8 @@ final class InlineCompletionDisplay extends BasicTextAreaUI {
         display = null; length = 0; modelChanged(); source.revalidate(); source.repaint();
     }
 
+    boolean showing() { return display != null; }
+
     private void configure() {
         if (display == null) return;
         display.setFont(source.getFont()); display.setTabSize(source.getTabSize());

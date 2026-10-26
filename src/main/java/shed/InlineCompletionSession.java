@@ -85,8 +85,8 @@ final class InlineCompletionSession implements AutoCloseable {
         dismiss(); if (!canRequest()) return;
         int offset = area.getCaretPosition();
         try {
-            int start = Math.max(0, offset - OllamaCompletionClient.MAX_PREFIX);
-            int end = Math.min(document.getLength(), offset + OllamaCompletionClient.MAX_SUFFIX);
+            int start = Math.max(0, offset - OpenCodeCompletionClient.MAX_PREFIX);
+            int end = Math.min(document.getLength(), offset + OpenCodeCompletionClient.MAX_SUFFIX);
             String context = document.getText(start, end - start);
             int relative = offset - start;
             if (!GraphemeBoundary.isBoundary(context, relative)) return;
@@ -101,8 +101,8 @@ final class InlineCompletionSession implements AutoCloseable {
                 if (closed || request != generation || capturedDocument != document || capturedRevision != revision
                     || offset != area.getCaretPosition() || !canRequest()) return;
                 pending = null;
-                if (error != null) { if (!(error instanceof java.util.concurrent.CancellationException)) errors.accept("Inline suggestion unavailable. Check the local Ollama model and settings."); return; }
-                if (text == null || text.isEmpty() || text.length() > OllamaCompletionClient.MAX_COMPLETION) return;
+                if (error != null) { if (!(error instanceof java.util.concurrent.CancellationException)) errors.accept("Inline suggestion unavailable. Check OpenCode authentication, credits and model settings."); return; }
+                if (text == null || text.isEmpty() || text.length() > OpenCodeCompletionClient.MAX_COMPLETION) return;
                 try {
                     long layoutStarted = System.nanoTime();
                     display.show(offset, text); suggestion = new Suggestion(document, revision, offset, text); area.repaint();
@@ -110,7 +110,7 @@ final class InlineCompletionSession implements AutoCloseable {
                     timings.accept("ready", System.nanoTime() - started);
                 } catch (BadLocationException unavailable) { display.clear(); }
             }));
-        } catch (BadLocationException | RuntimeException unavailable) { errors.accept("Inline suggestion unavailable. Check the local Ollama model and settings."); }
+        } catch (BadLocationException | RuntimeException unavailable) { errors.accept("Inline suggestion unavailable. Check OpenCode authentication, credits and model settings."); }
     }
 
     boolean visible() {

@@ -115,6 +115,14 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
             response -> { sessionId = text(response, "sessionId", 1024); record("session_created", Map.of("sessionId", sessionId)); });
     }
 
+    /** A dedicated completion connection reuses its process, never its previous prompt history. */
+    synchronized CompletableFuture<Map<String, Object>> freshSession() {
+        if (state == State.IDLE && (writes == null || writes.pending().isEmpty())) {
+            state = State.READY; sessionId = null; output = null; actionReply = null;
+        }
+        return newSession();
+    }
+
     synchronized CompletableFuture<Map<String, Object>> loadSession(String id) {
         if (!Boolean.TRUE.equals(capabilities.get("loadSession"))) throw invalid("Agent does not advertise session loading");
         if (id == null || id.isBlank() || id.length() > 1024) throw invalid("Invalid session ID");
@@ -261,6 +269,9 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
 
     private synchronized CompletableFuture<Map<String, Object>> permission(Map<String, Object> params) {
         requireSession(params);
+        // Tool-free completion connections have no permission UI and cannot grant tool access.
+        if (workspace.policy().capabilities().equals(Set.of(AgentPolicy.Capability.START_AGENT)))
+            return CompletableFuture.completedFuture(cancelled());
         if (state == State.CANCELLING) return CompletableFuture.completedFuture(cancelled());
         if (state != State.PROMPTING || decisions.size() >= 32) throw invalid("Permission request is unavailable in this state");
         var tool = frozen(object(params.get("toolCall"))); text(tool, "toolCallId", 1024);

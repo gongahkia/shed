@@ -73,7 +73,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         this(editor.asyncJobService, () -> {
             Path root = editor.workspaceController.activeRoot();
             return root == null ? null : new Scope(root, editor.workspaceDocuments(), Path.of(editor.configManager.getSessionDirectory()));
-        }, editor.configManager::getAgentProviderNames, name -> AgentProvider.configured(editor.configManager, name),
+        }, () -> List.of("opencode"), name -> AgentProvider.configured(editor.configManager, name),
             editor::ownAgentSession, editor::resolveUiFont, editor::resolveEditorFont);
         selectionSource = editor::captureAgentSelection;
         performance = editor.perfService;
@@ -85,7 +85,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                       Supplier<Font> uiFont, Supplier<Font> codeFont) {
         this.jobs = jobs; this.scopes = scopes; this.providers = providers; this.provider = provider; this.owner = owner;
         this.uiFont = uiFont; this.codeFont = codeFont;
-        panel.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10)); providerChoice.setEditable(true);
+        panel.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10)); providerChoice.setEditable(false);
         providerChoice.setRenderer(plainRenderer()); options.setRenderer(plainRenderer()); authMethods.setRenderer(plainRenderer());
         status.putClientProperty("html.disable", true); workspace.putClientProperty("html.disable", true);
         JPanel top = new JPanel(new BorderLayout(8, 5));
@@ -128,8 +128,9 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         permission.add(split, BorderLayout.CENTER); permission.add(scrollRow(row(options, respond)), BorderLayout.SOUTH);
         views.addTab("Requests", permission);
         ConnectionDetails setup = new ConnectionDetails();
-        setup.addRow(help("OpenCode: install and sign in with its CLI, then choose opencode and Connect.\n"
+        setup.addRow(help("OpenCode: install and sign in with its CLI, then Connect.\n"
             + "User settings: agent.opencode.command, .args and optional .model.\n"
+            + "Complete uses the same OpenCode settings; enable ai.completion.enabled to opt in.\n"
             + "The preset reads/searches and returns proposals for review. Actions do not run shell commands.\n"
             + "Connect starts the local program in this workspace. It retains its operating-system access; Shed does not sandbox it."));
         setup.addRow(new JLabel("Resume session ID (optional)")); setup.addRow(resume);
@@ -153,7 +154,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         actions.add(status, BorderLayout.SOUTH); compose.add(actions, BorderLayout.SOUTH); panel.add(compose, BorderLayout.SOUTH);
         prompt.getInputMap().put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, java.awt.event.InputEvent.CTRL_DOWN_MASK), "send");
         prompt.getActionMap().put("send", new AbstractAction() { public void actionPerformed(java.awt.event.ActionEvent event) { send(); } });
-        AccessibilitySupport.describe(providerChoice, "Agent provider", "Choose a configured local agent. Nothing starts until Connect is pressed.");
+        AccessibilitySupport.describe(providerChoice, "Agent backend", "OpenCode handles the focused AI actions. Connect starts the agent for this workspace.");
         AccessibilitySupport.describe(resume, "Resume session ID", "Optional provider session to load when connecting, if supported.");
         AccessibilitySupport.describe(prompt, "Message to agent", "Enter a message. Control Enter sends it; Enter adds a new line.");
         AccessibilitySupport.describe(transcript, "Agent conversation", "Streamed conversation. Incoming activity does not move keyboard focus.");

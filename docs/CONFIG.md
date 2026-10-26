@@ -134,14 +134,12 @@ Shed keeps an independent client for each `(file extension, workspace root)` pai
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `agent.opencode.command` | `opencode` | string | Installed OpenCode executable; starts only on Connect |
+| `agent.opencode.command` | `opencode` | string | Installed OpenCode executable; used by Connect and opted-in completion |
 | `agent.opencode.args` | `acp` | string | Arguments for the OpenCode ACP preset |
 | `agent.opencode.model` | empty | string | Optional provider/model; otherwise OpenCode's configured default |
-| `ai.completion.enabled` | `false` | bool | Opt into inline code suggestions from local Ollama |
-| `ai.completion.endpoint` | `http://127.0.0.1:11434/api/generate` | string | Local loopback Ollama endpoint; no redirects or proxies |
-| `ai.completion.model` | empty | string | Installed model supporting prefix/suffix generation; required when enabled |
+| `ai.completion.enabled` | `false` | bool | Opt into inline suggestions through the same OpenCode command/model |
 | `ai.completion.delay.ms` | `500` | int | Idle typing delay, 100–5,000 ms |
-| `ai.completion.timeout.ms` | `5000` | int | Whole-response deadline, 100–30,000 ms |
+| `ai.completion.timeout.ms` | `10000` | int | Whole-response deadline, 100–30,000 ms |
 | `lsp.completion.enabled` | `true` | bool | Completion requests |
 | `lsp.completion.auto.show` | `true` | bool | Show suggestions while typing; applies live |
 | `lsp.completion.delay.ms` | `90` | integer `0..1000` | Idle debounce before automatic suggestions; applies live |

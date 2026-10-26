@@ -139,7 +139,7 @@ public class HelpService {
                     + "The command palette exposes AI: Complete, Edit Selection, Ask/Search and Run Task.\n"
                     + ":agent opens the Assistant and Review changes tabs (also View > AI Assistant).\n"
                     + ":agent complete requests inline ghost text; Tab accepts and Escape dismisses.\n"
-                    + "Set ai.completion.model to an installed Ollama fill-in-the-middle model and ai.completion.enabled=true.\n"
+                    + "Configure agent.opencode.model (or your OpenCode default), authenticate OpenCode, and set ai.completion.enabled=true.\n"
                     + "Completion is opt-in and independent of the agent connection. Existing completion and keymap bindings take priority.\n"
                     + ":agent edit captures selected code. Describe the change, then review the proposed replacement.\n"
                     + ":agent ask answers project questions; choose a returned code location to navigate.\n"

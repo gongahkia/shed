@@ -24,7 +24,7 @@ import org.junit.jupiter.api.io.TempDir;
 class FocusedAiNativeAcceptanceTest {
     @TempDir Path temporary;
 
-    @Test void actualEditorAcceptsRealSuggestionsAndRendersWrappedMultilinePreviews() throws Exception {
+    @Test void actualEditorAcceptsAcpSuggestionsAndRendersWrappedMultilinePreviews() throws Exception {
         assertFalse(GraphicsEnvironment.isHeadless(), "Native acceptance requires -Djava.awt.headless=false");
         Path home = Files.createDirectory(temporary.resolve("home")); Files.createDirectory(home.resolve(".shed"));
         Files.writeString(home.resolve(".shed/config.toml"), "schema_version = 1\n\"font.family\" = \"Monospaced\"\n\"ui.font.family\" = \"Dialog\"\n\"keymap.profile\" = \"plain\"\n");
@@ -36,31 +36,23 @@ class FocusedAiNativeAcceptanceTest {
             try { return new Texteditor(new String[] {file.toString()}); }
             finally { System.setProperty("user.home", previousHome); }
         });
-        var server = com.sun.net.httpserver.HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        String multiline = "a + b\n\t+ anotherValueWithALongName + moreValues + moreValues + moreValues\n\t+ finalValue";
-        server.createContext("/api/generate", exchange -> {
-            exchange.getRequestBody().readAllBytes();
-            byte[] body = MiniJson.stringify(Map.of("response", multiline, "done", true)).getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, body.length); exchange.getResponseBody().write(body); exchange.close();
-        }); server.start();
         try {
             await(() -> editor.getCurrentBuffer() != null && file.toString().equals(editor.getCurrentBuffer().getFilePath()) && !editor.stagedStartupPending, 30);
             edt(() -> {
                 editor.configManager.set("ai.completion.enabled", "true");
-                editor.configManager.set("ai.completion.model", System.getProperty("shed.acceptance.ollama.model", "qwen2.5-coder:0.5b-base"));
-                editor.configManager.set("ai.completion.endpoint", System.getProperty("shed.acceptance.ollama.endpoint", "http://127.0.0.1:11434/api/generate"));
+                configureFixture(editor, "single");
                 editor.configManager.set("ai.completion.timeout.ms", "30000");
                 editor.setSize(900, 650); editor.toFront(); editor.setMode(EditorMode.INSERT);
                 editor.writingArea.setCaretPosition(original.indexOf(';')); editor.writingArea.requestFocusInWindow(); return null;
             });
             await(() -> editor.writingArea.isFocusOwner(), 15);
             edt(() -> { editor.requestAiCompletion(); return null; }); await(() -> editor.hasAiCompletion(editor.writingArea), 40);
-            capture(editor, "native-real-completion");
+            capture(editor, "native-acp-completion");
             edt(() -> {
                 assertEquals(original, editor.writingArea.getText()); press(editor, KeyEvent.VK_TAB);
                 assertTrue(editor.writingArea.getText().replaceAll("\\s", "").contains("returna+b;"));
                 editor.inputController.performMenuAction(PlainKeymap.Action.UNDO); assertEquals(original, editor.writingArea.getText());
-                editor.configManager.set("ai.completion.endpoint", "http://127.0.0.1:" + server.getAddress().getPort() + "/api/generate");
+                configureFixture(editor, "multiline");
                 editor.writingArea.setCaretPosition(original.indexOf(';')); editor.writingArea.setLineWrap(true);
                 editor.writingArea.setWrapStyleWord(true); editor.writingArea.setTabSize(4);
                 editor.requestAiCompletion(); return null;
@@ -91,7 +83,6 @@ class FocusedAiNativeAcceptanceTest {
         } finally {
             capture(editor, "native-latest");
             System.out.println(editor.perfService.report());
-            server.stop(0);
             edt(() -> {
                 for (var timer : new javax.swing.Timer[] {editor.messageResetTimer, editor.externalChangeTimer, editor.recoverySnapshotTimer, editor.diagnosticRefreshTimer}) if (timer != null) timer.stop();
                 if (editor.fileWatcherService != null) editor.fileWatcherService.stop();
@@ -99,6 +90,12 @@ class FocusedAiNativeAcceptanceTest {
                 if (editor.backupScheduler != null) editor.backupScheduler.close(); editor.dispose(); return null;
             });
         }
+    }
+    private static void configureFixture(Texteditor editor, String mode) {
+        var command = AcpConnectionTest.javaCommand(CompletionAcpFixture.class.getName(), mode);
+        editor.configManager.set("agent.opencode.command", command.stream()
+            .map(value -> "'" + value.replace("'", "'\\''") + "'").collect(java.util.stream.Collectors.joining(" ")));
+        editor.configManager.set("agent.opencode.args", "");
     }
     private static void press(Texteditor editor, int key) {
         var event = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, System.currentTimeMillis(), 0, key, KeyEvent.CHAR_UNDEFINED);

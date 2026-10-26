@@ -20,6 +20,8 @@ class OpenCodePresetTest {
             assertEquals("deny", permissions.get("*"));
             for (String tool : List.of("edit", "bash", "task", "question", "webfetch", "external_directory")) assertEquals("deny", permissions.get(tool));
             var agent = MiniJson.asObject(MiniJson.asObject(json.get("agent")).get("shed-review")); assertEquals(permissions, agent.get("permission"));
+            assertEquals(0L, agent.get("temperature"));
+            assertEquals(Boolean.TRUE, MiniJson.asObject(MiniJson.asObject(json.get("agent")).get("title")).get("disable"));
             config.set("agent.opencode.model", "provider/model");
             config.set("agent.opencode.command", "'/custom path/opencode'");
             var customized = AgentProvider.configured(config, "opencode"); assertEquals(List.of("/custom path/opencode", "acp"), customized.command());
@@ -35,5 +37,16 @@ class OpenCodePresetTest {
             assertTrue(AgentProvider.configured(config, "custom").environment().isEmpty());
             assertThrows(IllegalArgumentException.class, () -> OpenCodePreset.environment("bad\nmodel"));
         } finally { System.setProperty("user.home", home); }
+    }
+
+    @Test void completionUsesTheSameOpenCodeModelButHasNoToolPermissions() {
+        var config = MiniJson.asObject(MiniJson.parseStrict(OpenCodePreset.completionEnvironment(
+            OpenCodePreset.environment("provider/model")).get("OPENCODE_CONFIG_CONTENT")));
+        assertEquals("provider/model", config.get("model"));
+        assertEquals("shed-complete", config.get("default_agent"));
+        assertEquals(java.util.Map.of("*", "deny"), config.get("permission"));
+        var agents = MiniJson.asObject(config.get("agent"));
+        assertFalse(agents.containsKey("shed-review"));
+        assertEquals(config.get("permission"), MiniJson.asObject(agents.get("shed-complete")).get("permission"));
     }
 }

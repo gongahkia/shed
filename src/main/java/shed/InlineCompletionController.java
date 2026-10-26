@@ -6,12 +6,12 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import javax.swing.JTextArea;
 
-/** Editor composition for the local completion client and independently owned pane previews. */
+/** Editor composition for the OpenCode completion client and independently owned pane previews. */
 final class InlineCompletionController implements AutoCloseable {
     private final Texteditor editor;
     private final Map<JTextArea, InlineCompletionSession> sessions = new IdentityHashMap<>();
     private InlineCompletionSettings settings;
-    private OllamaCompletionClient client;
+    private OpenCodeCompletionClient client;
     private String lastError = "";
 
     InlineCompletionController(Texteditor editor) { this.editor = editor; }
@@ -47,7 +47,7 @@ final class InlineCompletionController implements AutoCloseable {
         var configured = InlineCompletionSettings.configured(editor.configManager);
         if (client == null || !configured.equals(settings)) {
             if (client != null) client.close();
-            settings = configured; client = new OllamaCompletionClient(settings); lastError = "";
+            settings = configured; client = new OpenCodeCompletionClient(settings); lastError = "";
         }
         long started = System.nanoTime(); var request = client.complete(prefix, suffix);
         request.whenComplete((text, error) -> {
@@ -74,7 +74,7 @@ final class InlineCompletionController implements AutoCloseable {
 
     String request() {
         if (!Boolean.parseBoolean(editor.configManager.get("ai.completion.enabled", "false")))
-            return "Configure ai.completion.model and enable ai.completion.enabled in user settings first.";
+            return "Configure OpenCode and enable ai.completion.enabled in user settings first.";
         InlineCompletionSession session = sessions.get(editor.writingArea);
         JTextArea area = editor.writingArea;
         FileBuffer buffer = editor.getCurrentBuffer();

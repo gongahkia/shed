@@ -88,14 +88,14 @@ public class NetworkConsentAuditTest {
         assertFalse(InlineCompletionSettings.configured(config).enabled());
         for (String key : java.util.List.of("enabled", "endpoint", "model", "delay.ms", "timeout.ms"))
             assertFalse(config.isProjectConfigKeyAllowed("ai.completion." + key));
-        config.set("ai.completion.model", "local-fim"); config.set("ai.completion.enabled", "true");
+        config.set("ai.completion.enabled", "true");
         assertTrue(InlineCompletionSettings.configured(config).enabled());
     }
 
     @Test
     void appOwnedOutboundPrimitivesRemainDocumented() throws IOException {
         assertEquals(Set.of("ManagedLanguageSupportService.java"), sourcesContaining("openConnection("));
-        assertEquals(Set.of("MarkdownPreviewAssets.java", "UpdateMetadataTransport.java", "OllamaCompletionClient.java"), sourcesContaining("HttpClient.newBuilder("));
+        assertEquals(Set.of("MarkdownPreviewAssets.java", "UpdateMetadataTransport.java"), sourcesContaining("HttpClient.newBuilder("));
         assertEquals(Set.of("DebugAdapterTransport.java", "WorkspaceBridgeClient.java"), sourcesContaining("new Socket("));
         assertEquals(Set.of("WorkspaceBridgeServer.java"), sourcesContaining("new ServerSocket("));
         assertEquals(Set.of("AgentQuestions.java", "EditActionController.java", "LspController.java", "MarkdownController.java", "TerminalController.java", "UpdateController.java"), sourcesContaining(".browse("));

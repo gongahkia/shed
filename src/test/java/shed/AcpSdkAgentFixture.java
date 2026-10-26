@@ -14,7 +14,21 @@ public final class AcpSdkAgentFixture {
             .loadSessionHandler(request -> new LoadSessionResponse(null))
             .promptHandler((request, context) -> {
                 String prompt = ((TextContent) request.prompt().getFirst()).text();
-                if (prompt.equals("reply-chunked")) { context.sendMessage("first "); context.sendMessage("second"); }
+                if (prompt.startsWith("Edit only the selected code")) {
+                    var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1)));
+                    if ("wait for cancellation".equals(input.get("instruction"))) {
+                        var decision = context.client().requestPermission(new RequestPermissionRequest(context.getSessionId(),
+                            new ToolCallUpdate("selection-wait", "Read selection context", ToolKind.READ, ToolCallStatus.PENDING),
+                            List.of(new PermissionOption("allow", "Allow once", PermissionOptionKind.ALLOW_ONCE),
+                                new PermissionOption("deny", "Reject once", PermissionOptionKind.REJECT_ONCE))));
+                        if (decision.outcome() instanceof PermissionCancelled) return PromptResponse.cancelled();
+                    }
+                    context.sendMessage(MiniJson.stringify(java.util.Map.of("replacement", ((String) input.get("selection")).toUpperCase(java.util.Locale.ROOT))));
+                }
+                else if (prompt.startsWith("Answer the project question below.")) {
+                    context.sendMessage("{\"answer\":\"The source handles the request.\",\"locations\":[{\"path\":\"source\",\"line\":1,\"column\":1,\"note\":\"Entry point\"}]}");
+                }
+                else if (prompt.equals("reply-chunked")) { context.sendMessage("first "); context.sendMessage("second"); }
                 else if (prompt.equals("reply-large")) context.sendMessage("x".repeat(65537));
                 else if (prompt.equals("read")) context.sendMessage(context.readFile(args[0]));
                 else if (prompt.equals("write")) {

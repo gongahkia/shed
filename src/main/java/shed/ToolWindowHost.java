@@ -97,6 +97,11 @@ final class ToolWindowHost extends JPanel {
         showTab(Tab.AGENT);
     }
 
+    void showAgentAction(AgentAction action) {
+        if (surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents) agents.showAction(action);
+        showTab(Tab.AGENT);
+    }
+
     private int preferredDividerLocation(Tab tab) {
         int desiredHeight = switch (tab) {
             case DEBUG, REPLACE, AGENT -> 520;

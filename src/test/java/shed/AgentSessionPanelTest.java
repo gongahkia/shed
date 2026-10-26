@@ -180,6 +180,82 @@ class AgentSessionPanelTest {
         assertFalse(owned.getFirst().policy().capabilities().contains(AgentPolicy.Capability.PROPOSE));
     }
 
+    @Test void selectionActionUsesCapturedUnsavedCodeAndTheActualReviewPanel() throws Exception {
+        Path root = prepare("project"), file = Files.writeString(root.resolve("source"), "saved\n"), sessions = temporary.resolve("sessions");
+        FileBuffer buffer = new FileBuffer(file.toFile());
+        try (var documents = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
+            edt(() -> buffer.replaceContentUndoably("before chosen after\n"));
+            scope.set(new AgentSessionPanel.Scope(root, documents, sessions)); open(); connect();
+            var review = new AtomicReference<AgentReviewPanel>(); var opened = new java.util.concurrent.atomic.AtomicBoolean();
+            edt(() -> {
+                panel.selectionSource(() -> documents.captureSelection(buffer, 7, 13)); panel.prepare(AgentAction.EDIT);
+                review.set(new AgentReviewPanel(jobs, () -> new AgentReviewPanel.Scope(panel.boundRoot(), panel.boundSessions(), documents),
+                    () -> new Font(Font.DIALOG, Font.PLAIN, 13), () -> new Font(Font.MONOSPACED, Font.PLAIN, 13)));
+                panel.onReview(id -> { opened.set(true); review.get().showProposal(id); });
+                text("prompt").setText("uppercase"); button("send").doClick(); text("prompt").setText("next draft");
+            });
+            await(() -> button("send").isEnabled() && button("review").isEnabled());
+            assertEquals("before chosen after\n", documents.snapshots().getFirst().content());
+            edt(() -> {
+                assertFalse(opened.get()); assertEquals(0, tabs().getSelectedIndex()); assertEquals("next draft", text("prompt").getText());
+                assertFalse(text("transcript").getText().contains("\"replacement\"")); button("review").doClick();
+            });
+            await(() -> ((JButton) find(review.get().component(), "agent.apply")).isEnabled());
+            edt(() -> {
+                assertEquals("before CHOSEN after\n", ((JTextArea) find(review.get().component(), "agent.proposed")).getText());
+                ((JButton) find(review.get().component(), "agent.apply")).doClick();
+            });
+            await(() -> buffer.getContent().equals("before CHOSEN after\n"));
+            assertEquals("saved\n", Files.readString(file)); assertTrue(buffer.isModified());
+        }
+    }
+
+    @Test void selectionActionRejectsAnOldCaptureBeforeAnyProposalIsApplied() throws Exception {
+        Path root = prepare("project"), file = Files.writeString(root.resolve("source"), "original\n");
+        FileBuffer buffer = new FileBuffer(file.toFile());
+        try (var documents = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
+            scope.set(new AgentSessionPanel.Scope(root, documents, temporary.resolve("sessions"))); open(); connect();
+            edt(() -> {
+                panel.selectionSource(() -> documents.captureSelection(buffer, 0, 8)); panel.prepare(AgentAction.EDIT);
+                buffer.replaceContentUndoably("later human draft\n");
+            });
+            send("uppercase"); await(() -> button("send").isEnabled() && status().getText().contains("Document changed"));
+            assertEquals("later human draft\n", documents.snapshots().getFirst().content()); edt(() -> assertFalse(button("review").isEnabled()));
+        }
+    }
+
+    @Test void cancellingASelectionActionDiscardsItsReplyAndReleasesTheAgent() throws Exception {
+        Path root = prepare("project"), file = Files.writeString(root.resolve("source"), "human\n");
+        FileBuffer buffer = new FileBuffer(file.toFile());
+        try (var documents = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
+            scope.set(new AgentSessionPanel.Scope(root, documents, temporary.resolve("sessions"))); open(); connect();
+            edt(() -> { panel.selectionSource(() -> documents.captureSelection(buffer, 0, 5)); panel.prepare(AgentAction.EDIT); });
+            send("wait for cancellation"); await(() -> button("respond").isEnabled());
+            edt(() -> button("cancel").doClick()); await(() -> button("send").isEnabled());
+            assertEquals("human\n", documents.snapshots().getFirst().content());
+            edt(() -> { assertFalse(button("review").isEnabled()); assertEquals(0, tabs().getSelectedIndex()); });
+            assertTrue(owned.getFirst().snapshot().permissions().isEmpty());
+            send("uppercase"); await(() -> button("review").isEnabled());
+        }
+    }
+
+    @Test void askActionShowsNavigableLocationsWithoutAutomaticallyOpeningThem() throws Exception {
+        Path root = prepare("project"), file = Files.writeString(root.resolve("source"), "entry point\n");
+        open(); connect(); var opened = new AtomicReference<AgentAnswer.Location>();
+        edt(() -> { panel.prepare(AgentAction.ASK); panel.onNavigate(opened::set); });
+        send("Where is the entry point?");
+        await(() -> button("send").isEnabled() && status().getText().contains("Answer complete"));
+        edt(() -> {
+            assertNull(opened.get()); assertTrue(text("transcript").getText().contains("The source handles the request."));
+            assertFalse(text("transcript").getText().contains("\"answer\""));
+            ((JList<?>) find(panel.component(), "agent.session.locations")).setSelectedIndex(0); button("openLocation").doClick();
+        });
+        await(() -> opened.get() != null); assertEquals(file.toRealPath(), opened.get().path()); assertEquals(1, opened.get().line());
+        opened.set(null); Files.writeString(file, "changed reference\n");
+        edt(() -> button("openLocation").doClick()); await(() -> status().getText().contains("changed since the answer"));
+        assertNull(opened.get());
+    }
+
     private Path prepare(String name) throws Exception {
         Path root = Files.createDirectory(temporary.resolve(name)); scope.set(new AgentSessionPanel.Scope(root, WorkspaceDocumentSource.diskOnly()));
         provider.set(new AgentProvider("fixture", AcpConnectionTest.javaCommand(AcpSdkAgentFixture.class.getName(), root.resolve("source").toString()),
@@ -190,6 +266,7 @@ class AgentSessionPanelTest {
         edt(() -> panel = new AgentSessionPanel(jobs, scope::get, () -> List.of("fixture"), ignored -> provider.get(), session -> {
             owned.add(session); registry.own(session);
         }, () -> new Font(Font.DIALOG, Font.PLAIN, 13), () -> new Font(Font.MONOSPACED, Font.PLAIN, 13)));
+        edt(() -> combo("action").setSelectedItem(AgentAction.RUN));
     }
     private void connect() throws Exception { edt(() -> button("connect").doClick()); await(() -> button("send").isEnabled()); }
     private void send(String value) throws Exception { edt(() -> { text("prompt").setText(value); button("send").doClick(); }); }

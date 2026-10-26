@@ -31,13 +31,18 @@ final class AgentWorkspaceController implements AutoCloseable {
         String value = argument == null ? "" : argument.trim();
         return switch (value) {
             case "complete" -> editor.requestAiCompletion();
+            case "edit", "ask", "run" -> {
+                if (editor.toolWindowHost != null) editor.toolWindowHost.showAgentAction(
+                    value.equals("edit") ? AgentAction.EDIT : value.equals("ask") ? AgentAction.ASK : AgentAction.RUN);
+                yield "Describe your request in the Assistant panel.";
+            }
             case "" -> { editor.showToolWindow(ToolWindowHost.Tab.AGENT); yield "Connect an agent or review proposals in the Agents panel."; }
             case "proposals" -> { if (editor.toolWindowHost != null) editor.toolWindowHost.showAgentReview(); yield "Review proposals in the Agents panel."; }
             case "status", "api", "api status" -> status;
             case "api start" -> start(false);
             case "api start propose" -> start(true);
             case "api stop" -> stop();
-            default -> "Usage: :agent [proposals] or :agent api start [propose]|status|stop";
+            default -> "Usage: :agent [edit|ask|run|complete|proposals] or :agent api start [propose]|status|stop";
         };
     }
 

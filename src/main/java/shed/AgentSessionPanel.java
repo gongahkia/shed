@@ -28,6 +28,20 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private final Supplier<Font> uiFont, codeFont;
     private final JPanel panel = new JPanel(new BorderLayout(8, 8));
     private final JComboBox<String> providerChoice = named(new JComboBox<>(), "provider");
+    private final JComboBox<AgentAction> actionChoice = named(new JComboBox<>(AgentAction.values()), "action");
+    private final JLabel selectionLabel = named(new JLabel("Ask about the project and jump to relevant code."), "selection");
+    private final JButton captureSelection = button("Use current selection", "captureSelection", this::captureSelection);
+    private final DefaultListModel<AgentAnswer.Location> locations = new DefaultListModel<>();
+    private final JList<AgentAnswer.Location> locationList = named(new JList<>(locations), "locations");
+    private final JPanel referencesPanel = new JPanel(new BorderLayout(6, 4));
+    private final JButton openLocation = button("Open location", "openLocation", this::openLocation);
+    private Supplier<Supplier<AgentSelection>> selectionSource;
+    private Supplier<AgentSelection> capturedSelection;
+    private Consumer<AgentAnswer.Location> navigation = ignored -> { };
+    private WorkspaceDocumentSource boundDocuments;
+    private String resultProposal = "";
+    private int actionJob = -1;
+    private record ActionResult(String proposal, AgentAnswer answer) { }
     private final JTextField resume = named(new JTextField(), "resume");
     private final JCheckBox foreground = named(new JCheckBox("Allow sign-in windows"), "foreground");
     private final JCheckBox reviewWrites = named(new JCheckBox("Review file writes through Shed", true), "reviewWrites");
@@ -60,6 +74,8 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             return root == null ? null : new Scope(root, editor.workspaceDocuments(), Path.of(editor.configManager.getSessionDirectory()));
         }, editor.configManager::getAgentProviderNames, name -> AgentProvider.configured(editor.configManager, name),
             editor::ownAgentSession, editor::resolveUiFont, editor::resolveEditorFont);
+        selectionSource = editor::captureAgentSelection;
+        navigation = location -> editor.showMessage(editor.openFileAtAsync(location.path().toFile(), location.line(), location.column(), "Agent reference"));
     }
 
     AgentSessionPanel(AsyncJobService jobs, Supplier<Scope> scopes, Supplier<List<String>> providers,
@@ -73,7 +89,29 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         JPanel top = new JPanel(new BorderLayout(8, 5));
         JPanel connection = row(new JLabel("Agent"), providerChoice, connect, stop);
         top.add(scrollRow(connection), BorderLayout.NORTH); top.add(workspace, BorderLayout.CENTER); panel.add(top, BorderLayout.NORTH);
-        views.addTab("Conversation", conversation);
+        JPanel activity = new JPanel(new BorderLayout(6, 6)); activity.add(conversation, BorderLayout.CENTER);
+        locationList.setCellRenderer(new DefaultListCellRenderer() {
+            @Override public java.awt.Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {
+                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focus);
+                label.putClientProperty("html.disable", true);
+                if (value instanceof AgentAnswer.Location location) {
+                    String path = boundRoot != null && location.path().startsWith(boundRoot) ? boundRoot.relativize(location.path()).toString() : location.path().toString();
+                    label.setText(path + ":" + location.line() + ":" + location.column() + " — " + location.note());
+                    label.setToolTipText(location.path().toString());
+                }
+                return label;
+            }
+        }); locationList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        locationList.addListSelectionListener(event -> openLocation.setEnabled(locationList.getSelectedValue() != null));
+        locationList.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent event) { if (event.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(event)) openLocation(); }
+        });
+        locationList.getInputMap().put(KeyStroke.getKeyStroke("ENTER"), "open");
+        locationList.getActionMap().put("open", new AbstractAction() { public void actionPerformed(java.awt.event.ActionEvent event) { openLocation(); } });
+        JPanel references = referencesPanel;
+        var referencesScroll = new JScrollPane(locationList); referencesScroll.setPreferredSize(new Dimension(200, WorkbenchStyle.px(100)));
+        references.add(referencesScroll, BorderLayout.CENTER); references.add(openLocation, BorderLayout.EAST); openLocation.setEnabled(false);
+        references.setVisible(false); activity.add(references, BorderLayout.SOUTH); views.addTab("Activity", activity);
         requestList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION); requestList.setCellRenderer(new DefaultListCellRenderer() {
             @Override public java.awt.Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {
                 JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focus);
@@ -100,6 +138,10 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         views.addTab("Connection", details); panel.add(views, BorderLayout.CENTER);
         prompt.setRows(3); transcript.setLineWrap(true); transcript.setWrapStyleWord(true); prompt.setLineWrap(true); prompt.setWrapStyleWord(true);
         JPanel compose = new JPanel(new BorderLayout(6, 6)); compose.add(new JScrollPane(prompt), BorderLayout.CENTER);
+        JPanel intent = new JPanel(new BorderLayout(6, 4)); intent.add(scrollRow(row(actionChoice, captureSelection)), BorderLayout.NORTH);
+        intent.add(selectionLabel, BorderLayout.SOUTH); compose.add(intent, BorderLayout.NORTH);
+        selectionLabel.putClientProperty("html.disable", true); actionChoice.setRenderer(plainRenderer());
+        actionChoice.addActionListener(event -> updateAction()); updateAction();
         JPanel actions = new JPanel(new BorderLayout(6, 4)); actions.add(scrollRow(row(send, cancel, review)), BorderLayout.NORTH);
         actions.add(status, BorderLayout.SOUTH); compose.add(actions, BorderLayout.SOUTH); panel.add(compose, BorderLayout.SOUTH);
         prompt.getInputMap().put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, java.awt.event.InputEvent.CTRL_DOWN_MASK), "send");
@@ -124,7 +166,29 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     Path boundRoot() { return boundRoot; }
     Path boundSessions() { return boundSessions; }
     void onReview(Consumer<String> action) { reviewAction = Objects.requireNonNull(action); }
+    void selectionSource(Supplier<Supplier<AgentSelection>> source) { selectionSource = source; }
+    void onNavigate(Consumer<AgentAnswer.Location> action) { navigation = action; }
+    void prepare(AgentAction action) {
+        if (submitting || busy) { message("Wait for the current action or cancel it first."); return; }
+        actionChoice.setSelectedItem(action);
+        if (action == AgentAction.EDIT) captureSelection();
+    }
+    private void updateAction() {
+        var action = (AgentAction) actionChoice.getSelectedItem();
+        captureSelection.setVisible(action == AgentAction.EDIT);
+        send.setText(action == AgentAction.EDIT ? "Propose edit" : action == AgentAction.ASK ? "Ask" : "Run task");
+        selectionLabel.setText(action == AgentAction.EDIT ? capturedSelection == null ? "Select code, then use the current selection." : "Selection captured. Describe the change below."
+            : action == AgentAction.ASK ? "Ask about the project and jump to relevant code." : "Describe changes to make across the project. Review before applying.");
+        refreshAppearance();
+    }
+    private void captureSelection() {
+        capturedSelection = null;
+        if (selectionSource == null) { updateAction(); message("Select code in an editor buffer first."); return; }
+        try { capturedSelection = selectionSource.get(); updateAction(); }
+        catch (RuntimeException invalid) { updateAction(); message(failure(invalid)); }
+    }
     private void reviewChanges() {
+        if (!resultProposal.isEmpty()) { reviewAction.accept(resultProposal); return; }
         if (active != null) active.snapshot().writes().stream().filter(write -> !write.proposal().isEmpty()).findFirst()
             .ifPresent(write -> reviewAction.accept(write.proposal()));
     }
@@ -142,7 +206,8 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         if (allowForeground) capabilities.add(AgentPolicy.Capability.OPEN_UI);
         var policy = new AgentPolicy(capabilities, List.of("**/README.md"), List.of(), !allowForeground);
         long request = ++generation; busy = true; notice = "Connecting…"; active = null;
-        transcript.setText(""); diagnostics.setText(""); lastSequence = droppedShown = 0; speaker = ""; boundRoot = scope.root(); boundSessions = scope.sessions();
+        transcript.setText(""); diagnostics.setText(""); locations.clear(); referencesPanel.setVisible(false); resultProposal = "";
+        lastSequence = droppedShown = 0; speaker = ""; boundRoot = scope.root(); boundSessions = scope.sessions(); boundDocuments = scope.documents();
         workspace.setText("Workspace: " + scope.root()); controls(null);
         startingJob = jobs.submitLongRunning("Connect agent " + selected.id(), token -> {
             var queries = new WorkspaceQueryService(scope.root(), policy, scope.documents());
@@ -179,6 +244,8 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private void send() {
         if (active == null || busy || submitting || active.snapshot().state() != AgentSessionService.State.IDLE) return;
         String text = prompt.getText(); if (text.isBlank()) { message("Enter a message first."); return; }
+        AgentAction action = (AgentAction) actionChoice.getSelectedItem();
+        if (action != AgentAction.RUN) { sendFocused(action, text); return; }
         if (text.length() > 65536) { message("This message is too long; shorten it to 65,536 characters or fewer."); return; }
         long request = generation; AgentSessionService session = active;
         operation("Agent prompt", true, current -> {
@@ -188,10 +255,103 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         });
     }
     private void cancel() {
+        if (actionJob >= 0) { jobs.cancel(actionJob); notice = "Cancelling action…"; refresh(); return; }
         if (active == null || active.snapshot().state() != AgentSessionService.State.PROMPTING) return;
         AgentSessionService session = active; long request = generation;
         jobs.submitLongRunning("Cancel agent turn", token -> { session.cancel(); return null; }, (job, ignored, error) -> {
             if (generation == request && active == session) { notice = error == null ? "" : failure(error); refresh(); }
+        });
+    }
+
+    private void sendFocused(AgentAction action, String instruction) {
+        Supplier<AgentSelection> selection = capturedSelection;
+        if (action == AgentAction.EDIT && selection == null) { message("Select code, then press Use current selection."); return; }
+        if (action == AgentAction.EDIT && (boundSessions == null || !active.policy().capabilities().contains(AgentPolicy.Capability.PROPOSE))) {
+            message("Connect with reviewed changes enabled before proposing an edit."); return;
+        }
+        long request = generation; AgentSessionService session = active;
+        Path root = boundRoot, storage = boundSessions; WorkspaceDocumentSource documents = boundDocuments;
+        submitting = true; notice = "Preparing " + action.toString().toLowerCase(java.util.Locale.ROOT) + "…";
+        locations.clear(); referencesPanel.setVisible(false); controls(session.snapshot());
+        var proposalOwner = new java.util.concurrent.atomic.AtomicReference<WorkspaceProposalService>();
+        var proposalId = new java.util.concurrent.atomic.AtomicReference<String>("");
+        actionJob = jobs.submitLongRunning(action.toString(), token -> {
+            var queries = new WorkspaceQueryService(root, session.policy(), documents);
+            AgentSelection target = action == AgentAction.EDIT ? selection.get() : null;
+            if (target != null) {
+                queries.checkWorkspace(target.document().workspaceId());
+                queries.policy().require(AgentPolicy.Capability.PROPOSE);
+                if (target.document().uri() != null) queries.policy().checkPath(queries.root().relativize(
+                    WorkspacePaths.resolve(queries.root(), target.document().uri())), AgentPolicy.Capability.PROPOSE);
+                proposalOwner.set(new WorkspaceProposalService(queries, documents instanceof WorkspaceDocumentEditor editor ? editor : null,
+                    storage.resolve("agent-workspace").resolve(queries.workspaceId()), "focused:" + java.util.UUID.randomUUID()));
+            }
+            String wire = target == null ? AgentAnswer.prompt(instruction, queries, token::isCancelled) : target.prompt(instruction);
+            if (token.isCancelled()) throw new java.util.concurrent.CancellationException();
+            var pending = session.actionPrompt(instruction, wire, false);
+            token.onCancel(() -> background(() -> {
+                synchronized (session) { if (session.snapshot().state() == AgentSessionService.State.PROMPTING) session.cancel(); }
+                withdraw(proposalOwner.get(), proposalId.get());
+            }));
+            SwingUtilities.invokeLater(() -> {
+                if (generation != request || active != session) return;
+                notice = "";
+                if (prompt.getText().equals(instruction)) prompt.setText("");
+                if (target != null && capturedSelection == selection) { selectionLabel.setText(target.label()); selectionLabel.setToolTipText(target.label()); }
+                refresh();
+            });
+            var reply = pending.get();
+            if (token.isCancelled() || reply.stopReason().equals("cancelled")) throw new java.util.concurrent.CancellationException();
+            if (!reply.stopReason().equals("end_turn")) throw new IllegalArgumentException("Agent stopped without a complete result: " + reply.stopReason());
+            if (target == null) return new ActionResult("", AgentAnswer.parse(reply.text(), queries));
+            var proposal = target.propose(proposalOwner.get(), java.util.UUID.randomUUID().toString(), reply.turnId(), reply.text());
+            String id = (String) proposal.get("id"); proposalId.set(id);
+            if (token.isCancelled()) { withdraw(proposalOwner.get(), id); throw new java.util.concurrent.CancellationException(); }
+            return new ActionResult(id, null);
+        }, (job, result, error) -> {
+            if (generation != request || active != session || disposed) { if (result != null) background(() -> withdraw(proposalOwner.get(), result.proposal())); return; }
+            actionJob = -1; submitting = false;
+            if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
+                background(() -> withdraw(proposalOwner.get(), proposalId.get())); notice = "Action cancelled.";
+            } else if (error != null) notice = failure(error);
+            else if (result != null && !result.proposal().isEmpty()) {
+                resultProposal = result.proposal(); notice = "Selection change is ready in Review changes.";
+                append("\n[Selection change proposed. Review changes before applying.]\n");
+            } else if (result != null && result.answer() != null) {
+                var answer = result.answer(); append("\nAnswer\n" + answer.text() + "\n");
+                answer.locations().forEach(locations::addElement);
+                referencesPanel.setVisible(!locations.isEmpty());
+                notice = answer.omittedLocations() > 0 ? answer.omittedLocations() + " unavailable references omitted."
+                    : locations.isEmpty() ? "Answer complete · no code locations returned." : "Answer complete · choose a code location below.";
+            }
+            refresh();
+        });
+        controls(session.snapshot());
+    }
+
+    private static void withdraw(WorkspaceProposalService proposals, String id) {
+        if (proposals == null || id == null || id.isEmpty()) return;
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        while (true) {
+            try { proposals.withdraw(id); return; }
+            catch (WorkspaceApiException unavailable) {
+                if (Boolean.TRUE.equals(unavailable.details().get("retryable")) && System.nanoTime() < deadline) {
+                    try { Thread.sleep(50); continue; }
+                    catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+                }
+                System.getLogger("shed.agent").log(System.Logger.Level.WARNING, "Cancelled proposal could not be withdrawn; inspect Review changes: " + id); return;
+            }
+        }
+    }
+
+    private void openLocation() {
+        AgentAnswer.Location location = locationList.getSelectedValue(); if (location == null || active == null) return;
+        Path root = boundRoot; WorkspaceDocumentSource documents = boundDocuments; AgentPolicy policy = active.policy(); long request = generation;
+        jobs.submit("Check agent location", token -> {
+            AgentAnswer.validateNavigation(location, new WorkspaceQueryService(root, policy, documents)); return location;
+        }, (job, checked, error) -> {
+            if (request != generation || disposed) return;
+            if (error != null) message(failure(error)); else if (checked != null) navigation.accept(checked);
         });
     }
     private void respond() {
@@ -216,6 +376,8 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     }
     private void stop() {
         ++generation;
+        if (actionJob >= 0) jobs.cancel(actionJob);
+        actionJob = -1;
         if (startingJob >= 0) jobs.cancel(startingJob);
         startingJob = -1; busy = submitting = false;
         AgentSessionService session = active;
@@ -272,6 +434,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                 var update = MiniJson.asObject(data.get("update"));
                 if (update == null) return;
                 if ("agent_message_chunk".equals(update.get("sessionUpdate")) || "user_message_chunk".equals(update.get("sessionUpdate"))) {
+                    if (Boolean.TRUE.equals(data.get("focusedAction")) && "agent_message_chunk".equals(update.get("sessionUpdate"))) return;
                     var content = MiniJson.asObject(update.get("content"));
                     String nextSpeaker = "user_message_chunk".equals(update.get("sessionUpdate")) ? "you" : "agent";
                     if (!speaker.equals(nextSpeaker)) append(nextSpeaker.equals("you") ? "\nYou\n" : "\nAgent\n");
@@ -328,10 +491,11 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         var state = snapshot == null ? null : snapshot.state(); boolean disconnected = snapshot == null || inactive(state);
         connect.setEnabled(!busy && !stopping && disconnected); providerChoice.setEnabled(connect.isEnabled()); foreground.setEnabled(connect.isEnabled());
         Scope available = scopes.get(); reviewWrites.setEnabled(connect.isEnabled() && available != null && available.sessions() != null);
-        review.setEnabled(snapshot != null && snapshot.writes().stream().anyMatch(write -> !write.proposal().isEmpty()));
+        review.setEnabled(!resultProposal.isEmpty() || snapshot != null && snapshot.writes().stream().anyMatch(write -> !write.proposal().isEmpty()));
+        actionChoice.setEnabled(!busy && !submitting && !stopping); captureSelection.setEnabled(actionChoice.isEnabled());
         stop.setEnabled(!stopping && (busy || !disconnected));
         send.setEnabled(!busy && !submitting && !stopping && state == AgentSessionService.State.IDLE && snapshot.writes().isEmpty());
-        cancel.setEnabled(!stopping && state == AgentSessionService.State.PROMPTING);
+        cancel.setEnabled(!stopping && (actionJob >= 0 || state == AgentSessionService.State.PROMPTING));
         respond.setEnabled(!stopping && state == AgentSessionService.State.PROMPTING && requestList.getSelectedValue() != null);
         resume.setEnabled(!busy && (disconnected || state == AgentSessionService.State.READY));
         begin.setEnabled(!busy && state == AgentSessionService.State.READY);
@@ -360,12 +524,13 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     @Override public void close() { disposed = true; refreshTimer.stop(); stop(); }
     @Override public void refreshAppearance() {
         fonts(panel, uiFont.get()); transcript.setFont(codeFont.get()); prompt.setFont(codeFont.get()); diagnostics.setFont(codeFont.get());
-        for (JButton button : List.of(connect, stop, send, cancel, respond, authenticate, begin, review)) {
+        for (JButton button : List.of(connect, stop, send, cancel, respond, authenticate, begin, review, captureSelection, openLocation)) {
             WorkbenchStyle.quiet(button); button.setPreferredSize(null); var size = button.getPreferredSize();
             button.setPreferredSize(new Dimension(size.width, Math.max(WorkbenchStyle.px(40), size.height)));
         }
         providerChoice.setPreferredSize(new Dimension(WorkbenchStyle.px(170), WorkbenchStyle.px(40)));
         resume.setPreferredSize(new Dimension(WorkbenchStyle.px(240), WorkbenchStyle.px(40))); requestList.setFixedCellHeight(WorkbenchStyle.px(40));
+        actionChoice.setPreferredSize(new Dimension(WorkbenchStyle.px(160), WorkbenchStyle.px(40))); locationList.setFixedCellHeight(WorkbenchStyle.px(40));
     }
     private static JPanel row(java.awt.Component... components) { JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 6, 0)); for (var item : components) row.add(item); return row; }
     private static JScrollPane scrollRow(JPanel row) { var scroll = new JScrollPane(row, JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED); scroll.setBorder(BorderFactory.createEmptyBorder()); return scroll; }

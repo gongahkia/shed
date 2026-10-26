@@ -260,6 +260,16 @@ public class Texteditor extends JFrame implements KeyListener {
 
     WorkspaceDocumentEditor workspaceDocuments() { return workspaceDocumentSource; }
 
+    java.util.function.Supplier<AgentSelection> captureAgentSelection() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || buffer.isLargeFile() || writingArea == null || writingArea.getDocument() != buffer.getDocument())
+            throw new IllegalArgumentException("Select code in an editable source buffer first");
+        if (!extraSelections.isEmpty()) throw new IllegalArgumentException("Use one contiguous selection for an agent edit");
+        int start = writingArea.getSelectionStart(), end = writingArea.getSelectionEnd();
+        if (end <= start) throw new IllegalArgumentException("Highlight the code to edit first");
+        return workspaceDocumentSource.captureSelection(buffer, start, end);
+    }
+
     void ownAgentSession(AgentSessionService session) { agentWorkspaceController.ownSession(session); }
 
     String handleAgentCommand(String argument) { return agentWorkspaceController.handle(argument); }

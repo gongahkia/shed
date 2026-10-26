@@ -216,7 +216,9 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
                 else if (!output.truncated) output.text.append(chunk);
             }
         }
-        record("session_update", params);
+        if (output != null && (state == State.PROMPTING || state == State.CANCELLING)) {
+            var focused = new LinkedHashMap<String, Object>(params); focused.put("focusedAction", true); record("session_update", focused);
+        } else record("session_update", params);
     }
 
     private Map<String, Object> read(Map<String, Object> params) {

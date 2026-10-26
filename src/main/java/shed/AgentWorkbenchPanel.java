@@ -20,12 +20,13 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface {
             var storage = session.boundSessions() == null ? java.nio.file.Path.of(editor.configManager.getSessionDirectory()) : session.boundSessions();
             return root == null ? null : new AgentReviewPanel.Scope(root, storage, editor.workspaceDocuments());
         }, editor::resolveUiFont, editor::resolveEditorFont);
-        tabs.addTab("Conversation", session.component()); tabs.addTab("Review changes", review.component());
+        tabs.addTab("Assistant", session.component()); tabs.addTab("Review changes", review.component());
         session.onReview(id -> { review.showProposal(id); tabs.setSelectedIndex(1); });
         tabs.addChangeListener(event -> refresh()); panel.add(tabs, BorderLayout.CENTER); refreshAppearance();
     }
     @Override public JPanel component() { return panel; }
     void showReview() { tabs.setSelectedIndex(1); }
+    void showAction(AgentAction action) { session.prepare(action); tabs.setSelectedIndex(0); }
     @Override public void refresh() { if (tabs.getSelectedIndex() == 0) session.refresh(); else review.refresh(); }
     @Override public void refreshAppearance() { tabs.setFont(uiFont.get()); session.refreshAppearance(); review.refreshAppearance(); }
 }

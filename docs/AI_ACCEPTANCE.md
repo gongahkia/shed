@@ -1,6 +1,6 @@
 # Focused AI engineering acceptance
 
-Shed exposes Complete, Edit selection, Ask/search and Run task through OpenCode ACP. This is an engineering acceptance record, not a claim of model-output reliability or parity with ThePrimeagen/99. At the user's direction, further model experiments have stopped; hosted-provider acceptance is deferred. The direct local-inference integration and its settings were removed.
+Shed exposes Complete, Edit selection, Ask/search and Run task through OpenCode ACP. This is an engineering acceptance record; the scoped code comparison with ThePrimeagen/99 is tracked separately in [AI_PARITY.md](AI_PARITY.md). Neither establishes equal model-output reliability or latency. At the user's direction, further model experiments have stopped; hosted-provider acceptance is deferred. The direct local-inference integration and its settings were removed.
 
 ## Implemented safeguards
 
@@ -13,7 +13,15 @@ Shed exposes Complete, Edit selection, Ask/search and Run task through OpenCode 
 
 These safeguards cannot prove a generated change is logically correct. A syntactically valid replacement can still be wrong; review and project-specific checks remain necessary. No model-specific guess is used to reinterpret an invalid response into an accepted edit.
 
-## Deterministic verification
+## Scoped 99 capability acceptance (2026-10-26)
+
+The comparison against 99 commit `c17422457027c913c76c75a921fca1e623d2678e` added explicit file/skill references, ancestor project instructions, previous results, reusable work descriptions, approved command feedback and iterative fixes, advertised model selection, independent conversations and task-source navigation. The capability/evidence ledger is [AI_PARITY.md](AI_PARITY.md).
+
+After the conversation changes, the full Java 21 headless `clean package` passed **1,245 tests: 1,160 passed, 85 skipped, zero failures/errors**, across 230 reports. The final source-navigation change then passed **18 focused tests with no skips, failures or errors** (`AgentReviewPanelTest`, `AgentWorkbenchPanelTest`, `AgentAnswerTest`, `ArchitectureBoundaryTest`). These runs used deterministic protocol subprocesses and headless Swing components; no app/native/browser window or inference service was launched. The final focused run includes one new test plus expanded existing resource-navigation cases; it is not an additional full-suite result.
+
+The final artifact was rebuilt successfully using headless `package -DskipTests` after the focused tests. This establishes the mapped engineering capabilities within the agreed scope. It does not establish model quality, real-provider latency, or native visual acceptance for the newly added controls. The earlier native/benchmark evidence below predates these changes. Hosted-provider acceptance remains deliberately deferred; no further provider/model experiments were attempted. Previously downloaded local-model weights, runtime and archive were removed.
+
+## Original deterministic verification
 
 The full Java 21 headless `clean package` run reported **1,223 tests: 1,138 passed, 85 skipped, zero failures/errors**, across 225 test reports. Native and benchmark cases are opt-in and are covered by the separate checks below. The subsequent focused regression run passed all 73 tests with no skips, failures or errors, covering the final configuration migration plus completion sessions, ACP transport and architecture boundaries.
 

@@ -26,6 +26,34 @@ class AgentReviewPanelTest {
 
     @AfterEach void close() { if (jobs != null) jobs.shutdownNow(); }
 
+    @Test void explicitProposalNavigationPreservesAnUnfinishedReviewBeforeSwitching() throws Exception {
+        var base = scope("project"); current.set(base);
+        Files.writeString(base.root().resolve("first"), "first original\n"); Files.writeString(base.root().resolve("second"), "second original\n");
+        String first = (String) base.service().propose("first", "task", "turn", List.of(input(base, "first", "first proposed\n"))).get("id");
+        String second = (String) base.service().propose("second", "task", "turn", List.of(input(base, "second", "second proposed\n"))).get("id");
+        open(); edt(() -> panel.showProposal(first));
+        await(() -> button("apply").isEnabled() && text("before").getText().equals("first original\n"));
+        edt(() -> {
+            text("proposed").setText("unfinished human review\n"); panel.showProposal(second);
+            assertEquals("unfinished human review\n", text("proposed").getText()); assertTrue(label().getText().contains("Save or discard"));
+            button("discard").doClick();
+        });
+        await(() -> button("apply").isEnabled() && text("before").getText().equals("second original\n"));
+        edt(() -> assertEquals("second proposed\n", text("proposed").getText()));
+        assertEquals("first proposed\n", base.service().preview(first, 0).proposed());
+    }
+
+    @Test void briefJournalContentionDoesNotRequireRepeatingTheReviewAction() throws Exception {
+        var base = scope("project"); current.set(base); Files.writeString(base.root().resolve("source"), "original\n");
+        base.service().propose("request", "task", "turn", List.of(input(base, "source", "proposed\n")));
+        var query = new WorkspaceQueryService(base.root(), AgentPolicy.readOnly(), base.documents());
+        try (var lease = new WorkspaceChangeJournal(base.sessions().resolve("agent-workspace").resolve(query.workspaceId())).open(false)) {
+            assertNotNull(lease); open(); Thread.sleep(200);
+            edt(() -> { assertFalse(button("apply").isEnabled()); assertFalse(label().getText().contains("CONFLICT")); });
+        }
+        ready(); edt(() -> assertEquals("proposed\n", text("proposed").getText()));
+    }
+
     @Test void renameReviewShowsBothPathsAndPreservesTheDraftThroughApplyAndUndo() throws Exception {
         var base = scope("project"); Path file = Files.writeString(base.root().resolve("source"), "saved\r\n");
         FileBuffer buffer = new FileBuffer(file.toFile());

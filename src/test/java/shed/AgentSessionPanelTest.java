@@ -140,6 +140,46 @@ class AgentSessionPanelTest {
         assertEquals(2, owned.size()); assertTrue(owned.getLast().policy().capabilities().contains(AgentPolicy.Capability.OPEN_UI));
     }
 
+    @Test void sdkWriteWaitsForTheActualReviewControlsAndKeepsTheBufferUnsaved() throws Exception {
+        Path root = prepare("project"), file = Files.writeString(root.resolve("source"), "disk\n"), sessions = temporary.resolve("sessions");
+        FileBuffer buffer = new FileBuffer(file.toFile());
+        try (var documents = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
+            edt(() -> buffer.replaceContentUndoably("human draft\n"));
+            scope.set(new AgentSessionPanel.Scope(root, documents, sessions)); open(); connect();
+            var review = new AtomicReference<AgentReviewPanel>(); var opened = new java.util.concurrent.atomic.AtomicBoolean();
+            edt(() -> {
+                review.set(new AgentReviewPanel(jobs, () -> new AgentReviewPanel.Scope(panel.boundRoot(), panel.boundSessions(), documents),
+                    () -> new Font(Font.DIALOG, Font.PLAIN, 13), () -> new Font(Font.MONOSPACED, Font.PLAIN, 13)));
+                panel.onReview(id -> { opened.set(true); review.get().showProposal(id); });
+            });
+            send("write"); await(() -> button("review").isEnabled() && !owned.getFirst().snapshot().writes().getFirst().proposal().isEmpty());
+            edt(() -> {
+                assertFalse(opened.get()); assertEquals(0, tabs().getSelectedIndex()); assertTrue(status().getText().contains("Review changes"));
+                assertFalse(text("transcript").getText().contains("After write")); button("review").doClick();
+            });
+            await(() -> ((JButton) find(review.get().component(), "agent.apply")).isEnabled());
+            edt(() -> {
+                assertEquals("human draft\n", ((JTextArea) find(review.get().component(), "agent.before")).getText());
+                assertEquals("agent write\n", ((JTextArea) find(review.get().component(), "agent.proposed")).getText());
+                ((JButton) find(review.get().component(), "agent.apply")).doClick();
+            });
+            await(() -> button("send").isEnabled() && text("transcript").getText().contains("After write: agent write"));
+            assertEquals("agent write\n", documents.snapshots().getFirst().content()); assertEquals("disk\n", Files.readString(file));
+            assertTrue(buffer.isModified()); assertTrue(opened.get());
+        }
+    }
+
+    @Test void disablingFileReviewBeforeConnectKeepsTheAgentReadOnly() throws Exception {
+        Path root = prepare("project"), file = Files.writeString(root.resolve("source"), "human\n");
+        scope.set(new AgentSessionPanel.Scope(root, WorkspaceDocumentSource.diskOnly(), temporary.resolve("sessions"))); open();
+        edt(() -> ((JCheckBox) find(panel.component(), "agent.session.reviewWrites")).setSelected(false));
+        connect(); send("write");
+        await(() -> button("send").isEnabled() && !owned.getFirst().snapshot().error().isBlank());
+        assertEquals("human\n", Files.readString(file)); assertTrue(owned.getFirst().snapshot().writes().isEmpty());
+        assertFalse(Files.exists(temporary.resolve("sessions")));
+        assertFalse(owned.getFirst().policy().capabilities().contains(AgentPolicy.Capability.PROPOSE));
+    }
+
     private Path prepare(String name) throws Exception {
         Path root = Files.createDirectory(temporary.resolve(name)); scope.set(new AgentSessionPanel.Scope(root, WorkspaceDocumentSource.diskOnly()));
         provider.set(new AgentProvider("fixture", AcpConnectionTest.javaCommand(AcpSdkAgentFixture.class.getName(), root.resolve("source").toString()),

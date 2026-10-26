@@ -16,7 +16,9 @@ import javax.swing.*;
 
 /** Explicit human controls. Streaming never opens a window, selects a tab, or changes focus. */
 final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseable {
-    record Scope(Path root, WorkspaceDocumentSource documents) { }
+    record Scope(Path root, WorkspaceDocumentSource documents, Path sessions) {
+        Scope(Path root, WorkspaceDocumentSource documents) { this(root, documents, null); }
+    }
     private record Connected(AgentSessionService service, String error) { }
     private final AsyncJobService jobs;
     private final Supplier<Scope> scopes;
@@ -28,6 +30,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private final JComboBox<String> providerChoice = named(new JComboBox<>(), "provider");
     private final JTextField resume = named(new JTextField(), "resume");
     private final JCheckBox foreground = named(new JCheckBox("Allow sign-in windows"), "foreground");
+    private final JCheckBox reviewWrites = named(new JCheckBox("Review file writes through Shed", true), "reviewWrites");
     private final JTextArea transcript = area("transcript", false), prompt = area("prompt", true), diagnostics = area("diagnostics", false), permissionDetails = area("permissionDetails", false);
     private final JScrollPane conversation = new JScrollPane(transcript);
     private final JLabel status = named(new JLabel("Choose a configured agent to start a conversation."), "status");
@@ -40,6 +43,8 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private final JButton send = button("Send", "send", this::send), cancel = button("Cancel turn", "cancel", this::cancel);
     private final JButton respond = button("Respond", "respond", this::respond), authenticate = button("Sign in", "authenticate", this::authenticate);
     private final JButton begin = button("Start conversation", "begin", this::begin);
+    private Consumer<String> reviewAction = ignored -> { };
+    private final JButton review = button("Review changes", "review", this::reviewChanges);
     private final Timer refreshTimer;
     private AgentSessionService active;
     private boolean busy, submitting, stopping, disposed;
@@ -47,11 +52,12 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private long generation, lastSequence, droppedShown;
     private String notice = "", speaker = "";
     private Path boundRoot;
+    private Path boundSessions;
 
     AgentSessionPanel(Texteditor editor) {
         this(editor.asyncJobService, () -> {
             Path root = editor.workspaceController.activeRoot();
-            return root == null ? null : new Scope(root, editor.workspaceDocuments());
+            return root == null ? null : new Scope(root, editor.workspaceDocuments(), Path.of(editor.configManager.getSessionDirectory()));
         }, editor.configManager::getAgentProviderNames, name -> AgentProvider.configured(editor.configManager, name),
             editor::ownAgentSession, editor::resolveUiFont, editor::resolveEditorFont);
     }
@@ -85,15 +91,17 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         setup.add(new JLabel("Configure agent.<name>.command and optional .args in your settings."));
         setup.add(new JLabel("Connect starts that local program in the workspace shown above."));
         setup.add(new JLabel("The program retains its operating-system access; Shed does not sandbox it."));
-        setup.add(row(new JLabel("Resume session ID (optional)"), resume)); setup.add(foreground);
+        setup.add(row(new JLabel("Resume session ID (optional)"), resume)); setup.add(reviewWrites); setup.add(foreground);
+        reviewWrites.setToolTipText("File writes wait for your approval in Review changes. Disable before connecting for read-only access through Shed.");
         foreground.setToolTipText("Enable before connecting to allow explicit sign-in requests. Stop and reconnect to change this permission.");
         setup.add(row(new JLabel("Authentication"), authMethods, authenticate, begin));
-        setup.add(new JLabel("Shed currently serves file reads. Reviewed writes and terminal requests are not connected yet."));
+        setup.add(new JLabel("Writes through Shed require review. Terminal requests are unavailable."));
         JPanel details = new JPanel(new BorderLayout(8, 8)); details.add(setup, BorderLayout.NORTH); details.add(new JScrollPane(diagnostics), BorderLayout.CENTER);
         views.addTab("Connection", details); panel.add(views, BorderLayout.CENTER);
         prompt.setRows(3); transcript.setLineWrap(true); transcript.setWrapStyleWord(true); prompt.setLineWrap(true); prompt.setWrapStyleWord(true);
         JPanel compose = new JPanel(new BorderLayout(6, 6)); compose.add(new JScrollPane(prompt), BorderLayout.CENTER);
-        compose.add(scrollRow(row(send, cancel)), BorderLayout.EAST); compose.add(status, BorderLayout.SOUTH); panel.add(compose, BorderLayout.SOUTH);
+        JPanel actions = new JPanel(new BorderLayout(6, 4)); actions.add(scrollRow(row(send, cancel, review)), BorderLayout.NORTH);
+        actions.add(status, BorderLayout.SOUTH); compose.add(actions, BorderLayout.SOUTH); panel.add(compose, BorderLayout.SOUTH);
         prompt.getInputMap().put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, java.awt.event.InputEvent.CTRL_DOWN_MASK), "send");
         prompt.getActionMap().put("send", new AbstractAction() { public void actionPerformed(java.awt.event.ActionEvent event) { send(); } });
         AccessibilitySupport.describe(providerChoice, "Agent provider", "Choose a configured local agent. Nothing starts until Connect is pressed.");
@@ -114,6 +122,12 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
 
     @Override public JPanel component() { return panel; }
     Path boundRoot() { return boundRoot; }
+    Path boundSessions() { return boundSessions; }
+    void onReview(Consumer<String> action) { reviewAction = Objects.requireNonNull(action); }
+    private void reviewChanges() {
+        if (active != null) active.snapshot().writes().stream().filter(write -> !write.proposal().isEmpty()).findFirst()
+            .ifPresent(write -> reviewAction.accept(write.proposal()));
+    }
 
     private void connect() {
         if (busy || stopping || disposed || active != null && !inactive(active.snapshot().state())) return;
@@ -123,13 +137,18 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         catch (RuntimeException invalid) { message(invalid.getMessage()); return; }
         boolean allowForeground = foreground.isSelected(); String resumeId = resume.getText().trim();
         var capabilities = new java.util.HashSet<>(Set.of(AgentPolicy.Capability.READ, AgentPolicy.Capability.START_AGENT));
+        boolean allowWrites = reviewWrites.isSelected() && scope.sessions() != null;
+        if (allowWrites) capabilities.add(AgentPolicy.Capability.PROPOSE);
         if (allowForeground) capabilities.add(AgentPolicy.Capability.OPEN_UI);
         var policy = new AgentPolicy(capabilities, List.of("**/README.md"), List.of(), !allowForeground);
         long request = ++generation; busy = true; notice = "Connecting…"; active = null;
-        transcript.setText(""); diagnostics.setText(""); lastSequence = droppedShown = 0; speaker = ""; boundRoot = scope.root();
+        transcript.setText(""); diagnostics.setText(""); lastSequence = droppedShown = 0; speaker = ""; boundRoot = scope.root(); boundSessions = scope.sessions();
         workspace.setText("Workspace: " + scope.root()); controls(null);
         startingJob = jobs.submitLongRunning("Connect agent " + selected.id(), token -> {
-            var session = new AgentSessionService(selected, new WorkspaceQueryService(scope.root(), policy, scope.documents()));
+            var queries = new WorkspaceQueryService(scope.root(), policy, scope.documents());
+            var session = new AgentSessionService(selected, queries,
+                scope.documents() instanceof WorkspaceDocumentEditor documents ? documents : null,
+                allowWrites ? scope.sessions().resolve("agent-workspace").resolve(queries.workspaceId()) : null);
             try {
                 owner.accept(session); token.onCancel(() -> background(session::close));
                 session.initialize().get();
@@ -269,6 +288,9 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             } + "]\n");
             case "cancel_requested" -> append("\n[Cancellation requested]\n");
             case "request_failed" -> append("\n[" + data.get("message") + "]\n");
+            case "write_proposed" -> append("\n[File change awaiting review: " + data.get("path") + "]\n");
+            case "write_applied" -> append("\n[Reviewed change applied" + (Boolean.TRUE.equals(data.get("pendingSave")) ? " to the unsaved buffer" : "") + ": " + data.get("path") + "]\n");
+            case "write_failed", "write_cleanup_required" -> append("\n[" + data.get("message") + "]\n");
             default -> { }
         }
     }
@@ -305,8 +327,10 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private void controls(AgentSessionService.Snapshot snapshot) {
         var state = snapshot == null ? null : snapshot.state(); boolean disconnected = snapshot == null || inactive(state);
         connect.setEnabled(!busy && !stopping && disconnected); providerChoice.setEnabled(connect.isEnabled()); foreground.setEnabled(connect.isEnabled());
+        Scope available = scopes.get(); reviewWrites.setEnabled(connect.isEnabled() && available != null && available.sessions() != null);
+        review.setEnabled(snapshot != null && snapshot.writes().stream().anyMatch(write -> !write.proposal().isEmpty()));
         stop.setEnabled(!stopping && (busy || !disconnected));
-        send.setEnabled(!busy && !submitting && !stopping && state == AgentSessionService.State.IDLE);
+        send.setEnabled(!busy && !submitting && !stopping && state == AgentSessionService.State.IDLE && snapshot.writes().isEmpty());
         cancel.setEnabled(!stopping && state == AgentSessionService.State.PROMPTING);
         respond.setEnabled(!stopping && state == AgentSessionService.State.PROMPTING && requestList.getSelectedValue() != null);
         resume.setEnabled(!busy && (disconnected || state == AgentSessionService.State.READY));
@@ -316,8 +340,9 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             : "Sign-in requires a connected agent and Allow sign-in windows enabled before connecting.");
         String text = !notice.isBlank() ? notice : snapshot == null ? "Choose a configured agent to start a conversation."
             : !snapshot.error().isBlank() ? snapshot.error() : switch (state) {
-                case IDLE -> "Ready · " + snapshot.provider();
-                case PROMPTING -> snapshot.permissions().isEmpty() ? "Agent is working…" : "Agent is waiting for your response in Requests.";
+                case IDLE -> snapshot.writes().isEmpty() ? "Ready · " + snapshot.provider() : "Finishing previous file reviews…";
+                case PROMPTING -> !snapshot.writes().isEmpty() ? "Agent is waiting for file changes in Review changes."
+                    : snapshot.permissions().isEmpty() ? "Agent is working…" : "Agent is waiting for your response in Requests.";
                 case CANCELLING -> "Waiting for cancellation acknowledgement…";
                 case READY -> "Agent connected. Start a conversation or choose a sign-in method in Connection.";
                 default -> "Agent " + state.name().toLowerCase(java.util.Locale.ROOT);
@@ -335,7 +360,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     @Override public void close() { disposed = true; refreshTimer.stop(); stop(); }
     @Override public void refreshAppearance() {
         fonts(panel, uiFont.get()); transcript.setFont(codeFont.get()); prompt.setFont(codeFont.get()); diagnostics.setFont(codeFont.get());
-        for (JButton button : List.of(connect, stop, send, cancel, respond, authenticate, begin)) {
+        for (JButton button : List.of(connect, stop, send, cancel, respond, authenticate, begin, review)) {
             WorkbenchStyle.quiet(button); button.setPreferredSize(null); var size = button.getPreferredSize();
             button.setPreferredSize(new Dimension(size.width, Math.max(WorkbenchStyle.px(40), size.height)));
         }

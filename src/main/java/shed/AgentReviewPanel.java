@@ -63,6 +63,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     private Map<String, Object> recovery;
     private Integer nextOffset;
     private boolean busy, rendering, dirty;
+    private String requestedProposal;
     private long generation;
 
     AgentReviewPanel(Texteditor editor) {
@@ -90,7 +91,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
                 label.putClientProperty("html.disable", true); return label;
             }
         });
-        WorkbenchStyle.emptyText(proposalList, "No proposals. Enable :agent api start propose to receive changes.");
+        WorkbenchStyle.emptyText(proposalList, "No proposals. Connect an agent with file review enabled, or use :agent api start propose.");
         WorkbenchStyle.emptyText(hunkTable, "Select a proposal to review its changes");
         before.setEditable(false); details.setEditable(false); details.setLineWrap(true); details.setWrapStyleWord(true);
         details.setRows(4); details.setOpaque(false);
@@ -154,7 +155,29 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
             if (busy) return;
             scope = current; clear();
         }
-        if (!busy && !dirty) reload(false);
+        if (!busy && !dirty) {
+            if (requestedProposal != null) openRequestedProposal(); else reload(false);
+        }
+    }
+
+    /** Explicit navigation can address a pending proposal beyond the currently loaded page. */
+    void showProposal(String id) {
+        requestedProposal = Objects.requireNonNull(id);
+        if (dirty) { message("Save or discard the current review edits before opening the requested proposal."); return; }
+        refresh();
+    }
+
+    private void openRequestedProposal() {
+        if (scope == null) { message("Select a workspace to review the requested proposal."); return; }
+        String id = requestedProposal; requestedProposal = null;
+        run("Opening requested proposal…", service -> service.preview(id, 0), value -> {
+            rendering = true;
+            try {
+                proposals.clear(); proposals.addElement(value.proposal()); nextOffset = null;
+                proposalList.setSelectedIndex(0);
+            } finally { rendering = false; }
+            selectProposal(value);
+        });
     }
 
     private void reload(boolean append) {
@@ -174,12 +197,16 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
                 for (int i = 0; i < proposals.size(); i++) if (Objects.equals(selectedId, proposals.get(i).get("id"))) selected = i;
                 if (!proposals.isEmpty()) proposalList.setSelectedIndex(selected);
             } finally { rendering = false; }
-            if (proposals.isEmpty()) { clearPreview(); message("No proposals yet. Start proposal access with :agent api start propose."); }
+            if (proposals.isEmpty()) { clearPreview(); message("No proposals yet. Connect an agent with file review enabled, or use :agent api start propose."); }
             else selectProposal();
         });
     }
 
     private void selectProposal() {
+        selectProposal(null);
+    }
+
+    private void selectProposal(WorkspaceProposalService.Preview loaded) {
         if (busy || dirty) return;
         var selected = proposalList.getSelectedValue();
         rendering = true;
@@ -194,7 +221,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
                     : "RENAME".equals(document.get("kind")) ? "Rename · " + label + " → " + document.get("destinationPath") : label);
             }
         } finally { rendering = false; }
-        if (selected != null) loadPreview(); else controls();
+        if (selected != null) { if (loaded == null) loadPreview(); else showPreview(loaded); } else controls();
     }
 
     private void loadPreview() {
@@ -268,6 +295,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         dirty = false;
         if (!Objects.equals(scope, scopeSupplier.get())) { scope = scopeSupplier.get(); clear(); reload(false); }
         else if (preview != null) showPreview(preview);
+        if (requestedProposal != null && !busy) refresh();
     }
 
     @FunctionalInterface private interface Mutation { Map<String, Object> apply(WorkspaceProposalService service, String id, int revision); }
@@ -319,8 +347,15 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         Scope captured = scope; long request = ++generation;
         busy = true; message(message); controls();
         jobs.submit("Agent review: " + message, token -> {
-            if (token.isCancelled()) throw new java.util.concurrent.CancellationException();
-            return operation.apply(captured.service());
+            var service = captured.service();
+            for (int attempt = 0; ; attempt++) {
+                if (token.isCancelled()) throw new java.util.concurrent.CancellationException();
+                try { return operation.apply(service); }
+                catch (WorkspaceApiException contention) {
+                    if (!Boolean.TRUE.equals(contention.details().get("retryable")) || attempt >= 100) throw contention;
+                    Thread.sleep(50);
+                }
+            }
         }, (snapshot, result, error) -> {
             if (request != generation) return;
             busy = false;
@@ -331,6 +366,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
             } else if (result != null) completion.accept(result);
             else message("Review operation was cancelled. Refresh to inspect its persisted outcome.");
             controls();
+            if (requestedProposal != null && !busy && !dirty) SwingUtilities.invokeLater(this::refresh);
         });
     }
 

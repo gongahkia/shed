@@ -28,7 +28,7 @@ final class PrivateWorkspaceFiles {
 
     static Path directory(Path requested) throws IOException {
         Path path = requested.toAbsolutePath().normalize();
-        Files.createDirectories(path, attributes(path, true));
+        createDirectories(path);
         check(path, true);
         return path.toRealPath();
     }
@@ -42,6 +42,7 @@ final class PrivateWorkspaceFiles {
         check(directory, true);
         Path path = directory.resolve(name);
         Files.createFile(path, attributes(path, false));
+        setCreatedOwner(path);
         try (FileChannel channel = FileChannel.open(path, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS)) {
             ByteBuffer bytes = ByteBuffer.wrap(content);
             while (bytes.hasRemaining()) channel.write(bytes);
@@ -105,6 +106,26 @@ final class PrivateWorkspaceFiles {
 
     private static UserPrincipal currentUser(Path path) throws IOException {
         return path.getFileSystem().getUserPrincipalLookupService().lookupPrincipalByName(System.getProperty("user.name"));
+    }
+
+    private static void createDirectories(Path path) throws IOException {
+        if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) return;
+        Path parent = path.getParent();
+        if (parent != null && !Files.exists(parent, LinkOption.NOFOLLOW_LINKS)) createDirectories(parent);
+        try { Files.createDirectory(path, attributes(path, true)); }
+        catch (java.nio.file.FileAlreadyExistsException raced) { return; }
+        setCreatedOwner(path);
+    }
+
+    private static void setCreatedOwner(Path path) throws IOException {
+        // An elevated Windows token can assign Administrators as the default owner.
+        // Set the owner only on objects we just created, with the user-only ACL already
+        // in place. Never take ownership of pre-existing state to make validation pass.
+        if (!path.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+            AclFileAttributeView acl = Files.getFileAttributeView(path, AclFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+            if (acl == null) throw new IOException("Owner-only private state is unsupported on this filesystem");
+            acl.setOwner(currentUser(path));
+        }
     }
 
     private static FileAttribute<?>[] attributes(Path path, boolean directory) throws IOException {

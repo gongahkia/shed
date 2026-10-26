@@ -15,6 +15,8 @@ class PrivateWorkspaceFilesTest {
         Path directory = PrivateWorkspaceFiles.directory(root.resolve("private"));
         byte[] data = "secret".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         Path file = PrivateWorkspaceFiles.create(directory, "connection.json", data);
+        var owner = root.getFileSystem().getUserPrincipalLookupService().lookupPrincipalByName(System.getProperty("user.name"));
+        assertEquals(owner, Files.getOwner(directory)); assertEquals(owner, Files.getOwner(file));
         assertArrayEquals(data, PrivateWorkspaceFiles.read(file, data.length));
         assertThrows(IOException.class, () -> PrivateWorkspaceFiles.read(file, 2));
         Files.writeString(file, "changed");

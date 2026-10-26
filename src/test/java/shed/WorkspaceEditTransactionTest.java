@@ -13,6 +13,54 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkspaceEditTransactionTest {
     @TempDir Path root;
 
+    @Test void exclusiveRenameCannotOverwriteAWriterThatOccupiesTheDestinationDuringItsIntent() throws Exception {
+        Path source = Files.writeString(root.resolve("source"), "original"), target = root.resolve("target");
+        var expected = WorkspaceEditTransaction.resourceIdentity(source);
+        try (var transaction = new WorkspaceEditTransaction(step -> {
+            if (step.kind().equals("RENAME_FILE")) Files.writeString(target, "concurrent human file");
+        })) {
+            assertThrows(IOException.class, () -> transaction.renameFile(source, target, expected));
+            assertEquals(WorkspaceEditTransaction.State.ROLLED_BACK, transaction.rollback().state());
+        }
+        assertEquals("original", Files.readString(source)); assertEquals("concurrent human file", Files.readString(target));
+    }
+
+    @Test void exclusiveRenamePreservesIdentityAndRollsBackARecordedIntermediateLink() throws Exception {
+        Path source = Files.writeString(root.resolve("source"), "original"), target = root.resolve("nested/target");
+        var expected = WorkspaceEditTransaction.resourceIdentity(source);
+        var steps = new java.util.ArrayList<String>();
+        try (var transaction = new WorkspaceEditTransaction(step -> {
+            steps.add(step.kind());
+            if (step.kind().equals("UNLINK_SOURCE")) {
+                assertTrue(Files.isSameFile(source, target)); throw new IOException("fixture interruption");
+            }
+        })) {
+            assertThrows(IOException.class, () -> transaction.renameFile(source, target, expected));
+        }
+        assertEquals(java.util.List.of("CREATE_DIRECTORY", "RENAME_FILE", "UNLINK_SOURCE"), steps);
+        assertEquals(expected, WorkspaceEditTransaction.resourceIdentity(source)); assertFalse(Files.exists(target.getParent()));
+        try (var transaction = new WorkspaceEditTransaction()) {
+            transaction.renameFile(source, target, expected); transaction.commit();
+            assertTrue(transaction.cleanup().failures().isEmpty());
+        }
+        assertFalse(Files.exists(source)); assertEquals(expected, WorkspaceEditTransaction.resourceIdentity(target));
+    }
+
+    @Test void aliasRecoveryAndItsRollbackNeverReplaceASeparateHumanFile() throws Exception {
+        Path survivor = Files.writeString(root.resolve("source"), "original"), alias = root.resolve("alias");
+        Files.createLink(alias, survivor); var expected = WorkspaceEditTransaction.resourceIdentity(survivor);
+        try (var transaction = new WorkspaceEditTransaction()) {
+            transaction.unlinkAlias(alias, survivor, expected); assertFalse(Files.exists(alias));
+            assertEquals(WorkspaceEditTransaction.State.ROLLED_BACK, transaction.rollback().state());
+            assertTrue(Files.isSameFile(alias, survivor));
+        }
+        Files.delete(alias); Files.writeString(alias, "human");
+        try (var transaction = new WorkspaceEditTransaction()) {
+            assertThrows(IOException.class, () -> transaction.unlinkAlias(alias, survivor, expected));
+        }
+        assertEquals("human", Files.readString(alias)); assertEquals("original", Files.readString(survivor));
+    }
+
     @Test void retainedDeletionKeepsTheExactOriginalForUndoAndStillRollsBackNormally() throws Exception {
         Path file = Files.writeString(root.resolve("source"), "original\r\n");
         if (file.getFileSystem().supportedFileAttributeViews().contains("posix"))

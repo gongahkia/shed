@@ -172,6 +172,47 @@ final class WorkspaceEditTransaction implements AutoCloseable {
         });
     }
 
+    /** A regular-file move with an atomic no-overwrite destination claim and recoverable link/unlink intents. */
+    void renameFile(Path source, Path target, Map<String, Object> expectedSource) throws IOException {
+        requireOpen();
+        Fingerprint expected = requireIdentity(source, Objects.requireNonNull(expectedSource));
+        if (expected.directory() || expected.link()) throw new IOException("Exclusive file rename requires a regular file");
+        requireIdentity(target, null); createParents(target);
+        prepared("RENAME_FILE", source, target, expected); requireMatching(source, expected);
+        Files.createLink(target, source);
+        addRollback("restore renamed file " + source, () -> {
+            requireMatching(target, expected);
+            if (exists(source)) {
+                requireMatching(source, expected);
+                if (!Files.isSameFile(source, target)) throw new IOException("Original path now contains a different resource: " + source);
+            } else Files.createLink(source, target);
+            requireMatching(target, expected); Files.delete(target);
+        });
+        prepared("UNLINK_SOURCE", source, target, expected);
+        requireMatching(source, expected); requireMatching(target, expected);
+        if (!Files.isSameFile(source, target)) throw new IOException("Rename paths no longer identify the same file");
+        Files.delete(source);
+        addCommit(() -> {
+            requireMatching(target, expected);
+            if (exists(source)) throw new IOException("The original rename path was reoccupied: " + source);
+        });
+    }
+
+    /** Removes only an inspected duplicate name for an unchanged surviving file. */
+    void unlinkAlias(Path alias, Path survivor, Map<String, Object> identity) throws IOException {
+        requireOpen(); Fingerprint expected = requireIdentity(survivor, Objects.requireNonNull(identity));
+        if (expected.directory() || expected.link()) throw new IOException("Alias recovery requires a regular file");
+        requireMatching(alias, expected);
+        if (!Files.isSameFile(alias, survivor)) throw new IOException("Recovery paths are not aliases of the same file");
+        prepared("UNLINK_ALIAS", alias, survivor, expected);
+        requireMatching(alias, expected); requireMatching(survivor, expected);
+        if (!Files.isSameFile(alias, survivor)) throw new IOException("Recovery alias changed during inspection");
+        Files.delete(alias);
+        addRollback("restore file alias " + alias, () -> {
+            requireMatching(survivor, expected); Files.createLink(alias, survivor);
+        });
+    }
+
     void delete(Path target) throws IOException { delete(target, resourceIdentity(target)); }
 
     void delete(Path target, Map<String, Object> expected) throws IOException {

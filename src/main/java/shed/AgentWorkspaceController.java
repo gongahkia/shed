@@ -15,6 +15,7 @@ final class AgentWorkspaceController implements AutoCloseable {
     private final Set<WorkspaceBridgeServer> releasing = ConcurrentHashMap.newKeySet();
     private final AtomicLong generation = new AtomicLong();
     private final AtomicBoolean disposed = new AtomicBoolean();
+    private final AgentSessionRegistry sessions = new AgentSessionRegistry();
     private WorkspaceBridgeServer active;
     private int startingJob = -1;
     private boolean stopping;
@@ -23,11 +24,14 @@ final class AgentWorkspaceController implements AutoCloseable {
 
     AgentWorkspaceController(Texteditor editor) { this.editor = editor; }
 
+    void ownSession(AgentSessionService session) { sessions.own(session); }
+
     String handle(String argument) {
         if (active != null && !active.running()) { active = null; status = "Agent API connection has stopped."; }
         String value = argument == null ? "" : argument.trim();
         return switch (value) {
-            case "", "proposals" -> { editor.showToolWindow(ToolWindowHost.Tab.AGENT); yield "Review agent proposals in the Agents panel."; }
+            case "" -> { editor.showToolWindow(ToolWindowHost.Tab.AGENT); yield "Connect an agent or review proposals in the Agents panel."; }
+            case "proposals" -> { if (editor.toolWindowHost != null) editor.toolWindowHost.showAgentReview(); yield "Review proposals in the Agents panel."; }
             case "status", "api", "api status" -> status;
             case "api start" -> start(false);
             case "api start propose" -> start(true);
@@ -105,6 +109,6 @@ final class AgentWorkspaceController implements AutoCloseable {
     }
 
     @Override public void close() {
-        disposed.set(true); stop();
+        disposed.set(true); sessions.close(); stop();
     }
 }

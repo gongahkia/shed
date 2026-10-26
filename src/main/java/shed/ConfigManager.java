@@ -1686,6 +1686,11 @@ public class ConfigManager {
         return config.get("lsp." + extension + ".command");
     }
 
+    public List<String> getAgentProviderNames() {
+        return config.keySet().stream().filter(key -> key.matches("agent\\.[A-Za-z0-9_-]{1,64}\\.command"))
+            .filter(key -> !config.get(key).isBlank()).map(key -> key.substring(6, key.length() - 8)).sorted().toList();
+    }
+
     public String[] getLspArgs(String extension) {
         String raw = config.get("lsp." + extension + ".args");
         if (raw == null || raw.isBlank()) {

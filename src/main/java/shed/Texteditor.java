@@ -251,6 +251,8 @@ public class Texteditor extends JFrame implements KeyListener {
 
     WorkspaceDocumentEditor workspaceDocuments() { return workspaceDocumentSource; }
 
+    void ownAgentSession(AgentSessionService session) { agentWorkspaceController.ownSession(session); }
+
     String handleAgentCommand(String argument) { return agentWorkspaceController.handle(argument); }
 
     private void applyWorkspaceTextBatch(Runnable mutation) {

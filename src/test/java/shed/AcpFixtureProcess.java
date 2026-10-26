@@ -22,6 +22,7 @@ public final class AcpFixtureProcess {
         }
         var reader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
         Object prompt = null;
+        boolean authenticated = false;
         for (String line; (line = reader.readLine()) != null;) {
             var request = MiniJson.asObject(MiniJson.parseStrict(line)); String method = MiniJson.asString(request.get("method"));
             if (mode.equals("hang")) continue;
@@ -46,8 +47,15 @@ public final class AcpFixtureProcess {
                 response.put("jsonrpc", "2.0"); response.put("id", request.get("id")); response.put("result", null); send(response);
             } else if (method.equals("initialize")) {
                 reply(request.get("id"), Map.of("protocolVersion", mode.equals("version") ? 99 : 1,
-                    "agentCapabilities", Map.of("loadSession", mode.equals("load")), "authMethods", List.of()));
-            } else if (method.equals("session/new")) reply(request.get("id"), Map.of("sessionId", "fixture-session"));
+                    "agentCapabilities", Map.of("loadSession", mode.equals("load")), "authMethods", mode.equals("auth")
+                        ? List.of(Map.of("id", "fixture-login", "name", "Fixture sign-in")) : List.of()));
+            } else if (method.equals("authenticate")) {
+                authenticated = true; reply(request.get("id"), Map.of());
+            } else if (method.equals("session/new")) {
+                if (mode.equals("auth") && !authenticated) send(Map.of("jsonrpc", "2.0", "id", request.get("id"),
+                    "error", Map.of("code", -32000, "message", "Authentication required")));
+                else reply(request.get("id"), Map.of("sessionId", "fixture-session"));
+            }
             else if (method.equals("session/load")) reply(request.get("id"), Map.of());
             else if (method.equals("session/prompt")) {
                 prompt = request.get("id");

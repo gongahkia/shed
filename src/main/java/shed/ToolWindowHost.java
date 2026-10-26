@@ -52,7 +52,7 @@ final class ToolWindowHost extends JPanel {
         addSurface(Tab.TESTS, "Tests", new TestsToolPanel(editor, this));
         addSurface(Tab.PROBLEMS, "Problems", new ProblemsToolPanel(editor, this));
         addSurface(Tab.REPLACE, "Replace", new ProjectReplaceToolPanel(editor, this));
-        addSurface(Tab.AGENT, "Agents", new AgentReviewPanel(editor));
+        addSurface(Tab.AGENT, "Agents", new AgentWorkbenchPanel(editor));
         selectedSurface = tabs.getSelectedComponent();
         tabs.addChangeListener(event -> selectedTabChanged());
     }
@@ -90,6 +90,11 @@ final class ToolWindowHost extends JPanel {
         tabs.setSelectedComponent(surface.component());
         sizeDockAutomatically(tab);
         surface.refresh();
+    }
+
+    void showAgentReview() {
+        if (surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents) agents.showReview();
+        showTab(Tab.AGENT);
     }
 
     private int preferredDividerLocation(Tab tab) {

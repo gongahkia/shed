@@ -7,6 +7,18 @@ import java.util.Map;
 final class OpenCodePreset {
     private OpenCodePreset() { }
 
+    static Map<String, String> withContext(Map<String, String> environment, java.nio.file.Path directory) {
+        var config = new LinkedHashMap<>(MiniJson.asObject(MiniJson.parseStrict(environment.get("OPENCODE_CONFIG_CONTENT"))));
+        var permissions = new LinkedHashMap<>(MiniJson.asObject(config.get("permission")));
+        var external = new LinkedHashMap<String, String>(); external.put("*", "deny");
+        external.put(directory.toAbsolutePath().toString().replace('\\', '/') + "/**", "allow");
+        permissions.put("external_directory", external); config.put("permission", permissions);
+        var agents = new LinkedHashMap<>(MiniJson.asObject(config.get("agent")));
+        var review = new LinkedHashMap<>(MiniJson.asObject(agents.get("shed-review")));
+        review.put("permission", permissions); agents.put("shed-review", review); config.put("agent", agents);
+        var result = new LinkedHashMap<>(environment); result.put("OPENCODE_CONFIG_CONTENT", MiniJson.stringify(config)); return Map.copyOf(result);
+    }
+
     static Map<String, String> environment(String model) {
         if (model == null || model.length() > 256 || model.chars().anyMatch(Character::isISOControl))
             throw new IllegalArgumentException("Invalid OpenCode model name");

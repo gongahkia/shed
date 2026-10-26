@@ -43,6 +43,7 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
     private boolean allowTurnWrites = true;
     private TurnOutput output;
     private CompletableFuture<Reply> actionReply;
+    private final AgentContextFiles contextFiles;
 
     AgentSessionService(AgentProvider provider, WorkspaceQueryService workspace) throws IOException {
         this(provider, workspace, null, null);
@@ -53,13 +54,20 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
         this.provider = provider; this.workspace = workspace;
         writes = proposalStorage == null ? null : new AgentWriteReview(workspace, editor, proposalStorage,
             "acp:" + provider.id() + ":" + UUID.randomUUID(), (type, data) -> { synchronized (this) { record(type, data); } });
-        connection = AcpConnection.start(provider.command(), workspace.root(), provider.environment(), this);
+        contextFiles = provider.id().equals("opencode") && provider.environment().containsKey("OPENCODE_CONFIG_CONTENT") ? new AgentContextFiles() : null;
+        try {
+            connection = AcpConnection.start(provider.command(), workspace.root(), contextFiles == null ? provider.environment()
+                : OpenCodePreset.withContext(provider.environment(), contextFiles.directory()), this);
+        } catch (IOException | RuntimeException failure) {
+            if (contextFiles != null) contextFiles.close(); if (writes != null) writes.close(); throw failure;
+        }
         connection.termination().thenRun(() -> {
             synchronized (this) {
                 if (state != State.CLOSED) { state = State.FAILED; error = connection.diagnostics().failure(); }
                 if (writes != null) writes.close();
                 cancelPendingRequests(); record("connection_closed", Map.of("reason", connection.diagnostics().failure()));
             }
+            if (contextFiles != null) contextFiles.close();
         });
     }
 
@@ -70,6 +78,9 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
 
     Path root() { return workspace.root(); }
     AgentPolicy policy() { return workspace.policy(); }
+    AgentContextFiles.Snapshot context(List<WorkspaceDocument> documents, java.util.function.BooleanSupplier cancelled) throws IOException {
+        return contextFiles == null ? null : contextFiles.capture(documents, cancelled);
+    }
     CompletableFuture<Void> termination() { return connection.termination(); }
 
     synchronized CompletableFuture<Map<String, Object>> initialize() {

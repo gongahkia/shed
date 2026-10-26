@@ -209,7 +209,9 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         boolean allowWrites = reviewWrites.isSelected() && scope.sessions() != null;
         if (allowWrites) capabilities.add(AgentPolicy.Capability.PROPOSE);
         if (allowForeground) capabilities.add(AgentPolicy.Capability.OPEN_UI);
-        var policy = new AgentPolicy(capabilities, List.of("**/README.md"), List.of(), !allowForeground);
+        // Context exports must not bypass OpenCode's environment-file read restrictions.
+        var excluded = selected.id().equals("opencode") ? List.of("**/*.env", "**/*.env.*") : List.<String>of();
+        var policy = new AgentPolicy(capabilities, List.of("**/README.md"), excluded, !allowForeground);
         long request = ++generation; busy = true; notice = "Connecting…"; active = null;
         transcript.setText(""); diagnostics.setText(""); locations.clear(); referencesPanel.setVisible(false); resultProposal = "";
         lastSequence = droppedShown = 0; speaker = ""; boundRoot = scope.root(); boundSessions = scope.sessions(); boundDocuments = scope.documents();
@@ -274,7 +276,9 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         var proposalOwner = new java.util.concurrent.atomic.AtomicReference<WorkspaceProposalService>();
         var proposalId = new java.util.concurrent.atomic.AtomicReference<String>("");
         actionJob = jobs.submitLongRunning(action.toString(), token -> {
-            var queries = new WorkspaceQueryService(root, session.policy(), documents);
+            var capturedDocuments = List.copyOf(documents.snapshots());
+            var queries = new WorkspaceQueryService(root, session.policy(), () -> capturedDocuments);
+            try (var context = session.context(queries.visibleDocuments(), token::isCancelled)) {
             AgentSelection target = action == AgentAction.EDIT ? selection.get() : null;
             AgentTaskPlan task = action == AgentAction.RUN ? AgentTaskPlan.capture(queries, token::isCancelled) : null;
             if (target != null) {
@@ -286,6 +290,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             if (action != AgentAction.ASK) proposalOwner.set(new WorkspaceProposalService(queries, documents instanceof WorkspaceDocumentEditor editor ? editor : null,
                 storage.resolve("agent-workspace").resolve(queries.workspaceId()), "focused:" + java.util.UUID.randomUUID()));
             String wire = task != null ? task.prompt(instruction) : target == null ? AgentAnswer.prompt(instruction, queries, token::isCancelled) : target.prompt(instruction);
+            if (context != null) wire += context.instruction();
             if (token.isCancelled()) throw new java.util.concurrent.CancellationException();
             var pending = session.actionPrompt(instruction, wire, false);
             token.onCancel(() -> background(() -> {
@@ -295,6 +300,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             SwingUtilities.invokeLater(() -> {
                 if (generation != request || active != session) return;
                 notice = "";
+                if (context != null && context.count() > 0) append("\nContext\nShared complete snapshots of " + context.count() + " unsaved buffers for this action.\n");
                 if (prompt.getText().equals(instruction)) prompt.setText("");
                 if (target != null && capturedSelection == selection) { selectionLabel.setText(target.label()); selectionLabel.setToolTipText(target.label()); }
                 refresh();
@@ -314,6 +320,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             proposalId.set(id);
             if (token.isCancelled()) { withdraw(proposalOwner.get(), id); throw new java.util.concurrent.CancellationException(); }
             return new ActionResult(id, null, summary);
+            }
         }, (job, result, error) -> {
             if (generation != request || active != session || disposed) { if (result != null) background(() -> withdraw(proposalOwner.get(), result.proposal())); return; }
             actionJob = -1; submitting = false;

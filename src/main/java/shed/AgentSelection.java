@@ -41,13 +41,9 @@ record AgentSelection(WorkspaceDocument document, int start, int end) {
     }
 
     Map<String, Object> propose(WorkspaceProposalService proposals, String request, String turn, String response) {
-        if (response == null || response.length() > 65536) throw new IllegalArgumentException("Selection response exceeds its limit");
-        String json = response.strip();
-        if (json.startsWith("```json\n") && json.endsWith("\n```")) json = json.substring(8, json.length() - 4);
-        else if (json.startsWith("```\n") && json.endsWith("\n```")) json = json.substring(4, json.length() - 4);
-        var value = MiniJson.asObject(MiniJson.parseStrict(json));
+        var value = AgentAnswer.json(response);
         if (value == null || !value.keySet().equals(java.util.Set.of("replacement")) || !(value.get("replacement") instanceof String replacement))
-            throw new IllegalArgumentException("Agent must return one JSON replacement for the selected code");
+            throw new AgentReplyFormatException("Agent must return one JSON replacement for the selected code");
         String result = document.content().substring(0, start) + replacement + document.content().substring(end);
         return proposals.propose(request, "selection-" + request, turn,
             List.of(new WorkspaceProposalService.Input(document.documentId(), document.version(), result)));

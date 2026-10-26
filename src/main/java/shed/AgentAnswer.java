@@ -48,7 +48,7 @@ record AgentAnswer(String text, List<Location> locations, int omittedLocations) 
         var value = json(response);
         if (!(value.get("answer") instanceof String answer) || answer.isBlank() || !(value.get("locations") instanceof List<?> locations)
             || locations.size() > 100 || !value.keySet().equals(java.util.Set.of("answer", "locations")))
-            throw new IllegalArgumentException("Agent must return an answer and a bounded list of locations");
+            throw new AgentReplyFormatException("Agent must return an answer and a bounded list of locations");
         List<Location> valid = new ArrayList<>(); int omitted = 0;
         for (Object item : locations) {
             try {
@@ -66,13 +66,17 @@ record AgentAnswer(String text, List<Location> locations, int omittedLocations) 
     }
 
     static Map<String, Object> json(String response) {
-        if (response == null || response.length() > 65536) throw new IllegalArgumentException("Agent response exceeds its limit");
+        if (response == null || response.length() > 65536) throw new AgentReplyFormatException("Agent response exceeds its limit");
         String value = response.strip();
         if (value.startsWith("```json\n") && value.endsWith("\n```")) value = value.substring(8, value.length() - 4);
         else if (value.startsWith("```\n") && value.endsWith("\n```")) value = value.substring(4, value.length() - 4);
-        Map<String, Object> parsed = MiniJson.asObject(MiniJson.parseStrict(value));
-        if (parsed == null) throw new IllegalArgumentException("Agent response must be a JSON object");
-        return parsed;
+        try {
+            Map<String, Object> parsed = MiniJson.asObject(MiniJson.parseStrict(value));
+            if (parsed == null) throw new AgentReplyFormatException("Agent response must be a JSON object");
+            return parsed;
+        } catch (IllegalArgumentException invalid) {
+            throw new AgentReplyFormatException("Agent response must contain one valid JSON object in the requested format");
+        }
     }
 
     static void validateNavigation(Location location, WorkspaceQueryService workspace) {

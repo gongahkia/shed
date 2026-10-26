@@ -279,54 +279,78 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             var capturedDocuments = List.copyOf(documents.snapshots());
             var queries = new WorkspaceQueryService(root, session.policy(), () -> capturedDocuments);
             try (var context = session.context(queries.visibleDocuments(), token::isCancelled)) {
-            AgentSelection target = action == AgentAction.EDIT ? selection.get() : null;
-            AgentTaskPlan task = action == AgentAction.RUN ? AgentTaskPlan.capture(queries, token::isCancelled) : null;
-            if (target != null) {
-                queries.checkWorkspace(target.document().workspaceId());
-                queries.policy().require(AgentPolicy.Capability.PROPOSE);
-                if (target.document().uri() != null) queries.policy().checkPath(queries.root().relativize(
-                    WorkspacePaths.resolve(queries.root(), target.document().uri())), AgentPolicy.Capability.PROPOSE);
-            }
-            if (action != AgentAction.ASK) proposalOwner.set(new WorkspaceProposalService(queries, documents instanceof WorkspaceDocumentEditor editor ? editor : null,
-                storage.resolve("agent-workspace").resolve(queries.workspaceId()), "focused:" + java.util.UUID.randomUUID()));
-            String wire = task != null ? task.prompt(instruction) : target == null ? AgentAnswer.prompt(instruction, queries, token::isCancelled) : target.prompt(instruction);
-            if (context != null) wire += context.instruction();
-            if (token.isCancelled()) throw new java.util.concurrent.CancellationException();
-            var pending = session.actionPrompt(instruction, wire, false);
-            token.onCancel(() -> background(() -> {
-                session.cancelAction(pending);
-                withdraw(proposalOwner.get(), proposalId.get());
-            }));
-            SwingUtilities.invokeLater(() -> {
-                if (generation != request || active != session) return;
-                notice = "";
-                if (context != null && context.count() > 0) append("\nContext\nShared complete snapshots of " + context.count() + " unsaved buffers for this action.\n");
-                if (prompt.getText().equals(instruction)) prompt.setText("");
-                if (target != null && capturedSelection == selection) { selectionLabel.setText(target.label()); selectionLabel.setToolTipText(target.label()); }
-                refresh();
-            });
-            var reply = pending.get();
-            if (token.isCancelled() || reply.stopReason().equals("cancelled")) throw new java.util.concurrent.CancellationException();
-            if (!reply.stopReason().equals("end_turn")) throw new IllegalArgumentException("Agent stopped without a complete result: " + reply.stopReason());
-            if (action == AgentAction.ASK) return new ActionResult("", AgentAnswer.parse(reply.text(), queries), "");
-            String id, summary;
-            if (task != null) {
-                var result = task.propose(proposalOwner.get(), java.util.UUID.randomUUID().toString(), reply.turnId(), reply.text());
-                id = result.proposal(); summary = result.summary();
-            } else {
-                var proposal = target.propose(proposalOwner.get(), java.util.UUID.randomUUID().toString(), reply.turnId(), reply.text());
-                id = (String) proposal.get("id"); summary = "Selection change proposed.";
-            }
-            proposalId.set(id);
-            if (token.isCancelled()) { withdraw(proposalOwner.get(), id); throw new java.util.concurrent.CancellationException(); }
-            return new ActionResult(id, null, summary);
+                AgentSelection target = action == AgentAction.EDIT ? selection.get() : null;
+                AgentTaskPlan task = action == AgentAction.RUN ? AgentTaskPlan.capture(queries, token::isCancelled) : null;
+                if (target != null) {
+                    queries.checkWorkspace(target.document().workspaceId());
+                    queries.policy().require(AgentPolicy.Capability.PROPOSE);
+                    if (target.document().uri() != null) queries.policy().checkPath(queries.root().relativize(
+                        WorkspacePaths.resolve(queries.root(), target.document().uri())), AgentPolicy.Capability.PROPOSE);
+                }
+                if (action != AgentAction.ASK) proposalOwner.set(new WorkspaceProposalService(queries, documents instanceof WorkspaceDocumentEditor editor ? editor : null,
+                    storage.resolve("agent-workspace").resolve(queries.workspaceId()), "focused:" + java.util.UUID.randomUUID()));
+                String wire = task != null ? task.prompt(instruction) : target == null ? AgentAnswer.prompt(instruction, queries, token::isCancelled) : target.prompt(instruction);
+                if (context != null) wire += context.instruction();
+                for (int attempt = 0; ; attempt++) {
+                    if (token.isCancelled()) throw new java.util.concurrent.CancellationException();
+                    var pending = session.actionPrompt(attempt == 0 ? instruction : "Repair response format", wire, false);
+                    token.onCancel(() -> background(() -> {
+                        session.cancelAction(pending);
+                        withdraw(proposalOwner.get(), proposalId.get());
+                    }));
+                    if (attempt == 0) SwingUtilities.invokeLater(() -> {
+                        if (generation != request || active != session) return;
+                        notice = "";
+                        if (context != null && context.count() > 0) append("\nContext\nShared complete snapshots of " + context.count() + " unsaved buffers for this action.\n");
+                        if (prompt.getText().equals(instruction)) prompt.setText("");
+                        if (target != null && capturedSelection == selection) { selectionLabel.setText(target.label()); selectionLabel.setToolTipText(target.label()); }
+                        refresh();
+                    });
+                    var reply = pending.get();
+                    if (token.isCancelled() || reply.stopReason().equals("cancelled")) throw new java.util.concurrent.CancellationException();
+                    if (!reply.stopReason().equals("end_turn")) throw new IllegalArgumentException("Agent stopped without a complete result: " + reply.stopReason());
+                    try {
+                        if (action == AgentAction.ASK) return new ActionResult("", AgentAnswer.parse(reply.text(), queries), "");
+                        String id, summary;
+                        if (task != null) {
+                            var result = task.propose(proposalOwner.get(), java.util.UUID.randomUUID().toString(), reply.turnId(), reply.text());
+                            id = result.proposal(); summary = result.summary();
+                        } else {
+                            var proposal = target.propose(proposalOwner.get(), java.util.UUID.randomUUID().toString(), reply.turnId(), reply.text());
+                            id = (String) proposal.get("id"); summary = "Selection change proposed.";
+                        }
+                        proposalId.set(id);
+                        if (token.isCancelled()) { withdraw(proposalOwner.get(), id); throw new java.util.concurrent.CancellationException(); }
+                        return new ActionResult(id, null, summary);
+                    } catch (AgentReplyFormatException malformed) {
+                        if (attempt >= 1) throw malformed;
+                        wire = malformed.correction(action);
+                        SwingUtilities.invokeLater(() -> {
+                            if (generation != request || active != session || disposed) return;
+                            notice = "Correcting the agent response format once…";
+                            append("\nResponse correction\nThe reply did not match the required format. Asking the agent to correct it; no changes were applied.\n");
+                            refresh();
+                        });
+                    }
+                }
             }
         }, (job, result, error) -> {
             if (generation != request || active != session || disposed) { if (result != null) background(() -> withdraw(proposalOwner.get(), result.proposal())); return; }
             actionJob = -1; submitting = false;
             if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
                 background(() -> withdraw(proposalOwner.get(), proposalId.get())); notice = "Action cancelled.";
-            } else if (error != null) notice = failure(error);
+                if (prompt.getText().isBlank()) prompt.setText(instruction);
+            } else if (error != null) {
+                if (prompt.getText().isBlank()) prompt.setText(instruction);
+                Throwable cause = rootFailure(error);
+                boolean stale = cause instanceof WorkspaceApiException workspaceError && workspaceError.code() == WorkspaceApiException.Code.STALE_VERSION;
+                if (stale && action == AgentAction.EDIT) { capturedSelection = null; updateAction(); }
+                notice = failure(error) + (stale && action == AgentAction.EDIT
+                    ? ". Use current selection to capture the changed code, then try again."
+                    : stale ? ". Retry to capture the current files."
+                    : ". Your request is available to adjust and retry; check Connection diagnostics for provider errors.");
+                append("\nAction not completed\n" + notice + "\n");
+            }
             else if (result != null && !result.proposal().isEmpty()) {
                 resultProposal = result.proposal(); notice = "Proposed changes are ready in Review changes.";
                 append("\nProposal\n" + result.summary() + "\n[Review changes before applying.]\n");
@@ -530,8 +554,12 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     }
     private void message(String value) { notice = Objects.toString(value, "Agent operation failed"); controls(active == null ? null : active.snapshot()); }
     private static boolean inactive(AgentSessionService.State state) { return state == AgentSessionService.State.CLOSED || state == AgentSessionService.State.FAILED; }
-    private static String failure(Throwable error) {
+    private static Throwable rootFailure(Throwable error) {
         while (error.getCause() != null && (error instanceof java.util.concurrent.ExecutionException || error instanceof java.util.concurrent.CompletionException)) error = error.getCause();
+        return error;
+    }
+    private static String failure(Throwable error) {
+        error = rootFailure(error);
         return error instanceof AcpException || error instanceof WorkspaceApiException || error instanceof IllegalArgumentException
             ? Objects.toString(error.getMessage(), "Agent operation failed") : "Agent operation failed. Check the configured command and Connection diagnostics.";
     }

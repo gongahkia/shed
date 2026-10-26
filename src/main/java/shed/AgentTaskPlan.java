@@ -81,7 +81,7 @@ final class AgentTaskPlan {
         var value = AgentAnswer.json(response);
         if (!value.keySet().equals(Set.of("summary", "changes")) || !(value.get("summary") instanceof String summary)
             || summary.isBlank() || summary.length() > 8192 || !(value.get("changes") instanceof List<?> changes) || changes.size() > 32)
-            throw new IllegalArgumentException("Agent must return a summary and at most 32 proposed file changes");
+            throw new AgentReplyFormatException("Agent must return a summary and at most 32 proposed file changes");
         if (changes.isEmpty()) return new Result(summary, "");
         List<WorkspaceProposalService.Input> inputs = new ArrayList<>();
         for (Object item : changes) {
@@ -134,5 +134,5 @@ final class AgentTaskPlan {
     private static String string(Map<String, Object> value, String key) {
         if (!(value.get(key) instanceof String text)) throw invalid("Expected text for " + key); return text;
     }
-    private static IllegalArgumentException invalid(String message) { return new IllegalArgumentException(message); }
+    private static IllegalArgumentException invalid(String message) { return new AgentReplyFormatException(message); }
 }

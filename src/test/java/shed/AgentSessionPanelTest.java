@@ -248,7 +248,36 @@ class AgentSessionPanelTest {
             });
             send("uppercase"); await(() -> button("send").isEnabled() && status().getText().contains("Document changed"));
             assertEquals("later human draft\n", documents.snapshots().getFirst().content()); edt(() -> assertFalse(button("review").isEnabled()));
+            edt(() -> {
+                assertEquals("uppercase", text("prompt").getText());
+                assertTrue(status().getText().contains("Use current selection"));
+                button("captureSelection").doClick(); button("send").doClick();
+            });
+            await(() -> button("review").isEnabled());
+            assertEquals("later human draft\n", documents.snapshots().getFirst().content());
         }
+    }
+
+    @Test void malformedRepliesGetOneVisibleCorrectionAndExhaustionRestoresTheRequest() throws Exception {
+        prepare("project"); open(); connect();
+        edt(() -> { panel.prepare(AgentAction.ASK); text("prompt").setText("malformed once"); button("send").doClick(); text("prompt").setText("next draft"); });
+        await(() -> button("send").isEnabled() && text("transcript").getText().contains("Corrected answer"));
+        edt(() -> {
+            assertEquals("next draft", text("prompt").getText());
+            assertTrue(text("transcript").getText().contains("Response correction"));
+        });
+        send("malformed always");
+        await(() -> button("send").isEnabled() && status().getText().contains("adjust and retry"));
+        edt(() -> { assertEquals("malformed always", text("prompt").getText()); assertFalse(button("review").isEnabled()); });
+        assertEquals(4, owned.getFirst().snapshot().events().stream().filter(event -> event.type().equals("user_prompt")).count());
+    }
+
+    @Test void cancellationDuringResponseCorrectionStopsTheActionAndRestoresTheInstruction() throws Exception {
+        prepare("project"); open(); connect(); edt(() -> panel.prepare(AgentAction.ASK));
+        send("malformed cancel"); await(() -> button("respond").isEnabled());
+        edt(() -> button("cancel").doClick()); await(() -> button("send").isEnabled());
+        edt(() -> { assertEquals("malformed cancel", text("prompt").getText()); assertFalse(button("review").isEnabled()); });
+        assertEquals(2, owned.getFirst().snapshot().events().stream().filter(event -> event.type().equals("user_prompt")).count());
     }
 
     @Test void cancellingASelectionActionDiscardsItsReplyAndReleasesTheAgent() throws Exception {

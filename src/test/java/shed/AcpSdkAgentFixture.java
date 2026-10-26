@@ -9,12 +9,22 @@ import java.util.List;
 public final class AcpSdkAgentFixture {
     public static void main(String[] args) {
         if (!Boolean.getBoolean("java.awt.headless")) throw new IllegalStateException("Headless fixture required");
+        var repair = new java.util.concurrent.atomic.AtomicReference<>("");
         var agent = AcpAgent.sync(new StdioAcpAgentTransport())
             .newSessionHandler(request -> new NewSessionResponse("sdk-session", null, null))
             .loadSessionHandler(request -> new LoadSessionResponse(null))
             .promptHandler((request, context) -> {
                 String prompt = ((TextContent) request.prompt().getFirst()).text();
-                if (prompt.startsWith("Propose changes for the project task below.")) {
+                if (prompt.startsWith("Repair the response format")) {
+                    if (repair.get().equals("cancel")) {
+                        var decision = context.client().requestPermission(new RequestPermissionRequest(context.getSessionId(),
+                            new ToolCallUpdate("repair-wait", "Read context for correction", ToolKind.READ, ToolCallStatus.PENDING),
+                            List.of(new PermissionOption("allow", "Allow once", PermissionOptionKind.ALLOW_ONCE))));
+                        if (decision.outcome() instanceof PermissionCancelled) return PromptResponse.cancelled();
+                    }
+                    context.sendMessage(repair.get());
+                }
+                else if (prompt.startsWith("Propose changes for the project task below.")) {
                     var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1)));
                     String instruction = (String) input.get("instruction"), summary = "Echo: " + instruction;
                     List<?> changes = List.of();
@@ -45,6 +55,13 @@ public final class AcpSdkAgentFixture {
                     context.sendMessage(MiniJson.stringify(java.util.Map.of("replacement", ((String) input.get("selection")).toUpperCase(java.util.Locale.ROOT))));
                 }
                 else if (prompt.startsWith("Answer the project question below.")) {
+                    var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1)));
+                    String instruction = (String) input.get("instruction");
+                    if (instruction.startsWith("malformed")) {
+                        repair.set(instruction.equals("malformed once") ? "{\"answer\":\"Corrected answer\",\"locations\":[]}"
+                            : instruction.equals("malformed cancel") ? "cancel" : "still not JSON");
+                        context.sendMessage("not JSON"); return PromptResponse.endTurn();
+                    }
                     context.sendMessage("{\"answer\":\"The source handles the request.\",\"locations\":[{\"path\":\"source\",\"line\":1,\"column\":1,\"note\":\"Entry point\"}]}");
                 }
                 else if (prompt.equals("reply-chunked")) { context.sendMessage("first "); context.sendMessage("second"); }

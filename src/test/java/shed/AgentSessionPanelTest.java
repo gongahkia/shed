@@ -361,6 +361,55 @@ class AgentSessionPanelTest {
         });
     }
 
+    @Test void commandsWaitForApprovalAndFeedActualResultsBackWithoutChangingTabs() throws Exception {
+        prepare("commands"); open(); connect(); edt(() -> panel.prepare(AgentAction.ASK)); send("check command");
+        await(() -> button("approveCommands").isEnabled());
+        edt(() -> {
+            assertEquals(0, tabs().getSelectedIndex()); assertTrue(button("cancel").isEnabled()); assertFalse(button("send").isEnabled());
+            assertTrue(text("commandDetails").getText().contains("Arguments:")); assertTrue(text("commandDetails").getText().contains("not sandboxed"));
+            assertFalse(text("transcript").getText().contains("Synthetic check failed")); button("approveCommands").doClick();
+        });
+        await(() -> button("send").isEnabled() && text("transcript").getText().contains("Check failed with exit code 7"));
+        edt(() -> assertTrue(text("transcript").getText().contains("Synthetic check failed")));
+        send("check command"); await(() -> button("rejectCommands").isEnabled());
+        edt(() -> button("rejectCommands").doClick());
+        await(() -> button("send").isEnabled() && text("transcript").getText().contains("Checks were denied"));
+        send("check command"); await(() -> button("approveCommands").isEnabled());
+        edt(() -> button("cancel").doClick());
+        await(() -> button("send").isEnabled() && !button("approveCommands").isEnabled());
+        edt(() -> { assertEquals("check command", text("prompt").getText()); assertEquals(0, tabs().getSelectedIndex()); });
+    }
+
+    @Test void appliedTaskCanRunChecksAndProposeAFixAgainstFreshCodeWithAnotherReview() throws Exception {
+        Path root = prepare("iteration"), file = Files.writeString(root.resolve("source"), "before\n");
+        try (var documents = new EditorWorkspaceDocuments(List::of, () -> List.of(root), () -> root, root)) {
+            scope.set(new AgentSessionPanel.Scope(root, documents, temporary.resolve("sessions"))); open(); connect();
+            var review = new AtomicReference<AgentReviewPanel>();
+            edt(() -> {
+                review.set(new AgentReviewPanel(jobs, () -> new AgentReviewPanel.Scope(panel.boundRoot(), panel.boundSessions(), documents),
+                    () -> new Font(Font.DIALOG, Font.PLAIN, 13), () -> new Font(Font.MONOSPACED, Font.PLAIN, 13)));
+                panel.onReview(id -> review.get().showProposal(id));
+            });
+            send("write"); await(() -> button("continueReviewed").isEnabled());
+            edt(() -> button("continueReviewed").doClick());
+            await(() -> button("send").isEnabled() && status().getText().contains("Apply the reviewed proposal"));
+            edt(() -> { assertTrue(button("review").isEnabled()); text("prompt").setText(""); button("review").doClick(); });
+            await(() -> ((JButton) find(review.get().component(), "agent.apply")).isEnabled());
+            edt(() -> ((JButton) find(review.get().component(), "agent.apply")).doClick());
+            await(() -> { try { return Files.readString(file).equals("agent write\n"); } catch (Exception e) { return false; } });
+            edt(() -> button("continueReviewed").doClick()); await(() -> button("approveCommands").isEnabled());
+            edt(() -> button("approveCommands").doClick());
+            await(() -> button("send").isEnabled() && text("transcript").getText().contains("Fix proposed after actual failing check"));
+            assertEquals("agent write\n", Files.readString(file));
+            edt(() -> button("review").doClick());
+            await(() -> ((JTextArea) find(review.get().component(), "agent.before")).getText().equals("agent write\n"));
+            edt(() -> {
+                assertEquals("fixed after check\n", ((JTextArea) find(review.get().component(), "agent.proposed")).getText());
+                assertTrue(((JButton) find(review.get().component(), "agent.apply")).isEnabled());
+            });
+        }
+    }
+
     private Path prepare(String name) throws Exception {
         Path root = Files.createDirectory(temporary.resolve(name)); scope.set(new AgentSessionPanel.Scope(root, WorkspaceDocumentSource.diskOnly(), temporary.resolve("sessions")));
         provider.set(new AgentProvider("fixture", AcpConnectionTest.javaCommand(AcpSdkAgentFixture.class.getName(), root.resolve("source").toString()),

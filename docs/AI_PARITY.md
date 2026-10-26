@@ -12,7 +12,7 @@ Reference inspected: ThePrimeagen/99 commit `c17422457027c913c76c75a921fca1e623d
 | Selection edits and code search | Existing reviewed edits and validated navigable references | Panel/ACP/review/navigation tests |
 | Reopen previous results and clear history | Implemented in History; bounded per-workspace in-memory results, reusable requests, existing review/navigation controls | History retention/isolation tests and actual panel reopen/reuse/clear test |
 | Work description reused for search/task follow-ups | Implemented; one private saved description per workspace, Find remaining work and Continue work prepare editable prompts | Private persistence/reload/clear/isolation and actual panel save/prepare tests |
-| Test/command feedback and iterative task fixes | Pending; preserve human review and explicit command approval | Synthetic background command execution, cancellation, bounded output, fresh baselines and feedback |
+| Test/command feedback and iterative task fixes | Implemented; explicit command approval in Requests and Check & continue after an applied proposal | Synthetic execution/failure/timeout/output/child cleanup tests; actual panel approval/rejection/cancel; apply → failed check → fresh proposal still requiring review |
 | Model selection | Pending inspection of ACP configuration and OpenCode model discovery | Correct configured invocation, selection and subsequent requests |
 | Status, cancellation and error recovery | Existing, extend to added operations | Pending-action cancellation, preserved drafts, malformed/stale failures |
 

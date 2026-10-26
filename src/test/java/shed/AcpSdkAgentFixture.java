@@ -9,6 +9,7 @@ import java.util.List;
 public final class AcpSdkAgentFixture {
     public static void main(String[] args) {
         if (!Boolean.getBoolean("java.awt.headless")) throw new IllegalStateException("Headless fixture required");
+        var commandTask = new java.util.concurrent.atomic.AtomicBoolean();
         var repair = new java.util.concurrent.atomic.AtomicReference<>("");
         var agent = AcpAgent.sync(new StdioAcpAgentTransport())
             .newSessionHandler(request -> new NewSessionResponse("sdk-session", null, null))
@@ -24,9 +25,22 @@ public final class AcpSdkAgentFixture {
                     }
                     context.sendMessage(repair.get());
                 }
+                else if (prompt.startsWith("Command results for the original request.")) {
+                    boolean denied = prompt.contains("Human denied");
+                    if (commandTask.get()) {
+                        context.sendMessage(MiniJson.stringify(java.util.Map.of("summary", "Fix proposed after actual failing check", "changes", List.of(
+                            java.util.Map.of("kind", "edit", "path", "source", "edits", List.of(java.util.Map.of("before", "agent write\n", "after", "fixed after check\n")))))));
+                    } else context.sendMessage(MiniJson.stringify(java.util.Map.of("answer", denied ? "Checks were denied" : "Check failed with exit code 7", "locations", List.of())));
+                }
                 else if (prompt.startsWith("Propose changes for the project task below.")) {
                     var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1).lines().findFirst().orElseThrow()));
                     String instruction = (String) input.get("instruction"), summary = "Echo: " + instruction;
+                    if (instruction.startsWith("Review the applied proposal")) {
+                        commandTask.set(true);
+                        context.sendMessage(MiniJson.stringify(java.util.Map.of("reason", "Check applied change", "commands", List.of(java.util.Map.of(
+                            "argv", AcpConnectionTest.javaCommand(AgentCheckFixture.class.getName(), "fail"), "directory", ".", "timeoutSeconds", 10)))));
+                        return PromptResponse.endTurn();
+                    }
                     List<?> changes = List.of();
                     if (instruction.equals("read")) summary = context.readFile(args[0]);
                     else if (instruction.equals("write")) {
@@ -57,6 +71,11 @@ public final class AcpSdkAgentFixture {
                 else if (prompt.startsWith("Answer the project question below.")) {
                     var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1).lines().findFirst().orElseThrow()));
                     String instruction = (String) input.get("instruction");
+                    if (instruction.equals("check command")) {
+                        context.sendMessage(MiniJson.stringify(java.util.Map.of("reason", "Run deterministic failing check", "commands", List.of(java.util.Map.of(
+                            "argv", AcpConnectionTest.javaCommand(AgentCheckFixture.class.getName(), "fail"), "directory", ".", "timeoutSeconds", 10)))));
+                        return PromptResponse.endTurn();
+                    }
                     if (instruction.startsWith("malformed")) {
                         repair.set(instruction.equals("malformed once") ? "{\"answer\":\"Corrected answer\",\"locations\":[]}"
                             : instruction.equals("malformed cancel") ? "cancel" : "still not JSON");

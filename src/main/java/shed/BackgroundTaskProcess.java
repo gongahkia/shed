@@ -42,6 +42,10 @@ final class BackgroundTaskProcess {
         private final CompletableFuture<CommandResult> completion = new CompletableFuture<>();
         private final CompletableFuture<Void> ready = new CompletableFuture<>();
         private boolean truncated;
+        private record Child(ProcessHandle handle, java.time.Instant started) {
+            boolean owned() { return handle.isAlive() && java.util.Objects.equals(started, handle.info().startInstant().orElse(null)); }
+        }
+        private final java.util.concurrent.ConcurrentMap<Long, Child> children = new java.util.concurrent.ConcurrentHashMap<>();
         private String readinessTail = "";
 
         private Running(Process process, int outputLimit, String readinessMarker) {
@@ -94,7 +98,34 @@ final class BackgroundTaskProcess {
             }
         }
 
+        CommandResult awaitCompletion(AsyncJobService.JobToken token, int timeoutMs) {
+            if (token != null) token.onCancel(this::stop);
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
+            try {
+                while (true) {
+                    captureChildren();
+                    if (token != null && token.isCancelled()) { stop(); return new CommandResult(-1, output(), "Process cancelled"); }
+                    if (System.nanoTime() >= deadline) { stop(); return new CommandResult(-1, output(), "Process timed out after " + timeoutMs + "ms"); }
+                    try { return completion.get(50, TimeUnit.MILLISECONDS); }
+                    catch (TimeoutException waiting) { /* Keep collecting owned descendants until the command finishes. */ }
+                }
+            } catch (InterruptedException interrupted) {
+                stop(); Thread.currentThread().interrupt(); return new CommandResult(-1, output(), "Process interrupted");
+            } catch (ExecutionException failed) { stop(); return new CommandResult(-1, output(), "Process failed: " + failed.getCause()); }
+            finally { stopChildren(); }
+        }
+        private void captureChildren() {
+            process.descendants().limit(257).forEach(child -> children.putIfAbsent(child.pid(), new Child(child, child.info().startInstant().orElse(null))));
+            children.entrySet().removeIf(entry -> !entry.getValue().owned());
+            if (children.size() > 256) stop();
+        }
+        private void stopChildren() {
+            for (Child child : children.values()) if (child.owned()) child.handle().destroyForcibly();
+        }
         void stop() {
+            // Capture before terminating the parent; children can be reparented afterward.
+            process.descendants().limit(257).forEach(child -> children.putIfAbsent(child.pid(), new Child(child, child.info().startInstant().orElse(null))));
+            stopChildren();
             if (process.isAlive()) process.destroyForcibly();
         }
 
@@ -110,7 +141,8 @@ final class BackgroundTaskProcess {
         private void completeWhenExited(Thread reader) {
             try {
                 int exitCode = process.waitFor();
-                reader.join();
+                reader.join(1000);
+                if (reader.isAlive()) { stopChildren(); reader.join(500); }
                 if (!readinessMarker.isBlank() && !ready.isDone()) {
                     ready.completeExceptionally(new IOException("background task exited before reporting ready_when marker: " + readinessMarker));
                 }

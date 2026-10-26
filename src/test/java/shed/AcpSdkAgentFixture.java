@@ -14,7 +14,26 @@ public final class AcpSdkAgentFixture {
             .loadSessionHandler(request -> new LoadSessionResponse(null))
             .promptHandler((request, context) -> {
                 String prompt = ((TextContent) request.prompt().getFirst()).text();
-                if (prompt.startsWith("Edit only the selected code")) {
+                if (prompt.startsWith("Propose changes for the project task below.")) {
+                    var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1)));
+                    String instruction = (String) input.get("instruction"), summary = "Echo: " + instruction;
+                    List<?> changes = List.of();
+                    if (instruction.equals("read")) summary = context.readFile(args[0]);
+                    else if (instruction.equals("write")) {
+                        String before = context.readFile(args[0]); summary = "Proposed source update and a helper file.";
+                        changes = List.of(java.util.Map.of("kind", "edit", "path", "source", "edits", List.of(java.util.Map.of("before", before, "after", "agent write\n"))),
+                            java.util.Map.of("kind", "create", "path", "helper", "text", "new helper\n"));
+                    } else if (instruction.equals("permission") || instruction.equals("execute")) {
+                        var decision = context.client().requestPermission(new RequestPermissionRequest(context.getSessionId(),
+                            new ToolCallUpdate("tool-1", "Fixture action", instruction.equals("execute") ? ToolKind.EXECUTE : ToolKind.READ, ToolCallStatus.PENDING),
+                            List.of(new PermissionOption("allow", "Allow once", PermissionOptionKind.ALLOW_ONCE),
+                                new PermissionOption("deny", "Reject once", PermissionOptionKind.REJECT_ONCE))));
+                        if (decision.outcome() instanceof PermissionCancelled) return PromptResponse.cancelled();
+                        summary = "Decision: " + ((PermissionSelected) decision.outcome()).optionId();
+                    }
+                    context.sendMessage(MiniJson.stringify(java.util.Map.of("summary", summary, "changes", changes)));
+                }
+                else if (prompt.startsWith("Edit only the selected code")) {
                     var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1)));
                     if ("wait for cancellation".equals(input.get("instruction"))) {
                         var decision = context.client().requestPermission(new RequestPermissionRequest(context.getSessionId(),

@@ -41,10 +41,10 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private WorkspaceDocumentSource boundDocuments;
     private String resultProposal = "";
     private int actionJob = -1;
-    private record ActionResult(String proposal, AgentAnswer answer) { }
+    private record ActionResult(String proposal, AgentAnswer answer, String summary) { }
     private final JTextField resume = named(new JTextField(), "resume");
     private final JCheckBox foreground = named(new JCheckBox("Allow sign-in windows"), "foreground");
-    private final JCheckBox reviewWrites = named(new JCheckBox("Review file writes through Shed", true), "reviewWrites");
+    private final JCheckBox reviewWrites = named(new JCheckBox("Allow proposed changes", true), "reviewWrites");
     private final JTextArea transcript = area("transcript", false), prompt = area("prompt", true), diagnostics = area("diagnostics", false), permissionDetails = area("permissionDetails", false);
     private final JScrollPane conversation = new JScrollPane(transcript);
     private final JLabel status = named(new JLabel("Choose a configured agent to start a conversation."), "status");
@@ -130,10 +130,10 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         setup.add(new JLabel("Connect starts that local program in the workspace shown above."));
         setup.add(new JLabel("The program retains its operating-system access; Shed does not sandbox it."));
         setup.add(row(new JLabel("Resume session ID (optional)"), resume)); setup.add(reviewWrites); setup.add(foreground);
-        reviewWrites.setToolTipText("File writes wait for your approval in Review changes. Disable before connecting for read-only access through Shed.");
+        reviewWrites.setToolTipText("Enable Edit selection and Run task. Proposed changes need your approval in Review changes. Disable before connecting to use Ask/search only.");
         foreground.setToolTipText("Enable before connecting to allow explicit sign-in requests. Stop and reconnect to change this permission.");
         setup.add(row(new JLabel("Authentication"), authMethods, authenticate, begin));
-        setup.add(new JLabel("Writes through Shed require review. Terminal requests are unavailable."));
+        setup.add(new JLabel("Actions propose changes for review. They do not run shell commands."));
         JPanel details = new JPanel(new BorderLayout(8, 8)); details.add(setup, BorderLayout.NORTH); details.add(new JScrollPane(diagnostics), BorderLayout.CENTER);
         views.addTab("Connection", details); panel.add(views, BorderLayout.CENTER);
         prompt.setRows(3); transcript.setLineWrap(true); transcript.setWrapStyleWord(true); prompt.setLineWrap(true); prompt.setWrapStyleWord(true);
@@ -245,14 +245,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         if (active == null || busy || submitting || active.snapshot().state() != AgentSessionService.State.IDLE) return;
         String text = prompt.getText(); if (text.isBlank()) { message("Enter a message first."); return; }
         AgentAction action = (AgentAction) actionChoice.getSelectedItem();
-        if (action != AgentAction.RUN) { sendFocused(action, text); return; }
-        if (text.length() > 65536) { message("This message is too long; shorten it to 65,536 characters or fewer."); return; }
-        long request = generation; AgentSessionService session = active;
-        operation("Agent prompt", true, current -> {
-            var reply = current.prompt(text);
-            SwingUtilities.invokeLater(() -> { if (generation == request && active == session && prompt.getText().equals(text)) prompt.setText(""); });
-            return reply;
-        });
+        sendFocused(action, text);
     }
     private void cancel() {
         if (actionJob >= 0) { jobs.cancel(actionJob); notice = "Cancelling action…"; refresh(); return; }
@@ -266,27 +259,28 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private void sendFocused(AgentAction action, String instruction) {
         Supplier<AgentSelection> selection = capturedSelection;
         if (action == AgentAction.EDIT && selection == null) { message("Select code, then press Use current selection."); return; }
-        if (action == AgentAction.EDIT && (boundSessions == null || !active.policy().capabilities().contains(AgentPolicy.Capability.PROPOSE))) {
-            message("Connect with reviewed changes enabled before proposing an edit."); return;
+        if (action != AgentAction.ASK && (boundSessions == null || !active.policy().capabilities().contains(AgentPolicy.Capability.PROPOSE))) {
+            message("Connect with reviewed changes enabled before proposing changes."); return;
         }
         long request = generation; AgentSessionService session = active;
         Path root = boundRoot, storage = boundSessions; WorkspaceDocumentSource documents = boundDocuments;
         submitting = true; notice = "Preparing " + action.toString().toLowerCase(java.util.Locale.ROOT) + "…";
-        locations.clear(); referencesPanel.setVisible(false); controls(session.snapshot());
+        locations.clear(); resultProposal = ""; referencesPanel.setVisible(false); controls(session.snapshot());
         var proposalOwner = new java.util.concurrent.atomic.AtomicReference<WorkspaceProposalService>();
         var proposalId = new java.util.concurrent.atomic.AtomicReference<String>("");
         actionJob = jobs.submitLongRunning(action.toString(), token -> {
             var queries = new WorkspaceQueryService(root, session.policy(), documents);
             AgentSelection target = action == AgentAction.EDIT ? selection.get() : null;
+            AgentTaskPlan task = action == AgentAction.RUN ? AgentTaskPlan.capture(queries, token::isCancelled) : null;
             if (target != null) {
                 queries.checkWorkspace(target.document().workspaceId());
                 queries.policy().require(AgentPolicy.Capability.PROPOSE);
                 if (target.document().uri() != null) queries.policy().checkPath(queries.root().relativize(
                     WorkspacePaths.resolve(queries.root(), target.document().uri())), AgentPolicy.Capability.PROPOSE);
-                proposalOwner.set(new WorkspaceProposalService(queries, documents instanceof WorkspaceDocumentEditor editor ? editor : null,
-                    storage.resolve("agent-workspace").resolve(queries.workspaceId()), "focused:" + java.util.UUID.randomUUID()));
             }
-            String wire = target == null ? AgentAnswer.prompt(instruction, queries, token::isCancelled) : target.prompt(instruction);
+            if (action != AgentAction.ASK) proposalOwner.set(new WorkspaceProposalService(queries, documents instanceof WorkspaceDocumentEditor editor ? editor : null,
+                storage.resolve("agent-workspace").resolve(queries.workspaceId()), "focused:" + java.util.UUID.randomUUID()));
+            String wire = task != null ? task.prompt(instruction) : target == null ? AgentAnswer.prompt(instruction, queries, token::isCancelled) : target.prompt(instruction);
             if (token.isCancelled()) throw new java.util.concurrent.CancellationException();
             var pending = session.actionPrompt(instruction, wire, false);
             token.onCancel(() -> background(() -> {
@@ -303,11 +297,18 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             var reply = pending.get();
             if (token.isCancelled() || reply.stopReason().equals("cancelled")) throw new java.util.concurrent.CancellationException();
             if (!reply.stopReason().equals("end_turn")) throw new IllegalArgumentException("Agent stopped without a complete result: " + reply.stopReason());
-            if (target == null) return new ActionResult("", AgentAnswer.parse(reply.text(), queries));
-            var proposal = target.propose(proposalOwner.get(), java.util.UUID.randomUUID().toString(), reply.turnId(), reply.text());
-            String id = (String) proposal.get("id"); proposalId.set(id);
+            if (action == AgentAction.ASK) return new ActionResult("", AgentAnswer.parse(reply.text(), queries), "");
+            String id, summary;
+            if (task != null) {
+                var result = task.propose(proposalOwner.get(), java.util.UUID.randomUUID().toString(), reply.turnId(), reply.text());
+                id = result.proposal(); summary = result.summary();
+            } else {
+                var proposal = target.propose(proposalOwner.get(), java.util.UUID.randomUUID().toString(), reply.turnId(), reply.text());
+                id = (String) proposal.get("id"); summary = "Selection change proposed.";
+            }
+            proposalId.set(id);
             if (token.isCancelled()) { withdraw(proposalOwner.get(), id); throw new java.util.concurrent.CancellationException(); }
-            return new ActionResult(id, null);
+            return new ActionResult(id, null, summary);
         }, (job, result, error) -> {
             if (generation != request || active != session || disposed) { if (result != null) background(() -> withdraw(proposalOwner.get(), result.proposal())); return; }
             actionJob = -1; submitting = false;
@@ -315,14 +316,16 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                 background(() -> withdraw(proposalOwner.get(), proposalId.get())); notice = "Action cancelled.";
             } else if (error != null) notice = failure(error);
             else if (result != null && !result.proposal().isEmpty()) {
-                resultProposal = result.proposal(); notice = "Selection change is ready in Review changes.";
-                append("\n[Selection change proposed. Review changes before applying.]\n");
+                resultProposal = result.proposal(); notice = "Proposed changes are ready in Review changes.";
+                append("\nProposal\n" + result.summary() + "\n[Review changes before applying.]\n");
             } else if (result != null && result.answer() != null) {
                 var answer = result.answer(); append("\nAnswer\n" + answer.text() + "\n");
                 answer.locations().forEach(locations::addElement);
                 referencesPanel.setVisible(!locations.isEmpty());
                 notice = answer.omittedLocations() > 0 ? answer.omittedLocations() + " unavailable references omitted."
                     : locations.isEmpty() ? "Answer complete · no code locations returned." : "Answer complete · choose a code location below.";
+            } else if (result != null) {
+                append("\nTask result\n" + result.summary() + "\n"); notice = "Task complete · no changes proposed.";
             }
             refresh();
         });

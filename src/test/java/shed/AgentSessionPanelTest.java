@@ -44,7 +44,7 @@ class AgentSessionPanelTest {
         Path root = prepare("project"), file = Files.writeString(root.resolve("source"), "saved\r\n");
         FileBuffer buffer = new FileBuffer(file.toFile());
         try (var editor = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
-            edt(() -> buffer.replaceContentUndoably("unsaved human text\n")); scope.set(new AgentSessionPanel.Scope(root, editor));
+            edt(() -> buffer.replaceContentUndoably("unsaved human text\n")); scope.set(new AgentSessionPanel.Scope(root, editor, temporary.resolve("sessions")));
             open(); connect(); Path other = Files.createDirectory(temporary.resolve("other"));
             edt(() -> {
                 scope.set(new AgentSessionPanel.Scope(other, WorkspaceDocumentSource.diskOnly())); panel.refresh();
@@ -80,7 +80,7 @@ class AgentSessionPanelTest {
         await(() -> button("send").isEnabled() && text("transcript").getText().contains("Decision: allow"));
         send("execute"); await(() -> button("respond").isEnabled());
         edt(() -> { combo("options").setSelectedIndex(0); button("respond").doClick(); });
-        await(() -> status().getText().contains("Capability is not granted"));
+        await(() -> status().getText().contains("only permits reading and searching"));
         assertEquals(1, owned.getFirst().snapshot().permissions().size());
         edt(() -> button("cancel").doClick());
         await(() -> button("send").isEnabled() && text("transcript").getText().contains("[Cancelled]"));
@@ -140,7 +140,7 @@ class AgentSessionPanelTest {
         assertEquals(2, owned.size()); assertTrue(owned.getLast().policy().capabilities().contains(AgentPolicy.Capability.OPEN_UI));
     }
 
-    @Test void sdkWriteWaitsForTheActualReviewControlsAndKeepsTheBufferUnsaved() throws Exception {
+    @Test void taskCreatesOneMultiFileProposalAndActualReviewKeepsTheBufferUnsaved() throws Exception {
         Path root = prepare("project"), file = Files.writeString(root.resolve("source"), "disk\n"), sessions = temporary.resolve("sessions");
         FileBuffer buffer = new FileBuffer(file.toFile());
         try (var documents = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
@@ -152,10 +152,10 @@ class AgentSessionPanelTest {
                     () -> new Font(Font.DIALOG, Font.PLAIN, 13), () -> new Font(Font.MONOSPACED, Font.PLAIN, 13)));
                 panel.onReview(id -> { opened.set(true); review.get().showProposal(id); });
             });
-            send("write"); await(() -> button("review").isEnabled() && !owned.getFirst().snapshot().writes().getFirst().proposal().isEmpty());
+            send("write"); await(() -> button("review").isEnabled() && button("send").isEnabled());
             edt(() -> {
                 assertFalse(opened.get()); assertEquals(0, tabs().getSelectedIndex()); assertTrue(status().getText().contains("Review changes"));
-                assertFalse(text("transcript").getText().contains("After write")); button("review").doClick();
+                assertFalse(Files.exists(root.resolve("helper"))); assertEquals("human draft\n", buffer.getContent()); button("review").doClick();
             });
             await(() -> ((JButton) find(review.get().component(), "agent.apply")).isEnabled());
             edt(() -> {
@@ -163,8 +163,9 @@ class AgentSessionPanelTest {
                 assertEquals("agent write\n", ((JTextArea) find(review.get().component(), "agent.proposed")).getText());
                 ((JButton) find(review.get().component(), "agent.apply")).doClick();
             });
-            await(() -> button("send").isEnabled() && text("transcript").getText().contains("After write: agent write"));
+            await(() -> buffer.getContent().equals("agent write\n"));
             assertEquals("agent write\n", documents.snapshots().getFirst().content()); assertEquals("disk\n", Files.readString(file));
+            assertEquals("new helper\n", Files.readString(root.resolve("helper")));
             assertTrue(buffer.isModified()); assertTrue(opened.get());
         }
     }
@@ -174,7 +175,7 @@ class AgentSessionPanelTest {
         scope.set(new AgentSessionPanel.Scope(root, WorkspaceDocumentSource.diskOnly(), temporary.resolve("sessions"))); open();
         edt(() -> ((JCheckBox) find(panel.component(), "agent.session.reviewWrites")).setSelected(false));
         connect(); send("write");
-        await(() -> button("send").isEnabled() && !owned.getFirst().snapshot().error().isBlank());
+        await(() -> button("send").isEnabled() && status().getText().contains("reviewed changes enabled"));
         assertEquals("human\n", Files.readString(file)); assertTrue(owned.getFirst().snapshot().writes().isEmpty());
         assertFalse(Files.exists(temporary.resolve("sessions")));
         assertFalse(owned.getFirst().policy().capabilities().contains(AgentPolicy.Capability.PROPOSE));
@@ -257,7 +258,7 @@ class AgentSessionPanelTest {
     }
 
     private Path prepare(String name) throws Exception {
-        Path root = Files.createDirectory(temporary.resolve(name)); scope.set(new AgentSessionPanel.Scope(root, WorkspaceDocumentSource.diskOnly()));
+        Path root = Files.createDirectory(temporary.resolve(name)); scope.set(new AgentSessionPanel.Scope(root, WorkspaceDocumentSource.diskOnly(), temporary.resolve("sessions")));
         provider.set(new AgentProvider("fixture", AcpConnectionTest.javaCommand(AcpSdkAgentFixture.class.getName(), root.resolve("source").toString()),
             Map.of(), Duration.ofSeconds(15), Duration.ofSeconds(20))); return root;
     }

@@ -30,7 +30,13 @@ public class LspServiceTest {
             var messages = Files.readAllLines(log).stream().map(MiniJson::parseStrict).map(MiniJson::asObject).toList();
             assertEquals(List.of("textDocument/didOpen", "textDocument/didClose"), messages.stream().map(message -> message.get("method")).toList());
             assertEquals(Map.of("textDocument", Map.of("uri", uri)), messages.getLast().get("params"));
-        } finally { client.stop(); Files.deleteIfExists(log); Files.deleteIfExists(workspace); }
+        } finally {
+            client.stop();
+            long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+            while (client.isAlive() && System.nanoTime() < deadline) Thread.sleep(10);
+            assertFalse(client.isAlive(), "Language server must exit before deleting its Windows working directory");
+            Files.deleteIfExists(log); Files.deleteIfExists(workspace);
+        }
     }
 
     @Test

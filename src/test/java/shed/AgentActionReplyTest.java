@@ -11,6 +11,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 class AgentActionReplyTest {
     @TempDir Path temporary;
+    private final java.util.ArrayList<AgentSessionService> sessions = new java.util.ArrayList<>();
+
+    @org.junit.jupiter.api.AfterEach void awaitProcessExit() throws Exception {
+        for (var session : sessions) { session.close(); session.termination().get(10, TimeUnit.SECONDS); }
+    }
 
     @Test void focusedReplyCollectsChunksAndKeepsTransportContextOutOfTheUserPrompt() throws Exception {
         Path root = Files.createDirectory(temporary.resolve("project"));
@@ -71,7 +76,8 @@ class AgentActionReplyTest {
             AgentPolicy.Capability.PROPOSE, AgentPolicy.Capability.START_AGENT), List.of("**/README.md"), List.of(), true), WorkspaceDocumentSource.diskOnly());
         var provider = new AgentProvider("fixture", AcpConnectionTest.javaCommand(AcpSdkAgentFixture.class.getName(), root.resolve("source").toString()),
             java.util.Map.of(), java.time.Duration.ofSeconds(15), java.time.Duration.ofSeconds(20));
-        return new AgentSessionService(provider, workspace, null, temporary.resolve("state"));
+        var session = new AgentSessionService(provider, workspace, null, temporary.resolve("state"));
+        sessions.add(session); return session;
     }
     private void connect(AgentSessionService session) throws Exception {
         session.initialize().get(15, TimeUnit.SECONDS); session.newSession().get(10, TimeUnit.SECONDS);

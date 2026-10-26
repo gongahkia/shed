@@ -36,6 +36,10 @@ public final class AcpFixtureProcess {
                     send(Map.of("jsonrpc", "2.0", "id", "blocked-" + i, "method", "permission", "params", Map.of()));
                     Thread.sleep(2);
                     send(Map.of("jsonrpc", "2.0", "method", "$/cancel_request", "params", Map.of("requestId", "blocked-" + i)));
+                    // Drain each cancellation/rejection response. Otherwise small Windows
+                    // pipes test output backpressure rather than the handler-thread bound.
+                    var response = MiniJson.asObject(MiniJson.parseStrict(reader.readLine()));
+                    if (!("blocked-" + i).equals(response.get("id"))) throw new IllegalStateException("Unexpected storm response");
                 }
                 reply(request.get("id"), Map.of());
             } else if (method.equals("pending")) {

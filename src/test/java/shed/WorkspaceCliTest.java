@@ -51,7 +51,8 @@ class WorkspaceCliTest {
         String request = WorkspaceRpcTest.request("headless", "workspace/info", Map.of());
         String executable = Path.of(System.getProperty("java.home"), "bin", System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString();
         Process process = startIsolated(new ProcessBuilder(executable, "-Djava.awt.headless=true", "-cp", System.getProperty("java.class.path"),
-            "shed.Texteditor", "--workspace-api", "--root", root.toString(), "--request", request));
+            "shed.Texteditor", "--workspace-api", "--root", root.toString(), "--stdio"));
+        sendRequest(process, request);
         try {
             assertTrue(process.waitFor(30, TimeUnit.SECONDS), "Headless workspace entry must exit without a window/event loop");
             String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -72,9 +73,10 @@ class WorkspaceCliTest {
         String request = WorkspaceRpcTest.request("search", "search/text", Map.of("workspaceId", WorkspacePaths.id(project), "query", "needle"));
         String executable = Path.of(System.getProperty("java.home"), "bin", System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString();
         ProcessBuilder builder = new ProcessBuilder(executable, "-Djava.awt.headless=true", "-Duser.home=" + home, "-cp", System.getProperty("java.class.path"),
-            "shed.Texteditor", "--workspace-api", "--root", project.toString(), "--request", request);
+            "shed.Texteditor", "--workspace-api", "--root", project.toString(), "--stdio");
         builder.environment().put("PATH", root.resolve("no-executables").toString());
         Process process = startIsolated(builder);
+        sendRequest(process, request);
         try {
             assertTrue(process.waitFor(30, TimeUnit.SECONDS), "Headless search must exit");
             String errors = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -105,7 +107,8 @@ class WorkspaceCliTest {
     private static Map<String, Object> filePage(Path root, Map<String, Object> params) throws Exception {
         String executable = Path.of(System.getProperty("java.home"), "bin", System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString();
         Process process = startIsolated(new ProcessBuilder(executable, "-Djava.awt.headless=true", "-cp", System.getProperty("java.class.path"),
-            "shed.Texteditor", "--workspace-api", "--root", root.toString(), "--request", WorkspaceRpcTest.request(1, "files/list", params)));
+            "shed.Texteditor", "--workspace-api", "--root", root.toString(), "--stdio"));
+        sendRequest(process, WorkspaceRpcTest.request(1, "files/list", params));
         try {
             assertTrue(process.waitFor(30, TimeUnit.SECONDS));
             String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -119,6 +122,12 @@ class WorkspaceCliTest {
         // banners on stderr and would contaminate assertions about the application's diagnostics.
         for (String name : java.util.List.of("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")) builder.environment().remove(name);
         return builder.start();
+    }
+
+    private static void sendRequest(Process process, String request) throws java.io.IOException {
+        // Exercise the real stdio entry point without Windows command-line JSON quote removal.
+        // The in-process tests above cover one-shot request parsing and exit codes separately.
+        try (var input = process.getOutputStream()) { input.write((request + "\n").getBytes(StandardCharsets.UTF_8)); }
     }
 
     private String[] args() { return new String[]{"--workspace-api", "--root", root.toString(), "--stdio"}; }

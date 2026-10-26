@@ -130,6 +130,19 @@
     </plugins>
   </build>
   <dependencies>
+    <!-- Independent ACP peer for interoperability tests; excluded from the shipped editor. -->
+    <dependency>
+      <groupId>com.agentclientprotocol</groupId>
+      <artifactId>acp-core</artifactId>
+      <version>0.80.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.agentclientprotocol</groupId>
+      <artifactId>acp-json-jackson2</artifactId>
+      <version>0.80.0</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.eclipse.jgit</groupId>
       <artifactId>org.eclipse.jgit</artifactId>

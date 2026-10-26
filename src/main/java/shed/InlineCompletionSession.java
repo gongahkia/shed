@@ -1,8 +1,5 @@
 package shed;
 
-import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
 import java.beans.PropertyChangeListener;
@@ -23,6 +20,7 @@ import javax.swing.text.Document;
 /** EDT-owned preview. Model output never enters the document until explicit acceptance. */
 final class InlineCompletionSession implements AutoCloseable {
     private final JTextArea area;
+    private final InlineCompletionDisplay display;
     private final BooleanSupplier eligible;
     private final BiFunction<String, String, CompletableFuture<String>> provider;
     private final Consumer<String> insertion, errors;
@@ -54,6 +52,7 @@ final class InlineCompletionSession implements AutoCloseable {
                             Consumer<String> insertion, Consumer<String> errors) {
         this.area = area; this.eligible = eligible; this.delay = delay; this.provider = provider;
         this.insertion = insertion; this.errors = errors;
+        display = new InlineCompletionDisplay(area);
         timer = new Timer(500, event -> request()); timer.setRepeats(false);
         bind(); area.addCaretListener(caret); area.addFocusListener(focus); area.addPropertyChangeListener(binding);
     }
@@ -101,13 +100,19 @@ final class InlineCompletionSession implements AutoCloseable {
                 pending = null;
                 if (error != null) { if (!(error instanceof java.util.concurrent.CancellationException)) errors.accept("Inline suggestion unavailable. Check the local Ollama model and settings."); return; }
                 if (text == null || text.isEmpty() || text.length() > OllamaCompletionClient.MAX_COMPLETION) return;
-                suggestion = new Suggestion(document, revision, offset, text); area.repaint();
+                try {
+                    display.show(offset, text); suggestion = new Suggestion(document, revision, offset, text); area.repaint();
+                } catch (BadLocationException unavailable) { display.clear(); }
             }));
         } catch (BadLocationException | RuntimeException unavailable) { errors.accept("Inline suggestion unavailable. Check the local Ollama model and settings."); }
     }
 
-    boolean visible() { return suggestion != null && suggestion.document() == document && suggestion.revision() == revision
-        && suggestion.caret() == area.getCaretPosition() && canRequest(); }
+    boolean visible() {
+        boolean valid = suggestion != null && suggestion.document() == document && suggestion.revision() == revision
+            && suggestion.caret() == area.getCaretPosition() && canRequest();
+        if (!valid) display.clear();
+        return valid;
+    }
     String preview() { return visible() ? suggestion.text() : ""; }
 
     boolean accept() {
@@ -132,39 +137,9 @@ final class InlineCompletionSession implements AutoCloseable {
 
     private void invalidate() {
         generation++; timer.stop(); suggestion = null;
+        display.clear();
         var previous = pending; pending = null; if (previous != null) previous.cancel(true);
         area.repaint();
-    }
-
-    /** Draw an insertion preview without changing text, selection, undo history or document geometry. */
-    void paint(Graphics graphics) {
-        if (!visible()) return;
-        try {
-            var anchor = area.modelToView2D(suggestion.caret()); if (anchor == null) return;
-            Graphics2D g = (Graphics2D) graphics.create();
-            try {
-                var viewport = area.getVisibleRect(); g.clip(viewport); g.setFont(area.getFont());
-                var metrics = g.getFontMetrics(); int lineHeight = metrics.getHeight();
-                String[] lines = suggestion.text().split("\n", -1);
-                int x = (int) anchor.getX(), y = (int) anchor.getY();
-                int left = area.getInsets().left;
-                Color foreground = area.getForeground(), background = area.getBackground();
-                Color ghost = new Color((foreground.getRed() + background.getRed()) / 2,
-                    (foreground.getGreen() + background.getGreen()) / 2, (foreground.getBlue() + background.getBlue()) / 2);
-                for (int i = 0; i < lines.length && y < viewport.y + viewport.height; i++, y += lineHeight) {
-                    int at = i == 0 ? x : left;
-                    String line = lines[i].replace("\t", " ".repeat(Math.max(1, area.getTabSize())));
-                    g.setColor(background); g.fillRect(at, y, Math.max(0, viewport.x + viewport.width - at), lineHeight);
-                    g.setColor(ghost); g.drawString(line, at, y + metrics.getAscent());
-                    if (i == lines.length - 1) {
-                        int lineEnd = Math.min(document.getLength(), area.getLineEndOffset(area.getLineOfOffset(suggestion.caret())));
-                        String suffix = document.getText(suggestion.caret(), lineEnd - suggestion.caret()).replace("\n", "");
-                        g.setColor(foreground); g.drawString(suffix, at + metrics.stringWidth(line), y + metrics.getAscent());
-                    }
-                }
-                g.setColor(area.getCaretColor()); g.drawLine(x, (int) anchor.getY(), x, (int) anchor.getY() + lineHeight - 1);
-            } finally { g.dispose(); }
-        } catch (BadLocationException ignored) { }
     }
 
     @Override public void close() {

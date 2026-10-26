@@ -39,13 +39,13 @@ class InlineCompletionSessionTest {
         open("return ;", 7); UndoManager undo = new UndoManager();
         edt(() -> { area.getDocument().addUndoableEditListener(undo); session.request(); });
         assertEquals(List.of("return |;"), contexts);
+        var before = new BufferedImage(600, 300, BufferedImage.TYPE_INT_ARGB);
+        edt(() -> { var graphics = before.createGraphics(); area.paint(graphics); graphics.dispose(); });
         requests.getFirst().complete("answer\n    + 1"); flush();
         edt(() -> {
             assertEquals("answer\n    + 1", session.preview()); assertEquals("return ;", area.getText()); assertFalse(undo.canUndo());
-            var before = new BufferedImage(600, 300, BufferedImage.TYPE_INT_ARGB);
             var after = new BufferedImage(600, 300, BufferedImage.TYPE_INT_ARGB);
-            var base = before.createGraphics(); area.paint(base); base.dispose();
-            var graphics = after.createGraphics(); area.paint(graphics); session.paint(graphics); graphics.dispose();
+            var graphics = after.createGraphics(); area.paint(graphics); graphics.dispose();
             assertFalse(java.util.Arrays.equals(before.getRGB(0, 0, 600, 300, null, 0, 600), after.getRGB(0, 0, 600, 300, null, 0, 600)));
             assertEquals("return ;", area.getText()); assertEquals(7, area.getCaretPosition());
             assertTrue(session.accept()); assertEquals("return answer\n    + 1;", area.getText());

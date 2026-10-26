@@ -371,7 +371,9 @@ final class EditorUiController {
                 if (g instanceof Graphics2D graphics) {
                     applyEditorTextRenderingHints(graphics);
                 }
+                boolean inlinePreview = editor.hasAiCompletion(this);
                 super.paintComponent(g);
+                if (inlinePreview) { editorPainted(this, paintStartedAt); return; }
                 FontMetrics fm = g.getFontMetrics(getFont());
                 int charW = fm.charWidth(' ');
                 int lineH = fm.getHeight();
@@ -423,7 +425,6 @@ final class EditorUiController {
                 if (getLineWrap()) paintWrapIndicators(g, this);
                 paintColorPreviews(g, this);
                 paintExplorerFileDropPreview(g, this);
-                editor.paintAiCompletion(g, this);
                 editorPainted(this, paintStartedAt);
             }
         };

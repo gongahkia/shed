@@ -1,6 +1,5 @@
 package shed;
 
-import java.awt.Graphics;
 import java.awt.event.KeyEvent;
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -85,7 +84,7 @@ final class InlineCompletionController implements AutoCloseable {
     }
 
     void dismiss() { sessions.values().forEach(InlineCompletionSession::dismiss); }
-    void paint(Graphics graphics, JTextArea area) { var session = sessions.get(area); if (session != null) session.paint(graphics); }
+    boolean visible(JTextArea area) { var session = sessions.get(area); return session != null && session.visible(); }
     void remove(JTextArea area) { var session = sessions.remove(area); if (session != null) session.close(); }
     @Override public void close() {
         sessions.values().forEach(InlineCompletionSession::close); sessions.clear();

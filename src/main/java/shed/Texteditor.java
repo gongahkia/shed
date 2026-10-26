@@ -247,7 +247,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void installAiCompletion(JTextArea area) { if (inlineCompletionController != null) inlineCompletionController.install(area); }
     void disposeAiCompletion(JTextArea area) { if (inlineCompletionController != null) inlineCompletionController.remove(area); }
-    void paintAiCompletion(Graphics graphics, JTextArea area) { if (inlineCompletionController != null) inlineCompletionController.paint(graphics, area); }
+    boolean hasAiCompletion(JTextArea area) { return inlineCompletionController != null && inlineCompletionController.visible(area); }
     boolean handleAiCompletionKey(KeyEvent event) { return inlineCompletionController != null && inlineCompletionController.keyPressed(event); }
     boolean allowsAiCompletion() { return inputController != null && inputController.allowsAiCompletion(); }
     void dismissAiCompletion() { if (inlineCompletionController != null) inlineCompletionController.dismiss(); }

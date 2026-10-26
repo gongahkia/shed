@@ -373,7 +373,10 @@ final class EditorUiController {
                 }
                 boolean inlinePreview = editor.hasAiCompletion(this);
                 super.paintComponent(g);
-                if (inlinePreview) { editorPainted(this, paintStartedAt); return; }
+                if (inlinePreview) {
+                    editor.perfService.recordDuration("ai.complete.paint", paintStartedAt, "virtual insertion");
+                    editorPainted(this, paintStartedAt); return;
+                }
                 FontMetrics fm = g.getFontMetrics(getFont());
                 int charW = fm.charWidth(' ');
                 int lineH = fm.getHeight();

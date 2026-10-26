@@ -31,6 +31,7 @@ final class InlineCompletionSession implements AutoCloseable {
     private CompletableFuture<String> pending;
     private Suggestion suggestion;
     private boolean closed, accepting;
+    private java.util.function.BiConsumer<String, Long> timings = (stage, nanos) -> { };
     private record Suggestion(Document document, long revision, int caret, String text) { }
 
     private final DocumentListener changes = new DocumentListener() {
@@ -78,6 +79,7 @@ final class InlineCompletionSession implements AutoCloseable {
     private boolean canRequest() {
         return !closed && area.isEditable() && area.isEnabled() && area.getSelectionStart() == area.getSelectionEnd() && eligible.getAsBoolean();
     }
+    void onTiming(java.util.function.BiConsumer<String, Long> listener) { timings = java.util.Objects.requireNonNull(listener); }
 
     void request() {
         dismiss(); if (!canRequest()) return;
@@ -93,6 +95,7 @@ final class InlineCompletionSession implements AutoCloseable {
             if (!context.isEmpty() && Character.isHighSurrogate(context.charAt(context.length() - 1))) context = context.substring(0, context.length() - 1);
             if (relative < 0 || relative > context.length()) return;
             long request = generation, capturedRevision = revision; Document capturedDocument = document;
+            long started = System.nanoTime();
             pending = provider.apply(context.substring(0, relative), context.substring(relative));
             pending.whenComplete((text, error) -> SwingUtilities.invokeLater(() -> {
                 if (closed || request != generation || capturedDocument != document || capturedRevision != revision
@@ -101,7 +104,10 @@ final class InlineCompletionSession implements AutoCloseable {
                 if (error != null) { if (!(error instanceof java.util.concurrent.CancellationException)) errors.accept("Inline suggestion unavailable. Check the local Ollama model and settings."); return; }
                 if (text == null || text.isEmpty() || text.length() > OllamaCompletionClient.MAX_COMPLETION) return;
                 try {
+                    long layoutStarted = System.nanoTime();
                     display.show(offset, text); suggestion = new Suggestion(document, revision, offset, text); area.repaint();
+                    timings.accept("layout", System.nanoTime() - layoutStarted);
+                    timings.accept("ready", System.nanoTime() - started);
                 } catch (BadLocationException unavailable) { display.clear(); }
             }));
         } catch (BadLocationException | RuntimeException unavailable) { errors.accept("Inline suggestion unavailable. Check the local Ollama model and settings."); }

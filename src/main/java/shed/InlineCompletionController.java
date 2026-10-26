@@ -18,12 +18,16 @@ final class InlineCompletionController implements AutoCloseable {
 
     void install(JTextArea area) {
         if (sessions.containsKey(area)) return;
-        sessions.put(area, new InlineCompletionSession(area, () -> eligible(area), this::delay, this::complete,
+        var session = new InlineCompletionSession(area, () -> eligible(area), this::delay, this::complete,
             text -> {
                 area.replaceSelection(text);
                 editor.lastInsertedText += text;
                 editor.requestStatusBarRefresh();
-            }, message -> { if (!message.equals(lastError)) { lastError = message; editor.showMessage(message); } }));
+            }, message -> { if (!message.equals(lastError)) { lastError = message; editor.showMessage(message); } });
+        session.onTiming((stage, nanos) -> {
+            if (editor.perfService != null) editor.perfService.recordNanos("ai.complete." + stage, nanos, "chars=" + area.getDocument().getLength());
+        });
+        sessions.put(area, session);
     }
 
     private boolean eligible(JTextArea area) {
@@ -45,7 +49,12 @@ final class InlineCompletionController implements AutoCloseable {
             if (client != null) client.close();
             settings = configured; client = new OllamaCompletionClient(settings); lastError = "";
         }
-        return client.complete(prefix, suffix);
+        long started = System.nanoTime(); var request = client.complete(prefix, suffix);
+        request.whenComplete((text, error) -> {
+            if (editor.perfService != null) editor.perfService.recordDuration("ai.complete.provider", started,
+                error == null ? "success" : request.isCancelled() ? "cancelled" : "failed");
+        });
+        return request;
     }
 
     boolean keyPressed(KeyEvent event) {

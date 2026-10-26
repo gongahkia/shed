@@ -67,6 +67,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private String notice = "", speaker = "";
     private Path boundRoot;
     private Path boundSessions;
+    private PerfService performance = new PerfService();
 
     AgentSessionPanel(Texteditor editor) {
         this(editor.asyncJobService, () -> {
@@ -75,6 +76,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         }, editor.configManager::getAgentProviderNames, name -> AgentProvider.configured(editor.configManager, name),
             editor::ownAgentSession, editor::resolveUiFont, editor::resolveEditorFont);
         selectionSource = editor::captureAgentSelection;
+        performance = editor.perfService;
         navigation = location -> editor.showMessage(editor.openFileAtAsync(location.path().toFile(), location.line(), location.column(), "Agent reference"));
     }
 
@@ -173,6 +175,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     void onReview(Consumer<String> action) { reviewAction = Objects.requireNonNull(action); }
     void selectionSource(Supplier<Supplier<AgentSelection>> source) { selectionSource = source; }
     void onNavigate(Consumer<AgentAnswer.Location> action) { navigation = action; }
+    void performance(PerfService value) { performance = Objects.requireNonNull(value); }
     void prepare(AgentAction action) {
         if (submitting || busy) { message("Wait for the current action or cancel it first."); return; }
         actionChoice.setSelectedItem(action);
@@ -275,6 +278,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         locations.clear(); resultProposal = ""; referencesPanel.setVisible(false); controls(session.snapshot());
         var proposalOwner = new java.util.concurrent.atomic.AtomicReference<WorkspaceProposalService>();
         var proposalId = new java.util.concurrent.atomic.AtomicReference<String>("");
+        long started = System.nanoTime(); String metric = "ai." + action.name().toLowerCase(java.util.Locale.ROOT);
         actionJob = jobs.submitLongRunning(action.toString(), token -> {
             var capturedDocuments = List.copyOf(documents.snapshots());
             var queries = new WorkspaceQueryService(root, session.policy(), () -> capturedDocuments);
@@ -291,8 +295,10 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                     storage.resolve("agent-workspace").resolve(queries.workspaceId()), "focused:" + java.util.UUID.randomUUID()));
                 String wire = task != null ? task.prompt(instruction) : target == null ? AgentAnswer.prompt(instruction, queries, token::isCancelled) : target.prompt(instruction);
                 if (context != null) wire += context.instruction();
+                performance.recordDuration(metric + ".prepare", started, "context and baseline");
                 for (int attempt = 0; ; attempt++) {
                     if (token.isCancelled()) throw new java.util.concurrent.CancellationException();
+                    long providerStarted = System.nanoTime();
                     var pending = session.actionPrompt(attempt == 0 ? instruction : "Repair response format", wire, false);
                     token.onCancel(() -> background(() -> {
                         session.cancelAction(pending);
@@ -306,7 +312,9 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                         if (target != null && capturedSelection == selection) { selectionLabel.setText(target.label()); selectionLabel.setToolTipText(target.label()); }
                         refresh();
                     });
-                    var reply = pending.get();
+                    AgentSessionService.Reply reply;
+                    try { reply = pending.get(); }
+                    finally { performance.recordDuration(metric + ".provider", providerStarted, "attempt=" + (attempt + 1)); }
                     if (token.isCancelled() || reply.stopReason().equals("cancelled")) throw new java.util.concurrent.CancellationException();
                     if (!reply.stopReason().equals("end_turn")) throw new IllegalArgumentException("Agent stopped without a complete result: " + reply.stopReason());
                     try {
@@ -335,6 +343,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                 }
             }
         }, (job, result, error) -> {
+            performance.recordDuration(metric + ".total", started, job.getStatus().name().toLowerCase(java.util.Locale.ROOT));
             if (generation != request || active != session || disposed) { if (result != null) background(() -> withdraw(proposalOwner.get(), result.proposal())); return; }
             actionJob = -1; submitting = false;
             if (job.getStatus() == AsyncJobService.Status.CANCELLED) {

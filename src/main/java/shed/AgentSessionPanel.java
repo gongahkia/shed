@@ -60,6 +60,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private Consumer<String> reviewAction = ignored -> { };
     private final JButton review = button("Review changes", "review", this::reviewChanges);
     private final Timer refreshTimer;
+    private final AgentContextCompletion contextCompletion;
     private AgentSessionService active;
     private boolean busy, submitting, stopping, disposed;
     private int startingJob = -1;
@@ -68,6 +69,8 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private Path boundRoot;
     private Path boundSessions;
     private PerfService performance = new PerfService();
+    private Supplier<AgentPromptContext.Settings> contextSettings = AgentPromptContext.Settings::defaults;
+    private Supplier<Path> contextFile = () -> null;
 
     AgentSessionPanel(Texteditor editor) {
         this(editor.asyncJobService, () -> {
@@ -77,6 +80,8 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             editor::ownAgentSession, editor::resolveUiFont, editor::resolveEditorFont);
         selectionSource = editor::captureAgentSelection;
         performance = editor.perfService;
+        contextSettings = () -> AgentPromptContext.Settings.configured(editor.configManager);
+        contextFile = () -> editor.getCurrentBuffer() == null || editor.getCurrentBuffer().getFilePath() == null ? null : Path.of(editor.getCurrentBuffer().getFilePath());
         navigation = location -> editor.showMessage(editor.openFileAtAsync(location.path().toFile(), location.line(), location.column(), "Agent reference"));
     }
 
@@ -145,7 +150,11 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         details.setBorder(BorderFactory.createEmptyBorder());
         views.addTab("Connection", details); panel.add(views, BorderLayout.CENTER);
         prompt.setRows(3); transcript.setLineWrap(true); transcript.setWrapStyleWord(true); prompt.setLineWrap(true); prompt.setWrapStyleWord(true);
-        JPanel compose = new JPanel(new BorderLayout(6, 6)); compose.add(new JScrollPane(prompt), BorderLayout.CENTER);
+        contextCompletion = new AgentContextCompletion(prompt, jobs, () -> active == null ? null : new WorkspaceQueryService(boundRoot, active.policy(), boundDocuments), () -> contextSettings.get());
+        JPanel entry = new JPanel(new BorderLayout(4, 4)); entry.add(new JScrollPane(prompt), BorderLayout.CENTER);
+        entry.add(contextCompletion.component(), BorderLayout.SOUTH);
+        prompt.setToolTipText("Describe the request. Type @ for files or # for rules; Control Enter sends.");
+        JPanel compose = new JPanel(new BorderLayout(6, 6)); compose.add(entry, BorderLayout.CENTER);
         JPanel intent = new JPanel(new BorderLayout(6, 4)); intent.add(scrollRow(row(actionChoice, captureSelection)), BorderLayout.NORTH);
         intent.add(selectionLabel, BorderLayout.SOUTH); compose.add(intent, BorderLayout.NORTH);
         selectionLabel.putClientProperty("html.disable", true); actionChoice.setRenderer(plainRenderer());
@@ -273,6 +282,9 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         if (action != AgentAction.ASK && (boundSessions == null || !active.policy().capabilities().contains(AgentPolicy.Capability.PROPOSE))) {
             message("Connect with reviewed changes enabled before proposing changes."); return;
         }
+        AgentPromptContext.Settings settings; Path origin;
+        try { settings = contextSettings.get(); origin = contextFile.get(); }
+        catch (RuntimeException invalid) { message(failure(invalid)); return; }
         long request = generation; AgentSessionService session = active;
         Path root = boundRoot, storage = boundSessions; WorkspaceDocumentSource documents = boundDocuments;
         submitting = true; notice = "Preparing " + action.toString().toLowerCase(java.util.Locale.ROOT) + "…";
@@ -284,8 +296,12 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         actionJob = jobs.submitLongRunning(action.toString(), token -> {
             var capturedDocuments = List.copyOf(documents.snapshots());
             var queries = new WorkspaceQueryService(root, session.policy(), () -> capturedDocuments);
-            try (var context = session.context(queries.visibleDocuments(), token::isCancelled)) {
-                AgentSelection target = action == AgentAction.EDIT ? selection.get() : null;
+            AgentSelection target = action == AgentAction.EDIT ? selection.get() : null;
+            Path contextOrigin = target != null && target.document().uri() != null ? WorkspacePaths.resolve(root, target.document().uri()) : origin;
+            if (contextOrigin != null && !contextOrigin.toAbsolutePath().normalize().startsWith(queries.root())) contextOrigin = null;
+            var requestedContext = AgentPromptContext.resolve(queries, settings, contextOrigin, instruction, token::isCancelled);
+            try (var context = session.context(queries.visibleDocuments(), token::isCancelled);
+                 var references = session.referenceContext(requestedContext.documents(), token::isCancelled)) {
                 AgentTaskPlan task = action == AgentAction.RUN ? AgentTaskPlan.capture(queries, token::isCancelled) : null;
                 if (target != null) {
                     queries.checkWorkspace(target.document().workspaceId());
@@ -297,6 +313,9 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                     storage.resolve("agent-workspace").resolve(queries.workspaceId()), "focused:" + java.util.UUID.randomUUID()));
                 String wire = task != null ? task.prompt(instruction) : target == null ? AgentAnswer.prompt(instruction, queries, token::isCancelled) : target.prompt(instruction);
                 if (context != null) wire += context.instruction();
+                wire += requestedContext.instruction(references != null);
+                if (references != null) wire += references.instruction();
+                if (wire.length() > 65536) throw new IllegalArgumentException("Combined context exceeds the prompt limit; choose fewer references");
                 String originalWire = wire;
                 performance.recordDuration(metric + ".prepare", started, "context and baseline");
                 for (int attempt = 0; ; attempt++) {
@@ -310,6 +329,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
                     if (attempt == 0) SwingUtilities.invokeLater(() -> {
                         if (generation != request || active != session) return;
                         notice = "";
+                        for (var source : requestedContext.sources()) append("\nContext · " + source.kind() + " · " + source.path() + "\n");
                         if (context != null && context.count() > 0) append("\nContext\nShared complete snapshots of " + context.count() + " unsaved buffers for this action.\n");
                         if (prompt.getText().equals(instruction)) prompt.setText("");
                         if (target != null && capturedSelection == selection) { selectionLabel.setText(target.label()); selectionLabel.setToolTipText(target.label()); }
@@ -579,7 +599,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             ? Objects.toString(error.getMessage(), "Agent operation failed") : "Agent operation failed. Check the configured command and Connection diagnostics.";
     }
     private static void background(Runnable action) { Thread.ofVirtual().name("shed-agent-panel-cancel").start(action); }
-    @Override public void close() { disposed = true; refreshTimer.stop(); stop(); }
+    @Override public void close() { disposed = true; contextCompletion.close(); refreshTimer.stop(); stop(); }
     @Override public void refreshAppearance() {
         fonts(panel, uiFont.get()); transcript.setFont(codeFont.get()); prompt.setFont(codeFont.get()); diagnostics.setFont(codeFont.get());
         for (JButton button : List.of(connect, stop, send, cancel, respond, authenticate, begin, review, captureSelection, openLocation)) {

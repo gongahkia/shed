@@ -356,6 +356,8 @@ public class ConfigManager {
         defineDefault("agent.opencode.command", "opencode");
         defineDefault("agent.opencode.args", "acp");
         defineDefault("agent.opencode.model", "");
+        defineDefault("agent.context.instructions", "AGENTS.md,AGENT.md");
+        defineDefault("agent.context.rules", ".agents/skills,.shed/rules");
         defineDefault("ai.completion.delay.ms", 500);
         defineDefault("ai.completion.timeout.ms", 10000);
         LspFeatureSettings lspFeatures = LspFeatureSettings.defaults();
@@ -500,6 +502,8 @@ public class ConfigManager {
             case "ai.completion.enabled" -> "Send bounded editor context through OpenCode for inline suggestions";
             case "agent.opencode.command" -> "Installed OpenCode executable; launched only when Connect is pressed";
             case "agent.opencode.args" -> "OpenCode ACP arguments (default: acp)";
+            case "agent.context.instructions" -> "Comma-separated project instruction filenames, loaded from workspace root to active file";
+            case "agent.context.rules" -> "Comma-separated skill directories for #rule references; absolute paths explicitly share external rules";
             case "agent.opencode.model" -> "Optional OpenCode provider/model; empty uses your OpenCode configuration";
             case "ai.completion.delay.ms" -> "Idle delay before an inline AI suggestion (100–5000 ms)";
             case "ai.completion.timeout.ms" -> "Deadline for an inline AI suggestion (100–30000 ms)";

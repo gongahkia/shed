@@ -25,9 +25,17 @@ final class AgentContextFiles implements AutoCloseable {
     }
 
     synchronized Snapshot capture(List<WorkspaceDocument> documents, java.util.function.BooleanSupplier cancelled) throws IOException {
+        return capture(documents, cancelled, false);
+    }
+
+    synchronized Snapshot captureReferences(List<WorkspaceDocument> documents, java.util.function.BooleanSupplier cancelled) throws IOException {
+        return capture(documents, cancelled, true);
+    }
+
+    private Snapshot capture(List<WorkspaceDocument> documents, java.util.function.BooleanSupplier cancelled, boolean references) throws IOException {
         if (closed) throw new IOException("Agent context is closed");
         if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
-        var dirty = documents.stream().filter(WorkspaceDocument::dirty).toList();
+        var dirty = references ? documents : documents.stream().filter(WorkspaceDocument::dirty).toList();
         long total = 0;
         for (var document : dirty) {
             total += document.content().length();
@@ -46,7 +54,7 @@ final class AgentContextFiles implements AutoCloseable {
                 index.add(Map.of("document", document.uri() == null ? document.documentId() : document.uri(),
                     "version", document.version(), "snapshot", file.toString(), "characters", document.content().length()));
             }
-            Path manifest = PrivateWorkspaceFiles.create(batch, "index.json", MiniJson.stringify(Map.of("unsavedDocuments", index)).getBytes(StandardCharsets.UTF_8));
+            Path manifest = PrivateWorkspaceFiles.create(batch, "index.json", MiniJson.stringify(Map.of(references ? "requestedContext" : "unsavedDocuments", index)).getBytes(StandardCharsets.UTF_8));
             files.add(manifest);
             if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException();
             String instruction = "\n\nFull unsaved editor snapshots are available in " + manifest + ". "
@@ -54,6 +62,8 @@ final class AgentContextFiles implements AutoCloseable {
                 + "they contain the COMPLETE unsaved text, overriding saved files and abbreviated excerpts. "
                 + "These are read-only context copies. Cite and propose changes using the ORIGINAL document paths in the index, never the snapshot paths. "
                 + "Do not edit the snapshots. They expire after this action.";
+            if (references) instruction = "\n\nComplete requested context snapshots are in " + manifest
+                + ". Read this index and every referenced snapshot before answering. Use the original paths when citing code. These copies expire after this action.";
             var snapshot = new Snapshot(batch, List.copyOf(files), instruction, dirty.size()); active.add(snapshot); return snapshot;
         } catch (IOException | RuntimeException error) { remove(batch, files); throw error; }
     }

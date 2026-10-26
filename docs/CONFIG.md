@@ -136,6 +136,8 @@ Shed keeps an independent client for each `(file extension, workspace root)` pai
 | :--- | :--- | :--- | :--- |
 | `agent.opencode.command` | `opencode` | string | Installed OpenCode executable; used by Connect and opted-in completion |
 | `agent.opencode.args` | `acp` | string | Arguments for the OpenCode ACP preset |
+| `agent.context.instructions` | `AGENTS.md,AGENT.md` | string | Comma-separated filenames; loaded root to active file directory for Ask/Edit/Run; empty disables discovery |
+| `agent.context.rules` | `.agents/skills,.shed/rules` | string | Comma-separated directories containing `SKILL.md` or immediate skill subdirectories; workspace-relative, absolute or `~/` paths; external paths explicitly share those rules |
 | `agent.opencode.model` | empty | string | Optional provider/model; otherwise OpenCode's configured default |
 | `ai.completion.enabled` | `false` | bool | Opt into inline suggestions through the same OpenCode command/model |
 | `ai.completion.delay.ms` | `500` | int | Idle typing delay, 100–5,000 ms |
@@ -534,3 +536,5 @@ schema_version = 1
 - `.shed.toml` is applied per project root and is cleared automatically when switching out of that project scope. Permitted DAP declarations are separately resolved from the target workspace root, so a Tests action does not depend on whichever file is active in another root.
 
 Shed Dark is the default for new configurations. Shed Light provides the same neutral workbench treatment in light mode. These palettes keep the editor background stable across editing modes; the status bar reports the current mode. Existing explicit theme choices and color overrides are preserved.
+
+Agent prompts accept `@path/to/file`, `@"path with spaces"` and `#skill-name`. Typing `@` or `#` shows fuzzy suggestions; arrows select, Tab/Enter insert, Escape dismisses, and Control Space refreshes. File suggestions respect workspace ignores and access policy. References use complete unsaved text where available. Missing/ambiguous references fail before prompting. Each selected source is limited to 102,400 characters and all explicit/instruction context to 1 Mi characters. OpenCode reads short-lived full snapshots; source paths are listed in Activity. Skill names must be unique across configured directories.

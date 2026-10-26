@@ -25,7 +25,7 @@ public final class AcpSdkAgentFixture {
                     context.sendMessage(repair.get());
                 }
                 else if (prompt.startsWith("Propose changes for the project task below.")) {
-                    var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1)));
+                    var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1).lines().findFirst().orElseThrow()));
                     String instruction = (String) input.get("instruction"), summary = "Echo: " + instruction;
                     List<?> changes = List.of();
                     if (instruction.equals("read")) summary = context.readFile(args[0]);
@@ -44,7 +44,7 @@ public final class AcpSdkAgentFixture {
                     context.sendMessage(MiniJson.stringify(java.util.Map.of("summary", summary, "changes", changes)));
                 }
                 else if (prompt.startsWith("Edit only the selected code")) {
-                    var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1)));
+                    var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1).lines().findFirst().orElseThrow()));
                     if ("wait for cancellation".equals(input.get("instruction"))) {
                         var decision = context.client().requestPermission(new RequestPermissionRequest(context.getSessionId(),
                             new ToolCallUpdate("selection-wait", "Read selection context", ToolKind.READ, ToolCallStatus.PENDING),
@@ -55,7 +55,7 @@ public final class AcpSdkAgentFixture {
                     context.sendMessage(MiniJson.stringify(java.util.Map.of("replacement", ((String) input.get("selection")).toUpperCase(java.util.Locale.ROOT))));
                 }
                 else if (prompt.startsWith("Answer the project question below.")) {
-                    var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1)));
+                    var input = MiniJson.asObject(MiniJson.parseStrict(prompt.substring(prompt.indexOf('\n') + 1).lines().findFirst().orElseThrow()));
                     String instruction = (String) input.get("instruction");
                     if (instruction.startsWith("malformed")) {
                         repair.set(instruction.equals("malformed once") ? "{\"answer\":\"Corrected answer\",\"locations\":[]}"

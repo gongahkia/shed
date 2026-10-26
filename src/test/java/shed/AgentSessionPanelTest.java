@@ -66,6 +66,28 @@ class AgentSessionPanelTest {
         for (Component child : container.getComponents()) if (child instanceof Container nested) layout(nested);
     }
 
+    @Test void contextSuggestionsInsertQuotedPathsAndReachTheActualAction() throws Exception {
+        Path root = prepare("context-project");
+        Files.writeString(root.resolve("some file.txt"), "requested context");
+        Files.writeString(root.resolve("AGENTS.md"), "Use clear names");
+        open(); connect();
+        edt(() -> { panel.prepare(AgentAction.ASK); text("prompt").setText("Explain @sf"); text("prompt").setCaretPosition(text("prompt").getText().length()); });
+        await(() -> ((JList<?>) find(panel.component(), "agent.session.contextItems")).getModel().getSize() == 1);
+        edt(() -> {
+            var input = text("prompt");
+            var key = input.getInputMap().get(KeyStroke.getKeyStroke("TAB"));
+            input.getActionMap().get(key).actionPerformed(new java.awt.event.ActionEvent(input, 0, ""));
+            assertEquals("Explain @\"some file.txt\" ", input.getText());
+            button("send").doClick();
+        });
+        await(() -> button("send").isEnabled() && text("transcript").getText().contains("Answer"));
+        edt(() -> {
+            assertTrue(text("transcript").getText().contains("Context · selected file"));
+            assertTrue(text("transcript").getText().contains("Context · project instructions"));
+            assertFalse(status().getText().contains("not completed"));
+        });
+    }
+
     @Test void connectedConversationKeepsItsWorkspaceAndPreservesTheNextDraft() throws Exception {
         Path root = prepare("project"), file = Files.writeString(root.resolve("source"), "saved\r\n");
         FileBuffer buffer = new FileBuffer(file.toFile());

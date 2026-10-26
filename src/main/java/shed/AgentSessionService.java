@@ -81,6 +81,9 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
     AgentContextFiles.Snapshot context(List<WorkspaceDocument> documents, java.util.function.BooleanSupplier cancelled) throws IOException {
         return contextFiles == null ? null : contextFiles.capture(documents, cancelled);
     }
+    AgentContextFiles.Snapshot referenceContext(List<WorkspaceDocument> documents, java.util.function.BooleanSupplier cancelled) throws IOException {
+        return contextFiles == null ? null : contextFiles.captureReferences(documents, cancelled);
+    }
     CompletableFuture<Void> termination() { return connection.termination(); }
 
     synchronized CompletableFuture<Map<String, Object>> initialize() {

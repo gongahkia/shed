@@ -45,13 +45,29 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
         List<Captured> captured = onEdt(this::capture);
         List<WorkspaceDocument> result = new ArrayList<>();
         for (Captured item : captured) {
-            Path root = item.path() == null ? item.scratchRoot() : owningRoot(item.path(), item.roots());
-            String workspaceId = WorkspacePaths.id(WorkspacePaths.root(root));
-            result.add(new WorkspaceDocument(workspaceId, item.id(), item.path() == null ? null : item.path().toUri().toString(),
-                item.version(), item.text().text(), item.dirty(), !item.complete(), item.complete(), item.encoding(),
-                item.lineEnding(), item.byteOrderMark(), WorkspaceDocument.Source.EDITOR));
+            result.add(materialize(item));
         }
         return List.copyOf(result);
+    }
+
+    /** Freeze the actual selected buffer now; filesystem identity resolution happens when the supplier is called off the EDT. */
+    java.util.function.Supplier<AgentSelection> captureSelection(FileBuffer buffer, int start, int end) {
+        Captured selected = onEdt(() -> {
+            List<Captured> captured = capture();
+            Identity identity = identities.get(buffer);
+            if (identity == null) throw new IllegalArgumentException("The selected editor is no longer open");
+            return captured.stream().filter(item -> item.id().equals(identity.id)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("The selected editor is no longer open"));
+        });
+        return () -> new AgentSelection(materialize(selected), start, end);
+    }
+
+    private static WorkspaceDocument materialize(Captured item) {
+        Path root = item.path() == null ? item.scratchRoot() : owningRoot(item.path(), item.roots());
+        String workspaceId = WorkspacePaths.id(WorkspacePaths.root(root));
+        return new WorkspaceDocument(workspaceId, item.id(), item.path() == null ? null : item.path().toUri().toString(),
+            item.version(), item.text().text(), item.dirty(), !item.complete(), item.complete(), item.encoding(),
+            item.lineEnding(), item.byteOrderMark(), WorkspaceDocument.Source.EDITOR);
     }
 
     private List<Captured> capture() {

@@ -11,7 +11,7 @@ Initial backends: [OpenCode through ACP](https://opencode.ai/docs/acp/) (`openco
 | Workflow | Acceptance | Current evidence |
 | --- | --- | --- |
 | Complete | Ghost text, Tab acceptance, Escape dismissal, existing keymap/completion compatibility; cancellation and exact-document/caret freshness. | Local transport, opt-in settings, per-pane previews, debounced typing, Tab/Escape and stale-result guards implemented. Headless component/key-routing tests; live-model and native desktop verification remain outstanding. |
-| Edit selection | Capture a specific selection and its document version, request a replacement, review/apply through shared proposals; preserve later human changes. | Proposal infrastructure exists; focused action pending. |
+| Edit selection | Capture a specific selection and its document version, request a replacement, review/apply through shared proposals; preserve later human changes. | Immutable selected-buffer capture, bounded prompt and strict replacement-to-proposal adapter implemented and headlessly tested with unsaved/scratch documents and stale versions. ACP action and focused UI remain pending. |
 | Ask/search | Useful project answers with validated navigable file/line results; clear empty/error states. | Workspace queries and ACP exist; focused action and result presentation pending. |
 | Run task | Prompted changes across files, progress, cancellation, human review. | ACP conversations and reviewed writes exist; focused action and provider-specific verification pending. |
 

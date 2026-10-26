@@ -125,18 +125,21 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(requestList), new JScrollPane(permissionDetails)); split.setResizeWeight(.3);
         permission.add(split, BorderLayout.CENTER); permission.add(scrollRow(row(options, respond)), BorderLayout.SOUTH);
         views.addTab("Requests", permission);
-        JPanel setup = new JPanel(); setup.setLayout(new BoxLayout(setup, BoxLayout.Y_AXIS));
-        setup.add(new JLabel("OpenCode: install and sign in with its CLI, then choose opencode and Connect."));
-        setup.add(new JLabel("User settings: agent.opencode.command, .args and optional .model."));
-        setup.add(new JLabel("The OpenCode preset allows reading/searching and returns proposals for review."));
-        setup.add(new JLabel("Connect starts that local program in the workspace shown above."));
-        setup.add(new JLabel("The program retains its operating-system access; Shed does not sandbox it."));
-        setup.add(row(new JLabel("Resume session ID (optional)"), resume)); setup.add(reviewWrites); setup.add(foreground);
+        ConnectionDetails setup = new ConnectionDetails();
+        setup.addRow(help("OpenCode: install and sign in with its CLI, then choose opencode and Connect.\n"
+            + "User settings: agent.opencode.command, .args and optional .model.\n"
+            + "The preset reads/searches and returns proposals for review. Actions do not run shell commands.\n"
+            + "Connect starts the local program in this workspace. It retains its operating-system access; Shed does not sandbox it."));
+        setup.addRow(new JLabel("Resume session ID (optional)")); setup.addRow(resume);
+        setup.addRow(reviewWrites); setup.addRow(foreground);
         reviewWrites.setToolTipText("Enable Edit selection and Run task. Proposed changes need your approval in Review changes. Disable before connecting to use Ask/search only.");
         foreground.setToolTipText("Enable before connecting to allow explicit sign-in requests. Stop and reconnect to change this permission.");
-        setup.add(row(new JLabel("Authentication"), authMethods, authenticate, begin));
-        setup.add(new JLabel("Actions propose changes for review. They do not run shell commands."));
-        JPanel details = new JPanel(new BorderLayout(8, 8)); details.add(setup, BorderLayout.NORTH); details.add(new JScrollPane(diagnostics), BorderLayout.CENTER);
+        setup.addRow(new JLabel("Authentication")); setup.addRow(authMethods);
+        setup.addRow(scrollRow(row(authenticate, begin)));
+        setup.addRow(new JLabel("Connection diagnostics")); diagnostics.setRows(5);
+        setup.addRow(new JScrollPane(diagnostics));
+        var details = named(new JScrollPane(setup, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER), "connectionDetails");
+        details.setBorder(BorderFactory.createEmptyBorder());
         views.addTab("Connection", details); panel.add(views, BorderLayout.CENTER);
         prompt.setRows(3); transcript.setLineWrap(true); transcript.setWrapStyleWord(true); prompt.setLineWrap(true); prompt.setWrapStyleWord(true);
         JPanel compose = new JPanel(new BorderLayout(6, 6)); compose.add(new JScrollPane(prompt), BorderLayout.CENTER);
@@ -538,6 +541,26 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         actionChoice.setPreferredSize(new Dimension(WorkbenchStyle.px(160), WorkbenchStyle.px(40))); locationList.setFixedCellHeight(WorkbenchStyle.px(40));
     }
     private static JPanel row(java.awt.Component... components) { JPanel row = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 6, 0)); for (var item : components) row.add(item); return row; }
+    private static JTextArea help(String text) {
+        JTextArea help = area("connectionHelp", false); help.setText(text); help.setLineWrap(true); help.setWrapStyleWord(true);
+        help.setOpaque(false); help.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4)); return help;
+    }
+    /** Track dock width while keeping every setup control reachable in a short tool window. */
+    private static final class ConnectionDetails extends JPanel implements Scrollable {
+        private int nextRow;
+        ConnectionDetails() { super(new java.awt.GridBagLayout()); }
+        void addRow(JComponent component) {
+            var constraints = new java.awt.GridBagConstraints(); constraints.gridx = 0; constraints.gridy = nextRow++;
+            constraints.weightx = 1; constraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+            constraints.anchor = java.awt.GridBagConstraints.NORTHWEST; constraints.insets = new java.awt.Insets(3, 4, 3, 4);
+            add(component, constraints);
+        }
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
+        @Override public int getScrollableUnitIncrement(java.awt.Rectangle visible, int orientation, int direction) { return WorkbenchStyle.px(24); }
+        @Override public int getScrollableBlockIncrement(java.awt.Rectangle visible, int orientation, int direction) { return Math.max(WorkbenchStyle.px(24), visible.height - WorkbenchStyle.px(24)); }
+    }
     private static JScrollPane scrollRow(JPanel row) { var scroll = new JScrollPane(row, JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED); scroll.setBorder(BorderFactory.createEmptyBorder()); return scroll; }
     private static JTextArea area(String name, boolean editable) { JTextArea area = named(new JTextArea(), name); area.setEditable(editable); return area; }
     private static JButton button(String title, String name, Runnable action) { JButton button = named(new JButton(title), name); button.addActionListener(event -> action.run()); return button; }

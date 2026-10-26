@@ -40,6 +40,32 @@ class AgentSessionPanelTest {
         assertTrue(owned.isEmpty());
     }
 
+    @Test void connectionControlsRemainReachableInAShortNarrowDock() throws Exception {
+        prepare("project"); open();
+        edt(() -> {
+            tabs().setSelectedIndex(2); panel.component().setSize(480, 480);
+            for (int pass = 0; pass < 4; pass++) layout(panel.component());
+            var scroll = (JScrollPane) find(panel.component(), "agent.session.connectionDetails");
+            var content = (JComponent) scroll.getViewport().getView();
+            assertTrue(scroll.getViewport().getExtentSize().height > 0);
+            assertTrue(content.getHeight() > scroll.getViewport().getExtentSize().height);
+            assertEquals(scroll.getViewport().getExtentSize().width, content.getWidth());
+            for (String name : List.of("resume", "reviewWrites", "foreground", "authMethods", "authenticate", "begin", "diagnostics")) {
+                var control = (JComponent) find(panel.component(), "agent.session." + name);
+                var bounds = SwingUtilities.convertRectangle(control.getParent(), control.getBounds(), content);
+                assertTrue(bounds.width > 0 && bounds.height > 0, name);
+                content.scrollRectToVisible(bounds); layout(scroll);
+                assertTrue(scroll.getViewport().getViewRect().contains(bounds), name + " must be reachable by scrolling");
+            }
+        });
+        assertTrue(owned.isEmpty());
+    }
+
+    private static void layout(Container container) {
+        container.doLayout();
+        for (Component child : container.getComponents()) if (child instanceof Container nested) layout(nested);
+    }
+
     @Test void connectedConversationKeepsItsWorkspaceAndPreservesTheNextDraft() throws Exception {
         Path root = prepare("project"), file = Files.writeString(root.resolve("source"), "saved\r\n");
         FileBuffer buffer = new FileBuffer(file.toFile());

@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /** Immutable inspection and guarded restoration plan for interrupted text and file-presence operations. */
-record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, String fingerprint,
+record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, List<WorkspaceRenameRecovery.Action> renames, String fingerprint,
                              String verifiedOutcome, boolean restorable, List<Object> resources) {
     record Artifact(Path path, Map<String, Object> identity) { }
     record Action(Map<String, Object> effect, WorkspaceDocument current, WorkspaceTextFile.Snapshot disk,
@@ -32,9 +32,17 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
         }
         if (resources.size() > 4096) throw invalid("Recovery resource limit exceeded");
         List<Object> observations = new ArrayList<>(); List<Action> actions = new ArrayList<>();
+        List<WorkspaceRenameRecovery.Action> renames = new ArrayList<>();
         boolean allBefore = true, allAfter = true, restorable = true;
         for (Object item : operation) {
             var effect = object(item);
+            if ("RENAME".equals(effect.get("kind"))) {
+                var rename = WorkspaceRenameRecovery.capture(workspace, lease, effect, resources);
+                observations.add(rename.observation());
+                if (rename.action() != null) renames.add(rename.action());
+                allBefore &= rename.before(); allAfter &= rename.after(); restorable &= rename.restorable();
+                continue;
+            }
             if ("CREATE".equals(effect.get("kind")) || "DELETE".equals(effect.get("kind"))) {
                 var presence = presence(workspace, lease, effect, resources);
                 observations.add(presence.observation());
@@ -93,7 +101,7 @@ record WorkspaceRecoveryPlan(List<Object> observations, List<Action> actions, St
             : allAfter ? (undo ? "UNDONE" : "APPLIED") : allBefore ? (undo ? "APPLIED" : "FAILED") : null;
         if (undo && "APPLIED".equals(outcome) && MiniJson.asArray(entry.data().get("appliedOperation")) == null) outcome = null;
         String proof = WorkspacePaths.hash(WorkspaceChangeJournal.canonical(map("id", entry.id(), "revision", entry.revision(), "observations", observations)));
-        return new WorkspaceRecoveryPlan(List.copyOf(observations), List.copyOf(actions), proof, outcome, restorable, List.copyOf(resources));
+        return new WorkspaceRecoveryPlan(List.copyOf(observations), List.copyOf(actions), List.copyOf(renames), proof, outcome, restorable, List.copyOf(resources));
     }
 
     private record Presence(Map<String, Object> observation, Action action, boolean before, boolean after, boolean restorable) { }

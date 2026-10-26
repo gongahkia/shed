@@ -18,9 +18,14 @@ final class WorkspaceProposalService {
     private final WorkspaceDocumentEditor editor;
     private final WorkspaceChangeJournal journal;
     private final String actor;
+    private final WorkspaceEditTransaction.StepObserver observer;
 
-    enum Kind { TEXT, CREATE, DELETE }
-    record Input(String document, String expectedVersion, String text, Kind kind) {
+    enum Kind { TEXT, CREATE, DELETE, RENAME }
+    record Input(String document, String expectedVersion, String text, Kind kind, String destination) {
+        Input(String document, String expectedVersion, String text, Kind kind) { this(document, expectedVersion, text, kind, null); }
+        static Input rename(String document, String expectedVersion, String destination) {
+            return new Input(document, expectedVersion, "", Kind.RENAME, destination);
+        }
         Input(String document, String expectedVersion, String text) { this(document, expectedVersion, text, Kind.TEXT); }
         static Input create(String document, String text) { return new Input(document, "absent", text, Kind.CREATE); }
         static Input delete(String document, String expectedVersion) { return new Input(document, expectedVersion, "", Kind.DELETE); }
@@ -29,7 +34,11 @@ final class WorkspaceProposalService {
     record Preview(Map<String, Object> proposal, Map<String, Object> document, String before, String proposed,
                    String selected, List<WorkspaceTextEdits.Hunk> hunks, String preservedDraft) { }
     private record Effect(WorkspaceDocument before, String after, byte[] diskBefore, byte[] diskAfter, Kind kind,
-                          Map<String, Object> diskIdentity, String uri, WorkspaceRecoveryPlan.Artifact original, boolean retainOriginal) {
+                          Map<String, Object> diskIdentity, String uri, WorkspaceRecoveryPlan.Artifact original, boolean retainOriginal, String destination) {
+        Effect(WorkspaceDocument before, String after, byte[] diskBefore, byte[] diskAfter, Kind kind,
+               Map<String, Object> diskIdentity, String uri, WorkspaceRecoveryPlan.Artifact original, boolean retainOriginal) {
+            this(before, after, diskBefore, diskAfter, kind, diskIdentity, uri, original, retainOriginal, null);
+        }
         Effect(WorkspaceDocument before, String after, byte[] diskBefore, byte[] diskAfter, Kind kind, Map<String, Object> diskIdentity) {
             this(before, after, diskBefore, diskAfter, kind, diskIdentity, before.uri(), null, false);
         }
@@ -39,7 +48,13 @@ final class WorkspaceProposalService {
     }
 
     WorkspaceProposalService(WorkspaceQueryService workspace, WorkspaceDocumentEditor editor, Path storage, String actor) {
+        this(workspace, editor, storage, actor, WorkspaceEditTransaction.StepObserver.NONE);
+    }
+
+    WorkspaceProposalService(WorkspaceQueryService workspace, WorkspaceDocumentEditor editor, Path storage, String actor,
+                             WorkspaceEditTransaction.StepObserver observer) {
         this.workspace = java.util.Objects.requireNonNull(workspace); this.editor = editor;
+        this.observer = java.util.Objects.requireNonNull(observer);
         this.actor = required(actor, "actor", 256);
         Path absolute = storage.toAbsolutePath().normalize();
         Path canonical = WorkspacePaths.resolve(WorkspacePaths.root(absolute.getRoot()), absolute.toString());
@@ -59,11 +74,14 @@ final class WorkspaceProposalService {
             required(input.document(), "document", 8192); required(input.expectedVersion(), "expectedVersion", 512); validText(input.text());
             if (input.kind() == Kind.CREATE && !input.expectedVersion().equals("absent"))
                 throw failure(WorkspaceApiException.Code.INVALID_REQUEST, "Creation requires an absent target");
-            if (input.kind() == Kind.DELETE && !input.text().isEmpty())
-                throw failure(WorkspaceApiException.Code.INVALID_REQUEST, "Deletion cannot include replacement text");
+            if ((input.kind() == Kind.DELETE || input.kind() == Kind.RENAME) && !input.text().isEmpty())
+                throw failure(WorkspaceApiException.Code.INVALID_REQUEST, "File removal or rename cannot include replacement text");
+            if (input.kind() == Kind.RENAME) required(input.destination(), "destination", 8192);
+            else if (input.destination() != null) throw failure(WorkspaceApiException.Code.INVALID_REQUEST, "Only rename accepts a destination");
             total += input.text().length();
             var requested = map("document", input.document(), "version", input.expectedVersion(), "text", input.text());
             if (input.kind() != Kind.TEXT) requested.put("kind", input.kind().name());
+            if (input.kind() == Kind.RENAME) requested.put("destination", input.destination());
             request.add(requested);
         }
         if (total > 8L * MAX_TEXT_CHARACTERS) throw failure(WorkspaceApiException.Code.LIMIT_EXCEEDED, "Proposal exceeds its total text limit");
@@ -94,11 +112,18 @@ final class WorkspaceProposalService {
                     targets.add(path);
                 }
                 validText(document.content());
-                String base = lease.putText(document.content()), desired = lease.putText(input.text());
+                String base = lease.putText(document.content()), desired = lease.putText(input.kind() == Kind.RENAME ? document.content() : input.text());
                 var change = map("kind", input.kind().name(), "document", document.documentId(), "uri", document.uri(), "version", document.version(),
                     "source", document.source().name(), "encoding", document.encoding(), "lineEnding", document.lineEnding(),
                     "bom", document.byteOrderMark(), "before", base, "proposed", desired, "desired", desired);
-                if (input.kind() == Kind.DELETE) captureDeletion(lease, change, document);
+                if (input.kind() == Kind.DELETE || input.kind() == Kind.RENAME) captureFileOperation(lease, change, document);
+                if (input.kind() == Kind.RENAME) {
+                    var destination = absent(input.destination(), AgentPolicy.Capability.PROPOSE, null);
+                    Path path = WorkspacePaths.resolve(workspace.root(), destination.uri());
+                    if (targets.stream().anyMatch(other -> path.startsWith(other) || other.startsWith(path)))
+                        throw failure(WorkspaceApiException.Code.INVALID_REQUEST, "Rename paths must be disjoint from all proposal paths");
+                    targets.add(path); change.put("destination", destination.uri());
+                }
                 changes.add(change);
             }
             var data = map("workspaceId", workspace.workspaceId(), "root", workspace.root().toUri().toString(), "actor", actor,
@@ -139,11 +164,12 @@ final class WorkspaceProposalService {
             if (index < 0 || index >= changes.size()) throw failure(WorkspaceApiException.Code.INVALID_REQUEST, "Unknown proposal document");
             var change = changes.get(index);
             String before = lease.getText(text(change, "before")), proposed = lease.getText(text(change, "proposed"));
-            boolean deletion = "DELETE".equals(change.get("kind"));
-            String draft = deletion && "EDITOR".equals(change.get("source")) ? before : null;
-            if (deletion) before = lease.getText(text(change, "diskText"));
-            return new Preview(summary(entry), change, before, proposed, lease.getText(text(change, "desired")),
-                deletion ? List.of() : WorkspaceTextEdits.diff(before, proposed), draft);
+            boolean deletion = "DELETE".equals(change.get("kind")), rename = "RENAME".equals(change.get("kind"));
+            String draft = (deletion || rename) && "EDITOR".equals(change.get("source")) ? before : null;
+            if (deletion || rename) before = lease.getText(text(change, "diskText"));
+            if (rename) proposed = before;
+            return new Preview(summary(entry), change, before, proposed, rename ? before : lease.getText(text(change, "desired")),
+                deletion || rename ? List.of() : WorkspaceTextEdits.diff(before, proposed), draft);
         } catch (IOException unavailable) { throw storageFailure(id); }
     }
 
@@ -156,8 +182,8 @@ final class WorkspaceProposalService {
             List<Map<String, Object>> changes = changes(entry.data());
             if (index < 0 || index >= changes.size()) throw failure(WorkspaceApiException.Code.INVALID_REQUEST, "Unknown proposal document");
             var change = new LinkedHashMap<>(changes.get(index));
-            if ("DELETE".equals(change.get("kind"))) throw failure(WorkspaceApiException.Code.INVALID_REQUEST,
-                "Deletion is a whole-file operation; reject it or explicitly rebase it for review");
+            if ("DELETE".equals(change.get("kind")) || "RENAME".equals(change.get("kind"))) throw failure(WorkspaceApiException.Code.INVALID_REQUEST,
+                "This is a whole-file operation; reject it or explicitly rebase it for review");
             String before = lease.getText(text(change, "before")), proposed = replacement == null ? lease.getText(text(change, "proposed")) : replacement;
             validText(proposed);
             String desired = selectedHunks == null ? proposed : WorkspaceTextEdits.selected(before, proposed, selectedHunks);
@@ -184,8 +210,9 @@ final class WorkspaceProposalService {
                 }
                 WorkspaceDocument current = resolve(stored);
                 authorize(current, AgentPolicy.Capability.APPLY, entry.data());
-                boolean deletion = "DELETE".equals(stored.get("kind"));
-                String desired = deletion ? "" : WorkspaceTextEdits.rebase(lease.getText(text(stored, "before")),
+                boolean deletion = "DELETE".equals(stored.get("kind")), rename = "RENAME".equals(stored.get("kind"));
+                if (rename) absent(text(stored, "destination"), AgentPolicy.Capability.APPLY, entry.data());
+                String desired = deletion ? "" : rename ? current.content() : WorkspaceTextEdits.rebase(lease.getText(text(stored, "before")),
                     lease.getText(text(stored, "desired")), current.content());
                 var change = new LinkedHashMap<>(stored);
                 change.put("document", current.documentId()); change.put("version", current.version());
@@ -194,7 +221,7 @@ final class WorkspaceProposalService {
                 change.remove("selectedHunks");
                 change.put("source", current.source().name()); change.put("encoding", current.encoding());
                 change.put("lineEnding", current.lineEnding()); change.put("bom", current.byteOrderMark());
-                if (deletion) captureDeletion(lease, change, current);
+                if (deletion || rename) captureFileOperation(lease, change, current);
                 updated.add(change);
             }
             var data = new LinkedHashMap<>(entry.data()); data.put("changes", updated); data.put("status", "PROPOSED"); data.remove("error");
@@ -235,8 +262,8 @@ final class WorkspaceProposalService {
             if (Long.valueOf(revision).equals(entry.data().get("reconciledRevision")) && fingerprint.equals(entry.data().get("reconciledFingerprint"))) return summary(entry);
             if (entry.revision() != revision || !Set.of("APPLYING", "UNDOING", "RECOVERY_REQUIRED").contains(entry.data().get("status")))
                 throw failure(WorkspaceApiException.Code.CONFLICT, "Only the inspected interrupted revision can be reconciled");
-            for (var change : changes(entry.data())) {
-                Object uri = change.get("uri");
+            for (var change : changes(entry.data())) for (String field : List.of("uri", "destination")) {
+                Object uri = change.get(field);
                 if (uri != null) {
                     Path relative = workspace.root().relativize(WorkspacePaths.resolve(workspace.root(), (String) uri));
                     workspace.policy().checkPath(relative, AgentPolicy.Capability.APPLY);
@@ -285,8 +312,18 @@ final class WorkspaceProposalService {
             if (!fingerprint.equals(plan.fingerprint())) throw failure(WorkspaceApiException.Code.STALE_VERSION, "Recovery evidence changed; inspect it again");
             if (!plan.restorable()) throw failure(WorkspaceApiException.Code.CONFLICT, "Restoration would overwrite changed or unavailable contents; inspect the recovery details");
             for (var action : plan.actions()) validateRestore(action, entry.data());
+            for (var action : plan.renames()) validateRenameRestore(action, entry.data());
             return restore(lease, entry, plan, fingerprint);
         } catch (IOException unavailable) { throw storageFailure(id); }
+    }
+
+    private void validateRenameRestore(WorkspaceRenameRecovery.Action action, Map<String, Object> proposal) throws IOException {
+        for (Path path : List.of(action.source(), action.destination()))
+            authorize(new WorkspaceDocument(workspace.workspaceId(), path.toUri().toString(), path.toUri().toString(), "recovery",
+                "", false, false, true, "UTF-8", "LF", false, WorkspaceDocument.Source.DISK), AgentPolicy.Capability.APPLY, proposal);
+        if (action.current() != null && (editor == null || !editor.connected()))
+            throw failure(WorkspaceApiException.Code.NOT_CONNECTED, "Editor recovery connection is unavailable");
+        action.validate(workspace);
     }
 
     private void validateRestore(WorkspaceRecoveryPlan.Action action, Map<String, Object> proposal) throws IOException {
@@ -339,6 +376,7 @@ final class WorkspaceProposalService {
         WorkspaceEditTransaction transaction = new WorkspaceEditTransaction(step -> {
             steps.add(step.toMap()); data.put("restoreSteps", List.copyOf(steps));
             pending.set(lease.append(initial.id(), pending.get().revision(), "RESTORE_PREPARED", data));
+            observer.prepared(step);
         });
         boolean committed = false, interrupted = false;
         try {
@@ -358,7 +396,13 @@ final class WorkspaceProposalService {
                     transaction.rename(action.artifact().path(), path, false);
                 } else transaction.replace(path, staged.get(i));
             }
+            for (var action : plan.renames()) {
+                validateRenameRestore(action, data); action.restore(transaction);
+            }
             List<WorkspaceDocumentEditor.TextChange> open = new ArrayList<>();
+            for (var action : plan.renames()) {
+                var change = action.editorChange(workspace); if (change != null) open.add(change);
+            }
             for (var action : plan.actions()) {
                 WorkspaceDocument current = action.current(); WorkspaceDiskBinding binding = null;
                 if (action.removeDisk()) {
@@ -383,8 +427,11 @@ final class WorkspaceProposalService {
                 }
             }
             transaction.prepareCommit();
-            List<Path> unbound = plan.actions().stream().filter(WorkspaceRecoveryPlan.Action::removeDisk)
-                .map(action -> WorkspacePaths.resolve(workspace.root(), action.document())).toList();
+            List<Path> unbound = new ArrayList<>(plan.actions().stream().filter(WorkspaceRecoveryPlan.Action::removeDisk)
+                .map(action -> WorkspacePaths.resolve(workspace.root(), action.document())).toList());
+            for (var action : plan.renames()) {
+                unbound.add(action.destination()); if (action.current() == null) unbound.add(action.source());
+            }
             List<WorkspaceDocument> after = editor == null || open.isEmpty() && unbound.isEmpty() ? List.of() : editor.applyTexts(open, unbound);
             interrupted = Thread.interrupted(); transaction.commit(); committed = true;
             boolean undo = "UNDO".equals(data.get("operationKind"));
@@ -424,6 +471,12 @@ final class WorkspaceProposalService {
             List<Effect> effects = new ArrayList<>();
             Set<String> seen = new java.util.HashSet<>();
             for (var change : changes(entry.data())) {
+                if ("RENAME".equals(change.get("kind"))) {
+                    Effect effect = rename(lease, entry, change, undo);
+                    if (!seen.add(effect.uri()) || !seen.add(effect.destination()))
+                        throw failure(WorkspaceApiException.Code.CONFLICT, "Duplicate proposal path");
+                    effects.add(effect); continue;
+                }
                 if ("CREATE".equals(change.get("kind")) || "DELETE".equals(change.get("kind"))) {
                     Effect effect = "DELETE".equals(change.get("kind")) ? deletion(lease, entry, change, undo) : creation(lease, entry, change, undo);
                     if (!seen.add(effect.uri())) throw failure(WorkspaceApiException.Code.CONFLICT, "Duplicate proposal path");
@@ -480,7 +533,7 @@ final class WorkspaceProposalService {
         List<Object> operation = new ArrayList<>();
         for (Effect effect : effects) operation.add(map("kind", effect.kind().name(), "document", effect.before().documentId(), "uri",
             effect.kind() == Kind.TEXT ? effect.uri() : WorkspacePaths.resolve(workspace.root(), effect.uri()).toUri().toString(),
-            "source", effect.before().source().name(), "version", effect.before().version(),
+            "destination", effect.destination(), "source", effect.before().source().name(), "version", effect.before().version(),
             "before", lease.putText(effect.before().content()), "after", lease.putText(effect.after()),
             "diskBefore", effect.diskBefore() == null ? null : lease.put(effect.diskBefore()),
             "diskAfter", effect.diskAfter() == null ? null : lease.put(effect.diskAfter()), "diskIdentity", effect.diskIdentity(),
@@ -496,15 +549,23 @@ final class WorkspaceProposalService {
         WorkspaceEditTransaction transaction = new WorkspaceEditTransaction(step -> {
             resourceSteps.add(step.toMap()); data.put("resourceSteps", List.copyOf(resourceSteps));
             pending.set(lease.append(initial.id(), pending.get().revision(), "RESOURCE_PREPARED", data));
+            observer.prepared(step);
         });
         boolean committed = false, interrupted = false;
         try {
             List<Path> staged = new ArrayList<>();
-            for (Effect effect : effects) staged.add(effect.diskAfter() == null || effect.original() != null ? null
+            for (Effect effect : effects) staged.add(effect.diskAfter() == null || effect.original() != null || effect.kind() == Kind.RENAME ? null
                 : transaction.stage(WorkspacePaths.resolve(workspace.root(), effect.uri()), effect.diskAfter()));
             for (int index = 0; index < effects.size(); index++) {
                 Effect effect = effects.get(index);
                 Path path = effect.uri() == null ? null : WorkspacePaths.resolve(workspace.root(), effect.uri());
+                if (effect.kind() == Kind.RENAME) {
+                    authorize(effect.before(), AgentPolicy.Capability.APPLY, data);
+                    absent(effect.destination(), AgentPolicy.Capability.APPLY, data);
+                    transaction.renameFile(WorkspaceRenameRecovery.path(workspace, effect.uri()),
+                        WorkspaceRenameRecovery.path(workspace, effect.destination()), effect.diskIdentity());
+                    continue;
+                }
                 if (effect.kind() == Kind.CREATE) {
                     absent(effect.uri(), AgentPolicy.Capability.APPLY, data);
                     if (effect.original() != null) transaction.rename(effect.original().path(), path, effect.original().identity(), null);
@@ -530,17 +591,19 @@ final class WorkspaceProposalService {
             }
             List<WorkspaceDocumentEditor.TextChange> open = new ArrayList<>();
             for (Effect effect : effects) if (effect.before().source() == WorkspaceDocument.Source.EDITOR) {
-                WorkspaceDiskBinding binding = effect.kind() == Kind.CREATE ? WorkspaceDiskBinding.capture(workspace.workspaceId(),
-                    WorkspacePaths.resolve(workspace.root(), effect.uri())) : null;
+                WorkspaceDiskBinding binding = effect.kind() == Kind.CREATE || effect.kind() == Kind.RENAME ? WorkspaceDiskBinding.capture(workspace.workspaceId(),
+                    WorkspacePaths.resolve(workspace.root(), effect.kind() == Kind.RENAME ? effect.destination() : effect.uri())) : null;
                 if (binding != null && !java.util.Arrays.equals(binding.digest(), java.util.HexFormat.of().parseHex(WorkspacePaths.hash(effect.diskAfter()))))
                     throw failure(WorkspaceApiException.Code.STALE_VERSION, "Restored file changed before editor adoption");
                 open.add(effect.kind() == Kind.DELETE ? WorkspaceDocumentEditor.TextChange.detach(effect.before())
                     : new WorkspaceDocumentEditor.TextChange(effect.before(), effect.after(), binding));
             }
             transaction.prepareCommit();
-            List<Path> unbound = effects.stream().filter(effect -> effect.kind() == Kind.DELETE
+            List<Path> unbound = new ArrayList<>(effects.stream().filter(effect -> effect.kind() == Kind.DELETE || effect.kind() == Kind.RENAME
                     || effect.kind() == Kind.CREATE && effect.before().source() != WorkspaceDocument.Source.EDITOR)
-                .map(effect -> WorkspacePaths.resolve(workspace.root(), effect.uri())).toList();
+                .map(effect -> WorkspacePaths.resolve(workspace.root(), effect.uri())).toList());
+            for (var effect : effects) if (effect.kind() == Kind.RENAME && effect.before().source() != WorkspaceDocument.Source.EDITOR)
+                unbound.add(WorkspacePaths.resolve(workspace.root(), effect.destination()));
             List<WorkspaceDocument> after = editor == null || open.isEmpty() && unbound.isEmpty() ? List.of() : editor.applyTexts(open, unbound);
             // Once an atomic editor batch starts, record its actual outcome even if its caller was interrupted.
             interrupted = Thread.interrupted();
@@ -601,22 +664,64 @@ final class WorkspaceProposalService {
         return missing;
     }
 
-    private void captureDeletion(WorkspaceChangeJournal.Lease lease, Map<String, Object> change, WorkspaceDocument document) throws IOException {
+    private void captureFileOperation(WorkspaceChangeJournal.Lease lease, Map<String, Object> change, WorkspaceDocument document) throws IOException {
         if (document.uri() == null || !document.complete() || document.readOnly())
-            throw failure(WorkspaceApiException.Code.UNSUPPORTED, "Deletion requires a complete, editable file-backed document");
+            throw failure(WorkspaceApiException.Code.UNSUPPORTED, "File operations require a complete, editable file-backed document");
         validText(document.content());
         Path path = WorkspacePaths.resolve(workspace.root(), document.uri());
         var disk = WorkspaceTextFile.capture(workspace.workspaceId(), path, true);
         if (document.source() == WorkspaceDocument.Source.DISK && !document.version().equals(disk.document().version()))
-            throw failure(WorkspaceApiException.Code.STALE_VERSION, "File changed while preparing deletion");
+            throw failure(WorkspaceApiException.Code.STALE_VERSION, "File changed while preparing the file operation");
         var identity = WorkspaceEditTransaction.resourceIdentity(path);
         if (!WorkspacePaths.hash(disk.bytes()).equals(identity.get("digest")))
-            throw failure(WorkspaceApiException.Code.STALE_VERSION, "File changed while capturing its deletion identity");
+            throw failure(WorkspaceApiException.Code.STALE_VERSION, "File changed while capturing its identity");
         validText(disk.document().content());
         change.put("uri", path.toUri().toString()); change.put("diskIdentity", identity);
         change.put("diskBefore", lease.put(disk.bytes())); change.put("diskText", lease.putText(disk.document().content()));
         change.put("diskVersion", disk.document().version()); change.put("diskFormat", map("encoding", disk.document().encoding(),
             "lineEnding", disk.document().lineEnding(), "bom", disk.document().byteOrderMark()));
+    }
+
+    private Effect rename(WorkspaceChangeJournal.Lease lease, WorkspaceChangeJournal.Entry entry,
+                          Map<String, Object> change, boolean undo) throws IOException {
+        String source = text(change, undo ? "destination" : "uri"), destination = text(change, undo ? "uri" : "destination");
+        Path path = WorkspaceRenameRecovery.path(workspace, source), target = WorkspaceRenameRecovery.path(workspace, destination);
+        WorkspaceDocument current = workspace.snapshot(workspace.workspaceId(), source);
+        authorize(current, AgentPolicy.Capability.APPLY, entry.data());
+        absent(destination, AgentPolicy.Capability.APPLY, entry.data());
+        if (!current.complete() || current.readOnly()) throw failure(WorkspaceApiException.Code.PERMISSION_DENIED, "Document cannot be renamed");
+        validText(current.content());
+        if (current.source() == WorkspaceDocument.Source.EDITOR && (editor == null || !editor.connected()))
+            throw failure(WorkspaceApiException.Code.NOT_CONNECTED, "Editor document connection is unavailable");
+        var disk = WorkspaceTextFile.capture(workspace.workspaceId(), path, true);
+        var identity = WorkspaceEditTransaction.resourceIdentity(path);
+        if (!WorkspacePaths.hash(disk.bytes()).equals(identity.get("digest")))
+            throw failure(WorkspaceApiException.Code.STALE_VERSION, "File changed during rename preflight");
+        if (!undo) {
+            if (!current.version().equals(change.get("version")) || !current.content().equals(lease.getText(text(change, "before")))
+                || !disk.document().version().equals(change.get("diskVersion")) || !identity.equals(change.get("diskIdentity")))
+                throw failure(WorkspaceApiException.Code.STALE_VERSION, "Document or disk changed after rename was proposed; rebase and review it");
+        } else {
+            var operations = MiniJson.asArray(entry.data().get("operation"));
+            var applied = operations == null ? null : operations.stream().map(WorkspaceProposalService::object)
+                .filter(effect -> "RENAME".equals(effect.get("kind")) && source.equals(effect.get("destination")) && destination.equals(effect.get("uri")))
+                .findFirst().orElse(null);
+            if (applied == null) throw failure(WorkspaceApiException.Code.RECOVERY_REQUIRED, "Applied rename evidence is unavailable");
+            var original = object(applied.get("diskIdentity"));
+            boolean sameFile = identity.equals(original) || !Objects.toString(original.get("key"), "").isEmpty()
+                && original.get("key").equals(identity.get("key"));
+            if (!sameFile && current.source() == WorkspaceDocument.Source.EDITOR && current.documentId().equals(applied.get("document"))) {
+                var binding = WorkspaceDiskBinding.capture(workspace.workspaceId(), path);
+                sameFile = java.util.Arrays.equals(binding.digest(), java.util.HexFormat.of().parseHex(WorkspacePaths.hash(disk.bytes())))
+                    && editor.matchesSavedDisk(current, binding) && identity.equals(WorkspaceEditTransaction.resourceIdentity(path));
+            }
+            if (!sameFile) throw failure(WorkspaceApiException.Code.CONFLICT, "The renamed file was replaced; review a new rename proposal");
+        }
+        Path ancestor = target.getParent();
+        while (ancestor != null && !java.nio.file.Files.exists(ancestor, java.nio.file.LinkOption.NOFOLLOW_LINKS)) ancestor = ancestor.getParent();
+        if (ancestor == null || !java.nio.file.Files.getFileStore(path).equals(java.nio.file.Files.getFileStore(ancestor)))
+            throw failure(WorkspaceApiException.Code.UNSUPPORTED, "Reviewed rename requires both paths on the same filesystem");
+        return new Effect(current, current.content(), disk.bytes(), disk.bytes(), Kind.RENAME, identity, source, null, false, destination);
     }
 
     private Effect deletion(WorkspaceChangeJournal.Lease lease, WorkspaceChangeJournal.Entry entry,
@@ -690,8 +795,10 @@ final class WorkspaceProposalService {
         if (!workspace.workspaceId().equals(entry.data().get("workspaceId")) || !workspace.root().toUri().toString().equals(entry.data().get("root")))
             throw failure(WorkspaceApiException.Code.NOT_FOUND, "Proposal belongs to another workspace");
         for (var change : changes(entry.data())) {
-            Object uri = change.get("uri");
-            if (uri != null) workspace.policy().checkPath(workspace.root().relativize(WorkspacePaths.resolve(workspace.root(), (String) uri)), AgentPolicy.Capability.READ);
+            for (String field : List.of("uri", "destination")) {
+                Object uri = change.get(field);
+                if (uri != null) workspace.policy().checkPath(workspace.root().relativize(WorkspacePaths.resolve(workspace.root(), (String) uri)), AgentPolicy.Capability.READ);
+            }
         }
     }
     private WorkspaceDocument resolve(Map<String, Object> change) {
@@ -719,7 +826,9 @@ final class WorkspaceProposalService {
             "actor", data.get("actor"), "reviewedBy", data.get("reviewedBy"), "taskId", data.get("taskId"), "turnId", data.get("turnId"),
             "requestId", data.get("requestId"), "createdAt", data.get("createdAt"), "files", changes(data).size(),
             "documents", changes(data).stream().map(change -> map("kind", change.getOrDefault("kind", "TEXT"), "document", change.get("document"),
-                "uri", change.get("uri"), "path", change.get("uri") instanceof String uri
+                "uri", change.get("uri"), "destination", change.get("destination"),
+                "destinationPath", change.get("destination") instanceof String destination
+                    ? workspace.root().relativize(WorkspacePaths.resolve(workspace.root(), destination)).toString() : null, "path", change.get("uri") instanceof String uri
                     ? workspace.root().relativize(WorkspacePaths.resolve(workspace.root(), uri)).toString() : null)).toList(),
             "pendingSaveAtApplication", data.get("pendingSaveAtApplication"), "error", data.get("error"), "recovery", data.get("recovery"));
     }

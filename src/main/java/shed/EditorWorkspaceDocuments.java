@@ -104,15 +104,25 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
         // A new path appearing after capture requires a retry instead of a filesystem lookup on the EDT.
         var canonicalPaths = new java.util.HashMap<Path, Path>();
         var detachedWorkspaces = new java.util.HashMap<String, Path>();
+        var preparedRoots = new java.util.HashMap<String, List<Path>>();
         if (resourceBatch) {
             if (SwingUtilities.isEventDispatchThread()) throw new WorkspaceApiException(WorkspaceApiException.Code.INVALID_REQUEST,
                 "Resource binding batches must be prepared off the event thread");
-            for (Captured item : onEdt(this::capture)) if (item.path() != null) {
-                canonicalPaths.put(item.path(), canonical(item.path()));
-                detachedWorkspaces.put(item.id(), WorkspacePaths.root(owningRoot(item.path(), item.roots())));
+            for (Captured item : onEdt(this::capture)) {
+                preparedRoots.put(item.id(), item.roots());
+                if (item.path() != null) {
+                    canonicalPaths.put(item.path(), canonical(item.path()));
+                    detachedWorkspaces.put(item.id(), WorkspacePaths.root(owningRoot(item.path(), item.roots())));
+                }
             }
-            for (TextChange change : requested) if (change.diskBinding() != null)
+            for (TextChange change : requested) if (change.diskBinding() != null) {
                 canonicalPaths.put(change.diskBinding().file(), canonical(change.diskBinding().file()));
+                var configured = preparedRoots.get(change.expected().documentId());
+                if (configured == null) throw new WorkspaceApiException(WorkspaceApiException.Code.STALE_VERSION, "Editor closed during resource preflight");
+                String destinationWorkspace = WorkspacePaths.id(WorkspacePaths.root(owningRoot(change.diskBinding().file(), configured)));
+                if (!destinationWorkspace.equals(change.expected().workspaceId()))
+                    throw new WorkspaceApiException(WorkspaceApiException.Code.OUTSIDE_WORKSPACE, "A binding change cannot transfer a document into another workspace");
+            }
             for (Path path : unboundPaths) canonicalPaths.put(path.toAbsolutePath().normalize(), canonical(path));
         }
         var unbound = unboundPaths.stream().map(path -> canonicalPaths.get(path.toAbsolutePath().normalize()))
@@ -129,6 +139,8 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
                 if (!seen.add(expected.documentId())) throw new WorkspaceApiException(WorkspaceApiException.Code.INVALID_REQUEST, "Duplicate document mutation");
                 if (actual == null || !actual.version().equals(expected.version()))
                     throw new WorkspaceApiException(WorkspaceApiException.Code.STALE_VERSION, "Editor document changed before application");
+                if (resourceBatch && !actual.roots().equals(preparedRoots.get(actual.id())))
+                    throw new WorkspaceApiException(WorkspaceApiException.Code.STALE_VERSION, "Workspace roots changed during resource preflight");
                 if (!Objects.equals(expected.uri(), actual.path() == null ? null : actual.path().toUri().toString())
                     || expected.source() != WorkspaceDocument.Source.EDITOR)
                     throw new WorkspaceApiException(WorkspaceApiException.Code.CONFLICT, "Editor document identity changed");

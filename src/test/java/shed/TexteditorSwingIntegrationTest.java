@@ -1011,6 +1011,7 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEmptyEditor(home);
         Rectangle saved;
         try {
+            awaitWindowGeometrySettled(editor);
             assertEquals(javax.swing.JFrame.NORMAL,
                 onEdt(() -> editor.getExtendedState() & javax.swing.JFrame.MAXIMIZED_BOTH));
             saved = onEdt(() -> {
@@ -1018,18 +1019,44 @@ public class TexteditorSwingIntegrationTest {
                 Rectangle next = new Rectangle(current.x + 8, current.y + 8,
                     Math.max(400, current.width - 16), Math.max(300, current.height - 16));
                 editor.setBounds(next);
-                editor.windowPlacementStore.save(editor);
                 return next;
             });
+            awaitWindowBounds(editor, saved);
+            onEdt(() -> { editor.windowPlacementStore.save(editor); return null; });
         } finally {
             disposeEditor(editor);
         }
         Texteditor restored = createEmptyEditor(home);
         try {
+            awaitWindowBounds(restored, saved);
             assertEquals(saved, onEdt(restored::getBounds));
         } finally {
             disposeEditor(restored);
         }
+    }
+
+    private static void awaitWindowGeometrySettled(Texteditor editor) throws Exception {
+        // Showing a frame returns before an X11 window manager has applied its decorations.
+        // Wait off the EDT for native bounds/insets events before resizing or persisting it.
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5), stableSince = System.nanoTime();
+        String previous = "";
+        while (System.nanoTime() < deadline) {
+            String geometry = onEdt(() -> editor.getBounds() + " " + editor.getInsets());
+            if (!geometry.equals(previous)) { previous = geometry; stableSince = System.nanoTime(); }
+            else if (System.nanoTime() - stableSince >= TimeUnit.MILLISECONDS.toNanos(250)) return;
+            Thread.sleep(25);
+        }
+        org.junit.jupiter.api.Assertions.fail("Window geometry did not settle");
+    }
+
+    private static void awaitWindowBounds(Texteditor editor, Rectangle expected) throws Exception {
+        awaitWindowGeometrySettled(editor);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            if (expected.equals(onEdt(editor::getBounds))) return;
+            Thread.sleep(25);
+        }
+        assertEquals(expected, onEdt(editor::getBounds), "Window manager did not restore the requested bounds");
     }
 
     @Test

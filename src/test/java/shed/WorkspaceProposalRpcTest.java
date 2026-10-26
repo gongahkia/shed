@@ -13,6 +13,30 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkspaceProposalRpcTest {
     @TempDir Path temporary;
 
+    @Test void connectedRenameHasExplicitDestinationAndCannotApplyWithoutHumanPermission() throws Exception {
+        Path root = Files.createDirectory(temporary.resolve("project")), history = temporary.resolve("history");
+        Files.writeString(root.resolve("source"), "saved\r\n"); var queries = queries(root, false);
+        var service = new WorkspaceProposalService(queries, null, history, "agent");
+        try (var server = new WorkspaceBridgeServer(queries, service, temporary.resolve("connections"));
+             var client = new WorkspaceBridgeClient(server.descriptor(), root)) {
+            String version = queries.snapshot(queries.workspaceId(), "source").version();
+            var change = new LinkedHashMap<String, Object>(Map.of("kind", "rename", "document", "source", "expectedVersion", version, "destination", "renamed"));
+            var params = new LinkedHashMap<String, Object>(Map.of("workspaceId", queries.workspaceId(), "requestId", "rename", "taskId", "t", "turnId", "u", "changes", List.of(change)));
+            var proposal = result(client.exchange(WorkspaceRpcTest.request(1, "proposals/propose", params))); String id = (String) proposal.get("id");
+            var document = MiniJson.asObject(MiniJson.asArray(proposal.get("documents")).getFirst());
+            assertEquals("RENAME", document.get("kind")); assertEquals("source", document.get("path")); assertEquals("renamed", document.get("destinationPath"));
+            assertEquals("saved\n", result(client.exchange(WorkspaceRpcTest.request(2, "proposals/read", Map.of("workspaceId", queries.workspaceId(), "id", id)))).get("content"));
+            assertEquals("PERMISSION_DENIED", code(client.exchange(WorkspaceRpcTest.request(3, "proposals/apply", Map.of("workspaceId", queries.workspaceId(), "id", id, "revision", 0)))));
+            change.put("text", "replacement");
+            assertEquals("INVALID_REQUEST", code(client.exchange(WorkspaceRpcTest.request(4, "proposals/propose", params)))); change.remove("text");
+            change.put("destination", "different");
+            assertEquals("CONFLICT", code(client.exchange(WorkspaceRpcTest.request(5, "proposals/propose", params))));
+            var reviewer = new WorkspaceProposalService(queries(root, true), null, history, "human");
+            var applied = reviewer.apply(id, 0); assertFalse(Files.exists(root.resolve("source"))); assertEquals("saved\r\n", Files.readString(root.resolve("renamed")));
+            reviewer.undo(id, ((Number) applied.get("revision")).intValue()); assertEquals("saved\r\n", Files.readString(root.resolve("source")));
+        }
+    }
+
     @Test void connectedDeletionShowsDiskAndPreservedDraftSeparatelyAndNeverGrantsTheAgentApply() throws Exception {
         Path root = Files.createDirectory(temporary.resolve("project")), history = temporary.resolve("history");
         Path file = Files.writeString(root.resolve("source"), "disk\r\n"); FileBuffer buffer = new FileBuffer(file.toFile());

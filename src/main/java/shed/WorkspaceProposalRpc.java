@@ -64,6 +64,10 @@ final class WorkspaceProposalRpc {
                         fields(change, Set.of("kind", "document", "expectedVersion"));
                         inputs.add(WorkspaceProposalService.Input.delete(string(change, "document", true, 8192),
                             string(change, "expectedVersion", true, 512)));
+                    } else if (kind.equals("rename")) {
+                        fields(change, Set.of("kind", "document", "expectedVersion", "destination"));
+                        inputs.add(WorkspaceProposalService.Input.rename(string(change, "document", true, 8192),
+                            string(change, "expectedVersion", true, 512), string(change, "destination", true, 8192)));
                     } else throw invalid("Unknown proposal operation");
                 }
                 yield proposals.propose(string(params, "requestId", true, 256), string(params, "taskId", true, 256),

@@ -109,7 +109,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         recoveryDetails.setEditable(false); recoveryDetails.setLineWrap(true); recoveryDetails.setWrapStyleWord(true);
         AccessibilitySupport.describe(recoveryDetails, "Recovery evidence", "Current contents compared with the recorded operation, and retained resource paths.");
         preservedDraft.setEditable(false);
-        AccessibilitySupport.describe(preservedDraft, "Preserved editor draft", "The reviewed editor contents remain in an unsaved buffer when the disk file is deleted.");
+        AccessibilitySupport.describe(preservedDraft, "Preserved editor draft", "The reviewed editor draft is preserved when a file is deleted or renamed.");
         reviewTabs.addTab("Changes", changes); reviewTabs.addTab("Recovery", new JScrollPane(recoveryDetails));
         reviewTabs.addTab("Preserved draft", new JScrollPane(preservedDraft)); reviewTabs.setEnabledAt(2, false);
         review.add(reviewTabs);
@@ -190,7 +190,8 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
                 String label = document.get("uri") == null ? "Unsaved · " + document.get("document")
                     : Objects.toString(document.get("path"), Objects.toString(document.get("uri")));
                 documents.addItem("CREATE".equals(document.get("kind")) ? "Create · " + label
-                    : "DELETE".equals(document.get("kind")) ? "Delete · " + label : label);
+                    : "DELETE".equals(document.get("kind")) ? "Delete · " + label
+                    : "RENAME".equals(document.get("kind")) ? "Rename · " + label + " → " + document.get("destinationPath") : label);
             }
         } finally { rendering = false; }
         if (selected != null) loadPreview(); else controls();
@@ -208,12 +209,12 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         rendering = true;
         try {
             preview = value; dirty = false;
-            boolean deletion = "DELETE".equals(value.document().get("kind"));
-            beforeTitle.setText(deletion ? "Disk snapshot to delete" : "Original snapshot");
-            proposedTitle.setText(deletion ? "File absent after acceptance" : "Proposed text · editable before acceptance");
+            boolean deletion = "DELETE".equals(value.document().get("kind")), rename = "RENAME".equals(value.document().get("kind"));
+            beforeTitle.setText(deletion ? "Disk snapshot to delete" : rename ? "File at original path" : "Original snapshot");
+            proposedTitle.setText(deletion ? "File absent after acceptance" : rename ? "Same contents at destination" : "Proposed text · editable before acceptance");
             AccessibilitySupport.describe(before, beforeTitle.getText(), deletion ? "The saved disk contents that this operation removes." : "The document contents used to create this proposal.");
-            AccessibilitySupport.describe(proposed, proposedTitle.getText(), deletion ? "Deletion is accepted or rejected as a whole-file operation." : "Edit the proposal, then save and review its hunks before applying.");
-            WorkbenchStyle.emptyText(hunkTable, deletion ? "Whole-file deletion · no text hunks" : "No text hunks in this proposal");
+            AccessibilitySupport.describe(proposed, proposedTitle.getText(), deletion || rename ? "This file operation is accepted or rejected as a whole." : "Edit the proposal, then save and review its hunks before applying.");
+            WorkbenchStyle.emptyText(hunkTable, deletion ? "Whole-file deletion · no text hunks" : rename ? "File rename · contents preserved" : "No text hunks in this proposal");
             before.setText(value.before()); proposed.setText(value.proposed()); before.setCaretPosition(0); proposed.setCaretPosition(0);
             preservedDraft.setText(Objects.toString(value.preservedDraft(), "")); preservedDraft.setCaretPosition(0);
             reviewTabs.setEnabledAt(2, value.preservedDraft() != null);
@@ -228,12 +229,13 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
                 hunks.addRow(new Object[]{selected == null || selected.contains((long) i), "Change " + (i + 1), first == line ? "Line " + first : "Lines " + first + "–" + line});
             }
             var metadata = value.proposal();
-            var format = "DELETE".equals(value.document().get("kind")) ? MiniJson.asObject(value.document().get("diskFormat")) : value.document();
+            var format = deletion || rename ? MiniJson.asObject(value.document().get("diskFormat")) : value.document();
             details.setText("Workspace: " + scope.root() + "\n" + metadata.get("status") + " · " + metadata.get("files") + " document(s) · proposed by " + metadata.get("actor")
                 + " · reviewed by " + Objects.toString(metadata.get("reviewedBy"), "nobody yet") + "\n"
                 + metadata.get("taskId") + " / " + metadata.get("turnId") + " · revision " + metadata.get("revision") + "\n"
                 + format.get("encoding") + " · " + format.get("lineEnding")
                 + ("DELETE".equals(value.document().get("kind")) ? " · Deletes the disk file shown in Original snapshot. Open editor contents remain as an unsaved buffer."
+                    : rename ? " · Rename to " + value.document().get("destination") + ". Open drafts follow the file without being saved."
                     : "CREATE".equals(value.document().get("kind")) ? " · Creates a new file on apply; an existing path is never overwritten."
                     : Boolean.TRUE.equals(metadata.get("pendingSaveAtApplication")) ? " · Applied to open buffers; saving is separate." : " · Open buffers stay unsaved; closed files are written on apply."));
             for (int i = 0; i < proposals.size(); i++) if (Objects.equals(metadata.get("id"), proposals.get(i).get("id"))) proposals.set(i, metadata);
@@ -244,6 +246,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
                     : "CREATE".equals(value.document().get("kind")) && "PROPOSED".equals(metadata.get("status"))
                         ? "Apply creates this file even when all text hunks are deselected. Reject the proposal to skip creation."
                         : "DELETE".equals(value.document().get("kind")) ? "Deletion applies to the whole file. Undo restores its retained original without overwriting an occupied path."
+                        : rename ? "Rename preserves file contents and open drafts. Undo moves the file back while preserving later edits; occupied paths require review."
                         : "Review each document. Apply accepts the saved hunk selections across the whole proposal.");
         } finally { rendering = false; }
         controls();
@@ -278,6 +281,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
             for (Object item : MiniJson.asArray(result.get("documents"))) {
                 var document = MiniJson.asObject(item);
                 detail.append(Objects.toString(document.get("uri"), Objects.toString(document.get("document"))))
+                    .append(document.get("destination") == null ? "" : " → " + document.get("destination"))
                     .append("\n  ").append(document.get("state"))
                     .append(document.get("restoreReason") == null ? "" : " · " + document.get("restoreReason")).append("\n");
             }
@@ -337,7 +341,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     }
     private boolean textChanged() { return preview != null && !proposed.getText().equals(preview.proposed()); }
     private boolean canEdit() { return !busy && preview != null && "PROPOSED".equals(preview.proposal().get("status"))
-        && !"DELETE".equals(preview.document().get("kind")); }
+        && !"DELETE".equals(preview.document().get("kind")) && !"RENAME".equals(preview.document().get("kind")); }
     private int revision() { return ((Number) preview.proposal().get("revision")).intValue(); }
     private String selectedId() { var value = proposalList.getSelectedValue(); return value == null ? null : (String) value.get("id"); }
     private void controls() {

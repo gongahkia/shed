@@ -14,7 +14,9 @@ public final class AcpSdkAgentFixture {
             .loadSessionHandler(request -> new LoadSessionResponse(null))
             .promptHandler((request, context) -> {
                 String prompt = ((TextContent) request.prompt().getFirst()).text();
-                if (prompt.equals("read")) context.sendMessage(context.readFile(args[0]));
+                if (prompt.equals("reply-chunked")) { context.sendMessage("first "); context.sendMessage("second"); }
+                else if (prompt.equals("reply-large")) context.sendMessage("x".repeat(65537));
+                else if (prompt.equals("read")) context.sendMessage(context.readFile(args[0]));
                 else if (prompt.equals("write")) {
                     context.sendMessage("Before write"); context.writeFile(args[0], "agent write\n");
                     context.sendMessage("After write: " + context.readFile(args[0]));

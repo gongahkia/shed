@@ -19,6 +19,11 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
     enum State { NEW, INITIALIZING, READY, AUTHENTICATING, CREATING, LOADING, IDLE, PROMPTING, CANCELLING, FAILED, CLOSED }
     record Event(long sequence, String type, Map<String, Object> data, int characters) { }
     record Permission(String id, Map<String, Object> tool, List<Map<String, Object>> options) { }
+    record Reply(String turnId, String stopReason, String text) { }
+    private static final class TurnOutput {
+        final StringBuilder text = new StringBuilder();
+        boolean truncated, cancelled;
+    }
     record Snapshot(String provider, State state, String sessionId, Map<String, Object> capabilities, List<Map<String, Object>> authMethods,
                     List<Event> events, long droppedEvents, List<Permission> permissions, List<AgentWriteReview.Pending> writes,
                     String error, AcpConnection.Diagnostics diagnostics) { }
@@ -35,6 +40,8 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
     private List<Map<String, Object>> authMethods = List.of();
     private long sequence, droppedEvents;
     private int eventCharacters;
+    private boolean allowTurnWrites = true;
+    private TurnOutput output;
 
     AgentSessionService(AgentProvider provider, WorkspaceQueryService workspace) throws IOException {
         this(provider, workspace, null, null);
@@ -105,10 +112,29 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
     }
 
     synchronized CompletableFuture<Map<String, Object>> prompt(String text) {
+        return prompt(text, text, true, null);
+    }
+
+    /** Focused actions get a complete bounded answer, independent of transcript retention. */
+    synchronized CompletableFuture<Reply> actionPrompt(String instruction, String text, boolean allowWrites) {
+        if (instruction == null || instruction.isBlank() || instruction.length() > 65536) throw invalid("Invalid action instruction");
+        var captured = new TurnOutput();
+        var request = prompt(text, instruction, allowWrites, captured);
+        String capturedTurn = turnId;
+        return request.thenApply(result -> {
+            synchronized (this) {
+                if (captured.truncated) throw invalid("Agent answer exceeded 65,536 characters; narrow the request and try again");
+                return new Reply(capturedTurn, captured.cancelled ? "cancelled" : (String) result.get("stopReason"), captured.text.toString());
+            }
+        });
+    }
+
+    private CompletableFuture<Map<String, Object>> prompt(String text, String display, boolean allowWrites, TurnOutput capture) {
         if (text == null || text.isBlank() || text.length() > 65536) throw invalid("A prompt must contain 1–65,536 characters");
         if (writes != null && !writes.pending().isEmpty()) throw invalid("Previous file reviews are still finishing");
         transition(State.IDLE, State.PROMPTING); turnId = UUID.randomUUID().toString();
-        record("user_prompt", Map.of("sessionId", sessionId, "turnId", turnId, "text", text));
+        allowTurnWrites = allowWrites; output = capture;
+        record("user_prompt", Map.of("sessionId", sessionId, "turnId", turnId, "text", display));
         return finish(connection.request("session/prompt", Map.of("sessionId", sessionId, "prompt", List.of(Map.of("type", "text", "text", text))), provider.turnTimeout()), State.IDLE,
             response -> {
                 String reason = text(response, "stopReason", 64);
@@ -121,6 +147,7 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
         if (state == State.CANCELLING) return;
         if (state != State.PROMPTING) throw invalid("No prompt is running");
         state = State.CANCELLING; cancelPendingRequests();
+        if (output != null) output.cancelled = true;
         record("cancel_requested", Map.of("sessionId", sessionId, "turnId", turnId));
         connection.notify("session/cancel", Map.of("sessionId", sessionId));
         String cancelledTurn = turnId;
@@ -167,6 +194,7 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
     }
 
     private synchronized CompletableFuture<Map<String, Object>> write(Map<String, Object> params) {
+        if (!allowTurnWrites) throw new AcpException(-32602, "This action does not allow agent file writes; return an answer for review");
         if (writes == null) throw new AcpException(-32601, "Reviewed file writes are unavailable for this connection");
         requireSession(params);
         if (state != State.PROMPTING) throw new AcpException(-32800, "File writes require an active prompt");
@@ -181,6 +209,13 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
         // ID on those events; never retarget them to a later session or an active editor tab.
         if (state != State.CREATING && !Objects.equals(id, sessionId)) throw invalid("Update belongs to another session");
         var update = object(params.get("update")); text(update, "sessionUpdate", 128);
+        if (state == State.PROMPTING && output != null && "agent_message_chunk".equals(update.get("sessionUpdate"))) {
+            var content = MiniJson.asObject(update.get("content"));
+            if (content != null && "text".equals(content.get("type")) && content.get("text") instanceof String chunk) {
+                if (chunk.length() > 65536 - output.text.length()) output.truncated = true;
+                else if (!output.truncated) output.text.append(chunk);
+            }
+        }
         record("session_update", params);
     }
 
@@ -222,6 +257,10 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
     }
 
     private void authorizeTool(Map<String, Object> tool) {
+        synchronized (this) {
+            if (!allowTurnWrites && !Set.of("read", "search").contains(Objects.toString(tool.get("kind"), "")))
+                throw invalid("This action only permits reading and searching");
+        }
         AgentPolicy.Capability capability = switch (Objects.toString(tool.get("kind"), "")) {
             case "read", "search" -> AgentPolicy.Capability.READ;
             case "edit", "delete", "move" -> AgentPolicy.Capability.APPLY;

@@ -13,6 +13,32 @@ import org.junit.jupiter.api.io.TempDir;
 class WorkspaceEditTransactionTest {
     @TempDir Path root;
 
+    @Test void retainedDeletionKeepsTheExactOriginalForUndoAndStillRollsBackNormally() throws Exception {
+        Path file = Files.writeString(root.resolve("source"), "original\r\n");
+        if (file.getFileSystem().supportedFileAttributeViews().contains("posix"))
+            Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rwxr-----"));
+        var identity = WorkspaceEditTransaction.resourceIdentity(file);
+        Path original;
+        try (var transaction = new WorkspaceEditTransaction()) {
+            transaction.deleteRetaining(file, identity); transaction.commit();
+            assertTrue(transaction.cleanup().failures().isEmpty());
+            original = transaction.report().recoveryPaths().getFirst().resolve("original");
+        }
+        assertFalse(Files.exists(file)); assertEquals(identity, WorkspaceEditTransaction.resourceIdentity(original));
+        try (var transaction = new WorkspaceEditTransaction()) {
+            transaction.rename(original, file, identity, null); transaction.commit();
+        }
+        assertEquals("original\r\n", Files.readString(file));
+        if (file.getFileSystem().supportedFileAttributeViews().contains("posix"))
+            assertEquals(PosixFilePermissions.fromString("rwxr-----"), Files.getPosixFilePermissions(file));
+        try (var transaction = new WorkspaceEditTransaction()) {
+            transaction.deleteRetaining(file, WorkspaceEditTransaction.resourceIdentity(file));
+            assertEquals(WorkspaceEditTransaction.State.ROLLED_BACK, transaction.rollback().state());
+            assertTrue(transaction.cleanup().recoveryPaths().isEmpty());
+        }
+        assertEquals(identity, WorkspaceEditTransaction.resourceIdentity(file));
+    }
+
     @Test void abandoningUninstalledStagingAlsoRemovesItsNewEmptyParentDirectories() throws Exception {
         Path target = root.resolve("new/nested/file");
         try (var transaction = new WorkspaceEditTransaction()) {

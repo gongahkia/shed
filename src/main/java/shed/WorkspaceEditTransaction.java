@@ -52,7 +52,7 @@ final class WorkspaceEditTransaction implements AutoCloseable {
         }
     }
     private record Action(String label, IoAction action) { }
-    private record Backup(Path directory, Path original, Fingerprint expected) { }
+    private record Backup(Path directory, Path original, Fingerprint expected, boolean retained) { }
     private record Fingerprint(Object key, boolean directory, boolean link, long size, FileTime modified, String digest,
                                Map<String, Fingerprint> children) { }
 
@@ -178,7 +178,16 @@ final class WorkspaceEditTransaction implements AutoCloseable {
         requireOpen(); backup(target, requireIdentity(target, Objects.requireNonNull(expected)));
     }
 
+    /** A reviewed deletion retains the original inode/metadata for durable undo. */
+    void deleteRetaining(Path target, Map<String, Object> expected) throws IOException {
+        requireOpen(); backup(target, requireIdentity(target, Objects.requireNonNull(expected)), true);
+    }
+
     private void backup(Path target, Fingerprint expected) throws IOException {
+        backup(target, expected, false);
+    }
+
+    private void backup(Path target, Fingerprint expected, boolean retained) throws IOException {
         requireMatching(target, expected);
         Path directory = Files.createTempDirectory(target.toAbsolutePath().getParent(), ".shed-edit-backup-");
         Path original = directory.resolve("original");
@@ -187,7 +196,7 @@ final class WorkspaceEditTransaction implements AutoCloseable {
             try { Files.deleteIfExists(directory); } catch (IOException cleanup) { failed.addSuppressed(cleanup); }
             throw failed;
         }
-        backups.add(new Backup(directory, original, expected));
+        backups.add(new Backup(directory, original, expected, retained));
         addRollback("restore original " + target, () -> {
             if (exists(target)) throw new IOException("Restore target now contains newer data: " + target);
             // An external writer can still hold the original inode. Preserve its newer data on rollback.
@@ -246,6 +255,7 @@ final class WorkspaceEditTransaction implements AutoCloseable {
         }
         for (Backup backup : backups) {
             if (!exists(backup.directory())) continue;
+            if (state == State.COMMITTED && backup.retained()) continue;
             try {
                 if (state == State.COMMITTED) requireMatching(backup.original(), backup.expected());
                 else if (exists(backup.original())) throw new IOException("Restored backup path now contains data; retained");

@@ -258,5 +258,7 @@ final class WorkspaceChangeJournal {
         if (id == null || !id.matches("(proposal|task|validation|session)-[a-f0-9]{32}"))
             throw new WorkspaceApiException(WorkspaceApiException.Code.INVALID_REQUEST, "Invalid workspace journal identity");
     }
-    private static WorkspaceApiException busy() { return new WorkspaceApiException(WorkspaceApiException.Code.CONFLICT, "Workspace journal is busy; retry the operation"); }
+    private static WorkspaceApiException busy() {
+        return new WorkspaceApiException(WorkspaceApiException.Code.CONFLICT, "Workspace journal is busy; retry the operation", Map.of("retryable", true));
+    }
 }

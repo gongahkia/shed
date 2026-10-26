@@ -137,6 +137,40 @@ final class WorkspaceProposalService {
         return page(offset, limit).proposals();
     }
 
+    record ReviewState(String status, int revision, List<String> appliedText, boolean pendingSave) { }
+
+    /** Observe the committed decision without computing a diff or reading mutable workspace contents. */
+    ReviewState reviewState(String id) {
+        workspace.policy().require(AgentPolicy.Capability.READ);
+        try (var lease = journal.open(false)) {
+            var entry = entry(lease, id);
+            return reviewState(lease, entry);
+        } catch (IOException unavailable) { throw storageFailure(id); }
+    }
+
+    /** Owner cancellation serializes with review/application under the same cross-process lease. */
+    ReviewState withdraw(String id) {
+        workspace.policy().require(AgentPolicy.Capability.PROPOSE);
+        try (var lease = journal.open(false)) {
+            var entry = entry(lease, id);
+            if (!actor.equals(entry.data().get("actor")))
+                throw failure(WorkspaceApiException.Code.PERMISSION_DENIED, "Only the proposal owner may withdraw it");
+            if (Set.of("PROPOSED", "FAILED").contains(entry.data().get("status"))) {
+                var data = new LinkedHashMap<>(entry.data()); data.put("status", "REJECTED");
+                data.put("withdrawnBy", actor); data.put("withdrawnAt", Instant.now().toString());
+                entry = lease.append(id, entry.revision(), "WITHDRAWN", data);
+            }
+            return reviewState(lease, entry);
+        } catch (IOException unavailable) { throw storageFailure(id); }
+    }
+
+    private ReviewState reviewState(WorkspaceChangeJournal.Lease lease, WorkspaceChangeJournal.Entry entry) throws IOException {
+        String status = text(entry.data(), "status");
+        List<String> applied = new ArrayList<>();
+        if (status.equals("APPLIED")) for (var change : changes(entry.data())) applied.add(lease.getText(text(change, "desired")));
+        return new ReviewState(status, entry.revision(), List.copyOf(applied), Boolean.TRUE.equals(entry.data().get("pendingSaveAtApplication")));
+    }
+
     Page page(int offset, int limit) {
         workspace.policy().require(AgentPolicy.Capability.READ);
         if (offset < 0 || limit < 1 || limit > 100) throw failure(WorkspaceApiException.Code.INVALID_REQUEST, "Invalid proposal page");

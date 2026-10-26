@@ -47,6 +47,25 @@ class AgentActionReplyTest {
         }
     }
 
+    @Test void delayedCancellationOfAnOldActionCannotCancelItsSuccessor() throws Exception {
+        Path root = Files.createDirectory(temporary.resolve("project"));
+        try (var session = session(root)) {
+            connect(session);
+            var old = session.actionPrompt("first", "first", false); old.get(10, TimeUnit.SECONDS);
+            var current = session.actionPrompt("second", "permission", false);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (session.snapshot().permissions().isEmpty() && System.nanoTime() < deadline) Thread.sleep(10);
+            assertFalse(session.snapshot().permissions().isEmpty());
+            session.cancelAction(old);
+            assertEquals(AgentSessionService.State.PROMPTING, session.snapshot().state());
+            assertFalse(current.isDone());
+            session.cancelAction(current);
+            assertEquals("cancelled", current.get(10, TimeUnit.SECONDS).stopReason());
+            assertEquals(AgentSessionService.State.IDLE, session.snapshot().state());
+            assertEquals("Echo: third", session.actionPrompt("third", "third", false).get(10, TimeUnit.SECONDS).text());
+        }
+    }
+
     private AgentSessionService session(Path root) throws Exception {
         var workspace = new WorkspaceQueryService(root, new AgentPolicy(Set.of(AgentPolicy.Capability.READ,
             AgentPolicy.Capability.PROPOSE, AgentPolicy.Capability.START_AGENT), List.of("**/README.md"), List.of(), true), WorkspaceDocumentSource.diskOnly());

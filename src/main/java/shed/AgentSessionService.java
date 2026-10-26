@@ -42,6 +42,7 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
     private int eventCharacters;
     private boolean allowTurnWrites = true;
     private TurnOutput output;
+    private CompletableFuture<Reply> actionReply;
 
     AgentSessionService(AgentProvider provider, WorkspaceQueryService workspace) throws IOException {
         this(provider, workspace, null, null);
@@ -121,18 +122,25 @@ final class AgentSessionService implements AcpConnection.Handler, AutoCloseable 
         var captured = new TurnOutput();
         var request = prompt(text, instruction, allowWrites, captured);
         String capturedTurn = turnId;
-        return request.thenApply(result -> {
+        actionReply = request.thenApply(result -> {
             synchronized (this) {
                 if (captured.truncated) throw invalid("Agent answer exceeded 65,536 characters; narrow the request and try again");
                 return new Reply(capturedTurn, captured.cancelled ? "cancelled" : (String) result.get("stopReason"), captured.text.toString());
             }
         });
+        return actionReply;
+    }
+
+    /** A delayed worker cancellation must never cancel a later action on this connection. */
+    synchronized void cancelAction(CompletableFuture<Reply> request) {
+        if (request != null && request == actionReply && state == State.PROMPTING) cancel();
     }
 
     private CompletableFuture<Map<String, Object>> prompt(String text, String display, boolean allowWrites, TurnOutput capture) {
         if (text == null || text.isBlank() || text.length() > 65536) throw invalid("A prompt must contain 1–65,536 characters");
         if (writes != null && !writes.pending().isEmpty()) throw invalid("Previous file reviews are still finishing");
         transition(State.IDLE, State.PROMPTING); turnId = UUID.randomUUID().toString();
+        actionReply = null;
         allowTurnWrites = allowWrites; output = capture;
         record("user_prompt", Map.of("sessionId", sessionId, "turnId", turnId, "text", display));
         return finish(connection.request("session/prompt", Map.of("sessionId", sessionId, "prompt", List.of(Map.of("type", "text", "text", text))), provider.turnTimeout()), State.IDLE,

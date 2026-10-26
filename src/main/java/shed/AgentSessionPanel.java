@@ -289,7 +289,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             if (token.isCancelled()) throw new java.util.concurrent.CancellationException();
             var pending = session.actionPrompt(instruction, wire, false);
             token.onCancel(() -> background(() -> {
-                synchronized (session) { if (session.snapshot().state() == AgentSessionService.State.PROMPTING) session.cancel(); }
+                session.cancelAction(pending);
                 withdraw(proposalOwner.get(), proposalId.get());
             }));
             SwingUtilities.invokeLater(() -> {

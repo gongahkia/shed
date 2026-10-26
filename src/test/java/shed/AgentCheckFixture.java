@@ -10,7 +10,7 @@ public class AgentCheckFixture {
             case "child" -> {
                 var command = AcpConnectionTest.javaCommand(AgentCheckFixture.class.getName(), "wait");
                 var child = new ProcessBuilder(command).inheritIO().start();
-                java.nio.file.Files.writeString(java.nio.file.Path.of(args[1]), Long.toString(child.pid()));
+                AtomicFileWriter.write(java.nio.file.Path.of(args[1]), Long.toString(child.pid()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 child.waitFor();
             }
             default -> System.out.println("Synthetic check passed");

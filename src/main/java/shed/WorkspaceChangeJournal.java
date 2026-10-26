@@ -137,12 +137,48 @@ final class WorkspaceChangeJournal {
                 for (Path path : stream) {
                     String name = path.getFileName().toString();
                     if (name.matches("(proposal|task|validation|session)-[a-f0-9]{32}")) result.add(name);
-                    else if (!name.equals("journal.lock") && !name.equals("blobs")) throw new IOException("Unknown workspace journal file");
+                    else if (!name.equals("journal.lock") && !name.equals("blobs") && !name.equals("retained")) throw new IOException("Unknown workspace journal file");
                     if (result.size() > MAX_RECORDS) throw new IOException("Workspace journal record count exceeded");
                 }
             }
             result.sort(String::compareTo);
             return List.copyOf(result);
+        }
+
+        Path retentionDirectory(long additionalBytes) throws IOException {
+            check(); Path folder = PrivateWorkspaceFiles.directory(root.resolve("retained"));
+            long bytes = additionalBytes; int count = 0;
+            try (var children = Files.newDirectoryStream(folder)) {
+                for (Path child : children) {
+                    Path original = retainedPath(child.resolve("original").toUri().toString());
+                    if (original == null) throw new IOException("Invalid retained resource directory");
+                    if (Files.exists(original, LinkOption.NOFOLLOW_LINKS)) {
+                        var attributes = Files.readAttributes(original, java.nio.file.attribute.BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                        if (!attributes.isRegularFile()) throw new IOException("Retained original is not a regular file");
+                        bytes += attributes.size();
+                    }
+                    if (++count >= 1024) throw new WorkspaceApiException(WorkspaceApiException.Code.LIMIT_EXCEEDED, "Retained resource count exceeded");
+                }
+            }
+            if (bytes > 512L * 1024 * 1024) throw new WorkspaceApiException(WorkspaceApiException.Code.LIMIT_EXCEEDED, "Retained resource storage limit exceeded");
+            return folder;
+        }
+
+        /** Resolves only the owned retention namespace; inspection never creates missing directories. */
+        Path retainedPath(String reference) throws IOException {
+            check(); Path path;
+            try { path = Path.of(java.net.URI.create(reference)).toAbsolutePath().normalize(); }
+            catch (IllegalArgumentException invalid) { throw new IOException("Invalid retained resource reference", invalid); }
+            Path folder = root.resolve("retained");
+            if (!path.startsWith(folder)) return null;
+            if (!reference.equals(path.toUri().toString()) || path.getNameCount() != folder.getNameCount() + 2
+                || !path.getFileName().toString().equals("original") || !path.getParent().getFileName().toString().matches("resource-[A-Za-z0-9-]{1,80}"))
+                throw new IOException("Invalid retained resource path");
+            for (Path parent : List.of(folder, path.getParent())) {
+                try { if (!PrivateWorkspaceFiles.existingDirectory(parent).equals(parent)) throw new IOException("Retained resource directory was aliased"); }
+                catch (java.nio.file.NoSuchFileException missing) { /* Missing evidence is observed, never recreated. */ }
+            }
+            return path;
         }
 
         String put(byte[] bytes) throws IOException {

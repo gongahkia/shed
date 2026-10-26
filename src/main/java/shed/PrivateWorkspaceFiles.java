@@ -33,6 +33,10 @@ final class PrivateWorkspaceFiles {
         return path.toRealPath();
     }
 
+    static Path existingDirectory(Path requested) throws IOException {
+        Path path = requested.toAbsolutePath().normalize(); check(path, true); return path.toRealPath();
+    }
+
     static Path create(Path directory, String name, byte[] content) throws IOException {
         if (name == null || !name.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}")) throw new IOException("Invalid private state name");
         check(directory, true);

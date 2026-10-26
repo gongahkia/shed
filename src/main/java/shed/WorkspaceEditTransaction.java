@@ -183,13 +183,26 @@ final class WorkspaceEditTransaction implements AutoCloseable {
         requireOpen(); backup(target, requireIdentity(target, Objects.requireNonNull(expected)), true);
     }
 
+    void deleteRetaining(Path target, Map<String, Object> expected, Path retentionDirectory) throws IOException {
+        requireOpen();
+        Path privateDirectory = PrivateWorkspaceFiles.existingDirectory(retentionDirectory);
+        if (!Files.getFileStore(target).equals(Files.getFileStore(privateDirectory)))
+            throw new IOException("Durable deletion requires history on the same filesystem as the original");
+        backup(target, requireIdentity(target, Objects.requireNonNull(expected)), true, privateDirectory);
+    }
+
     private void backup(Path target, Fingerprint expected) throws IOException {
         backup(target, expected, false);
     }
 
     private void backup(Path target, Fingerprint expected, boolean retained) throws IOException {
+        backup(target, expected, retained, null);
+    }
+
+    private void backup(Path target, Fingerprint expected, boolean retained, Path retentionDirectory) throws IOException {
         requireMatching(target, expected);
-        Path directory = Files.createTempDirectory(target.toAbsolutePath().getParent(), ".shed-edit-backup-");
+        Path directory = retentionDirectory == null ? Files.createTempDirectory(target.toAbsolutePath().getParent(), ".shed-edit-backup-")
+            : PrivateWorkspaceFiles.directory(retentionDirectory.resolve("resource-" + java.util.UUID.randomUUID()));
         Path original = directory.resolve("original");
         try { prepared("BACKUP", target, original, expected); requireMatching(target, expected); move(target, original, false); }
         catch (IOException | RuntimeException failed) {

@@ -12,6 +12,26 @@ class WorkspaceChangeJournalTest {
     @TempDir Path root;
     private static final String ID = "proposal-" + "a".repeat(32);
 
+    @Test void retentionReferencesArePrivateBoundedAndReadOnlyInspectionDoesNotCreateDirectories() throws Exception {
+        Path storage = root.resolve("journal");
+        try (var lease = new WorkspaceChangeJournal(storage).open(true)) {
+            Path missing = storage.toRealPath().resolve("retained/resource-missing/original");
+            assertEquals(missing, lease.retainedPath(missing.toUri().toString()));
+            assertFalse(Files.exists(missing.getParent().getParent()));
+            assertNull(lease.retainedPath(root.resolve("outside").toUri().toString()));
+            Path retained = lease.retentionDirectory(16);
+            assertTrue(lease.list().isEmpty());
+            assertEquals(WorkspaceApiException.Code.LIMIT_EXCEEDED,
+                assertThrows(WorkspaceApiException.class, () -> lease.retentionDirectory(512L * 1024 * 1024 + 1)).code());
+            assertThrows(IOException.class, () -> lease.retainedPath(retained.resolve("foreign/original").toUri().toString()));
+            Path outside = Files.createDirectory(root.resolve("outside"));
+            try { Files.createSymbolicLink(retained.resolve("resource-link"), outside); }
+            catch (UnsupportedOperationException | IOException unavailable) { return; }
+            assertThrows(IOException.class, () -> lease.retainedPath(retained.resolve("resource-link/original").toUri().toString()));
+            assertFalse(Files.exists(outside.resolve("original")));
+        }
+    }
+
     @Test void readOnlyAbsenceHasNoSideEffectsAndHistorySurvivesReopeningWithExactUtf16Preimages() throws Exception {
         Path storage = root.resolve("journal");
         WorkspaceChangeJournal journal = new WorkspaceChangeJournal(storage);

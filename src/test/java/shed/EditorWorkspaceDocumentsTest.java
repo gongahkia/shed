@@ -13,6 +13,22 @@ import org.junit.jupiter.api.io.TempDir;
 class EditorWorkspaceDocumentsTest {
     @TempDir Path root;
 
+    @Test void savedDiskProofDistinguishesAnEditorSaveFromAnIdenticalExternalReplacement() throws Exception {
+        Path file = Files.writeString(root.resolve("source"), "loaded\r\n"); FileBuffer buffer = new FileBuffer(file.toFile());
+        try (var editor = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
+            var before = editor.snapshots().getFirst();
+            assertTrue(editor.matchesSavedDisk(before, WorkspaceDiskBinding.capture(before.workspaceId(), file)));
+            SwingUtilities.invokeAndWait(() -> buffer.replaceContentUndoably("saved by human\n")); buffer.save();
+            var saved = editor.snapshots().getFirst(); var binding = WorkspaceDiskBinding.capture(saved.workspaceId(), file);
+            assertTrue(editor.matchesSavedDisk(saved, binding));
+            assertEquals(WorkspaceApiException.Code.STALE_VERSION, assertThrows(WorkspaceApiException.class,
+                () -> editor.matchesSavedDisk(before, binding)).code());
+            Files.move(file, root.resolve("original-inode")); Files.writeString(file, "saved by human\r\n");
+            assertFalse(editor.matchesSavedDisk(saved, WorkspaceDiskBinding.capture(saved.workspaceId(), file)));
+            assertTrue(editor.matchesSavedDisk(saved, binding), "A proof describes its captured disk image; mutation must recheck the current resource");
+        }
+    }
+
     @Test void detachingKeepsHumanTextFormatIdentityAndWorkspaceButRequiresSaveAs() throws Exception {
         Path other = Files.createDirectory(root.resolve("other"));
         Path file = Files.writeString(root.resolve("source"), "saved\r\n");

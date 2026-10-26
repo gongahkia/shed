@@ -4,6 +4,9 @@ import java.util.List;
 
 /** Explicit document identities and versions; adapters own UI affinity and batch atomicity. */
 interface WorkspaceDocumentEditor extends WorkspaceDocumentSource {
+    /** Proves that this exact editor snapshot adopted the supplied disk image through load/save. */
+    default boolean matchesSavedDisk(WorkspaceDocument expected, WorkspaceDiskBinding binding) { return false; }
+
     record TextChange(WorkspaceDocument expected, String text, WorkspaceDiskBinding diskBinding, boolean detach) {
         public TextChange {
             java.util.Objects.requireNonNull(expected); java.util.Objects.requireNonNull(text);

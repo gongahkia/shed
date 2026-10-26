@@ -524,6 +524,15 @@ public class FileBuffer {
 
     long documentRevision() { return documentRevision; }
 
+    /** Pure comparison with a worker-captured disk image; never reads the filesystem on the EDT. */
+    boolean matchesSavedDisk(WorkspaceDiskBinding binding) {
+        return hasFilePath() && externalFileStamp != null && externalFileStamp.kind() == ExternalFileKind.REGULAR
+            && java.util.Objects.equals(externalFileStamp.fileKey(), binding.fileKey())
+            && java.util.Objects.equals(externalFileStamp.creationTime(), binding.created())
+            && java.util.Objects.equals(externalFileStamp.modifiedTime(), binding.modified())
+            && externalFileStamp.size() == binding.size() && java.util.Arrays.equals(savedDiskDigest, binding.digest());
+    }
+
     private void trackDocumentRevisions() {
         document.addDocumentListener(new javax.swing.event.DocumentListener() {
             public void insertUpdate(DocumentEvent event) { documentRevision++; }

@@ -82,6 +82,21 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
         return applyTexts(changes, List.of());
     }
 
+    @Override public boolean matchesSavedDisk(WorkspaceDocument expected, WorkspaceDiskBinding binding) {
+        if (expected.source() != WorkspaceDocument.Source.EDITOR || expected.uri() == null) return false;
+        if (SwingUtilities.isEventDispatchThread()) throw new WorkspaceApiException(WorkspaceApiException.Code.INVALID_REQUEST,
+            "Disk-identity inspection must be prepared off the event thread");
+        if (!canonical(Path.of(java.net.URI.create(expected.uri()))).equals(canonical(binding.file()))) return false;
+        return onEdt(() -> {
+            Captured actual = capture().stream().filter(item -> item.id().equals(expected.documentId())).findFirst().orElse(null);
+            if (actual == null || !actual.version().equals(expected.version()))
+                throw new WorkspaceApiException(WorkspaceApiException.Code.STALE_VERSION, "Editor document changed during disk-identity inspection");
+            FileBuffer buffer = identities.entrySet().stream().filter(item -> item.getValue().id.equals(expected.documentId()))
+                .map(java.util.Map.Entry::getKey).findFirst().orElseThrow();
+            return buffer.matchesSavedDisk(binding);
+        });
+    }
+
     @Override public List<WorkspaceDocument> applyTexts(List<TextChange> changes, List<Path> unboundPaths) {
         List<TextChange> requested = List.copyOf(changes);
         boolean resourceBatch = !unboundPaths.isEmpty() || requested.stream().anyMatch(change -> change.detach() || change.diskBinding() != null);

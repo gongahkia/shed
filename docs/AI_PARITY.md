@@ -10,8 +10,8 @@ Reference inspected: ThePrimeagen/99 commit `c17422457027c913c76c75a921fca1e623d
 | File/rule prompt completion | Implemented: `@file`, quoted paths, `#skill`, fuzzy suggestions, explicit custom skill directories | `AgentPromptContextTest` (5 passing) plus actual panel suggestion insertion/action test; existing context and panel regression cases pass |
 | Project instruction discovery | Implemented: configurable ancestor instruction filenames, root-to-nearest order, visible source list | Root/ancestor ordering, unsaved references, external skills, limits and cancellation tests; actual panel action includes listed sources |
 | Selection edits and code search | Existing reviewed edits and validated navigable references | Panel/ACP/review/navigation tests |
-| Reopen previous results and clear history | Pending | Previous answer locations and proposal restoration, workspace isolation, clear behavior |
-| Work description reused for search/task follow-ups | Pending; one workspace-scoped description, no task dashboard | Persistence, workspace isolation, search/run prompt integration |
+| Reopen previous results and clear history | Implemented in History; bounded per-workspace in-memory results, reusable requests, existing review/navigation controls | History retention/isolation tests and actual panel reopen/reuse/clear test |
+| Work description reused for search/task follow-ups | Implemented; one private saved description per workspace, Find remaining work and Continue work prepare editable prompts | Private persistence/reload/clear/isolation and actual panel save/prepare tests |
 | Test/command feedback and iterative task fixes | Pending; preserve human review and explicit command approval | Synthetic background command execution, cancellation, bounded output, fresh baselines and feedback |
 | Model selection | Pending inspection of ACP configuration and OpenCode model discovery | Correct configured invocation, selection and subsequent requests |
 | Status, cancellation and error recovery | Existing, extend to added operations | Pending-action cancellation, preserved drafts, malformed/stale failures |

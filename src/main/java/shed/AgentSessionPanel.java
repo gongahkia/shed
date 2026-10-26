@@ -40,6 +40,16 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private Consumer<AgentAnswer.Location> navigation = ignored -> { };
     private WorkspaceDocumentSource boundDocuments;
     private String resultProposal = "";
+    private final AgentInteractionHistory history = new AgentInteractionHistory();
+    private final DefaultListModel<AgentInteractionHistory.Entry> pastResults = new DefaultListModel<>();
+    private final JList<AgentInteractionHistory.Entry> historyList = named(new JList<>(pastResults), "history");
+    private final JTextArea workDescription = area("workDescription", true);
+    private final JButton openResult = button("Open result", "openResult", this::openResult);
+    private final JButton reuseRequest = button("Reuse request", "reuseRequest", this::reuseRequest);
+    private final JButton clearHistory = button("Clear history", "clearHistory", this::clearHistory);
+    private final JButton saveWork = button("Save work", "saveWork", this::saveWork);
+    private final JButton findRemaining = button("Find remaining work", "findRemaining", () -> useWork(false));
+    private final JButton continueWork = button("Continue work", "continueWork", () -> useWork(true));
     private int actionJob = -1;
     private record ActionResult(String proposal, AgentAnswer answer, String summary) { }
     private final JTextField resume = named(new JTextField(), "resume");
@@ -62,7 +72,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
     private final Timer refreshTimer;
     private final AgentContextCompletion contextCompletion;
     private AgentSessionService active;
-    private boolean busy, submitting, stopping, disposed;
+    private boolean busy, submitting, stopping, disposed, workSaving;
     private int startingJob = -1;
     private long generation, lastSequence, droppedShown;
     private String notice = "", speaker = "";
@@ -149,6 +159,20 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         var details = named(new JScrollPane(setup, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER), "connectionDetails");
         details.setBorder(BorderFactory.createEmptyBorder());
         views.addTab("Connection", details); panel.add(views, BorderLayout.CENTER);
+        historyList.setCellRenderer(plainRenderer()); historyList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        historyList.addListSelectionListener(e -> controls(active == null ? null : active.snapshot()));
+        historyList.getInputMap().put(KeyStroke.getKeyStroke("ENTER"), "openResult");
+        historyList.getActionMap().put("openResult", new AbstractAction() { public void actionPerformed(java.awt.event.ActionEvent e) { openResult(); } });
+        var historyPanel = new JPanel(new BorderLayout(6, 6));
+        historyPanel.add(new JScrollPane(historyList), BorderLayout.CENTER);
+        historyPanel.add(scrollRow(row(openResult, reuseRequest, clearHistory)), BorderLayout.SOUTH);
+        var workPanel = new JPanel(new BorderLayout(6, 4)); workDescription.setRows(3); workDescription.setLineWrap(true); workDescription.setWrapStyleWord(true);
+        workPanel.add(new JLabel("Current work · saved privately for this workspace"), BorderLayout.NORTH);
+        workPanel.add(new JScrollPane(workDescription), BorderLayout.CENTER);
+        workPanel.add(scrollRow(row(saveWork, findRemaining, continueWork)), BorderLayout.SOUTH);
+        historyPanel.add(workPanel, BorderLayout.NORTH); views.addTab("History", historyPanel);
+        AccessibilitySupport.describe(historyList, "Previous AI results", "Open a previous answer or proposal, or reuse its request. Locations are revalidated before navigation.");
+        AccessibilitySupport.describe(workDescription, "Current work description", "Save one description for this workspace, then find remaining work or prepare the next task.");
         prompt.setRows(3); transcript.setLineWrap(true); transcript.setWrapStyleWord(true); prompt.setLineWrap(true); prompt.setWrapStyleWord(true);
         contextCompletion = new AgentContextCompletion(prompt, jobs, () -> active == null ? null : new WorkspaceQueryService(boundRoot, active.policy(), boundDocuments), () -> contextSettings.get());
         JPanel entry = new JPanel(new BorderLayout(4, 4)); entry.add(new JScrollPane(prompt), BorderLayout.CENTER);
@@ -227,8 +251,8 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         var policy = new AgentPolicy(capabilities, List.of("**/README.md"), excluded, !allowForeground);
         long request = ++generation; busy = true; notice = "Connecting…"; active = null;
         transcript.setText(""); diagnostics.setText(""); locations.clear(); referencesPanel.setVisible(false); resultProposal = "";
-        lastSequence = droppedShown = 0; speaker = ""; boundRoot = scope.root(); boundSessions = scope.sessions(); boundDocuments = scope.documents();
-        workspace.setText("Workspace: " + scope.root()); controls(null);
+        lastSequence = droppedShown = 0; speaker = ""; workSaving = false; boundRoot = scope.root(); boundSessions = scope.sessions(); boundDocuments = scope.documents();
+        workspace.setText("Workspace: " + scope.root()); refreshHistory(); loadWork(); controls(null);
         startingJob = jobs.submitLongRunning("Connect agent " + selected.id(), token -> {
             var queries = new WorkspaceQueryService(scope.root(), policy, scope.documents());
             var session = new AgentSessionService(selected, queries,
@@ -245,7 +269,7 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             if (request != generation || disposed) { if (connected != null) background(connected.service()::close); return; }
             startingJob = -1; busy = false;
             if (connected == null) { notice = error == null ? "Connection cancelled." : failure(error); }
-            else { active = connected.service(); notice = connected.error(); boundRoot = active.root(); workspace.setText("Workspace: " + active.root()); }
+            else { active = connected.service(); notice = connected.error(); boundRoot = active.root(); workspace.setText("Workspace: " + active.root()); refreshHistory(); }
             refresh();
         });
     }
@@ -398,9 +422,58 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
             } else if (result != null) {
                 append("\nTask result\n" + result.summary() + "\n"); notice = "Task complete · no changes proposed.";
             }
+            if (result != null && error == null && job.getStatus() != AsyncJobService.Status.CANCELLED) {
+                history.add(root, new AgentInteractionHistory.Entry(java.time.Instant.now(), action, instruction,
+                    result.proposal(), result.answer(), result.summary()));
+                refreshHistory();
+            }
             refresh();
         });
         controls(session.snapshot());
+    }
+
+    private void clearHistory() { if (boundRoot != null) history.clear(boundRoot); refreshHistory(); }
+    private void refreshHistory() {
+        pastResults.clear(); if (boundRoot != null) history.entries(boundRoot).forEach(pastResults::addElement);
+        controls(active == null ? null : active.snapshot());
+    }
+    private void openResult() {
+        var entry = historyList.getSelectedValue(); if (entry == null || busy || submitting) return;
+        resultProposal = entry.proposal(); locations.clear();
+        if (entry.answer() != null) entry.answer().locations().forEach(locations::addElement);
+        referencesPanel.setVisible(!locations.isEmpty());
+        append("\nPrevious " + entry.action() + " · " + entry.time() + "\nRequest: " + entry.instruction() + "\n"
+            + (entry.answer() == null ? entry.summary() : entry.answer().text()) + "\n");
+        views.setSelectedIndex(0); message(resultProposal.isEmpty() ? "Previous result opened; references are checked before navigation." : "Previous proposal opened; Review changes shows its current status.");
+    }
+    private void reuseRequest() {
+        var entry = historyList.getSelectedValue(); if (entry == null || busy || submitting) return;
+        if (!prompt.getText().isBlank()) { message("Clear or send the current draft before reusing a request."); return; }
+        prepare(entry.action()); prompt.setText(entry.instruction()); views.setSelectedIndex(0); prompt.requestFocusInWindow();
+    }
+    private void useWork(boolean run) {
+        if (busy || submitting) return;
+        if (!prompt.getText().isBlank()) { message("Clear or send the current draft before preparing work."); return; }
+        try { String text = AgentInteractionHistory.workPrompt(workDescription.getText(), run); prepare(run ? AgentAction.RUN : AgentAction.ASK);
+            prompt.setText(text); views.setSelectedIndex(0); prompt.requestFocusInWindow(); }
+        catch (IllegalArgumentException invalid) { message(invalid.getMessage()); }
+    }
+    private void loadWork() {
+        workDescription.setText(""); long request = generation; Path root = boundRoot, storage = boundSessions;
+        jobs.submit("Load current agent work", token -> AgentInteractionHistory.loadWork(storage, root), (job, text, error) -> {
+            if (request != generation || disposed || !workDescription.getText().isEmpty()) return;
+            if (error != null) message("Could not load current work: " + failure(error)); else if (text != null) workDescription.setText(text);
+        });
+    }
+    private void saveWork() {
+        if (boundRoot == null || boundSessions == null || workSaving) return;
+        Path root = boundRoot, storage = boundSessions; String text = workDescription.getText(); long request = generation;
+        workSaving = true; saveWork.setEnabled(false);
+        jobs.submit("Save current agent work", token -> { AgentInteractionHistory.saveWork(storage, root, text); return text; }, (job, saved, error) -> {
+            if (request != generation || disposed) return;
+            workSaving = false;
+            message(error == null ? "Current work saved for this workspace." : failure(error));
+        });
     }
 
     private static void withdraw(WorkspaceProposalService proposals, String id) {
@@ -567,6 +640,11 @@ final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseab
         Scope available = scopes.get(); reviewWrites.setEnabled(connect.isEnabled() && available != null && available.sessions() != null);
         review.setEnabled(!resultProposal.isEmpty() || snapshot != null && snapshot.writes().stream().anyMatch(write -> !write.proposal().isEmpty()));
         actionChoice.setEnabled(!busy && !submitting && !stopping); captureSelection.setEnabled(actionChoice.isEnabled());
+        boolean idleUi = !busy && !submitting && !stopping;
+        openResult.setEnabled(idleUi && historyList.getSelectedValue() != null); reuseRequest.setEnabled(openResult.isEnabled());
+        clearHistory.setEnabled(idleUi && !pastResults.isEmpty());
+        saveWork.setEnabled(!workSaving && idleUi && boundRoot != null && boundSessions != null);
+        findRemaining.setEnabled(idleUi && boundRoot != null); continueWork.setEnabled(findRemaining.isEnabled());
         stop.setEnabled(!stopping && (busy || !disconnected));
         send.setEnabled(!busy && !submitting && !stopping && state == AgentSessionService.State.IDLE && snapshot.writes().isEmpty());
         cancel.setEnabled(!stopping && (actionJob >= 0 || state == AgentSessionService.State.PROMPTING));

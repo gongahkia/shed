@@ -338,6 +338,29 @@ class AgentSessionPanelTest {
         assertNull(opened.get());
     }
 
+    @Test void historyReopensAnswersAndReusesRequestsWithoutReplacingDrafts() throws Exception {
+        Path root = prepare("history"); Files.writeString(root.resolve("source"), "entry point\n");
+        open(); connect(); edt(() -> panel.prepare(AgentAction.ASK)); send("Find source");
+        await(() -> button("send").isEnabled() && ((JList<?>) find(panel.component(), "agent.session.history")).getModel().getSize() == 1);
+        edt(() -> {
+            ((JList<?>) find(panel.component(), "agent.session.history")).setSelectedIndex(0);
+            text("prompt").setText("keep draft"); button("reuseRequest").doClick(); assertEquals("keep draft", text("prompt").getText());
+            text("prompt").setText(""); button("reuseRequest").doClick(); assertEquals("Find source", text("prompt").getText());
+            button("openResult").doClick();
+            assertTrue(text("transcript").getText().contains("Previous Ask/search"));
+            assertEquals(1, ((JList<?>) find(panel.component(), "agent.session.locations")).getModel().getSize());
+            button("clearHistory").doClick(); assertEquals(0, ((JList<?>) find(panel.component(), "agent.session.history")).getModel().getSize());
+            text("prompt").setText(""); text("workDescription").setText("Improve search"); button("saveWork").doClick();
+        });
+        await(() -> status().getText().contains("Current work saved"));
+        assertEquals("Improve search", AgentInteractionHistory.loadWork(temporary.resolve("sessions"), root));
+        edt(() -> {
+            button("findRemaining").doClick(); assertEquals(AgentAction.ASK, combo("action").getSelectedItem());
+            assertTrue(text("prompt").getText().contains("Improve search"));
+            text("prompt").setText(""); button("continueWork").doClick(); assertEquals(AgentAction.RUN, combo("action").getSelectedItem());
+        });
+    }
+
     private Path prepare(String name) throws Exception {
         Path root = Files.createDirectory(temporary.resolve(name)); scope.set(new AgentSessionPanel.Scope(root, WorkspaceDocumentSource.diskOnly(), temporary.resolve("sessions")));
         provider.set(new AgentProvider("fixture", AcpConnectionTest.javaCommand(AcpSdkAgentFixture.class.getName(), root.resolve("source").toString()),

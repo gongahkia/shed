@@ -49,6 +49,16 @@ Authenticate your model provider through OpenCode, then opt into completion with
 
 Current evidence and reproduction commands are recorded in [AI acceptance](AI_ACCEPTANCE.md). Deterministic tests cover all four workflows, transport failure/cancellation, malformed and stale proposals, review/apply/undo, bounded context and navigable references. Native fixture checks exercise the actual editor without invoking a model. A valid schema and matching document versions do not establish semantic correctness: users must review proposed code, and model answers can still be wrong. Hosted-model quality and provider credits are intentionally outside the final engineering sign-off.
 
+## Context, previous results and current work
+
+Type `@` in an action prompt for file suggestions or `#` for configured skills. Arrow keys choose, Tab/Enter insert, Escape dismisses, and Control Space refreshes. Quoted paths support spaces. Explicit sources use frozen unsaved text where available; project instructions are loaded from workspace root through the active file's directory. Activity lists the shared sources. See `agent.context.instructions` and `agent.context.rules` in [configuration](CONFIG.md).
+
+History retains the latest 50 results per workspace (bounded to 2 Mi characters across up to eight workspaces for the panel lifetime). Open result restores answer references or the proposal's review link; references still undergo version validation. Reuse request prepares an editable prompt without sending it or overwriting an existing draft. Clear history removes the current workspace's result list, not its proposal journal.
+
+The History tab also saves one work description (up to 7,500 characters) in owner-only session storage outside the project. Find remaining work prepares Ask/search; Continue work prepares Run task. Neither sends automatically. Save an empty description to clear it. This is a reusable description, not a task dashboard or background scheduler.
+
+See [the comparison ledger](AI_PARITY.md) for the remaining code parity work.
+
 ## Historical roadmap (superseded)
 
 The following ledger records the previous implementation scope and the foundations it produced. Pending entries are historical, not commitments for the focused AI goal.

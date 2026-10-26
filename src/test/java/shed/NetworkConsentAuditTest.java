@@ -87,7 +87,7 @@ public class NetworkConsentAuditTest {
         assertEquals(Set.of("MarkdownPreviewAssets.java", "UpdateMetadataTransport.java"), sourcesContaining("HttpClient.newBuilder("));
         assertEquals(Set.of("DebugAdapterTransport.java", "WorkspaceBridgeClient.java"), sourcesContaining("new Socket("));
         assertEquals(Set.of("WorkspaceBridgeServer.java"), sourcesContaining("new ServerSocket("));
-        assertEquals(Set.of("EditActionController.java", "LspController.java", "MarkdownController.java", "TerminalController.java", "UpdateController.java"), sourcesContaining(".browse("));
+        assertEquals(Set.of("AgentQuestions.java", "EditActionController.java", "LspController.java", "MarkdownController.java", "TerminalController.java", "UpdateController.java"), sourcesContaining(".browse("));
         assertEquals(Set.of(
             "AcpConnection.java", "BackgroundTaskProcess.java", "BuiltInRemoteWorkspaceProviders.java", "BuiltInScmContributions.java", "DebugAdapterTransport.java", "DevContainerController.java", "DevContainerRuntime.java", "ExternalFormatter.java",
             "DockerRuntime.java", "JobQuickfixController.java", "LanguageServerDetector.java", "LspClient.java", "NotebookController.java",

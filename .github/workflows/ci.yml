@@ -35,7 +35,7 @@ jobs:
           java-version: '21'
           cache: maven
       - name: Test and package portable JAR
-        run: mvn -B -ntp -Djava.awt.headless=true clean package
+        run: mvn -B -ntp '-Djava.awt.headless=true' clean package
       - name: Retain test reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

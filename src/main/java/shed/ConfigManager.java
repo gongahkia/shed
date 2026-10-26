@@ -666,6 +666,19 @@ public class ConfigManager {
                 errors.add(tomlLocation(result.inputPositionOf(entry.getKey())) + error.getMessage() + fallbackDescription(key));
             }
         }
+        // A local-provider opt-in must not silently become an OpenCode opt-in.
+        // Remove obsolete keys before persistence so enabling completion again survives reload.
+        boolean legacyCompletion = false;
+        for (String key : List.of("ai.completion.endpoint", "ai.completion.model")) {
+            if (parsed.remove(key) != null) {
+                legacyCompletion = true;
+                if (repairs != null) {
+                    repairs.add(new ConfigRepair(key, "legacy local completion setting",
+                        "removed; enable ai.completion.enabled explicitly to use OpenCode"));
+                }
+            }
+        }
+        if (legacyCompletion) parsed.put("ai.completion.enabled", false);
         if (validateDebug) {
             DebugAdapterRegistry.Validation debug = DebugAdapterRegistry.validate(parsed);
             for (DebugAdapterRegistry.Error error : debug.errors()) {

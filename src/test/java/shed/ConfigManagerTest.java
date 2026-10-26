@@ -89,6 +89,33 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void legacyCompletionRequiresFreshOpenCodeOptInAndRemovesObsoleteSettings() throws Exception {
+        for (String legacyKey : List.of("ai.completion.endpoint", "ai.completion.model")) {
+            Path home = tempDir.resolve(legacyKey);
+            Path configFile = home.resolve(".shed/config.toml");
+            Files.createDirectories(configFile.getParent());
+            String original = "schema_version = 1\n\"ai.completion.enabled\" = true\n\""
+                + legacyKey + "\" = \"old-provider\"\n\"tab.size\" = 8\n";
+            Files.writeString(configFile, original);
+            System.setProperty("user.home", home.toString());
+
+            ConfigManager config = new ConfigManager();
+            assertFalse(config.hasConfigLoadFailure());
+            assertFalse(InlineCompletionSettings.configured(config).enabled());
+            assertEquals("absent", config.get(legacyKey, "absent"));
+            assertEquals(8, config.getTabSize());
+            assertTrue(config.getConfigLoadReport().contains("enable ai.completion.enabled explicitly"));
+            assertEquals(original, Files.readString(configFile));
+
+            config.persistSuggestedRepairs();
+            assertFalse(Files.readString(configFile).contains(legacyKey));
+            assertFalse(InlineCompletionSettings.configured(new ConfigManager()).enabled());
+            config.setAndPersist("ai.completion.enabled", "true");
+            assertTrue(InlineCompletionSettings.configured(new ConfigManager()).enabled());
+        }
+    }
+
+    @Test
     void builtInThemesKeepDerivedSelectionAndLineNumberTextReadable() {
         System.setProperty("user.home", tempDir.resolve("theme-contrast").toString());
         ConfigManager config = new ConfigManager();

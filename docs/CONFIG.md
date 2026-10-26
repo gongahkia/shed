@@ -140,6 +140,8 @@ Shed keeps an independent client for each `(file extension, workspace root)` pai
 | `ai.completion.enabled` | `false` | bool | Opt into inline suggestions through the same OpenCode command/model |
 | `ai.completion.delay.ms` | `500` | int | Idle typing delay, 100–5,000 ms |
 | `ai.completion.timeout.ms` | `10000` | int | Whole-response deadline, 100–30,000 ms |
+
+Configurations containing the retired `ai.completion.endpoint` or `ai.completion.model` keys load with completion disabled and those keys removed from active settings. The configuration report explains the migration; `:config heal` saves it. Explicitly enable `ai.completion.enabled` again to opt into OpenCode. This prevents an old local-provider opt-in from silently sending context through a different provider.
 | `lsp.completion.enabled` | `true` | bool | Completion requests |
 | `lsp.completion.auto.show` | `true` | bool | Show suggestions while typing; applies live |
 | `lsp.completion.delay.ms` | `90` | integer `0..1000` | Idle debounce before automatic suggestions; applies live |

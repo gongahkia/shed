@@ -15,12 +15,31 @@ import org.junit.jupiter.api.io.TempDir;
 
 class AgentSessionServiceTest {
     @TempDir Path root;
+    private final List<AgentSessionService> sessions = new java.util.ArrayList<>();
+
+    @org.junit.jupiter.api.AfterEach void closeProcesses() throws Exception {
+        for (var session : sessions) {
+            session.close();
+            session.termination().get(10, TimeUnit.SECONDS);
+        }
+        try (var paths = Files.walk(root)) {
+            for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                FixtureCleanup.deleteEventually(path);
+            }
+        }
+    }
+
+    private AgentSessionService session(AgentProvider provider, WorkspaceQueryService queries) throws Exception {
+        var service = new AgentSessionService(provider, queries);
+        sessions.add(service);
+        return service;
+    }
 
     @Test void independentSdkReadsTheLiveUnsavedBufferAndStreamsBeforeTurnCompletion() throws Exception {
         Path file = Files.writeString(root.resolve("source"), "saved\r\n"); FileBuffer buffer = new FileBuffer(file.toFile());
         try (var editor = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root)) {
             SwingUtilities.invokeAndWait(() -> buffer.replaceContentUndoably("unsaved human work\n"));
-            try (var service = new AgentSessionService(sdk(file), queries(editor))) {
+            try (var service = session(sdk(file), queries(editor))) {
                 service.initialize().get(15, TimeUnit.SECONDS); assertEquals(AgentSessionService.State.READY, service.snapshot().state());
                 assertTrue(Boolean.TRUE.equals(service.snapshot().capabilities().get("loadSession")));
                 service.newSession().get(10, TimeUnit.SECONDS);
@@ -35,7 +54,7 @@ class AgentSessionServiceTest {
     }
 
     @Test void independentSdkPermissionsAreExplicitAndCancellationAllowsAnotherTurn() throws Exception {
-        try (var service = new AgentSessionService(sdk(root.resolve("source")), queries(WorkspaceDocumentSource.diskOnly()))) {
+        try (var service = session(sdk(root.resolve("source")), queries(WorkspaceDocumentSource.diskOnly()))) {
             service.initialize().get(15, TimeUnit.SECONDS); service.newSession().get(10, TimeUnit.SECONDS);
             var prompt = service.prompt("permission"); AcpConnectionTest.await(() -> service.snapshot().permissions().size() == 1);
             assertFalse(prompt.isDone());
@@ -50,7 +69,7 @@ class AgentSessionServiceTest {
     }
 
     @Test void permissionDecisionsCannotEscalateTheWorkspacePolicy() throws Exception {
-        try (var service = new AgentSessionService(sdk(root.resolve("source")), queries(WorkspaceDocumentSource.diskOnly()))) {
+        try (var service = session(sdk(root.resolve("source")), queries(WorkspaceDocumentSource.diskOnly()))) {
             service.initialize().get(15, TimeUnit.SECONDS); service.newSession().get(10, TimeUnit.SECONDS);
             var prompt = service.prompt("execute"); AcpConnectionTest.await(() -> !service.snapshot().permissions().isEmpty());
             String id = service.snapshot().permissions().getFirst().id();
@@ -61,11 +80,11 @@ class AgentSessionServiceTest {
     }
 
     @Test void loadingRequiresAdvertisedCapabilityAndDoesNotPretendToPersistLocally() throws Exception {
-        try (var service = new AgentSessionService(sdk(root.resolve("source")), queries(WorkspaceDocumentSource.diskOnly()))) {
+        try (var service = session(sdk(root.resolve("source")), queries(WorkspaceDocumentSource.diskOnly()))) {
             service.initialize().get(15, TimeUnit.SECONDS); service.loadSession("sdk-session").get(10, TimeUnit.SECONDS);
             assertEquals("sdk-session", service.snapshot().sessionId()); assertEquals("end_turn", service.prompt("resumed").get(10, TimeUnit.SECONDS).get("stopReason"));
         }
-        try (var service = new AgentSessionService(provider("echo"), queries(WorkspaceDocumentSource.diskOnly()))) {
+        try (var service = session(provider("echo"), queries(WorkspaceDocumentSource.diskOnly()))) {
             service.initialize().get(10, TimeUnit.SECONDS);
             assertThrows(AcpException.class, () -> service.loadSession("unknown")); assertEquals(AgentSessionService.State.READY, service.snapshot().state());
         }
@@ -74,7 +93,7 @@ class AgentSessionServiceTest {
     @Test void unsupportedProtocolIsStoppedAndReadOnlyPolicyDoesNotLaunchAProcess() throws Exception {
         assertEquals(WorkspaceApiException.Code.PERMISSION_DENIED, assertThrows(WorkspaceApiException.class,
             () -> new AgentSessionService(provider("echo"), new WorkspaceQueryService(root, AgentPolicy.readOnly(), WorkspaceDocumentSource.diskOnly()))).code());
-        try (var service = new AgentSessionService(provider("version"), queries(WorkspaceDocumentSource.diskOnly()))) {
+        try (var service = session(provider("version"), queries(WorkspaceDocumentSource.diskOnly()))) {
             assertThrows(ExecutionException.class, () -> service.initialize().get(10, TimeUnit.SECONDS));
             assertEquals(AgentSessionService.State.FAILED, service.snapshot().state()); assertFalse(service.snapshot().diagnostics().running());
             assertThrows(AcpException.class, service::newSession);
@@ -82,7 +101,7 @@ class AgentSessionServiceTest {
     }
 
     @Test void unresponsiveCancellationClosesTheOwnedConnectionInsteadOfClaimingSuccess() throws Exception {
-        try (var service = new AgentSessionService(provider("ignore-cancel"), queries(WorkspaceDocumentSource.diskOnly()))) {
+        try (var service = session(provider("ignore-cancel"), queries(WorkspaceDocumentSource.diskOnly()))) {
             service.initialize().get(10, TimeUnit.SECONDS); service.newSession().get(10, TimeUnit.SECONDS);
             var prompt = service.prompt("work"); service.cancel();
             assertThrows(ExecutionException.class, () -> prompt.get(10, TimeUnit.SECONDS));
@@ -97,7 +116,7 @@ class AgentSessionServiceTest {
         Path outside = Files.createTempFile("shed-acp-outside", ".txt");
         try {
             Files.writeString(outside, "outside");
-            try (var service = new AgentSessionService(sdk(outside), queries(WorkspaceDocumentSource.diskOnly()))) {
+            try (var service = session(sdk(outside), queries(WorkspaceDocumentSource.diskOnly()))) {
                 service.initialize().get(15, TimeUnit.SECONDS); service.newSession().get(10, TimeUnit.SECONDS);
                 assertThrows(ExecutionException.class, () -> service.prompt("read").get(10, TimeUnit.SECONDS));
                 assertEquals(AgentSessionService.State.IDLE, service.snapshot().state());
@@ -109,7 +128,7 @@ class AgentSessionServiceTest {
     }
 
     @Test void advertisedModernAndLegacyModelsCanChangeBetweenTurnsWithoutRestart() throws Exception {
-        for (String mode : List.of("models", "legacy-models")) try (var service = new AgentSessionService(provider(mode), queries(WorkspaceDocumentSource.diskOnly()))) {
+        for (String mode : List.of("models", "legacy-models")) try (var service = session(provider(mode), queries(WorkspaceDocumentSource.diskOnly()))) {
             service.initialize().get(10, TimeUnit.SECONDS); service.newSession().get(10, TimeUnit.SECONDS);
             assertEquals("provider/fast", service.models().current());
             assertThrows(AcpException.class, () -> service.selectModel("not-advertised"));

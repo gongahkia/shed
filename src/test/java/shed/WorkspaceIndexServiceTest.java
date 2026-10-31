@@ -219,9 +219,15 @@ public class WorkspaceIndexServiceTest {
         try {
             WorkspaceIndexService.BuildResult built = service.build(true, root, WorkspaceIndexService.Observer.NO_OP);
             assertEquals(List.of("source.txt"), built.index().entries().stream().map(WorkspaceIndexService.Entry::relativePath).toList());
-            WorkspaceIndexService.BuildResult reused = service.recover(true, root, WorkspaceIndexService.Cancellation.NONE,
-                WorkspaceIndexService.Observer.NO_OP);
-            assertEquals("using in-memory index", reused.status().message());
+            write(root.resolve(".shed/index/watch-noise.txt"), "cache metadata");
+            // Watch delivery is asynchronous; exercise delayed cache/directory notifications too.
+            for (int attempt = 0; attempt < 20; attempt++) {
+                Thread.sleep(25);
+                WorkspaceIndexService.BuildResult reused = service.recover(true, root, WorkspaceIndexService.Cancellation.NONE,
+                    WorkspaceIndexService.Observer.NO_OP);
+                assertEquals("using in-memory index", reused.status().message());
+                org.junit.jupiter.api.Assertions.assertSame(built.index(), reused.index());
+            }
         } finally {
             service.close();
         }

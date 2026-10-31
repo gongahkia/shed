@@ -260,6 +260,11 @@ final class WorkspaceIndexService implements AutoCloseable {
                     if (!(event.context() instanceof Path name)) return null;
                     Path file = directory.resolve(name).normalize();
                     if (!file.startsWith(watchedRoot)) return null;
+                    if (file.startsWith(storageDirectory)) continue;
+                    // Windows also reports directory metadata changes for writes below it.
+                    // Child create/delete events handle structural changes separately.
+                    if (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
+                        && Files.isDirectory(file, LinkOption.NOFOLLOW_LINKS)) continue;
                     Path relative = watchedRoot.relativize(file);
                     if (WorkspaceInternalPaths.containsRecoveryArtifact(relative)) continue;
                     if (relative.getNameCount() == 0 || ".gitignore".equals(name.toString())

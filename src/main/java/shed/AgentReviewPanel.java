@@ -401,7 +401,9 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
             } else if (result != null) completion.accept(result);
             else message("Review operation was cancelled. Refresh to inspect its persisted outcome.");
             controls();
-            if (requestedProposal != null && !busy && !dirty) SwingUtilities.invokeLater(this::refresh);
+            // Continue navigation in this EDT callback so no editable frame is exposed
+            // between the current preview and an already requested proposal.
+            if (requestedProposal != null && !busy && !dirty) refresh();
         });
     }
 

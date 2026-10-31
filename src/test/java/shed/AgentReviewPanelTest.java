@@ -67,6 +67,33 @@ class AgentReviewPanelTest {
         assertEquals("first proposed\n", base.service().preview(first, 0).proposed());
     }
 
+    @Test void queuedProposalNavigationDoesNotExposeAnEditableIntermediatePreview() throws Exception {
+        var base = scope("project"); current.set(base);
+        Files.writeString(base.root().resolve("source"), "original\n");
+        String id = (String) base.service().propose("request", "task", "turn", List.of(input(base, "source", "proposed\n"))).get("id");
+        var executor = Executors.newSingleThreadExecutor();
+        CountDownLatch blocked = new CountDownLatch(1), release = new CountDownLatch(1);
+        executor.submit(() -> { blocked.countDown(); release.await(10, TimeUnit.SECONDS); return null; });
+        assertTrue(blocked.await(5, TimeUnit.SECONDS));
+        jobs = new AsyncJobService(executor, 50, null);
+        var editableBetweenLoads = new java.util.concurrent.CompletableFuture<Boolean>();
+        var observed = new java.util.concurrent.atomic.AtomicBoolean();
+        try {
+            open();
+            edt(() -> {
+                panel.showProposal(id);
+                button("apply").addPropertyChangeListener("enabled", event -> {
+                    if (Boolean.TRUE.equals(event.getNewValue()) && observed.compareAndSet(false, true)) {
+                        SwingUtilities.invokeLater(() -> editableBetweenLoads.complete(text("proposed").isEditable()));
+                    }
+                });
+            });
+        } finally { release.countDown(); }
+        assertFalse(editableBetweenLoads.get(10, TimeUnit.SECONDS));
+        ready();
+        edt(() -> assertEquals("proposed\n", text("proposed").getText()));
+    }
+
     @Test void briefJournalContentionDoesNotRequireRepeatingTheReviewAction() throws Exception {
         var base = scope("project"); current.set(base); Files.writeString(base.root().resolve("source"), "original\n");
         base.service().propose("request", "task", "turn", List.of(input(base, "source", "proposed\n")));

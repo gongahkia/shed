@@ -17,7 +17,7 @@ import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.geom.Rectangle2D;
 
-final class BlockCaret extends DefaultCaret {
+class BlockCaret extends DefaultCaret {
     private static final long serialVersionUID = 1L;
 
     private final CaretMotion motion = new CaretMotion();
@@ -169,7 +169,8 @@ final class BlockCaret extends DefaultCaret {
             if (dot < 0 || dot >= component.getDocument().getLength()) {
                 return;
             }
-            String glyph = component.getDocument().getText(dot, 1);
+            String glyph = component instanceof javax.swing.JPasswordField password && password.echoCharIsSet()
+                ? String.valueOf(password.getEchoChar()) : component.getDocument().getText(dot, 1);
             if (glyph.isEmpty() || glyph.charAt(0) == '\n' || glyph.charAt(0) == '\r' || glyph.charAt(0) == '\t') {
                 return;
             }

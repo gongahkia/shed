@@ -87,7 +87,14 @@ final class PtyTerminalPane implements AutoCloseable {
 
         PtyTerminalConnector connector = new PtyTerminalConnector(process, command, StandardCharsets.UTF_8);
         ShedTerminalSettingsProvider settingsProvider = new ShedTerminalSettingsProvider(configManager, terminalFont);
-        JediTermWidget widget = new JediTermWidget(INITIAL_COLUMNS, INITIAL_ROWS, settingsProvider);
+        JediTermWidget widget = new JediTermWidget(INITIAL_COLUMNS, INITIAL_ROWS, settingsProvider) {
+            @Override protected com.jediterm.terminal.ui.TerminalPanel createTerminalPanel(
+                    com.jediterm.terminal.ui.settings.SettingsProvider settings, com.jediterm.terminal.model.StyleState style,
+                    com.jediterm.terminal.model.TerminalTextBuffer buffer) {
+                return new AnimatedTerminalPanel(settings, buffer, style);
+            }
+        };
+        ((AnimatedTerminalPanel) widget.getTerminalPanel()).setCursorColumnSupplier(() -> widget.getTypeAheadManager().getCursorX() - 1);
         widget.setTtyConnector(connector);
         TerminalShellIntegrationTracker shellIntegration = launch.enabled() ? new TerminalShellIntegrationTracker() : null;
         if (shellIntegration != null) widget.getTerminal().addCustomCommandListener(shellIntegration::accept);

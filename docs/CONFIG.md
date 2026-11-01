@@ -541,6 +541,6 @@ Agent prompts accept `@path/to/file`, `@"path with spaces"` and `#skill-name`. T
 
 ## Caret Motion
 
-The block caret glides with a short, directional smear when navigating or clicking to reposition it. Each movement settles within 150 ms and can be redirected immediately. Editing, selecting text, changing buffers or layout, and displaying inline suggestions use the stationary caret.
+Text inputs throughout Shed, including settings search, the command palette, prompts, editable combo boxes, and terminal sessions, use a short, directional caret smear when navigating or clicking to reposition the cursor. Each movement settles within 150 ms and can be redirected immediately. Swing text edits, selections, buffer or layout changes, and inline suggestions use the stationary caret. Terminal sessions retain JediTerm’s native cursor shapes and blinking when settled, honor cursor visibility commands, and skip motion during selection, IME composition, scrolling, or focus loss. Password fields retain their masked echo character.
 
 For reduced motion, launch with `java -Dshed.caretAnimation=false -jar target/shed-2.0.0.jar`, or set `JAVA_TOOL_OPTIONS=-Dshed.caretAnimation=false` when using the Shed launcher. This is a JVM option, not a TOML setting. Embedded Swing hosts can also set the text component client property `shed.caretAnimation` to `Boolean.FALSE`.

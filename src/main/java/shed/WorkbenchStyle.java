@@ -101,31 +101,36 @@ public final class WorkbenchStyle {
         }
     }
 
-    private static final class ResourceCaret extends BlockCaret implements UIResource { }
+    private static BlockCaret workbenchCaret(String prefix) {
+        // Application-owned carets survive updateUI, preserving selections and listeners.
+        BlockCaret caret = new BlockCaret();
+        caret.setBlinkRate(UIManager.getInt(prefix + ".caretBlinkRate"));
+        return caret;
+    }
 
     public static class TextFieldUI extends BasicTextFieldUI {
         public static ComponentUI createUI(JComponent c) { return new TextFieldUI(); }
-        @Override protected javax.swing.text.Caret createCaret() { return new ResourceCaret(); }
+        @Override protected javax.swing.text.Caret createCaret() { return workbenchCaret(getPropertyPrefix()); }
     }
     public static class PasswordFieldUI extends BasicPasswordFieldUI {
         public static ComponentUI createUI(JComponent c) { return new PasswordFieldUI(); }
-        @Override protected javax.swing.text.Caret createCaret() { return new ResourceCaret(); }
+        @Override protected javax.swing.text.Caret createCaret() { return workbenchCaret(getPropertyPrefix()); }
     }
     public static class FormattedTextFieldUI extends BasicFormattedTextFieldUI {
         public static ComponentUI createUI(JComponent c) { return new FormattedTextFieldUI(); }
-        @Override protected javax.swing.text.Caret createCaret() { return new ResourceCaret(); }
+        @Override protected javax.swing.text.Caret createCaret() { return workbenchCaret(getPropertyPrefix()); }
     }
     public static class TextAreaUI extends BasicTextAreaUI {
         public static ComponentUI createUI(JComponent c) { return new TextAreaUI(); }
-        @Override protected javax.swing.text.Caret createCaret() { return new ResourceCaret(); }
+        @Override protected javax.swing.text.Caret createCaret() { return workbenchCaret(getPropertyPrefix()); }
     }
     public static class TextPaneUI extends BasicTextPaneUI {
         public static ComponentUI createUI(JComponent c) { return new TextPaneUI(); }
-        @Override protected javax.swing.text.Caret createCaret() { return new ResourceCaret(); }
+        @Override protected javax.swing.text.Caret createCaret() { return workbenchCaret(getPropertyPrefix()); }
     }
     public static class EditorPaneUI extends BasicEditorPaneUI {
         public static ComponentUI createUI(JComponent c) { return new EditorPaneUI(); }
-        @Override protected javax.swing.text.Caret createCaret() { return new ResourceCaret(); }
+        @Override protected javax.swing.text.Caret createCaret() { return workbenchCaret(getPropertyPrefix()); }
     }
 
     static int px(int value) {

@@ -74,6 +74,9 @@ public class TexteditorSwingIntegrationTest {
             onEdt(() -> {
                 var button = descendants(shown, javax.swing.JButton.class).stream().filter(b -> "Action".equals(b.getText())).findFirst().orElseThrow();
                 assertTrue(button.getUI() instanceof WorkbenchStyle.ButtonUI);
+                for (var input : descendants(shown, javax.swing.text.JTextComponent.class)) {
+                    assertTrue(input.getCaret() instanceof BlockCaret, input.getClass().getName());
+                }
                 assertTrue(button.getPreferredSize().height >= 40);
                 var box = descendants(shown, javax.swing.JCheckBox.class).getFirst();
                 Object press = box.getInputMap().get(javax.swing.KeyStroke.getKeyStroke("pressed SPACE"));
@@ -96,6 +99,9 @@ public class TexteditorSwingIntegrationTest {
                 editor.sessionConfigController.applyRuntimeConfigFromSettings();
                 var button = descendants(shown, javax.swing.JButton.class).stream().filter(b -> "Action".equals(b.getText())).findFirst().orElseThrow();
                 assertTrue(button.getUI() instanceof WorkbenchStyle.ButtonUI);
+                for (var input : descendants(shown, javax.swing.text.JTextComponent.class)) {
+                    assertTrue(input.getCaret() instanceof BlockCaret, input.getClass().getName());
+                }
                 assertEquals(editor.resolveUiFont().getSize(), button.getFont().getSize());
                 assertTrue(button.getPreferredSize().height >= 60);
                 var field = descendants(shown, javax.swing.JTextField.class).getFirst();
@@ -2311,6 +2317,7 @@ public class TexteditorSwingIntegrationTest {
             assertEquals("Terminal opened", onEdt(() -> editor.commandHandler.execute("term")));
             EditorPane terminalEditorPane = onEdt(editor::getActivePane);
             PtyTerminalPane terminalPane = onEdt(terminalEditorPane::getTerminalPane);
+            assertTrue(onEdt(() -> terminalPane.getInputComponent() instanceof AnimatedTerminalPanel));
             FileBuffer terminalBuffer = onEdt(terminalEditorPane::getBuffer);
 
             onEdt(() -> {

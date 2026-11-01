@@ -13,10 +13,11 @@ import javax.swing.Timer;
 
 /** Adds motion while leaving JediTerm responsible for the settled cursor and terminal semantics. */
 class AnimatedTerminalPanel extends TerminalPanel {
+    private boolean disposed;
     private final CaretMotion motion = new CaretMotion();
     private final Timer animation = new Timer(16, event -> {
-        if (!isShowing() || !isFocusOwner()) resetMotion();
-        repaint();
+        if (disposed || !isShowing() || !isFocusOwner()) resetMotion();
+        repaint(0, 0, getWidth(), getHeight());
     });
     private volatile Point cursor = new Point(0, 1);
     private volatile boolean cursorVisible = true;
@@ -73,6 +74,7 @@ class AnimatedTerminalPanel extends TerminalPanel {
     private void resetMotion() {
         animation.stop();
         target = null;
+        repaint(0, 0, getWidth(), getHeight());
     }
 
     @Override public void removeNotify() {
@@ -81,6 +83,7 @@ class AnimatedTerminalPanel extends TerminalPanel {
     }
 
     @Override public void dispose() {
+        disposed = true;
         resetMotion();
         super.dispose();
     }
@@ -88,7 +91,7 @@ class AnimatedTerminalPanel extends TerminalPanel {
     @Override public void paintComponent(Graphics graphics) {
         CursorShape effectiveShape = shape == null ? defaultShape : shape;
         Rectangle bounds = cursorBounds(effectiveShape);
-        boolean enabled = isShowing() && isFocusOwner() && cursorVisible && !composing && getSelection() == null
+        boolean enabled = !disposed && isShowing() && isFocusOwner() && cursorVisible && !composing && getSelection() == null
             && !Boolean.FALSE.equals(getClientProperty("shed.caretAnimation"))
             && !"false".equalsIgnoreCase(System.getProperty("shed.caretAnimation"));
         boolean alternate = getTerminalTextBuffer().isUsingAlternateBuffer();

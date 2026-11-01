@@ -60,7 +60,7 @@ class BlockCaret extends DefaultCaret {
     private void observeDocument() {
         if (observedDocument != null) observedDocument.removeDocumentListener(edits);
         observedDocument = getComponent().getDocument();
-        observedDocument.addDocumentListener(edits);
+        if (observedDocument != null) observedDocument.addDocumentListener(edits);
     }
 
     @Override

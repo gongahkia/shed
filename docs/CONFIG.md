@@ -538,3 +538,9 @@ schema_version = 1
 Shed Dark is the default for new configurations. Shed Light provides the same neutral workbench treatment in light mode. These palettes keep the editor background stable across editing modes; the status bar reports the current mode. Existing explicit theme choices and color overrides are preserved.
 
 Agent prompts accept `@path/to/file`, `@"path with spaces"` and `#skill-name`. Typing `@` or `#` shows fuzzy suggestions; arrows select, Tab/Enter insert, Escape dismisses, and Control Space refreshes. File suggestions respect workspace ignores and access policy. References use complete unsaved text where available. Missing/ambiguous references fail before prompting. Each selected source is limited to 102,400 characters and all explicit/instruction context to 1 Mi characters. OpenCode reads short-lived full snapshots; source paths are listed in Activity. Skill names must be unique across configured directories.
+
+## Caret Motion
+
+The block caret glides with a short, directional smear when navigating or clicking to reposition it. Each movement settles within 150 ms and can be redirected immediately. Editing, selecting text, changing buffers or layout, and displaying inline suggestions use the stationary caret.
+
+For reduced motion, launch with `java -Dshed.caretAnimation=false -jar target/shed-2.0.0.jar`, or set `JAVA_TOOL_OPTIONS=-Dshed.caretAnimation=false` when using the Shed launcher. This is a JVM option, not a TOML setting. Embedded Swing hosts can also set the text component client property `shed.caretAnimation` to `Boolean.FALSE`.

@@ -1,5 +1,12 @@
 package shed;
 
+import javax.swing.Timer;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.text.Document;
+import java.beans.PropertyChangeListener;
+import java.awt.event.HierarchyListener;
+import java.awt.RenderingHints;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
@@ -12,6 +19,90 @@ import java.awt.geom.Rectangle2D;
 
 final class BlockCaret extends DefaultCaret {
     private static final long serialVersionUID = 1L;
+
+    private final CaretMotion motion = new CaretMotion();
+    private final Timer animation = new Timer(16, event -> tick());
+    private int paintedDot = -1;
+    private Rectangle paintedTarget;
+    private Rectangle paintedViewport;
+    private Document observedDocument;
+    private final DocumentListener edits = new DocumentListener() {
+        public void insertUpdate(DocumentEvent event) { resetMotion(); }
+        public void removeUpdate(DocumentEvent event) { resetMotion(); }
+        public void changedUpdate(DocumentEvent event) { resetMotion(); }
+    };
+    private final PropertyChangeListener properties = event -> {
+        if ("document".equals(event.getPropertyName())) observeDocument();
+        resetMotion();
+    };
+    private final HierarchyListener hierarchy = event -> {
+        if (getComponent() != null && !getComponent().isShowing()) resetMotion();
+    };
+
+    @Override
+    public void install(JTextComponent component) {
+        super.install(component);
+        component.addPropertyChangeListener(properties);
+        component.addHierarchyListener(hierarchy);
+        observeDocument();
+    }
+
+    @Override
+    public void deinstall(JTextComponent component) {
+        resetMotion();
+        component.removePropertyChangeListener(properties);
+        component.removeHierarchyListener(hierarchy);
+        if (observedDocument != null) observedDocument.removeDocumentListener(edits);
+        observedDocument = null;
+        super.deinstall(component);
+    }
+
+    private void observeDocument() {
+        if (observedDocument != null) observedDocument.removeDocumentListener(edits);
+        observedDocument = getComponent().getDocument();
+        observedDocument.addDocumentListener(edits);
+    }
+
+    @Override
+    public void setVisible(boolean visible) {
+        super.setVisible(visible);
+        if (!visible) resetMotion();
+    }
+
+    private void resetMotion() {
+        animation.stop();
+        repaintMotion();
+        paintedDot = -1;
+        paintedTarget = null;
+        paintedViewport = null;
+    }
+
+    private void repaintMotion() {
+        JTextComponent component = getComponent();
+        if (component == null || paintedTarget == null) return;
+        Rectangle dirty = motion.bounds().union(paintedTarget);
+        dirty.grow(2, 2);
+        component.repaint(dirty.x, dirty.y, dirty.width, dirty.height);
+    }
+
+    private void tick() {
+        JTextComponent component = getComponent();
+        if (component == null || !component.isShowing() || !isVisible()) {
+            resetMotion();
+            return;
+        }
+        repaintMotion();
+        motion.advance(System.nanoTime());
+        repaintMotion();
+        if (!motion.moving()) animation.stop();
+    }
+
+    private boolean animate(JTextComponent component) {
+        return component.isShowing() && getDot() == getMark()
+            && !Boolean.FALSE.equals(component.getClientProperty("shed.caretAnimation"))
+            && !"false".equalsIgnoreCase(System.getProperty("shed.caretAnimation"))
+            && !(component.getUI() instanceof InlineCompletionDisplay preview && preview.showing());
+    }
 
     @Override
     public void paint(Graphics g) {
@@ -26,7 +117,34 @@ final class BlockCaret extends DefaultCaret {
             }
             Rectangle bounds = modelBounds.getBounds();
             int caretWidth = Math.max(1, blockWidth(component, getDot()));
-            paintBlockCaret(g, component, bounds, caretWidth, getDot());
+            Rectangle target = new Rectangle(bounds.x, bounds.y, caretWidth, bounds.height);
+            long now = System.nanoTime();
+            // Layout changes at the same offset (scroll, resize, font) must never smear.
+            if (!animate(component) || paintedDot < 0
+                || (paintedDot == getDot() && !target.equals(paintedTarget))
+                || !component.getVisibleRect().equals(paintedViewport)
+                || (paintedTarget != null && !component.getVisibleRect().contains(paintedTarget))) {
+                motion.snap(target);
+                animation.stop();
+            } else {
+                motion.moveTo(target, now);
+            }
+            paintedDot = getDot();
+            paintedTarget = target;
+            paintedViewport = component.getVisibleRect();
+            motion.advance(now);
+            if (motion.moving() && g instanceof Graphics2D graphics) {
+                Graphics2D smear = (Graphics2D) graphics.create();
+                try {
+                    smear.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    Color color = component.getCaretColor();
+                    smear.setColor(color == null ? component.getForeground() : color);
+                    smear.fill(motion.shape());
+                } finally { smear.dispose(); }
+                if (!animation.isRunning()) animation.start();
+            } else {
+                paintBlockCaret(g, component, bounds, caretWidth, getDot());
+            }
         } catch (BadLocationException ignored) {
         }
     }
@@ -70,10 +188,14 @@ final class BlockCaret extends DefaultCaret {
             return;
         }
         JTextComponent component = getComponent();
-        x = r.x;
-        y = r.y;
-        height = r.height;
-        width = component == null ? Math.max(1, r.width) : Math.max(1, blockWidth(component, getDot()));
+        Rectangle dirty = new Rectangle(r.x, r.y,
+            component == null ? Math.max(1, r.width) : Math.max(1, blockWidth(component, getDot())), r.height);
+        if (paintedTarget != null) dirty = dirty.union(paintedTarget).union(motion.bounds());
+        dirty.grow(2, 2);
+        x = dirty.x;
+        y = dirty.y;
+        height = dirty.height;
+        width = dirty.width;
         repaint();
     }
 

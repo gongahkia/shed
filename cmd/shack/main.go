@@ -27,6 +27,7 @@ func run() error {
 	noRecovery := flag.Bool("no-recovery", false, "disable recovery snapshots")
 	noLSP := flag.Bool("no-lsp", false, "disable language servers")
 	plain := flag.Bool("plain", false, "disable syntax highlighting and language servers")
+	cursorTrail := flag.Bool("cursor-trail", false, "show a short cell-based trail on cursor jumps")
 	readonly := flag.Bool("readonly", false, "open without modifying files")
 	flag.Usage = func() {
 		fmt.Fprint(flag.CommandLine.Output(), "Shack — Atomweight Terminal Text Editor IDE with Sensible Day 1 Defaults\nUsage: shack [options] [files or directory...]\n\n")
@@ -60,6 +61,9 @@ func run() error {
 	}
 	if *plain {
 		cfg.Syntax = false
+	}
+	if *cursorTrail {
+		cfg.CursorTrail = true
 	}
 	screen, err := tcell.NewScreen()
 	if err != nil {

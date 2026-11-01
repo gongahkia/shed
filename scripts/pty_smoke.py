@@ -50,15 +50,15 @@ with tempfile.TemporaryDirectory(prefix='shack-pty-') as directory:
         # Actual terminal decoding: CSI-u and xterm modifyOtherKeys, including
         # uppercase encodings. Legacy control bytes retain their original meaning.
         for sequence, title in (
-            (b'\x05', b'Commands'),
-            (b'\x1b[101;5u', b'Commands'),
-            (b'\x1b[69;5u', b'Commands'),
-            (b'\x1b[27;5;101~', b'Commands'),
-            (b'\x1b[104;5u', b'Help'),
-            (b'\x1b[27;5;104~', b'Help'),
-            (b'\x1bOQ', b'Commands'),
-            (b'\x1bOP', b'Help'),
-            (b'\x10', b'Project files'),
+            (b'\x05', b'Enter choose'),
+            (b'\x1b[101;5u', b'Enter choose'),
+            (b'\x1b[69;5u', b'Enter choose'),
+            (b'\x1b[27;5;101~', b'Enter choose'),
+            (b'\x1b[104;5u', b'Enter choose'),
+            (b'\x1b[27;5;104~', b'Enter choose'),
+            (b'\x1bOQ', b'Enter choose'),
+            (b'\x1bOP', b'Enter choose'),
+            (b'\x10', b'Enter choose'),
         ):
             settle()
             os.write(master, sequence)

@@ -76,6 +76,11 @@ func (a *App) registerCommands() {
 				a.Config.Theme = "dark"
 			}
 		}},
+		{"Toggle cursor trail", "", func() {
+			a.Config.CursorTrail = !a.Config.CursorTrail
+			a.clearCursorTrail()
+			a.Status = fmt.Sprintf("Cursor trail: %t", a.Config.CursorTrail)
+		}},
 		{"Command palette", "Ctrl+E / F2", a.palette},
 		{"Help / keyboard shortcuts", "Ctrl+H / F1", a.help},
 	}
@@ -114,6 +119,9 @@ func (a *App) palette() {
 		items = append(items, choice{label, c.Run})
 	}
 	a.list("Commands · type to filter", items)
+	if a.Dialog != nil {
+		a.Dialog.HideTitle = true
+	}
 }
 func (a *App) help() {
 	a.palette()
@@ -165,12 +173,18 @@ func (a *App) filePicker() {
 		}})
 	}
 	a.list("Project files · Ctrl+O opens any path", items)
+	if a.Dialog != nil {
+		a.Dialog.HideTitle = true
+	}
 	if len(items) == 0 {
 		a.Status = "File index is empty or still loading; Ctrl+O opens a path"
 	}
 }
 func (a *App) findPrompt() {
 	a.prompt("Find ("+a.searchMode()+")", a.Query, func(q string) { a.Query = q; a.runSearch(false, "") })
+	if a.Dialog != nil {
+		a.Dialog.HideTitle = true
+	}
 }
 func (a *App) searchMode() string {
 	if a.Regex {

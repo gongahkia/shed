@@ -492,6 +492,7 @@ Missing fields retain defaults. Example:
   "file_tree": "auto",
   "tree_width": 26,
   "minimap": false,
+  "cursor_trail": false,
   "terminal_scrollback": 500,
   "recovery": true,
   "recovery_max_bytes": 8388608,
@@ -528,6 +529,28 @@ Terminal protocols cannot distinguish every key combination, so choose keys your
 terminal actually sends. Tasks use argument arrays; use `["sh", "-c", "..."]` only
 when shell interpretation is wanted. No repository-local configuration is run.
 Theme/mouse palette changes last for the session; configuration is read at startup.
+
+### Optional cursor trail
+
+Run `./build/shack --cursor-trail .`, set `"cursor_trail": true` in your JSON
+configuration, or use **Toggle cursor trail** in the command palette. It is off
+by default. Try clicking between distant positions in the same visible pane or
+using Home/End and word jumps. The real caret moves immediately; a tapered,
+cell-based background trail contracts and fades over 150 ms. Text stays readable
+and unchanged. Adjacent movement and typing do not start animations.
+
+The trail uses ordinary terminal colors, so it can travel over SSH and tmux
+without a GUI, shader or special graphics protocol. Truecolor/256-color terminals
+give the best fade; limited palettes are coarser and monochrome terminals or
+`NO_COLOR` skip the effect. Connection latency can make animation less fluid.
+Clicks still need the terminal's usual mouse forwarding. This is a cell-based
+approximation of a cursor smear, without pixel-level blur or movement between cells.
+
+Animation ticks are capped at 30 per second and 64 sampled trail cells, with no
+animation timer running after it settles. Editing, scrolling, resizing, changing
+panes/buffers, selections and dialogs clear the trail. Embedded terminals and
+reading previews keep their existing cursor behavior. The palette toggle lasts
+for the current session.
 
 ## Current boundaries
 

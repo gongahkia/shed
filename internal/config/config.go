@@ -13,6 +13,7 @@ type Server struct {
 	Language string   `json:"language"`
 }
 type Config struct {
+	CursorTrail        bool                    `json:"cursor_trail"`
 	Debuggers          map[string]DebugProfile `json:"debuggers"`
 	TerminalShell      []string                `json:"terminal_shell"`
 	TerminalScrollback int                     `json:"terminal_scrollback"`

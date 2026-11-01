@@ -52,6 +52,7 @@ type choice struct {
 	Run   func()
 }
 type dialog struct {
+	HideTitle     bool
 	Inline        bool
 	Title, Input  string
 	Cursor, Index int
@@ -78,6 +79,10 @@ type preview struct {
 	Index                 int
 }
 type App struct {
+	cursorTrail                                                cursorTrail
+	cursorCandidate                                            cursorTarget
+	cursorTimer                                                *time.Timer
+	cursorC                                                    <-chan time.Time
 	frame                                                      tcell.CellBuffer
 	composing                                                  bool
 	lineLayouts                                                layoutCache
@@ -285,6 +290,7 @@ func (a *App) Run() error {
 		return err
 	}
 	defer a.Screen.Fini()
+	defer a.clearCursorTrail()
 	defer a.closeTerminals()
 	defer a.cancel()
 	defer a.closeDebugger()
@@ -328,6 +334,8 @@ func (a *App) Run() error {
 			update()
 		case <-a.miniC:
 			a.runMinimap()
+		case <-a.cursorC:
+			a.cursorC = nil
 		case <-a.serviceC:
 			a.serviceC = nil
 			a.services()

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 )
@@ -61,8 +62,10 @@ func (a *App) fill(x, y, width int, style tcell.Style) {
 }
 func (a *App) gutter() int { return len(strconv.Itoa(a.Current().Doc.Text.Lines())) + 3 }
 func (a *App) draw() {
+	a.cursorCandidate = cursorTarget{}
 	w, h := a.Screen.Size()
 	if w < 1 || h < 1 {
+		a.clearCursorTrail()
 		return
 	}
 	a.frame.Resize(w, h)
@@ -77,6 +80,7 @@ func (a *App) draw() {
 	b := a.Current()
 	d := b.Doc
 	if w < 20 || h < 5 {
+		a.clearCursorTrail()
 		a.put(0, 0, w, "Shack · enlarge terminal", p.text)
 		return
 	}
@@ -178,6 +182,7 @@ func (a *App) draw() {
 	if a.Menu != nil {
 		a.drawContext(p)
 	}
+	a.drawCursorTrail(time.Now(), p)
 }
 func (a *App) drawPane(index int, p palette) {
 	if a.panes[index].Buffer.Terminal != nil {
@@ -346,6 +351,7 @@ func (a *App) drawPane(index int, p palette) {
 				cx := a.columnAt(b, pos) - left
 				if cx >= 0 && cx < width {
 					a.Screen.ShowCursor(r.X+gutter+cx, r.Y+row)
+					a.trackCursor(r.X+gutter+cx, r.Y+row, pos, rectangle{r.X + gutter, r.Y, width, r.H})
 				}
 			}
 		}
@@ -372,7 +378,11 @@ func (a *App) panel(title string, p palette) (int, int, int, int) {
 }
 func (a *App) drawDialog(p palette) {
 	d := a.Dialog
-	x, y, w, h := a.panel(d.Title, p)
+	title := d.Title
+	if d.HideTitle {
+		title = ""
+	}
+	x, y, w, h := a.panel(title, p)
 	a.fill(x+1, y+2, w-2, p.text)
 	// Prompts scroll horizontally with the caret.
 	input := []rune(d.Input)

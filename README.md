@@ -28,7 +28,7 @@ Shack is an [atomweight](https://en.wikipedia.org/wiki/Atomweight) terminal IDE 
 ## Video of `Shack` editing its own source code
 
 <div align="center">
-  <video width="85%" src="https://github.com/user-attachments/assets/5b7ebf07-36ff-4ffc-badc-21389dcbdb29" controls muted playsinline preload="metadata"></video>
+  <video width="85%" src="https://github.com/user-attachments/assets/476227ec-3b7f-450d-bb92-a81e1fc7e3da" controls muted playsinline preload="metadata"></video>
 </div>
 
 ## Usage

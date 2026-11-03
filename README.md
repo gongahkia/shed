@@ -32,7 +32,7 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 ## Video of `Shed` editing its own source code
 
 <div align="center">
-  <video width="85%" src="https://github.com/user-attachments/assets/265b5974-3740-4cd2-bdfe-de75ea3059e2" controls muted playsinline preload="metadata"></video>
+  <video width="85%" src="https://github.com/user-attachments/assets/b50cf84d-e22a-486f-b8a3-20bb517b222c" controls muted playsinline preload="metadata"></video>
 </div>
 
 ## Usage

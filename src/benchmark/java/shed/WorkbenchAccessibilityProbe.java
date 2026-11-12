@@ -4,7 +4,7 @@ import java.util.*;
 import javax.accessibility.*;
 
 /** Uses actual Swing/Compose accessibility bridges, not test-only callbacks. EDT only. */
-final class LabAccessibility {
+final class WorkbenchAccessibilityProbe {
     static List<AccessibleContext> contexts(Accessible root) {
         List<AccessibleContext> result = new ArrayList<>();
         Set<AccessibleContext> seen = Collections.newSetFromMap(new IdentityHashMap<>());

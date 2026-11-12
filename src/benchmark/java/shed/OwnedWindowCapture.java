@@ -4,8 +4,13 @@ import com.sun.jna.*;
 import java.nio.file.*;
 import java.util.concurrent.TimeUnit;
 
-/** Capture only a window owned by this prototype process, even when it is behind another app. */
-final class WindowCapture {
+/** Capture only a window owned by this application process, even when it is behind another app. */
+final class OwnedWindowCapture {
+    interface Accessibility extends Library { byte AXIsProcessTrusted(); }
+    static boolean nativeInputAuthorized() {
+        if (!System.getProperty("os.name").startsWith("Mac")) return true;
+        return Native.load("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices", Accessibility.class).AXIsProcessTrusted() != 0;
+    }
     interface CoreGraphics extends Library { Pointer CGWindowListCopyWindowInfo(int option, int relative); }
     interface CoreFoundation extends Library {
         long CFArrayGetCount(Pointer array);
@@ -37,7 +42,7 @@ final class WindowCapture {
             }
         } finally {cf.CFRelease(windows);}
         if(match==0)match=fallback;
-        if(match==0)throw new IllegalStateException("Could not identify prototype-owned window: "+title);
+        if(match==0)throw new IllegalStateException("Could not identify application-owned window: "+title);
         Process process=new ProcessBuilder("/usr/sbin/screencapture","-x","-o","-l",Integer.toString(match),output.toAbsolutePath().toString()).redirectErrorStream(true).start();
         if(!process.waitFor(15,TimeUnit.SECONDS)){process.destroyForcibly();throw new IllegalStateException("Window capture timeout");}
         String diagnostic=new String(process.getInputStream().readAllBytes());

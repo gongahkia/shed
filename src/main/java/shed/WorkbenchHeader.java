@@ -93,7 +93,7 @@ final class WorkbenchHeader extends JPanel implements AutoCloseable {
             });
         }
         menu.addSeparator();
-        item(menu, "Hide docked tools", editor::hideToolWindow);
+        item(menu, "Hide docked tools", () -> { editor.hideToolWindow(); editor.requestActivePaneFocus(); });
         item(menu, "Return detached tools to dock", () -> { if (editor.toolWindowHost != null) editor.toolWindowHost.reattachAll(); });
         prepare(menu); return menu;
     }
@@ -128,6 +128,8 @@ final class WorkbenchHeader extends JPanel implements AutoCloseable {
         String rootName = root == null ? "Open workspace ▾" : (root.getFileName() == null ? root.toString() : root.getFileName().toString()) + " ▾";
         if (!rootName.equals(workspace.getText())) workspace.setText(rootName);
         workspace.setToolTipText(root == null ? "Open a workspace folder" : root.toString());
+        workspace.getAccessibleContext().setAccessibleDescription(root == null ? "No active workspace folder. Choose a folder to open."
+            : "Active workspace folder: " + root + ". Choose another folder or manage this workspace.");
         var document = documents.activeDocument();
         String path = document == null ? "No document" : document.path();
         String context = document == null ? "No document" : document.name();
@@ -136,6 +138,7 @@ final class WorkbenchHeader extends JPanel implements AutoCloseable {
                 Path file = Path.of(path).toAbsolutePath().normalize();
                 Path parent = file.getParent();
                 if (root != null && parent != null && parent.startsWith(root)) parent = root.relativize(parent);
+                else if (parent != null && parent.getFileName() != null) parent = Path.of("…", parent.getFileName().toString());
                 if (parent != null && !parent.toString().isBlank()) context += "  ·  " + parent;
             } catch (java.nio.file.InvalidPathException ignored) { }
         }

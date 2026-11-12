@@ -789,8 +789,21 @@ final class EditorUiController {
         editor.refreshLspDecorations();
         updateStatusBar();
         editor.refreshLimelight();
+        refreshPaneFocus();
     }
 
+    void refreshPaneFocus() {
+        boolean multiple = editor.editorPanes.stream().filter(pane -> !pane.isHiddenByFocusMode()).count() > 1;
+        int line = UiZoom.scale(2, editor.configManager.getUiZoom());
+        for (int index = 0; index < editor.editorPanes.size(); index++) {
+            EditorPane pane = editor.editorPanes.get(index);
+            boolean active = index == editor.activePaneIndex;
+            pane.getScrollPane().setViewportBorder(multiple ? BorderFactory.createMatteBorder(line, 0, 0, 0,
+                active ? editor.configManager.getFocusColor() : editor.configManager.getSubtleBorderColor()) : null);
+            pane.getScrollPane().putClientProperty("shed.activePane", active);
+            pane.getScrollPane().getAccessibleContext().setAccessibleName((active ? "Active editor pane " : "Editor pane ") + (index + 1));
+        }
+    }
 
     void requestActivePaneFocus() {
         EditorPane pane = getActivePane();
@@ -824,22 +837,27 @@ final class EditorUiController {
             editor.editorHostPanel.add(next, BorderLayout.CENTER);
         }
         editor.updateZenModeLayout();
+        refreshPaneFocus();
         editor.editorHostPanel.revalidate();
         editor.editorHostPanel.repaint();
     }
 
     void showToolWindow() {
         if (editor.toolWindowHost == null || editor.editorToolSplit == null) return;
+        boolean wasVisible = editor.toolWindowHost.isVisible();
         editor.toolWindowHost.setVisible(true);
-        editor.editorToolSplit.setDividerSize(6);
-        int height = Math.max(editor.getHeight(), editor.editorToolSplit.getHeight());
-        editor.editorToolSplit.setDividerLocation(Math.max(180, (int) (height * 0.62)));
+        editor.editorToolSplit.setDividerSize(UiZoom.scale(6, editor.configManager.getUiZoom()));
+        if (!wasVisible && !editor.toolWindowHost.restoreDockSize()) {
+            int height = Math.max(editor.getHeight(), editor.editorToolSplit.getHeight());
+            editor.editorToolSplit.setDividerLocation(Math.max(180, (int) (height * 0.62)));
+        }
         editor.toolWindowHost.refreshActive();
         editor.editorToolSplit.revalidate();
     }
 
     void hideToolWindow() {
         if (editor.toolWindowHost == null || editor.editorToolSplit == null) return;
+        editor.toolWindowHost.rememberDockSize();
         editor.toolWindowHost.setVisible(false);
         editor.editorToolSplit.setDividerSize(0);
         editor.editorToolSplit.setDividerLocation(1.0);
@@ -955,6 +973,7 @@ final class EditorUiController {
         editor.applyThemeColors();
         editor.revalidate();
         editor.repaint();
+        editor.sessionConfigController.restoreWorkbenchTools();
         if (editor.pendingStartupToolTab != null) {
             ToolWindowHost.Tab tab = editor.pendingStartupToolTab;
             editor.pendingStartupToolTab = null;

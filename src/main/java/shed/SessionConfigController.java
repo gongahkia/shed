@@ -17,6 +17,15 @@ final class SessionConfigController {
     private final Texteditor editor;
     private final ConfigLiveReloadService configLiveReloadService;
     private String terminalRestoreSummary;
+    private Map<String, Object> pendingToolDock;
+    private boolean pendingToolRestore;
+
+    void restoreWorkbenchTools() {
+        if (!pendingToolRestore || editor.toolWindowHost == null) return;
+        pendingToolRestore = false;
+        editor.toolWindowHost.restoreWorkbench(pendingToolDock);
+        pendingToolDock = null;
+    }
 
     SessionConfigController(Texteditor editor) {
         this.editor = editor;
@@ -723,6 +732,7 @@ final class SessionConfigController {
         }
         payload.put("layout", serializeWindowLayout(editor.windowLayoutRoot));
         payload.put("toolPlacements", editor.workbenchPlacementState.toList());
+        if (editor.toolWindowHost != null) payload.put("toolDock", editor.toolWindowHost.captureDockState());
         payload.put("activePaneIndex", editor.activePaneIndex);
         FileBuffer current = editor.getCurrentBuffer();
         if (current != null) {
@@ -867,6 +877,8 @@ final class SessionConfigController {
             MiniJson.asString(payload.get("workspaceManifestSource")));
         editor.workbenchPlacementState = WorkbenchPlacementState.fromList(payload.get("toolPlacements"));
         applySessionUiSettings(MiniJson.asObject(payload.get("uiSettings")));
+        pendingToolDock = MiniJson.asObject(payload.get("toolDock")); pendingToolRestore = true;
+        restoreWorkbenchTools();
         return true;
     }
 

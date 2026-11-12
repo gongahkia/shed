@@ -14,7 +14,7 @@ import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
 /** Shared docked tool area; controllers remain the source of truth. */
-final class ToolWindowHost extends JPanel {
+final class ToolWindowHost extends JPanel implements AutoCloseable {
     enum Tab { GIT, DEBUG, TASKS, TESTS, PROBLEMS, REPLACE, SEARCH, AGENT }
 
     private final Texteditor editor;
@@ -25,6 +25,11 @@ final class ToolWindowHost extends JPanel {
     private final EnumSet<Tab> hiddenDetachedForFocusMode = EnumSet.noneOf(Tab.class);
     private java.awt.Component selectedSurface;
     private int automaticDockHeight = -1;
+    private boolean closed;
+    private final Map<Tab, Runnable> dockTransitions = new EnumMap<>(Tab.class);
+    private int rememberedHeight = -1;
+    private boolean rememberedAutomatic;
+    private static final java.util.List<Tab> TAB_ORDER = java.util.List.of(Tab.SEARCH, Tab.GIT, Tab.DEBUG, Tab.TASKS, Tab.TESTS, Tab.PROBLEMS, Tab.REPLACE, Tab.AGENT);
 
     ToolWindowHost(Texteditor editor) {
         super(new BorderLayout());
@@ -64,7 +69,7 @@ final class ToolWindowHost extends JPanel {
     private JPanel header() {
         JPanel panel = new JPanel(new java.awt.GridLayout(1, 2, 0, 0));
         JButton close = new JButton(WorkbenchIcons.CLOSE);
-        close.addActionListener(event -> editor.hideToolWindow());
+        close.addActionListener(event -> { editor.hideToolWindow(); editor.requestActivePaneFocus(); });
         JButton detach = new JButton(WorkbenchIcons.DETACH);
         detach.addActionListener(event -> detachSelected());
         WorkbenchStyle.quiet(close); WorkbenchStyle.quiet(detach);
@@ -81,6 +86,7 @@ final class ToolWindowHost extends JPanel {
     }
 
     void showTab(Tab tab) {
+        if (closed) return;
         ToolSurface surface = surfaces.get(tab);
         if (surface == null) return;
         JDialog dialog = detached.get(tab);
@@ -90,9 +96,10 @@ final class ToolWindowHost extends JPanel {
             surface.refresh();
             return;
         }
+        boolean firstSizing = !isVisible() && rememberedHeight < 0;
         editor.showToolWindow();
         tabs.setSelectedComponent(surface.component());
-        sizeDockAutomatically(tab);
+        if (firstSizing) sizeDockAutomatically(tab);
         surface.refresh();
     }
 
@@ -105,7 +112,7 @@ final class ToolWindowHost extends JPanel {
     void focus(Tab tab) {
         ToolSurface surface = surfaces.get(tab);
         if (surface != null) javax.swing.SwingUtilities.invokeLater(() -> {
-            if (surface.component().isShowing()) surface.focus();
+            if (!closed && surface.component().isShowing()) surface.focus();
         });
     }
 
@@ -161,6 +168,7 @@ final class ToolWindowHost extends JPanel {
     }
 
     void refresh(Tab tab) {
+        if (closed) return;
         ToolSurface surface = surfaces.get(tab);
         if (surface != null) surface.refresh();
     }
@@ -191,6 +199,7 @@ final class ToolWindowHost extends JPanel {
     }
 
     void refreshActive() {
+        if (closed) return;
         for (Map.Entry<Tab, ToolSurface> entry : surfaces.entrySet()) {
             if (tabs.getSelectedComponent() == entry.getValue().component()) {
                 entry.getValue().refresh();
@@ -235,7 +244,10 @@ final class ToolWindowHost extends JPanel {
         }
     }
 
-    private void detach(Tab tab, ToolSurface surface) {
+    private void detach(Tab tab, ToolSurface surface) { detach(tab, surface, false); }
+
+    private void detach(Tab tab, ToolSurface surface, boolean restoring) {
+        if (closed || detached.containsKey(tab)) return;
         tabs.remove(surface.component());
         JDialog dialog = new JDialog(editor, title(tab), false);
         dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
@@ -244,22 +256,34 @@ final class ToolWindowHost extends JPanel {
         dialog.add(surface.component(), BorderLayout.CENTER);
         editor.editorUiController.prepareDialog(dialog, 820, 500);
         dialog.pack();
-        WorkbenchToolWindowPlacement.restore(editor, dialog, surfaceType(tab), "panel");
+        dockTransitions.put(tab, WorkbenchToolWindowPlacement.restore(editor, dialog, surfaceType(tab), "panel"));
+        if (restoring) dialog.setAutoRequestFocus(false);
         detached.put(tab, dialog);
         dialog.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override public void windowClosed(java.awt.event.WindowEvent event) { reattach(tab, surface, dialog); }
         });
-        dialog.setVisible(true);
+        if (!editor.goyoModeEnabled) dialog.setVisible(true);
+        else hiddenDetachedForFocusMode.add(tab);
         surface.refresh();
+        if (!restoring) focus(tab);
     }
 
     private void reattach(Tab tab, ToolSurface surface, Window dialog) {
         if (detached.get(tab) != dialog) return;
         detached.remove(tab);
+        Runnable dock = dockTransitions.remove(tab);
+        if (closed || editor.closingDown || !editor.isDisplayable()) return;
+        if (dock != null) dock.run();
         if (surface.component().getParent() != null) surface.component().getParent().remove(surface.component());
-        tabs.addTab(title(tab), surface.component());
+        int index = 0;
+        for (Tab candidate : TAB_ORDER) {
+            if (candidate == tab) break;
+            if (!detached.containsKey(candidate)) index++;
+        }
+        tabs.insertTab(title(tab), null, surface.component(), null, Math.min(index, tabs.getTabCount()));
         tabs.setSelectedComponent(surface.component());
         tabs.revalidate();
+        if (!editor.goyoModeEnabled) editor.showToolWindow();
     }
 
     static String title(Tab tab) {
@@ -279,10 +303,67 @@ final class ToolWindowHost extends JPanel {
         };
     }
 
-    void closeAgentWorkbench() { if (surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents) agents.close(); }
+    @Override public void close() {
+        if (closed) return;
+        closed = true;
+        for (ToolSurface surface : surfaces.values()) surface.close();
+        for (JDialog dialog : java.util.List.copyOf(detached.values())) dialog.dispose();
+        detached.clear(); dockTransitions.clear();
+    }
 
     void reattachAll() {
-        for (JDialog dialog : java.util.List.copyOf(detached.values())) dialog.dispose();
+        for (var entry : java.util.List.copyOf(detached.entrySet())) {
+            JDialog dialog = entry.getValue(); reattach(entry.getKey(), surfaces.get(entry.getKey()), dialog); dialog.dispose();
+        }
+    }
+
+    void rememberDockSize() {
+        if (!isVisible()) return;
+        rememberedHeight = Math.max(0, dockHeight());
+        rememberedAutomatic = automaticDockHeight >= 0 && Math.abs(rememberedHeight - automaticDockHeight) <= 2;
+    }
+
+    boolean restoreDockSize() {
+        if (rememberedHeight < 0) return false;
+        editor.editorToolSplit.setDividerLocation(Math.max(WorkbenchStyle.px(120), editor.editorToolSplit.getHeight() - rememberedHeight - editor.editorToolSplit.getDividerSize()));
+        automaticDockHeight = rememberedAutomatic ? dockHeight() : -1;
+        return true;
+    }
+
+    Map<String, Object> captureDockState() {
+        if (isVisible()) rememberDockSize();
+        Tab selected = Tab.SEARCH;
+        for (var entry : surfaces.entrySet()) if (entry.getValue().component() == tabs.getSelectedComponent()) selected = entry.getKey();
+        int total = editor.editorToolSplit.getHeight();
+        double ratio = total <= 0 || rememberedHeight < 0 ? .6 : 1.0 - rememberedHeight / (double) total;
+        return Map.of("visible", isVisible(), "selected", selected.name(), "ratio", Math.max(.1, Math.min(.9, ratio)));
+    }
+
+    void restoreWorkbench(Map<String, Object> dock) {
+        if (closed) return;
+        String workspace = WorkbenchToolWindowPlacement.workspaceId(editor);
+        Map<Tab, WorkbenchPlacementState.Entry> saved = new EnumMap<>(Tab.class);
+        for (Tab tab : TAB_ORDER) {
+            var placement = editor.workbenchPlacementState.get(workspace, surfaceType(tab), "panel");
+            if (placement != null) saved.put(tab, placement);
+        }
+        reattachAll();
+        for (Tab tab : TAB_ORDER) {
+            var entry = saved.get(tab);
+            if (entry != null && entry.mode() == WorkbenchPlacementState.Mode.DETACHED && "primary".equals(entry.ownerWindowId())) detach(tab, surfaces.get(tab), true);
+        }
+        if (dock == null) return;
+        try {
+            Tab selected = Tab.valueOf(String.valueOf(dock.get("selected")));
+            if (!detached.containsKey(selected)) tabs.setSelectedComponent(surfaces.get(selected).component());
+        } catch (IllegalArgumentException ignored) { }
+        if (dock.get("ratio") instanceof Number number && Double.isFinite(number.doubleValue()) && number.doubleValue() >= .1 && number.doubleValue() <= .9) {
+            editor.validate(); rememberedHeight = (int) Math.round(editor.editorToolSplit.getHeight() * (1 - number.doubleValue())); rememberedAutomatic = false;
+        }
+        if (Boolean.TRUE.equals(dock.get("visible"))) { editor.showToolWindow(); restoreDockSize(); }
+        else {
+            int savedHeight = rememberedHeight; editor.hideToolWindow(); rememberedHeight = savedHeight; rememberedAutomatic = false;
+        }
     }
 
     interface ToolSurface {
@@ -290,6 +371,7 @@ final class ToolWindowHost extends JPanel {
         void refresh();
         default void refreshAppearance() { }
         default void focus() { }
+        default void close() { }
     }
 
 

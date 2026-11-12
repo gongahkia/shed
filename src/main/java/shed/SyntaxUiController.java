@@ -476,6 +476,7 @@ final class SyntaxUiController {
         if (editor.inlineFindBar != null) editor.inlineFindBar.refreshAppearance();
         if (editor.openEditorsBar != null) editor.openEditorsBar.refreshAppearance();
         if (editor.workbenchHeader != null) editor.workbenchHeader.refreshAppearance();
+        editor.editorUiController.refreshPaneFocus();
         Color editorForeground = editor.configManager.getEditorForeground();
         Color caretColor = editor.configManager.getCaretColor();
         Color selectionColor = editor.configManager.getSelectionColor();

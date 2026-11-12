@@ -3410,6 +3410,54 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void toolLayoutRetainsManualSizeAndRestoresDetachedPlacementFromSession() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-tool-session"));
+        Path root = Files.createDirectories(tempDir.resolve("tool-session-project"));
+        Path source = Files.writeString(root.resolve("source.txt"), "source\n");
+        Path session = tempDir.resolve("tool-layout.json");
+        Texteditor editor = createEditor(home, source);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> { editor.setSize(1100, 820); editor.workspaceController.addFolder(root, true); editor.showToolWindow(ToolWindowHost.Tab.TASKS); return null; });
+            flushEdt();
+            int divider = onEdt(() -> { editor.editorToolSplit.setDividerLocation(300); return editor.editorToolSplit.getDividerLocation(); });
+            onEdt(() -> { editor.hideToolWindow(); return null; }); flushEdt();
+            onEdt(() -> {
+                editor.showToolWindow(ToolWindowHost.Tab.DEBUG);
+                assertEquals(divider, editor.editorToolSplit.getDividerLocation(), 2, "reopening another tool must preserve a manually sized dock");
+                editor.showToolWindow(ToolWindowHost.Tab.TASKS);
+                descendants(editor.toolWindowHost, javax.swing.JButton.class).stream()
+                    .filter(b -> "Detach selected tool".equals(b.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow().doClick();
+                return null;
+            });
+            assertTrue(awaitUiState(() -> Arrays.stream(editor.getOwnedWindows()).anyMatch(w -> w instanceof javax.swing.JDialog d && d.isShowing() && "Tasks".equals(d.getTitle()))));
+            onEdt(() -> {
+                var floating = Arrays.stream(editor.getOwnedWindows()).filter(w -> w instanceof javax.swing.JDialog d && d.isShowing() && "Tasks".equals(d.getTitle())).findFirst().orElseThrow();
+                floating.setBounds(75, 80, 750, 450);
+                var dock = editor.toolWindowHost.captureDockState();
+                editor.toolWindowHost.restoreWorkbench(dock); // Same placement model must also be safe.
+                assertTrue(editor.sessionConfigController.saveSession(session.toString()).startsWith("Session saved:"));
+                return null;
+            });
+            onEdt(() -> { editor.toolWindowHost.reattachAll(); return null; }); flushEdt();
+            onEdt(() -> {
+                assertEquals(WorkbenchPlacementState.Mode.DOCKED, editor.workbenchPlacementState.get(root.toRealPath().toString(), WorkbenchLayout.SurfaceType.TASKS, "panel").mode());
+                assertTrue(editor.sessionConfigController.loadSession(session.toString(), true).startsWith("Restored session:"));
+                return null;
+            });
+            assertTrue(awaitUiState(() -> Arrays.stream(editor.getOwnedWindows()).anyMatch(w -> w instanceof javax.swing.JDialog d && d.isShowing() && "Tasks".equals(d.getTitle()))));
+            onEdt(() -> {
+                var floating = Arrays.stream(editor.getOwnedWindows()).filter(w -> w instanceof javax.swing.JDialog d && d.isShowing() && "Tasks".equals(d.getTitle())).findFirst().orElseThrow();
+                assertEquals(new Rectangle(75, 80, 750, 450), floating.getBounds());
+                assertEquals(WorkbenchPlacementState.Mode.DETACHED, editor.workbenchPlacementState.get(root.toRealPath().toString(), WorkbenchLayout.SurfaceType.TASKS, "panel").mode());
+                floating.dispose(); return null;
+            });
+            assertTrue(awaitUiState(() -> editor.workbenchPlacementState.get(root.toRealPath().toString(), WorkbenchLayout.SurfaceType.TASKS, "panel").mode() == WorkbenchPlacementState.Mode.DOCKED));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void settingsValidationKeepsDraftsInlineAndModifiedFilterCanResetDefaults() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-settings-validation"));

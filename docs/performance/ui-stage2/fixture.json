@@ -1,0 +1,14 @@
+{
+  "bytes": 104857600,
+  "sha256": "c96a64d76b9b5f17714f2e282a7275747eaee36748fafa10ff515bb6455e626e",
+  "block_ascii": "0123456789 alpha beta gamma delta epsilon zeta theta eta\n",
+  "generation": "Repeat the ASCII block to exactly bytes, truncating the last block.",
+  "iterations": 3,
+  "java_flags": [
+    "-Xms64m",
+    "-Xmx512m"
+  ],
+  "benchmark": "shed.LargeFileBenchmark",
+  "baseline_jar_sha256": "381b24dc0c3155ce08abaeeef05bfea0a37390d9f8a209d9582ce564c7cb6fe4",
+  "final_jar_sha256": "7173c05d062b55611d800938d277acd44ae0016b1b10f7f625ca2195693efebb"
+}

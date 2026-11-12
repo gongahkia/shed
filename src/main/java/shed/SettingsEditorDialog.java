@@ -51,6 +51,7 @@ final class SettingsEditorDialog extends JDialog {
     }
 
     private final Texteditor editor;
+    private final SettingsApplication application;
     private final JTextField search = new JTextField();
     private final JList<String> categories = new JList<>();
     private final JPanel settings = new SettingsList();
@@ -65,6 +66,7 @@ final class SettingsEditorDialog extends JDialog {
     private SettingsEditorDialog(Texteditor editor) {
         super(editor, "Settings", false);
         this.editor = editor;
+        this.application = editor.settingsApplication;
         theme = DialogTheme.from(editor.configManager);
         settings.addPropertyChangeListener("font", event -> {
             laidOutDetailWidth = -1;
@@ -155,7 +157,7 @@ final class SettingsEditorDialog extends JDialog {
         javax.swing.DefaultListModel<String> model = new javax.swing.DefaultListModel<>();
         model.addElement("All");
         LinkedHashSet<String> values = new LinkedHashSet<>();
-        for (TypedSettings.Descriptor descriptor : editor.configManager.typedSettingDescriptors()) values.add(descriptor.category());
+        for (SettingsApplication.Setting descriptor : application.search("")) values.add(descriptor.category());
         for (String value : values) model.addElement(value);
         categories.setModel(model);
         categories.setSelectedValue(selected == null ? "All" : selected, true);
@@ -174,9 +176,9 @@ final class SettingsEditorDialog extends JDialog {
             laidOutDetailWidth = -1;
             theme = DialogTheme.from(editor.configManager);
             String category = categories.getSelectedValue();
-            List<TypedSettings.Descriptor> descriptors = editor.configManager.searchTypedSettings(search.getText());
+            List<SettingsApplication.Setting> descriptors = application.search(search.getText());
             int row = 0;
-            for (TypedSettings.Descriptor descriptor : descriptors) {
+            for (SettingsApplication.Setting descriptor : descriptors) {
                 if (category != null && !"All".equals(category) && !category.equals(descriptor.category())) continue;
                 addDescriptor(descriptor, row++);
             }
@@ -248,7 +250,7 @@ final class SettingsEditorDialog extends JDialog {
         settings.repaint();
     }
 
-    private void addDescriptor(TypedSettings.Descriptor descriptor, int row) {
+    private void addDescriptor(SettingsApplication.Setting descriptor, int row) {
         JPanel panel = new JPanel(new BorderLayout(0, uiPixels(4)));
         panel.setOpaque(true);
         panel.setBackground(theme.surface());
@@ -283,7 +285,7 @@ final class SettingsEditorDialog extends JDialog {
         settings.add(panel, target);
     }
 
-    private JComponent control(TypedSettings.Descriptor descriptor) {
+    private JComponent control(SettingsApplication.Setting descriptor) {
         if ("boolean".equals(descriptor.type())) {
             JCheckBox box = new JCheckBox();
             box.setSelected(Boolean.parseBoolean(descriptor.currentValue()));
@@ -322,9 +324,14 @@ final class SettingsEditorDialog extends JDialog {
         return field;
     }
 
+    @Override public void dispose() {
+        searchRefresh.stop();
+        super.dispose();
+    }
+
     private boolean persist(String key, String value) {
         if (refreshing) return false;
-        String result = editor.setConfigOptionPersistent(key, value);
+        String result = application.update(key, value);
         if (result.startsWith("Error")) {
             javax.swing.JOptionPane.showMessageDialog(this, result, "Settings", javax.swing.JOptionPane.ERROR_MESSAGE);
             refresh();

@@ -204,27 +204,7 @@ final class SessionConfigController {
 
 
     public String setConfigOptionPersistent(String key, String value) {
-        if (key == null || key.isEmpty()) {
-            return "Error: Missing config key";
-        }
-        if (editor.configManager.isSchemaVersionKey(key)) {
-            return "Error: schema_version is managed by Shed";
-        }
-        String requestedValue = value == null ? "" : value;
-        String appliedValue = editor.configManager.selfHealedSettingValue(key, requestedValue);
-        String validationError = editor.configManager.validateSettingValue(key, appliedValue);
-        if (validationError != null) {
-            return "Error: " + validationError;
-        }
-        try {
-            editor.configManager.setAndPersist(key, appliedValue);
-            applyRuntimeConfigFromSettings();
-            if (isThemeRelatedConfigKey(key)) {
-                    }
-            return configSetResult("Set and saved", key, requestedValue, appliedValue);
-        } catch (IOException e) {
-            return "Error saving config: " + e.getMessage();
-        }
+        return editor.settingsApplication.update(key, value);
     }
 
     private String configSetResult(String action, String key, String requestedValue, String appliedValue) {

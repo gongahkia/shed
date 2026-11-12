@@ -17,10 +17,6 @@ import java.util.List;
 final class EditActionController {
     private final Texteditor editor;
     private final MotionService motionService = new MotionService();
-    private record JumpLocation(long bufferId, int offset) { }
-    private final NavigationHistory<JumpLocation> navigationHistory = new NavigationHistory<>(100);
-    private final Map<FileBuffer, Long> navigationBufferIds = new WeakHashMap<>();
-    private long nextNavigationBufferId;
     private boolean restoringNavigation;
 
     EditActionController(Texteditor editor) {
@@ -1478,40 +1474,36 @@ final class EditActionController {
 
 
     void recordJumpPosition() {
-        if (!restoringNavigation) navigationHistory.record(currentJumpLocation());
+        if (!restoringNavigation) editor.documentNavigation.record(currentJumpLocation());
     }
 
-    private JumpLocation currentJumpLocation() {
+    private DocumentNavigation.Location currentJumpLocation() {
         EditorPane pane = editor.getActivePane();
         FileBuffer buffer = editor.getCurrentBuffer();
         if (pane == null || buffer == null || buffer.isLargeFile() || pane.getTerminalPane() != null
             || pane.isMarkdownPreview() || pane.getAlternateComponent() != null) return null;
-        long id = navigationBufferIds.computeIfAbsent(buffer, ignored -> ++nextNavigationBufferId);
-        return new JumpLocation(id, editor.writingArea.getCaretPosition());
+        return new DocumentNavigation.Location(editor.documentStore.id(buffer), pane.surface().selection().dot());
     }
 
-    private FileBuffer bufferForJump(JumpLocation location) {
-        for (FileBuffer buffer : editor.buffers) {
-            if (Objects.equals(navigationBufferIds.get(buffer), location.bufferId())) return buffer;
-        }
-        return null;
+    private FileBuffer bufferForJump(DocumentNavigation.Location location) {
+        return editor.documentStore.resolve(location.document());
     }
 
     void jumpBack() { editor.showMessage(navigateHistory(false)); }
     void jumpForward() { editor.showMessage(navigateHistory(true)); }
 
     String navigateHistory(boolean forward) {
-        JumpLocation current = currentJumpLocation();
-        JumpLocation target = forward
-            ? navigationHistory.forward(current, location -> bufferForJump(location) != null)
-            : navigationHistory.back(current, location -> bufferForJump(location) != null);
+        DocumentNavigation.Location current = currentJumpLocation();
+        DocumentNavigation.Location target = editor.documentNavigation.navigate(forward, current,
+            id -> editor.documentStore.resolve(id) != null);
         if (target == null) return forward ? "At newest jump" : "At oldest jump";
         FileBuffer buffer = bufferForJump(target);
         restoringNavigation = true;
         try {
             if (buffer != editor.getCurrentBuffer()) editor.switchToBuffer(editor.buffers.indexOf(buffer));
-            editor.writingArea.setCaretPosition(Math.min(target.offset(), editor.writingArea.getDocument().getLength()));
-            editor.writingArea.requestFocusInWindow();
+            EditorSurface surface = editor.documents.activeSurface();
+            surface.select(target.offset(), target.offset());
+            surface.focus();
         } finally {
             restoringNavigation = false;
         }

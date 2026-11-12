@@ -29,6 +29,10 @@ final class ToolWindowHost extends JPanel {
     ToolWindowHost(Texteditor editor) {
         super(new BorderLayout());
         this.editor = editor;
+        tabs.setName("workbench.tools");
+        tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+        AccessibilitySupport.describe(tabs, "Tool panels", "Select a tool. Scroll the strip for more tools, or use the workbench Tools menu. Escape returns to the editor.");
+        KeyboardFocusSupport.installEscape(this, editor::requestActivePaneFocus);
         setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, editor.configManager.getStatusBarBackground()));
         setMinimumSize(new Dimension(0, 160));
         headerPanel = header();
@@ -95,6 +99,14 @@ final class ToolWindowHost extends JPanel {
     void showAgentReview() {
         if (surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents) agents.showReview();
         showTab(Tab.AGENT);
+    }
+
+    /** Focus is an explicit user-navigation action, never a side effect of refresh/completion. */
+    void focus(Tab tab) {
+        ToolSurface surface = surfaces.get(tab);
+        if (surface != null) javax.swing.SwingUtilities.invokeLater(() -> {
+            if (surface.component().isShowing()) surface.focus();
+        });
     }
 
     void showAgentAction(AgentAction action) {
@@ -250,7 +262,7 @@ final class ToolWindowHost extends JPanel {
         tabs.revalidate();
     }
 
-    private static String title(Tab tab) {
+    static String title(Tab tab) {
         return switch (tab) { case GIT -> "Git"; case DEBUG -> "Debug"; case TASKS -> "Tasks"; case TESTS -> "Tests"; case PROBLEMS -> "Problems"; case REPLACE -> "Replace"; case SEARCH -> "Search"; case AGENT -> "Agents"; };
     }
 
@@ -269,10 +281,15 @@ final class ToolWindowHost extends JPanel {
 
     void closeAgentWorkbench() { if (surfaces.get(Tab.AGENT) instanceof AgentWorkbenchPanel agents) agents.close(); }
 
+    void reattachAll() {
+        for (JDialog dialog : java.util.List.copyOf(detached.values())) dialog.dispose();
+    }
+
     interface ToolSurface {
         JPanel component();
         void refresh();
         default void refreshAppearance() { }
+        default void focus() { }
     }
 
 

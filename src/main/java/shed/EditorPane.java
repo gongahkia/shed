@@ -5,8 +5,9 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
 public class EditorPane {
-    private final java.util.Map<FileBuffer, BufferViewState> bufferViews = new java.util.WeakHashMap<>();
+    private final java.util.Map<FileBuffer, EditorSurface.View> bufferViews = new java.util.WeakHashMap<>();
     private final JTextArea textArea;
+    private final EditorSurface surface;
     private final LineNumberPanel lineNumberPanel;
     private final JScrollPane scrollPane;
     private final SearchManager searchManager;
@@ -21,8 +22,13 @@ public class EditorPane {
         this.textArea = textArea;
         this.lineNumberPanel = lineNumberPanel;
         this.scrollPane = scrollPane;
+        this.surface = new SwingEditorSurface(textArea, scrollPane,
+            () -> buffer == null || buffer.isLargeFile() ? null : buffer.getUndoManager(),
+            () -> buffer != null && !buffer.isLargeFile());
         this.searchManager = searchManager;
     }
+
+    public EditorSurface surface() { return surface; }
 
     public JTextArea getTextArea() {
         return textArea;
@@ -58,11 +64,11 @@ public class EditorPane {
         // A large-file document is only a movable projection, not stable document coordinates.
         if (buffer != null && !buffer.isLargeFile() && textArea.getDocument() == buffer.getDocument()
             && terminalPane == null && alternateComponent == null && markdownPreviewComponent == null) {
-            bufferViews.put(buffer, BufferViewState.capture(textArea, scrollPane));
+            bufferViews.put(buffer, surface.captureView());
         }
     }
 
-    BufferViewState rememberedView(FileBuffer target) {
+    EditorSurface.View rememberedView(FileBuffer target) {
         return bufferViews.get(target);
     }
 

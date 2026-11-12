@@ -357,7 +357,7 @@ public final class InterfaceGalleryProbe {
         edt(() -> {
             JTabbedPane tabs = descendants(editor.toolWindowHost, JTabbedPane.class).getFirst();
             if (!editor.toolWindowHost.isShowing() || tabs.getSelectedIndex() < 0
-                || !tabs.getTitleAt(tabs.getSelectedIndex()).equalsIgnoreCase(tab.name()) || !tabs.getSelectedComponent().isShowing()) {
+                || !tabs.getTitleAt(tabs.getSelectedIndex()).equalsIgnoreCase(tab == ToolWindowHost.Tab.AGENT ? "Agents" : tab.name()) || !tabs.getSelectedComponent().isShowing()) {
                 throw new IllegalStateException("Expected the " + tab + " tool to be visible");
             }
             return null;

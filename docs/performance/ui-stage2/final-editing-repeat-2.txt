@@ -1,0 +1,10 @@
+workload.lines=500000
+workload.characters=10893841
+workload.samples=25
+p95.edit.ms=0.293
+p95.caret.ms=0.844
+p95.convergence.ms=828.533
+p95.syntax.ms=21.637
+p95.symbols.ms=382.944
+p95.completion-index.ms=828.533
+p95.diff-gutter.ms=117.595

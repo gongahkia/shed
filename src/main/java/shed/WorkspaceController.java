@@ -9,22 +9,23 @@ import java.util.List;
 import java.util.Map;
 import javax.swing.JFileChooser;
 
-final class WorkspaceController {
+final class WorkspaceController implements WorkspaceFoldersApplication {
     private final Texteditor editor;
-    private final WorkspaceRoots roots = new WorkspaceRoots();
+    private final WorkspaceRoots roots;
     private Path importedManifest;
     private Map<Path, String> importedFolderNames = Map.of();
     private WorkspaceEditorSettings.Snapshot importedEditorSettings = WorkspaceEditorSettings.empty();
 
     WorkspaceController(Texteditor editor) {
         this.editor = editor;
+        this.roots = editor.workspaceRoots;
     }
 
-    List<Path> roots() {
+    public List<Path> roots() {
         return roots.all();
     }
 
-    Path activeRoot() {
+    public Path activeRoot() {
         return roots.active();
     }
 
@@ -33,7 +34,7 @@ final class WorkspaceController {
         return WorkspaceRootResolver.configuredOrActive(resource, roots.all(), roots.active());
     }
 
-    String displayRoot(Path root) {
+    public String displayRoot(Path root) {
         if (root == null) return "";
         String name = importedFolderNames.get(WorkspaceRootResolver.normalizedIdentity(root));
         return name == null ? root.toString() : name + " — " + root;
@@ -101,6 +102,10 @@ final class WorkspaceController {
         if (added) editor.treeGitController.warmFinderIndex(root);
         return (added ? "Added workspace folder: " : "Workspace folder already added: ") + root;
     }
+
+    public String addFolder(Path path, boolean activate) { return addDirectory(path == null ? null : path.toFile(), activate); }
+    public String removeFolder(Path path) { return remove(path == null ? "" : path.toString()); }
+    public String activateFolder(Path path, boolean showTree) { return activate(path == null ? "" : path.toString(), showTree); }
 
     String addDirectory(File folder, boolean activate) {
         return add(folder == null ? "" : folder.getPath(), activate);

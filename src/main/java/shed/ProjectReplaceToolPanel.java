@@ -97,6 +97,7 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
         detail.setLineWrap(true); detail.setWrapStyleWord(true);
     }
     @Override public JPanel component() { return panel; }
+    @Override public void focus() { find.requestFocusInWindow(); }
 
     private JPanel toolbar() {
         JPanel controls = new JPanel(new BorderLayout(4, 4));

@@ -49,6 +49,7 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     @Override public JPanel component() { return panel; }
+    @Override public void focus() { tasks.requestFocusInWindow(); }
 
     private JPanel toolbar() {
         JPanel panel = new JPanel(new BorderLayout(12, 0));

@@ -1,0 +1,210 @@
+{
+  "interaction": {
+    "real_document_activation": true,
+    "accessibility_tree": [
+      {
+        "name": "Appearance",
+        "role": "label",
+        "editable": false,
+        "actions": 0
+      },
+      {
+        "name": "Make space for your work.",
+        "role": "label",
+        "editable": false,
+        "actions": 0
+      },
+      {
+        "name": "Dark",
+        "role": "push button",
+        "editable": false,
+        "actions": 1
+      },
+      {
+        "name": "Light",
+        "role": "push button",
+        "editable": false,
+        "actions": 1
+      },
+      {
+        "name": "Detach",
+        "role": "push button",
+        "editable": false,
+        "actions": 1
+      },
+      {
+        "name": "Close",
+        "role": "push button",
+        "editable": false,
+        "actions": 1
+      },
+      {
+        "name": "Search appearance settings",
+        "role": "label",
+        "editable": false,
+        "actions": 0
+      },
+      {
+        "name": "Search appearance settings",
+        "role": "text",
+        "editable": true,
+        "actions": 58
+      },
+      {
+        "name": "Interface scale",
+        "role": "label",
+        "editable": false,
+        "actions": 0
+      },
+      {
+        "name": "Interface scale (ui.zoom)",
+        "role": "text",
+        "editable": true,
+        "actions": 58
+      },
+      {
+        "name": "Apply",
+        "role": "push button",
+        "editable": false,
+        "actions": 1
+      },
+      {
+        "name": "Application interface scale; Ctrl/Cmd + and Ctrl/Cmd - adjust it live; Ctrl/Cmd 0 resets it",
+        "role": "label",
+        "editable": false,
+        "actions": 0
+      },
+      {
+        "name": "",
+        "role": "push button",
+        "editable": false,
+        "actions": 1
+      },
+      {
+        "name": "",
+        "role": "push button",
+        "editable": false,
+        "actions": 1
+      },
+      {
+        "name": "",
+        "role": "push button",
+        "editable": false,
+        "actions": 1
+      },
+      {
+        "name": "",
+        "role": "push button",
+        "editable": false,
+        "actions": 1
+      },
+      {
+        "name": "Settings result",
+        "role": "label",
+        "editable": false,
+        "actions": 0
+      }
+    ],
+    "accessible_query": true,
+    "accessible_invalid_update": true,
+    "accessible_valid_update": true,
+    "persisted_on_disk": true,
+    "accessible_document_action": true,
+    "editor_local_clipboard": true,
+    "real_editor_popup": true,
+    "popup_host": "separate owned Swing window",
+    "real_setting_persistence": true,
+    "subscriptions_after_repeated_detach": 3,
+    "native_focus_observed": true,
+    "keyboard_bindings_installed": true
+  },
+  "native_keyboard": {
+    "activation": true,
+    "focus_after_f6": "javax.swing.JTextField:query",
+    "search_typing": true,
+    "escape_dismissed": true,
+    "editor_focus_restored": true,
+    "status": "native events exercised on owned focused window"
+  },
+  "captures": [
+    {
+      "name": "01-dark",
+      "capture": "prototype-owned native window",
+      "screen_menu": "false",
+      "menu_height": 32,
+      "width": 1120,
+      "height": 792
+    },
+    {
+      "name": "02-light",
+      "capture": "prototype-owned native window",
+      "screen_menu": "false",
+      "menu_height": 32,
+      "width": 1120,
+      "height": 792
+    },
+    {
+      "name": "03-light-150",
+      "capture": "prototype-owned native window",
+      "screen_menu": "false",
+      "menu_height": 48,
+      "width": 1120,
+      "height": 792
+    },
+    {
+      "name": "04-dark-150",
+      "capture": "prototype-owned native window",
+      "screen_menu": "false",
+      "menu_height": 48,
+      "width": 1120,
+      "height": 792
+    },
+    {
+      "name": "05-narrow-150",
+      "capture": "prototype-owned native window",
+      "screen_menu": "false",
+      "menu_height": 48,
+      "width": 760,
+      "height": 680
+    },
+    {
+      "name": "06-empty",
+      "capture": "prototype-owned native window",
+      "screen_menu": "false",
+      "menu_height": 48,
+      "width": 760,
+      "height": 680
+    },
+    {
+      "name": "07-error",
+      "capture": "prototype-owned native window",
+      "screen_menu": "false",
+      "menu_height": 48,
+      "width": 760,
+      "height": 680
+    },
+    {
+      "name": "08-detached",
+      "capture": "prototype-owned native window",
+      "screen_menu": "false",
+      "menu_height": 32,
+      "width": 1120,
+      "height": 792
+    },
+    {
+      "name": "09-editor-popup",
+      "capture": "prototype-owned native window",
+      "screen_menu": "false",
+      "menu_height": 32,
+      "width": 1120,
+      "height": 792
+    }
+  ],
+  "screen_menu": "false",
+  "flavor": "swing",
+  "java": "21.0.12.1",
+  "os": "Mac OS X x86_64",
+  "fixture_lines": 20011,
+  "native_ime_screenreader": "not verified",
+  "evaluation_render_mode": "default"
+}

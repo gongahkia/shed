@@ -77,6 +77,10 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
         sessions.forEach(AgentSessionPanel::stopRequests); dismissCompletion.run();
     }
     @Override public JPanel component() { return panel; }
+    @Override public void focus() {
+        if (tabs.getSelectedIndex() == 1) review.focus();
+        else { var session = current(); if (session != null) session.focus(); }
+    }
     void showReview() { reviewOwner = current(); tabs.setSelectedIndex(1); review.refresh(); }
     void showAction(AgentAction action) { var current = current(); if (current != null) current.prepare(action); tabs.setSelectedIndex(0); }
     @Override public void refresh() {

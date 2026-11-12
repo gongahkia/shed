@@ -114,13 +114,13 @@ public class CommandHandler {
 
     private void registerCommands() {
         registerCommand((args, range, force) -> handleWrite(args.isEmpty() ? null : args), "w", "write");
-        registerCommand((args, range, force) -> editor.requestCloseActiveWindow(force), "q", "quit");
+        registerCommand((args, range, force) -> editor.documents.closeWindow(force), "q", "quit");
         registerCommand((args, range, force) -> handleWriteQuit(args.isEmpty() ? null : args, force), "wq", "x");
         registerCommand((args, range, force) -> handleEdit(args), "e", "edit");
         registerCommand((args, range, force) -> editor.nextBuffer(), "bn", "bnext");
         registerCommand((args, range, force) -> editor.prevBuffer(), "bp", "bprev");
-        registerCommand((args, range, force) -> editor.editActionController.navigateHistory(false), "back");
-        registerCommand((args, range, force) -> editor.editActionController.navigateHistory(true), "forward");
+        registerCommand((args, range, force) -> editor.documents.navigate(false), "back");
+        registerCommand((args, range, force) -> editor.documents.navigate(true), "forward");
         registerCommand((args, range, force) -> editor.deleteBuffer(force), "bd", "bdelete");
         registerCommand((args, range, force) -> handleDiscard(args), "discard");
         registerCommand((args, range, force) -> handleSet(args, force), "set");
@@ -158,8 +158,8 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.showFileFinder(), "files");
         registerCommand((args, range, force) -> editor.showFolderFinder(), "folder", "folders");
         registerCommand((args, range, force) -> editor.showBufferFinder(), "buffers", "buf");
-        registerCommand((args, range, force) -> editor.splitWindow(false), "split", "sp", "s");
-        registerCommand((args, range, force) -> editor.splitWindow(true), "vsplit", "vsp", "vs");
+        registerCommand((args, range, force) -> editor.documents.split(false), "split", "sp", "s");
+        registerCommand((args, range, force) -> editor.documents.split(true), "vsplit", "vsp", "vs");
         registerCommand((args, range, force) -> editor.closeActiveWindow(), "close", "clo");
         registerCommand((args, range, force) -> handleWindow(args), "window", "win");
         registerCommand((args, range, force) -> handleZoom(args), "zoom", "uizoom");
@@ -253,11 +253,11 @@ public class CommandHandler {
     }
 
     private String handleWrite(String targetPath) {
-        return editor.formatOnSaveController.requestCurrent(targetPath, false, false);
+        return editor.documents.save(targetPath, false, false);
     }
 
     private String handleWriteQuit(String targetPath, boolean force) {
-        return editor.formatOnSaveController.requestCurrent(targetPath, true, force);
+        return editor.documents.save(targetPath, true, force);
     }
 
     private String handleDiscard(String target) {

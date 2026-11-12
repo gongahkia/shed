@@ -1,0 +1,32 @@
+{
+  "identical_benchmark_engine_classes": [
+    "shed/EditorResponsivenessBenchmark$Arguments.class",
+    "shed/EditorResponsivenessBenchmark$Convergence.class",
+    "shed/EditorResponsivenessBenchmark$Report.class",
+    "shed/EditorResponsivenessBenchmark.class",
+    "shed/GrammarHighlightService$1.class",
+    "shed/GrammarHighlightService$Cache.class",
+    "shed/GrammarHighlightService$Line.class",
+    "shed/GrammarHighlightService$Mode.class",
+    "shed/GrammarHighlightService$Scope.class",
+    "shed/GrammarHighlightService$State.class",
+    "shed/GrammarHighlightService$TagResult.class",
+    "shed/GrammarHighlightService$Token.class",
+    "shed/GrammarHighlightService.class",
+    "shed/LineNumberPanel$1.class",
+    "shed/LineNumberPanel$2.class",
+    "shed/LineNumberPanel$DiffMarkers.class",
+    "shed/LineNumberPanel.class",
+    "shed/OpenBufferCompletionIndex$Candidate.class",
+    "shed/OpenBufferCompletionIndex$Snapshot.class",
+    "shed/OpenBufferCompletionIndex$WordStats.class",
+    "shed/OpenBufferCompletionIndex.class",
+    "shed/SymbolService$Symbol.class",
+    "shed/SymbolService.class",
+    "shed/VersionedTextSnapshot$Node.class",
+    "shed/VersionedTextSnapshot$Parts.class",
+    "shed/VersionedTextSnapshot$Position.class",
+    "shed/VersionedTextSnapshot$Stats.class",
+    "shed/VersionedTextSnapshot.class"
+  ]
+}

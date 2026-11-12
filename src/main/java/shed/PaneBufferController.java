@@ -22,8 +22,7 @@ final class PaneBufferController {
     private long diffGutterGeneration;
     private FileBuffer diffGutterBuffer;
     private IncrementalDiffGutter incrementalDiffGutter;
-    private long openRequestSequence;
-    private final Map<EditorPane, Long> openRequests = new WeakHashMap<>();
+    private final DocumentRequests<EditorPane> openRequests = new DocumentRequests<>();
 
     PaneBufferController(Texteditor editor) {
         this.editor = editor;
@@ -81,17 +80,15 @@ final class PaneBufferController {
     private void restoreBufferIntoPane(EditorPane pane, FileBuffer buffer) {
         if (pane == null || buffer == null) return;
         pane.rememberBufferView();
-        BufferViewState view = pane.rememberedView(buffer);
+        EditorSurface.View view = pane.rememberedView(buffer);
         loadBufferIntoPane(pane, buffer, 0);
         if (view == null) return;
-        view.restoreSelection(pane.getTextArea());
-        int dot = pane.getTextArea().getCaret().getDot();
-        int mark = pane.getTextArea().getCaret().getMark();
+        view.restoreSelection(pane.surface());
+        EditorSurface.Selection selection = pane.surface().selection();
         SwingUtilities.invokeLater(() -> {
             // An explicit jump or another switch before layout must win over this restoration.
-            if (pane.getBuffer() != buffer || pane.getTextArea().getCaret().getDot() != dot
-                || pane.getTextArea().getCaret().getMark() != mark) return;
-            view.restoreViewport(pane.getScrollPane());
+            if (pane.getBuffer() != buffer || !pane.surface().selection().equals(selection)) return;
+            view.restoreViewport(pane.surface());
         });
     }
 
@@ -139,7 +136,7 @@ final class PaneBufferController {
         }
         withSuppressedDocumentEvents(() -> pane.getTextArea().setDocument(buffer.getDocument()));
         pane.getTextArea().setEditable(!buffer.isLargeFile() && editor.editorState.mode.isEditable());
-        pane.getTextArea().setCaretPosition(Math.min(caretPosition, pane.getTextArea().getDocument().getLength()));
+        pane.surface().select(caretPosition, caretPosition);
         if (activePane) {
             editor.bindActivePane(pane);
             attachActiveDocumentListener();
@@ -449,7 +446,7 @@ final class PaneBufferController {
     public void openFile(File file) throws IOException {
         if (findBufferByPath(file) != getCurrentBuffer()) editor.recordJumpPosition();
         EditorPane activePane = editor.getActivePane();
-        if (activePane != null) openRequests.put(activePane, ++openRequestSequence);
+        if (activePane != null) openRequests.issue(activePane);
         persistCurrentBufferState();
         String projectConfigMessage = applyProjectConfigurationForFile(file);
 
@@ -463,12 +460,7 @@ final class PaneBufferController {
             return;
         }
 
-        FileBuffer buffer;
-        if (file.exists()) {
-            buffer = new FileBuffer(file, editor.configManager);
-        } else {
-            buffer = new FileBuffer(file.getAbsolutePath(), editor.configManager);
-        }
+        FileBuffer buffer = editor.documentStore.load(file.toPath());
 
         installLoadedBuffer(file, buffer, projectConfigMessage, editor.getActivePane());
     }
@@ -481,8 +473,7 @@ final class PaneBufferController {
         if (findBufferByPath(file) != getCurrentBuffer()) editor.recordJumpPosition();
         persistCurrentBufferState();
         EditorPane targetPane = editor.getActivePane();
-        long request = ++openRequestSequence;
-        if (targetPane != null) openRequests.put(targetPane, request);
+        long request = openRequests.issue(targetPane);
         String projectConfigMessage = applyProjectConfigurationForFile(file);
         FileBuffer existing = findBufferByPath(file);
         if (existing != null) {
@@ -495,14 +486,14 @@ final class PaneBufferController {
         editor.asyncJobService.submit("open file", token -> {
             long started = System.nanoTime();
             try {
-                return file.exists() ? new FileBuffer(file, editor.configManager)
-                    : new FileBuffer(file.getAbsolutePath(), editor.configManager);
+                return editor.documentStore.load(file.toPath());
             } finally {
                 editor.perfService.recordDuration("file.open.load", started, "bytes=" + file.length());
             }
         }, (job, loaded, error) -> {
                 if (editor.closingDown || job.getStatus() == AsyncJobService.Status.CANCELLED) return;
-                if (targetPane != null && !java.util.Objects.equals(openRequests.get(targetPane), request)) return;
+                if (targetPane != null && (!openRequests.current(targetPane, request)
+                    || !editor.editorPanes.contains(targetPane))) return;
                 if (error != null || loaded == null) {
                     IOException failure = error instanceof IOException io ? io
                         : new IOException(error == null ? "unknown error" : error.getMessage(), error);
@@ -587,7 +578,7 @@ final class PaneBufferController {
         editor.renderWindowLayout();
         editor.activateEditorPane(newPane);
         editor.showAlternateSurfaceIfAvailable(newPane, targetBuffer);
-        newPane.getTextArea().requestFocusInWindow();
+        newPane.surface().focus();
         editor.addToRecentFiles(file.getAbsolutePath());
         if (existing == null) {
             editor.registerFileWatch(targetBuffer);
@@ -713,7 +704,7 @@ final class PaneBufferController {
             return;
         }
         EditorPane pane = editor.getActivePane();
-        if (pane != null) openRequests.put(pane, ++openRequestSequence);
+        if (pane != null) openRequests.issue(pane);
 
         FileBuffer newBuffer = editor.buffers.get(index);
         if (newBuffer != getCurrentBuffer()) editor.recordJumpPosition();
@@ -737,10 +728,10 @@ final class PaneBufferController {
             editor.windowLayoutRoot = WindowLayoutNode.leaf(activePane);
         }
         editor.windowLayoutRoot.splitLeaf(activePane, newPane, orientation, false, 0.5);
-        loadBufferIntoPane(newPane, currentBuffer, editor.writingArea.getCaretPosition());
+        loadBufferIntoPane(newPane, currentBuffer, activePane.surface().selection().dot());
         editor.renderWindowLayout();
         editor.activateEditorPane(newPane);
-        newPane.getTextArea().requestFocusInWindow();
+        newPane.surface().focus();
         return vertical ? "Vertical split created" : "Horizontal split created";
     }
 
@@ -828,6 +819,7 @@ final class PaneBufferController {
         }
 
         detachActiveDocumentListener();
+        openRequests.invalidate(paneToClose);
         editor.editorPanes.remove(paneToClose);
         editor.disposeAiCompletion(paneToClose.getTextArea());
         editor.windowLayoutRoot = editor.windowLayoutRoot == null ? null : editor.windowLayoutRoot.removeLeaf(paneToClose);

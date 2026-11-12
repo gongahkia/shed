@@ -488,11 +488,11 @@ final class InputController {
             }
             case UNDO -> {
                 editor.clearExtraCursors();
-                if (editor.writingArea.isEditable() && editor.undoManager.canUndo()) editor.undoManager.undo();
+                if (editor.documents.activeSurface().editable()) editor.documents.activeSurface().undo();
             }
             case REDO -> {
                 editor.clearExtraCursors();
-                if (editor.writingArea.isEditable() && editor.undoManager.canRedo()) editor.undoManager.redo();
+                if (editor.documents.activeSurface().editable()) editor.documents.activeSurface().redo();
             }
             case NEXT_SELECTION -> editor.addCursorAtNextMatch();
             case CURSOR_ABOVE -> editor.addCursorAbove();

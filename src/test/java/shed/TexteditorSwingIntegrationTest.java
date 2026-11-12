@@ -268,14 +268,14 @@ public class TexteditorSwingIntegrationTest {
                     list, list.getSelectedValue(), list.getSelectedIndex(), true, true);
                 assertTrue(dirtyLabel.getText().startsWith("● "));
                 assertTrue(dirtyLabel.getAccessibleContext().getAccessibleName().contains("unsaved changes"));
-                assertFalse(bar.closeBuffer(first, false));
+                assertFalse(bar.closeDocument(editor.documentStore.id(first), false));
                 assertTrue(editor.buffers.contains(first));
                 list.setSelectedIndex(1);
                 assertEquals("cond", editor.writingArea.getSelectedText());
-                assertTrue(bar.closeBuffer(first, true));
+                assertTrue(bar.closeDocument(editor.documentStore.id(first), true));
                 assertSame(second, editor.getCurrentBuffer());
                 editor.splitWindow(true);
-                assertTrue(bar.closeBuffer(second, false));
+                assertTrue(bar.closeDocument(editor.documentStore.id(second), false));
                 assertEquals(1, editor.buffers.size());
                 assertTrue(editor.editorPanes.stream().allMatch(pane -> pane.getBuffer() == editor.getCurrentBuffer()));
                 assertTrue(editor.isDisplayable());
@@ -1269,6 +1269,122 @@ public class TexteditorSwingIntegrationTest {
             assertEquals("", onEdt(() -> editor.getCurrentBuffer().getContent()));
             assertEquals("# My start page\n", Files.readString(landing));
         } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void closingTabChecksCurrentDirtyStateInsteadOfCachedPresentation() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-live-dirty-close"));
+        Texteditor editor = createEditor(home, Files.writeString(tempDir.resolve("dirty-close.txt"), "text"));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                FileBuffer document = editor.getCurrentBuffer();
+                document.setModified(false);
+                editor.openEditorsBar.refresh();
+                document.setModified(true); // Application state changes before the next presentation refresh.
+                boolean[] prompted = {false};
+                drivePicker(editor, "Unsaved Changes", dialog -> {
+                    prompted[0] = true;
+                    dialog.dispose(); // Cancel; never grant discard permission.
+                }, () -> { editor.openEditorsBar.closeSelected(); return ""; });
+                assertTrue(prompted[0], "a cached clean tab must not bypass confirmation");
+                assertTrue(editor.buffers.contains(document));
+                assertTrue(document.isModified());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void documentOperationsRejectSupersededAndClosedPaneLoads() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-document-requests"));
+        Path source = Files.writeString(tempDir.resolve("request-source.txt"), "source");
+        Path rejected = Files.writeString(tempDir.resolve("request-rejected.txt"), "rejected");
+        Path latest = Files.writeString(tempDir.resolve("request-latest.txt"), "latest");
+        Texteditor editor = createEditor(home, source);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.documents.open(rejected, 0, 0, "rejected");
+                editor.documents.open(latest, 0, 0, "latest");
+                return null;
+            });
+            assertTrue(awaitCurrentFile(editor, latest));
+            assertTrue(awaitUiState(() -> editor.asyncJobService.list().stream()
+                .filter(job -> "open file".equals(job.getDescription()))
+                .noneMatch(job -> job.getStatus() == AsyncJobService.Status.RUNNING)));
+            flushEdt();
+            onEdt(() -> {
+                assertFalse(editor.documents.isOpen(rejected));
+                editor.documents.split(true);
+                editor.documents.open(rejected, 0, 0, "rejected");
+                assertEquals("Window closed", editor.documents.closeWindow(true));
+                return null;
+            });
+            assertTrue(awaitUiState(() -> editor.asyncJobService.list().stream()
+                .filter(job -> "open file".equals(job.getDescription()))
+                .noneMatch(job -> job.getStatus() == AsyncJobService.Status.RUNNING)));
+            flushEdt();
+            onEdt(() -> {
+                assertFalse(editor.documents.isOpen(rejected));
+                assertEquals(latest.toFile(), editor.getCurrentBuffer().getFile());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void bufferPickerResolvesCapturedIdentityAfterLiveListReordering() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-buffer-boundary"));
+        Path first = Files.writeString(tempDir.resolve("first-buffer.txt"), "first");
+        Path second = Files.writeString(tempDir.resolve("second-buffer.txt"), "second");
+        Texteditor editor = createEditor(home, first, second);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                String result = drivePicker(editor, "Open Buffers", dialog -> {
+                    java.util.Collections.reverse(editor.buffers);
+                    var field = descendants(dialog, javax.swing.JTextField.class).getFirst();
+                    field.setText("first-buffer.txt");
+                    field.postActionEvent();
+                }, editor.paletteController::showBufferFinder);
+                assertEquals("Switched to buffer", result);
+                assertEquals(first.toFile(), editor.getCurrentBuffer().getFile());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void settingsDialogReadsAndPersistsThroughApplicationBoundary() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-settings-boundary"));
+        Texteditor editor = createEditor(home, Files.writeString(tempDir.resolve("settings-boundary.txt"), "text"));
+        SettingsEditorDialog[] dialog = new SettingsEditorDialog[1];
+        try {
+            onEdt(() -> {
+                SettingsEditorDialog.showFor(editor);
+                dialog[0] = Arrays.stream(Window.getWindows()).filter(SettingsEditorDialog.class::isInstance)
+                    .map(SettingsEditorDialog.class::cast).filter(Window::isDisplayable).findFirst().orElseThrow();
+                var field = descendants(dialog[0], javax.swing.JTextField.class).stream()
+                    .filter(input -> "tab.size".equals(input.getClientProperty("shed.setting.key")))
+                    .findFirst().orElseThrow();
+                field.setText("7");
+                field.postActionEvent();
+                assertEquals(7, editor.configManager.getTabSize());
+                assertEquals(7, editor.writingArea.getTabSize());
+                assertTrue(Files.readString(Path.of(editor.configManager.getConfigPath())).contains("7"));
+                assertEquals("Set and saved tab.size", editor.setConfigOptionPersistent("tab.size", "5"));
+                assertEquals(5, editor.writingArea.getTabSize());
+                return null;
+            });
+        } finally {
+            if (dialog[0] != null) onEdt(() -> { dialog[0].dispose(); return null; });
             disposeEditor(editor);
         }
     }
@@ -3153,6 +3269,80 @@ public class TexteditorSwingIntegrationTest {
         if (timer != null) {
             timer.stop();
         }
+    }
+
+    @Test
+    void workbenchNavigationUsesRealDocumentsAndKeepsActionsReachableAtEnlargedScale() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-navigation"));
+        Path a = Files.writeString(tempDir.resolve("navigation-a.txt"), "first\n");
+        Path b = Files.writeString(tempDir.resolve("navigation-b.txt"), "second\n");
+        Texteditor editor = createEditor(home, a, b);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                assertNotNull(editor.workbenchHeader);
+                assertEquals(5, descendants(editor.workbenchHeader, javax.swing.JButton.class).stream()
+                    .filter(button -> button.getIcon() != null).count());
+                var document = editor.documents.documents().getFirst();
+                editor.documents.activate(document.id());
+                editor.documents.activeSurface().replace(0, 0, "edited ");
+                editor.documents.activeSurface().undo();
+                assertEquals("first\n", editor.writingArea.getText());
+                editor.settingsApplication.update("ui.zoom", "1.5");
+                editor.setSize(760, 750); editor.validate();
+                assertTrue(editor.workbenchHeader.isShowing());
+                Rectangle visible = new Rectangle(editor.workbenchHeader.getSize());
+                for (var button : descendants(editor.workbenchHeader, javax.swing.JButton.class)) {
+                    Rectangle bounds = SwingUtilities.convertRectangle(button.getParent(), button.getBounds(), editor.workbenchHeader);
+                    assertTrue(visible.contains(bounds), button.getAccessibleContext().getAccessibleName() + " must remain in the navigation row: " + bounds);
+                    assertTrue(bounds.height >= 60, "Controls must scale with UI zoom");
+                }
+                var location = descendants(editor.workbenchHeader, javax.swing.JLabel.class).stream()
+                    .filter(label -> "workbench.location".equals(label.getName())).findFirst().orElseThrow();
+                assertTrue(location.getText().contains("navigation-a.txt"));
+                editor.settingsApplication.update("ui.open_editors.visible", "false");
+                assertFalse(editor.openEditorsBar.isVisible());
+                assertTrue(editor.workbenchHeader.isVisible(), "Tab visibility must not remove workspace navigation");
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void documentNavigationRetainsFocusAndToolRefreshDoesNotTakeIt() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-navigation-focus"));
+        Path a = Files.writeString(tempDir.resolve("focus-a.txt"), "first\n");
+        Path b = Files.writeString(tempDir.resolve("focus-b.txt"), "second\n");
+        Texteditor editor = createEditor(home, a, b);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> { editor.toFront(); editor.openEditorsBar.focusEditors(); return null; });
+            var list = onEdt(() -> descendants(editor.openEditorsBar, javax.swing.JList.class).getFirst());
+            assumeTrue(awaitUiState(list::isFocusOwner), "Desktop must grant native focus");
+            onEdt(() -> {
+                int next = list.getSelectedIndex() == 0 ? 1 : 0;
+                list.setSelectedIndex(next);
+                assertEquals(editor.documents.documents().get(next).id(), editor.documents.activeDocument().id());
+                return null;
+            });
+            assertTrue(awaitUiState(list::isFocusOwner), "Selecting a document must keep focus in keyboard navigation");
+            onEdt(() -> {
+                var action = list.getActionMap().get(list.getInputMap().get(javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0)));
+                action.actionPerformed(new ActionEvent(list, ActionEvent.ACTION_PERFORMED, "Enter"));
+                return null;
+            });
+            assertTrue(awaitUiState(() -> editor.writingArea.isFocusOwner()));
+            onEdt(() -> {
+                editor.showToolWindow(ToolWindowHost.Tab.PROBLEMS);
+                editor.requestActivePaneFocus(); editor.toolWindowHost.refreshActive();
+                return null;
+            });
+            assertTrue(awaitUiState(() -> editor.writingArea.isFocusOwner()), "Background refresh must not steal editor focus");
+            onEdt(() -> { editor.toolWindowHost.focus(ToolWindowHost.Tab.PROBLEMS); return null; });
+            assertTrue(awaitUiState(() -> descendants(editor.toolWindowHost.problemsPanel().component(), javax.swing.JTextField.class).getFirst().isFocusOwner()));
+        } finally { disposeEditor(editor); }
     }
 
     private static <T extends Component> List<T> descendants(Component root, Class<T> type) {

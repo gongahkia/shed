@@ -16,6 +16,7 @@ import javax.swing.*;
 
 /** Explicit human controls. Streaming never opens a window, selects a tab, or changes focus. */
 final class AgentSessionPanel implements ToolWindowHost.ToolSurface, AutoCloseable {
+    @Override public void focus() { prompt.requestFocusInWindow(); }
     record Scope(Path root, WorkspaceDocumentSource documents, Path sessions) {
         Scope(Path root, WorkspaceDocumentSource documents) { this(root, documents, null); }
     }

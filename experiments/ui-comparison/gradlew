@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+"""Isolated, checksum-pinned Gradle bootstrap. Does not install system tools."""
+import hashlib, os, pathlib, subprocess, sys, urllib.request, zipfile
+root = pathlib.Path(__file__).resolve().parent
+version = "8.14.3"
+expected = "bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531"
+tools = root / ".tools"
+executable = tools / ("gradle-" + version) / "bin" / "gradle"
+if not executable.exists():
+    tools.mkdir(exist_ok=True)
+    archive = tools / ("gradle-" + version + "-bin.zip")
+    if not archive.exists():
+        urllib.request.urlretrieve("https://services.gradle.org/distributions/gradle-" + version + "-bin.zip", archive)
+    if hashlib.sha256(archive.read_bytes()).hexdigest() != expected:
+        raise SystemExit("Gradle archive checksum mismatch; remove " + str(archive))
+    with zipfile.ZipFile(archive) as bundle:
+        bundle.extractall(tools)
+    executable.chmod(0o755)
+env = os.environ.copy()
+env["JAVA_HOME"] = subprocess.check_output([str(root.parents[1] / "scripts/resolve-toolchain.sh"), "home"], text=True).strip()
+raise SystemExit(subprocess.call([str(executable), "--no-daemon", "-p", str(root), *sys.argv[1:]], env=env))

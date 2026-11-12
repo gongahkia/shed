@@ -16,16 +16,17 @@ import javax.swing.ListSelectionModel;
 
 final class WorkspaceFoldersDialog extends JDialog {
     private final Texteditor editor;
-    private final WorkspaceController controller;
+    private final WorkspaceFoldersApplication controller;
     private final DefaultListModel<String> folders = new DefaultListModel<>();
     private final JList<String> list = new JList<>(folders);
+    private java.util.List<java.nio.file.Path> visibleRoots = java.util.List.of();
 
-    static void showFor(Texteditor editor, WorkspaceController controller) {
+    static void showFor(Texteditor editor, WorkspaceFoldersApplication controller) {
         WorkspaceFoldersDialog dialog = new WorkspaceFoldersDialog(editor, controller);
         dialog.setVisible(true);
     }
 
-    private WorkspaceFoldersDialog(Texteditor editor, WorkspaceController controller) {
+    private WorkspaceFoldersDialog(Texteditor editor, WorkspaceFoldersApplication controller) {
         super(editor, "Workspace Folders", false);
         this.editor = editor;
         this.controller = controller;
@@ -58,14 +59,14 @@ final class WorkspaceFoldersDialog extends JDialog {
         chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
         editor.editorUiController.applyUiTheme(chooser);
         if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
-        message(controller.addDirectory(chooser.getSelectedFile(), false));
+        message(controller.addFolder(chooser.getSelectedFile().toPath(), false));
         refresh();
     }
 
     private void open() {
         int index = list.getSelectedIndex();
         if (index < 0) { message("Select a workspace folder."); return; }
-        message(controller.activate(Integer.toString(index + 1), true));
+        message(controller.activateFolder(visibleRoots.get(index), true));
         refresh();
     }
 
@@ -74,14 +75,15 @@ final class WorkspaceFoldersDialog extends JDialog {
         if (index < 0) { message("Select a workspace folder."); return; }
         if (JOptionPane.showConfirmDialog(this, "Remove this folder from the workspace? Files are not deleted.", "Remove Workspace Folder",
             JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) return;
-        message(controller.remove(Integer.toString(index + 1)));
+        message(controller.removeFolder(visibleRoots.get(index)));
         refresh();
     }
 
     private void refresh() {
         int prior = list.getSelectedIndex();
         folders.clear();
-        for (java.nio.file.Path root : controller.roots()) {
+        visibleRoots = controller.roots();
+        for (java.nio.file.Path root : visibleRoots) {
             folders.addElement((root.equals(controller.activeRoot()) ? "* " : "  ") + controller.displayRoot(root));
         }
         if (!folders.isEmpty()) list.setSelectedIndex(Math.max(0, Math.min(prior, folders.size() - 1)));

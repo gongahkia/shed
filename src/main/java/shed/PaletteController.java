@@ -218,41 +218,37 @@ final class PaletteController {
 
 
     public String showBufferFinder() {
-        List<String> candidates = bufferPickerCandidates(editor.buffers, editor.currentBufferIndex);
-        String selection = showPaletteDialog("Open Buffers", candidates, value -> "Switch to " + value);
-        if (selection == null || selection.isEmpty()) {
-            return "Buffer finder cancelled";
+        DocumentWorkspace application = editor.documents;
+        List<DocumentWorkspace.Document> snapshot = application.documents();
+        var active = application.activeDocument();
+        List<BufferPalette.Item> items = snapshot.stream().map(document -> new BufferPalette.Item(
+            Long.toString(document.id().value()), document.name(), document.modified(),
+            active != null && active.id().equals(document.id()))).toList();
+        try (PaletteSession session = new BufferPalette(items, editor.fuzzyMatchService, id ->
+                application.activate(new DocumentWorkspace.Id(Long.parseLong(id)))
+                    ? "Switched to buffer" : "Buffer finder cancelled")) {
+            PaletteSelection selected = showPicker("Open Buffers", session.candidates(),
+                value -> "Switch to " + value, null, session::query, null);
+            return selected == null ? "Buffer finder cancelled" : session.accept(selected.value(), selected.query());
         }
-        int colon = selection.indexOf(':');
-        if (colon > 0) {
-            try {
-                int bufferIndex = Integer.parseInt(selection.substring(0, colon).trim()) - 1;
-                editor.switchToBuffer(bufferIndex);
-                return "Switched to buffer";
-            } catch (NumberFormatException ignored) {
-            }
+    }
+
+    private static List<BufferPalette.Item> bufferItems(List<FileBuffer> buffers, int current) {
+        List<BufferPalette.Item> items = new ArrayList<>();
+        for (int i = 0; i < buffers.size(); i++) {
+            FileBuffer buffer = buffers.get(i);
+            items.add(new BufferPalette.Item(Integer.toString(i), buffer == null ? "[Unavailable]" : buffer.getDisplayName(),
+                buffer != null && buffer.isModified(), i == current));
         }
-        return "Buffer finder cancelled";
+        return items;
     }
 
     static List<String> bufferPickerCandidates(List<FileBuffer> buffers, int currentBufferIndex) {
-        if (buffers == null || buffers.isEmpty()) {
-            return List.of();
+        if (buffers == null) return List.of();
+        try (PaletteSession session = new BufferPalette(bufferItems(buffers, currentBufferIndex),
+                new FuzzyMatchService(), id -> "")) {
+            return session.candidates();
         }
-        List<String> candidates = new ArrayList<>(buffers.size());
-        for (int i = 0; i < buffers.size(); i++) {
-            FileBuffer buffer = buffers.get(i);
-            StringBuilder candidate = new StringBuilder().append(i + 1).append(": ")
-                .append(buffer == null ? "[Unavailable]" : buffer.getDisplayName());
-            if (buffer != null && buffer.isModified()) {
-                candidate.append(" [+]");
-            }
-            if (i == currentBufferIndex) {
-                candidate.append(" (current)");
-            }
-            candidates.add(candidate.toString());
-        }
-        return List.copyOf(candidates);
     }
 
 
@@ -847,41 +843,24 @@ final class PaletteController {
     String showFilePicker(String title, Map<String, File> files) {
         if (files.isEmpty()) return "No files found";
         Map<String, String> paths = new LinkedHashMap<>();
-        Map<String, String> labelsByPath = new HashMap<>();
-        files.forEach((label, file) -> {
-            paths.put(label, file.getPath());
-            labelsByPath.put(file.toPath().toAbsolutePath().normalize().toString(), label);
-        });
-        Set<String> ordered = new LinkedHashSet<>();
-        for (String recent : editor.recentFiles) {
-            String label = labelsByPath.get(new File(recent).toPath().toAbsolutePath().normalize().toString());
-            if (label != null) ordered.add(label);
+        files.forEach((label, file) -> paths.put(label, file.getPath()));
+        DocumentWorkspace application = editor.documents;
+        var current = application.activeDocument();
+        String currentPath = current == null ? null : current.path();
+        try (PaletteSession session = new FilePalette(paths, List.copyOf(editor.recentFiles), currentPath,
+                editor.fuzzyMatchService, new FilePalette.Opener() {
+                    public boolean isOpen(String path) {
+                        return application.isOpen(java.nio.file.Path.of(path));
+                    }
+                    public String open(String path, int line, int column, String label) {
+                        return application.open(java.nio.file.Path.of(path), line, column, label);
+                    }
+                })) {
+            PaletteSelection selection = showPicker(title, session.candidates(), null,
+                FileFinderIcons.renderer(editor, paths), session::query,
+                "File name · file:line:column · :line for the current file");
+            return selection == null ? title + " cancelled" : session.accept(selection.value(), selection.query());
         }
-        ordered.addAll(files.keySet());
-        List<String> candidates = List.copyOf(ordered);
-        FileBuffer current = editor.getCurrentBuffer();
-        String currentLabel = current == null || current.getFile() == null ? null
-            : labelsByPath.get(current.getFile().toPath().toAbsolutePath().normalize().toString());
-        PaletteSelection selection = showPicker(title, candidates, null, FileFinderIcons.renderer(editor, paths), query -> {
-            // An exact real filename wins over the optional location syntax (valid on POSIX).
-            if (files.containsKey(query)) return List.of(query);
-            QuickOpenQuery parsed = QuickOpenQuery.parse(query);
-            if (parsed.hasLocation() && parsed.fileQuery().isEmpty()) {
-                return currentLabel == null ? List.of() : List.of(currentLabel);
-            }
-            return editor.fuzzyMatchService.matchPathStrings(parsed.fileQuery(), candidates, PALETTE_RESULT_LIMIT);
-        }, "File name · file:line:column · :line for the current file");
-        if (selection == null) return title + " cancelled";
-        File file = files.get(selection.value());
-        if (file == null) return "File selection is unavailable";
-        if (editor.paneBufferController.findBufferByPath(file) == null && !file.isFile()) {
-            return "File is no longer available: " + file.getPath();
-        }
-        QuickOpenQuery query = files.containsKey(selection.query())
-            ? new QuickOpenQuery(selection.query(), 0, 0) : QuickOpenQuery.parse(selection.query());
-        if (query.hasLocation()) return editor.openFileAtAsync(file, query.line(), query.column(), "Opened: " + selection.value());
-        editor.openFileAsync(file);
-        return "Opening: " + selection.value();
     }
 
     private PaletteSelection showPicker(String title, List<String> candidates, PalettePreviewProvider previewProvider,
@@ -996,8 +975,12 @@ final class PaletteController {
         editor.editorUiController.prepareDialog(dialog, targetSize.width, targetSize.height);
         dialog.pack();
         dialog.setLocationRelativeTo(editor);
-        dialog.setVisible(true);
-        filtering.close();
+        try {
+            dialog.setVisible(true);
+        } finally {
+            filtering.close();
+            dialog.dispose();
+        }
         return selection[0];
     }
 

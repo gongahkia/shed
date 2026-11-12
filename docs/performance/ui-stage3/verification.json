@@ -1,0 +1,53 @@
+{
+  "revision": "94792eabbfe304c10f85ad576baa64eb2ab1be9d",
+  "working_tree": "Includes uncommitted stage 1/2 implementation; stage 3 changes isolated under experiments and documentation.",
+  "core_jar_sha256_before_after": "c051395ad94d4aa1cbfcc39ddf79b22700091853701e163a9696d5f97fa4d9b1",
+  "headless_first": {
+    "tests": 1273,
+    "failures": 0,
+    "errors": 1,
+    "skipped": 89,
+    "error": "AgentSessionPanelTest.selectionActionUsesCapturedUnsavedCodeAndTheActualReviewPanel: JUnit temporary-directory cleanup involving pending agent-workspace JSON."
+  },
+  "isolated_agent_retest": {
+    "tests": 21,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "headless_package_repeat": {
+    "tests": 1273,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 89
+  },
+  "desktop_swing_integration": {
+    "selector": "TexteditorSwingIntegrationTest#settingsDialog*+openEditorsShow*+customActionsWork*+splitCloseFocus*",
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "production_gallery_baseline": {
+    "exit_code": 1,
+    "captures_before_failure": 8,
+    "failure": "IllegalStateException: Expected the AGENT tool to be visible"
+  },
+  "native_unverified": [
+    "Native IME/dead-key composition",
+    "External screen reader output",
+    "OS clipboard integration (isolated local clipboard tested)",
+    "Windows/Linux/ARM64 native desktop execution",
+    "Full native installer/signing/runtime bundling"
+  ],
+  "logs_outside_clean": "/tmp/shed-ui-stage3-*",
+  "packaged_launch": {
+    "swing": "passed native activation, focus/search, Escape and source focus restoration from extracted ZIP",
+    "compose": "passed native activation, focus/search, Escape and source focus restoration from extracted ZIP"
+  },
+  "capture_probe": {
+    "swing": "all required real-operation assertions passed; subscriptions=3 after detach/dock; embedded menu heights 32/48",
+    "compose": "all required real-operation assertions passed; subscriptions=3 after detach/dock; embedded menu heights 32/48",
+    "compose_offscreen": "same assertions passed; separate unmeasured experimental render mode"
+  }
+}

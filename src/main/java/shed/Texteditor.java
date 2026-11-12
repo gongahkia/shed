@@ -74,6 +74,7 @@ public class Texteditor extends JFrame implements KeyListener {
     SearchManager searchManager;
     CommandHandler commandHandler;
     ConfigManager configManager;
+    SettingsApplication settingsApplication;
     HelpService helpService;
     GitService gitService;
     TreeService treeService;
@@ -128,7 +129,12 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Buffer management
     List<FileBuffer> buffers;
+    final WorkspaceRoots workspaceRoots = new WorkspaceRoots();
+    final DocumentNavigation documentNavigation = new DocumentNavigation();
+    LegacyDocumentStore documentStore;
+    DocumentWorkspace documents;
     OpenEditorsBar openEditorsBar;
+    WorkbenchHeader workbenchHeader;
     int currentBufferIndex;
     List<EditorPane> editorPanes;
     int activePaneIndex;
@@ -293,7 +299,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 try {
                     FileBuffer buffer = entry.getKey().getBuffer();
                     entry.getValue().restoreSelectionAfterChanges(entry.getKey().getTextArea(), before.get(buffer).text(), buffer.getContent());
-                    entry.getValue().restoreViewport(entry.getKey().getScrollPane());
+                    entry.getValue().restoreViewport(entry.getKey().surface());
                 } catch (RuntimeException presentationFailure) {
                     System.getLogger("shed.workspace").log(System.Logger.Level.WARNING, "Workspace edit view restoration was incomplete.");
                 }
@@ -366,7 +372,9 @@ public class Texteditor extends JFrame implements KeyListener {
         toolchainController = new ToolchainController(this);
         editorState = new EditorState();
         modeEngine = new ModeEngine();
-        buffers = new ArrayList<>();
+        documentStore = new LegacyDocumentStore(configManager);
+        buffers = documentStore.legacyBuffers();
+        documents = new DocumentWorkbench(documentStore, workspaceRoots, new SwingWorkbenchHost(this, documentStore));
         currentBufferIndex = -1;
         editorPanes = new ArrayList<>();
         workspaceDocumentSource = new EditorWorkspaceDocuments(() -> List.copyOf(buffers), workspaceController::roots,
@@ -375,6 +383,7 @@ public class Texteditor extends JFrame implements KeyListener {
         inlineCompletionController = new InlineCompletionController(this);
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override public void windowClosed(java.awt.event.WindowEvent event) {
+                if (workbenchHeader != null) workbenchHeader.close();
                 if (toolWindowHost != null) toolWindowHost.closeAgentWorkbench();
                 workspaceDocumentSource.close(); agentWorkspaceController.close(); inlineCompletionController.close();
             }
@@ -457,6 +466,7 @@ public class Texteditor extends JFrame implements KeyListener {
         markdownController = new MarkdownController(this);
         paneBufferController = new PaneBufferController(this);
         sessionConfigController = new SessionConfigController(this);
+        settingsApplication = new ConfigSettingsApplication(configManager, sessionConfigController::applyRuntimeConfigFromSettings);
         symbolService = new SymbolService();
         taskService = new TaskService();
         fileWatcherService = new FileWatcherService();
@@ -2904,11 +2914,11 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String nextBuffer() {
-        return paneBufferController.nextBuffer();
+        return documents.cycle(1);
     }
 
     public String prevBuffer() {
-        return paneBufferController.prevBuffer();
+        return documents.cycle(-1);
     }
 
     public String deleteBuffer(boolean force) {
@@ -2916,11 +2926,11 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     void switchToBuffer(int index) {
-        paneBufferController.switchToBuffer(index);
+        if (index >= 0 && index < buffers.size()) documents.activate(documentStore.id(buffers.get(index)));
     }
 
     public String splitWindow(boolean vertical) {
-        return paneBufferController.splitWindow(vertical);
+        return documents.split(vertical);
     }
 
     String openFileInSplit(File file, EditorPane targetPane, WindowLayoutNode.Orientation orientation, boolean newPaneFirst) {
@@ -3314,7 +3324,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String requestCloseActiveWindow(boolean force) {
-        return sessionConfigController.requestCloseActiveWindow(force);
+        return documents.closeWindow(force);
     }
 
     public ConfigManager getConfigManager() {

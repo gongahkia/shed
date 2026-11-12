@@ -211,7 +211,7 @@ class EditorWorkspaceDocumentsTest {
         try (var source = new EditorWorkspaceDocuments(() -> List.of(buffer), () -> List.of(root), () -> root, root, action -> {
             var view = BufferViewState.capture(area, scroll);
             String original = area.getText();
-            try { action.run(); } finally { view.restoreSelectionAfterChanges(area, original, area.getText()); view.restoreViewport(scroll); }
+            try { action.run(); } finally { view.restoreSelectionAfterChanges(area, original, area.getText()); view.restoreViewport(new SwingEditorSurface(area, scroll, buffer::getUndoManager)); }
         })) {
             var before = source.snapshots().getFirst();
             var after = source.applyTexts(List.of(new WorkspaceDocumentEditor.TextChange(before, "FIRST longer\nmiddle\nLAST\n"))).getFirst();

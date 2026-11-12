@@ -3,15 +3,15 @@ package shed;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.event.KeyEvent;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.*;
 
 /** A document switcher independent of the editor's pane layout. All opens are retained. */
 final class OpenEditorsBar extends JPanel {
-    private record Entry(FileBuffer buffer, String label, String path, boolean dirty) { }
+    private record Entry(DocumentWorkspace.Id id, String label, String path, boolean dirty) { }
     private final Texteditor editor;
+    private final DocumentWorkspace documents;
     private final DefaultListModel<Entry> model = new DefaultListModel<>();
     private final JList<Entry> list = new JList<>(model);
     private final JButton close = new JButton(WorkbenchIcons.CLOSE);
@@ -22,6 +22,7 @@ final class OpenEditorsBar extends JPanel {
     OpenEditorsBar(Texteditor editor) {
         super(new BorderLayout(4, 0));
         this.editor = editor;
+        this.documents = editor.documents;
         setBorder(BorderFactory.createEmptyBorder());
         list.setLayoutOrientation(JList.HORIZONTAL_WRAP);
         list.setVisibleRowCount(1);
@@ -56,11 +57,15 @@ final class OpenEditorsBar extends JPanel {
         list.addListSelectionListener(event -> {
             if (refreshing || event.getValueIsAdjusting()) return;
             Entry entry = list.getSelectedValue();
-            if (entry != null && entry.buffer() != editor.getCurrentBuffer()) editor.switchToBuffer(editor.buffers.indexOf(entry.buffer()));
+            if (entry != null && (documents.activeDocument() == null || !entry.id().equals(documents.activeDocument().id()))) {
+                boolean keepNavigationFocus = list.isFocusOwner();
+                documents.activate(entry.id());
+                if (keepNavigationFocus) list.requestFocusInWindow();
+            }
         });
-        bind(KeyEvent.VK_ENTER, "edit", () -> editor.writingArea.requestFocusInWindow());
+        bind(KeyEvent.VK_ENTER, "edit", () -> focusSurface());
         bind(KeyEvent.VK_DELETE, "close", this::closeSelected);
-        KeyboardFocusSupport.installEscape(this, () -> editor.writingArea.requestFocusInWindow());
+        KeyboardFocusSupport.installEscape(this, () -> focusSurface());
         close.addActionListener(event -> closeSelected());
         WorkbenchStyle.quiet(close);
         close.setToolTipText("Close selected editor");
@@ -86,8 +91,9 @@ final class OpenEditorsBar extends JPanel {
         } else {
             list.setFont(editor.resolveUiFont()); close.setFont(editor.resolveUiFont());
         }
-        int height = UiZoom.scale(40, editor.configManager.getUiZoom());
+        int height = controlHeight();
         list.setFixedCellHeight(height);
+        list.setFixedCellWidth(UiZoom.scale(220, editor.configManager.getUiZoom()));
         close.setPreferredSize(new Dimension(height, height));
         setBackground(editor.configManager.getStatusBarBackground());
         list.setBackground(editor.configManager.getStatusBarBackground());
@@ -99,7 +105,7 @@ final class OpenEditorsBar extends JPanel {
     }
 
     @Override public Dimension getPreferredSize() {
-        int height = UiZoom.scale(40, editor.configManager.getUiZoom());
+        int height = controlHeight();
         // Reserve scrolling space only when documents overflow the strip.
         if (scroll != null && scroll.getHorizontalScrollBar().isVisible()) height += UiZoom.scale(10, editor.configManager.getUiZoom());
         return new Dimension(200, height);
@@ -108,20 +114,20 @@ final class OpenEditorsBar extends JPanel {
     void refresh() {
         if (!isVisible()) return;
         List<Entry> next = new ArrayList<>();
-        java.util.Map<String, Integer> names = new java.util.HashMap<>();
-        for (FileBuffer buffer : editor.buffers) names.merge(buffer.getDisplayName(), 1, Integer::sum);
-        for (FileBuffer buffer : editor.buffers) {
-            String name = buffer.getDisplayName();
-            String path = buffer.hasFilePath() ? buffer.getFilePath() : name;
-            if (names.get(name) > 1) name = buffer.hasFilePath() ? name + " — " + Path.of(path).toAbsolutePath().getParent()
-                : name + " " + (editor.buffers.indexOf(buffer) + 1);
-            next.add(new Entry(buffer, name, path, buffer.isModified()));
+        List<DocumentWorkspace.Document> snapshot = documents.documents();
+        var labels = DocumentLabels.forDocuments(snapshot);
+        for (int index = 0; index < snapshot.size(); index++) {
+            var document = snapshot.get(index);
+            String name = labels.get(document.id());
+            String path = document.path() == null || document.path().isBlank() ? name : document.path();
+            next.add(new Entry(document.id(), name, path, document.modified()));
         }
         refreshing = true;
         try {
             if (!entries.equals(next)) { entries = List.copyOf(next); model.clear(); model.addAll(entries); }
             int selected = -1;
-            for (int index = 0; index < entries.size(); index++) if (entries.get(index).buffer() == editor.getCurrentBuffer()) selected = index;
+            var active = documents.activeDocument();
+            for (int index = 0; index < entries.size(); index++) if (active != null && entries.get(index).id().equals(active.id())) selected = index;
             if (list.getSelectedIndex() != selected) { list.setSelectedIndex(selected); if (selected >= 0) list.ensureIndexIsVisible(selected); }
             close.setEnabled(selected >= 0);
         } finally { refreshing = false; }
@@ -129,20 +135,31 @@ final class OpenEditorsBar extends JPanel {
 
     void focusEditors() { setVisible(true); refresh(); list.requestFocusInWindow(); }
 
+    private int controlHeight() {
+        return Math.max(UiZoom.scale(40, editor.configManager.getUiZoom()),
+            list == null ? 0 : list.getFontMetrics(list.getFont()).getHeight() + UiZoom.scale(16, editor.configManager.getUiZoom()));
+    }
+
     void closeSelected() {
         Entry selected = list.getSelectedValue();
         if (selected == null) return;
-        boolean discard = !selected.buffer().isModified() || DocumentLifecycle.discardConfirmed(
-            editor.confirmDiscardChanges("Discard unsaved changes to " + selected.buffer().getDisplayName() + " and close it?"));
-        closeBuffer(selected.buffer(), discard);
+        var current = documents.documents().stream().filter(document -> document.id().equals(selected.id()))
+            .findFirst().orElse(null);
+        if (current == null) return;
+        boolean discard = !current.modified() || DocumentLifecycle.discardConfirmed(
+            editor.confirmDiscardChanges("Discard unsaved changes to " + current.name() + " and close it?"));
+        closeDocument(selected.id(), discard);
     }
 
     // Keeps the close decision explicit, including in noninteractive lifecycle tests.
-    boolean closeBuffer(FileBuffer buffer, boolean discard) {
-        if (!editor.buffers.contains(buffer) || buffer.isModified() && !discard) return false;
-        editor.switchToBuffer(editor.buffers.indexOf(buffer));
-        editor.showMessage(editor.closeActiveBufferWithoutExiting(true));
-        refresh(); editor.writingArea.requestFocusInWindow();
-        return !editor.buffers.contains(buffer);
+    boolean closeDocument(DocumentWorkspace.Id id, boolean discard) {
+        boolean closed = documents.close(id, discard);
+        if (closed) { refresh(); focusSurface(); }
+        return closed;
+    }
+
+    private void focusSurface() {
+        EditorSurface surface = documents.activeSurface();
+        if (surface != null) surface.focus();
     }
 }

@@ -100,6 +100,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     @Override public JPanel component() { return panel; }
+    @Override public void focus() { configurations.requestFocusInWindow(); }
 
     private JPanel toolbar() {
         JPanel panel = new JPanel(new BorderLayout(6, 4));

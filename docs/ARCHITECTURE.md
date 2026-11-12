@@ -83,3 +83,15 @@ All current `*Controller` classes are package-private. Each is constructed with 
 ## Approved reduction direction
 
 New work should first extract deterministic, non-UI logic into a service with explicit constructor dependencies and focused tests. When a controller needs only part of `Texteditor`, introduce a narrow interface at the composition root and migrate that controller without changing unrelated controllers. This reduces the existing owner-reference surface incrementally while preserving Java, Swing, and Maven.
+
+## Stage 1 application boundaries
+
+Settings inspector reads and persistent updates now use `SettingsApplication` and its immutable `Setting` records. `ConfigSettingsApplication` implements validation/repair/persistence against the existing `ConfigManager`; `Texteditor` injects the existing runtime-apply callback. `SessionConfigController.setConfigOptionPersistent` delegates to that same use case. UI styling and neighboring settings actions remain in Swing.
+
+File and buffer picker invocations use `PaletteSession`, implemented by `FilePalette` and `BufferPalette`. These services own immutable candidate snapshots, query rules and acceptance validation. The Swing controller supplies narrow open/activate callbacks and resolves captured buffer identities against the current list. `PaletteFilterSession` retains EDT-owned debounce/cancellation/result-generation behavior. See [UI modernization](UI_MODERNIZATION.md) for ownership, verification and the deliberately retained legacy coupling.
+
+## Stage 2 document and surface boundaries
+
+`LegacyDocumentStore` owns the canonical FileBuffer list; `Texteditor.buffers` is a compatibility alias, not another store. Application metadata/identities are exposed through `DocumentWorkspace`, implemented by `DocumentWorkbench`. `SwingWorkbenchHost` integrates the existing load/save/close/layout/history pipelines. `WorkspaceRoots` and `DocumentNavigation` are application state owned at composition. The folder manager uses `WorkspaceFoldersApplication`; the legacy workspace controller retains manifest and presentation integration.
+
+Each EditorPane owns an `EditorSurface` adapter and its per-document captured views. `SwingEditorSurface` retains the actual text widget attachment and document-owned history; `EditorSurface.View` hides BufferViewState's live Swing Positions. Document content and undo are shared across splits; directed selection/viewport state remains per pane. `DocumentRequests` handles latest-target load admission, including pane-close invalidation. See [UI modernization](UI_MODERNIZATION.md) for migrated callers, evidence and residual legacy dependencies.

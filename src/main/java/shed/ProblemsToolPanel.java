@@ -52,6 +52,7 @@ final class ProblemsToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     @Override public JPanel component() { return panel; }
+    @Override public void focus() { filter.requestFocusInWindow(); }
 
     @Override public void refresh() {
         List<ProblemsService.Problem> all = editor.problemsController.snapshot();

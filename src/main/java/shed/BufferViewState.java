@@ -7,7 +7,7 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.Position;
 
 /** A split's view of an editable document; positions track edits made in other splits. */
-final class BufferViewState {
+final class BufferViewState implements EditorSurface.View {
     private final Position dot;
     private final Position mark;
     private final Point viewport;
@@ -31,10 +31,8 @@ final class BufferViewState {
         }
     }
 
-    void restoreSelection(JTextArea area) {
-        int length = area.getDocument().getLength();
-        area.setCaretPosition(Math.min(mark.getOffset(), length));
-        area.moveCaretPosition(Math.min(dot.getOffset(), length));
+    @Override public void restoreSelection(EditorSurface surface) {
+        surface.select(Math.min(dot.getOffset(), surface.length()), Math.min(mark.getOffset(), surface.length()));
     }
 
     void restoreSelectionAfterChanges(JTextArea area, String before, String after) {
@@ -53,11 +51,7 @@ final class BufferViewState {
         return offset + shift;
     }
 
-    void restoreViewport(JScrollPane scroll) {
-        var view = scroll.getViewport();
-        var size = view.getViewSize();
-        var extent = view.getExtentSize();
-        view.setViewPosition(new Point(Math.min(viewport.x, Math.max(0, size.width - extent.width)),
-            Math.min(viewport.y, Math.max(0, size.height - extent.height))));
+    @Override public void restoreViewport(EditorSurface surface) {
+        surface.scrollTo(new EditorSurface.Viewport(viewport.x, viewport.y));
     }
 }

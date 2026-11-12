@@ -17,6 +17,7 @@ import javax.swing.table.DefaultTableModel;
 
 /** Human review only. Incoming proposals never open this surface or take focus. */
 final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
+    @Override public void focus() { proposalList.requestFocusInWindow(); }
     record Scope(Path root, Path sessions, WorkspaceDocumentEditor documents) {
         WorkspaceProposalService service() {
             var policy = new AgentPolicy(Set.of(AgentPolicy.Capability.READ, AgentPolicy.Capability.PROPOSE, AgentPolicy.Capability.APPLY),

@@ -16,12 +16,12 @@ class BufferViewStateTest {
             BufferViewState state = BufferViewState.capture(area, new JScrollPane(area));
             area.insert("prefix\n", 0);
             area.setCaretPosition(0);
-            state.restoreSelection(area);
+            state.restoreSelection(new SwingEditorSurface(area, new JScrollPane(area), () -> null));
             assertEquals(13, area.getCaret().getDot());
             assertEquals(19, area.getCaret().getMark());
             assertEquals("second", area.getSelectedText());
             area.setText("short");
-            assertDoesNotThrow(() -> state.restoreSelection(area));
+            assertDoesNotThrow(() -> state.restoreSelection(new SwingEditorSurface(area, new JScrollPane(area), () -> null)));
             assertTrue(area.getCaretPosition() <= area.getDocument().getLength());
         });
     }

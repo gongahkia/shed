@@ -153,6 +153,7 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
         } finally { changing = false; }
     }
     @Override public JPanel component() { return panel; }
+    @Override public void focus() { query.requestFocusInWindow(); }
     @Override public void refresh() {
         WorkspaceSearchCoordinator.Snapshot snapshot = coordinator().snapshot();
         if (!initialized && snapshot.query() != null) {

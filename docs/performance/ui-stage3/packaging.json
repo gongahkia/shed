@@ -1,0 +1,16 @@
+{
+  "swing": {
+    "jar_files": 2,
+    "jar_bytes": 49952729,
+    "zip_bytes": 45993494,
+    "jre": "external Java 21; excluded for both",
+    "native_installers": "not built"
+  },
+  "compose": {
+    "jar_files": 47,
+    "jar_bytes": 90040537,
+    "zip_bytes": 84442111,
+    "jre": "external Java 21; excluded for both",
+    "native_installers": "not built"
+  }
+}

@@ -208,7 +208,11 @@ final class EditorUiController {
         editor.add(editor.editorToolSplit, BorderLayout.CENTER);
         JPanel documentHeader = new JPanel(new BorderLayout());
         editor.openEditorsBar = new OpenEditorsBar(editor);
-        documentHeader.add(editor.openEditorsBar, BorderLayout.NORTH);
+        editor.workbenchHeader = new WorkbenchHeader(editor);
+        JPanel navigation = new JPanel(new BorderLayout());
+        navigation.add(editor.workbenchHeader, BorderLayout.NORTH);
+        navigation.add(editor.openEditorsBar, BorderLayout.CENTER);
+        documentHeader.add(navigation, BorderLayout.NORTH);
         documentHeader.add(editor.inlineFindBar, BorderLayout.SOUTH);
         editor.add(documentHeader, BorderLayout.NORTH);
         if (!editor.stagedStartupPending) editor.add(editor.footerPanel, BorderLayout.SOUTH);
@@ -1496,6 +1500,7 @@ final class EditorUiController {
 
     void updateStatusBar() {
         if (editor.openEditorsBar != null) editor.openEditorsBar.refresh();
+        if (editor.workbenchHeader != null) editor.workbenchHeader.refresh();
         long started = System.nanoTime();
         FileBuffer buffer = editor.getCurrentBuffer();
         StringBuilder status = new StringBuilder();

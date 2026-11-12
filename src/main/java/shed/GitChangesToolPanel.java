@@ -58,6 +58,7 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     @Override public JPanel component() { return panel; }
+    @Override public void focus() { changeTable.requestFocusInWindow(); }
 
     private JPanel header() {
         JPanel panel = new JPanel(new BorderLayout(6, 0));

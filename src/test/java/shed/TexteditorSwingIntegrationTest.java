@@ -1578,6 +1578,7 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, file);
         SettingsEditorDialog dialog = null;
         try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending), "Footer assertions require full UI readiness");
             assertEquals(1.5, editor.configManager.getUiZoom());
             assertEquals(onEdt(() -> editor.resolveUiFont().getSize()), onEdt(() -> editor.statusBar.getFont().getSize()));
             assertEquals(onEdt(() -> editor.resolveUiFont().getSize()), onEdt(() -> editor.commandBar.getFont().getSize()));
@@ -3342,6 +3343,62 @@ public class TexteditorSwingIntegrationTest {
                 return null;
             });
         } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void settingsValidationKeepsDraftsInlineAndModifiedFilterCanResetDefaults() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-settings-validation"));
+        Texteditor editor = createEditor(home, Files.writeString(tempDir.resolve("settings-validation.txt"), "text\n"));
+        SettingsEditorDialog[] shown = new SettingsEditorDialog[1];
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                SettingsEditorDialog.showFor(editor);
+                shown[0] = Arrays.stream(editor.getOwnedWindows()).filter(SettingsEditorDialog.class::isInstance)
+                    .map(SettingsEditorDialog.class::cast).filter(Window::isShowing).findFirst().orElseThrow();
+                var query = descendants(shown[0], javax.swing.JTextField.class).stream()
+                    .filter(field -> "Search settings".equals(field.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow();
+                query.setText("tab.size"); return null;
+            });
+            assertTrue(awaitUiState(() -> descendants(shown[0], javax.swing.JTextField.class).stream()
+                .filter(field -> field.getClientProperty("shed.setting.key") != null).count() == 1));
+            int original = editor.configManager.getTabSize();
+            onEdt(() -> {
+                var field = descendants(shown[0], javax.swing.JTextField.class).stream()
+                    .filter(input -> "tab.size".equals(input.getClientProperty("shed.setting.key"))).findFirst().orElseThrow();
+                field.setText("not-a-number"); field.postActionEvent();
+                assertEquals(original, editor.configManager.getTabSize());
+                assertEquals("not-a-number", field.getText());
+                assertEquals(Boolean.TRUE, field.getClientProperty("shed.invalid"));
+                assertTrue(descendants(shown[0], javax.swing.JButton.class).stream()
+                    .anyMatch(button -> "settings.reset.tab.size".equals(button.getName()) && button.isEnabled()), "Reset must recover an invalid draft even when the saved value is already default");
+                var feedback = descendants(shown[0], javax.swing.JTextArea.class).stream()
+                    .filter(area -> "settings.feedback".equals(area.getName())).findFirst().orElseThrow();
+                assertTrue(feedback.getText().contains("Error"));
+                assertFalse(Arrays.stream(editor.getOwnedWindows()).filter(javax.swing.JDialog.class::isInstance)
+                    .map(javax.swing.JDialog.class::cast).anyMatch(dialog -> dialog.isShowing() && dialog.isModal()), "Validation must stay inline");
+                field.setText("7"); field.postActionEvent();
+                assertEquals(7, editor.configManager.getTabSize()); return null;
+            });
+            assertTrue(awaitUiState(() -> descendants(shown[0], javax.swing.JButton.class).stream()
+                .anyMatch(button -> "settings.reset.tab.size".equals(button.getName()) && button.isEnabled())));
+            onEdt(() -> {
+                var reset = descendants(shown[0], javax.swing.JButton.class).stream()
+                    .filter(button -> "settings.reset.tab.size".equals(button.getName())).findFirst().orElseThrow();
+                reset.doClick();
+                var setting = editor.settingsApplication.search("tab.size").stream().filter(item -> item.key().equals("tab.size")).findFirst().orElseThrow();
+                assertEquals(Integer.parseInt(setting.defaultValue()), editor.configManager.getTabSize());
+                descendants(shown[0], javax.swing.JCheckBox.class).stream()
+                    .filter(box -> "settings.modifiedOnly".equals(box.getName())).findFirst().orElseThrow().doClick();
+                return null;
+            });
+            assertTrue(awaitUiState(() -> descendants(shown[0], javax.swing.JTextField.class).stream()
+                .noneMatch(field -> "tab.size".equals(field.getClientProperty("shed.setting.key")))));
+        } finally {
+            if (shown[0] != null) onEdt(() -> { shown[0].dispose(); return null; });
+            disposeEditor(editor);
+        }
     }
 
     @Test

@@ -22,6 +22,9 @@ public final class WorkbenchStyle {
         color("shed.focus", config.getFocusColor());
         color("shed.foreground", config.getEditorForeground());
         color("shed.selection", config.getSelectionColor());
+        color("shed.error", AccessibilitySupport.readableText(new Color(0xCC4855), config.getNormalColor()));
+        color("shed.warning", AccessibilitySupport.readableText(new Color(0xA87808), config.getNormalColor()));
+        color("shed.success", AccessibilitySupport.readableText(new Color(0x27815C), config.getNormalColor()));
         UIManager.put("ButtonUI", ButtonUI.class.getName());
         UIManager.put("ToggleButtonUI", ButtonUI.class.getName());
         UIManager.put("CheckBoxUI", CheckUI.class.getName());
@@ -99,6 +102,30 @@ public final class WorkbenchStyle {
             color(type + ".acceleratorForeground", config.getMutedForegroundColor());
             color(type + ".acceleratorSelectionForeground", config.getSelectionTextColor());
         }
+    }
+
+    /** Semantic status survives theme recursion; callers must also communicate state in text. */
+    static void intent(JComponent component, String intent) {
+        component.putClientProperty("shed.intent", intent);
+        refreshIntent(component);
+    }
+
+    static void refreshIntent(JComponent component) {
+        Object intent = component.getClientProperty("shed.intent");
+        if (intent instanceof String name) {
+            Color foreground = switch (name) {
+                case "error", "warning", "success", "muted" -> UIManager.getColor("shed." + name);
+                default -> null;
+            };
+            if (foreground != null) component.setForeground(foreground);
+        }
+    }
+
+    static void message(JLabel label, String text, String intent) {
+        label.setText(text);
+        label.setToolTipText(text);
+        label.getAccessibleContext().setAccessibleDescription(text);
+        intent(label, intent == null ? "muted" : intent);
     }
 
     private static BlockCaret workbenchCaret(String prefix) {
@@ -205,7 +232,8 @@ public final class WorkbenchStyle {
             Graphics2D g = brush(graphics);
             Component focus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
             boolean focused = c.isFocusOwner() || c instanceof Container parent && focus != null && SwingUtilities.isDescendingFrom(focus, parent);
-            g.setColor(color(focused ? "focus" : "border"));
+            g.setColor(color(c instanceof JComponent component && Boolean.TRUE.equals(component.getClientProperty("shed.invalid"))
+                ? "error" : focused ? "focus" : "border"));
             g.setStroke(new BasicStroke(focused ? px(2) : 1));
             g.drawRoundRect(x + 1, y + 1, Math.max(0, width - 3), Math.max(0, height - 3), px(6), px(6));
             g.dispose();

@@ -1154,6 +1154,7 @@ final class EditorUiController {
         if (component instanceof JComponent swing && swing.getBorder() instanceof javax.swing.border.TitledBorder border) {
             border.setTitleColor(colors.foreground());
         }
+        if (component instanceof JComponent swing) WorkbenchStyle.refreshIntent(swing);
         if (component instanceof Container container) {
             for (Component child : container.getComponents()) applyUiThemeRecursively(child, colors);
         }

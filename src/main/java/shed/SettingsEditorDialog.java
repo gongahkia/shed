@@ -19,17 +19,14 @@ import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
-import javax.swing.JList;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
 import javax.swing.JTextField;
-import javax.swing.ListSelectionModel;
 import javax.swing.Scrollable;
-import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.SwingConstants;
 import javax.swing.Timer;
 import javax.swing.plaf.basic.BasicHTML;
 import javax.swing.text.View;
@@ -53,7 +50,13 @@ final class SettingsEditorDialog extends JDialog {
     private final Texteditor editor;
     private final SettingsApplication application;
     private final JTextField search = new JTextField();
-    private final JList<String> categories = new JList<>();
+    private final JComboBox<String> categories = new JComboBox<>();
+    private final JCheckBox modifiedOnly = new JCheckBox("Modified only");
+    private final javax.swing.JTextArea feedback = new javax.swing.JTextArea("Changes save automatically. Text values apply on Enter or when you leave the field.", 2, 0);
+    private final JLabel count = new JLabel();
+    private final java.util.Map<String, String> drafts = new java.util.HashMap<>();
+    private final java.util.Set<String> invalidKeys = new java.util.HashSet<>();
+    private final java.util.Map<String, JButton> resetButtons = new java.util.HashMap<>();
     private final JPanel settings = new SettingsList();
     private JScrollPane settingsScroll;
     private final Timer searchRefresh = new Timer(120, event -> { resetScroll(); refresh(); });
@@ -87,52 +90,43 @@ final class SettingsEditorDialog extends JDialog {
             @Override public void removeUpdate(DocumentEvent event) { searchRefresh.restart(); }
             @Override public void changedUpdate(DocumentEvent event) { searchRefresh.restart(); }
         });
-        categories.addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) { resetScroll(); refresh(); } });
+        categories.addActionListener(event -> { if (!refreshing) { resetScroll(); refresh(); } });
+        modifiedOnly.addActionListener(event -> { resetScroll(); refresh(); });
         populateCategories();
         refresh();
         applyTheme(this);
     }
 
     private JPanel header() {
-        JPanel panel = new JPanel(new BorderLayout(8, 0));
-        panel.setBorder(BorderFactory.createEmptyBorder(uiPixels(8), uiPixels(8), 0, uiPixels(8)));
-        JLabel searchLabel = new JLabel("Search settings");
-        searchLabel.setLabelFor(search);
+        JPanel panel = new JPanel(new BorderLayout(8, 8));
+        panel.setBorder(BorderFactory.createEmptyBorder(uiPixels(12), uiPixels(12), 0, uiPixels(12)));
+        JPanel query = new JPanel(new BorderLayout(8, 0));
+        JLabel searchLabel = new JLabel("Search settings"); searchLabel.setLabelFor(search);
         AccessibilitySupport.describe(search, "Search settings", "Filter settings by name, category, or description.");
-        panel.add(searchLabel, BorderLayout.WEST);
-        panel.add(search, BorderLayout.CENTER);
-        return panel;
+        query.add(searchLabel, BorderLayout.WEST); query.add(search, BorderLayout.CENTER);
+        panel.add(query, BorderLayout.NORTH);
+        JPanel filters = new JPanel(new WrappingFlowLayout(new FlowLayout(FlowLayout.LEADING, 8, 0)));
+        JLabel category = new JLabel("Category"); category.setLabelFor(categories);
+        categories.setPreferredSize(new Dimension(uiPixels(220), categories.getPreferredSize().height));
+        AccessibilitySupport.describe(categories, "Settings categories", "Choose a group of settings, or All to search every group.");
+        modifiedOnly.setName("settings.modifiedOnly");
+        AccessibilitySupport.describe(modifiedOnly, "Modified settings only", "Show saved values that differ from their defaults.");
+        filters.add(category); filters.add(categories); filters.add(modifiedOnly); filters.add(count);
+        panel.add(filters, BorderLayout.CENTER); return panel;
     }
 
     private JPanel content() {
-        categories.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        categories.setFixedCellHeight(uiPixels(40));
-        AccessibilitySupport.describe(categories, "Settings categories", "Select a category of typed Shed settings.");
-        JScrollPane left = new JScrollPane(categories);
-        left.setBorder(BorderFactory.createEmptyBorder(uiPixels(8), uiPixels(8), uiPixels(8), uiPixels(8)));
-        left.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        left.setPreferredSize(new Dimension(uiPixels(180), uiPixels(400)));
-        JScrollPane right = new JScrollPane(settings);
-        settingsScroll = right;
-        right.setBorder(BorderFactory.createEmptyBorder(uiPixels(8), uiPixels(4), uiPixels(8), uiPixels(12)));
-        right.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        right.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {
+        settingsScroll = new JScrollPane(settings);
+        settingsScroll.setBorder(BorderFactory.createEmptyBorder(uiPixels(8), uiPixels(12), uiPixels(8), uiPixels(12)));
+        settingsScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        settingsScroll.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override public void componentResized(java.awt.event.ComponentEvent event) { updateDetailWidths(); }
         });
-        javax.swing.JSplitPane split = new javax.swing.JSplitPane(javax.swing.JSplitPane.HORIZONTAL_SPLIT, left, right);
-        split.setResizeWeight(0.0);
-        split.setDividerLocation(uiPixels(180));
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.add(split, BorderLayout.CENTER);
-        return panel;
+        JPanel panel = new JPanel(new BorderLayout()); panel.add(settingsScroll); return panel;
     }
 
     private JPanel actions() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        JLabel note = new JLabel("Changes save automatically");
-        note.putClientProperty("shed.muted", true);
-        note.setHorizontalAlignment(SwingConstants.LEFT);
-        panel.add(note);
+        JPanel panel = new JPanel(new WrappingFlowLayout(new FlowLayout(FlowLayout.LEADING, 6, 4)));
         JPanel actions = panel;
         JButton file = new JButton("Open TOML");
         file.addActionListener(event -> editor.openSettingsBuffer());
@@ -149,19 +143,28 @@ final class SettingsEditorDialog extends JDialog {
         JButton close = new JButton("Close");
         close.addActionListener(event -> dispose());
         panel.add(close);
-        return panel;
+        feedback.setEditable(false); feedback.setLineWrap(true); feedback.setWrapStyleWord(true);
+        feedback.setOpaque(false); feedback.setName("settings.feedback");
+        AccessibilitySupport.describe(feedback, "Settings result", "Saved updates and validation errors. Invalid values remain available to correct.");
+        JScrollPane message = new JScrollPane(feedback, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        message.setBorder(BorderFactory.createEmptyBorder());
+        JPanel footer = new JPanel(new BorderLayout(0, 4));
+        footer.setBorder(BorderFactory.createEmptyBorder(0, uiPixels(12), uiPixels(8), uiPixels(12)));
+        footer.add(message, BorderLayout.NORTH); footer.add(panel, BorderLayout.CENTER); return footer;
     }
 
     private void populateCategories() {
-        String selected = categories.getSelectedValue();
-        javax.swing.DefaultListModel<String> model = new javax.swing.DefaultListModel<>();
-        model.addElement("All");
-        LinkedHashSet<String> values = new LinkedHashSet<>();
-        for (SettingsApplication.Setting descriptor : application.search("")) values.add(descriptor.category());
-        for (String value : values) model.addElement(value);
-        categories.setModel(model);
-        categories.setSelectedValue(selected == null ? "All" : selected, true);
-        if (categories.getSelectedIndex() < 0) categories.setSelectedIndex(0);
+        Object selected = categories.getSelectedItem();
+        boolean wasRefreshing = refreshing; refreshing = true;
+        try {
+            javax.swing.DefaultComboBoxModel<String> model = new javax.swing.DefaultComboBoxModel<>();
+            model.addElement("All");
+            LinkedHashSet<String> values = new LinkedHashSet<>();
+            for (var descriptor : application.search("")) values.add(descriptor.category());
+            values.stream().sorted().forEach(model::addElement);
+            categories.setModel(model); categories.setSelectedItem(selected == null ? "All" : selected);
+            if (categories.getSelectedIndex() < 0) categories.setSelectedIndex(0);
+        } finally { refreshing = wasRefreshing; }
     }
 
     private void refresh() {
@@ -173,15 +176,18 @@ final class SettingsEditorDialog extends JDialog {
         refreshing = true;
         try {
             settings.removeAll();
+            resetButtons.clear();
             laidOutDetailWidth = -1;
             theme = DialogTheme.from(editor.configManager);
-            String category = categories.getSelectedValue();
+            String category = (String) categories.getSelectedItem();
             List<SettingsApplication.Setting> descriptors = application.search(search.getText());
             int row = 0;
             for (SettingsApplication.Setting descriptor : descriptors) {
                 if (category != null && !"All".equals(category) && !category.equals(descriptor.category())) continue;
+                if (modifiedOnly.isSelected() && descriptor.currentValue().equals(descriptor.defaultValue())) continue;
                 addDescriptor(descriptor, row++);
             }
+            count.setText(row + (row == 1 ? " setting" : " settings"));
             if (row == 0) {
                 JLabel empty = new JLabel("No settings match this search.");
                 GridBagConstraints emptyCell = constraints(0, row++);
@@ -258,20 +264,29 @@ final class SettingsEditorDialog extends JDialog {
             BorderFactory.createEmptyBorder(uiPixels(12), uiPixels(12), uiPixels(12), uiPixels(12))));
         JPanel top = new JPanel(new BorderLayout(0, uiPixels(3)));
         top.setOpaque(false);
-        JLabel name = new JLabel(descriptor.key());
+        JLabel name = new JLabel(settingTitle(descriptor.key()));
         name.setToolTipText(descriptor.description());
         JComponent input = control(descriptor);
         name.setLabelFor(input);
         AccessibilitySupport.describe(input, descriptor.key(), descriptor.description() + " Current value: " + descriptor.currentValue());
         input.putClientProperty("shed.setting.key", descriptor.key());
-        if (input instanceof JCheckBox box) box.setText(descriptor.key());
+        if (invalidKeys.contains(descriptor.key())) input.putClientProperty("shed.invalid", true);
+        JButton reset = new JButton("Reset"); reset.setName("settings.reset." + descriptor.key());
+        reset.setEnabled(!descriptor.currentValue().equals(descriptor.defaultValue()) || drafts.containsKey(descriptor.key()));
+        resetButtons.put(descriptor.key(), reset);
+        reset.setToolTipText("Reset " + descriptor.key() + " to its default value");
+        AccessibilitySupport.describe(reset, "Reset " + descriptor.key(), "Restore this setting to its default value through the normal settings operation.");
+        reset.addActionListener(event -> persist(descriptor.key(), descriptor.defaultValue()));
+        JPanel controls = new JPanel(new BorderLayout(uiPixels(8), 0)); controls.setOpaque(false);
+        controls.add(input, BorderLayout.CENTER); controls.add(reset, BorderLayout.EAST);
+        if (input instanceof JCheckBox box) box.setText(settingTitle(descriptor.key()));
         else top.add(name, BorderLayout.NORTH);
-        top.add(input, BorderLayout.CENTER);
+        top.add(controls, BorderLayout.CENTER);
         panel.add(top, BorderLayout.NORTH);
         String defaultValue = descriptor.defaultValue();
         String shownDefault = defaultValue.length() > 70 ? defaultValue.substring(0, 67) + "…" : defaultValue;
         String detailText = descriptor.description() + " Default: " + defaultValue + ". " + descriptor.applyBehavior();
-        JLabel detail = new JLabel("<html>" + escape(descriptor.description()) + "<br>Default: "
+        JLabel detail = new JLabel("<html>" + escape(descriptor.key()) + "<br>" + escape(descriptor.description()) + "<br>Default: "
             + escape(shownDefault) + " · " + escape(descriptor.applyBehavior()) + "</html>");
         detail.setToolTipText(detailText);
         detail.putClientProperty("shed.setting.description", Boolean.TRUE);
@@ -309,8 +324,14 @@ final class SettingsEditorDialog extends JDialog {
             combo.addActionListener(event -> { if (!refreshing && combo.getSelectedItem() != null) persist(descriptor.key(), String.valueOf(combo.getSelectedItem())); });
             return combo;
         }
-        JTextField field = new JTextField(descriptor.currentValue());
+        JTextField field = new JTextField(drafts.getOrDefault(descriptor.key(), descriptor.currentValue()));
         field.setColumns(22);
+        field.getDocument().addDocumentListener(new DocumentListener() {
+            private void changed() { drafts.put(descriptor.key(), field.getText()); }
+            public void insertUpdate(DocumentEvent event) { changed(); }
+            public void removeUpdate(DocumentEvent event) { changed(); }
+            public void changedUpdate(DocumentEvent event) { changed(); }
+        });
         final String[] savedValue = { descriptor.currentValue() };
         Runnable save = () -> {
             String value = field.getText();
@@ -332,17 +353,39 @@ final class SettingsEditorDialog extends JDialog {
     private boolean persist(String key, String value) {
         if (refreshing) return false;
         String result = application.update(key, value);
+        feedback.setText(key + ": " + result);
+        feedback.getAccessibleContext().setAccessibleDescription(feedback.getText());
         if (result.startsWith("Error")) {
-            javax.swing.JOptionPane.showMessageDialog(this, result, "Settings", javax.swing.JOptionPane.ERROR_MESSAGE);
-            refresh();
+            invalidKeys.add(key);
+            WorkbenchStyle.intent(feedback, "error");
+            JComponent control = settingControl(settings, key);
+            if (control != null) { control.putClientProperty("shed.invalid", true); control.repaint(); }
+            if (resetButtons.get(key) != null) resetButtons.get(key).setEnabled(true);
             return false;
-        } else if (result.contains("(self-healed ")) {
-            javax.swing.JOptionPane.showMessageDialog(this, result, "Settings", javax.swing.JOptionPane.INFORMATION_MESSAGE);
-            refresh();
         }
+        WorkbenchStyle.intent(feedback, result.contains("(self-healed ") ? "warning" : "success");
+        drafts.remove(key);
+        invalidKeys.remove(key);
         theme = DialogTheme.from(editor.configManager);
         applyTheme(this);
+        SwingUtilities.invokeLater(() -> { if (isDisplayable()) refresh(); });
         return true;
+    }
+
+    private static String settingTitle(String key) {
+        return switch (key) {
+            case "theme" -> "Color theme";
+            case "font.family" -> "Editor font";
+            case "font.size" -> "Editor font size";
+            case "ui.font.family" -> "Interface font";
+            case "ui.font.size" -> "Interface font size";
+            case "ui.zoom" -> "Interface scale";
+            case "keymap.profile" -> "Keyboard profile";
+            default -> {
+                String words = key.replace('.', ' ').replace('_', ' ');
+                yield words.isEmpty() ? key : Character.toUpperCase(words.charAt(0)) + words.substring(1);
+            }
+        };
     }
 
     private static String[] choices(String allowed) {

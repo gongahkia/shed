@@ -18,14 +18,20 @@ final class JobQuickfixController {
     }
 
     private final Texteditor editor;
-    private final Map<Integer, String> taskOutputs = new LinkedHashMap<>();
+    private record TaskOutput(String text, int exitCode) { }
+    private final Map<Integer, TaskOutput> taskOutputs = new LinkedHashMap<>();
 
     JobQuickfixController(Texteditor editor) {
         this.editor = editor;
     }
 
     String taskOutputForPanel(int jobId) {
-        return taskOutputs.getOrDefault(jobId, "");
+        var output = taskOutputs.get(jobId);
+        return output == null ? "" : output.text();
+    }
+
+    Integer taskExitCodeForPanel(int jobId) {
+        var output = taskOutputs.get(jobId); return output == null ? null : output.exitCode();
     }
 
     public String deleteLineRange(int startLine, int endLine) {
@@ -453,6 +459,15 @@ final class JobQuickfixController {
 
     String runLoadedTask(String taskName, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun,
                          Map<String, String> inputValues) {
+        return runLoadedTask(taskName, projectRoot, tasks, dryRun, inputValues, false);
+    }
+
+    String runTaskForPanel(String taskName, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun) {
+        return runLoadedTask(taskName, projectRoot, tasks, dryRun, Map.of(), true);
+    }
+
+    private String runLoadedTask(String taskName, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun,
+                                 Map<String, String> inputValues, boolean panelOutput) {
         String normalizedName = taskName == null ? "" : taskName.trim();
         if (normalizedName.isEmpty()) return "Task name required";
         TaskService.WorkspaceTask task = resolveTask(normalizedName, projectRoot, tasks);
@@ -475,20 +490,20 @@ final class JobQuickfixController {
             ? null : editor.remoteWorkspaceSessions.connectionFor(projectRoot.toPath());
         if (remoteConnection != null) {
             if (TaskService.hasBackgroundTask(plans)) return "Background tasks are supported only in the local workspace";
-            return runActivatedRemoteTask(normalizedName, plans, activeFile, remoteConnection, dryRun);
+            return runActivatedRemoteTask(normalizedName, plans, activeFile, remoteConnection, dryRun, panelOutput);
         }
         DevContainerSessionService.Connection connection = editor.devContainerSessions == null
             ? null : editor.devContainerSessions.connectionFor(projectRoot.toPath());
         if (connection != null) {
             if (TaskService.hasBackgroundTask(plans)) return "Background tasks are supported only in the local workspace";
-            return runConnectedContainerTask(normalizedName, plans, activeFile, connection, dryRun, false);
+            return runConnectedContainerTask(normalizedName, plans, activeFile, connection, dryRun, false, panelOutput);
         }
         if (dryRun) return showTaskDryRun(plans);
         boolean background = TaskService.hasBackgroundTask(plans);
         String description = "task " + normalizedName + (background ? " [watch]: " : ": ") + taskPlanDescription(plans);
         AsyncJobService.JobTask<CommandResult> execution = token -> runLocalTaskPlans(plans, token);
         AsyncJobService.JobCompletion<CommandResult> completion = (snapshot, result, error) ->
-            handleTaskJobCompletion(normalizedName, plan, snapshot, result, error);
+            handleTaskJobCompletion(normalizedName, plan, snapshot, result, error, panelOutput);
         int jobId = background
             ? editor.asyncJobService.submitLongRunning(description, execution, completion)
             : editor.asyncJobService.submit(description, execution, completion);
@@ -653,7 +668,7 @@ final class JobQuickfixController {
     }
 
     private String runActivatedRemoteTask(String taskName, List<TaskService.TaskExecutionPlan> plans, File activeFile,
-                                          RemoteWorkspaceSessionService.Connection connection, boolean dryRun) {
+                                          RemoteWorkspaceSessionService.Connection connection, boolean dryRun, boolean panelOutput) {
         RemoteWorkspaceTaskTargets.Target target = new RemoteWorkspaceTaskTargets.Target(connection.id(), connection.workspace(), connection.localRoot());
         String remoteValidation = validateRemoteTaskPlans(plans, connection.localRoot(), connection.workspace().executionRoot(), activeFile);
         if (remoteValidation != null) return remoteValidation;
@@ -664,7 +679,7 @@ final class JobQuickfixController {
             token -> runTaskPlans(plans, token, stage -> remoteCommandResult(connection.workspace().execute(
                 editor.taskService.buildRemoteCommandRequest(stage, connection.localRoot(), connection.workspace().executionRoot(), activeFile)
             ))),
-            (snapshot, result, error) -> handleTaskJobCompletion(taskName, plan, snapshot, result, error)
+            (snapshot, result, error) -> handleTaskJobCompletion(taskName, plan, snapshot, result, error, panelOutput)
         );
         return "Task job " + jobId + " started remotely (" + connection.id() + ":" + taskName + ")";
     }
@@ -691,7 +706,7 @@ final class JobQuickfixController {
         DevContainerSessionService.Connection connection = editor.devContainerSessions == null
             ? null : editor.devContainerSessions.connectionFor(projectRoot.toPath());
         if (connection != null) {
-            return runConnectedContainerTask(normalizedName, plans, activeFile, connection, dryRun, true);
+            return runConnectedContainerTask(normalizedName, plans, activeFile, connection, dryRun, true, false);
         }
         TaskService.TaskExecutionPlan plan = plans.get(plans.size() - 1);
         String containerValidation = validateContainerTaskPlans(plans, projectRoot.toPath(), "/<remote-workspace>", activeFile);
@@ -708,7 +723,7 @@ final class JobQuickfixController {
     /** Runs a task through an already verified, explicitly connected Dev Container without re-probing it. */
     private String runConnectedContainerTask(String taskName, List<TaskService.TaskExecutionPlan> plans, File activeFile,
                                              DevContainerSessionService.Connection connection, boolean dryRun,
-                                             boolean explicitlyRequested) {
+                                             boolean explicitlyRequested, boolean panelOutput) {
         String containerValidation = validateContainerTaskPlans(plans, connection.workspace(), connection.remoteWorkingDirectory(), activeFile);
         if (containerValidation != null) return containerValidation;
         TaskService.TaskExecutionPlan plan = plans.get(plans.size() - 1);
@@ -716,7 +731,7 @@ final class JobQuickfixController {
         int jobId = editor.asyncJobService.submit(
             "task container " + taskName,
             token -> runConnectedContainerTaskPlans(plans, activeFile, connection, token),
-            (snapshot, result, error) -> handleTaskJobCompletion(taskName, plan, snapshot, result, error)
+            (snapshot, result, error) -> handleTaskJobCompletion(taskName, plan, snapshot, result, error, panelOutput)
         );
         return explicitlyRequested ? "Dev Container task job " + jobId + " started (" + taskName + ")"
             : "Task job " + jobId + " started in Dev Container (" + taskName + ")";
@@ -1342,55 +1357,64 @@ final class JobQuickfixController {
 
     void handleTaskJobCompletion(String taskName, TaskService.TaskExecutionPlan plan,
                                  AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
+        handleTaskJobCompletion(taskName, plan, snapshot, result, error, false);
+    }
+
+    private void handleTaskJobCompletion(String taskName, TaskService.TaskExecutionPlan plan,
+                                         AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error,
+                                         boolean panelOutput) {
         if (editor.closingDown) {
             return;
         }
-        int jobId = snapshot == null ? -1 : snapshot.getId();
-        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
-            editor.showMessage("Task job " + jobId + " cancelled");
-            return;
-        }
-        if (error != null || result == null) {
-            String message = error == null ? "unknown error" : error.getMessage();
-            editor.showMessage("Task job " + jobId + " failed: " + (message == null ? "" : message));
-            return;
-        }
-        String output = taskOutput(result);
-        if (jobId >= 0) {
-            taskOutputs.put(jobId, output);
-            while (taskOutputs.size() > 100) taskOutputs.remove(taskOutputs.keySet().iterator().next());
-        }
-        List<QuickfixService.Entry> parsedEntries = plan.task().problemMatcher() == TaskService.ProblemMatcher.NONE
-            ? List.of()
-            : parseTaskQuickfixEntries(output, "task:" + taskName, plan.workingDirectory(), plan.task().problemMatcher(),
-                plan.task().customProblemMatcher());
-        if (parsedEntries.isEmpty()) editor.problemsController.clearQuickfixSource("task:" + taskName);
-        if (!parsedEntries.isEmpty()) {
-            updateQuickfixEntries("task " + taskName + " #" + jobId, parsedEntries);
-        }
+        try {
+            int jobId = snapshot == null ? -1 : snapshot.getId();
+            if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
+                editor.showMessage("Task job " + jobId + " cancelled");
+                return;
+            }
+            if (error != null || result == null) {
+                String message = error == null ? "unknown error" : error.getMessage();
+                editor.showMessage("Task job " + jobId + " failed: " + (message == null ? "" : message));
+                return;
+            }
+            String output = taskOutput(result);
+            if (jobId >= 0) {
+                taskOutputs.put(jobId, new TaskOutput(output, result.exitCode));
+                while (taskOutputs.size() > 100) taskOutputs.remove(taskOutputs.keySet().iterator().next());
+            }
+            List<QuickfixService.Entry> parsedEntries = plan.task().problemMatcher() == TaskService.ProblemMatcher.NONE
+                ? List.of()
+                : parseTaskQuickfixEntries(output, "task:" + taskName, plan.workingDirectory(), plan.task().problemMatcher(),
+                    plan.task().customProblemMatcher());
+            if (parsedEntries.isEmpty()) editor.problemsController.clearQuickfixSource("task:" + taskName);
+            if (!parsedEntries.isEmpty()) {
+                updateQuickfixEntries("task " + taskName + " #" + jobId, parsedEntries);
+            }
 
-        if (result.exitCode != 0) {
-            if (shouldPresentTaskOutput(plan.task().presentation(), false) && !output.isEmpty()) {
+            if (result.exitCode != 0) {
+                if (!panelOutput && shouldPresentTaskOutput(plan.task().presentation(), false) && !output.isEmpty()) {
+                    if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.TASKS)) {
+                        editor.showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
+                    }
+                }
+                String failure = result.stderr == null || result.stderr.isBlank() ? "exit " + result.exitCode : result.stderr.strip();
+                editor.showMessage(parsedEntries.isEmpty()
+                    ? "Task '" + taskName + "' failed (" + failure + ")"
+                    : "Task '" + taskName + "' failed (" + failure + ", quickfix updated)");
+                return;
+            }
+
+            if (!panelOutput && shouldPresentTaskOutput(plan.task().presentation(), true) && !output.isEmpty()) {
                 if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.TASKS)) {
                     editor.showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
                 }
             }
-            String failure = result.stderr == null || result.stderr.isBlank() ? "exit " + result.exitCode : result.stderr.strip();
             editor.showMessage(parsedEntries.isEmpty()
-                ? "Task '" + taskName + "' failed (" + failure + ")"
-                : "Task '" + taskName + "' failed (" + failure + ", quickfix updated)");
-            return;
+                ? "Task '" + taskName + "' complete"
+                : "Task '" + taskName + "' complete (quickfix updated)");
+        } finally {
+            if (editor.toolWindowHost != null) editor.toolWindowHost.refresh(ToolWindowHost.Tab.TASKS);
         }
-
-        if (shouldPresentTaskOutput(plan.task().presentation(), true) && !output.isEmpty()) {
-            if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.TASKS)) {
-                editor.showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
-            }
-        }
-        editor.showMessage(parsedEntries.isEmpty()
-            ? "Task '" + taskName + "' complete"
-            : "Task '" + taskName + "' complete (quickfix updated)");
-        if (editor.toolWindowHost != null) editor.toolWindowHost.refresh(ToolWindowHost.Tab.TASKS);
     }
 
 

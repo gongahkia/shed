@@ -35,17 +35,29 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
     };
     private final JTable jobTable = new JTable(jobs);
     private final JTextArea output = new JTextArea();
+    private final JLabel state = new JLabel("Select a task to run it. Opening this panel does not run commands.");
+    private final JButton cancel = button("Cancel", this::cancelJob);
+    private final java.util.Set<Integer> cancelling = new java.util.HashSet<>();
+    private Integer displayedJob;
+    private boolean refreshing;
 
     TasksToolPanel(Texteditor editor, ToolWindowHost host) {
         this.editor = editor;
         panel.setBorder(BorderFactory.createEmptyBorder(5, 7, 7, 7));
         panel.add(toolbar(), BorderLayout.NORTH);
         panel.add(content(), BorderLayout.CENTER);
+        panel.add(state, BorderLayout.SOUTH);
+        AccessibilitySupport.describe(state, "Task status", "Saved task count, background progress, completion and cancellation.");
+        AccessibilitySupport.describe(tasks, "Workspace tasks", "Select a task; Run starts it explicitly. Opening the panel does not execute commands.");
+        AccessibilitySupport.describe(jobTable, "Task jobs", "Select a job to read its output. Only a running job can be cancelled.");
+        AccessibilitySupport.describe(output, "Task output", "Output of the selected job. Background refresh preserves your reading position.");
+        AccessibilitySupport.describe(cancel, "Cancel selected task job", "Stop the selected running task and its tracked child processes.");
+        cancel.setEnabled(false);
         output.setEditable(false);
         WorkbenchStyle.emptyText(tasks, "Save a task above to get started");
         WorkbenchStyle.emptyText(jobTable, "Run a task to see its progress");
-        jobTable.getSelectionModel().addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) showOutput(); });
-        tasks.addListSelectionListener(event -> { if (!event.getValueIsAdjusting()) loadTask(); });
+        jobTable.getSelectionModel().addListSelectionListener(event -> { if (!refreshing && !event.getValueIsAdjusting()) { showOutput(); updateCancellation(); } });
+        tasks.addListSelectionListener(event -> { if (!refreshing && !event.getValueIsAdjusting()) loadTask(); });
     }
 
     @Override public JPanel component() { return panel; }
@@ -84,7 +96,7 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
         rightTop.setBorder(BorderFactory.createTitledBorder("Jobs"));
         rightTop.add(new JScrollPane(jobTable), BorderLayout.CENTER);
         JPanel jobActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-        jobActions.add(button("Cancel", this::cancelJob));
+        jobActions.add(cancel);
         jobActions.add(button("Quickfix", () -> message(editor.openQuickfixList())));
         rightTop.add(jobActions, BorderLayout.SOUTH);
         output.setBorder(BorderFactory.createTitledBorder("Selected Task Output"));
@@ -96,26 +108,49 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     @Override public void refresh() {
-        File root = editor.resolveTaskProjectRoot();
-        TaskService.TaskLoadResult loaded = editor.taskService.loadWorkspaceTasks(root);
-        String selected = tasks.getSelectedValue();
-        taskNames.clear(); taskByName.clear();
-        if (loaded.isValid()) {
-            for (Map.Entry<String, TaskService.WorkspaceTask> entry : editor.jobQuickfixController.effectiveWorkspaceTasks(root, loaded).entrySet()) {
-                taskNames.addElement(entry.getKey()); taskByName.put(entry.getKey(), entry.getValue());
+        if (refreshing) return;
+        refreshing = true;
+        Integer selectedJob = selectedJob();
+        try {
+            File root = editor.resolveTaskProjectRoot();
+            TaskService.TaskLoadResult loaded = editor.taskService.loadWorkspaceTasks(root);
+            String selected = tasks.getSelectedValue();
+            var available = loaded.isValid() ? editor.jobQuickfixController.effectiveWorkspaceTasks(root, loaded) : Map.<String, TaskService.WorkspaceTask>of();
+            List<String> nextNames = List.copyOf(available.keySet());
+            taskByName.clear(); taskByName.putAll(available);
+            if (!java.util.Collections.list(taskNames.elements()).equals(nextNames)) {
+                taskNames.clear(); taskNames.addAll(nextNames); tasks.setSelectedValue(selected, true);
             }
-        } else {
-            output.setText(String.join("\n", loaded.diagnostics()));
-        }
-        tasks.setSelectedValue(selected, true);
-        jobs.setRowCount(0);
-        for (AsyncJobService.JobSnapshot job : editor.asyncJobService.list()) {
-            if (!job.getDescription().startsWith("task ")) continue;
-            Long done = job.getFinishedAtMillis();
-            long duration = Math.max(0L, (done == null ? System.currentTimeMillis() : done) - job.getStartedAtMillis());
-            jobs.addRow(new Object[] {job.getId(), job.getStatus().name().toLowerCase(), job.getDescription(), duration + " ms"});
-        }
-        showOutput();
+            jobs.setRowCount(0);
+            int running = 0, failed = 0;
+            for (AsyncJobService.JobSnapshot job : editor.asyncJobService.list()) {
+                if (!job.getDescription().startsWith("task ")) continue;
+                if (job.getStatus() == AsyncJobService.Status.RUNNING) running++;
+                else cancelling.remove(job.getId());
+                Integer exitCode = editor.jobQuickfixController.taskExitCodeForPanel(job.getId());
+                boolean commandFailed = exitCode != null && exitCode != 0;
+                if (job.getStatus() == AsyncJobService.Status.FAILED || commandFailed) failed++;
+                Long done = job.getFinishedAtMillis();
+                long duration = Math.max(0L, (done == null ? System.currentTimeMillis() : done) - job.getStartedAtMillis());
+                String status = cancelling.contains(job.getId()) ? "cancelling" : commandFailed ? "failed · exit " + exitCode : job.getStatus().name().toLowerCase(java.util.Locale.ROOT);
+                jobs.addRow(new Object[] {job.getId(), status, job.getDescription(), duration + " ms"});
+                if (java.util.Objects.equals(selectedJob, job.getId())) jobTable.setRowSelectionInterval(jobs.getRowCount() - 1, jobs.getRowCount() - 1);
+            }
+            if (!loaded.isValid()) WorkbenchStyle.message(state, "Task file error: " + String.join("; ", loaded.diagnostics()), "error");
+            else WorkbenchStyle.message(state, taskNames.size() + " saved tasks · " + running + " running · " + failed + " failed", failed > 0 ? "error" : null);
+        } finally { refreshing = false; }
+        showOutput(); updateCancellation();
+    }
+
+    private Integer selectedJob() {
+        int row = jobTable.getSelectedRow();
+        return row < 0 || row >= jobs.getRowCount() ? null : (Integer) jobs.getValueAt(row, 0);
+    }
+
+    private void updateCancellation() {
+        Integer id = selectedJob();
+        var job = id == null ? null : editor.asyncJobService.get(id);
+        cancel.setEnabled(job != null && job.getStatus() == AsyncJobService.Status.RUNNING && !cancelling.contains(id));
     }
 
     private void loadTask() {
@@ -145,23 +180,28 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
         String selected = tasks.getSelectedValue();
         if (selected == null) { message("Select a task."); return; }
         TaskService.TaskLoadResult loaded = editor.taskService.loadWorkspaceTasks(editor.resolveTaskProjectRoot());
-        message(editor.jobQuickfixController.runLoadedTask(selected, editor.resolveTaskProjectRoot(),
+        int previousId = editor.asyncJobService.list().stream().mapToInt(AsyncJobService.JobSnapshot::getId).max().orElse(0);
+        message(editor.jobQuickfixController.runTaskForPanel(selected, editor.resolveTaskProjectRoot(),
             editor.jobQuickfixController.effectiveWorkspaceTasks(editor.resolveTaskProjectRoot(), loaded), dry));
+        for (int row = 0; row < jobs.getRowCount(); row++) {
+            if ((Integer) jobs.getValueAt(row, 0) > previousId) { jobTable.setRowSelectionInterval(row, row); break; }
+        }
     }
 
     private void cancelJob() {
         int row = jobTable.getSelectedRow();
         if (row < 0) { message("Select a job."); return; }
-        message(editor.cancelJob(String.valueOf(jobs.getValueAt(row, 0))));
+        Integer id = selectedJob();
+        String result = editor.cancelJob(String.valueOf(id));
+        if (result.startsWith("Cancellation sent")) cancelling.add(id);
+        message(result);
     }
 
     private void showOutput() {
-        int row = jobTable.getSelectedRow();
-        if (row < 0) return;
-        Object value = jobs.getValueAt(row, 0);
-        try { output.setText(editor.jobQuickfixController.taskOutputForPanel(Integer.parseInt(String.valueOf(value)))); }
-        catch (NumberFormatException ignored) { output.setText(""); }
-        output.setCaretPosition(0);
+        Integer id = selectedJob();
+        if (id == null) { updateCancellation(); return; }
+        ToolOutput.update(output, editor.jobQuickfixController.taskOutputForPanel(id), !java.util.Objects.equals(displayedJob, id));
+        displayedJob = id;
     }
 
     private void message(String result) { editor.showMessage(result); refresh(); }
@@ -169,5 +209,5 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
         TaskService.WorkspaceTask task = taskByName.get(tasks.getSelectedValue());
         return task != null && task.hasDirectArguments();
     }
-    private static JButton button(String text, Runnable action) { JButton button = new JButton(text); button.addActionListener(event -> action.run()); return button; }
+    private static JButton button(String text, Runnable action) { JButton button = new JButton(text); button.setName("tasks." + text.toLowerCase(java.util.Locale.ROOT).replace(' ', '.')); button.addActionListener(event -> action.run()); return button; }
 }

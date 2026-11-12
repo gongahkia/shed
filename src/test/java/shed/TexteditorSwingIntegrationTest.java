@@ -3346,6 +3346,70 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void panelTaskCompletionAndCancellationPreserveTheEditingDocument() throws Exception {
+        assumeSwingAvailable();
+        assumeFalse(System.getProperty("os.name").startsWith("Windows"), "POSIX task fixture");
+        Path home = Files.createDirectories(tempDir.resolve("home-panel-task"));
+        Path root = Files.createDirectories(tempDir.resolve("panel-task-project"));
+        Path source = Files.writeString(root.resolve("source.txt"), "editing stays here\n");
+        Path release = root.resolve("release");
+        Files.writeString(root.resolve(".shedtasks"), "schema_version = 1\n[task.check]\ncommand = \"while [ ! -e release ]; do sleep 0.05; done; printf 'task output'; exit 2\"\npresentation = \"always\"\n");
+        Texteditor editor = createEditor(home, source);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            int id = onEdt(() -> {
+                editor.workspaceController.addFolder(root, true);
+                var loaded = editor.taskService.loadWorkspaceTasks(root.toFile());
+                assertTrue(loaded.isValid(), loaded.diagnostics().toString());
+                editor.showToolWindow(ToolWindowHost.Tab.TASKS);
+                var list = descendants(editor.toolWindowHost, javax.swing.JList.class).stream()
+                    .filter(value -> "Workspace tasks".equals(value.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow();
+                list.setSelectedValue("check", true);
+                descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().filter(b -> "Run".equals(b.getText())).findFirst().orElseThrow().doClick();
+                int job = editor.asyncJobService.list().stream().filter(value -> value.getDescription().startsWith("task ")).mapToInt(AsyncJobService.JobSnapshot::getId).max().orElseThrow();
+                editor.hideToolWindow(); editor.requestActivePaneFocus();
+                editor.documents.activeSurface().replace(0, 0, "unsaved ");
+                return job;
+            });
+            Files.writeString(release, "finish");
+            assertTrue(awaitUiState(() -> Integer.valueOf(2).equals(editor.jobQuickfixController.taskExitCodeForPanel(id))));
+            onEdt(() -> {
+                assertEquals(source.toFile(), editor.getCurrentBuffer().getFile());
+                assertEquals("unsaved editing stays here\n", editor.getCurrentBuffer().getContent());
+                editor.showToolWindow(ToolWindowHost.Tab.TASKS);
+                var table = descendants(editor.toolWindowHost, javax.swing.JTable.class).stream()
+                    .filter(value -> "Task jobs".equals(value.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow();
+                int row = java.util.stream.IntStream.range(0, table.getRowCount()).filter(i -> Integer.valueOf(id).equals(table.getValueAt(i, 0))).findFirst().orElseThrow();
+                table.setRowSelectionInterval(row, row);
+                assertEquals("failed · exit 2", table.getValueAt(row, 1));
+                var output = descendants(editor.toolWindowHost, javax.swing.JTextArea.class).stream()
+                    .filter(value -> "Task output".equals(value.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow();
+                assertTrue(output.getText().contains("task output"));
+                output.setCaretPosition(7); output.moveCaretPosition(2);
+                editor.toolWindowHost.refresh(ToolWindowHost.Tab.TASKS);
+                assertEquals(7, output.getCaret().getMark()); assertEquals(2, output.getCaret().getDot());
+                var cancel = descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().filter(b -> "tasks.cancel".equals(b.getName())).findFirst().orElseThrow();
+                assertFalse(cancel.isEnabled());
+                return null;
+            });
+            Files.delete(release);
+            int cancelled = onEdt(() -> {
+                descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().filter(b -> "Run".equals(b.getText())).findFirst().orElseThrow().doClick();
+                int job = editor.asyncJobService.list().stream().filter(value -> value.getDescription().startsWith("task ")).mapToInt(AsyncJobService.JobSnapshot::getId).max().orElseThrow();
+                var cancel = descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().filter(b -> "tasks.cancel".equals(b.getName())).findFirst().orElseThrow();
+                assertTrue(cancel.isEnabled()); cancel.doClick(); assertFalse(cancel.isEnabled());
+                return job;
+            });
+            assertTrue(awaitUiState(() -> editor.asyncJobService.get(cancelled).getStatus() == AsyncJobService.Status.CANCELLED));
+            onEdt(() -> {
+                assertEquals(source.toFile(), editor.getCurrentBuffer().getFile());
+                assertEquals("unsaved editing stays here\n", editor.getCurrentBuffer().getContent());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void settingsValidationKeepsDraftsInlineAndModifiedFilterCanResetDefaults() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-settings-validation"));

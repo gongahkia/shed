@@ -3534,6 +3534,13 @@ public class TexteditorSwingIntegrationTest {
                 var state = descendants(editor.toolWindowHost, javax.swing.JLabel.class).stream().filter(label -> "agent.reviewState".equals(label.getName())).findFirst().orElseThrow();
                 assertTrue(state.getText().contains("Review"));
                 var apply = descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().filter(b -> "agent.apply".equals(b.getName())).findFirst().orElseThrow();
+                editor.settingsApplication.update("ui.zoom", "1.5"); editor.setSize(760, 780); editor.validate();
+                for (String name : List.of("agent.apply", "agent.reject")) {
+                    var decision = descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().filter(b -> name.equals(b.getName())).findFirst().orElseThrow();
+                    Rectangle bounds = javax.swing.SwingUtilities.convertRectangle(decision.getParent(), decision.getBounds(), editor.getRootPane());
+                    assertTrue(editor.getRootPane().getVisibleRect().contains(bounds), name + " must remain reachable at narrow width and 150% scale: " + bounds);
+                }
+                editor.settingsApplication.update("ui.zoom", "1.0"); editor.setSize(1100, 820); editor.validate();
                 assertTrue(apply.isShowing()); apply.doClick(); return null;
             });
             assertTrue(awaitUiState(() -> editor.getCurrentBuffer().getContent().equals("reviewed\n") && editor.getCurrentBuffer().isModified()));

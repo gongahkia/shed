@@ -37,6 +37,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     private final JTextArea before = named(new JTextArea(), "agent.before");
     private final JTextArea proposed = named(new JTextArea(), "agent.proposed");
     private final JTextArea details = named(new JTextArea(), "agent.details");
+    private final JLabel summary = named(new JLabel(), "agent.summary");
     private final JTextArea recoveryDetails = named(new JTextArea(), "agent.recoveryDetails");
     private final JTextArea preservedDraft = named(new JTextArea(), "agent.preservedDraft");
     private final JLabel beforeTitle = new JLabel("Original snapshot");
@@ -105,7 +106,8 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         JPanel listActions = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0)); listActions.add(refresh); listActions.add(more);
         left.add(listActions, BorderLayout.NORTH); left.setMinimumSize(new Dimension(180, 100));
         JPanel review = new JPanel(new BorderLayout(6, 6));
-        JPanel heading = new JPanel(new BorderLayout(4, 4)); heading.add(details); heading.add(documents, BorderLayout.SOUTH);
+        JPanel heading = new JPanel(new BorderLayout(4, 4)); heading.add(summary); heading.add(documents, BorderLayout.SOUTH);
+        summary.putClientProperty("html.disable", true);
         review.add(heading, BorderLayout.NORTH);
         JSplitPane texts = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, textPane(beforeTitle, before), textPane(proposedTitle, proposed));
         texts.setResizeWeight(0.5); texts.setDividerLocation(0.5);
@@ -117,22 +119,28 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         AccessibilitySupport.describe(recoveryDetails, "Recovery evidence", "Current contents compared with the recorded operation, and retained resource paths.");
         preservedDraft.setEditable(false);
         AccessibilitySupport.describe(preservedDraft, "Preserved editor draft", "The reviewed editor draft is preserved when a file is deleted or renamed.");
+        reviewTabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+        AccessibilitySupport.describe(reviewTabs, "Proposal views", "Changes, recovery evidence, preserved draft and full proposal details.");
         reviewTabs.addTab("Changes", changes); reviewTabs.addTab("Recovery", new JScrollPane(recoveryDetails));
         reviewTabs.addTab("Preserved draft", new JScrollPane(preservedDraft)); reviewTabs.setEnabledAt(2, false);
+        reviewTabs.addTab("Details", new JScrollPane(details));
+        AccessibilitySupport.describe(details, "Proposal details", "Full reviewed workspace path, proposer, task, revision and file-format metadata.");
         review.add(reviewTabs);
         JPanel actions = new JPanel(new BorderLayout(6, 0));
-        JPanel primary = new JPanel(new FlowLayout(FlowLayout.TRAILING, 4, 0));
+        JPanel primary = new JPanel(new java.awt.GridLayout(1, 2, 4, 0));
         primary.add(reject); primary.add(apply);
-        JPanel secondary = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
-        for (JButton action : List.of(save, discard, openSource, undo, rebase, inspect, reconcile, restore)) secondary.add(action);
+        JPanel secondary = new JPanel(); secondary.setLayout(new BoxLayout(secondary, BoxLayout.LINE_AXIS));
+        for (JButton action : List.of(save, discard, openSource, undo, rebase, inspect, reconcile, restore)) {
+            secondary.add(action); secondary.add(Box.createHorizontalStrut(4));
+        }
         restore.setToolTipText("Restore the snapshots from before this interrupted apply or undo. Requires the inspected versions and intact recorded originals.");
         JScrollPane actionScroll = new JScrollPane(secondary, JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         actionScroll.setBorder(BorderFactory.createEmptyBorder());
         actions.add(actionScroll, BorderLayout.CENTER); actions.add(primary, BorderLayout.EAST);
-        review.add(actions, BorderLayout.SOUTH);
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, review);
         split.setResizeWeight(0.24); split.setDividerLocation(260); review.setMinimumSize(new Dimension(240, 120));
-        panel.add(reviewState, BorderLayout.NORTH); panel.add(split); panel.add(status, BorderLayout.SOUTH);
+        JPanel footer = new JPanel(new BorderLayout(4, 4)); footer.add(actions); footer.add(status, BorderLayout.SOUTH);
+        panel.add(reviewState, BorderLayout.NORTH); panel.add(split); panel.add(footer, BorderLayout.SOUTH);
         reviewState.putClientProperty("html.disable", true);
         AccessibilitySupport.describe(reviewState, "Proposal review state", "Opening review never executes a proposal. Apply accepts the saved selection across the entire proposal.");
         proposalList.addListSelectionListener(event -> { if (!event.getValueIsAdjusting() && !rendering) selectProposal(); });
@@ -271,6 +279,9 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
             }
             var metadata = value.proposal();
             var format = deletion || rename ? MiniJson.asObject(value.document().get("diskFormat")) : value.document();
+            summary.setText(Objects.toString(scope.root().getFileName(), scope.root().toString()) + " · " + metadata.get("files") + " document(s) · proposed by " + metadata.get("actor"));
+            summary.setToolTipText("Reviewed workspace: " + scope.root() + " · proposed by " + metadata.get("actor"));
+            summary.getAccessibleContext().setAccessibleDescription(summary.getToolTipText());
             details.setText("Workspace: " + scope.root() + "\n" + metadata.get("status") + " · " + metadata.get("files") + " document(s) · proposed by " + metadata.get("actor")
                 + " · reviewed by " + Objects.toString(metadata.get("reviewedBy"), "nobody yet") + "\n"
                 + metadata.get("taskId") + " / " + metadata.get("turnId") + " · revision " + metadata.get("revision") + "\n"
@@ -462,7 +473,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     private void clearPreview() {
         preview = null; recovery = null; recoveryDetails.setText("Inspect an interrupted operation to compare its recorded and current contents.");
         reviewTabs.setSelectedIndex(0); reviewTabs.setEnabledAt(2, false); preservedDraft.setText("");
-        before.setText(""); proposed.setText(""); details.setText(""); hunks.setRowCount(0);
+        before.setText(""); proposed.setText(""); details.setText(""); summary.setText(""); hunks.setRowCount(0);
     }
     private void message(String text) { WorkbenchStyle.message(status, text, null); }
     private static JPanel textPane(JLabel label, JTextArea text) {

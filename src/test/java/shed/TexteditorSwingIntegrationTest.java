@@ -3472,11 +3472,16 @@ public class TexteditorSwingIntegrationTest {
             assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
             onEdt(() -> { editor.setSize(1100, 820); editor.workspaceController.addFolder(root, true); editor.showToolWindow(ToolWindowHost.Tab.TASKS); return null; });
             flushEdt();
-            int divider = onEdt(() -> { editor.editorToolSplit.setDividerLocation(300); return editor.editorToolSplit.getDividerLocation(); });
+            int dockHeight = onEdt(() -> {
+                editor.editorToolSplit.setDividerLocation(300); editor.validate();
+                return editor.editorToolSplit.getHeight() - editor.editorToolSplit.getDividerLocation() - editor.editorToolSplit.getDividerSize();
+            });
             onEdt(() -> { editor.hideToolWindow(); return null; }); flushEdt();
             onEdt(() -> {
                 editor.showToolWindow(ToolWindowHost.Tab.DEBUG);
-                assertEquals(divider, editor.editorToolSplit.getDividerLocation(), 2, "reopening another tool must preserve a manually sized dock");
+                editor.validate();
+                assertEquals(dockHeight, editor.editorToolSplit.getHeight() - editor.editorToolSplit.getDividerLocation() - editor.editorToolSplit.getDividerSize(), 2,
+                    "reopening another tool must preserve dock height even when footer layout changes the divider coordinate");
                 editor.showToolWindow(ToolWindowHost.Tab.TASKS);
                 descendants(editor.toolWindowHost, javax.swing.JButton.class).stream()
                     .filter(b -> "Detach selected tool".equals(b.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow().doClick();

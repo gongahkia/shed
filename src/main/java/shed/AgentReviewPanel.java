@@ -42,6 +42,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     private final JLabel beforeTitle = new JLabel("Original snapshot");
     private final JLabel proposedTitle = new JLabel("Proposed text · editable before acceptance");
     private final JTabbedPane reviewTabs = new JTabbedPane();
+    private final JLabel reviewState = named(new JLabel("Review required · Opening this panel does not apply changes"), "agent.reviewState");
     private final JLabel status = named(new JLabel("Select a workspace to review agent proposals."), "agent.status");
     private final DefaultTableModel hunks = new DefaultTableModel(new Object[]{"Use", "Change", "Range"}, 0) {
         @Override public Class<?> getColumnClass(int column) { return column == 0 ? Boolean.class : String.class; }
@@ -66,6 +67,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     private Map<String, Object> recovery;
     private Integer nextOffset;
     private boolean busy, rendering, dirty;
+    private boolean closed;
     private String requestedProposal;
     private long generation;
 
@@ -118,15 +120,21 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         reviewTabs.addTab("Changes", changes); reviewTabs.addTab("Recovery", new JScrollPane(recoveryDetails));
         reviewTabs.addTab("Preserved draft", new JScrollPane(preservedDraft)); reviewTabs.setEnabledAt(2, false);
         review.add(reviewTabs);
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
-        for (JButton action : List.of(openSource, save, discard, rebase, reject, undo, apply, inspect, reconcile, restore)) actions.add(action);
+        JPanel actions = new JPanel(new BorderLayout(6, 0));
+        JPanel primary = new JPanel(new FlowLayout(FlowLayout.TRAILING, 4, 0));
+        primary.add(reject); primary.add(apply);
+        JPanel secondary = new JPanel(new FlowLayout(FlowLayout.LEADING, 4, 0));
+        for (JButton action : List.of(save, discard, openSource, undo, rebase, inspect, reconcile, restore)) secondary.add(action);
         restore.setToolTipText("Restore the snapshots from before this interrupted apply or undo. Requires the inspected versions and intact recorded originals.");
-        // A horizontal scroller keeps every action reachable in a narrow dock or at larger UI zoom.
-        JScrollPane actionScroll = new JScrollPane(actions, JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        review.add(actionScroll, BorderLayout.SOUTH);
+        JScrollPane actionScroll = new JScrollPane(secondary, JScrollPane.VERTICAL_SCROLLBAR_NEVER, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        actionScroll.setBorder(BorderFactory.createEmptyBorder());
+        actions.add(actionScroll, BorderLayout.CENTER); actions.add(primary, BorderLayout.EAST);
+        review.add(actions, BorderLayout.SOUTH);
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, review);
         split.setResizeWeight(0.24); split.setDividerLocation(260); review.setMinimumSize(new Dimension(240, 120));
-        panel.add(split); panel.add(status, BorderLayout.SOUTH);
+        panel.add(reviewState, BorderLayout.NORTH); panel.add(split); panel.add(status, BorderLayout.SOUTH);
+        reviewState.putClientProperty("html.disable", true);
+        AccessibilitySupport.describe(reviewState, "Proposal review state", "Opening review never executes a proposal. Apply accepts the saved selection across the entire proposal.");
         proposalList.addListSelectionListener(event -> { if (!event.getValueIsAdjusting() && !rendering) selectProposal(); });
         documents.addActionListener(event -> { if (!rendering && documents.getSelectedIndex() >= 0) loadPreview(); });
         proposed.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
@@ -152,7 +160,9 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     }
 
     @Override public JPanel component() { return panel; }
+    @Override public void close() { closed = true; generation++; }
     @Override public void refresh() {
+        if (closed) return;
         Scope current = scopeSupplier.get();
         if (!Objects.equals(current, scope)) {
             if (dirty) { message("Local review edits belong to the previous workspace. Save or discard them before switching review."); return; }
@@ -379,7 +389,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
     }
 
     private <T> void run(String message, Function<WorkspaceProposalService, T> operation, Consumer<T> completion) {
-        if (busy || scope == null) return;
+        if (closed || busy || scope == null) return;
         Scope captured = scope; long request = ++generation;
         busy = true; message(message); controls();
         jobs.submit("Agent review: " + message, token -> {
@@ -393,12 +403,13 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
                 }
             }
         }, (snapshot, result, error) -> {
-            if (request != generation) return;
+            if (closed || request != generation) return;
             busy = false;
             if (!Objects.equals(captured, scopeSupplier.get()) && !dirty) { scope = scopeSupplier.get(); clear(); reload(false); return; }
             if (error != null) {
                 message(error instanceof WorkspaceApiException failure ? failure.code() + ": " + failure.getMessage()
                     : "Review operation did not finish. Refresh to inspect its persisted outcome.");
+                WorkbenchStyle.intent(status, "error");
             } else if (result != null) completion.accept(result);
             else message("Review operation was cancelled. Refresh to inspect its persisted outcome.");
             controls();
@@ -428,6 +439,14 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         apply.setEnabled(ready && state.equals("PROPOSED")); reject.setEnabled(ready && state.equals("PROPOSED"));
         undo.setEnabled(ready && state.equals("APPLIED")); rebase.setEnabled(ready && Set.of("PROPOSED", "FAILED").contains(state));
         boolean interrupted = Set.of("APPLYING", "UNDOING", "RECOVERY_REQUIRED").contains(state);
+        inspect.setVisible(interrupted); reconcile.setVisible(interrupted); restore.setVisible(interrupted);
+        String summary = busy ? "Working · waiting for the requested review operation" : dirty ? "Local edits · save or discard your review before applying"
+            : interrupted ? "Recovery required · automatic application is disabled"
+            : state.equals("APPLIED") ? (Boolean.TRUE.equals(preview.proposal().get("pendingSaveAtApplication"))
+                ? "Applied to open buffers · save files separately" : "Applied · inspect the result or undo this proposal")
+            : state.equals("PROPOSED") ? "Review required · Apply accepts saved changes across this proposal"
+            : "Select a proposal · opening review does not change files";
+        WorkbenchStyle.message(reviewState, summary, interrupted ? "error" : dirty || state.equals("PROPOSED") ? "warning" : null);
         String kind = preview == null ? "" : Objects.toString(preview.document().get("kind"), "TEXT");
         openSource.setEnabled(ready && navigation != null && !interrupted
             && !(kind.equals("CREATE") && !state.equals("APPLIED")) && !(kind.equals("DELETE") && state.equals("APPLIED")));
@@ -445,7 +464,7 @@ final class AgentReviewPanel implements ToolWindowHost.ToolSurface {
         reviewTabs.setSelectedIndex(0); reviewTabs.setEnabledAt(2, false); preservedDraft.setText("");
         before.setText(""); proposed.setText(""); details.setText(""); hunks.setRowCount(0);
     }
-    private void message(String text) { status.setText(text); status.setToolTipText(text); status.getAccessibleContext().setAccessibleDescription(text); }
+    private void message(String text) { WorkbenchStyle.message(status, text, null); }
     private static JPanel textPane(JLabel label, JTextArea text) {
         JPanel pane = new JPanel(new BorderLayout(4, 4)); label.setLabelFor(text);
         pane.add(label, BorderLayout.NORTH); pane.add(new JScrollPane(text)); pane.setMinimumSize(new Dimension(80, 80)); return pane;

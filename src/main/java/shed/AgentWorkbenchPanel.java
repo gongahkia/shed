@@ -94,5 +94,5 @@ final class AgentWorkbenchPanel implements ToolWindowHost.ToolSurface, AutoClose
             var size = button.getPreferredSize(); button.setPreferredSize(new java.awt.Dimension(size.width, Math.max(size.height, WorkbenchStyle.px(40)))); }
         sessions.forEach(AgentSessionPanel::refreshAppearance); review.refreshAppearance();
     }
-    @Override public void close() { if (closed) return; closed = true; sessions.forEach(AgentSessionPanel::close); }
+    @Override public void close() { if (closed) return; closed = true; review.close(); sessions.forEach(AgentSessionPanel::close); }
 }

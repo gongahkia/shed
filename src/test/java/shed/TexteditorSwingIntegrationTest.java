@@ -3458,6 +3458,41 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void productionReviewRequiresExplicitApplyAndRetainsUnsavedEditorChanges() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-production-review"));
+        Path root = Files.createDirectories(tempDir.resolve("production-review-project"));
+        Path source = Files.writeString(root.resolve("source.txt"), "original\n");
+        Texteditor editor = createEditor(home, source);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> { editor.workspaceController.addFolder(root, true); return null; });
+            var scope = new AgentReviewPanel.Scope(root, Path.of(editor.configManager.getSessionDirectory()), editor.workspaceDocuments());
+            var queries = new WorkspaceQueryService(root, AgentPolicy.readOnly(), scope.documents());
+            scope.service().propose("review fixture", "task", "turn", List.of(new WorkspaceProposalService.Input("source.txt", queries.snapshot(queries.workspaceId(), "source.txt").version(), "reviewed\n")));
+            onEdt(() -> { editor.toolWindowHost.showAgentReview(); return null; });
+            assertTrue(awaitUiState(() -> descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().anyMatch(b -> "agent.apply".equals(b.getName()) && b.isEnabled())));
+            assertEquals("original\n", Files.readString(source));
+            onEdt(() -> {
+                assertEquals("original\n", editor.getCurrentBuffer().getContent());
+                var state = descendants(editor.toolWindowHost, javax.swing.JLabel.class).stream().filter(label -> "agent.reviewState".equals(label.getName())).findFirst().orElseThrow();
+                assertTrue(state.getText().contains("Review"));
+                var apply = descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().filter(b -> "agent.apply".equals(b.getName())).findFirst().orElseThrow();
+                assertTrue(apply.isShowing()); apply.doClick(); return null;
+            });
+            assertTrue(awaitUiState(() -> editor.getCurrentBuffer().getContent().equals("reviewed\n") && editor.getCurrentBuffer().isModified()));
+            assertEquals("original\n", Files.readString(source), "Apply to an open document must preserve the existing unsaved-apply policy");
+            assertTrue(awaitUiState(() -> descendants(editor.toolWindowHost, javax.swing.JButton.class).stream()
+                .anyMatch(b -> "agent.undo".equals(b.getName()) && b.isEnabled())));
+            onEdt(() -> {
+                var undo = descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().filter(b -> "agent.undo".equals(b.getName())).findFirst().orElseThrow();
+                assertTrue(undo.isEnabled()); undo.doClick(); return null;
+            });
+            assertTrue(awaitUiState(() -> editor.getCurrentBuffer().getContent().equals("original\n")));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void settingsValidationKeepsDraftsInlineAndModifiedFilterCanResetDefaults() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-settings-validation"));

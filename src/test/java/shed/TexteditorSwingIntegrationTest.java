@@ -3450,7 +3450,8 @@ public class TexteditorSwingIntegrationTest {
                 assertTrue(cancel.isEnabled()); cancel.doClick(); assertFalse(cancel.isEnabled());
                 return job;
             });
-            assertTrue(awaitUiState(() -> editor.asyncJobService.get(cancelled).getStatus() == AsyncJobService.Status.CANCELLED));
+            assertTrue(awaitUiState(() -> editor.asyncJobService.get(cancelled).getStatus() == AsyncJobService.Status.CANCELLED
+                && descendants(editor.toolWindowHost, javax.swing.JTextArea.class).stream().anyMatch(area -> "Task output".equals(area.getAccessibleContext().getAccessibleName()) && area.getText().contains("Task cancelled"))));
             onEdt(() -> {
                 assertEquals(source.toFile(), editor.getCurrentBuffer().getFile());
                 assertEquals("unsaved editing stays here\n", editor.getCurrentBuffer().getContent());

@@ -200,7 +200,16 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
     private void showOutput() {
         Integer id = selectedJob();
         if (id == null) { updateCancellation(); return; }
-        ToolOutput.update(output, editor.jobQuickfixController.taskOutputForPanel(id), !java.util.Objects.equals(displayedJob, id));
+        String text = editor.jobQuickfixController.taskOutputForPanel(id);
+        var job = editor.asyncJobService.get(id);
+        if (text.isEmpty() && job != null) text = switch (job.getStatus()) {
+            case RUNNING -> "Running… output will appear when this task finishes.";
+            case CANCELLED -> "Task cancelled. No completed output was retained.";
+            case FAILED -> "Task failed: " + job.getErrorMessage();
+            case SUCCEEDED -> editor.jobQuickfixController.taskExitCodeForPanel(id) == null
+                ? "Finishing task output…" : "Task completed without output.";
+        };
+        ToolOutput.update(output, text, !java.util.Objects.equals(displayedJob, id));
         displayedJob = id;
     }
 

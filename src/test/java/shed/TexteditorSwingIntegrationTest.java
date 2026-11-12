@@ -1338,6 +1338,41 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void paletteDisposesResourcesWhenPreviewSetupFails() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-picker-setup-failure"));
+        Path source = Files.writeString(tempDir.resolve("picker-setup-failure.txt"), "source stays open");
+        Texteditor editor = createEditor(home, source);
+        javax.swing.JDialog[] failed = new javax.swing.JDialog[1];
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+                    editor.paletteController.showPaletteDialog("Failing preview", List.of("alpha"), selected -> {
+                        failed[0] = Arrays.stream(editor.getOwnedWindows())
+                            .filter(javax.swing.JDialog.class::isInstance).map(javax.swing.JDialog.class::cast)
+                            .filter(window -> "Failing preview".equals(window.getTitle())).findFirst().orElseThrow();
+                        failed[0].pack();
+                        assertTrue(failed[0].isDisplayable());
+                        throw new IllegalStateException("preview fixture failed");
+                    }));
+                assertFalse(failed[0].isDisplayable(), "setup failure must dispose the realized picker");
+                var field = descendants(failed[0], javax.swing.JTextField.class).getFirst();
+                var results = descendants(failed[0], javax.swing.JList.class).getFirst();
+                assertEquals(0, field.getActionListeners().length, "picker must release its acceptance listener");
+                field.setText("after disposal");
+                assertTrue(results.isEnabled());
+                assertEquals(1, results.getModel().getSize(), "disposed widgets must no longer trigger filtering");
+                assertEquals(source.toFile(), editor.getCurrentBuffer().getFile());
+                return null;
+            });
+        } finally {
+            if (failed[0] != null) onEdt(() -> { failed[0].dispose(); return null; });
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void bufferPickerResolvesCapturedIdentityAfterLiveListReordering() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-buffer-boundary"));

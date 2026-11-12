@@ -943,39 +943,39 @@ final class PaletteController {
         AccessibilitySupport.describe(status, title + " status", "Current filter progress and result count.");
         PaletteFilterSession filtering = new PaletteFilterSession(filterField, list, status,
             matcher, (value, query) -> { selection[0] = new PaletteSelection(value, query); dialog.dispose(); });
-        dialog.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
-            .put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0), "dismiss");
-        dialog.getRootPane().getActionMap().put("dismiss", new AbstractAction() {
-            public void actionPerformed(java.awt.event.ActionEvent event) { dialog.dispose(); }
-        });
-        dialog.add(status, BorderLayout.SOUTH);
-        JPanel header = new JPanel(new BorderLayout());
-        header.setOpaque(false);
-        header.add(titleLabel, BorderLayout.NORTH);
-        if (hint != null) {
-            JLabel guidance = new JLabel(hint);
-            guidance.setForeground(editor.configManager.getCommandBarForeground());
-            guidance.setFont(uiFont);
-            guidance.setBorder(BorderFactory.createEmptyBorder(2, 8, 4, 8));
-            header.add(guidance, BorderLayout.CENTER);
-            filterField.getAccessibleContext().setAccessibleDescription(hint);
-        }
-        header.add(filterField, BorderLayout.SOUTH);
-        dialog.add(header, BorderLayout.NORTH);
-        JScrollPane sp = new JScrollPane(list) {
-            @Override public Dimension getPreferredSize() {
-                return editor.editorUiController.scaleUiDimension(previewProvider == null ? 600 : 520, 320);
-            }
-        };
-        sp.setBorder(null);
-        dialog.add(sp, BorderLayout.CENTER);
-        if (previewProvider != null) dialog.add(previewArea, BorderLayout.EAST);
-        syncPreview.run();
-        Dimension targetSize = previewProvider == null ? new Dimension(620, 400) : new Dimension(860, 420);
-        editor.editorUiController.prepareDialog(dialog, targetSize.width, targetSize.height);
-        dialog.pack();
-        dialog.setLocationRelativeTo(editor);
         try {
+            dialog.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0), "dismiss");
+            dialog.getRootPane().getActionMap().put("dismiss", new AbstractAction() {
+                public void actionPerformed(java.awt.event.ActionEvent event) { dialog.dispose(); }
+            });
+            dialog.add(status, BorderLayout.SOUTH);
+            JPanel header = new JPanel(new BorderLayout());
+            header.setOpaque(false);
+            header.add(titleLabel, BorderLayout.NORTH);
+            if (hint != null) {
+                JLabel guidance = new JLabel(hint);
+                guidance.setForeground(editor.configManager.getCommandBarForeground());
+                guidance.setFont(uiFont);
+                guidance.setBorder(BorderFactory.createEmptyBorder(2, 8, 4, 8));
+                header.add(guidance, BorderLayout.CENTER);
+                filterField.getAccessibleContext().setAccessibleDescription(hint);
+            }
+            header.add(filterField, BorderLayout.SOUTH);
+            dialog.add(header, BorderLayout.NORTH);
+            JScrollPane sp = new JScrollPane(list) {
+                @Override public Dimension getPreferredSize() {
+                    return editor.editorUiController.scaleUiDimension(previewProvider == null ? 600 : 520, 320);
+                }
+            };
+            sp.setBorder(null);
+            dialog.add(sp, BorderLayout.CENTER);
+            if (previewProvider != null) dialog.add(previewArea, BorderLayout.EAST);
+            syncPreview.run();
+            Dimension targetSize = previewProvider == null ? new Dimension(620, 400) : new Dimension(860, 420);
+            editor.editorUiController.prepareDialog(dialog, targetSize.width, targetSize.height);
+            dialog.pack();
+            dialog.setLocationRelativeTo(editor);
             dialog.setVisible(true);
         } finally {
             filtering.close();

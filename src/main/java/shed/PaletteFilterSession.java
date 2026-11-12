@@ -1,6 +1,7 @@
 package shed;
 
 import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -20,6 +21,9 @@ final class PaletteFilterSession implements AutoCloseable {
     private final Function<String, List<String>> matcher;
     private final BiConsumer<String, String> accept;
     private final Timer debounce;
+    private final DocumentListener queryListener;
+    private final ActionListener acceptListener;
+    private final MouseAdapter selectionListener;
     private SwingWorker<List<String>, Void> worker;
     private long generation;
     private boolean pending;
@@ -36,24 +40,27 @@ final class PaletteFilterSession implements AutoCloseable {
         this.accept = accept;
         debounce = new Timer(75, event -> startFilter());
         debounce.setRepeats(false);
-        filter.getDocument().addDocumentListener(new DocumentListener() {
+        queryListener = new DocumentListener() {
             public void insertUpdate(DocumentEvent event) { changed(); }
             public void removeUpdate(DocumentEvent event) { changed(); }
             public void changedUpdate(DocumentEvent event) { changed(); }
-        });
-        filter.addActionListener(event -> acceptSelection());
+        };
+        filter.getDocument().addDocumentListener(queryListener);
+        acceptListener = event -> acceptSelection();
+        filter.addActionListener(acceptListener);
         bind(list, KeyEvent.VK_ENTER, "accept", this::acceptSelection);
         bind(filter, KeyEvent.VK_DOWN, "next", () -> move(1));
         bind(filter, KeyEvent.VK_UP, "previous", () -> move(-1));
         bind(filter, KeyEvent.VK_PAGE_DOWN, "page-next", () -> move(pageSize()));
         bind(filter, KeyEvent.VK_PAGE_UP, "page-previous", () -> move(-pageSize()));
-        list.addMouseListener(new MouseAdapter() {
+        selectionListener = new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent event) {
                 if (event.getClickCount() != 2 || !SwingUtilities.isLeftMouseButton(event)) return;
                 int row = list.locationToIndex(event.getPoint());
                 if (row >= 0 && list.getCellBounds(row, row).contains(event.getPoint())) acceptSelection();
             }
-        });
+        };
+        list.addMouseListener(selectionListener);
         updateCount();
     }
 
@@ -78,6 +85,7 @@ final class PaletteFilterSession implements AutoCloseable {
     }
 
     private void startFilter() {
+        if (closed) return;
         String query = filter.getText();
         long request = generation;
         worker = new SwingWorker<>() {
@@ -125,16 +133,20 @@ final class PaletteFilterSession implements AutoCloseable {
     private int pageSize() { return Math.max(1, list.getLastVisibleIndex() - list.getFirstVisibleIndex()); }
 
     private void move(int delta) {
-        if (pending || model.isEmpty()) return;
+        if (closed || pending || model.isEmpty()) return;
         int index = Math.max(0, Math.min(model.size() - 1, list.getSelectedIndex() + delta));
         list.setSelectedIndex(index);
         list.ensureIndexIsVisible(index);
     }
 
     @Override public void close() {
+        if (closed) return;
         closed = true;
         generation++;
         debounce.stop();
         if (worker != null) worker.cancel(true);
+        filter.getDocument().removeDocumentListener(queryListener);
+        filter.removeActionListener(acceptListener);
+        list.removeMouseListener(selectionListener);
     }
 }

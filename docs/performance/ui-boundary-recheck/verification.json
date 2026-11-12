@@ -1,0 +1,87 @@
+{
+  "recorded_at_utc": "2026-11-12T08:02:26.380726+00:00",
+  "scope": "Settings/file/buffer application-boundary follow-up; later existing redesign changes retained, not certified complete.",
+  "revision": "0c3ff946828fa1f25f43d8a06846720b5a9ad954",
+  "dirty": true,
+  "toolchain": {
+    "java": "Temurin 21.0.12.1+1-LTS",
+    "maven": "3.9.11",
+    "display": "Intel macOS 15.7.7"
+  },
+  "headless_baseline": {
+    "tests": 1279,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 92
+  },
+  "headless_final": {
+    "tests": 1282,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 93,
+    "jar_sha256": "82d9a6363943b539aa424a495c4f507a9d3040b3568244cd44bafd8de0932a30"
+  },
+  "focused_and_desktop": [
+    {
+      "name": "shed.CommandParsingTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "shed.TexteditorSwingIntegrationTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "shed.AsyncJobServiceTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "shed.PaletteFilterSessionTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "shed.ConfigManagerTest",
+      "tests": 54,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "shed.ApplicationBoundaryTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "command_exit_codes": {
+    "baseline_headless": 0,
+    "focused_and_desktop": 0,
+    "final_headless": 0,
+    "baseline_desktop": 1,
+    "final_desktop": 1,
+    "baseline_control_desktop": 1,
+    "final_repeat_desktop": 1
+  },
+  "unverified": [
+    "Windows/Linux desktop interaction",
+    "Native IME hardware",
+    "External screen readers"
+  ],
+  "artifacts_outside_clean": [
+    "/tmp/shed-boundary-recheck-baseline",
+    "/tmp/shed-boundary-recheck-final"
+  ],
+  "performance_limits": "All desktop passes miss three startup targets; the first final pass also misses edit/ranking. Baseline control and unchanged final repeat pass edit/ranking. All samples retained. No causal speedup or specific environmental cause established. Paint/ranker benchmark code and engine classes are unchanged."
+}

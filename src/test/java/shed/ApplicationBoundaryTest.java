@@ -23,7 +23,11 @@ class ApplicationBoundaryTest {
                 assertEquals(7, config.getTabSize());
                 notifications.incrementAndGet();
             });
+            SettingsApplication.Setting before = settings.search("tab.size").stream()
+                .filter(d -> d.key().equals("tab.size")).findFirst().orElseThrow();
+            String originalValue = before.currentValue();
             assertEquals("Set and saved tab.size", settings.update("tab.size", "7"));
+            assertEquals(originalValue, before.currentValue(), "previous snapshots must not become live configuration views");
             assertEquals(1, notifications.get());
             assertEquals("7", settings.search("tab.size").stream().filter(d -> d.key().equals("tab.size"))
                 .findFirst().orElseThrow().currentValue());
@@ -35,6 +39,30 @@ class ApplicationBoundaryTest {
             assertEquals(7, new ConfigManager().getTabSize());
             assertThrows(UnsupportedOperationException.class, () -> settings.search("").clear());
         } finally { System.setProperty("user.home", home); }
+    }
+
+    @Test void paletteQueriesRunWithoutUiAndAcceptanceRetainsTheCallingThread() throws Exception {
+        List<String> activated = new ArrayList<>();
+        try (PaletteSession session = new BufferPalette(List.of(
+                new BufferPalette.Item("document-id", "source.java", false, true)), new FuzzyMatchService(), id -> {
+                    assertTrue(javax.swing.SwingUtilities.isEventDispatchThread());
+                    activated.add(id);
+                    return "activated";
+                });
+             var worker = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            assertEquals(List.of("1: source.java (current)"), worker.submit(() -> {
+                assertFalse(javax.swing.SwingUtilities.isEventDispatchThread());
+                return session.query("source");
+            }).get(5, java.util.concurrent.TimeUnit.SECONDS));
+            assertTrue(activated.isEmpty(), "queries must not invoke application actions");
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                assertEquals("activated", session.accept("1: source.java (current)", "source"));
+                assertEquals(List.of("document-id"), activated, "acceptance must complete inline");
+                session.close();
+            });
+            assertEquals(List.of(), worker.submit(() -> session.query("source"))
+                .get(5, java.util.concurrent.TimeUnit.SECONDS));
+        }
     }
 
     @Test void settingsWriteFailureDoesNotDeliverSuccessfulApplicationCallback() throws Exception {

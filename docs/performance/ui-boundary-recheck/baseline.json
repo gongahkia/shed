@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-11-12T07:41:20.547008+00:00",
+  "revision": "0c3ff946828fa1f25f43d8a06846720b5a9ad954",
+  "dirty": true,
+  "jar_sha256": "2c63487c9028c5cc889ea1a0e1b1d9fa4f85c284acb29a0d62f302c30777ff17",
+  "note": "Preserved working-tree artifact; carried-over reports are historical, fresh baseline suite logged separately.",
+  "fresh_headless": {
+    "tests": 1279,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 92
+  },
+  "fresh_jar_sha256": "2c63487c9028c5cc889ea1a0e1b1d9fa4f85c284acb29a0d62f302c30777ff17"
+}

@@ -1,0 +1,15 @@
+{
+  "added": [],
+  "removed": [],
+  "changed": [
+    "shed/PaletteController$3.class",
+    "shed/PaletteController$4.class",
+    "shed/PaletteController.class",
+    "shed/PaletteFilterSession$1.class",
+    "shed/PaletteFilterSession$2.class",
+    "shed/PaletteFilterSession$3.class",
+    "shed/PaletteFilterSession$4.class",
+    "shed/PaletteFilterSession.class"
+  ],
+  "common_class_count": 19099
+}

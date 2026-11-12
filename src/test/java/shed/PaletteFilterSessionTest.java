@@ -16,16 +16,50 @@ class PaletteFilterSessionTest {
         final JList<String> list = new JList<>(model);
         final JLabel status = new JLabel();
         final CompletableFuture<String> accepted = new CompletableFuture<>();
+        final int documentListeners;
+        final int actionListeners;
+        final int mouseListeners;
         final PaletteFilterSession controller;
 
         Fixture(Function<String, List<String>> matcher) {
             model.addElement("old result");
             list.setSelectedIndex(0);
+            documentListeners = ((javax.swing.text.AbstractDocument) field.getDocument()).getDocumentListeners().length;
+            actionListeners = field.getActionListeners().length;
+            mouseListeners = list.getMouseListeners().length;
             controller = new PaletteFilterSession(field, list, status, matcher,
-                (value, query) -> accepted.complete(value + "|" + query));
+                (value, query) -> {
+                    assertTrue(SwingUtilities.isEventDispatchThread(), "acceptance must retain EDT delivery");
+                    accepted.complete(value + "|" + query);
+                });
         }
 
         public void close() { controller.close(); }
+    }
+
+    @Test
+    void closingDetachesOwnedListenersAndLeavesOtherSubscriptionsIntact() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            Fixture f = new Fixture(query -> { fail("a disposed picker must not start filtering"); return List.of(); });
+            java.util.concurrent.atomic.AtomicInteger otherActions = new java.util.concurrent.atomic.AtomicInteger();
+            java.awt.event.ActionListener otherListener = event -> otherActions.incrementAndGet();
+            f.field.addActionListener(otherListener);
+            f.field.setText("queued");
+            f.close();
+            f.close();
+            assertEquals(f.documentListeners,
+                ((javax.swing.text.AbstractDocument) f.field.getDocument()).getDocumentListeners().length);
+            assertEquals(f.actionListeners + 1, f.field.getActionListeners().length);
+            assertEquals(f.mouseListeners, f.list.getMouseListeners().length);
+            assertTrue(List.of(f.field.getActionListeners()).contains(otherListener));
+            String status = f.status.getText();
+            f.field.setText("after close");
+            f.field.postActionEvent();
+            f.controller.acceptSelection();
+            assertEquals(1, otherActions.get());
+            assertEquals(status, f.status.getText());
+            assertFalse(f.accepted.isDone());
+        });
     }
 
     @Test

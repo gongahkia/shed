@@ -84,13 +84,13 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
         AccessibilitySupport.describe(functionBreakpointList, "Function breakpoints", "Configure enabled, condition, or hit-count settings for a DAP function breakpoint.");
         AccessibilitySupport.describe(exceptionBreakpointList, "Exception breakpoints", "Enable or disable exception breakpoint filters advertised by the active debug adapter.");
         breakpointList.addListSelectionListener(event -> {
-            if (!event.getValueIsAdjusting()) loadBreakpoint(breakpointList.getSelectedValue());
+            if (!refreshing && !event.getValueIsAdjusting()) loadBreakpoint(breakpointList.getSelectedValue());
         });
         functionBreakpointList.addListSelectionListener(event -> {
-            if (!event.getValueIsAdjusting()) loadFunctionBreakpoint(functionBreakpointList.getSelectedValue());
+            if (!refreshing && !event.getValueIsAdjusting()) loadFunctionBreakpoint(functionBreakpointList.getSelectedValue());
         });
         exceptionBreakpointList.addListSelectionListener(event -> {
-            if (!event.getValueIsAdjusting()) loadExceptionBreakpoint(exceptionBreakpointList.getSelectedValue());
+            if (!refreshing && !event.getValueIsAdjusting()) loadExceptionBreakpoint(exceptionBreakpointList.getSelectedValue());
         });
         variableTree.addTreeWillExpandListener(new TreeWillExpandListener() {
             @Override public void treeWillExpand(TreeExpansionEvent event) { requestVariableExpansion(event); }
@@ -277,7 +277,8 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
             else configurations.setSelectedItem(selected);
             String processSummary = session.processes().isEmpty() ? "" : " — " + session.processes().size() + " announced process"
                 + (session.processes().size() == 1 ? "" : "es");
-            state.setText(session.lifecycle().name().toLowerCase() + " — " + session.detail() + processSummary);
+            WorkbenchStyle.message(state, session.lifecycle().name().toLowerCase(java.util.Locale.ROOT) + " — " + session.detail() + processSummary,
+                session.lifecycle() == DebugSessionService.Lifecycle.FAILED ? "error" : null);
             DebugInspection.Snapshot snapshot = editor.debugSessionController.inspectionForPanel();
             threads.removeAllItems();
             for (DebugInspection.ThreadInfo thread : snapshot.threads()) threads.addItem(thread);
@@ -287,10 +288,18 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
                     break;
                 }
             }
+            DebugInspection.Frame selectedFrame = frameList.getSelectedValue();
             frames.clear();
-            for (DebugInspection.Frame frame : snapshot.frames()) frames.addElement(frame);
+            for (DebugInspection.Frame frame : snapshot.frames()) {
+                frames.addElement(frame);
+                if (frame.id() == (selectedFrame == null ? snapshot.frameId() : selectedFrame.id())) frameList.setSelectedIndex(frames.size() - 1);
+            }
+            DebugInspection.Watch selectedWatch = watchList.getSelectedValue();
             watches.clear();
-            for (DebugInspection.Watch watch : snapshot.watches()) watches.addElement(watch);
+            for (DebugInspection.Watch watch : snapshot.watches()) {
+                watches.addElement(watch);
+                if (selectedWatch != null && watch.expression().equals(selectedWatch.expression())) watchList.setSelectedIndex(watches.size() - 1);
+            }
             BreakpointStore.Breakpoint selectedBreakpoint = breakpointList.getSelectedValue();
             breakpoints.clear();
             for (BreakpointStore.Breakpoint breakpoint : editor.debugSessionController.breakpointsForPanel()) breakpoints.addElement(breakpoint);
@@ -304,6 +313,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
                 }
             }
             if (breakpointList.getSelectedIndex() < 0) loadBreakpoint(null);
+            else if (!java.util.Objects.equals(selectedBreakpoint, breakpointList.getSelectedValue())) loadBreakpoint(breakpointList.getSelectedValue());
             FunctionBreakpointStore.Breakpoint selectedFunctionBreakpoint = functionBreakpointList.getSelectedValue();
             functionBreakpoints.clear();
             for (FunctionBreakpointStore.Breakpoint breakpoint : editor.debugSessionController.functionBreakpointsForPanel()) {
@@ -318,6 +328,7 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
                 }
             }
             if (functionBreakpointList.getSelectedIndex() < 0) loadFunctionBreakpoint(null);
+            else if (!java.util.Objects.equals(selectedFunctionBreakpoint, functionBreakpointList.getSelectedValue())) loadFunctionBreakpoint(functionBreakpointList.getSelectedValue());
             DebugSessionController.ExceptionBreakpointView selectedExceptionBreakpoint = exceptionBreakpointList.getSelectedValue();
             exceptionBreakpoints.clear();
             for (DebugSessionController.ExceptionBreakpointView breakpoint : editor.debugSessionController.exceptionBreakpointsForPanel()) {
@@ -333,10 +344,10 @@ final class DebugToolPanel implements ToolWindowHost.ToolSurface {
                 }
             }
             if (exceptionBreakpointList.getSelectedIndex() < 0) loadExceptionBreakpoint(null);
+            else if (!java.util.Objects.equals(selectedExceptionBreakpoint, exceptionBreakpointList.getSelectedValue())) loadExceptionBreakpoint(exceptionBreakpointList.getSelectedValue());
             refreshVariableTree(snapshot);
             DebugConsole.Snapshot output = editor.debugSessionController.consoleForPanel();
-            console.setText(output.output());
-            console.setCaretPosition(0);
+            ToolOutput.update(console, output.output(), false);
         } finally { refreshing = false; }
     }
 

@@ -40,6 +40,7 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     private long diffGeneration;
     private final javax.swing.Timer autoRefreshTimer;
     private boolean statusLoading;
+    private boolean closed;
 
     GitChangesToolPanel(Texteditor editor, ToolWindowHost host) {
         this.editor = editor;
@@ -59,6 +60,10 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
 
     @Override public JPanel component() { return panel; }
     @Override public void focus() { changeTable.requestFocusInWindow(); }
+
+    @Override public void close() {
+        closed = true; autoRefreshTimer.stop(); statusGeneration++; diffGeneration++;
+    }
 
     private JPanel header() {
         JPanel panel = new JPanel(new BorderLayout(6, 0));
@@ -89,9 +94,12 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
         fileActions.add(button("Branch…", this::switchBranch));
         fileActions.add(button("Worktrees…", () -> editor.treeGitController.showGitRepositoryToolsDocument()));
         fileActions.add(button("Stashes…", () -> editor.treeGitController.showGitRepositoryToolsDocument()));
-        panel.add(fileActions, BorderLayout.WEST);
+        panel.add(fileActions, BorderLayout.NORTH);
         JPanel commitActions = new JPanel(new BorderLayout(4, 0));
+        JLabel commitLabel = new JLabel("Commit message"); commitLabel.setLabelFor(commit);
+        commitActions.add(commitLabel, BorderLayout.WEST);
         commitActions.add(commit, BorderLayout.CENTER);
+        AccessibilitySupport.describe(commit, "Commit message", "Write a message, then choose Commit explicitly. Opening Git does not commit changes.");
         commitActions.add(button("Commit", this::commit), BorderLayout.EAST);
         panel.add(commitActions, BorderLayout.CENTER);
         return panel;
@@ -112,29 +120,33 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     private void requestRefresh(boolean automatic) {
-        if (statusLoading) return;
+        if (closed || statusLoading) return;
         statusLoading = true;
         long request = ++statusGeneration;
-        if (!automatic) state.setText("Refreshing Git status…");
+        if (!automatic) WorkbenchStyle.message(state, "Refreshing Git status…", null);
         editor.asyncJobService.submit("Git changes refresh", token -> editor.treeGitController.loadGitChangesWorkbench(), (job, result, error) -> {
-            if (request != statusGeneration || !panel.isDisplayable()) return;
+            if (closed || request != statusGeneration) return;
             statusLoading = false;
+            if (!panel.isDisplayable()) return;
             if (error != null || result == null) {
-                snapshot = null; visibleChanges.clear(); changes.setRowCount(0);
-                state.setText(error == null ? job.getErrorMessage() : error.getMessage());
+                snapshot = null; diffGeneration++; selectedDiff = null; visibleChanges.clear(); changes.setRowCount(0);
+                ToolOutput.update(diff, "", true);
+                WorkbenchStyle.message(state, "Git refresh failed: " + (error == null ? job.getErrorMessage() : error.getMessage()), "error");
                 return;
             }
             if (automatic && Objects.equals(snapshot, result)) return;
-            render(result, automatic);
+            render(result);
         });
     }
 
-    private void render(GitChangesWorkbenchModel.Snapshot result, boolean preserveSelection) {
-        GitChangesWorkbenchModel.Change previous = preserveSelection ? selected() : null;
+    private void render(GitChangesWorkbenchModel.Snapshot result) {
+        GitChangesWorkbenchModel.Change previous = selected();
         String selectedPath = previous == null ? null : previous.path();
-        snapshot = result; selectedDiff = null; visibleChanges.clear(); changes.setRowCount(0); diff.setText("");
+        snapshot = result; diffGeneration++; selectedDiff = null; visibleChanges.clear(); changes.setRowCount(0); ToolOutput.update(diff, "", true);
         repository.setText(result.root().isBlank() ? "Repository: unavailable" : "Repository: " + result.root());
-        state.setText(result.detail() + (result.branch().isBlank() ? "" : "  Branch: " + result.branch()));
+        repository.setToolTipText(result.root());
+        WorkbenchStyle.message(state, result.detail() + (result.branch().isBlank() ? "" : "  Branch: " + result.branch()), result.state() == GitChangesWorkbenchModel.State.ERROR ? "error" : null);
+        WorkbenchStyle.emptyText(changeTable, result.available() ? "Working tree is clean" : result.detail());
         for (GitChangesWorkbenchModel.Change change : result.changes()) {
             if (!change.indexStatus().isBlank()) addChange("Staged", change.indexStatus(), change);
             if (!change.worktreeStatus().isBlank()) addChange("Changes", change.worktreeStatus(), change);
@@ -157,14 +169,15 @@ final class GitChangesToolPanel implements ToolWindowHost.ToolSurface {
 
     private void loadDiff() {
         GitChangesWorkbenchModel.Change change = selected();
-        if (snapshot == null || change == null) return;
         long request = ++diffGeneration;
-        state.setText("Loading diff…");
-        editor.asyncJobService.submit("Git diff: " + change.path(), token -> editor.treeGitController.loadGitChangesWorkbenchDiff(snapshot, change),
+        GitChangesWorkbenchModel.Snapshot captured = snapshot;
+        if (captured == null || change == null) return;
+        WorkbenchStyle.message(state, "Loading diff…", null);
+        editor.asyncJobService.submit("Git diff: " + change.path(), token -> editor.treeGitController.loadGitChangesWorkbenchDiff(captured, change),
             (job, result, error) -> {
-                if (request != diffGeneration || !panel.isDisplayable()) return;
-                if (error != null || result == null) { state.setText(error == null ? job.getErrorMessage() : error.getMessage()); return; }
-                selectedDiff = result; diff.setText(result.content()); diff.setCaretPosition(0); state.setText(result.detail());
+                if (closed || request != diffGeneration || snapshot != captured || !panel.isDisplayable()) return;
+                if (error != null || result == null) { WorkbenchStyle.message(state, "Diff failed: " + (error == null ? job.getErrorMessage() : error.getMessage()), "error"); return; }
+                selectedDiff = result; ToolOutput.update(diff, result.content(), true); WorkbenchStyle.message(state, result.detail(), result.available() ? null : "error");
             });
     }
 

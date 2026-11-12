@@ -51,6 +51,9 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
     private List<WorkspaceReplaceService.FilePlan> visibleFiles = List.of();
     private List<WorkspaceReplaceService.MatchPlan> visibleMatches = List.of();
     private boolean refreshing;
+    private final JLabel activity = new JLabel();
+    private final JButton discard = button("Discard Preview", this::discard);
+    private final JButton apply = button("Apply Selected…", this::apply);
 
     ProjectReplaceToolPanel(Texteditor editor, ToolWindowHost host) {
         this.editor = editor;
@@ -146,9 +149,10 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
 
     private JPanel actions() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
-        panel.add(button("Discard Preview", this::discard));
-        panel.add(button("Apply Selected…", this::apply));
-        return panel;
+        panel.add(discard); panel.add(apply);
+        JPanel footer = new JPanel(new BorderLayout(6, 0)); footer.add(activity, BorderLayout.CENTER); footer.add(panel, BorderLayout.EAST);
+        AccessibilitySupport.describe(activity, "Replacement activity", "Preview progress, cancellation and reviewed replacement results.");
+        return footer;
     }
 
     @Override public void refresh() {
@@ -160,8 +164,13 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
         try {
             WorkspaceReplaceCoordinator controller = editor.workspaceReplaceCoordinator();
             ProjectReplacePolicy policy = controller.policyForPanel();
+            var progress = controller.activityForPanel();
+            WorkbenchStyle.message(activity, progress.message(), progress.failed() ? "error" : null);
+            discard.setText(progress.previewing() ? "Cancel Preview" : "Discard Preview");
+            discard.setEnabled(!progress.applying());
             enabled.setSelected(policy.enabled()); scope.setSelectedItem(policy.scope());
             plan = controller.planForPanel();
+            apply.setEnabled(!progress.previewing() && !progress.applying() && plan != null && plan.selectedMatchCount() > 0);
             files.setRowCount(0); visibleFiles = plan == null ? List.of() : plan.files();
             for (WorkspaceReplaceService.FilePlan file : visibleFiles) {
                 String label = file.path().getFileName().toString();
@@ -176,10 +185,9 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
             for (int index = 0; index < visibleMatches.size(); index++)
                 if (visibleMatches.get(index).matchId() == selectedMatch) matchTable.setRowSelectionInterval(index, index);
             WorkspaceReplaceService.ApplyResult result = controller.lastApplyResultForPanel();
-            if (result != null) detail.setText(renderResult(result));
-            else if (plan == null) detail.setText(policy.enabled() ? "Enter a find/replacement pair, then Preview. Regex replacements support $1 and ${name}." : "Enable project replace before previewing.");
-            else detail.setText((visibleFiles.isEmpty() ? "" : visibleFiles.get(fileRow).path() + "\n\n") + renderPlan(plan));
-            detail.setCaretPosition(0);
+            if (result != null) ToolOutput.update(detail, renderResult(result), false);
+            else if (plan == null) ToolOutput.update(detail, progress.previewing() ? "Preview in progress. Cancel Preview stops the search without editing files." : policy.enabled() ? "Enter a find/replacement pair, then Preview. Regex replacements support $1 and ${name}." : "Enable project replace before previewing.", selectedFile >= 0);
+            else ToolOutput.update(detail, (visibleFiles.isEmpty() ? "" : visibleFiles.get(fileRow).path() + "\n\n") + renderPlan(plan), selectedFile < 0);
         } finally { refreshing = false; }
     }
 
@@ -189,7 +197,7 @@ final class ProjectReplaceToolPanel implements ToolWindowHost.ToolSurface {
         try {
             renderMatches();
             if (plan != null && fileTable.getSelectedRow() >= 0) {
-                detail.setText(visibleFiles.get(fileTable.getSelectedRow()).path() + "\n\n" + renderPlan(plan)); detail.setCaretPosition(0);
+                ToolOutput.update(detail, visibleFiles.get(fileTable.getSelectedRow()).path() + "\n\n" + renderPlan(plan), true);
             }
         } finally { refreshing = false; }
     }

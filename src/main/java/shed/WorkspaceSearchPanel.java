@@ -42,14 +42,14 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
         actions.add(button("Search", this::search)); actions.add(cancel);
         actions.add(button("Current File", () -> {
             try { editor.inlineFindBar.showFind(request().pattern()); editor.hideToolWindow(); }
-            catch (IllegalArgumentException error) { status.setText(error.getMessage()); }
+            catch (IllegalArgumentException error) { WorkbenchStyle.message(status, error.getMessage(), "error"); }
         }));
         actions.add(button("Replace…", () -> {
             try {
                 WorkspaceSearchQuery value = request();
                 editor.showToolWindow(ToolWindowHost.Tab.REPLACE);
                 editor.toolWindowHost.replacePanel().setSearchQuery(value);
-            } catch (IllegalArgumentException error) { status.setText(error.getMessage()); }
+            } catch (IllegalArgumentException error) { WorkbenchStyle.message(status, error.getMessage(), "error"); }
         }));
         controls.add(queryRow, BorderLayout.NORTH);
         controls.add(actions, BorderLayout.CENTER);
@@ -131,7 +131,7 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
         debounce.stop();
         if (editor.closingDown || !editor.isDisplayable()) return;
         try { coordinator().search(request()); }
-        catch (IllegalArgumentException error) { coordinator().invalidate(); status.setText("Invalid search: " + error.getMessage()); }
+        catch (IllegalArgumentException error) { coordinator().invalidate(); WorkbenchStyle.message(status, "Invalid search: " + error.getMessage(), "error"); }
     }
     private void openSelected() {
         WorkspaceTextSearchService.Match selected = results.getSelectedValue();
@@ -154,6 +154,7 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
     }
     @Override public JPanel component() { return panel; }
     @Override public void focus() { query.requestFocusInWindow(); }
+    @Override public void close() { debounce.stop(); }
     @Override public void refresh() {
         WorkspaceSearchCoordinator.Snapshot snapshot = coordinator().snapshot();
         if (!initialized && snapshot.query() != null) {
@@ -165,7 +166,10 @@ final class WorkspaceSearchPanel implements ToolWindowHost.ToolSurface {
             changing = false;
         }
         initialized = true;
-        cancel.setEnabled(snapshot.running()); status.setText(snapshot.status());
+        cancel.setEnabled(snapshot.running());
+        WorkbenchStyle.message(status, snapshot.status(), snapshot.status().startsWith("Search failed") ? "error" : null);
+        WorkbenchStyle.emptyText(results, snapshot.running() ? "Searching workspace files…" : snapshot.query() == null
+            ? "Enter text to search this workspace" : "No matches · change the query or file filters");
         if (!displayed.equals(snapshot.matches())) {
             WorkspaceTextSearchService.Match selection = results.getSelectedValue();
             displayed = snapshot.matches(); model.clear(); model.addAll(displayed);

@@ -3346,6 +3346,56 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void toolsPreserveTestTreeAndSortedProblemSelectionOnBackgroundRefresh() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-tool-refresh"));
+        Path root = Files.createDirectories(tempDir.resolve("tool-refresh-project"));
+        Path tests = Files.createDirectories(root.resolve("src/test/java/demo"));
+        Files.writeString(root.resolve("pom.xml"), "<project/>\n");
+        Files.writeString(root.resolve(".shedtests"), "schema_version = 1\n[[adapter]]\nid = \"maven\"\n");
+        Files.writeString(tests.resolve("AlphaTest.java"), "package demo; class AlphaTest { @Test void works() {} }\n");
+        Files.writeString(tests.resolve("BetaTest.java"), "package demo; class BetaTest { @Test void works() {} }\n");
+        Path source = Files.writeString(root.resolve("source.txt"), "one\ntwo\n");
+        Texteditor editor = createEditor(home, source);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> { editor.workspaceController.addFolder(root, false); editor.testController.selectRoot(root); editor.handleTestCommand("refresh"); editor.showToolWindow(ToolWindowHost.Tab.TESTS); return null; });
+            assertTrue(awaitTestDiscovery(editor, root, "demo.BetaTest#works"));
+            onEdt(() -> {
+                var tree = descendants(editor.toolWindowHost, javax.swing.JTree.class).stream()
+                    .filter(value -> "Tests".equals(value.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow();
+                var model = tree.getModel();
+                var treeRoot = (javax.swing.tree.DefaultMutableTreeNode) model.getRoot();
+                javax.swing.tree.TreePath collapsed = null, selected = null;
+                var nodes = treeRoot.preorderEnumeration();
+                while (nodes.hasMoreElements()) {
+                    var node = (javax.swing.tree.DefaultMutableTreeNode) nodes.nextElement();
+                    if (!node.isLeaf() && node.toString().contains("AlphaTest")) collapsed = new javax.swing.tree.TreePath(node.getPath());
+                    if (node.isLeaf() && node.getParent().toString().contains("BetaTest")) selected = new javax.swing.tree.TreePath(node.getPath());
+                }
+                assertNotNull(collapsed); assertNotNull(selected);
+                tree.collapsePath(collapsed); tree.setSelectionPath(selected);
+                for (int iteration = 0; iteration < 3; iteration++) editor.toolWindowHost.refresh(ToolWindowHost.Tab.TESTS);
+                assertSame(model, tree.getModel(), "unchanged background refresh must not rebuild the tree");
+                assertEquals(selected, tree.getSelectionPath()); assertFalse(tree.isExpanded(collapsed));
+                editor.problemsController.recordQuickfixEntries(List.of(
+                    new QuickfixService.Entry(source.toString(), 1, 1, "selected diagnostic", "refresh"),
+                    new QuickfixService.Entry(source.toString(), 2, 1, "another diagnostic", "refresh")));
+                editor.showToolWindow(ToolWindowHost.Tab.PROBLEMS);
+                var table = descendants(editor.toolWindowHost.problemsPanel().component(), javax.swing.JTable.class).getFirst();
+                table.getRowSorter().toggleSortOrder(4);
+                int row = java.util.stream.IntStream.range(0, table.getRowCount()).filter(i -> "selected diagnostic".equals(table.getValueAt(i, 4))).findFirst().orElseThrow();
+                table.setRowSelectionInterval(row, row);
+                editor.problemsController.recordQuickfixEntries(List.of(new QuickfixService.Entry(source.toString(), 2, 2, "new diagnostic", "extra")));
+                editor.toolWindowHost.refresh(ToolWindowHost.Tab.PROBLEMS);
+                assertTrue(table.getSelectedRow() >= 0);
+                assertEquals("selected diagnostic", table.getValueAt(table.getSelectedRow(), 4));
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void panelTaskCompletionAndCancellationPreserveTheEditingDocument() throws Exception {
         assumeSwingAvailable();
         assumeFalse(System.getProperty("os.name").startsWith("Windows"), "POSIX task fixture");

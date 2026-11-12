@@ -30,12 +30,27 @@ final class ProblemsToolPanel implements ToolWindowHost.ToolSurface {
     };
     private final JTable table = new JTable(rows);
     private List<ProblemsService.Problem> visible = List.of();
+    private final JLabel state = new JLabel();
 
     ProblemsToolPanel(Texteditor editor, ToolWindowHost host) {
         this.editor = editor;
         panel.setBorder(BorderFactory.createEmptyBorder(5, 7, 7, 7));
         panel.add(toolbar(), BorderLayout.NORTH);
         panel.add(new JScrollPane(table), BorderLayout.CENTER);
+        panel.add(state, BorderLayout.SOUTH);
+        AccessibilitySupport.describe(filter, "Filter problems", "Filter diagnostics by source, path or message.");
+        AccessibilitySupport.describe(table, "Problems", "Select a diagnostic, then press Enter to open its source location.");
+        table.getInputMap().put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "openProblem");
+        table.getActionMap().put("openProblem", new javax.swing.AbstractAction() {
+            public void actionPerformed(java.awt.event.ActionEvent event) { openSelected(); }
+        });
+        table.setDefaultRenderer(Object.class, new javax.swing.table.DefaultTableCellRenderer() {
+            public java.awt.Component getTableCellRendererComponent(JTable source, Object value, boolean selected, boolean focused, int row, int column) {
+                super.getTableCellRendererComponent(source, value, selected, focused, row, column);
+                setToolTipText(value == null ? null : value.toString());
+                return this;
+            }
+        });
         table.setAutoCreateRowSorter(true);
         table.getColumnModel().getColumn(4).setPreferredWidth(520);
         table.addMouseListener(new MouseAdapter() {
@@ -58,6 +73,9 @@ final class ProblemsToolPanel implements ToolWindowHost.ToolSurface {
         List<ProblemsService.Problem> all = editor.problemsController.snapshot();
         String query = filter.getText() == null ? "" : filter.getText().trim().toLowerCase(Locale.ROOT);
         String selectedSeverity = String.valueOf(severity.getSelectedItem()).toLowerCase(Locale.ROOT);
+        int selectedRow = table.getSelectedRow();
+        String selectedIdentity = selectedRow < 0 || table.convertRowIndexToModel(selectedRow) >= visible.size()
+            ? null : visible.get(table.convertRowIndexToModel(selectedRow)).identity();
         visible = new ArrayList<>();
         for (ProblemsService.Problem problem : all) {
             if (!matchesSeverity(problem, selectedSeverity) || !matchesQuery(problem, query)) continue;
@@ -70,6 +88,12 @@ final class ProblemsToolPanel implements ToolWindowHost.ToolSurface {
                 problem.source(), displayPath(problem.filePath()), problem.line() + ":" + problem.column(), problem.message()
             });
         }
+        for (int row = 0; row < visible.size(); row++) if (visible.get(row).identity().equals(selectedIdentity)) {
+            int view = table.convertRowIndexToView(row); if (view >= 0) table.setRowSelectionInterval(view, view); break;
+        }
+        WorkbenchStyle.emptyText(table, all.isEmpty() ? "No problems reported in this workspace" : "No problems match the current filters");
+        long errors = all.stream().filter(problem -> problem.severity() == ProblemsService.Severity.ERROR).count();
+        WorkbenchStyle.message(state, visible.size() + " of " + all.size() + " problems · " + errors + " errors", errors > 0 ? "error" : null);
     }
 
     void selectFilter(String value) {

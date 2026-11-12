@@ -43,7 +43,11 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
     private final JLabel state = new JLabel("Refresh to discover tests.");
     private final JTree tree = new JTree(new DefaultMutableTreeNode("Tests"));
     private final JTextArea output = new JTextArea();
-    private boolean refreshing;
+    private boolean refreshing, renderingTree;
+    private java.util.List<TestService.TestCase> displayedTests;
+    private String displayedFilter = "", displayedTest;
+    private Path displayedRoot;
+    private String summaryOutput = "";
 
     TestsToolPanel(Texteditor editor, ToolWindowHost host) {
         this.editor = editor;
@@ -59,7 +63,12 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(tree), new JScrollPane(output));
         split.setResizeWeight(0.47);
         panel.add(split, BorderLayout.CENTER);
-        AccessibilitySupport.describe(tree, "Tests", "Discovered tests grouped by adapter and suite. Double-click to open source.");
+        AccessibilitySupport.describe(tree, "Tests", "Discovered tests grouped by adapter and suite. Enter or double-click opens source; running tests is a separate explicit action.");
+        AccessibilitySupport.describe(filter, "Filter tests", "Filter discovered tests by name or adapter.");
+        tree.getInputMap().put(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER, 0), "openTest");
+        tree.getActionMap().put("openTest", new javax.swing.AbstractAction() {
+            public void actionPerformed(java.awt.event.ActionEvent event) { message(editor.testController.open(selectedTest())); }
+        });
         AccessibilitySupport.describe(roots, "Test workspace folder", "Select the workspace folder whose tests to discover or run. The full path is available in the tooltip.");
     }
 
@@ -100,29 +109,65 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
             if (roots.getSelectedIndex() < 0 && !previous.isBlank()) roots.setSelectedItem(previous);
             roots.setToolTipText(String.valueOf(roots.getSelectedItem()));
             TestController.Snapshot snapshot = editor.testController.snapshot(selected);
-            state.setText((snapshot.runningJobs() > 0 ? "running " + snapshot.runningJobs() + " — " : "") + (snapshot.diagnostics().isEmpty() ? summary(snapshot) : snapshot.diagnostics().getFirst()));
-            output.setText(snapshot.output());
-            output.setCaretPosition(0);
+            boolean failed = snapshot.tests().stream().anyMatch(test -> test.status().failed());
+            WorkbenchStyle.message(state, (snapshot.runningJobs() > 0 ? "running " + snapshot.runningJobs() + " — " : "")
+                + (snapshot.diagnostics().isEmpty() ? summary(snapshot) : snapshot.diagnostics().getFirst()),
+                !snapshot.diagnostics().isEmpty() || failed ? "error" : null);
             refreshTree(snapshot);
         } finally { refreshing = false; }
     }
 
     private void refreshTree() { refreshTree(editor.testController.snapshot(editor.testController.selectedRoot())); }
     private void refreshTree(TestController.Snapshot snapshot) {
-        DefaultMutableTreeNode root = new DefaultMutableTreeNode("Tests — " + snapshot.tests().size());
-        Map<String, DefaultMutableTreeNode> groups = new LinkedHashMap<>();
-        for (TestService.TestCase test : snapshot.tests()) {
-            if (!matches(test)) continue;
-            String adapter = test.adapterId().isBlank() ? "unknown" : test.adapterId();
-            DefaultMutableTreeNode adapterNode = groups.computeIfAbsent(adapter, key -> { DefaultMutableTreeNode node = new DefaultMutableTreeNode(key); root.add(node); return node; });
-            String suite = test.suite().isBlank() ? "tests" : test.suite();
-            String key = adapter + "\u0000" + suite;
-            DefaultMutableTreeNode suiteNode = groups.computeIfAbsent(key, ignored -> { DefaultMutableTreeNode node = new DefaultMutableTreeNode(suite); adapterNode.add(node); return node; });
-            suiteNode.add(new DefaultMutableTreeNode(new Node(marker(test.status()) + " " + test.name(), test)));
+        summaryOutput = snapshot.output();
+        String filterKey = filter.getText() + "\u0000" + status.getSelectedItem();
+        Path rootPath = editor.testController.selectedRoot();
+        if (!java.util.Objects.equals(displayedTests, snapshot.tests()) || !displayedFilter.equals(filterKey) || !rootPath.equals(displayedRoot)) {
+            TestService.TestCase prior = selectedTest();
+            boolean first = displayedTests == null || !rootPath.equals(displayedRoot);
+            String selectedKey = first || prior == null ? null : testKey(prior);
+            java.util.Set<String> expanded = new java.util.HashSet<>();
+            var oldRoot = (DefaultMutableTreeNode) tree.getModel().getRoot();
+            var oldNodes = oldRoot.preorderEnumeration();
+            while (oldNodes.hasMoreElements()) {
+                var node = (DefaultMutableTreeNode) oldNodes.nextElement();
+                TreePath path = new TreePath(node.getPath());
+                if (!node.isLeaf() && tree.isExpanded(path)) expanded.add(groupKey(path));
+            }
+            DefaultMutableTreeNode root = new DefaultMutableTreeNode(snapshot.tests().isEmpty()
+                ? "No tests discovered · use Refresh" : "Tests — " + snapshot.tests().size());
+            Map<String, DefaultMutableTreeNode> groups = new LinkedHashMap<>();
+            for (TestService.TestCase test : snapshot.tests()) {
+                if (!matches(test)) continue;
+                String adapter = test.adapterId().isBlank() ? "unknown" : test.adapterId();
+                DefaultMutableTreeNode adapterNode = groups.computeIfAbsent(adapter, key -> { var node = new DefaultMutableTreeNode(key); root.add(node); return node; });
+                String suite = test.suite().isBlank() ? "tests" : test.suite();
+                DefaultMutableTreeNode suiteNode = groups.computeIfAbsent(adapter + "\u0000" + suite, ignored -> { var node = new DefaultMutableTreeNode(suite); adapterNode.add(node); return node; });
+                suiteNode.add(new DefaultMutableTreeNode(new Node(marker(test.status()) + " " + test.name(), test)));
+            }
+            if (root.getChildCount() == 0 && !snapshot.tests().isEmpty()) root.setUserObject("No tests match the current filters");
+            renderingTree = true;
+            try {
+                tree.setModel(new DefaultTreeModel(root));
+                var nodes = root.preorderEnumeration();
+                while (nodes.hasMoreElements()) {
+                    var node = (DefaultMutableTreeNode) nodes.nextElement(); TreePath path = new TreePath(node.getPath());
+                    if (!node.isLeaf() && (first || expanded.contains(groupKey(path)))) tree.expandPath(path);
+                    if (node.getUserObject() instanceof Node item && testKey(item.test()).equals(selectedKey)) tree.setSelectionPath(path);
+                }
+            } finally { renderingTree = false; }
+            displayedTests = snapshot.tests(); displayedFilter = filterKey; displayedRoot = rootPath;
         }
-        tree.setModel(new DefaultTreeModel(root));
-        for (int index = 0; index < tree.getRowCount(); index++) tree.expandRow(index);
+        selected(null);
     }
+
+    private static String groupKey(TreePath path) {
+        Object[] elements = path.getPath(); StringBuilder key = new StringBuilder();
+        for (int i = 1; i < elements.length; i++) key.append('\u0000').append(elements[i]);
+        return key.toString();
+    }
+
+    private static String testKey(TestService.TestCase test) { return test.adapterId() + "\u0000" + test.id() + "\u0000" + test.file(); }
 
     private boolean matches(TestService.TestCase test) {
         String required = String.valueOf(status.getSelectedItem()).toLowerCase(Locale.ROOT);
@@ -139,11 +184,13 @@ final class TestsToolPanel implements ToolWindowHost.ToolSurface {
     }
 
     private void selected(TreeSelectionEvent event) {
+        if (renderingTree) return;
         TestService.TestCase test = selectedTest();
-        if (test == null) return;
+        if (test == null) { ToolOutput.update(output, summaryOutput, displayedTest != null); displayedTest = null; return; }
         String details = test.label() + "\nstatus: " + test.status().name().toLowerCase(Locale.ROOT) + "\nduration: " + test.durationMillis() + "ms\n";
-        output.setText(details + (test.output().isBlank() ? "" : "\n" + test.output()));
-        output.setCaretPosition(0);
+        String key = testKey(test);
+        ToolOutput.update(output, details + (test.output().isBlank() ? "" : "\n" + test.output()), !key.equals(displayedTest));
+        displayedTest = key;
     }
 
     private void message(String value) { editor.showMessage(value); refresh(); }

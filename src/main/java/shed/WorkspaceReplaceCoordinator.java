@@ -10,6 +10,13 @@ final class WorkspaceReplaceCoordinator {
     private WorkspaceReplaceService.ApplyResult lastApplyResult;
     private long activeRequest;
     private int previewJob = -1;
+    record PanelActivity(boolean previewing, boolean applying, String message, boolean failed) { }
+    private PanelActivity activity = new PanelActivity(false, false, "Preview changes before applying. Opening this panel does not edit files.", false);
+    PanelActivity activityForPanel() { return activity; }
+    private void activity(boolean previewing, boolean applying, String message, boolean failed) {
+        activity = new PanelActivity(previewing, applying, message, failed);
+        if (editor.toolWindowHost != null) editor.toolWindowHost.refresh(ToolWindowHost.Tab.REPLACE);
+    }
 
     WorkspaceReplaceCoordinator(Texteditor editor) {
         this.editor = editor;
@@ -82,7 +89,8 @@ final class WorkspaceReplaceCoordinator {
             token.onCancel(cancellation::cancel);
             try { return new WorkspaceReplaceService(index).preview(persistent, folders, query, replacement, scope, cancellation); }
             finally { index.close(); }
-        }, (snapshot, result, error) -> completePreview(request, snapshot, result, error));
+        }, (snapshot, result, error) -> completePreview(request, snapshot, result, error, false));
+        activity(true, false, "Previewing replacements… no files have been changed", false);
         return "Started project replace preview job " + previewJob;
     }
 
@@ -100,7 +108,7 @@ final class WorkspaceReplaceCoordinator {
         return "Match selection updated";
     }
 
-    String applyForPanel() { return apply(policy().confirmRequired() ? "confirm" : ""); }
+    String applyForPanel() { return apply(policy().confirmRequired() ? "confirm" : "", false); }
 
     String cancelForPanel() { return cancel(); }
 
@@ -133,7 +141,9 @@ final class WorkspaceReplaceCoordinator {
                 WorkspaceIndexService index = workspaceIndexService();
                 return new WorkspaceReplaceService(index).preview(persistentIndexEnabled, root, spec.find(), spec.replacement(), scopeFile, cancellation);
             },
-            (snapshot, result, error) -> completePreview(request, snapshot, result, error));
+            (snapshot, result, error) -> completePreview(request, snapshot, result, error, true));
+        previewJob = jobId;
+        activity(true, false, "Previewing replacements… no files have been changed", false);
         return "Started project replace preview job " + jobId;
     }
 
@@ -178,6 +188,7 @@ final class WorkspaceReplaceCoordinator {
         if (editor.closingDown || request != activeRequest) {
             return;
         }
+        previewJob = -1;
         int jobId = snapshot == null ? -1 : snapshot.getId();
         if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED
             || preview != null && preview.state() == WorkspaceReplaceService.State.CANCELLED) {
@@ -211,26 +222,29 @@ final class WorkspaceReplaceCoordinator {
         editor.showMessage("Started project replace apply job " + applyJobId);
     }
 
-    private void completePreview(long request, AsyncJobService.JobSnapshot snapshot, WorkspaceReplaceService.Preview preview, Exception error) {
+    private void completePreview(long request, AsyncJobService.JobSnapshot snapshot, WorkspaceReplaceService.Preview preview, Exception error, boolean showTextResult) {
         if (editor.closingDown || request != activeRequest) {
             return;
         }
         int jobId = snapshot == null ? -1 : snapshot.getId();
         if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED
             || preview != null && preview.state() == WorkspaceReplaceService.State.CANCELLED) {
+            activity(false, false, "Preview cancelled · no files changed by preview", false);
             editor.showMessage("Project replace preview job " + jobId + " cancelled");
             return;
         }
         if (error != null || preview == null || preview.state() == WorkspaceReplaceService.State.FAILED) {
             String message = error == null ? preview == null ? "unknown error" : preview.message() : error.getMessage();
+            activity(false, false, "Preview failed: " + (message == null ? "unknown error" : message), true);
             editor.showMessage("Project replace preview job " + jobId + " failed: " + (message == null ? "" : message));
             return;
         }
         previewJob = -1;
         plan = preview.plan();
+        activity(false, false, "Preview ready · review selected matches before Apply", false);
         if (editor.toolWindowHost != null && editor.toolWindowHost.isSelected(ToolWindowHost.Tab.REPLACE)) {
             editor.toolWindowHost.refresh(ToolWindowHost.Tab.REPLACE);
-        } else {
+        } else if (showTextResult) {
             showPlan();
         }
         editor.showMessage("Project replace preview ready");
@@ -258,7 +272,9 @@ final class WorkspaceReplaceCoordinator {
         return showPlan();
     }
 
-    private String apply(String argument) {
+    private String apply(String argument) { return apply(argument, true); }
+
+    private String apply(String argument, boolean showTextResult) {
         ProjectReplacePolicy policy = policy();
         if (!policy.enabled()) {
             return "Project replacement is disabled; run :projectreplace enable";
@@ -291,26 +307,35 @@ final class WorkspaceReplaceCoordinator {
                 WorkspaceIndexService index = workspaceIndexService();
                 return new WorkspaceReplaceService(index).apply(applying, cancellation, options);
             },
-            (snapshot, result, error) -> completeApply(snapshot, result, error));
+            (snapshot, result, error) -> completeApply(snapshot, result, error, showTextResult));
+        activity(false, true, "Applying approved replacements…", false);
         return "Started project replace apply job " + jobId;
     }
 
     private void completeApply(AsyncJobService.JobSnapshot snapshot, WorkspaceReplaceService.ApplyResult result, Exception error) {
+        completeApply(snapshot, result, error, true);
+    }
+
+    private void completeApply(AsyncJobService.JobSnapshot snapshot, WorkspaceReplaceService.ApplyResult result, Exception error, boolean showTextResult) {
+        if (editor.closingDown) return;
         int jobId = snapshot == null ? -1 : snapshot.getId();
         if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED
             || result != null && result.state() == WorkspaceReplaceService.State.CANCELLED) {
+            activity(false, false, "Apply cancelled · inspect retained results before retrying", true);
             editor.showMessage("Project replace apply job " + jobId + " cancelled");
             return;
         }
         if (error != null || result == null) {
             String message = error == null ? "unknown error" : error.getMessage();
+            activity(false, false, "Apply failed: " + (message == null ? "unknown error" : message), true);
             editor.showMessage("Project replace apply job " + jobId + " failed: " + (message == null ? "" : message));
             return;
         }
         lastApplyResult = result;
-        if (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.REPLACE)) {
+        activity(false, false, result.message(), result.state() == WorkspaceReplaceService.State.FAILED);
+        if (showTextResult && (editor.toolWindowHost == null || !editor.toolWindowHost.isSelected(ToolWindowHost.Tab.REPLACE))) {
             editor.showScratchBuffer("[project replace result]", formatResult(result));
-        } else {
+        } else if (editor.toolWindowHost != null) {
             editor.toolWindowHost.refresh(ToolWindowHost.Tab.REPLACE);
         }
         editor.showMessage("Project replace apply complete");
@@ -327,6 +352,7 @@ final class WorkspaceReplaceCoordinator {
         plan = null;
         lastApplyResult = null;
         activeRequest++;
+        if (!activity.applying()) activity(false, false, "Preview discarded · previously applied changes are not undone", false);
         return "Project replace preview discarded";
     }
 

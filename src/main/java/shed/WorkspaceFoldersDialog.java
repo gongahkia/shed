@@ -34,6 +34,15 @@ final class WorkspaceFoldersDialog extends JDialog {
         KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        list.setCellRenderer(new javax.swing.DefaultListCellRenderer() {
+            @Override public java.awt.Component getListCellRendererComponent(JList<?> source, Object value, int index, boolean selected, boolean focus) {
+                super.getListCellRendererComponent(source, value, index, selected, focus);
+                putClientProperty("html.disable", true);
+                String path = index >= 0 && index < visibleRoots.size() ? visibleRoots.get(index).toString() : "";
+                setToolTipText(path); getAccessibleContext().setAccessibleName(value + ", " + path);
+                return this;
+            }
+        });
         AccessibilitySupport.describe(list, "Workspace folders", "Folders in this workspace; the active folder is marked with an asterisk.");
         JScrollPane scroll = new JScrollPane(list);
         scroll.setBorder(BorderFactory.createTitledBorder("Folders"));

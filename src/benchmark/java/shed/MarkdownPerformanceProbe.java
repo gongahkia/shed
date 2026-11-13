@@ -23,7 +23,7 @@ public final class MarkdownPerformanceProbe {
     private static Texteditor editor;
     private static int samples, warmups;
     private static Path file;
-    private static boolean wrap, withPreview, empty;
+    private static boolean wrap, withPreview, empty, failed;
     private static Object field(Object owner, String name) throws Exception {
         Field f = (owner instanceof Class<?> c ? c : owner.getClass()).getDeclaredField(name);
         f.setAccessible(true); return f.get(owner instanceof Class<?> ? null : owner);
@@ -199,7 +199,7 @@ public final class MarkdownPerformanceProbe {
                 v.put("worker_ms",metric("syntax.highlight")[1]/1e6);v.put("perf_report",editor.perfService.report());
                 v.put("foreground_spans",editor.syntaxForegroundSpans.size());return null;});out("MD_SAMPLE ",v);
         }
-        edt(() -> {editor.disposeMarkdownPreviews(); editor.commandHandler.execute("bd!");return null;});memory("after_document_close_without_gc");
+        edt(() -> {editor.disposeMarkdownPreviews(); editor.buffers.add(FileBuffer.createPlainScratch("[benchmark remainder]","")); editor.commandHandler.execute("bd!");return null;});memory("after_document_close_without_gc");
     }
     private static void model() throws Exception {
         FileBuffer[] box=new FileBuffer[1];out("MD_SAMPLE ",timed("file_open_worker_no_ui",() -> box[0]=new FileBuffer(file.toFile())));
@@ -226,6 +226,13 @@ public final class MarkdownPerformanceProbe {
             var edit=edt(() -> timed("plain_document_snapshot_listener_insert_remove_"+n,() -> {buffer.getDocument().insertString(at,"x",null);buffer.getDocument().remove(at,1);}));if(i>=0)out("MD_SAMPLE ",edit);
         }
         if(!original.equals(edt(() -> documentHash(buffer.getDocument()))))throw new AssertionError("Model edits changed source");
+        modelGrammarAndSearch(buffer);
+        sink=null; // Do not retain a full replacement result into the independent save measurement.
+        edt(() -> {buffer.getDocument().insertString(buffer.getDocument().getLength(),"\n# saved\n",null);return null;});
+        String expected=edt(() -> documentHash(buffer.getDocument()));out("MD_SAMPLE ",timed("dirty_save_real_write",buffer::save));
+        if(!expected.equals(hash(file)))throw new AssertionError("Saved content mismatch");memory("after_model_work");
+    }
+    private static void modelGrammarAndSearch(FileBuffer buffer) throws Exception {
         String text=buffer.getContent();GrammarHighlightService grammar=new GrammarHighlightService();
         for(int p=0;p<3;p++)for(int i=-Math.min(warmups,2);i<Math.min(samples,5);i++){
             final int start=p==0?0:p==1?Math.max(0,text.length()/2-4096):Math.max(0,text.length()-8192);
@@ -238,9 +245,6 @@ public final class MarkdownPerformanceProbe {
             out("MD_SAMPLE ",timed("replace_all_compute_only",() -> sink=SearchPattern.literal("alpha").replaceAll(text,"ALPHA",() -> false)));
         }
         final int[] reads={0};out("MD_SAMPLE ",timed("search_cooperative_cancellation",() -> {try{new SearchPattern("[a-z]+",true,true,false).scan(text,200000,() -> ++reads[0]>20);}catch(CancellationException expected){return;}throw new AssertionError("Did not cancel");}));
-        edt(() -> {buffer.getDocument().insertString(buffer.getDocument().getLength(),"\n# saved\n",null);return null;});
-        String expected=edt(() -> documentHash(buffer.getDocument()));out("MD_SAMPLE ",timed("dirty_save_real_write",buffer::save));
-        if(!expected.equals(hash(file)))throw new AssertionError("Saved content mismatch");memory("after_model_work");
     }
     private static void assets() throws Exception {
         memory("before_assets");
@@ -248,7 +252,13 @@ public final class MarkdownPerformanceProbe {
             for(String kind:List.of("math","mermaid")) {
                 for(int i=0;i<Math.min(samples,6);i++) {
                     final int n=i;String name=kind+"_"+(i==0?"first_use":i<=3?"identical_cached":"changed");
-                    out("MD_SAMPLE ",edt(() -> timed(name,() -> sink=kind.equals("math")?assets.renderMath("x^2 + "+(n<=3?1:n),false,Color.BLACK):assets.renderMermaid("flowchart LR\n A --> B"+(n<=3?1:n)))));
+                    Object[] error={null};
+                    var value=edt(() -> timed(name,() -> {
+                        try{sink=kind.equals("math")?assets.renderMath("x^2 + "+(n<=3?1:n),false,Color.BLACK):assets.renderMermaid("flowchart LR\n A --> B"+(n<=3?1:n));}
+                        catch(Exception exception){error[0]=exception.toString();}
+                    }));
+                    if(error[0]!=null){value.put("state","ERROR");value.put("error",error[0]);failed=true;}
+                    out("MD_SAMPLE ",value);
                     memory(name);
                 }
                 var v=edt(() -> timed(kind+"_invalid",() -> {try{sink=kind.equals("math")?assets.renderMath("\\notARealCommand{",true,Color.BLACK):assets.renderMermaid("not a valid diagram");}catch(Exception expected){sink=expected.getClass().getName();}}));v.put("outcome",String.valueOf(sink));out("MD_SAMPLE ",v);
@@ -260,6 +270,11 @@ public final class MarkdownPerformanceProbe {
         for(int i=0;i<Math.min(samples,3);i++) {
             out("MD_SAMPLE ",edt(() -> timed("preview_open_end_to_end_edt",() -> editor.commandHandler.execute("markdown preview"))));
             out("MD_SAMPLE ",edt(() -> timed("preview_layout_and_forced_paint",() -> {editor.validate();var pane=editor.editorPanes.stream().filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow();var component=(JComponent)pane.getComponent();component.paintImmediately(component.getVisibleRect());})));
+            var previewPane=edt(() -> (JEditorPane)((JScrollPane)((MarkdownPreviewPane)editor.editorPanes.stream().filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow().getComponent()).getComponent(1)).getViewport().getView());
+            long imageStart=System.nanoTime();await(() -> imagesReady(previewPane),5);
+            var image=row("preview_images_ready");image.put("wall_ms",(System.nanoTime()-imageStart)/1e6);out("MD_SAMPLE ",image);
+            String htmlText=edt(() -> ((MarkdownPreviewPane)editor.editorPanes.stream().filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow().getComponent()).getHtml());
+            out("MD_META ",Map.of("mermaid_error_fallback",htmlText.contains("Mermaid preview error"),"html_characters",htmlText.length()));
             memory("preview_active");
             for(int j=0;j<Math.min(samples,5);j++) out("MD_SAMPLE ",edt(() -> timed("preview_refresh_end_to_end_edt",() -> editor.commandHandler.execute("markdown refresh"))));
             out("MD_SAMPLE ",edt(() -> timed("preview_close_edt",() -> editor.commandHandler.execute("markdown close"))));memory("preview_closed_no_forced_gc");
@@ -282,15 +297,78 @@ public final class MarkdownPerformanceProbe {
         }
     }
     private static String iLabel(String name,int i){return name+"_"+i;}
+    private static void search() throws Exception {
+        open();FileBuffer buffer=edt(editor::getCurrentBuffer);String original=hash(file);
+        if(buffer.isLargeFile()){var v=row("find_bar");v.put("state","UNSUPPORTED");out("MD_SAMPLE ",v);return;}
+        for(SearchPattern pattern:List.of(SearchPattern.literal("alpha"),new SearchPattern("[a-z]+",true,true,false))) {
+            for(int i=0;i<Math.min(samples,5);i++) {
+                long began=System.nanoTime();edt(() -> {editor.inlineFindBar.showFind(pattern);return null;});
+                await(() -> {Object scan=field(editor.inlineFindBar,"scan");return scan!=null && pattern.equals(field(scan,"pattern"));},10);
+                var v=row(pattern.regex()?"find_bar_regex_convergence":"find_bar_literal_convergence");
+                v.put("wall_ms",(System.nanoTime()-began)/1e6);
+                v.put("matches",edt(() -> ((List<?>)field(field(editor.inlineFindBar,"scan"),"ranges")).size()));out("MD_SAMPLE ",v);
+                // Invalidate this result so the next repetition cannot accept the previous scan.
+                edt(() -> {editor.inlineFindBar.showFind("no-such-benchmark-query");return null;});
+            }
+        }
+        edt(() -> {editor.inlineFindBar.showReplace("alpha");((JTextField)field(editor.inlineFindBar,"replacement")).setText("ALPHA");return null;});
+        await(() -> {Object scan=field(editor.inlineFindBar,"scan");return scan!=null && ((SearchPattern)field(scan,"pattern")).query().equals("alpha");},10);
+        long version=edt(() -> buffer.textSnapshot().version());long began=System.nanoTime();
+        edt(() -> {Method m=InlineFindBar.class.getDeclaredMethod("replaceAll");m.setAccessible(true);m.invoke(editor.inlineFindBar);return null;});
+        await(() -> buffer.textSnapshot().version()>version,15);
+        var replacement=row("find_bar_replace_all_install_convergence");replacement.put("wall_ms",(System.nanoTime()-began)/1e6);out("MD_SAMPLE ",replacement);
+        String changed=edt(() -> buffer.getContent());if(changed.contains("alpha"))throw new AssertionError("Replace All incomplete");
+        edt(() -> {buffer.getUndoManager().undo();return null;});
+        if(!original.equals(edt(() -> documentHash(buffer.getDocument()))))throw new AssertionError("Replace All undo mismatch");
+        memory("before_file_switches");
+        Path second=file.resolveSibling("second.md");Files.copy(file,second);FileBuffer other=new FileBuffer(second.toFile());
+        edt(() -> {editor.buffers.add(other);return null;});
+        for(int i=0;i<20;i++){final int n=i;out("MD_SAMPLE ",edt(() -> timed("file_buffer_switch",() -> editor.loadBufferIntoEditor(n%2==0?other:buffer))));}
+        memory("after_20_switches_no_forced_gc");
+        edt(() -> {editor.buffers.add(FileBuffer.createPlainScratch("[benchmark remainder]",""));editor.commandHandler.execute("bd!");editor.commandHandler.execute("bd!");return null;});memory("after_document_closes_no_forced_gc");
+    }
+    private static void syntax() throws Exception {
+        open();
+        for(int position=0;position<3;position++) for(int repeat=0;repeat<3;repeat++) {
+            final int p=position;long before=edt(() -> (long)field(editor.syntaxUiController,"syntaxGeneration"));
+            long began=System.nanoTime();
+            edt(() -> {
+                int length=editor.writingArea.getDocument().getLength();
+                editor.writingArea.setCaretPosition(p==0?0:p==1?length/2:Math.max(0,length-1));
+                var bounds=editor.writingArea.modelToView2D(editor.writingArea.getCaretPosition());
+                if(bounds!=null)editor.writingArea.scrollRectToVisible(bounds.getBounds());
+                editor.validate();editor.scheduleSyntaxHighlighting();return null;
+            });
+            await(() -> {
+                var job=editor.asyncJobService.list().stream().filter(j -> j.getDescription().equals("Syntax highlighting")).findFirst().orElse(null);
+                return (long)field(editor.syntaxUiController,"syntaxGeneration")>before
+                    && (int)field(editor.syntaxUiController,"syntaxJobId")==-1
+                    && job!=null && job.getStatus()==AsyncJobService.Status.SUCCEEDED;
+            },15);
+            var v=row("production_viewport_highlight_"+p);v.put("debounce_and_convergence_ms",(System.nanoTime()-began)/1e6);
+            edt(() -> {v.put("worker_ms",metric("syntax.highlight")[1]/1e6);v.put("foreground_spans",editor.syntaxForegroundSpans.size());
+                v.put("perf_report",editor.perfService.report());v.put("generation",field(editor.syntaxUiController,"syntaxGeneration"));return null;});out("MD_SAMPLE ",v);
+        }
+    }
+    private static boolean imagesReady(JEditorPane pane) {
+        return imagesReady(pane.getUI().getRootView(pane));
+    }
+    private static boolean imagesReady(View view) {
+        if(view instanceof javax.swing.text.html.ImageView image) {
+            Image value=image.getImage();if(value!=null && (Toolkit.getDefaultToolkit().checkImage(value,-1,-1,null)&java.awt.image.ImageObserver.ALLBITS)==0)return false;
+        }
+        for(int i=0;i<view.getViewCount();i++)if(!imagesReady(view.getView(i)))return false;return true;
+    }
     public static void main(String[] args) throws Exception {
         if(args.length!=6)throw new IllegalArgumentException("mode disposable.md samples warmups wrap preview");
         file=Path.of(args[1]).toRealPath();samples=Integer.parseInt(args[2]);warmups=Integer.parseInt(args[3]);empty=args[0].equals("startup-empty");wrap=Boolean.parseBoolean(args[4]);withPreview=Boolean.parseBoolean(args[5]);
         try {
-            switch(args[0]){case "model"->model();case "ui"->ui();case "startup", "startup-empty"->open();case "assets"->assets();case "preview"->preview();default->throw new IllegalArgumentException("Unknown mode");}
+            switch(args[0]){case "model"->model();case "ui"->ui();case "startup", "startup-empty"->open();case "assets"->assets();case "preview"->preview();case "search"->search();case "syntax"->syntax();default->throw new IllegalArgumentException("Unknown mode");}
             if(editor!=null)out("MD_META ",edt(() -> Map.of("perf",editor.perfService.report(),"jobs",editor.asyncJobService.list().stream().map(j -> j.getDescription()+":"+j.getStatus()).toList())));
         } finally {
             if(editor!=null)edt(() -> {editor.disposeMarkdownPreviews();editor.shutdownSyntaxUi();editor.shutdownLspScheduling();editor.asyncJobService.shutdownNow();if(editor.backupScheduler!=null)editor.backupScheduler.close();if(editor.externalChangeTimer!=null)editor.externalChangeTimer.stop();if(editor.recoverySnapshotTimer!=null)editor.recoverySnapshotTimer.stop();if(editor.messageResetTimer!=null)editor.messageResetTimer.stop();editor.fileWatcherService.stop();editor.dispose();return null;});
         }
-        System.exit(0);
+        System.out.println("MD_DONE");System.out.flush();
+        System.exit(failed?2:0);
     }
 }

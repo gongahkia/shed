@@ -12,6 +12,8 @@ from pathlib import Path
 import platform
 import shutil
 import subprocess
+import struct
+import zlib
 import tempfile
 import time
 
@@ -22,6 +24,13 @@ SIZES = (100 * 1024, 1024**2, 10 * 1024**2, 50 * 1024**2, 100 * 1024**2)
 spec = importlib.util.spec_from_file_location('editor_benchmark', ROOT / 'scripts/benchmark-editor.py')
 workflow = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(workflow)
+
+
+def png_fixture():
+    def chunk(kind, data):
+        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+    pixels = (b'\x00' + bytes((40, 120, 200, 255)) * 4) * 4
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 4, 4, 8, 6, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(pixels)) + chunk(b'IEND', b'')
 
 
 def digest(path):
@@ -97,7 +106,7 @@ def summarize(rows):
                   'max_ms': max(values)} for key, values in groups.items()}
 
 
-def execute(java, jar, classes, output, case, fixture_path, samples, warmups, timeout, heap, profile, font):
+def execute(java, jar, classes, output, case, fixture_path, samples, warmups, timeout, heap, profile, font, classpath):
     directory = output / case['name']
     directory.mkdir()
     home = directory / 'home'
@@ -112,13 +121,14 @@ def execute(java, jar, classes, output, case, fixture_path, samples, warmups, ti
                f'-Xlog:gc*,safepoint:file={directory}/gc.log:time,uptime,level,tags']
     if profile:
         command += ['-XX:NativeMemoryTracking=summary', f'-XX:StartFlightRecording=filename={directory}/profile.jfr,settings=profile,maxsize=64m,dumponexit=true']
-    command += ['-cp', os.pathsep.join((str(classes), str(jar))), 'shed.MarkdownPerformanceProbe', case['mode'],
+    command += ['-cp', os.pathsep.join((str(classes), classpath)), 'shed.MarkdownPerformanceProbe', case['mode'],
                 str(source), str(samples), str(warmups), str(case.get('wrap', False)).lower(),
                 str(case.get('preview', False)).lower()]
     record = {'case': case, 'command': command, 'profiled': profile, 'state': 'ERROR',
               'environment_before': environment(), 'samples': [], 'rss_samples_mib': []}
     started = time.monotonic()
     with (directory / 'stdout.log').open('w') as log:
+        record['launch_epoch_ms'] = time.time() * 1000
         child = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
         record['pid'] = child.pid
         timed_out = False
@@ -154,6 +164,9 @@ def execute(java, jar, classes, output, case, fixture_path, samples, warmups, ti
     for line in (directory / 'stdout.log').read_text(errors='replace').splitlines():
         if line.startswith('MD_SAMPLE '): record['samples'].append(json.loads(line[10:]))
         elif line.startswith('MD_META '): record.setdefault('metadata', []).append(json.loads(line[8:]))
+    record['completion_marker'] = any(line == 'MD_DONE' for line in (directory / 'stdout.log').read_text(errors='replace').splitlines())
+    if record['state'] == 'OK' and not record['completion_marker']: record['state'] = 'INCOMPLETE'
+    record['renderer_error_fallback'] = any(m.get('mermaid_error_fallback') for m in record.get('metadata', []))
     record['summary'] = summarize(record['samples'])
     rss = [row['mib'] for row in record['rss_samples_mib']]
     record['sampled_peak_rss_mib'] = max(rss) if rss else None
@@ -167,8 +180,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True, help='New directory outside the checkout')
     parser.add_argument('--jar', type=Path, default=ROOT / 'target/shed-2.0.0.jar')
+    parser.add_argument('--classpath-file', type=Path, help='Optional existing dependency classpath for a separately labeled packaged-vs-classpath control')
     parser.add_argument('--generate-only', action='store_true')
-    parser.add_argument('--mode', choices=['startup', 'startup-empty', 'ui', 'model', 'preview', 'assets'], default='model')
+    parser.add_argument('--mode', choices=['startup', 'startup-empty', 'ui', 'model', 'preview', 'assets', 'search', 'syntax'], default='model')
     parser.add_argument('--shapes', nargs='+', choices=SHAPES, default=['mixed'])
     parser.add_argument('--sizes', nargs='+', type=int, default=list(SIZES), help='Exact bytes, <=100 MiB each')
     parser.add_argument('--samples', type=int, default=100)
@@ -187,20 +201,25 @@ def main():
         parser.error('Fixtures 1 KiB..100 MiB and at most 40 cases per invocation')
     output = args.output.resolve()
     if output == ROOT or ROOT in output.parents or output.exists(): parser.error('Output must be a NEW directory outside the checkout')
+    estimate = sum(args.sizes) * len(args.shapes) * (1 + 2 * args.runs)
+    if estimate > 2 * 1024**3: parser.error('Temporary corpus/copy bound is 2 GiB per invocation')
     output.mkdir(parents=True)
+    if shutil.disk_usage(output).free < estimate + 512 * 1024**2: parser.error('Insufficient free disk headroom')
     fixtures = output / 'fixtures'
     fixtures.mkdir()
     # Valid tiny local image; no network access or image tooling required.
-    (fixtures / 'swatch.png').write_bytes(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6V8AAAAASUVORK5CYII='))
+    (fixtures / 'swatch.png').write_bytes(png_fixture())
     manifest = [fixture(fixtures / f'{shape}-{size}.md', size, shape) for shape in args.shapes for size in args.sizes]
     (output / 'fixtures.json').write_text(json.dumps(manifest, indent=2) + '\n')
     if args.generate_only: return 0
     jar = args.jar.resolve(strict=True)
+    classpath = args.classpath_file.read_text().strip() if args.classpath_file else str(jar)
     java = Path(subprocess.check_output([str(ROOT / 'scripts/resolve-toolchain.sh'), 'home'], text=True).strip())
     classes = output / 'classes'; classes.mkdir()
     sources = [ROOT / f'src/benchmark/java/shed/{name}.java' for name in ('EditorWorkflowProbe', 'MarkdownPerformanceProbe')]
     subprocess.run([str(java / 'bin/javac'), '-cp', str(jar), '-d', str(classes)] + list(map(str, sources)), check=True)
-    report = {'jar_sha256': digest(jar), 'java': command_output([str(java / 'bin/java'), '-version']),
+    report = {'jar_sha256': digest(jar), 'runner_sha256': digest(Path(__file__)),
+              'runtime_classpath_sha256': hashlib.sha256(classpath.encode()).hexdigest(), 'packaged_jar_runtime': args.classpath_file is None, 'java': command_output([str(java / 'bin/java'), '-version']),
               'probe_hashes': {str(p.relative_to(ROOT)): digest(p) for p in sources}, 'arguments': vars(args).copy(),
               'fixtures': manifest, 'cases': []}
     report['arguments'] = {k: str(v) if isinstance(v, Path) else v for k, v in report['arguments'].items()}
@@ -209,7 +228,7 @@ def main():
             case = {'name': f"{args.mode}-{entry['shape']}-{entry['bytes']}-{iteration}", 'mode': args.mode,
                     'wrap': args.wrap, 'preview': args.preview, 'fixture': entry}
             result = execute(java, jar, classes, output, case, Path(entry['path']), args.samples, args.warmups,
-                             args.timeout, args.heap, args.profile, args.font)
+                             args.timeout, args.heap, args.profile, args.font, classpath)
             report['cases'].append(result)
             (output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
             print(case['name'], result['state'], result['wall_seconds'], flush=True)

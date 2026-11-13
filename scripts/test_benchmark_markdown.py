@@ -25,6 +25,20 @@ class MarkdownBenchmarkTest(unittest.TestCase):
             self.assertTrue(text.endswith('\n'))
             with self.assertRaises(FileExistsError): bench.fixture(a, 102400, 'mixed')
 
+    def test_local_png_fixture_has_valid_chunk_checksums(self):
+        import struct, zlib
+        image = bench.png_fixture()
+        self.assertEqual(b'\x89PNG\r\n\x1a\n', image[:8])
+        position = 8
+        while position < len(image):
+            length = struct.unpack('>I', image[position:position+4])[0]
+            kind = image[position+4:position+8]
+            data = image[position+8:position+8+length]
+            crc = struct.unpack('>I', image[position+8+length:position+12+length])[0]
+            self.assertEqual(zlib.crc32(kind + data), crc)
+            position += length + 12
+        self.assertEqual(len(image), position)
+
     def test_fixture_bounds_and_unknown_shape_are_rejected_before_writing(self):
         with tempfile.TemporaryDirectory() as directory:
             p = Path(directory) / 'never-created.md'

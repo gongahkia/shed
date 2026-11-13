@@ -104,7 +104,17 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
         output.setBorder(BorderFactory.createTitledBorder("Selected Task Output"));
         JScrollPane outputScroll = readableScroll(output, () -> Math.max(WorkbenchStyle.px(100),
             output.getInsets().top + output.getInsets().bottom + output.getFontMetrics(output.getFont()).getHeight() * 3));
-        JSplitPane right = new JSplitPane(JSplitPane.VERTICAL_SPLIT, rightTop, outputScroll);
+        JSplitPane right = new JSplitPane(JSplitPane.VERTICAL_SPLIT, rightTop, outputScroll) {
+            @Override public void doLayout() {
+                super.doLayout();
+                int minimum = rightTop.getMinimumSize().height;
+                int maximum = getHeight() - getDividerSize() - outputScroll.getMinimumSize().height;
+                if (maximum >= minimum) {
+                    int readable = Math.max(minimum, Math.min(maximum, getDividerLocation()));
+                    if (readable != getDividerLocation()) { setDividerLocation(readable); super.doLayout(); }
+                }
+            }
+        };
         right.setResizeWeight(0.48);
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
         split.setResizeWeight(0.28);

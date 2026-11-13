@@ -272,6 +272,7 @@ public final class WorkbenchJourneyProbe {
             }
             return null;
         });
+        capture(editor, "task-narrow-light-150-job-status");
         revealTaskOutput();
         capture(editor, "task-narrow-light-150-cancelled");
         check("explicit task Run, nonzero exit, hidden-panel completion retains source, explicit Cancel and retained output state");

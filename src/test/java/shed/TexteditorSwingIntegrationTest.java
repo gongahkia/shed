@@ -3437,7 +3437,9 @@ public class TexteditorSwingIntegrationTest {
                 assertTrue(output.getText().contains("task output"));
                 for (String zoom : List.of("1.0", "1.5")) {
                     editor.settingsApplication.update("ui.zoom", zoom);
-                    editor.setSize(zoom.equals("1.5") ? 760 : 1100, 820); editor.validate();
+                    editor.setSize(zoom.equals("1.5") ? 760 : 1100, 780); editor.validate();
+                    editor.editorToolSplit.setDividerLocation(editor.editorToolSplit.getHeight() - 210 - editor.editorToolSplit.getDividerSize());
+                    editor.validate();
                     Rectangle jobCell = table.getCellRect(row, 1, true);
                     ToolViewport.reveal(table, jobCell);
                     assertTrue(table.getVisibleRect().contains(jobCell), "Selected task status must remain reachable at " + zoom);

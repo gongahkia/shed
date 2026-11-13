@@ -98,6 +98,8 @@ public final class MarkdownPerformanceProbe {
             var input=row("input_accepted");input.put("epoch_ms",System.currentTimeMillis());out("MD_META ",input);
         }
         await(() -> !editor.stagedStartupPending,30);
+        int requestedTabSize=Integer.getInteger("shed.benchmark.tabSize",0);
+        if(requestedTabSize>0)edt(() -> {editor.writingArea.setTabSize(requestedTabSize);return null;});
         edt(() -> {editor.getRootPane().paintImmediately(editor.getRootPane().getVisibleRect());
             editor.showMessage("Markdown benchmark: stable viewport"); if(editor.messageResetTimer!=null)editor.messageResetTimer.stop();
             editor.setWrap(wrap);editor.validate();return null;});
@@ -106,6 +108,8 @@ public final class MarkdownPerformanceProbe {
         full.put("editor_font",edt(() -> editor.writingArea.getFont().toString()));
         full.put("viewport",edt(() -> editor.getActivePane().getScrollPane().getViewport().getExtentSize().toString()));
         full.put("lsp_clients",edt(() -> editor.lspClients.size()));full.put("syntax_enabled",edt(() -> editor.getCurrentBuffer().isSyntaxHighlightingEnabled()));out("MD_META ",full);
+        out("MD_META ",Map.of("source_view",edt(() -> editor.writingArea.getUI().getRootView(editor.writingArea).getView(0).getClass().getName()),
+            "tab_size",edt(() -> editor.writingArea.getTabSize())));
         await(() -> !(boolean)field(editor.recoveryController,"recoveryJournalLoading"),10);
         edt(() -> {for(Window window:Window.getWindows())
             if(window instanceof Dialog dialog && dialog.isModal() && dialog.isVisible())
@@ -184,9 +188,24 @@ public final class MarkdownPerformanceProbe {
             uiText("delete_longest_line",() -> editor.writingArea.replaceRange("",longest[0],longest[1]),true);
             uiText("undo_longest_line",() -> buffer.getUndoManager().undo(),true);
         }
+        final int other=edt(() -> longest[0]==0 && buffer.getDocument().getDefaultRootElement().getElementCount()>1
+            ?buffer.getDocument().getDefaultRootElement().getElement(1).getStartOffset():0);
+        for(int i=-warmups;i<samples;i++) {
+            boolean measured=i>=0;
+            final int at=(i&1)==0?longest[0]:other;
+            edt(() -> {editor.writingArea.setCaretPosition(at);return null;});
+            String name=(i&1)==0?"modify_longest":"modify_other";
+            uiText(name,() -> editor.writingArea.insert("W",at),measured);
+            uiText("undo_"+name,() -> buffer.getUndoManager().undo(),measured);
+        }
         uiOther("heading_navigation",() -> editor.navigateHeading(false),true);
         out("MD_SAMPLE ",edt(() -> timed("split_create",() -> editor.splitWindow(true))));
         for(int i=0;i<Math.min(samples,20);i++){final int n=i;uiOther("split_switch",() -> editor.activateEditorPane(editor.editorPanes.get(n%2)),true);}
+        edt(() -> {editor.writingArea.setCaretPosition(longest[0]);return null;});
+        for(int i=-Math.min(warmups,3);i<Math.min(samples,20);i++) {
+            uiText("shared_split_insert",() -> editor.writingArea.insert("W",longest[0]),i>=0);
+            uiText("shared_split_undo",() -> buffer.getUndoManager().undo(),i>=0);
+        }
         if(!original.equals(edt(() -> documentHash(buffer.getDocument()))))throw new AssertionError("Source bytes changed");
         memory("after_edits");
         if(withPreview){edt(() -> {editor.disposeMarkdownPreviews();return null;});memory("after_preview_dispose_without_gc");}

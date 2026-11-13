@@ -19,7 +19,7 @@ public final class MarkdownJfrSummary {
                     var trace=e.getStackTrace();if(trace==null)continue;
                     List<String> frames=new ArrayList<>();for(RecordedFrame f:trace.getFrames())frames.add(f.getMethod().getType().getName()+"."+f.getMethod().getName());
                     String joined=String.join(";",frames);stacks.merge(category+" "+joined,1L,Long::sum);
-                    for(String needle:List.of("PlainView","WrappedPlainView","GapContent","VersionedTextSnapshot","reconcileDocumentText","GrammarHighlightService","highlightSnapshot","MarkdownPreviewRenderer","MarkdownPreviewAssets","HTMLEditorKit","HTMLDocument","FlowView","ParagraphView","SunLayoutEngine","FontDesignMetrics","UndoManager.undo","DefaultDocumentEvent.undo"))
+                    for(String needle:List.of("PlainView","javax.swing.text.PlainView.calculateLongestLine","SourcePlainView","WrappedPlainView","GapContent","VersionedTextSnapshot","reconcileDocumentText","GrammarHighlightService","highlightSnapshot","MarkdownPreviewRenderer","MarkdownPreviewAssets","HTMLEditorKit","HTMLDocument","FlowView","ParagraphView","SunLayoutEngine","FontDesignMetrics","UndoManager.undo","DefaultDocumentEvent.undo"))
                         if(joined.contains(needle))groups.merge(category+" "+needle,1L,Long::sum);
                 }
                 if(type.equals("jdk.ObjectAllocationSample")) {

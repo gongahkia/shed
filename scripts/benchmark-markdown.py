@@ -16,7 +16,7 @@ import zlib
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-SHAPES = ('mixed', 'plain', 'long-line', 'nested', 'table', 'fence', 'headings', 'markers')
+SHAPES = ('mixed', 'plain', 'long-line', 'nested', 'table', 'fence', 'headings', 'markers', 'tabs', 'widths')
 SIZES = (100 * 1024, 1024**2, 10 * 1024**2, 50 * 1024**2, 100 * 1024**2)
 # Reuse the established nearest-rank statistics definition; do not replace its budgets.
 spec = importlib.util.spec_from_file_location('editor_benchmark', ROOT / 'scripts/benchmark-editor.py')
@@ -56,11 +56,17 @@ def fixture(path, size, shape):
         'fence': '```text\n' + ('code ' * 24 + '\n') * 2000 + '```\n',
         'headings': ''.join(f'## Heading {i}\n[link](file-{i}.md)\n\n' for i in range(256)),
         'markers': ('**b** *i* ~~s~~ `c` [l](x) ![i](swatch.png)\n' * 128 + '\n'),
+        'tabs': '# Tabs\n\n' + ('\titem\tvalue\tmore\n' * 64) + prose,
+        'widths': '# Width changes\n\n' + prose,
     }
     data = blocks[shape].encode('ascii')
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('xb') as out:
         remaining = size
+        if shape == 'widths':
+            widest = b'W' * min(32768, size // 2) + b'\n'
+            out.write(widest)
+            remaining -= len(widest)
         while remaining >= len(data):
             out.write(data)
             remaining -= len(data)
@@ -68,7 +74,8 @@ def fixture(path, size, shape):
         if remaining:
             out.write(b'p' * (remaining - 1) + b'\n')
     return {'path': str(path), 'bytes': size, 'sha256': digest(path), 'shape': shape,
-            'generator': 1, 'complete_blocks': size // len(data), 'padding_bytes': size % len(data), 'encoding': 'ASCII/UTF-8', 'eof_newline': True}
+            'generator': 1, 'complete_blocks': (size - (min(32768, size // 2) + 1 if shape == 'widths' else 0)) // len(data),
+            'padding_bytes': remaining, 'encoding': 'ASCII/UTF-8', 'eof_newline': True}
 
 
 def command_output(command):
@@ -104,19 +111,23 @@ def summarize(rows):
                   'max_ms': max(values)} for key, values in groups.items()}
 
 
-def execute(java, jar, classes, output, case, fixture_path, samples, warmups, timeout, heap, profile, font, classpath):
+def execute(java, jar, classes, output, case, fixture_path, samples, warmups, timeout, heap, profile, font, classpath, font_size=0, tab_size=0):
     directory = output / case['name']
     directory.mkdir()
     home = directory / 'home'
     (home / '.shed').mkdir(parents=True)
     (home / '.shed/config.toml').write_text('schema_version = 1\n"keymap.profile" = "plain"\n'
         '"session.restore.on.start" = false\n"markdown.preview.remote.images" = false\n'
-        + ('"font.family" = ' + json.dumps(font) + '\n' if font else ''))
+        + ('"font.family" = ' + json.dumps(font) + '\n' if font else '')
+        + (f'"font.size" = {font_size}\n' if font_size else '')
+        + (f'"tab.size" = {tab_size}\n' if tab_size else ''))
     source = directory / 'input.md'
     shutil.copyfile(fixture_path, source)
     shutil.copyfile(fixture_path.parent / 'swatch.png', directory / 'swatch.png')
     command = [str(java / 'bin/java'), '-Xms64m', f'-Xmx{heap}m', '-Djava.awt.headless=false', f'-Duser.home={home}',
                f'-Xlog:gc*,safepoint:file={directory}/gc.log:time,uptime,level,tags']
+    if tab_size:
+        command.append(f'-Dshed.benchmark.tabSize={tab_size}')
     if profile:
         command += ['-XX:NativeMemoryTracking=summary', f'-XX:StartFlightRecording=filename={directory}/profile.jfr,settings=profile,maxsize=64m,dumponexit=true']
     command += ['-cp', os.pathsep.join((str(classes), classpath)), 'shed.MarkdownPerformanceProbe', case['mode'],
@@ -195,7 +206,11 @@ def main():
     parser.add_argument('--preview', action='store_true')
     parser.add_argument('--profile', action='store_true')
     parser.add_argument('--font', default='')
+    parser.add_argument('--font-size', type=int, default=0, help='0 keeps existing default; otherwise 8..48 pt')
+    parser.add_argument('--tab-size', type=int, default=0, help='0 keeps existing default; otherwise 1..16')
     args = parser.parse_args()
+    if args.font_size != 0 and not 8 <= args.font_size <= 48 or args.tab_size != 0 and not 1 <= args.tab_size <= 16:
+        parser.error('Font size must be 0 or 8..48; tab size must be 0 or 1..16')
     if not 1 <= args.samples <= 200 or not 0 <= args.warmups <= 25 or not 1 <= args.runs <= 5 or not 5 <= args.timeout <= 180 or not 128 <= args.heap <= 768:
         parser.error('Bounds: samples 1..200, warmups 0..25, runs 1..5, timeout 5..180 s, heap 128..768 MiB')
     if any(not 1024 <= n <= 100 * 1024**2 for n in args.sizes) or len(args.sizes) * len(args.shapes) * args.runs > 40:
@@ -229,7 +244,7 @@ def main():
             case = {'name': f"{args.mode}-{entry['shape']}-{entry['bytes']}-{iteration}", 'mode': args.mode,
                     'wrap': args.wrap, 'preview': args.preview, 'fixture': entry}
             result = execute(java, jar, classes, output, case, Path(entry['path']), args.samples, args.warmups,
-                             args.timeout, args.heap, args.profile, args.font, classpath)
+                             args.timeout, args.heap, args.profile, args.font, classpath, args.font_size, args.tab_size)
             report['cases'].append(result)
             (output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
             print(case['name'], result['state'], result['wall_seconds'], flush=True)

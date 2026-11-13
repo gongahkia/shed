@@ -58,7 +58,7 @@ final class InlineCompletionDisplay extends BasicTextAreaUI {
     }
 
     @Override public View create(Element element) {
-        return display == null ? super.create(element) : new Projection(element, display.getUI().getRootView(display));
+        return display == null ? SourcePlainView.adapt(super.create(element)) : new Projection(element, display.getUI().getRootView(display));
     }
 
     private int projected(int offset) { return offset <= anchor ? offset : offset + length; }

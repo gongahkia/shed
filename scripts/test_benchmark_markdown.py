@@ -10,6 +10,19 @@ spec.loader.exec_module(bench)
 
 
 class MarkdownBenchmarkTest(unittest.TestCase):
+    def test_width_fixture_has_one_widest_line_and_tabs_fixture_contains_tabs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'widths.md'
+            manifest = bench.fixture(path, 102400, 'widths')
+            lines = path.read_text().splitlines()
+            self.assertEqual(32768, len(lines[0]))
+            self.assertTrue(all(len(line) < len(lines[0]) for line in lines[1:]))
+            self.assertEqual(102400, path.stat().st_size)
+            self.assertGreater(manifest['complete_blocks'], 0)
+            tabs = Path(directory) / 'tabs.md'
+            bench.fixture(tabs, 102400, 'tabs')
+            self.assertIn('\t', tabs.read_text())
+
     def test_fixture_bytes_hash_and_syntax_are_deterministic(self):
         with tempfile.TemporaryDirectory() as directory:
             a = Path(directory) / 'a.md'

@@ -4439,6 +4439,72 @@ public class TexteditorSwingIntegrationTest {
         } finally { disposeEditor(editor); }
     }
 
+    @Test
+    void sourceWidthFastPathKeepsSplitHistorySnapshotsPersistenceAndThemeBinding() throws Exception {
+        assumeSwingAvailable();
+        String original = "# Source\n" + ("W".repeat(120) + "\n").repeat(20);
+        Path file = Files.writeString(tempDir.resolve("source-width.md"), original);
+        Texteditor editor = createEditor(tempDir.resolve("source-width-home"), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                FileBuffer buffer = editor.getCurrentBuffer();
+                var document = buffer.getDocument();
+                long revision = buffer.documentRevision();
+                editor.splitWindow(true);
+                for (EditorPane pane : editor.editorPanes) {
+                    assertSame(document, pane.getTextArea().getDocument());
+                    assertTrue(pane.getTextArea().getUI().getRootView(pane.getTextArea()).getView(0) instanceof SourcePlainView);
+                }
+                int[] events = {0};
+                document.addDocumentListener(new javax.swing.event.DocumentListener() {
+                    public void insertUpdate(javax.swing.event.DocumentEvent e) { events[0]++; }
+                    public void removeUpdate(javax.swing.event.DocumentEvent e) { events[0]++; }
+                    public void changedUpdate(javax.swing.event.DocumentEvent e) { events[0]++; }
+                });
+                int offset = original.indexOf('W');
+                editor.writingArea.insert("x", offset);
+                assertTrue(buffer.isModified());
+                assertEquals(editor.writingArea.getText(), buffer.textSnapshot().text());
+                buffer.getUndoManager().undo();
+                assertEquals(original, buffer.getContent());
+                buffer.getUndoManager().redo();
+                buffer.getUndoManager().undo();
+                assertEquals(4, events[0]);
+                assertEquals(revision + 4, buffer.documentRevision());
+                for (EditorPane pane : editor.editorPanes) assertEquals(original, pane.getTextArea().getText());
+                var snapshot = buffer.textSnapshot();
+                editor.configManager.set("theme", "shed-light");
+                editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                for (EditorPane pane : editor.editorPanes) {
+                    var area = pane.getTextArea();
+                    assertTrue(area.getUI().getRootView(area).getView(0) instanceof SourcePlainView);
+                    area.setLineWrap(true);
+                    assertTrue(area.getUI().getRootView(area).getView(0) instanceof javax.swing.text.WrappedPlainView);
+                    area.setLineWrap(false);
+                    assertTrue(area.getUI().getRootView(area).getView(0) instanceof SourcePlainView);
+                }
+                assertSame(snapshot, buffer.textSnapshot());
+                assertEquals(revision + 4, buffer.documentRevision());
+                assertEquals(4, events[0]);
+                return null;
+            });
+            FileBuffer buffer = onEdt(editor::getCurrentBuffer);
+            FileBuffer.SaveSnapshot save = onEdt(() -> buffer.captureSaveSnapshot(null));
+            buffer.writeSaveSnapshot(save);
+            onEdt(() -> { buffer.completeSaveSnapshot(save); return null; });
+            assertEquals(original, Files.readString(file));
+            assertEquals(original, new FileBuffer(file.toFile()).getContent());
+            onEdt(() -> { editor.writingArea.insert("draft", 0); editor.persistRecoverySnapshots(); return null; });
+            assertTrue(awaitUiState(() -> {
+                try {
+                    var journal = RecoveryJournal.read(editor.recoveryStoreDir.toPath());
+                    return journal != null && journal.entries().stream().anyMatch(e -> e.content().equals("draft" + original));
+                } catch (java.io.IOException error) { return false; }
+            }));
+        } finally { disposeEditor(editor); }
+    }
+
     private static <T extends Component> List<T> descendants(Component root, Class<T> type) {
         List<T> result = new ArrayList<>();
         if (root == null) return result;

@@ -435,6 +435,7 @@ final class EditorUiController {
                 editorPainted(this, paintStartedAt);
             }
         };
+        textArea.putClientProperty(SourcePlainView.SOURCE_PROPERTY, Boolean.TRUE);
         textArea.addKeyListener(editor);
         editor.installAiCompletion(textArea);
         editor.inputController.watchComposition(textArea);

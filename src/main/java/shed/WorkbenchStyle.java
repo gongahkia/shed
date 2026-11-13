@@ -150,6 +150,11 @@ public final class WorkbenchStyle {
     public static class TextAreaUI extends BasicTextAreaUI {
         public static ComponentUI createUI(JComponent c) { return new TextAreaUI(); }
         @Override protected javax.swing.text.Caret createCaret() { return workbenchCaret(getPropertyPrefix()); }
+        @Override public javax.swing.text.View create(javax.swing.text.Element element) {
+            javax.swing.text.View stock = super.create(element);
+            return Boolean.TRUE.equals(getComponent().getClientProperty(SourcePlainView.SOURCE_PROPERTY))
+                ? SourcePlainView.adapt(stock) : stock;
+        }
     }
     public static class TextPaneUI extends BasicTextPaneUI {
         public static ComponentUI createUI(JComponent c) { return new TextPaneUI(); }

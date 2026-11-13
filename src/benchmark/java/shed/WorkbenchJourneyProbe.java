@@ -260,6 +260,17 @@ public final class WorkbenchJourneyProbe {
         await("task cancelled", () -> namedAccessible(editor.toolWindowHost, JTextArea.class, "Task output").getText().contains("Task cancelled"));
         revealTaskOutput();
         capture(editor, "task-cancelled");
+        edt(() -> {
+            editor.settingsApplication.update("theme", "shed-light"); editor.settingsApplication.update("ui.zoom", "1.5"); editor.setSize(760, 780); editor.validate();
+            JTable table = namedAccessible(editor.toolWindowHost, JTable.class, "Task jobs");
+            require(table.getSelectedRow() >= 0, "Cancelled task selection was lost");
+            Rectangle status = table.getCellRect(table.getSelectedRow(), 1, true);
+            reveal(table, status);
+            require(table.getVisibleRect().contains(status), "Task status row is unreadable at narrow width and 150% scale");
+            return null;
+        });
+        revealTaskOutput();
+        capture(editor, "task-narrow-light-150-cancelled");
         check("explicit task Run, nonzero exit, hidden-panel completion retains source, explicit Cancel and retained output state");
     }
 

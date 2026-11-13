@@ -787,6 +787,41 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void liveReloadPreservesSessionThemeAfterOwnWriteButStillLoadsExternalEdits() throws IOException {
+        Path home = tempDir.resolve("home-owned-config-write");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        ConfigLiveReloadService liveReload = new ConfigLiveReloadService(config);
+        config.setAndPersist("theme", "shed-dark");
+        config.setTheme("shed-light"); // A restored session's runtime appearance.
+
+        assertFalse(liveReload.reloadIfChanged(), "An already-applied local write must not erase the restored session");
+        assertEquals("shed-light", config.getThemeId());
+        Path file = Path.of(config.getConfigPath());
+        Files.writeString(file, "schema_version = 1\n\"theme\" = \"dracula\"\n");
+        assertTrue(liveReload.reloadIfChanged(), "An external edit still takes effect");
+        assertEquals("dracula", config.getThemeId());
+    }
+
+    @Test
+    void liveReloadDoesNotMistakeAnExternalEditForTheLastLocalWrite() throws IOException {
+        Path home = tempDir.resolve("home-racing-config-write");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        ConfigLiveReloadService liveReload = new ConfigLiveReloadService(config);
+        config.setAndPersist("theme", "shed-dark");
+        config.setTheme("shed-light");
+        Path file = Path.of(config.getConfigPath());
+        var writtenAt = Files.getLastModifiedTime(file);
+        String external = Files.readString(file).replace("\"shed-dark\"", "\"nib-light\"");
+        Files.writeString(file, external); // Same length, including on coarse-timestamp filesystems.
+        Files.setLastModifiedTime(file, writtenAt);
+
+        assertTrue(liveReload.reloadIfChanged(), "Matching metadata must not hide different external contents");
+        assertEquals("nib-light", config.getThemeId());
+    }
+
+    @Test
     void liveReloadKeepsLastKnownGoodConfigurationAfterInvalidEdit() throws IOException {
         Path home = tempDir.resolve("home-live-reload");
         Path configPath = home.resolve(".shed/config.toml");

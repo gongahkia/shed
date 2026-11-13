@@ -39,6 +39,8 @@ public class ConfigManager {
     private File activeProjectConfigFile;
     private final String shedDirectoryPath;
     private String configPath;
+    private String lastWrittenConfigFingerprint;
+    private String lastWrittenConfigText;
     private String configLoadReport;
     private boolean configLoadFailed;
     private final List<ConfigRepair> configRepairs;
@@ -2214,9 +2216,32 @@ public class ConfigManager {
             StandardOpenOption.TRUNCATE_EXISTING,
             StandardOpenOption.WRITE
         );
+        lastWrittenConfigText = String.join(System.lineSeparator(), lines) + System.lineSeparator();
+        lastWrittenConfigFingerprint = configFileFingerprint();
         if (!configRepairs.isEmpty()) {
             configRepairs.clear();
             configLoadReport = "Configuration repairs saved: " + configPath;
+        }
+    }
+
+    String configFileFingerprint() {
+        Path path = Path.of(configPath);
+        if (!Files.isRegularFile(path)) return "missing";
+        try {
+            return Files.size(path) + ":" + Files.getLastModifiedTime(path);
+        } catch (IOException | SecurityException error) {
+            return error.getClass().getSimpleName() + ":" + String.valueOf(error.getMessage());
+        }
+    }
+
+    /** A local write has already been applied; do not replay it over session runtime values. */
+    boolean isOwnConfigFileWrite(String fingerprint) {
+        if (!fingerprint.equals(lastWrittenConfigFingerprint) || lastWrittenConfigText == null) return false;
+        try {
+            // Confirm content too: an external writer may race the post-write metadata read.
+            return lastWrittenConfigText.equals(Files.readString(Path.of(configPath), StandardCharsets.UTF_8));
+        } catch (IOException | SecurityException error) {
+            return false;
         }
     }
 

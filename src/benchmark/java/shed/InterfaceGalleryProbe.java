@@ -68,6 +68,7 @@ public final class InterfaceGalleryProbe {
     private final Path output;
     private final List<Map<String, Object>> captures = new ArrayList<>();
     private final List<String> narrowToolChecks = new ArrayList<>();
+    private final List<String> enlargedToolChecks = new ArrayList<>();
     private final List<String> scrollableFormChecks = new ArrayList<>();
     private final List<String> nativeFocusLimits = new ArrayList<>();
     private final List<Map<String, Object>> controlBoundsFailures = new ArrayList<>();
@@ -242,6 +243,15 @@ public final class InterfaceGalleryProbe {
         settle();
         assertActiveTool(ToolWindowHost.Tab.SEARCH);
         capture(editor, "light-150", true);
+        edt(() -> { editor.setSize(760, 780); return null; });
+        for (ToolWindowHost.Tab tab : ToolWindowHost.Tab.values()) {
+            edt(() -> { editor.showToolWindow(tab); return null; });
+            settle();
+            assertActiveTool(tab);
+            capture(editor, "narrow-light-150-tool-" + tab.name().toLowerCase(Locale.ROOT), true);
+            if (Integer.valueOf(0).equals(captures.getLast().get("control_bounds_failures"))) enlargedToolChecks.add(tab.name());
+        }
+        edt(() -> { editor.setSize(1120, 900); return null; });
         dialog("settings-light-150", () -> SettingsEditorDialog.showFor(editor), ignored -> { }, true);
         edt(() -> {
             editor.configManager.set("theme", "shed-dark");
@@ -335,6 +345,7 @@ public final class InterfaceGalleryProbe {
             java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(jar))));
         report.put("language_servers", languageServers);
         report.put("narrow_tool_control_bounds", narrowToolChecks);
+        report.put("narrow_enlarged_tool_control_bounds", enlargedToolChecks);
         report.put("scrollable_debug_forms", scrollableFormChecks);
         report.put("debug_form_native_focus_checked", keyboardFocusObserved && nativeFocusLimits.isEmpty());
         report.put("native_focus_limits", nativeFocusLimits);

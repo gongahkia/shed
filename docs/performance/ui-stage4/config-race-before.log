@@ -1,0 +1,27 @@
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.690 s <<< FAILURE! -- in shed.ConfigManagerTest
+[ERROR] shed.ConfigManagerTest.liveReloadPreservesSessionThemeAfterOwnWriteButStillLoadsExternalEdits -- Time elapsed: 1.527 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: An already-applied local write must not erase the restored session ==> expected: <false> but was: <true>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertFalse.failNotFalse(AssertFalse.java:63)
+	at org.junit.jupiter.api.AssertFalse.assertFalse(AssertFalse.java:36)
+	at org.junit.jupiter.api.Assertions.assertFalse(Assertions.java:239)
+	at shed.ConfigManagerTest.liveReloadPreservesSessionThemeAfterOwnWriteButStillLoadsExternalEdits(ConfigManagerTest.java:798)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[ERROR] Failures: 
+[ERROR]   ConfigManagerTest.liveReloadPreservesSessionThemeAfterOwnWriteButStillLoadsExternalEdits:798 An already-applied local write must not erase the restored session ==> expected: <false> but was: <true>
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project shed: There are test failures.
+[ERROR] 
+[ERROR] Please refer to /Users/gabrielongtemasek/Desktop/personal/shed/target/surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

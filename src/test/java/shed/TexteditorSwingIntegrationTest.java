@@ -3435,14 +3435,18 @@ public class TexteditorSwingIntegrationTest {
                 var output = descendants(editor.toolWindowHost, javax.swing.JTextArea.class).stream()
                     .filter(value -> "Task output".equals(value.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow();
                 assertTrue(output.getText().contains("task output"));
-                editor.validate();
-                Rectangle jobCell = table.getCellRect(row, 1, true);
-                ToolViewport.reveal(table, jobCell);
-                assertTrue(table.getVisibleRect().contains(jobCell), "Selected task status must remain reachable beside its output");
-                int readableHeight = output.getInsets().top + output.getFontMetrics(output.getFont()).getHeight() * 3;
-                Rectangle readableOutput = new Rectangle(0, 0, Math.min(100, output.getWidth()), readableHeight);
-                ToolViewport.reveal(output, readableOutput);
-                assertTrue(output.getVisibleRect().contains(readableOutput), "Selected task output must expose readable rows in a short dock");
+                for (String zoom : List.of("1.0", "1.5")) {
+                    editor.settingsApplication.update("ui.zoom", zoom);
+                    editor.setSize(zoom.equals("1.5") ? 760 : 1100, 820); editor.validate();
+                    Rectangle jobCell = table.getCellRect(row, 1, true);
+                    ToolViewport.reveal(table, jobCell);
+                    assertTrue(table.getVisibleRect().contains(jobCell), "Selected task status must remain reachable at " + zoom);
+                    int readableHeight = output.getInsets().top + output.getFontMetrics(output.getFont()).getHeight() * 3;
+                    Rectangle readableOutput = new Rectangle(0, 0, Math.min(100, output.getWidth()), readableHeight);
+                    ToolViewport.reveal(output, readableOutput);
+                    assertTrue(output.getVisibleRect().contains(readableOutput), "Selected task output must expose readable rows at " + zoom);
+                }
+                editor.settingsApplication.update("ui.zoom", "1.0");
                 output.setCaretPosition(7); output.moveCaretPosition(2);
                 editor.toolWindowHost.refresh(ToolWindowHost.Tab.TASKS);
                 assertEquals(7, output.getCaret().getMark()); assertEquals(2, output.getCaret().getDot());
@@ -3635,7 +3639,12 @@ public class TexteditorSwingIntegrationTest {
         Texteditor editor = createEditor(home, a, b);
         try {
             assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
-            onEdt(() -> { editor.toFront(); editor.openEditorsBar.focusEditors(); return null; });
+            onEdt(() -> {
+                if (java.awt.Desktop.isDesktopSupported() && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.APP_REQUEST_FOREGROUND)) {
+                    java.awt.Desktop.getDesktop().requestForeground(true);
+                }
+                editor.toFront(); editor.openEditorsBar.focusEditors(); return null;
+            });
             var list = onEdt(() -> descendants(editor.openEditorsBar, javax.swing.JList.class).getFirst());
             assumeTrue(awaitUiState(list::isFocusOwner), "Desktop must grant native focus");
             onEdt(() -> {

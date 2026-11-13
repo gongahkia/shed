@@ -94,21 +94,30 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
 
         JPanel rightTop = new JPanel(new BorderLayout(3, 3));
         rightTop.setBorder(BorderFactory.createTitledBorder("Jobs"));
-        JScrollPane jobScroll = new JScrollPane(jobTable);
-        jobScroll.setMinimumSize(new java.awt.Dimension(0, WorkbenchStyle.px(80)));
+        JScrollPane jobScroll = readableScroll(jobTable, () -> Math.max(WorkbenchStyle.px(80),
+            jobTable.getTableHeader().getPreferredSize().height + jobTable.getRowHeight()));
         rightTop.add(jobScroll, BorderLayout.CENTER);
         JPanel jobActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         jobActions.add(cancel);
         jobActions.add(button("Quickfix", () -> message(editor.openQuickfixList())));
         rightTop.add(jobActions, BorderLayout.SOUTH);
         output.setBorder(BorderFactory.createTitledBorder("Selected Task Output"));
-        JScrollPane outputScroll = new JScrollPane(output);
-        outputScroll.setMinimumSize(new java.awt.Dimension(0, WorkbenchStyle.px(100)));
+        JScrollPane outputScroll = readableScroll(output, () -> Math.max(WorkbenchStyle.px(100),
+            output.getInsets().top + output.getInsets().bottom + output.getFontMetrics(output.getFont()).getHeight() * 3));
         JSplitPane right = new JSplitPane(JSplitPane.VERTICAL_SPLIT, rightTop, outputScroll);
         right.setResizeWeight(0.48);
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
         split.setResizeWeight(0.28);
         return split;
+    }
+
+    private JScrollPane readableScroll(javax.swing.JComponent content, java.util.function.IntSupplier height) {
+        return new JScrollPane(content) {
+            @Override public java.awt.Dimension getMinimumSize() {
+                var border = getInsets();
+                return new java.awt.Dimension(0, height.getAsInt() + border.top + border.bottom);
+            }
+        };
     }
 
     @Override public void refresh() {

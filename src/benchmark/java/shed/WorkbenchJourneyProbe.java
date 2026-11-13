@@ -266,7 +266,7 @@ public final class WorkbenchJourneyProbe {
             require(table.getSelectedRow() >= 0, "Cancelled task selection was lost");
             Rectangle status = table.getCellRect(table.getSelectedRow(), 1, true);
             reveal(table, status);
-            require(table.getVisibleRect().contains(status), "Task status row is unreadable at narrow width and 150% scale");
+            require(table.getVisibleRect().contains(status), "Task status row is unreadable at narrow width and 150% scale: cell=" + status + " visible=" + table.getVisibleRect());
             return null;
         });
         revealTaskOutput();

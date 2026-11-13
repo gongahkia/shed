@@ -209,5 +209,22 @@
       "intended_processes": 10,
       "failure": "Output queue timed out after 120 seconds during the second process; no complete counterbalanced aggregate was produced."
     }
+  },
+  "completion_gate_recheck": {
+    "observed_at": "2026-11-13T15:12:40+08:00",
+    "logical_cpus": 8,
+    "load_averages_1_5_15_minutes": [
+      50.3603515625,
+      38.310546875,
+      58.69189453125
+    ],
+    "live_java_compiler_maven_processes": [],
+    "source_unchanged_since_tested_checkpoint": true,
+    "visual_manifest_files_verified": 63,
+    "visual_manifest_mismatches": [],
+    "baseline_and_final_jar_hashes_reverified": true,
+    "readme_unchanged_since_foundation": true,
+    "decision": "Blocked awaiting stable desktop host conditions; do not mark complete or rerun to obtain a passing sample.",
+    "next_action": "Run a fresh counterbalanced five-JVM-per-artifact comparison using the unchanged desktop probe and thresholds after contention subsides. Preserve previous failures; investigate any reproducible introduced regression before closing the gate."
   }
 }

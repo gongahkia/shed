@@ -367,7 +367,7 @@ Remaining coupling includes Texteditor's owner-oriented composition, global conf
 
 # Stage 4 — production workbench redesign
 
-**Functional implementation and local visual verification are complete. Desktop performance verification remains open.** The production approach is Swing with WorkbenchStyle, WorkbenchIcons, UiZoom and the Java application boundaries selected by stage three. The editor, Java 21/Maven launch paths, configuration formats and approval policy are retained. No further framework selection or next-stage implementation has begun. `README.md` is outside the editing scope.
+**Functional implementation and local visual verification are complete. Stage completion is blocked on desktop performance verification under comparable host conditions.** The production approach is Swing with WorkbenchStyle, WorkbenchIcons, UiZoom and the Java application boundaries selected by stage three. The editor, Java 21/Maven launch paths, configuration formats and approval policy are retained. No further framework selection or next-stage implementation has begun. `README.md` is outside the editing scope.
 
 ## Fresh baseline
 

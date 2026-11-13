@@ -1,0 +1,36 @@
+SHED_JOURNEY_OK open workspace through actual folder chooser
+SHED_JOURNEY_CAPTURE {"file":"01-file-finder-location.png","method":"actual production Swing root paint; native window decorations excluded","focus":"none","width":622,"height":402,"active_document":"/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-workbench-journey-3811519610475826694/a-workspace-with-a-long-name/src/service/Source.txt"}
+SHED_JOURNEY_CAPTURE {"file":"02-edited-saved-requested-focus.png","method":"actual production Swing root paint; native window decorations excluded","focus":"none","width":1120,"height":792,"active_document":"/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-workbench-journey-3811519610475826694/a-workspace-with-a-long-name/tests/service/Source.txt"}
+SHED_JOURNEY_CAPTURE {"file":"03-dirty-close-confirmation.png","method":"actual production Swing root paint; native window decorations excluded","focus":"none","width":466,"height":143,"active_document":"/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-workbench-journey-3811519610475826694/a-workspace-with-a-long-name/tests/service/Source.txt"}
+SHED_JOURNEY_OK workspace/file query/location/native-or-port edit/undo/redo/save/document selection/dirty close with cancel and discard
+SHED_JOURNEY_CAPTURE {"file":"04-search-result-navigation.png","method":"actual production Swing root paint; native window decorations excluded","focus":"none","width":1120,"height":792,"active_document":"/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-workbench-journey-3811519610475826694/a-workspace-with-a-long-name/tests/service/Source.txt"}
+SHED_JOURNEY_CAPTURE {"file":"05-problem-navigation.png","method":"actual production Swing root paint; native window decorations excluded","focus":"none","width":1120,"height":792,"active_document":"/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-workbench-journey-3811519610475826694/a-workspace-with-a-long-name/tests/service/Source.txt"}
+SHED_JOURNEY_OK search result Enter, retained diagnostic Enter, explicit tool hide
+SHED_JOURNEY_CAPTURE {"file":"06-settings-scale-150.png","method":"actual production Swing root paint; native window decorations excluded","focus":"none","width":1560,"height":975,"active_document":"/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-workbench-journey-3811519610475826694/a-workspace-with-a-long-name/tests/service/Source.txt"}
+SHED_JOURNEY_CAPTURE {"file":"07-narrow-light-150.png","method":"actual production Swing root paint; native window decorations excluded","focus":"none","width":760,"height":752,"active_document":"/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-workbench-journey-3811519610475826694/a-workspace-with-a-long-name/tests/service/Source.txt"}
+SHED_JOURNEY_CAPTURE {"file":"08-detached-search-light.png","method":"actual production Swing root paint; native window decorations excluded","focus":"none","width":820,"height":472,"active_document":"/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-workbench-journey-3811519610475826694/a-workspace-with-a-long-name/tests/service/Source.txt"}
+SHED_FLOATING_BEFORE_SAVE java.awt.Rectangle[x=60,y=70,width=820,height=500] [{workspace=/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-workbench-journey-3811519610475826694/a-workspace-with-a-long-name, surface=search, instance=panel, mode=detached, ownerWindow=primary, region=detached, bounds={height=500, x=60, y=70, width=820}}]
+java.util.concurrent.ExecutionException: java.lang.IllegalStateException: Detached bounds changed: java.awt.Rectangle[x=60,y=70,width=820,height=528] screen=java.awt.Rectangle[x=0,y=25,width=1920,height=1055] placements=[{workspace=/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-workbench-journey-3811519610475826694/a-workspace-with-a-long-name, surface=search, instance=panel, mode=detached, ownerWindow=primary, region=detached, bounds={height=528, x=60, y=70, width=820}}]
+	at java.base/java.util.concurrent.FutureTask.report(FutureTask.java:122)
+	at java.base/java.util.concurrent.FutureTask.get(FutureTask.java:205)
+	at shed.WorkbenchJourneyProbe.edt(WorkbenchJourneyProbe.java:354)
+	at shed.WorkbenchJourneyProbe.appearanceAndLayoutJourney(WorkbenchJourneyProbe.java:194)
+	at shed.WorkbenchJourneyProbe.run(WorkbenchJourneyProbe.java:72)
+	at shed.WorkbenchJourneyProbe.main(WorkbenchJourneyProbe.java:30)
+Caused by: java.lang.IllegalStateException: Detached bounds changed: java.awt.Rectangle[x=60,y=70,width=820,height=528] screen=java.awt.Rectangle[x=0,y=25,width=1920,height=1055] placements=[{workspace=/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-workbench-journey-3811519610475826694/a-workspace-with-a-long-name, surface=search, instance=panel, mode=detached, ownerWindow=primary, region=detached, bounds={height=528, x=60, y=70, width=820}}]
+	at shed.WorkbenchJourneyProbe.require(WorkbenchJourneyProbe.java:348)
+	at shed.WorkbenchJourneyProbe.lambda$appearanceAndLayoutJourney$57(WorkbenchJourneyProbe.java:194)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)
+	at java.desktop/java.awt.event.InvocationEvent.dispatch(InvocationEvent.java:318)
+	at java.desktop/java.awt.EventQueue.dispatchEventImpl(EventQueue.java:773)
+	at java.desktop/java.awt.EventQueue$4.run(EventQueue.java:720)
+	at java.desktop/java.awt.EventQueue$4.run(EventQueue.java:714)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:400)
+	at java.base/java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege(ProtectionDomain.java:87)
+	at java.desktop/java.awt.EventQueue.dispatchEvent(EventQueue.java:742)
+	at java.desktop/java.awt.EventDispatchThread.pumpOneEventForFilters(EventDispatchThread.java:203)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForFilter(EventDispatchThread.java:124)
+	at java.desktop/java.awt.EventDispatchThread.pumpEventsForHierarchy(EventDispatchThread.java:113)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:109)
+	at java.desktop/java.awt.EventDispatchThread.pumpEvents(EventDispatchThread.java:101)
+	at java.desktop/java.awt.EventDispatchThread.run(EventDispatchThread.java:90)

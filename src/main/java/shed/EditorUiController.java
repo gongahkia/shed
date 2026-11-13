@@ -1223,6 +1223,7 @@ final class EditorUiController {
     }
 
     private void applyDialogSize(JDialog dialog) {
+        if (Boolean.TRUE.equals(dialog.getRootPane().getClientProperty(WorkbenchToolWindowPlacement.MANAGED_BOUNDS_PROPERTY))) return;
         Object stored = dialog.getRootPane().getClientProperty(BASE_DIALOG_SIZE_PROPERTY);
         if (!(stored instanceof Dimension base)) return;
         dialog.getContentPane().setPreferredSize(constrainDialogContentSize(dialog, base.width, base.height));

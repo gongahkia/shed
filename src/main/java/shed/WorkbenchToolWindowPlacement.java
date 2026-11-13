@@ -8,6 +8,7 @@ import java.io.IOException;
 import javax.swing.JDialog;
 
 final class WorkbenchToolWindowPlacement {
+    static final String MANAGED_BOUNDS_PROPERTY = "shed.workbenchPlacementBounds";
     private static final String OWNER_WINDOW_ID = "primary";
 
     private WorkbenchToolWindowPlacement() {
@@ -16,6 +17,7 @@ final class WorkbenchToolWindowPlacement {
     /** Returns a dock transition bound to the original workspace and placement model. */
     static Runnable restore(Texteditor editor, JDialog dialog, WorkbenchLayout.SurfaceType surface, String instanceId) {
         if (editor == null || dialog == null || surface == null || instanceId == null || instanceId.isBlank()) return () -> { };
+        dialog.getRootPane().putClientProperty(MANAGED_BOUNDS_PROPERTY, Boolean.TRUE);
         String workspaceId = workspaceId(editor);
         WorkbenchPlacementState state = editor.workbenchPlacementState;
         WorkbenchPlacementState.Entry entry = state.get(workspaceId, surface, instanceId);
@@ -36,6 +38,14 @@ final class WorkbenchToolWindowPlacement {
             @Override public void componentResized(java.awt.event.ComponentEvent event) { capture.run(); }
         });
         dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowOpened(java.awt.event.WindowEvent event) {
+                // Native decoration/initial-pack events can arrive after the pre-show bounds.
+                if (entry != null && OWNER_WINDOW_ID.equals(entry.ownerWindowId()) && entry.bounds() != null) {
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        if (!docked[0] && dialog.isShowing()) { applyBounds(dialog, entry.bounds()); capture.run(); }
+                    });
+                }
+            }
             @Override public void windowClosed(java.awt.event.WindowEvent event) { capture.run(); }
         });
         return () -> {

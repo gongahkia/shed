@@ -191,6 +191,7 @@ public final class WorkbenchJourneyProbe {
         await("reattached search", () -> !floating.isShowing() && editor.toolWindowHost.isSelected(ToolWindowHost.Tab.SEARCH));
         edt(() -> { editor.settingsApplication.update("theme", "shed-dark"); require(editor.sessionConfigController.loadSession(session.toString(), true).startsWith("Restored session:"), "Session restore failed"); return null; });
         JDialog restored = dialog("Search");
+        await("restored floating bounds after native window-open events", () -> restored.getBounds().equals(new Rectangle(60, 70, 820, 500)));
         edt(() -> { require(restored.getBounds().equals(new Rectangle(60, 70, 820, 500)), "Detached bounds changed: " + restored.getBounds() + " screen=" + GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds() + " placements=" + editor.workbenchPlacementState.toList()); require(editor.configManager.get("theme").equals("shed-light"), "Session theme not restored"); editor.toolWindowHost.reattachAll(); return null; });
         await("all tools docked", () -> !restored.isShowing());
         edt(() -> { editor.settingsApplication.update("theme", "shed-dark"); editor.documents.split(true); editor.requestActivePaneFocus(); return null; });

@@ -3499,6 +3499,10 @@ public class TexteditorSwingIntegrationTest {
             onEdt(() -> {
                 var floating = Arrays.stream(editor.getOwnedWindows()).filter(w -> w instanceof javax.swing.JDialog d && d.isShowing() && "Tasks".equals(d.getTitle())).findFirst().orElseThrow();
                 floating.setBounds(75, 80, 750, 450);
+                editor.settingsApplication.update("ui.zoom", "1.5");
+                assertEquals(new Rectangle(75, 80, 750, 450), floating.getBounds(), "Appearance updates must preserve user-owned tool geometry");
+                editor.settingsApplication.update("ui.zoom", "1.0");
+                assertEquals(new Rectangle(75, 80, 750, 450), floating.getBounds());
                 var dock = editor.toolWindowHost.captureDockState();
                 editor.toolWindowHost.restoreWorkbench(dock); // Same placement model must also be safe.
                 assertTrue(editor.sessionConfigController.saveSession(session.toString()).startsWith("Session saved:"));

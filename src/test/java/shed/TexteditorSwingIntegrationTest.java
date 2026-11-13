@@ -3440,6 +3440,7 @@ public class TexteditorSwingIntegrationTest {
                     editor.setSize(zoom.equals("1.5") ? 760 : 1100, 780); editor.validate();
                     editor.editorToolSplit.setDividerLocation(editor.editorToolSplit.getHeight() - 210 - editor.editorToolSplit.getDividerSize());
                     editor.validate();
+                    assertEquals(editor.resolveUiFont().getSize(), output.getFont().getSize(), "Task output must follow interface text scaling");
                     Rectangle jobCell = table.getCellRect(row, 1, true);
                     ToolViewport.reveal(table, jobCell);
                     assertTrue(table.getVisibleRect().contains(jobCell), "Selected task status must remain reachable at " + zoom);

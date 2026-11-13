@@ -989,7 +989,7 @@ final class EditorUiController {
 
     private void applyUiFontWithProfile(StartupProfile profile) {
         FontUIResource interfaceFont = new FontUIResource(resolveUiFont());
-        for (String type : new String[] {"Label", "Button", "ToggleButton", "CheckBox", "RadioButton", "TextField",
+        for (String type : new String[] {"Label", "Button", "ToggleButton", "CheckBox", "RadioButton", "TextField", "TextArea",
             "PasswordField", "FormattedTextField", "ComboBox", "List", "Tree", "Table", "TableHeader", "TabbedPane",
             "MenuBar", "Menu", "MenuItem", "CheckBoxMenuItem", "RadioButtonMenuItem", "ToolTip", "OptionPane", "TitledBorder"})
             UIManager.put(type + ".font", interfaceFont);

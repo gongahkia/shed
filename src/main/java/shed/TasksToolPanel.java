@@ -34,7 +34,7 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
         @Override public boolean isCellEditable(int row, int column) { return false; }
     };
     private final JTable jobTable = new JTable(jobs);
-    private final JTextArea output = new JTextArea();
+    private final JTextArea output = new JTextArea(6, 0);
     private final JLabel state = new JLabel("Select a task to run it. Opening this panel does not run commands.");
     private final JButton cancel = button("Cancel", this::cancelJob);
     private final java.util.Set<Integer> cancelling = new java.util.HashSet<>();
@@ -94,13 +94,17 @@ final class TasksToolPanel implements ToolWindowHost.ToolSurface {
 
         JPanel rightTop = new JPanel(new BorderLayout(3, 3));
         rightTop.setBorder(BorderFactory.createTitledBorder("Jobs"));
-        rightTop.add(new JScrollPane(jobTable), BorderLayout.CENTER);
+        JScrollPane jobScroll = new JScrollPane(jobTable);
+        jobScroll.setMinimumSize(new java.awt.Dimension(0, WorkbenchStyle.px(80)));
+        rightTop.add(jobScroll, BorderLayout.CENTER);
         JPanel jobActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         jobActions.add(cancel);
         jobActions.add(button("Quickfix", () -> message(editor.openQuickfixList())));
         rightTop.add(jobActions, BorderLayout.SOUTH);
         output.setBorder(BorderFactory.createTitledBorder("Selected Task Output"));
-        JSplitPane right = new JSplitPane(JSplitPane.VERTICAL_SPLIT, rightTop, new JScrollPane(output));
+        JScrollPane outputScroll = new JScrollPane(output);
+        outputScroll.setMinimumSize(new java.awt.Dimension(0, WorkbenchStyle.px(100)));
+        JSplitPane right = new JSplitPane(JSplitPane.VERTICAL_SPLIT, rightTop, outputScroll);
         right.setResizeWeight(0.48);
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
         split.setResizeWeight(0.28);

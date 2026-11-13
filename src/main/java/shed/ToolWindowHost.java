@@ -21,6 +21,14 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
     private final JTabbedPane tabs = new JTabbedPane();
     private JPanel headerPanel;
     private final Map<Tab, ToolSurface> surfaces = new EnumMap<>(Tab.class);
+    private final Map<Tab, ToolViewport> presentations = new EnumMap<>(Tab.class);
+    private final java.beans.PropertyChangeListener toolFocus = event -> {
+        if (event.getNewValue() instanceof javax.swing.JComponent component) {
+            for (ToolViewport view : presentations.values()) if (javax.swing.SwingUtilities.isDescendingFrom(component, view)) {
+                revealFocusedControl(component); break;
+            }
+        }
+    };
     private final Map<Tab, JDialog> detached = new EnumMap<>(Tab.class);
     private final EnumSet<Tab> hiddenDetachedForFocusMode = EnumSet.noneOf(Tab.class);
     private java.awt.Component selectedSurface;
@@ -63,6 +71,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         addSurface(Tab.REPLACE, "Replace", new ProjectReplaceToolPanel(editor, this));
         addSurface(Tab.AGENT, "Agents", new AgentWorkbenchPanel(editor));
         selectedSurface = tabs.getSelectedComponent();
+        java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("permanentFocusOwner", toolFocus);
         tabs.addChangeListener(event -> selectedTabChanged());
     }
 
@@ -82,7 +91,13 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
 
     private void addSurface(Tab tab, String title, ToolSurface surface) {
         surfaces.put(tab, surface);
-        tabs.addTab(title, surface.component());
+        ToolViewport view = new ToolViewport(surface.component(), () -> UiZoom.scale(switch (tab) {
+            case AGENT, DEBUG, REPLACE -> 480;
+            case GIT, TESTS -> 380;
+            default -> 320;
+        }, editor.configManager.getUiZoom()));
+        presentations.put(tab, view);
+        tabs.addTab(title, view);
     }
 
     void showTab(Tab tab) {
@@ -98,7 +113,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         }
         boolean firstSizing = !isVisible() && rememberedHeight < 0;
         editor.showToolWindow();
-        tabs.setSelectedComponent(surface.component());
+        tabs.setSelectedComponent(presentations.get(tab));
         if (firstSizing) sizeDockAutomatically(tab);
         surface.refresh();
     }
@@ -150,7 +165,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         if (changed && isVisible() && editor.editorToolSplit != null && automaticDockHeight >= 0
             && Math.abs(dockHeight() - automaticDockHeight) <= 2) {
             for (Map.Entry<Tab, ToolSurface> entry : surfaces.entrySet()) {
-                if (entry.getValue().component() == selected
+                if (presentations.get(entry.getKey()) == selected
                     && preferredDividerLocation(entry.getKey()) < editor.editorToolSplit.getDividerLocation()) {
                     sizeDockAutomatically(entry.getKey());
                     break;
@@ -164,7 +179,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         ToolSurface surface = surfaces.get(tab);
         JDialog dialog = detached.get(tab);
         if (dialog != null && dialog.isDisplayable() && dialog.isVisible()) return true;
-        return surface != null && tabs.getSelectedComponent() == surface.component() && isVisible();
+        return surface != null && tabs.getSelectedComponent() == presentations.get(tab) && isVisible();
     }
 
     void refresh(Tab tab) {
@@ -196,12 +211,13 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
             }
         });
         for (ToolSurface surface : surfaces.values()) surface.refreshAppearance();
+        for (ToolViewport view : presentations.values()) view.revalidate();
     }
 
     void refreshActive() {
         if (closed) return;
         for (Map.Entry<Tab, ToolSurface> entry : surfaces.entrySet()) {
-            if (tabs.getSelectedComponent() == entry.getValue().component()) {
+            if (tabs.getSelectedComponent() == presentations.get(entry.getKey())) {
                 entry.getValue().refresh();
                 return;
             }
@@ -237,7 +253,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
 
     private void detachSelected() {
         for (Map.Entry<Tab, ToolSurface> entry : surfaces.entrySet()) {
-            if (tabs.getSelectedComponent() == entry.getValue().component()) {
+            if (tabs.getSelectedComponent() == presentations.get(entry.getKey())) {
                 detach(entry.getKey(), entry.getValue());
                 return;
             }
@@ -248,12 +264,12 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
 
     private void detach(Tab tab, ToolSurface surface, boolean restoring) {
         if (closed || detached.containsKey(tab)) return;
-        tabs.remove(surface.component());
+        tabs.remove(presentations.get(tab));
         JDialog dialog = new JDialog(editor, title(tab), false);
         dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
         KeyboardFocusSupport.installEscape(dialog.getRootPane(), dialog::dispose);
         dialog.setLayout(new BorderLayout());
-        dialog.add(surface.component(), BorderLayout.CENTER);
+        dialog.add(presentations.get(tab), BorderLayout.CENTER);
         editor.editorUiController.prepareDialog(dialog, 820, 500);
         dialog.pack();
         dockTransitions.put(tab, WorkbenchToolWindowPlacement.restore(editor, dialog, surfaceType(tab), "panel"));
@@ -274,14 +290,15 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         Runnable dock = dockTransitions.remove(tab);
         if (closed || editor.closingDown || !editor.isDisplayable()) return;
         if (dock != null) dock.run();
-        if (surface.component().getParent() != null) surface.component().getParent().remove(surface.component());
+        ToolViewport presentation = presentations.get(tab);
+        if (presentation.getParent() != null) presentation.getParent().remove(presentation);
         int index = 0;
         for (Tab candidate : TAB_ORDER) {
             if (candidate == tab) break;
             if (!detached.containsKey(candidate)) index++;
         }
-        tabs.insertTab(title(tab), null, surface.component(), null, Math.min(index, tabs.getTabCount()));
-        tabs.setSelectedComponent(surface.component());
+        tabs.insertTab(title(tab), null, presentation, null, Math.min(index, tabs.getTabCount()));
+        tabs.setSelectedComponent(presentations.get(tab));
         tabs.revalidate();
         if (!editor.goyoModeEnabled) editor.showToolWindow();
     }
@@ -306,6 +323,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
     @Override public void close() {
         if (closed) return;
         closed = true;
+        java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().removePropertyChangeListener("permanentFocusOwner", toolFocus);
         for (ToolSurface surface : surfaces.values()) surface.close();
         for (JDialog dialog : java.util.List.copyOf(detached.values())) dialog.dispose();
         detached.clear(); dockTransitions.clear();
@@ -333,7 +351,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
     Map<String, Object> captureDockState() {
         if (isVisible()) rememberDockSize();
         Tab selected = Tab.SEARCH;
-        for (var entry : surfaces.entrySet()) if (entry.getValue().component() == tabs.getSelectedComponent()) selected = entry.getKey();
+        for (var entry : surfaces.entrySet()) if (presentations.get(entry.getKey()) == tabs.getSelectedComponent()) selected = entry.getKey();
         int total = editor.editorToolSplit.getHeight();
         double ratio = total <= 0 || rememberedHeight < 0 ? .6 : 1.0 - rememberedHeight / (double) total;
         return Map.of("visible", isVisible(), "selected", selected.name(), "ratio", Math.max(.1, Math.min(.9, ratio)));
@@ -355,7 +373,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         if (dock == null) return;
         try {
             Tab selected = Tab.valueOf(String.valueOf(dock.get("selected")));
-            if (!detached.containsKey(selected)) tabs.setSelectedComponent(surfaces.get(selected).component());
+            if (!detached.containsKey(selected)) tabs.setSelectedComponent(presentations.get(selected));
         } catch (IllegalArgumentException ignored) { }
         if (dock.get("ratio") instanceof Number number && Double.isFinite(number.doubleValue()) && number.doubleValue() >= .1 && number.doubleValue() <= .9) {
             editor.validate(); rememberedHeight = (int) Math.round(editor.editorToolSplit.getHeight() * (1 - number.doubleValue())); rememberedAutomatic = false;
@@ -364,6 +382,21 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         else {
             int savedHeight = rememberedHeight; editor.hideToolWindow(); rememberedHeight = savedHeight; rememberedAutomatic = false;
         }
+    }
+
+    private static void revealFocusedControl(javax.swing.JComponent component) {
+        java.awt.Rectangle area = new java.awt.Rectangle(0, 0, component.getWidth(), component.getHeight());
+        if (component instanceof javax.swing.text.JTextComponent text && !(component instanceof javax.swing.JTextField)) {
+            try { var caret = text.modelToView2D(text.getCaretPosition()); if (caret != null) area = caret.getBounds(); }
+            catch (javax.swing.text.BadLocationException ignored) { }
+        } else if (component instanceof javax.swing.JTable table) {
+            if (table.getRowCount() > 0 && table.getColumnCount() > 0) area = table.getCellRect(Math.max(0, table.getSelectedRow()), Math.max(0, table.getSelectedColumn()), true);
+        } else if (component instanceof javax.swing.JList<?> list) {
+            if (list.getModel().getSize() > 0) { var cell = list.getCellBounds(Math.max(0, list.getSelectedIndex()), Math.max(0, list.getSelectedIndex())); if (cell != null) area = cell; }
+        } else if (component instanceof javax.swing.JTree tree && tree.getSelectionPath() != null) {
+            var row = tree.getPathBounds(tree.getSelectionPath()); if (row != null) area = row;
+        }
+        ToolViewport.reveal(component, area);
     }
 
     interface ToolSurface {

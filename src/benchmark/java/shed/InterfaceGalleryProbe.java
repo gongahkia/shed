@@ -69,6 +69,7 @@ public final class InterfaceGalleryProbe {
     private final List<Map<String, Object>> captures = new ArrayList<>();
     private final List<String> narrowToolChecks = new ArrayList<>();
     private final List<String> scrollableFormChecks = new ArrayList<>();
+    private final List<String> nativeFocusLimits = new ArrayList<>();
     private final List<Map<String, Object>> controlBoundsFailures = new ArrayList<>();
     private boolean keyboardFocusObserved;
     private Texteditor editor;
@@ -283,17 +284,17 @@ public final class InterfaceGalleryProbe {
                         .filter(control -> (control instanceof JTextField || control instanceof AbstractButton)
                             && control.isShowing() && control.isFocusable()).toList());
                     for (JComponent control : formControls) {
-                        boolean checkFocus = keyboardFocusObserved && control.isEnabled();
+                        boolean checkFocus = edt(() -> keyboardFocusObserved && editor.isFocused() && control.isEnabled());
                         edt(() -> {
+                            reveal(control, new Rectangle(0, 0, control.getWidth(), control.getHeight()));
                             if (checkFocus) control.requestFocusInWindow();
-                            else if (control.getParent() instanceof JComponent parent) parent.scrollRectToVisible(control.getBounds());
                             return null;
                         });
                         try {
                             awaitUntil("Debug " + section + " form control", System.nanoTime() + Duration.ofSeconds(3).toNanos(), () -> {
-                                if (checkFocus && !control.isFocusOwner()) control.requestFocusInWindow();
+                                if (checkFocus && editor.isFocused() && !control.isFocusOwner()) control.requestFocusInWindow();
                                 Rectangle visible = control.getVisibleRect();
-                                return (!checkFocus || control.isFocusOwner())
+                                return (!checkFocus || !editor.isFocused() || control.isFocusOwner())
                                     && visible.width >= control.getWidth() - 2 && visible.height >= control.getHeight() - 2;
                             });
                         } catch (Exception failure) {
@@ -302,6 +303,12 @@ public final class InterfaceGalleryProbe {
                                 + " " + control.getAccessibleContext().getAccessibleName() + " bounds=" + control.getBounds()
                                 + " visible=" + control.getVisibleRect() + " windowFocused=" + editor.isFocused()
                                 + " focusOwner=" + java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner()), failure);
+                        }
+                        if (edt(control::isEnabled) && !edt(control::isFocusOwner)) {
+                            String limit = "Debug " + section + ": native focus not observed for " + control.getClass().getSimpleName()
+                                + " " + edt(() -> control.getAccessibleContext().getAccessibleName());
+                            nativeFocusLimits.add(limit);
+                            System.out.println("SHED_NATIVE_FOCUS_UNVERIFIED " + limit);
                         }
                     }
                     scrollableFormChecks.add(section);
@@ -329,7 +336,8 @@ public final class InterfaceGalleryProbe {
         report.put("language_servers", languageServers);
         report.put("narrow_tool_control_bounds", narrowToolChecks);
         report.put("scrollable_debug_forms", scrollableFormChecks);
-        report.put("debug_form_native_focus_checked", keyboardFocusObserved);
+        report.put("debug_form_native_focus_checked", keyboardFocusObserved && nativeFocusLimits.isEmpty());
+        report.put("native_focus_limits", nativeFocusLimits);
         report.put("control_bounds_failures", controlBoundsFailures);
         report.put("control_bounds_passed", controlBoundsFailures.isEmpty());
         report.put("keyboard_focus_observed", keyboardFocusObserved);
@@ -432,28 +440,43 @@ public final class InterfaceGalleryProbe {
     /** Scrollable content may intentionally extend outside its viewport; fixed controls must remain reachable. */
     private int recordControlBounds(Container root, String name) {
         int failures = 0;
-        for (JComponent component : descendants(root, JComponent.class)) {
-            if (!(component instanceof AbstractButton || component instanceof JTextField || component instanceof JComboBox<?>)) continue;
-            if (!component.isShowing() || !component.isFocusable() || insideViewport(component)) continue;
-            Rectangle visible = component.getVisibleRect();
-            if (component.getWidth() < 1 || component.getHeight() < 1 || visible.x > 1 || visible.y > 1
-                || visible.width < component.getWidth() - 2 || visible.height < component.getHeight() - 2) {
-                Map<String, Object> failure = new LinkedHashMap<>();
-                failure.put("screen", name);
-                failure.put("control", component.getAccessibleContext().getAccessibleName());
-                failure.put("component", component.getClass().getSimpleName());
-                failure.put("bounds", component.getBounds().toString());
-                failure.put("visible", visible.toString());
-                controlBoundsFailures.add(failure);
-                failures++;
-                System.out.println("SHED_CONTROL_BOUNDS_FAIL " + MiniJson.stringify(failure));
+        Map<JViewport, java.awt.Point> positions = new LinkedHashMap<>();
+        for (JViewport view : descendants(root, JViewport.class)) if (toolViewport(view)) positions.put(view, view.getViewPosition());
+        try {
+            for (JComponent component : descendants(root, JComponent.class)) {
+                if (!(component instanceof AbstractButton || component instanceof JTextField || component instanceof JComboBox<?>)) continue;
+                if (!component.isShowing() || !component.isFocusable() || insideViewport(component)) continue;
+                // The tool viewport must make every ordinary control fully reachable; it is not an exemption.
+                if (insideToolViewport(component)) reveal(component, new Rectangle(0, 0, component.getWidth(), component.getHeight()));
+                Rectangle visible = component.getVisibleRect();
+                if (component.getWidth() < 1 || component.getHeight() < 1 || visible.x > 1 || visible.y > 1
+                    || visible.width < component.getWidth() - 2 || visible.height < component.getHeight() - 2) {
+                    Map<String, Object> failure = new LinkedHashMap<>();
+                    failure.put("screen", name); failure.put("control", component.getAccessibleContext().getAccessibleName());
+                    failure.put("component", component.getClass().getSimpleName()); failure.put("bounds", component.getBounds().toString());
+                    failure.put("visible", visible.toString()); controlBoundsFailures.add(failure); failures++;
+                    System.out.println("SHED_CONTROL_BOUNDS_FAIL " + MiniJson.stringify(failure));
+                }
             }
-        }
+        } finally { positions.forEach(JViewport::setViewPosition); }
         return failures;
     }
 
+    private static void reveal(JComponent component, Rectangle area) {
+        component.scrollRectToVisible(area);
+        for (Container parent = component.getParent(); parent != null; parent = parent.getParent()) if (parent instanceof JViewport view)
+            view.scrollRectToVisible(SwingUtilities.convertRectangle(component, area, view));
+    }
+
+    private static boolean toolViewport(JViewport viewport) {
+        return viewport.getParent() instanceof JComponent parent && Boolean.TRUE.equals(parent.getClientProperty("shed.toolViewport"));
+    }
+    private static boolean insideToolViewport(Component component) {
+        for (Container parent = component.getParent(); parent != null; parent = parent.getParent()) if (parent instanceof JViewport view && toolViewport(view)) return true;
+        return false;
+    }
     private static boolean insideViewport(Component component) {
-        for (Container parent = component.getParent(); parent != null; parent = parent.getParent()) if (parent instanceof JViewport) return true;
+        for (Container parent = component.getParent(); parent != null; parent = parent.getParent()) if (parent instanceof JViewport view && !toolViewport(view)) return true;
         return false;
     }
 

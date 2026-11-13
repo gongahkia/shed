@@ -3435,6 +3435,14 @@ public class TexteditorSwingIntegrationTest {
                 var output = descendants(editor.toolWindowHost, javax.swing.JTextArea.class).stream()
                     .filter(value -> "Task output".equals(value.getAccessibleContext().getAccessibleName())).findFirst().orElseThrow();
                 assertTrue(output.getText().contains("task output"));
+                editor.validate();
+                Rectangle jobCell = table.getCellRect(row, 1, true);
+                ToolViewport.reveal(table, jobCell);
+                assertTrue(table.getVisibleRect().contains(jobCell), "Selected task status must remain reachable beside its output");
+                int readableHeight = output.getInsets().top + output.getFontMetrics(output.getFont()).getHeight() * 3;
+                Rectangle readableOutput = new Rectangle(0, 0, Math.min(100, output.getWidth()), readableHeight);
+                ToolViewport.reveal(output, readableOutput);
+                assertTrue(output.getVisibleRect().contains(readableOutput), "Selected task output must expose readable rows in a short dock");
                 output.setCaretPosition(7); output.moveCaretPosition(2);
                 editor.toolWindowHost.refresh(ToolWindowHost.Tab.TASKS);
                 assertEquals(7, output.getCaret().getMark()); assertEquals(2, output.getCaret().getDot());
@@ -3537,7 +3545,10 @@ public class TexteditorSwingIntegrationTest {
                 editor.settingsApplication.update("ui.zoom", "1.5"); editor.setSize(760, 780); editor.validate();
                 for (String name : List.of("agent.apply", "agent.reject")) {
                     var decision = descendants(editor.toolWindowHost, javax.swing.JButton.class).stream().filter(b -> name.equals(b.getName())).findFirst().orElseThrow();
+                    Rectangle control = new Rectangle(0, 0, decision.getWidth(), decision.getHeight());
+                    ToolViewport.reveal(decision, control);
                     Rectangle bounds = javax.swing.SwingUtilities.convertRectangle(decision.getParent(), decision.getBounds(), editor.getRootPane());
+                    assertTrue(decision.getVisibleRect().contains(control), name + " must be fully visible after scrolling at 150% scale");
                     assertTrue(editor.getRootPane().getVisibleRect().contains(bounds), name + " must remain reachable at narrow width and 150% scale: " + bounds);
                 }
                 editor.settingsApplication.update("ui.zoom", "1.0"); editor.setSize(1100, 820); editor.validate();

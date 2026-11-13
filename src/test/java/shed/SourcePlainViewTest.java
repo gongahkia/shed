@@ -64,6 +64,15 @@ class SourcePlainViewTest {
                 assertTrue(document.readCharacters < 8192, "local undo read " + document.readCharacters + " characters");
                 assertEquals(1010000, document.getLength());
 
+                UndoManager history = new UndoManager(); document.addUndoableEditListener(history);
+                // Line-start insertion/undo changes root Elements. A tied maximum must not move
+                // the full scan from undo to the next newline operation.
+                document.readCharacters = 0;
+                document.insertString(101, "x", null); history.undo();
+                document.insertString(101, "\n", null); history.undo();
+                optimized.getPreferredSize();
+                assertTrue(document.readCharacters < 8192, "line-boundary edits read " + document.readCharacters + " characters");
+
                 MeasuredDocument control = new MeasuredDocument();
                 control.insertString(0, document.getText(0, document.getLength()), null);
                 JTextArea stock = area(control, false);
@@ -167,5 +176,65 @@ class SourcePlainViewTest {
         Graphics2D graphics = image.createGraphics();
         try { area.paint(graphics); } finally { graphics.dispose(); }
         return image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+    }
+
+    @Test void exhaustingWidthCandidatesAndBulkUndoRetainTheExactMaximum() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                PlainDocument document = new PlainDocument();
+                StringBuilder text = new StringBuilder();
+                for (int n = 160; n > 0; n--) text.append("W".repeat(n)).append('\n');
+                document.insertString(0, text.toString(), null);
+                UndoManager history = new UndoManager(); document.addUndoableEditListener(history);
+                JTextArea stock = area(document, false), optimized = area(document, true);
+                equalGeometry(stock, optimized);
+                for (int n = 0; n < 100; n++) {
+                    int end = document.getDefaultRootElement().getElement(0).getEndOffset();
+                    document.remove(0, end);
+                    equalGeometry(stock, optimized);
+                }
+                for (int n = 0; n < 100; n++) { history.undo(); equalGeometry(stock, optimized); }
+                assertEquals(text.toString(), document.getText(0, document.getLength()));
+                document.remove(0, document.getLength() / 2);
+                // Stock PlainView can keep a removed widest Element after a bulk removal if it
+                // first promotes an added line. A fresh stock view gives the actual text extent.
+                equalGeometry(area(document, false), optimized);
+                history.undo(); equalGeometry(stock, optimized);
+            } catch (Exception error) { throw new AssertionError(error); }
+        });
+    }
+
+    @Test void tabsAndUnicodeAfterCachedEditsHandBackToStockMetrics() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                for (String inserted : new String[]{"\t", "café", "😀", "עברית"}) {
+                    PlainDocument document = new PlainDocument();
+                    document.insertString(0, "W".repeat(200) + "\n" + "M".repeat(100) + "\nlast", null);
+                    JTextArea stock = area(document, false), optimized = area(document, true);
+                    equalGeometry(stock, optimized);
+                    // Remove the original widest Element before requiring the stock policy again.
+                    document.remove(0, 201); equalGeometry(stock, optimized);
+                    document.insertString(0, inserted, null); equalGeometry(stock, optimized);
+                    document.remove(0, inserted.length()); equalGeometry(stock, optimized);
+                }
+            } catch (Exception error) { throw new AssertionError(error); }
+        });
+    }
+
+    @Test void extremeLineExtentsUseStockGeometry() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                for (int length : new int[]{900000, 1000001}) {
+                    PlainDocument document = new PlainDocument();
+                    document.insertString(0, "W".repeat(length), null);
+                    JTextArea stock = area(document, false), optimized = area(document, true);
+                    assertEquals(stock.getPreferredSize(), optimized.getPreferredSize());
+                    document.insertString(0, "x", null);
+                    assertEquals(stock.getPreferredSize(), optimized.getPreferredSize());
+                    document.remove(0, 1);
+                    assertEquals(stock.getPreferredSize(), optimized.getPreferredSize());
+                }
+            } catch (Exception error) { throw new AssertionError(error); }
+        });
     }
 }

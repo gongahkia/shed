@@ -3,6 +3,7 @@ package shed;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Shape;
+import java.util.Arrays;
 import java.util.Objects;
 import javax.swing.event.DocumentEvent;
 import javax.swing.text.BadLocationException;
@@ -13,15 +14,17 @@ import javax.swing.text.Utilities;
 import javax.swing.text.View;
 import javax.swing.text.ViewFactory;
 
-/** Keeps Swing painting/geometry; avoids scanning all lines when undo restores a known widest line. */
+/** PlainView painting/geometry with a bounded summary of widest source lines. EDT-owned, like PlainView. */
 final class SourcePlainView extends PlainView {
     static final String SOURCE_PROPERTY = "shed.sourceView";
-    private boolean eligible;
+    static final int MAX_WIDTH_CANDIDATES = 64;
+    private boolean eligible, ready;
     private Font extentFont;
     private FontMetrics extentMetrics;
-    private float knownWidth = Float.NaN;
-    private Element grownLine;
-    private float previousMaximum;
+    private final Segment measurement = new Segment();
+    private Element[] candidates;
+    private int[] widths;
+    private int count, minimum, maximumWidth, untrackedUpperBound;
 
     private SourcePlainView(Element element) { super(element); }
 
@@ -31,12 +34,11 @@ final class SourcePlainView extends PlainView {
 
     @Override public void setParent(View parent) {
         super.setParent(parent);
-        clearWitness();
-        knownWidth = Float.NaN;
+        reset();
         extentFont = null;
         extentMetrics = null;
-        // One attachment scan; no document copy or per-line metadata. Tabs/complex glyphs retain
-        // stock behavior, including Swing's font/tab initialization and invalidation semantics.
+        // Partial Segments avoid flattening/copying the document. Complex text and tabs retain the
+        // stock view's exact shaping and tab initialization behavior; check inserts incrementally.
         eligible = parent != null && simpleRange(0, getDocument().getLength());
     }
 
@@ -56,72 +58,120 @@ final class SourcePlainView extends PlainView {
         } catch (BadLocationException unavailable) { return false; }
     }
 
-    private boolean sameMetrics() {
-        return extentFont == getContainer().getFont() && Objects.equals(extentMetrics, metrics);
-    }
-
-    private void remember(float width) {
-        knownWidth = width;
-        extentFont = getContainer().getFont();
-        extentMetrics = metrics;
-    }
-
-    private void clearWitness() { grownLine = null; }
-
-    @Override public float getPreferredSpan(int axis) {
-        float span = super.getPreferredSpan(axis);
-        if (eligible && axis == X_AXIS && (Float.isNaN(knownWidth) || !sameMetrics())) {
-            clearWitness();
-            remember(span);
-        }
-        // Another document listener may query size after mutation but before this view's event.
-        // Keep the pre-event bound until updateDamage has processed that event.
-        return span;
+    private void reset() {
+        if (candidates != null) Arrays.fill(candidates, null);
+        count = minimum = maximumWidth = untrackedUpperBound = 0;
+        ready = false;
     }
 
     @SuppressWarnings("deprecation") // Same integer API as PlainView.getLineWidth in Java 21.
     private int width(Element line) throws BadLocationException {
-        Segment segment = new Segment();
         int start = line.getStartOffset();
-        getDocument().getText(start, line.getEndOffset() - start, segment);
-        return Utilities.getTabbedTextWidth(segment, metrics, 0, null, start);
+        int length = line.getEndOffset() - start;
+        if (length > 1_000_000) throw new ArithmeticException("Use stock geometry for extreme lines");
+        try {
+            getDocument().getText(start, length, measurement);
+            int value = Utilities.getTabbedTextWidth(measurement, metrics, 0, null, start);
+            // Keep float-origin rounding/overflow at extreme pixel coordinates in the stock view.
+            if (value < 0 || value >= (1 << 23)) throw new ArithmeticException("Use stock geometry for extreme widths");
+            return value;
+        } finally { measurement.array = null; }
+    }
+
+    private void findMinimum() {
+        minimum = 0;
+        maximumWidth = 0;
+        for (int i = 0; i < count; i++) {
+            if (widths[i] < widths[minimum]) minimum = i;
+            maximumWidth = Math.max(maximumWidth, widths[i]);
+        }
+    }
+
+    private void put(Element line) throws BadLocationException {
+        int value = width(line);
+        for (int i = 0; i < count; i++) {
+            if (candidates[i] == line) { widths[i] = value; findMinimum(); return; }
+        }
+        if (count < MAX_WIDTH_CANDIDATES) {
+            candidates[count] = line;
+            widths[count++] = value;
+            findMinimum();
+        } else if (value > widths[minimum]) {
+            untrackedUpperBound = Math.max(untrackedUpperBound, widths[minimum]);
+            candidates[minimum] = line;
+            widths[minimum] = value;
+            findMinimum();
+        } else untrackedUpperBound = Math.max(untrackedUpperBound, value);
+    }
+
+    private void remove(Element line) {
+        for (int i = 0; i < count; i++) {
+            if (candidates[i] == line) {
+                candidates[i] = candidates[--count]; widths[i] = widths[count]; candidates[count] = null;
+                findMinimum(); return;
+            }
+        }
+    }
+
+    private int maximum() {
+        return maximumWidth;
+    }
+
+    private void rebuild() throws BadLocationException {
+        reset();
+        if (candidates == null) { candidates = new Element[MAX_WIDTH_CANDIDATES]; widths = new int[MAX_WIDTH_CANDIDATES]; }
+        Element root = getElement();
+        for (int i = 0; i < root.getElementCount(); i++) put(root.getElement(i));
+        extentFont = getContainer().getFont(); extentMetrics = metrics; ready = true;
+    }
+
+    private void ensureSummary() throws BadLocationException {
+        updateMetrics(); // Retain PlainView's font, tab and painting initialization.
+        if (!ready || extentFont != getContainer().getFont() || !Objects.equals(extentMetrics, metrics)) rebuild();
+    }
+
+    private void useStock() {
+        eligible = false; reset(); extentFont = null; extentMetrics = null;
+        // Our width policy did not maintain PlainView's private widest-line reference. Its protected
+        // metrics invalidation forces a fresh stock calculation before handing control back.
+        metrics = null;
+    }
+
+    @Override public float getPreferredSpan(int axis) {
+        if (!eligible || axis != X_AXIS) return super.getPreferredSpan(axis);
+        try { ensureSummary(); return maximum(); }
+        catch (BadLocationException | ArithmeticException unavailable) { useStock(); return super.getPreferredSpan(axis); }
     }
 
     @Override protected void updateDamage(DocumentEvent event, Shape allocation, ViewFactory factory) {
         if (eligible && event.getType() == DocumentEvent.EventType.INSERT
-            && !simpleRange(event.getOffset(), event.getLength())) eligible = false;
-        if (!eligible) {
-            clearWitness();
-            super.updateDamage(event, allocation, factory);
-            return;
-        }
-        updateMetrics();
-        // Preferred spans are floats; beyond this bound adjacent integer pixel widths can alias.
-        boolean valid = knownWidth >= 0 && knownWidth < (1 << 24) && sameMetrics();
-        float before = knownWidth;
-        Element root = getElement();
-        boolean local = event.getChange(root) == null;
-        int index = root.getElementIndex(event.getOffset());
-        Element line = root.getElement(index);
-        boolean restored = false;
-        if (valid && local && event.getType() == DocumentEvent.EventType.REMOVE && grownLine != null && line == grownLine) {
-            try { restored = width(line) >= previousMaximum; }
-            catch (BadLocationException unavailable) { /* Use stock invalidation. */ }
-        }
-        if (restored) {
-            // Other lines are unchanged and <= previousMaximum. Swing's widest-line reference
-            // remains valid; only damage this line and notify horizontal preference.
-            damageLineRange(index, index, allocation, getContainer());
-            preferenceChanged(null, true, false);
-        } else {
-            super.updateDamage(event, allocation, factory);
-            clearWitness();
-        }
-        float after = super.getPreferredSpan(X_AXIS);
-        remember(after);
-        if (valid && local && event.getType() == DocumentEvent.EventType.INSERT && after > before) {
-            grownLine = line;
-            previousMaximum = before;
+            && !simpleRange(event.getOffset(), event.getLength())) useStock();
+        if (!eligible) { super.updateDamage(event, allocation, factory); return; }
+        try {
+            ensureSummary();
+            int before = maximum();
+            Element root = getElement();
+            DocumentEvent.ElementChange change = event.getChange(root);
+            boolean structural = change != null;
+            if (structural) {
+                Element[] removed = change.getChildrenRemoved(), added = change.getChildrenAdded();
+                if (removed.length + added.length > MAX_WIDTH_CANDIDATES) rebuild();
+                else {
+                    for (Element line : removed) remove(line);
+                    for (Element line : added) put(line);
+                }
+            } else put(root.getElement(root.getElementIndex(event.getOffset())));
+            // Every untracked line is <= this conservative bound. Refresh only when the remaining
+            // candidates cannot prove the maximum, e.g. many distinct widest lines were removed.
+            if (maximum() < untrackedUpperBound) rebuild();
+            if (structural || before != maximum()) preferenceChanged(null, true, structural);
+            if (structural) getContainer().repaint();
+            else {
+                int line = root.getElementIndex(event.getOffset());
+                damageLineRange(line, line, allocation, getContainer());
+            }
+        } catch (BadLocationException | ArithmeticException unavailable) {
+            useStock(); super.updateDamage(event, allocation, factory);
         }
     }
 }

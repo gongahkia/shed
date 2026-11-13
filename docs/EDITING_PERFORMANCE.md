@@ -52,3 +52,7 @@ java -Xms64m -Xmx512m src/benchmark/java/shed/PickerComparisonProbe.java \
 ```
 
 This loads each ranker through an independent classloader, alternates their order, warms each for 30 iterations, and records 50 wall-clock and current-thread CPU samples per version over identical 50,000-path inputs. Every result list must be identical. CPU time excludes other threads and scheduler waits; the wall-clock desktop measurements above remain the measure of user-visible responsiveness. See [recorded results](PERFORMANCE_RESULTS.md).
+
+## Source-view width invalidation
+
+The opt-in [Tranche 1B report](SOURCE_VIEW_PERFORMANCE.md) documents the bounded PlainView width summary, exact geometry qualification, paired EDT/paint measurements and stock fallbacks. Wrapped, tabbed, international and extreme-coordinate source retains Swing behavior. Initial/font-metric setup and summary exhaustion can still scan all lines; routine eligible local undo avoids that scan. This changes no existing performance gate or document/undo ownership.

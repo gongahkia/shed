@@ -1,9 +1,9 @@
 [
   {
-    "run_group": "after-paired-font",
-    "jar_sha256": "5db4be696f5a923c2c7754efbc7cb1b451856dc7b4ee9327b5a960c02bfb81ff",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
-    "runtime_classpath_sha256": "9b74a11ad671095252a3f220728724bf88899ee27f0dd426d8a1450fc46977f2",
+    "run_group": "summary-after-font12",
+    "jar_sha256": "06661ebc00b3bb001c0ae24050d76afc759a88c036bdd0a203d29ed72badf0e0",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "68c4b0a83a06574d0b50305d417fc582504df729eb76b4be2cded9952b96fca8",
     "packaged_jar_runtime": true,
     "java": {
       "exit": 0,
@@ -11,16 +11,69 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-font",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after.jar",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-font12",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
       "classpath_file": null,
       "generate_only": false,
       "mode": "ui",
       "shapes": [
-        "widths"
+        "mixed"
+      ],
+      "sizes": [
+        1048576
+      ],
+      "samples": 100,
+      "warmups": 10,
+      "runs": 1,
+      "timeout": 90,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": "Monospaced",
+      "font_size": 12,
+      "tab_size": 0
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-font12/fixtures/mixed-1048576.md",
+        "bytes": 1048576,
+        "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 551,
+        "padding_bytes": 23,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
+  },
+  {
+    "run_group": "summary-after-font20",
+    "jar_sha256": "06661ebc00b3bb001c0ae24050d76afc759a88c036bdd0a203d29ed72badf0e0",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "68c4b0a83a06574d0b50305d417fc582504df729eb76b4be2cded9952b96fca8",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-font20",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "ui",
+      "shapes": [
+        "mixed"
       ],
       "sizes": [
         1048576
@@ -39,13 +92,13 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-font/fixtures/widths-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-font20/fixtures/mixed-1048576.md",
         "bytes": 1048576,
-        "sha256": "d93d4a90a9df523f9ade4d28fb4e54812d378d8fcfd3075ce0cda6af200e9b84",
-        "shape": "widths",
+        "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
+        "shape": "mixed",
         "generator": 1,
-        "complete_blocks": 653,
-        "padding_bytes": 1045,
+        "complete_blocks": 551,
+        "padding_bytes": 23,
         "encoding": "ASCII/UTF-8",
         "eof_newline": true
       }
@@ -53,10 +106,10 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "after-paired-long-line",
-    "jar_sha256": "5db4be696f5a923c2c7754efbc7cb1b451856dc7b4ee9327b5a960c02bfb81ff",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
-    "runtime_classpath_sha256": "9b74a11ad671095252a3f220728724bf88899ee27f0dd426d8a1450fc46977f2",
+    "run_group": "summary-after-long-line",
+    "jar_sha256": "06661ebc00b3bb001c0ae24050d76afc759a88c036bdd0a203d29ed72badf0e0",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "68c4b0a83a06574d0b50305d417fc582504df729eb76b4be2cded9952b96fca8",
     "packaged_jar_runtime": true,
     "java": {
       "exit": 0,
@@ -64,11 +117,11 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-long-line",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after.jar",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-long-line",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
       "classpath_file": null,
       "generate_only": false,
       "mode": "ui",
@@ -92,7 +145,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-long-line/fixtures/long-line-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-long-line/fixtures/long-line-1048576.md",
         "bytes": 1048576,
         "sha256": "2ef0426e1b35128e1a0e1324e6ee2e14da18d21a801aa8fa46a23b19d87ae2dd",
         "shape": "long-line",
@@ -106,10 +159,10 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "after-paired-main",
-    "jar_sha256": "5db4be696f5a923c2c7754efbc7cb1b451856dc7b4ee9327b5a960c02bfb81ff",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
-    "runtime_classpath_sha256": "9b74a11ad671095252a3f220728724bf88899ee27f0dd426d8a1450fc46977f2",
+    "run_group": "summary-after-main",
+    "jar_sha256": "06661ebc00b3bb001c0ae24050d76afc759a88c036bdd0a203d29ed72badf0e0",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "68c4b0a83a06574d0b50305d417fc582504df729eb76b4be2cded9952b96fca8",
     "packaged_jar_runtime": true,
     "java": {
       "exit": 0,
@@ -117,11 +170,11 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-main",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after.jar",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-main",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
       "classpath_file": null,
       "generate_only": false,
       "mode": "ui",
@@ -147,7 +200,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-main/fixtures/mixed-102400.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-main/fixtures/mixed-102400.md",
         "bytes": 102400,
         "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
         "shape": "mixed",
@@ -158,7 +211,7 @@
         "eof_newline": true
       },
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-main/fixtures/mixed-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-main/fixtures/mixed-1048576.md",
         "bytes": 1048576,
         "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
         "shape": "mixed",
@@ -169,7 +222,7 @@
         "eof_newline": true
       },
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-main/fixtures/mixed-10485760.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-main/fixtures/mixed-10485760.md",
         "bytes": 10485760,
         "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
         "shape": "mixed",
@@ -183,10 +236,10 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "after-paired-profile",
-    "jar_sha256": "5db4be696f5a923c2c7754efbc7cb1b451856dc7b4ee9327b5a960c02bfb81ff",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
-    "runtime_classpath_sha256": "9b74a11ad671095252a3f220728724bf88899ee27f0dd426d8a1450fc46977f2",
+    "run_group": "summary-after-profile",
+    "jar_sha256": "06661ebc00b3bb001c0ae24050d76afc759a88c036bdd0a203d29ed72badf0e0",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "68c4b0a83a06574d0b50305d417fc582504df729eb76b4be2cded9952b96fca8",
     "packaged_jar_runtime": true,
     "java": {
       "exit": 0,
@@ -194,11 +247,11 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-profile",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after.jar",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-profile",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
       "classpath_file": null,
       "generate_only": false,
       "mode": "ui",
@@ -222,7 +275,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-profile/fixtures/mixed-10485760.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-profile/fixtures/mixed-10485760.md",
         "bytes": 10485760,
         "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
         "shape": "mixed",
@@ -236,10 +289,10 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "after-paired-small-font",
-    "jar_sha256": "5db4be696f5a923c2c7754efbc7cb1b451856dc7b4ee9327b5a960c02bfb81ff",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
-    "runtime_classpath_sha256": "9b74a11ad671095252a3f220728724bf88899ee27f0dd426d8a1450fc46977f2",
+    "run_group": "summary-after-startup",
+    "jar_sha256": "06661ebc00b3bb001c0ae24050d76afc759a88c036bdd0a203d29ed72badf0e0",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "68c4b0a83a06574d0b50305d417fc582504df729eb76b4be2cded9952b96fca8",
     "packaged_jar_runtime": true,
     "java": {
       "exit": 0,
@@ -247,64 +300,11 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-small-font",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after.jar",
-      "classpath_file": null,
-      "generate_only": false,
-      "mode": "ui",
-      "shapes": [
-        "mixed"
-      ],
-      "sizes": [
-        1048576
-      ],
-      "samples": 100,
-      "warmups": 10,
-      "runs": 1,
-      "timeout": 90,
-      "heap": 512,
-      "wrap": false,
-      "preview": false,
-      "profile": false,
-      "font": "Monospaced",
-      "font_size": 12,
-      "tab_size": 0
-    },
-    "fixtures": [
-      {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-small-font/fixtures/mixed-1048576.md",
-        "bytes": 1048576,
-        "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
-        "shape": "mixed",
-        "generator": 1,
-        "complete_blocks": 551,
-        "padding_bytes": 23,
-        "encoding": "ASCII/UTF-8",
-        "eof_newline": true
-      }
-    ],
-    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
-  },
-  {
-    "run_group": "after-paired-startup",
-    "jar_sha256": "5db4be696f5a923c2c7754efbc7cb1b451856dc7b4ee9327b5a960c02bfb81ff",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
-    "runtime_classpath_sha256": "9b74a11ad671095252a3f220728724bf88899ee27f0dd426d8a1450fc46977f2",
-    "packaged_jar_runtime": true,
-    "java": {
-      "exit": 0,
-      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
-    },
-    "probe_hashes": {
-      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
-    },
-    "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-startup",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after.jar",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-startup",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
       "classpath_file": null,
       "generate_only": false,
       "mode": "startup",
@@ -328,7 +328,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-startup/fixtures/plain-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-startup/fixtures/plain-1048576.md",
         "bytes": 1048576,
         "sha256": "4d2e2353d46f3d11642076fc2d58c975459187b14fe3bfa1867822d20ee5c175",
         "shape": "plain",
@@ -342,10 +342,10 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "after-paired-tabs",
-    "jar_sha256": "5db4be696f5a923c2c7754efbc7cb1b451856dc7b4ee9327b5a960c02bfb81ff",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
-    "runtime_classpath_sha256": "9b74a11ad671095252a3f220728724bf88899ee27f0dd426d8a1450fc46977f2",
+    "run_group": "summary-after-tabs2",
+    "jar_sha256": "06661ebc00b3bb001c0ae24050d76afc759a88c036bdd0a203d29ed72badf0e0",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "68c4b0a83a06574d0b50305d417fc582504df729eb76b4be2cded9952b96fca8",
     "packaged_jar_runtime": true,
     "java": {
       "exit": 0,
@@ -353,11 +353,64 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-tabs",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after.jar",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-tabs2",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "ui",
+      "shapes": [
+        "tabs"
+      ],
+      "sizes": [
+        1048576
+      ],
+      "samples": 100,
+      "warmups": 10,
+      "runs": 1,
+      "timeout": 90,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": "",
+      "font_size": 0,
+      "tab_size": 2
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-tabs2/fixtures/tabs-1048576.md",
+        "bytes": 1048576,
+        "sha256": "5d27d668b48f6c414b61d0cff56bf536fcc9f7e6717fed664f9c385a6b5939a5",
+        "shape": "tabs",
+        "generator": 1,
+        "complete_blocks": 398,
+        "padding_bytes": 642,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
+  },
+  {
+    "run_group": "summary-after-tabs8",
+    "jar_sha256": "06661ebc00b3bb001c0ae24050d76afc759a88c036bdd0a203d29ed72badf0e0",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "68c4b0a83a06574d0b50305d417fc582504df729eb76b4be2cded9952b96fca8",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-tabs8",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
       "classpath_file": null,
       "generate_only": false,
       "mode": "ui",
@@ -381,7 +434,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-tabs/fixtures/tabs-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-tabs8/fixtures/tabs-1048576.md",
         "bytes": 1048576,
         "sha256": "5d27d668b48f6c414b61d0cff56bf536fcc9f7e6717fed664f9c385a6b5939a5",
         "shape": "tabs",
@@ -395,10 +448,10 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "after-paired-widths",
-    "jar_sha256": "5db4be696f5a923c2c7754efbc7cb1b451856dc7b4ee9327b5a960c02bfb81ff",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
-    "runtime_classpath_sha256": "9b74a11ad671095252a3f220728724bf88899ee27f0dd426d8a1450fc46977f2",
+    "run_group": "summary-after-widths",
+    "jar_sha256": "06661ebc00b3bb001c0ae24050d76afc759a88c036bdd0a203d29ed72badf0e0",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "68c4b0a83a06574d0b50305d417fc582504df729eb76b4be2cded9952b96fca8",
     "packaged_jar_runtime": true,
     "java": {
       "exit": 0,
@@ -406,11 +459,11 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-widths",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after.jar",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-widths",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
       "classpath_file": null,
       "generate_only": false,
       "mode": "ui",
@@ -434,7 +487,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-widths/fixtures/widths-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-widths/fixtures/widths-1048576.md",
         "bytes": 1048576,
         "sha256": "d93d4a90a9df523f9ade4d28fb4e54812d378d8fcfd3075ce0cda6af200e9b84",
         "shape": "widths",
@@ -448,10 +501,10 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "after-paired-wrapped",
-    "jar_sha256": "5db4be696f5a923c2c7754efbc7cb1b451856dc7b4ee9327b5a960c02bfb81ff",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
-    "runtime_classpath_sha256": "9b74a11ad671095252a3f220728724bf88899ee27f0dd426d8a1450fc46977f2",
+    "run_group": "summary-after-wrapped",
+    "jar_sha256": "06661ebc00b3bb001c0ae24050d76afc759a88c036bdd0a203d29ed72badf0e0",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "68c4b0a83a06574d0b50305d417fc582504df729eb76b4be2cded9952b96fca8",
     "packaged_jar_runtime": true,
     "java": {
       "exit": 0,
@@ -459,11 +512,11 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-wrapped",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after.jar",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-wrapped",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
       "classpath_file": null,
       "generate_only": false,
       "mode": "ui",
@@ -489,7 +542,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-wrapped/fixtures/mixed-102400.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-wrapped/fixtures/mixed-102400.md",
         "bytes": 102400,
         "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
         "shape": "mixed",
@@ -500,7 +553,7 @@
         "eof_newline": true
       },
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-wrapped/fixtures/mixed-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-wrapped/fixtures/mixed-1048576.md",
         "bytes": 1048576,
         "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
         "shape": "mixed",
@@ -511,7 +564,7 @@
         "eof_newline": true
       },
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-wrapped/fixtures/mixed-10485760.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-wrapped/fixtures/mixed-10485760.md",
         "bytes": 10485760,
         "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
         "shape": "mixed",
@@ -525,9 +578,9 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "before-paired-font",
+    "run_group": "summary-before-font12",
     "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
     "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
     "packaged_jar_runtime": true,
     "java": {
@@ -536,16 +589,69 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-font",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-font12",
       "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
       "classpath_file": null,
       "generate_only": false,
       "mode": "ui",
       "shapes": [
-        "widths"
+        "mixed"
+      ],
+      "sizes": [
+        1048576
+      ],
+      "samples": 100,
+      "warmups": 10,
+      "runs": 1,
+      "timeout": 90,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": "Monospaced",
+      "font_size": 12,
+      "tab_size": 0
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-font12/fixtures/mixed-1048576.md",
+        "bytes": 1048576,
+        "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 551,
+        "padding_bytes": 23,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
+  },
+  {
+    "run_group": "summary-before-font20",
+    "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-font20",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "ui",
+      "shapes": [
+        "mixed"
       ],
       "sizes": [
         1048576
@@ -564,13 +670,13 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-font/fixtures/widths-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-font20/fixtures/mixed-1048576.md",
         "bytes": 1048576,
-        "sha256": "d93d4a90a9df523f9ade4d28fb4e54812d378d8fcfd3075ce0cda6af200e9b84",
-        "shape": "widths",
+        "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
+        "shape": "mixed",
         "generator": 1,
-        "complete_blocks": 653,
-        "padding_bytes": 1045,
+        "complete_blocks": 551,
+        "padding_bytes": 23,
         "encoding": "ASCII/UTF-8",
         "eof_newline": true
       }
@@ -578,9 +684,9 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "before-paired-long-line",
+    "run_group": "summary-before-long-line",
     "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
     "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
     "packaged_jar_runtime": true,
     "java": {
@@ -589,10 +695,10 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-long-line",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-long-line",
       "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
       "classpath_file": null,
       "generate_only": false,
@@ -617,7 +723,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-long-line/fixtures/long-line-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-long-line/fixtures/long-line-1048576.md",
         "bytes": 1048576,
         "sha256": "2ef0426e1b35128e1a0e1324e6ee2e14da18d21a801aa8fa46a23b19d87ae2dd",
         "shape": "long-line",
@@ -631,9 +737,9 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "before-paired-main",
+    "run_group": "summary-before-main",
     "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
     "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
     "packaged_jar_runtime": true,
     "java": {
@@ -642,10 +748,10 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-main",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-main",
       "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
       "classpath_file": null,
       "generate_only": false,
@@ -672,7 +778,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-main/fixtures/mixed-102400.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-main/fixtures/mixed-102400.md",
         "bytes": 102400,
         "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
         "shape": "mixed",
@@ -683,7 +789,7 @@
         "eof_newline": true
       },
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-main/fixtures/mixed-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-main/fixtures/mixed-1048576.md",
         "bytes": 1048576,
         "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
         "shape": "mixed",
@@ -694,7 +800,7 @@
         "eof_newline": true
       },
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-main/fixtures/mixed-10485760.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-main/fixtures/mixed-10485760.md",
         "bytes": 10485760,
         "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
         "shape": "mixed",
@@ -708,9 +814,9 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "before-paired-profile",
+    "run_group": "summary-before-profile",
     "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
     "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
     "packaged_jar_runtime": true,
     "java": {
@@ -719,10 +825,10 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-profile",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-profile",
       "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
       "classpath_file": null,
       "generate_only": false,
@@ -747,7 +853,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-profile/fixtures/mixed-10485760.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-profile/fixtures/mixed-10485760.md",
         "bytes": 10485760,
         "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
         "shape": "mixed",
@@ -761,9 +867,9 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "before-paired-small-font",
+    "run_group": "summary-before-startup",
     "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
     "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
     "packaged_jar_runtime": true,
     "java": {
@@ -772,63 +878,10 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-small-font",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
-      "classpath_file": null,
-      "generate_only": false,
-      "mode": "ui",
-      "shapes": [
-        "mixed"
-      ],
-      "sizes": [
-        1048576
-      ],
-      "samples": 100,
-      "warmups": 10,
-      "runs": 1,
-      "timeout": 90,
-      "heap": 512,
-      "wrap": false,
-      "preview": false,
-      "profile": false,
-      "font": "Monospaced",
-      "font_size": 12,
-      "tab_size": 0
-    },
-    "fixtures": [
-      {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-small-font/fixtures/mixed-1048576.md",
-        "bytes": 1048576,
-        "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
-        "shape": "mixed",
-        "generator": 1,
-        "complete_blocks": 551,
-        "padding_bytes": 23,
-        "encoding": "ASCII/UTF-8",
-        "eof_newline": true
-      }
-    ],
-    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
-  },
-  {
-    "run_group": "before-paired-startup",
-    "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
-    "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
-    "packaged_jar_runtime": true,
-    "java": {
-      "exit": 0,
-      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
-    },
-    "probe_hashes": {
-      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
-    },
-    "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-startup",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-startup",
       "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
       "classpath_file": null,
       "generate_only": false,
@@ -853,7 +906,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-startup/fixtures/plain-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-startup/fixtures/plain-1048576.md",
         "bytes": 1048576,
         "sha256": "4d2e2353d46f3d11642076fc2d58c975459187b14fe3bfa1867822d20ee5c175",
         "shape": "plain",
@@ -867,9 +920,9 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "before-paired-tabs",
+    "run_group": "summary-before-tabs2",
     "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
     "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
     "packaged_jar_runtime": true,
     "java": {
@@ -878,10 +931,63 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-tabs",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-tabs2",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "ui",
+      "shapes": [
+        "tabs"
+      ],
+      "sizes": [
+        1048576
+      ],
+      "samples": 100,
+      "warmups": 10,
+      "runs": 1,
+      "timeout": 90,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": "",
+      "font_size": 0,
+      "tab_size": 2
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-tabs2/fixtures/tabs-1048576.md",
+        "bytes": 1048576,
+        "sha256": "5d27d668b48f6c414b61d0cff56bf536fcc9f7e6717fed664f9c385a6b5939a5",
+        "shape": "tabs",
+        "generator": 1,
+        "complete_blocks": 398,
+        "padding_bytes": 642,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
+  },
+  {
+    "run_group": "summary-before-tabs8",
+    "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-tabs8",
       "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
       "classpath_file": null,
       "generate_only": false,
@@ -906,7 +1012,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-tabs/fixtures/tabs-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-tabs8/fixtures/tabs-1048576.md",
         "bytes": 1048576,
         "sha256": "5d27d668b48f6c414b61d0cff56bf536fcc9f7e6717fed664f9c385a6b5939a5",
         "shape": "tabs",
@@ -920,9 +1026,9 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "before-paired-widths",
+    "run_group": "summary-before-widths",
     "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
     "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
     "packaged_jar_runtime": true,
     "java": {
@@ -931,10 +1037,10 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-widths",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-widths",
       "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
       "classpath_file": null,
       "generate_only": false,
@@ -959,7 +1065,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-widths/fixtures/widths-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-widths/fixtures/widths-1048576.md",
         "bytes": 1048576,
         "sha256": "d93d4a90a9df523f9ade4d28fb4e54812d378d8fcfd3075ce0cda6af200e9b84",
         "shape": "widths",
@@ -973,9 +1079,9 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "before-paired-wrapped",
+    "run_group": "summary-before-wrapped",
     "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
-    "runner_sha256": "a5630d31bec3383254c291708f910bfb4698e1d1d48e0d5a98ac312095fb8c21",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
     "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
     "packaged_jar_runtime": true,
     "java": {
@@ -984,10 +1090,10 @@
     },
     "probe_hashes": {
       "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "c3794e84a2a2e7116c652ee3ede5420e75799ac9ab777e5131cc97f41bc6b9c0"
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-wrapped",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-wrapped",
       "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
       "classpath_file": null,
       "generate_only": false,
@@ -1014,7 +1120,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-wrapped/fixtures/mixed-102400.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-wrapped/fixtures/mixed-102400.md",
         "bytes": 102400,
         "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
         "shape": "mixed",
@@ -1025,7 +1131,7 @@
         "eof_newline": true
       },
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-wrapped/fixtures/mixed-1048576.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-wrapped/fixtures/mixed-1048576.md",
         "bytes": 1048576,
         "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
         "shape": "mixed",
@@ -1036,7 +1142,7 @@
         "eof_newline": true
       },
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-wrapped/fixtures/mixed-10485760.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-wrapped/fixtures/mixed-10485760.md",
         "bytes": 10485760,
         "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
         "shape": "mixed",
@@ -1050,7 +1156,72 @@
     "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
   },
   {
-    "run_group": "font-normal-before-final",
+    "run_group": "summary-repeat-after",
+    "jar_sha256": "06661ebc00b3bb001c0ae24050d76afc759a88c036bdd0a203d29ed72badf0e0",
+    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
+    "runtime_classpath_sha256": "68c4b0a83a06574d0b50305d417fc582504df729eb76b4be2cded9952b96fca8",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-repeat-after",
+      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "ui",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        102400,
+        10485760
+      ],
+      "samples": 100,
+      "warmups": 10,
+      "runs": 1,
+      "timeout": 120,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": "",
+      "font_size": 0,
+      "tab_size": 0
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-repeat-after/fixtures/mixed-102400.md",
+        "bytes": 102400,
+        "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 53,
+        "padding_bytes": 1541,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-repeat-after/fixtures/mixed-10485760.md",
+        "bytes": 10485760,
+        "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 5510,
+        "padding_bytes": 230,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
+  },
+  {
+    "run_group": "summary-repeat-before",
     "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
     "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
     "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
@@ -1064,113 +1235,7 @@
       "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
     },
     "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/font-normal-before-final",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
-      "classpath_file": null,
-      "generate_only": false,
-      "mode": "ui",
-      "shapes": [
-        "mixed"
-      ],
-      "sizes": [
-        1048576
-      ],
-      "samples": 100,
-      "warmups": 10,
-      "runs": 1,
-      "timeout": 90,
-      "heap": 512,
-      "wrap": false,
-      "preview": false,
-      "profile": false,
-      "font": "Dialog",
-      "font_size": 20,
-      "tab_size": 0
-    },
-    "fixtures": [
-      {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/font-normal-before-final/fixtures/mixed-1048576.md",
-        "bytes": 1048576,
-        "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
-        "shape": "mixed",
-        "generator": 1,
-        "complete_blocks": 551,
-        "padding_bytes": 23,
-        "encoding": "ASCII/UTF-8",
-        "eof_newline": true
-      }
-    ],
-    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
-  },
-  {
-    "run_group": "font-normal-after-final",
-    "jar_sha256": "5db4be696f5a923c2c7754efbc7cb1b451856dc7b4ee9327b5a960c02bfb81ff",
-    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
-    "runtime_classpath_sha256": "9b74a11ad671095252a3f220728724bf88899ee27f0dd426d8a1450fc46977f2",
-    "packaged_jar_runtime": true,
-    "java": {
-      "exit": 0,
-      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
-    },
-    "probe_hashes": {
-      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
-    },
-    "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/font-normal-after-final",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after.jar",
-      "classpath_file": null,
-      "generate_only": false,
-      "mode": "ui",
-      "shapes": [
-        "mixed"
-      ],
-      "sizes": [
-        1048576
-      ],
-      "samples": 100,
-      "warmups": 10,
-      "runs": 1,
-      "timeout": 90,
-      "heap": 512,
-      "wrap": false,
-      "preview": false,
-      "profile": false,
-      "font": "Dialog",
-      "font_size": 20,
-      "tab_size": 0
-    },
-    "fixtures": [
-      {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/font-normal-after-final/fixtures/mixed-1048576.md",
-        "bytes": 1048576,
-        "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
-        "shape": "mixed",
-        "generator": 1,
-        "complete_blocks": 551,
-        "padding_bytes": 23,
-        "encoding": "ASCII/UTF-8",
-        "eof_newline": true
-      }
-    ],
-    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
-  },
-  {
-    "run_group": "repeat-before",
-    "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
-    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
-    "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
-    "packaged_jar_runtime": true,
-    "java": {
-      "exit": 0,
-      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
-    },
-    "probe_hashes": {
-      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
-    },
-    "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/repeat-before",
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-repeat-before",
       "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
       "classpath_file": null,
       "generate_only": false,
@@ -1196,7 +1261,7 @@
     },
     "fixtures": [
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/repeat-before/fixtures/mixed-102400.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-repeat-before/fixtures/mixed-102400.md",
         "bytes": 102400,
         "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
         "shape": "mixed",
@@ -1207,184 +1272,13 @@
         "eof_newline": true
       },
       {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/repeat-before/fixtures/mixed-10485760.md",
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-repeat-before/fixtures/mixed-10485760.md",
         "bytes": 10485760,
         "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
         "shape": "mixed",
         "generator": 1,
         "complete_blocks": 5510,
         "padding_bytes": 230,
-        "encoding": "ASCII/UTF-8",
-        "eof_newline": true
-      }
-    ],
-    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
-  },
-  {
-    "run_group": "repeat-after",
-    "jar_sha256": "5db4be696f5a923c2c7754efbc7cb1b451856dc7b4ee9327b5a960c02bfb81ff",
-    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
-    "runtime_classpath_sha256": "9b74a11ad671095252a3f220728724bf88899ee27f0dd426d8a1450fc46977f2",
-    "packaged_jar_runtime": true,
-    "java": {
-      "exit": 0,
-      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
-    },
-    "probe_hashes": {
-      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
-    },
-    "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/repeat-after",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after.jar",
-      "classpath_file": null,
-      "generate_only": false,
-      "mode": "ui",
-      "shapes": [
-        "mixed"
-      ],
-      "sizes": [
-        102400,
-        10485760
-      ],
-      "samples": 100,
-      "warmups": 10,
-      "runs": 1,
-      "timeout": 120,
-      "heap": 512,
-      "wrap": false,
-      "preview": false,
-      "profile": false,
-      "font": "",
-      "font_size": 0,
-      "tab_size": 0
-    },
-    "fixtures": [
-      {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/repeat-after/fixtures/mixed-102400.md",
-        "bytes": 102400,
-        "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
-        "shape": "mixed",
-        "generator": 1,
-        "complete_blocks": 53,
-        "padding_bytes": 1541,
-        "encoding": "ASCII/UTF-8",
-        "eof_newline": true
-      },
-      {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/repeat-after/fixtures/mixed-10485760.md",
-        "bytes": 10485760,
-        "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
-        "shape": "mixed",
-        "generator": 1,
-        "complete_blocks": 5510,
-        "padding_bytes": 230,
-        "encoding": "ASCII/UTF-8",
-        "eof_newline": true
-      }
-    ],
-    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
-  },
-  {
-    "run_group": "before-tabs2",
-    "jar_sha256": "3037b3a8de905931a38c8df30e03fc61d596090beabb191a42752ce771d39c90",
-    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
-    "runtime_classpath_sha256": "7738fbb5175cd0d7160f9e94d0d9ebe2c25f141464e87b910fd947e66350cd09",
-    "packaged_jar_runtime": true,
-    "java": {
-      "exit": 0,
-      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
-    },
-    "probe_hashes": {
-      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
-    },
-    "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-tabs2",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before.jar",
-      "classpath_file": null,
-      "generate_only": false,
-      "mode": "ui",
-      "shapes": [
-        "tabs"
-      ],
-      "sizes": [
-        1048576
-      ],
-      "samples": 100,
-      "warmups": 10,
-      "runs": 1,
-      "timeout": 90,
-      "heap": 512,
-      "wrap": false,
-      "preview": false,
-      "profile": false,
-      "font": "",
-      "font_size": 0,
-      "tab_size": 2
-    },
-    "fixtures": [
-      {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-tabs2/fixtures/tabs-1048576.md",
-        "bytes": 1048576,
-        "sha256": "5d27d668b48f6c414b61d0cff56bf536fcc9f7e6717fed664f9c385a6b5939a5",
-        "shape": "tabs",
-        "generator": 1,
-        "complete_blocks": 398,
-        "padding_bytes": 642,
-        "encoding": "ASCII/UTF-8",
-        "eof_newline": true
-      }
-    ],
-    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee"
-  },
-  {
-    "run_group": "after-tabs2",
-    "jar_sha256": "5db4be696f5a923c2c7754efbc7cb1b451856dc7b4ee9327b5a960c02bfb81ff",
-    "runner_sha256": "482d5f23539cc67449e484ec8b49e2fd7ceec0b37e7672e4f040175539255d5e",
-    "runtime_classpath_sha256": "9b74a11ad671095252a3f220728724bf88899ee27f0dd426d8a1450fc46977f2",
-    "packaged_jar_runtime": true,
-    "java": {
-      "exit": 0,
-      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
-    },
-    "probe_hashes": {
-      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
-      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7190b154ecd54f419ef03160035a425d3646f965f090b65c650846af98f0f9a9"
-    },
-    "arguments": {
-      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-tabs2",
-      "jar": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after.jar",
-      "classpath_file": null,
-      "generate_only": false,
-      "mode": "ui",
-      "shapes": [
-        "tabs"
-      ],
-      "sizes": [
-        1048576
-      ],
-      "samples": 100,
-      "warmups": 10,
-      "runs": 1,
-      "timeout": 90,
-      "heap": 512,
-      "wrap": false,
-      "preview": false,
-      "profile": false,
-      "font": "",
-      "font_size": 0,
-      "tab_size": 2
-    },
-    "fixtures": [
-      {
-        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-tabs2/fixtures/tabs-1048576.md",
-        "bytes": 1048576,
-        "sha256": "5d27d668b48f6c414b61d0cff56bf536fcc9f7e6717fed664f9c385a6b5939a5",
-        "shape": "tabs",
-        "generator": 1,
-        "complete_blocks": 398,
-        "padding_bytes": 642,
         "encoding": "ASCII/UTF-8",
         "eof_newline": true
       }

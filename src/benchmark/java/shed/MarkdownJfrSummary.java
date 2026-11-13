@@ -21,6 +21,9 @@ public final class MarkdownJfrSummary {
                     String joined=String.join(";",frames);stacks.merge(category+" "+joined,1L,Long::sum);
                     for(String needle:List.of("PlainView","javax.swing.text.PlainView.calculateLongestLine","SourcePlainView","WrappedPlainView","GapContent","VersionedTextSnapshot","reconcileDocumentText","GrammarHighlightService","highlightSnapshot","MarkdownPreviewRenderer","MarkdownPreviewAssets","HTMLEditorKit","HTMLDocument","FlowView","ParagraphView","SunLayoutEngine","FontDesignMetrics","UndoManager.undo","DefaultDocumentEvent.undo"))
                         if(joined.contains(needle))groups.merge(category+" "+needle,1L,Long::sum);
+                    if(joined.contains("javax.swing.text.PlainView.calculateLongestLine") && joined.contains("DefaultDocumentEvent.undo"))
+                        groups.merge(category+" undo+global-width-scan",1L,Long::sum);
+                    if(joined.contains("shed.SourcePlainView.rebuild"))groups.merge(category+" source-width-summary-rebuild",1L,Long::sum);
                 }
                 if(type.equals("jdk.ObjectAllocationSample")) {
                     allocationSamples++;String name=e.getClass("objectClass").getName();

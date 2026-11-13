@@ -1,0 +1,555 @@
+[
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "vimMacrosRecordInsertKeysAndReplayCounted",
+    "state": "passed",
+    "seconds": 18.778
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "settingsValidationKeepsDraftsInlineAndModifiedFilterCanResetDefaults",
+    "state": "passed",
+    "seconds": 2.938
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "closingTabChecksCurrentDirtyStateInsteadOfCachedPresentation",
+    "state": "passed",
+    "seconds": 0.684
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "markdownPreviewTracksSourceScrollAndCaretUnlessDisabled",
+    "state": "passed",
+    "seconds": 1.492
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "commandCompletionUsesTheRegisteredCommandSurface",
+    "state": "passed",
+    "seconds": 0.512
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "vscodeProcessTaskDryRunIsSessionOnlyAndUsesDirectArguments",
+    "state": "passed",
+    "seconds": 0.665
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "inlineReplaceShowsLiveCountAndCanUndoAllMatches",
+    "state": "passed",
+    "seconds": 1.104
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree",
+    "state": "skipped",
+    "seconds": 0.0,
+    "reason": "org.opentest4j.TestAbortedException: Assumption failed: CMake, CTest, and CPack are unavailable"
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "vscodeLaunchProfileCanRunOnlyItsAcceptedProcessTaskLabelBeforeOpeningAnAdapter",
+    "state": "passed",
+    "seconds": 2.336
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "bufferViewsAreIndependentAcrossSplitsAndExplicitJumpsWin",
+    "state": "passed",
+    "seconds": 0.525
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "defaultStartupOpensEmptyBufferAndOpeningAFileReplacesIt",
+    "state": "passed",
+    "seconds": 0.625
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "activeRemoteSessionTakesPrecedenceOverOverlappingDevContainerTaskRouting",
+    "state": "passed",
+    "seconds": 0.433
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "workspaceSearchAddsExactQuickfixLocationWithoutPersistentIndex",
+    "state": "passed",
+    "seconds": 0.765
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "debugStatusCommandShowsVisibleLifecycleWithoutStartingAnAdapter",
+    "state": "passed",
+    "seconds": 0.484
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "asynchronousOpenInstallsTheLoadedBuffer",
+    "state": "passed",
+    "seconds": 0.726
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "productionReviewRequiresExplicitApplyAndRetainsUnsavedEditorChanges",
+    "state": "passed",
+    "seconds": 2.369
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "startupAcceptsAFolderAndMultipleFiles",
+    "state": "passed",
+    "seconds": 0.756
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "workbenchControlsKeepTheirStyleAndKeyboardBehaviorAcrossThemeAndZoomChanges",
+    "state": "passed",
+    "seconds": 1.552
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "panelTaskCompletionAndCancellationPreserveTheEditingDocument",
+    "state": "passed",
+    "seconds": 1.886
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "toolLayoutRetainsManualSizeAndRestoresDetachedPlacementFromSession",
+    "state": "passed",
+    "seconds": 2.673
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "configuredLandingSourceDoesNotCreateAStartupFile",
+    "state": "passed",
+    "seconds": 0.292
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "themeGallerySavesAndRefreshesForLightThemes",
+    "state": "passed",
+    "seconds": 0.837
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "documentNavigationRetainsFocusAndToolRefreshDoesNotTakeIt",
+    "state": "passed",
+    "seconds": 0.965
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "bufferPickerResolvesCapturedIdentityAfterLiveListReordering",
+    "state": "passed",
+    "seconds": 0.931
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "importedWorkspaceSearchExclusionsFilterWorkspaceSearch",
+    "state": "passed",
+    "seconds": 0.779
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "paletteAcceptsLatestQueryAndCanDismissFromResultsFocus",
+    "state": "passed",
+    "seconds": 0.679
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "openEditWriteRoundTrip",
+    "state": "passed",
+    "seconds": 0.599
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "markdownPreviewUsesNativeSplitAndRefreshesFromSourceBuffer",
+    "state": "passed",
+    "seconds": 0.365
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "startupFolderCreatesAnActiveWorkspaceAndExplorer",
+    "state": "passed",
+    "seconds": 0.358
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "localTaskDependenciesRunInDeclaredOrderAsOneJob",
+    "state": "passed",
+    "seconds": 0.485
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "workspaceIndexControlsPersistOnlyExplicitPreference",
+    "state": "passed",
+    "seconds": 0.593
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "debugBreakpointCommandsConfigureTheActiveSourceBreakpoint",
+    "state": "passed",
+    "seconds": 0.644
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "repeatedCompletionUpdatesReuseOneOverlayInsideTheEditor",
+    "state": "passed",
+    "seconds": 0.373
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "quickOpenNavigatesToLocationAndRecentPickerPreservesTheSourceOnCancel",
+    "state": "passed",
+    "seconds": 0.938
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "explicitVscodeDefaultBuildTaskRunsWhenNoNamedBuildTaskExists",
+    "state": "passed",
+    "seconds": 0.448
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "documentOperationsRejectSupersededAndClosedPaneLoads",
+    "state": "passed",
+    "seconds": 0.382
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "gitStatusAndBranchesOpenWindowsWithoutReplacingTheDocument",
+    "state": "passed",
+    "seconds": 0.739
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "searchPanelRetainsSourceSharesOptionsAndOpensLocations",
+    "state": "passed",
+    "seconds": 0.743
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "importedCodeWorkspaceCanRunItsAcceptedTaskBeforeItsAcceptedLaunchProfile",
+    "state": "passed",
+    "seconds": 1.468
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "terminalProfilesReportActiveRemoteExecutionSession",
+    "state": "passed",
+    "seconds": 0.41
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "helpOpensSearchableWindowWithoutReplacingTheEditorBuffer",
+    "state": "passed",
+    "seconds": 0.568
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "quickfixJumpOpensTargetAndMovesCaret",
+    "state": "passed",
+    "seconds": 0.539
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "terminalOpenExitRemovesDirectPtyPane",
+    "state": "passed",
+    "seconds": 2.411
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "lspStatusSmokeForUnconfiguredFile",
+    "state": "passed",
+    "seconds": 0.358
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "uiZoomScalesTheFooterAndSettingsDialog",
+    "state": "passed",
+    "seconds": 2.675
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "connectedDevContainerRoutesNormalTaskDryRunsWithoutStartingAnotherCliProcess",
+    "state": "passed",
+    "seconds": 0.268
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "terminalInputSurfaceTransfersFocusWithoutDuplicatingOwnership",
+    "state": "passed",
+    "seconds": 0.572
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "perfReportsEditorInputThroughSwingPaint",
+    "state": "passed",
+    "seconds": 0.531
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "testDebugCanUseAnExplicitImportedVsCodeProfileWithTestPlaceholders",
+    "state": "passed",
+    "seconds": 5.344
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "replacePanelInvalidatesPendingPreviewsAndGuardsDirtyDocuments",
+    "state": "passed",
+    "seconds": 2.024
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "debugInstructionBreakpointCommandsPersistOpaqueLocations",
+    "state": "passed",
+    "seconds": 2.42
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "externalReloadUpdatesUnmodifiedBuffer",
+    "state": "passed",
+    "seconds": 1.128
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "paletteInformationAndMarkdownOutlineOpenWindowsWithoutReplacingTheDocument",
+    "state": "passed",
+    "seconds": 1.94
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "editorContextMenuOffersEditingActionsAndRespectsReadOnlyBuffers",
+    "state": "passed",
+    "seconds": 1.69
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "openingAFileDoesNotWaitForLanguageServerInitialization",
+    "state": "passed",
+    "seconds": 2.879
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "editorAndExplorerRefreshWhenTheThemeChanges",
+    "state": "passed",
+    "seconds": 1.266
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "splitCloseFocusPreservesActiveBuffer",
+    "state": "passed",
+    "seconds": 1.745
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "debugFunctionBreakpointCommandsPersistNamedBreakpointOptions",
+    "state": "passed",
+    "seconds": 1.739
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "conflictSaveAsPreservesExternalVersion",
+    "state": "passed",
+    "seconds": 1.094
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "startupRestoresThePreviousWindowSizeAndPosition",
+    "state": "passed",
+    "seconds": 1.691
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "bufferSwitchRestoresSelectionAndViewportWithoutLosingEdits",
+    "state": "passed",
+    "seconds": 0.349
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "commandLineFileLoadsAfterTheWindowIsShown",
+    "state": "passed",
+    "seconds": 0.465
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "notebookPanelSaveWritesOnBackgroundJob",
+    "state": "passed",
+    "seconds": 0.714
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "importedWorkspaceFileExclusionsApplyToExplorerOnly",
+    "state": "passed",
+    "seconds": 0.44
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "debugPreLaunchTaskRunsBeforeAnAdapterProcessIsOpened",
+    "state": "passed",
+    "seconds": 3.039
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "ordinarySavePreservesUndoHistory",
+    "state": "passed",
+    "seconds": 0.673
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "selectingToolTabsGrowsTheDefaultDockButPreservesManualSizing",
+    "state": "passed",
+    "seconds": 1.0
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "customActionsWorkInEachProfileWithoutInterceptingOtherFieldsOrComposition",
+    "state": "passed",
+    "seconds": 0.617
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "settingsDialogUsesTheActiveShedPalette",
+    "state": "passed",
+    "seconds": 2.629
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "vimLineMotionRetainsCaretAndCurrentLineHighlightAcrossLargeBuffer",
+    "state": "passed",
+    "seconds": 1.028
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "paletteDisposesResourcesWhenPreviewSetupFails",
+    "state": "passed",
+    "seconds": 1.301
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "settingsDialogReadsAndPersistsThroughApplicationBoundary",
+    "state": "passed",
+    "seconds": 2.574
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "legacyLandingFileDoesNotReplaceEmptyStartupBuffer",
+    "state": "passed",
+    "seconds": 0.149
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "activeRemoteSessionRoutesNormalTaskDryRunsWithoutStartingAProcess",
+    "state": "passed",
+    "seconds": 0.204
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "editorScrollbarsFollowTheRuntimeVisibilitySetting",
+    "state": "passed",
+    "seconds": 0.252
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "workbenchNavigationUsesRealDocumentsAndKeepsActionsReachableAtEnlargedScale",
+    "state": "passed",
+    "seconds": 0.335
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "openEditorsShowDirtyStatePreserveViewsAndCloseSafelyAcrossSplits",
+    "state": "passed",
+    "seconds": 0.331
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "toolsPreserveTestTreeAndSortedProblemSelectionOnBackgroundRefresh",
+    "state": "passed",
+    "seconds": 0.496
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "globalUiZoomShortcutUpdatesTheVisibleInterfaceAndPersistsTheSetting",
+    "state": "passed",
+    "seconds": 0.532
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "inlineRegexReplacementSupportsGroupsAndSingleUndo",
+    "state": "passed",
+    "seconds": 0.44
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "remoteForwardListIsExplicitAndProcessFree",
+    "state": "passed",
+    "seconds": 0.4
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "cmakePresetDryRunsUseDirectArgumentsWithoutReadingWorkspaceTasks",
+    "state": "passed",
+    "seconds": 0.445
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "stagedStartupKeepsTypingWhenFullUiAppears",
+    "state": "passed",
+    "seconds": 0.201
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "navigationHistoryReturnsAcrossDocumentsAndBranchesAfterNewJumps",
+    "state": "passed",
+    "seconds": 0.233
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "discardCurrentBufferClosesTheActiveBufferWithoutSaving",
+    "state": "passed",
+    "seconds": 0.234
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "managedLspCommandsExposeInertStatusAndManualRemediation",
+    "state": "passed",
+    "seconds": 1.44
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "explorerFileDropOpensTheFileInASplitWithoutReplacingTheTargetPane",
+    "state": "passed",
+    "seconds": 0.418
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "vimMacroUppercaseRegisterAppendsToItsLowercaseMacro",
+    "state": "passed",
+    "seconds": 0.235
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "gitHistoryAndStandardSwingSurfacesFollowThemeChanges",
+    "state": "passed",
+    "seconds": 0.316
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "vimCountPrefixMovesSixHundredLines",
+    "state": "passed",
+    "seconds": 0.269
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "quitCommandsCloseOnlyTheActiveEditorWindow",
+    "state": "passed",
+    "seconds": 0.245
+  },
+  {
+    "class": "shed.TexteditorSwingIntegrationTest",
+    "test": "desktopMenusAndPositionCueAreVisible",
+    "state": "passed",
+    "seconds": 0.146
+  }
+]

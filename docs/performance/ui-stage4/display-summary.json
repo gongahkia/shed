@@ -1,0 +1,13 @@
+{
+  "tests": 92,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 1,
+  "skips": [
+    {
+      "test": "testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree",
+      "reason": "org.opentest4j.TestAbortedException: Assumption failed: CMake, CTest, and CPack are unavailable"
+    }
+  ],
+  "observation": "Completed fresh Surefire XML; original process handle unavailable after tool refresh; no failure output or live Maven process."
+}

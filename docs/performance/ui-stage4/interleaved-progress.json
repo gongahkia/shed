@@ -1,0 +1,103 @@
+{
+  "order": [
+    "baseline",
+    "final",
+    "final",
+    "baseline",
+    "baseline",
+    "final",
+    "final",
+    "baseline",
+    "baseline",
+    "final"
+  ],
+  "completed": 1,
+  "runs": {
+    "baseline": [
+      {
+        "window_ms": 7732.8466796875,
+        "source_ready_ms": 8924.8466796875,
+        "startup_ms": 55961.8466796875,
+        "rss_mib": 362.953125,
+        "heap_used_mib": 31.9090576171875,
+        "heap_committed_mib": 64.0,
+        "edit_paint_ms": [
+          16.7336,
+          8.643986,
+          16.677799,
+          9.832589,
+          9.02011,
+          7.237896,
+          6.967365,
+          6.921758,
+          8.93726,
+          6.861272,
+          13.30771,
+          16.071475,
+          12.753017,
+          6.697539,
+          6.790238,
+          11.260945,
+          7.975761,
+          8.209754,
+          5.511842,
+          4.823029,
+          5.780287,
+          6.762527,
+          18.781198,
+          46.479324,
+          14.227351
+        ],
+        "picker_ms": [
+          141.439077,
+          111.722597,
+          142.278652,
+          131.558088,
+          145.363655,
+          168.770984,
+          144.930656,
+          100.377068,
+          151.104541,
+          174.731985,
+          141.00386,
+          197.003645,
+          194.8409,
+          227.523968,
+          115.984603,
+          180.43621,
+          188.179347,
+          177.865513,
+          254.867358,
+          159.588761,
+          166.630457,
+          262.655905,
+          163.105985,
+          182.326038,
+          234.253732
+        ],
+        "perf": "Perf\n========================================\n\nstatus.render count=174 last=2853us avg=3284us p95=7278us max=32359us lines=20001\nstartup.window-visible count=1 last=1919451us avg=1919451us p95=1919451us max=1919451us constructor to visible\nstartup.editor-usable count=1 last=1919487us avg=1919487us p95=1919487us max=1919487us initial editor buffer visible\nsymbol.cache count=3 last=425228us avg=540391us p95=1195176us max=1195176us chars=1380000 lines=20001\nsyntax.paint count=159 last=235us avg=2039us p95=6141us max=97931us spans=153\nlsp.semantic.paint count=159 last=1us avg=4us p95=16us max=48us spans=0\ndiagnostic.paint count=159 last=14us avg=20us p95=24us max=1176us ranges=0\nfile.open.load count=1 last=881201us avg=881201us p95=881201us max=881201us bytes=1380000\nsyntax.highlight count=12 last=5005us avg=6763us p95=19415us max=19415us scanChars=10556 totalChars=1380000\nfile.open.install count=1 last=254173us avg=254173us p95=254173us max=254173us chars=1380000\nstartup.files-installed count=1 last=3089737us avg=3089737us p95=3089737us max=3089737us files=1\ngit.blame count=153 last=97656us avg=143367us p95=342109us max=601541us line=1\nstartup.full-ui-ready count=1 last=49830364us avg=49830364us p95=49830364us max=49830364us menu and footer attached\ndiff.gutter.incremental count=70 last=207us avg=295us p95=763us max=1022us fixture.txt\ncompletion.input-to-paint count=1 last=286530us avg=286530us p95=286530us max=286530us first suggestion paint\nrecovery.journal.write count=1 last=823391us avg=823391us p95=823391us max=823391us entries=1\n\nSlow edits (at least 16ms, newest first):\nnone\n",
+        "open_buffers": 1,
+        "language_servers": 0,
+        "java": "21.0.12.1+1-LTS",
+        "os": "Mac OS X 15.7.7 x86_64"
+      }
+    ],
+    "final": []
+  },
+  "commands": [
+    {
+      "variant": "baseline",
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+        "-Xms64m",
+        "-Xmx512m",
+        "-Djava.awt.headless=false",
+        "-Duser.home=/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-interleaved-vrwl9elz/home-0",
+        "-cp",
+        "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-interleaved-vrwl9elz/baseline:/tmp/shed-ui-stage4-baseline/shed-2.0.0.jar",
+        "shed.EditorWorkflowProbe",
+        "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-interleaved-vrwl9elz/fixture.txt"
+      ]
+    }
+  ]
+}

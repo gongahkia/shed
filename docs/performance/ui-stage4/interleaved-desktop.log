@@ -1,0 +1,9 @@
+START 1 baseline
+DONE 1 baseline startup 55962
+START 2 final
+Traceback (most recent call last):
+  File "/tmp/shed-ui-stage4-typography/interleaved-desktop.py", line 41, in <module>
+    line=lines.get(timeout=120)
+  File "/usr/local/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/queue.py", line 209, in get
+    raise Empty
+_queue.Empty

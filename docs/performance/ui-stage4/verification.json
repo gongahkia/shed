@@ -1,0 +1,213 @@
+{
+  "source_revision": "0fa173c53777a201b2f1c2ca2e9dbe0c5c0c7ab5",
+  "headless_command": "JAVA_HOME=<Java 21 home> <resolved Maven> -B -q -Djava.awt.headless=true package",
+  "headless_exit_code": 0,
+  "display_command": "JAVA_HOME=<Java 21 home> <resolved Maven> -B -q -Djava.awt.headless=false -Dtest=TexteditorSwingIntegrationTest test",
+  "display_exit_code": null,
+  "display_observation": "Fresh completed Surefire XML proves 92 results; original process handle was unavailable after tool refresh.",
+  "visual_checks": [
+    {
+      "check": "journeys",
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+        "-Dshed.journey.nativeInput=false",
+        "-cp",
+        "/tmp/shed-ui-stage4-typography/probe-classes:/tmp/shed-ui-stage4-typography/shed.jar",
+        "shed.WorkbenchJourneyProbe",
+        "/tmp/shed-ui-stage4-typography/journeys"
+      ],
+      "exit_code": 0
+    },
+    {
+      "check": "gallery",
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+        "-cp",
+        "/tmp/shed-ui-stage4-typography/probe-classes:/tmp/shed-ui-stage4-typography/shed.jar",
+        "shed.InterfaceGalleryProbe",
+        "/tmp/shed-ui-stage4-typography/gallery"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "performance_steps": [
+    {
+      "name": "baseline-editing",
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+        "-Xms64m",
+        "-Xmx512m",
+        "-cp",
+        "/tmp/shed-ui-stage4-baseline/shed-2.0.0.jar",
+        "shed.EditorResponsivenessBenchmark"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.955514907836914
+    },
+    {
+      "name": "final-editing",
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+        "-Xms64m",
+        "-Xmx512m",
+        "-cp",
+        "/tmp/shed-ui-stage4-typography/shed.jar",
+        "shed.EditorResponsivenessBenchmark"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.53994607925415
+    },
+    {
+      "name": "baseline-paged",
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+        "-Xms64m",
+        "-Xmx512m",
+        "-cp",
+        "/tmp/shed-ui-stage4-baseline/shed-2.0.0.jar",
+        "shed.LargeFileBenchmark",
+        "--iterations",
+        "3",
+        "/tmp/shed-ui-stage4-baseline/paged-fixture.txt"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.196102857589722
+    },
+    {
+      "name": "final-paged",
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+        "-Xms64m",
+        "-Xmx512m",
+        "-cp",
+        "/tmp/shed-ui-stage4-typography/shed.jar",
+        "shed.LargeFileBenchmark",
+        "--iterations",
+        "3",
+        "/tmp/shed-ui-stage4-baseline/paged-fixture.txt"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.509563207626343
+    },
+    {
+      "name": "baseline-desktop",
+      "command": [
+        "python3",
+        "/Users/gabrielongtemasek/Desktop/personal/shed/scripts/benchmark-editor.py",
+        "--jar",
+        "/tmp/shed-ui-stage4-baseline/shed-2.0.0.jar",
+        "--label",
+        "ui-stage4-baseline-paired",
+        "--runs",
+        "5",
+        "--output",
+        "/tmp/shed-ui-stage4-typography/baseline-desktop.json"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 83.25486397743225
+    },
+    {
+      "name": "final-desktop",
+      "command": [
+        "python3",
+        "/Users/gabrielongtemasek/Desktop/personal/shed/scripts/benchmark-editor.py",
+        "--jar",
+        "/tmp/shed-ui-stage4-typography/shed.jar",
+        "--label",
+        "ui-stage4-final-paired",
+        "--runs",
+        "5",
+        "--output",
+        "/tmp/shed-ui-stage4-typography/final-desktop.json"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 130.45069003105164
+    }
+  ],
+  "readme_unchanged_since_foundation": true,
+  "byte_identical_approval_classes": [
+    "shed/AgentPolicy$Capability.class",
+    "shed/AgentPolicy.class",
+    "shed/WorkspaceProposalService$Effect.class",
+    "shed/WorkspaceProposalService$Input.class",
+    "shed/WorkspaceProposalService$Kind.class",
+    "shed/WorkspaceProposalService$Page.class",
+    "shed/WorkspaceProposalService$Preview.class",
+    "shed/WorkspaceProposalService$ReviewState.class",
+    "shed/WorkspaceProposalService.class"
+  ],
+  "changed_approval_classes": [],
+  "artifacts_outside_clean": "/tmp/shed-ui-stage4-typography",
+  "jar_sha256": {
+    "baseline": "c051395ad94d4aa1cbfcc39ddf79b22700091853701e163a9696d5f97fa4d9b1",
+    "final": "bd2243bb1ce36715de9677c461a7b54f95cf96f5cbdea58a867a88684d14e20c"
+  },
+  "performance_followup": [
+    {
+      "name": "picker-isolation",
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+        "-Xms64m",
+        "-Xmx512m",
+        "src/benchmark/java/shed/PickerComparisonProbe.java",
+        "/tmp/shed-ui-stage4-baseline/shed-2.0.0.jar",
+        "/tmp/shed-ui-stage4-typography/shed.jar"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.590642213821411
+    },
+    {
+      "name": "baseline-control-desktop",
+      "command": [
+        "python3",
+        "scripts/benchmark-editor.py",
+        "--jar",
+        "/tmp/shed-ui-stage4-baseline/shed-2.0.0.jar",
+        "--label",
+        "ui-stage4-baseline-control",
+        "--runs",
+        "5",
+        "--output",
+        "/tmp/shed-ui-stage4-typography/baseline-control-desktop.json"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 99.56339025497437
+    },
+    {
+      "name": "final-repeat-desktop",
+      "command": [
+        "python3",
+        "scripts/benchmark-editor.py",
+        "--jar",
+        "/tmp/shed-ui-stage4-typography/shed.jar",
+        "--label",
+        "ui-stage4-final-repeat",
+        "--runs",
+        "5",
+        "--output",
+        "/tmp/shed-ui-stage4-typography/final-repeat-desktop.json"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 114.89529538154602
+    }
+  ],
+  "desktop_performance_gate": {
+    "state": "unverified",
+    "reason": "Desktop budget misses and unstable host load; counterbalanced unchanged-workload attempt timed out.",
+    "host_snapshot": "14:49  up 9 days,  3:01, 2 users, load averages: 48.49 166.31 134.66",
+    "logical_cpus": 8,
+    "original_misses_retained": true,
+    "thresholds_changed": false,
+    "counterbalanced_failure_observation": {
+      "observed_local": "2026-11-13 14:46 Asia/Singapore",
+      "load_averages": [
+        397.63,
+        273.57,
+        150.87
+      ],
+      "completed_processes": 1,
+      "intended_processes": 10,
+      "failure": "Output queue timed out after 120 seconds during the second process; no complete counterbalanced aggregate was produced."
+    }
+  }
+}

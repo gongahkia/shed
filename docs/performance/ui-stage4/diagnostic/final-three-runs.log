@@ -1,0 +1,54 @@
+diagnostic-final-three-runs: run 1/3, startup 18115 ms
+diagnostic-final-three-runs: run 2/3, startup 21047 ms
+diagnostic-final-three-runs: run 3/3, startup 9319 ms
+{
+  "window_ms": {
+    "p50": 2271.739013671875,
+    "p95": 3261.9150390625,
+    "budget": 2000,
+    "pass": false,
+    "samples": 3
+  },
+  "source_ready_ms": {
+    "p50": 3288.739013671875,
+    "p95": 4186.9150390625,
+    "budget": 3000,
+    "pass": false,
+    "samples": 3
+  },
+  "startup_ms": {
+    "p50": 18114.9150390625,
+    "p95": 21046.739013671875,
+    "budget": 10000,
+    "pass": false,
+    "samples": 3
+  },
+  "edit_paint_ms": {
+    "p50": 5.030093,
+    "p95": 13.732864,
+    "budget": 16,
+    "pass": true,
+    "samples": 75
+  },
+  "picker_ms": {
+    "p50": 27.935679,
+    "p95": 34.287664,
+    "budget": 50,
+    "pass": true,
+    "samples": 75
+  },
+  "heap_used_mib": {
+    "p50": 48.8314208984375,
+    "p95": 51.89873504638672,
+    "budget": 384,
+    "pass": true,
+    "samples": 3
+  },
+  "rss_mib": {
+    "p50": 412.82421875,
+    "p95": 439.25390625,
+    "budget": 768,
+    "pass": true,
+    "samples": 3
+  }
+}

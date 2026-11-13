@@ -1,0 +1,104 @@
+{
+  "artifacts": {
+    "baseline": "c051395ad94d4aa1cbfcc39ddf79b22700091853701e163a9696d5f97fa4d9b1",
+    "final": "bd2243bb1ce36715de9677c461a7b54f95cf96f5cbdea58a867a88684d14e20c"
+  },
+  "fixture": {
+    "bytes": 104857600,
+    "sha256": "c96a64d76b9b5f17714f2e282a7275747eaee36748fafa10ff515bb6455e626e"
+  },
+  "steps": [
+    {
+      "name": "baseline-editing",
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+        "-Xms64m",
+        "-Xmx512m",
+        "-cp",
+        "/tmp/shed-ui-stage4-baseline/shed-2.0.0.jar",
+        "shed.EditorResponsivenessBenchmark"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.955514907836914
+    },
+    {
+      "name": "final-editing",
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+        "-Xms64m",
+        "-Xmx512m",
+        "-cp",
+        "/tmp/shed-ui-stage4-typography/shed.jar",
+        "shed.EditorResponsivenessBenchmark"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.53994607925415
+    },
+    {
+      "name": "baseline-paged",
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+        "-Xms64m",
+        "-Xmx512m",
+        "-cp",
+        "/tmp/shed-ui-stage4-baseline/shed-2.0.0.jar",
+        "shed.LargeFileBenchmark",
+        "--iterations",
+        "3",
+        "/tmp/shed-ui-stage4-baseline/paged-fixture.txt"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.196102857589722
+    },
+    {
+      "name": "final-paged",
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+        "-Xms64m",
+        "-Xmx512m",
+        "-cp",
+        "/tmp/shed-ui-stage4-typography/shed.jar",
+        "shed.LargeFileBenchmark",
+        "--iterations",
+        "3",
+        "/tmp/shed-ui-stage4-baseline/paged-fixture.txt"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.509563207626343
+    },
+    {
+      "name": "baseline-desktop",
+      "command": [
+        "python3",
+        "/Users/gabrielongtemasek/Desktop/personal/shed/scripts/benchmark-editor.py",
+        "--jar",
+        "/tmp/shed-ui-stage4-baseline/shed-2.0.0.jar",
+        "--label",
+        "ui-stage4-baseline-paired",
+        "--runs",
+        "5",
+        "--output",
+        "/tmp/shed-ui-stage4-typography/baseline-desktop.json"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 83.25486397743225
+    },
+    {
+      "name": "final-desktop",
+      "command": [
+        "python3",
+        "/Users/gabrielongtemasek/Desktop/personal/shed/scripts/benchmark-editor.py",
+        "--jar",
+        "/tmp/shed-ui-stage4-typography/shed.jar",
+        "--label",
+        "ui-stage4-final-paired",
+        "--runs",
+        "5",
+        "--output",
+        "/tmp/shed-ui-stage4-typography/final-desktop.json"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 130.45069003105164
+    }
+  ]
+}

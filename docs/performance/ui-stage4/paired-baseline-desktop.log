@@ -1,0 +1,56 @@
+ui-stage4-baseline-paired: run 1/5, startup 13579 ms
+ui-stage4-baseline-paired: run 2/5, startup 6491 ms
+ui-stage4-baseline-paired: run 3/5, startup 9396 ms
+ui-stage4-baseline-paired: run 4/5, startup 10433 ms
+ui-stage4-baseline-paired: run 5/5, startup 20109 ms
+{
+  "window_ms": {
+    "p50": 2113.21533203125,
+    "p95": 4615.263916015625,
+    "budget": 2000,
+    "pass": false,
+    "samples": 5
+  },
+  "source_ready_ms": {
+    "p50": 2703.21533203125,
+    "p95": 6417.263916015625,
+    "budget": 3000,
+    "pass": false,
+    "samples": 5
+  },
+  "startup_ms": {
+    "p50": 10433.487060546875,
+    "p95": 20109.263916015625,
+    "budget": 10000,
+    "pass": false,
+    "samples": 5
+  },
+  "edit_paint_ms": {
+    "p50": 3.297431,
+    "p95": 5.531449,
+    "budget": 16,
+    "pass": true,
+    "samples": 125
+  },
+  "picker_ms": {
+    "p50": 21.013819,
+    "p95": 38.908469,
+    "budget": 50,
+    "pass": true,
+    "samples": 125
+  },
+  "heap_used_mib": {
+    "p50": 52.160301208496094,
+    "p95": 53.8807373046875,
+    "budget": 384,
+    "pass": true,
+    "samples": 5
+  },
+  "rss_mib": {
+    "p50": 472.90234375,
+    "p95": 487.6953125,
+    "budget": 768,
+    "pass": true,
+    "samples": 5
+  }
+}

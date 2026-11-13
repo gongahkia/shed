@@ -1,0 +1,49 @@
+[
+  {
+    "name": "picker-isolation",
+    "command": [
+      "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+      "-Xms64m",
+      "-Xmx512m",
+      "src/benchmark/java/shed/PickerComparisonProbe.java",
+      "/tmp/shed-ui-stage4-baseline/shed-2.0.0.jar",
+      "/tmp/shed-ui-stage4-typography/shed.jar"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.590642213821411
+  },
+  {
+    "name": "baseline-control-desktop",
+    "command": [
+      "python3",
+      "scripts/benchmark-editor.py",
+      "--jar",
+      "/tmp/shed-ui-stage4-baseline/shed-2.0.0.jar",
+      "--label",
+      "ui-stage4-baseline-control",
+      "--runs",
+      "5",
+      "--output",
+      "/tmp/shed-ui-stage4-typography/baseline-control-desktop.json"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 99.56339025497437
+  },
+  {
+    "name": "final-repeat-desktop",
+    "command": [
+      "python3",
+      "scripts/benchmark-editor.py",
+      "--jar",
+      "/tmp/shed-ui-stage4-typography/shed.jar",
+      "--label",
+      "ui-stage4-final-repeat",
+      "--runs",
+      "5",
+      "--output",
+      "/tmp/shed-ui-stage4-typography/final-repeat-desktop.json"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 114.89529538154602
+  }
+]

@@ -1,0 +1,25 @@
+[
+  {
+    "check": "journeys",
+    "command": [
+      "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+      "-Dshed.journey.nativeInput=false",
+      "-cp",
+      "/tmp/shed-ui-stage4-typography/probe-classes:/tmp/shed-ui-stage4-typography/shed.jar",
+      "shed.WorkbenchJourneyProbe",
+      "/tmp/shed-ui-stage4-typography/journeys"
+    ],
+    "exit_code": 0
+  },
+  {
+    "check": "gallery",
+    "command": [
+      "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+      "-cp",
+      "/tmp/shed-ui-stage4-typography/probe-classes:/tmp/shed-ui-stage4-typography/shed.jar",
+      "shed.InterfaceGalleryProbe",
+      "/tmp/shed-ui-stage4-typography/gallery"
+    ],
+    "exit_code": 0
+  }
+]

@@ -1,0 +1,36 @@
+[
+  {
+    "name": "baseline-three-runs",
+    "command": [
+      "python3",
+      "/tmp/shed-ui-stage4-typography/diagnostic/benchmark-diagnostic.py",
+      "--jar",
+      "/tmp/shed-ui-stage4-baseline/shed-2.0.0.jar",
+      "--label",
+      "diagnostic-baseline-three-runs",
+      "--runs",
+      "3",
+      "--output",
+      "/tmp/shed-ui-stage4-typography/diagnostic/baseline-three-runs.json"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 45.415826082229614
+  },
+  {
+    "name": "final-three-runs",
+    "command": [
+      "python3",
+      "/tmp/shed-ui-stage4-typography/diagnostic/benchmark-diagnostic.py",
+      "--jar",
+      "/tmp/shed-ui-stage4-typography/shed.jar",
+      "--label",
+      "diagnostic-final-three-runs",
+      "--runs",
+      "3",
+      "--output",
+      "/tmp/shed-ui-stage4-typography/diagnostic/final-three-runs.json"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 72.81955814361572
+  }
+]

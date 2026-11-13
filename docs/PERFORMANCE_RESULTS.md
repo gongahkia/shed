@@ -1,5 +1,11 @@
 # Recorded performance
 
+## Production UI modernization: current verification status
+
+The current Swing redesign is functionally verified, but its desktop performance gate remains open. The unchanged 500,000-line model and three-iteration 100 MiB paged-file checks pass for both preserved artifacts. Desktop startup targets miss in both revisions; additional edit/ranking tails vary across controls, and a counterbalanced attempt timed out while host load was far above the eight-logical-CPU capacity. These results are not a clean performance pass or a demonstrated speedup.
+
+[Current paired results, controls, diagnosis and limitations](UI_MODERNIZATION.md) and [raw verification/commands](performance/ui-stage4/verification.json) preserve the original failures separately from historical measurements below. The final production artifact is `bd2243bb1ce36715de9677c461a7b54f95cf96f5cbdea58a867a88684d14e20c`; the baseline is `c051395ad94d4aa1cbfcc39ddf79b22700091853701e163a9696d5f97fa4d9b1`. Definitions and thresholds were retained. Resume desktop performance attribution on a stable host before declaring this stage complete.
+
 The measurements establish a reproducible baseline and expose missed targets. **They do not establish an overall editor speed improvement.** The isolated, alternating ranker comparison does show lower CPU and wall time for the allocation reduction; desktop startup and latency percentiles still miss their targets on this host.
 
 ## Method and artifacts

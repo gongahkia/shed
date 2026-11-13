@@ -1,6 +1,8 @@
 # UI modernization
 
-Current stage: production workbench redesign using Swing (stage four, in progress). Earlier application-boundary work and its separate revalidation remain below as historical evidence. The current implementation/verification ledger is in the stage-four section; earlier passing results do not certify that broader stage.
+Series constraint: do not edit `README.md`; keep modernization handoffs under `docs/`.
+
+Current stage: production Swing redesign (stage four). Implementation and local functional/visual checks are complete; the desktop performance gate remains open. Earlier stages and their measurements remain below as historical evidence, separately from this checkout’s results.
 
 ## Scope and baseline
 
@@ -288,7 +290,7 @@ Considered and rejected: **FlatLaf** (no demonstrated limitation in the existing
 
 ## Reproduction and platform constraints
 
-Use the [experiment README](../experiments/ui-comparison/README.md) for exact build, launch, capture, keyboard, comparison and package commands. Build Swing with Java 21 `javac`/`jar` and the existing release JAR. Compose uses an isolated checksum-pinned Gradle 8.14.3 bootstrap, Kotlin/compiler plugin 2.3.20 and Compose 1.12.2; the ordinary Maven build does not resolve or include them. Both measured processes run compiled release JARs with the same plain Java invocation and 64–512 MiB heap, without a debugger, Gradle launcher or development reload tooling.
+For historical reproduction, the [experiment archive](../experiments/ui-comparison/README.md) identifies the original source revision and artifact; use the commands from that revision. Current production commands are recorded in stage four below. Build Swing with Java 21 `javac`/`jar` and the existing release JAR. Compose uses an isolated checksum-pinned Gradle 8.14.3 bootstrap, Kotlin/compiler plugin 2.3.20 and Compose 1.12.2; the ordinary Maven build does not resolve or include them. Both measured processes run compiled release JARs with the same plain Java invocation and 64–512 MiB heap, without a debugger, Gradle launcher or development reload tooling.
 
 Official [Compose compatibility documentation](https://kotlinlang.org/docs/multiplatform/compose-compatibility-and-versioning.html) currently lists ARM64 macOS, while the evaluated Intel macOS 15.7.7 host could resolve and run the published `skiko-awt-runtime-macos-x64` artifact. **Observed x64 execution is not a supported-platform guarantee.** JDK 21 satisfies the documented runtime/packaging requirements. The [Swing interoperability guide](https://kotlinlang.org/docs/multiplatform/compose-desktop-swing-interoperability.html) documents panel-contained Compose popups and experimental alternatives for layering/offscreen rendering, with potential performance costs. Those constraints remain migration work.
 
@@ -363,9 +365,9 @@ Carry forward the **Swing design and the application ports**, with incremental p
 
 Remaining coupling includes Texteditor's owner-oriented composition, global config/theme application, source key routing, native dialog preparation, pane attachment, syntax/LSP overlays and specialized tool/editor surfaces identified in stage two. The experiment demonstrates that these selected workbench views can consume the boundary; it does not prove that a full frontend replacement is now routine. No production rollout, global restyling, frontend framework migration or new extension system belongs to this completed comparison stage.
 
-# Stage 4 — production workbench redesign (in progress)
+# Stage 4 — production workbench redesign
 
-The selected production approach is **Swing with the existing WorkbenchStyle, WorkbenchIcons, UiZoom and Java application boundaries**. No new framework selection is being conducted. This stage is broader than the prototype: it is incomplete until the complete workbench, listed journeys, visual review and performance checks below are verified. Earlier stage-one/two source changes and stage-three evidence were present and retained at the start.
+**Functional implementation and local visual verification are complete. Desktop performance verification remains open.** The production approach is Swing with WorkbenchStyle, WorkbenchIcons, UiZoom and the Java application boundaries selected by stage three. The editor, Java 21/Maven launch paths, configuration formats and approval policy are retained. No further framework selection or next-stage implementation has begun. `README.md` is outside the editing scope.
 
 ## Fresh baseline
 
@@ -375,7 +377,7 @@ Fresh measurements against this preserved JAR passed all existing budgets on thi
 
 The original gallery returned 1 after eight captures because its enum/string comparison expected `AGENT` while the actual tab is `Agents`. Correcting that one title mapping, retaining the visibility/selection assertions, produced **30 baseline captures with zero control-bounds failures** against the unchanged starting JAR. Both original failure and corrected evidence are retained in `/tmp/shed-ui-stage4-baseline`. This was a verifier mismatch, not proof that the production Agents tool was invisible.
 
-## Implementation and ownership so far
+## Implementation and ownership
 
 - `WorkbenchHeader` adds a workspace-root chooser, active-document path context, focus/pane cue, and explicit File/Commands/Splits/Tools/Settings actions around the existing editing surface. Folder changes use WorkspaceFoldersApplication; document/split operations use DocumentWorkspace. Legacy owner-aware operations remain at composition. Metadata refresh reuses the existing status update; there is no new polling timer or text snapshot. The focus listener is removed when the owning window closes. Saved tab visibility and focus-mode preferences remain independent of navigation.
 - `DocumentLabels` provides deterministic, shortest distinguishing parent suffixes for duplicate filenames. Full paths remain in tooltips/accessibility text. Document cells have bounded width and font-aware height. Switching a document from keyboard navigation retains focus until Enter explicitly returns to editing; dirty-close decisions still revalidate current application metadata.
@@ -389,30 +391,105 @@ The original gallery returned 1 after eight captures because its enum/string com
 - Review adds explicit pending/working/dirty/applied/recovery state, keeps proposal-wide Apply and Reject in a full-width footer, and scrolls nonwrapping secondary actions. A compact workspace/proposer/document summary stays visible; full metadata is in Details and the review tabs scroll rather than wrap. The 760-pixel/150% production check caught and corrected clipping from the earlier document-column action row. Opening review still does not apply a proposal. The production test checks explicit Apply to an open buffer remains unsaved on disk and explicit Undo restores it.
 - Docked size and selected tool are saved as optional Session V2 data. Detached placement is restored per workspace/owner; returning a panel records DOCKED while retaining its last floating geometry. Lifecycle callbacks bind to their original placement model, and restoration snapshots desired placement before reattaching existing windows. Closing the workbench disposes floating windows and closes tool surfaces. Active split borders/accessibility cues reuse the existing panes; specialized content and undo ownership are unchanged.
 
-Focused verification so far: the 33-test native-display selection passes (9 TexteditorSwingIntegrationTest cases plus AgentReviewPanel/ToolOutput/placement/application-boundary tests). It covers actual task failure/cancellation without losing the source document, unchanged-tree and sorted-diagnostic selection, saved/manual dock sizes and detached-session restoration, normal proposal Apply/Undo, settings invalid-draft/reset behavior, and existing split/search/focus/zoom checks. The first production gallery against an intermediate JAR passed 30 captures and every narrow-tool bounds check. A production journey probe is being completed; its native-key attempt is under investigation and is not counted as a passing native-input journey.
 
-A later candidate gallery exposed ten clipped Debug controls, and short-dock inspection showed that green component tests were not sufficient evidence for constrained content. ToolViewport now retains a usable scaled content height and scrolls it within the chosen dock; the same presentation moves with detached tools. Focus reveal crosses nested viewports. The gallery is being strengthened to scroll each ordinary control into view and verify its complete visible rectangle, rather than treating the new root viewport as an exemption. Final verification remains pending until those checks and actual image inspection pass. Native backing-store captures also proved stale in some background runs; the final state evidence uses actual production Swing root paints, with native attempts retained as a verification limit.
+Generic text areas now participate in the shared interface-font defaults, so enlarged tool output and prose follow UI zoom. Explicit editor/code font ownership remains separate. Short docks retain scaled virtual content height; focus reveal crosses nested viewports. Tasks additionally reserve a readable job row and output region using current font metrics, and clamp the inner divider only when its previous location violates those minimums.
 
-Atomic implementation commits so far: `cba4faff` settings/semantic styles, `3bf0828d` Tasks feedback, `4dbec5af` layout/lifecycle, `19d2f06d` review presentation and `62a6ba2a` tool refresh behavior. The picker-lifetime follow-up is `f7fb84bb`. These are implementation checkpoints, not a declaration that all final gates have passed.
+Floating tools retain placement-owned outer bounds through appearance refresh and native opening. Local config writes are acknowledged using both file metadata and exact contents, preventing the existing reload poll from erasing restored runtime appearance. Real external edits and invalid-file fallback remain active. The new headless regressions cover local-write/session ownership and a racing external edit with matching metadata.
 
-## Requirement and completion ledger
-
-| Required scope | Current state / evidence still required |
+| Responsibility | Canonical owner / boundary |
 | --- | --- |
-| 1. Workspace/document/split/tool navigation and active focus | Navigation foundation implemented and focused tests pass; inspect packaged production captures, active split presentation, tool detach/reattach/recovery and session restoration end to end. |
-| 2. Command discovery and settings organization | Workbench entry points, responsive settings search/category/modified/reset and inline validation implemented; final captures/journeys and full display run remain. |
-| 3. Shared typography/spacing/colors/icons/control/scaling | Shared semantic intent/invalid states implemented across tools and settings; final five-category review and exact-artifact captures remain. |
-| 4. Loading/cancellation/empty/error/completion | Task cancellation/exit-state and noninterrupting panel completion tested; search/replace/Git stale-result and output/selection handling implemented. Full final checks remain. |
-| 5. Approval/review presentation with identical authorization | Review banner and fixed primary decisions implemented; real production Apply/Undo test passes with unchanged unsaved-buffer policy. Native captures remain. |
-| 6. Search/Problems/tasks/tests/debug/Git/agent/dialog conventions | Shared feedback and state-preserving refresh implemented across tools; first intermediate gallery passes. Full relevant desktop suite and final review remain. |
-| 7. Narrow/long/enlarged/light/dark/persisted/recoverable layouts | Intermediate 30-capture gallery/all narrow tools and detached/session/manual-size tests pass. Final gallery, native captures and preference journey remain. |
-| 8. Keyboard/focus/accessibility/states/restrained motion | Navigation focus regression covered; full journeys and native interaction states remain. No custom motion introduced. |
-| Editor journey | Test actual workspace → file finder → edit/undo/redo/save → switch → dirty-close confirmation. |
-| Search/diagnostics/tools journey | Exercise actual result navigation and tool open/close. |
-| Appearance/layout/session journey | Exercise settings, resize, detach/reattach, persist and restore. |
-| Normal approval journey | Exercise an existing proposal through its normal review/approval path; preserve versions/admission checks. |
-| Final headless package / desktop / gallery | Run after the complete implementation, preserve exact counts/logs and visual artifacts. |
-| Performance | Repeat unchanged desktop, 500,000-line and paged benchmarks against the final artifact; compare with the fresh baseline and resolve attributable regressions. |
-| Cleanup | Rejected prototype sources/dependencies removed in worktree; decision samples/images retained and capture/accessibility helpers moved to benchmark sources. Archive commit and final audit remain. |
-| Final design/migration handoff | Update INTERFACE_DESIGN and WORKBENCH_LAYOUT to describe actual final behavior; full five-category skill review with source lines and verification verdict. |
-| Verification limits / release | Label platform/native/IME/screen-reader evidence accurately. No release publication is authorized or planned. |
+| Application logic | DocumentWorkbench/LegacyDocumentStore retain document identity/content/history; SettingsApplication and pure PaletteSession services retain settings/query/accept behavior. ConfigManager owns persisted/runtime settings and its last local file version. |
+| Presentation state | Each view owns its drafts, selected stable identities, reading position, loading/error/cancellation state and request generation. A view closes its subscriptions/timers/work; it cannot admit a stale result after disposal. |
+| Swing presentation | WorkbenchHeader, OpenEditorsBar, ToolWindowHost/ToolViewport, tool panels and dialogs own construction, rendering, focus, fonts and geometry. UI types stay out of application-facing contracts. |
+| Composition/lifecycle | Texteditor binds the ports to retained controllers and disposes their surfaces; SessionConfigController coordinates the existing editor layout and optional tool state. AsyncJobService completion stays on the EDT. |
+
+Settings updates still persist and apply inline on the caller/EDT; palette query inputs remain immutable worker data and acceptance/close remain UI-owned. The one post-window-open geometry correction is explicitly queued on the EDT, bound to the original placement model and guarded against docking/disposal. It does not alter application callback delivery. There is no generic event bus, DI framework or plugin platform.
+
+## Current verification and exact artifacts
+
+Final production source checkpoint: `0fa173c5` (following `58522584` task divider geometry, `7e776668` floating geometry, and `04fc2bae` config ownership). The earlier implementation checkpoints remain in Git, including settings, task-origin output, dock lifecycle, review and state-preserving refresh. Atomic commits were retained throughout.
+
+Final packaged JAR SHA-256: `bd2243bb1ce36715de9677c461a7b54f95cf96f5cbdea58a867a88684d14e20c`. All **1,287 production class files** match both the packaged artifact and the class hashes captured from the final full Swing test run. All **60 benchmark/model/ranker classes** compared with the preserved baseline are byte-identical. Nine compared approval/policy classes are also unchanged. [Class comparison](performance/ui-stage4/class-comparison.json), [commands, exits and scope](performance/ui-stage4/verification.json).
+
+| Check | Observed result |
+| --- | --- |
+| Java 21 headless `package` | **1,288 tests, zero failures/errors, 97 skips**, exit 0. The earlier full clean package also passed before the last UI-only changes. [Summary](performance/ui-stage4/headless-summary.json), [case scope](performance/ui-stage4/headless-cases.json). |
+| Complete TexteditorSwingIntegrationTest | **92 cases, zero failures/errors, one skip**: the fixture’s CMake/CTest/CPack availability check. Native document-list → editor → tool focus assertions passed. The original process handle disappeared during tool refresh; fresh completed Surefire XML, compiled-class timestamps and matching class hashes are the authoritative result, rather than an invented process exit code. [Summary](performance/ui-stage4/display-summary.json), [cases](performance/ui-stage4/display-cases.json). |
+| Real production journeys | **All four journeys plus explicit task failure/cancellation pass**, exit 0; **18 actual production root-pane captures**. [Journey metadata](images/ui-stage4/journeys/journeys.json). |
+| Interface gallery | **38 captures, zero unreachable/clipped ordinary controls**. All eight tools checked at narrow width and at narrow width with 150% text. Existing nested Debug Source/Functions forms also pass scroll reachability. [Gallery metadata](images/ui-stage4/after/gallery.json). |
+| Artifact integrity | Production views come from the same supplied JAR; probes do not overlay production classes. Isolated homes/workspaces are removed after runs. Baseline/final JARs and complete reports remain outside `target` under `/tmp/shed-ui-stage4-baseline` and `/tmp/shed-ui-stage4-typography`. |
+
+The editor journey opens a workspace through the folder chooser, accepts a file/location query, edits, undoes/redoes, saves, switches documents, cancels dirty close and then explicitly discards. The search journey enters a query and navigates real matches and diagnostics through their Enter bindings. The appearance journey submits the actual zoom setting, changes light/dark appearance, resizes, detaches/reattaches and restores a real saved session, checking the exact supported floating rectangle and restored theme. The approval journey creates a fixture proposal through the normal service, proves opening review changes neither disk nor buffer, explicitly applies to an unsaved open buffer and explicitly undoes. Task checks cover running, nonzero exit, hidden-panel completion retaining the source, cancellation, and readable job/output regions in a 210-pixel dock at narrow width/150% text.
+
+[Visual index and matched before/after evidence](images/ui-stage4/INDEX.md) distinguishes the four selected baseline images, current gallery, real journeys and preserved failure image. Captures are actual Swing root paints, excluding native decorations. Native backing-store attempts sometimes disagreed with current Swing state; they are not used as state proof. The final gallery observed control-state focus but did not retain native focus through every Debug form control; the geometry checks still ran and its unobserved native checks are recorded explicitly. The dedicated final native-focus integration test passed. Final journeys used application/accessible actions and mapped key actions with Robot injection disabled; earlier native injection attempts were inconclusive. No IME or external-screen-reader certification is claimed.
+
+## Failures found and corrected
+
+The baseline gallery’s `AGENT`/`Agents` mismatch was a verifier error, corrected against the unchanged baseline. Later production checks exposed real clipped Debug controls, review decisions displaced by a narrow/enlarged action row, floating geometry replaced by default dialog sizing/native opening, a local config write reloaded over restored appearance, and a task divider leaving a one-pixel data viewport after scaling. These prompted production fixes and stronger checks; the root viewport is not an exemption from ordinary-control bounds assertions. Populated data rows/output are verified separately from those control bounds.
+
+Preserved evidence includes [clipped candidate gallery](performance/ui-stage4/review-layout-candidate-gallery.json), [floating restore failure](performance/ui-stage4/restoration-candidate-journeys.log), [theme failure](performance/ui-stage4/theme-candidate-journeys.log), [failing headless config regression](performance/ui-stage4/config-race-before.log), and [task divider trace](performance/ui-stage4/task-divider-before.log) / [image](images/ui-stage4/failures/task-divider-before.png). One interrupted focused run timed out at the existing 30-second staged-startup wait before reaching review; the unchanged ten-test repeat passed. [Failure](performance/ui-stage4/interrupted-focused-startup-failure.log), [repeat](performance/ui-stage4/restoration-focused-repeat-summary.json). No assertion or timeout was weakened to turn those failures green.
+
+## Performance: results and open gate
+
+The unchanged harnesses ran sequentially with Java 21 and 64–512 MiB heap, with no builds/tests or heavy artifact inspection from this goal running concurrently. Unrelated host activity was uncontrolled. The 20,000-line desktop fixture, 50,000-path ranking set, warmup/sample counts, definitions and thresholds were retained. The first fresh baseline above is distinct from the following later paired control. OS/font caches and unrelated host activity are uncontrolled; startup p95 is the maximum of five runs.
+
+| Metric | Target | Baseline p50 / p95 | Final p50 / p95 |
+| --- | ---: | ---: | ---: |
+| Visible window (ms) | 2000 | 2113.22 / 4615.26 **MISS** | 2131.25 / 6644.27 **MISS** |
+| Painted source (ms) | 3000 | 2703.22 / 6417.26 **MISS** | 3124.25 / 8278.27 **MISS** |
+| Full workbench (ms) | 10000 | 10433.49 / 20109.26 **MISS** | 21059.25 / 38366.17 **MISS** |
+| Edit/paint (ms) | 16 | 3.30 / 5.53 | 4.33 / 16.79 **MISS** |
+| Rank 50,000 paths (ms) | 50 | 21.01 / 38.91 | 27.48 / 121.87 **MISS** |
+| Used heap (MiB) | 384 | 52.16 / 53.88 | 27.29 / 29.34 |
+| RSS (MiB) | 768 | 472.90 / 487.70 | 420.41 / 498.73 |
+
+Used heap was sampled without forcing GC; the lower final reading does not establish a lower retained footprint.
+
+The initial final run missed edit/paint and ranking in addition to the startup misses already observed in the control. Both original desktop invocations returned 1. An unchanged baseline control and unchanged-final repeat retained all seven definitions and also returned 1:
+
+| Metric | Baseline control p95 | Unchanged final repeat p95 |
+| --- | ---: | ---: |
+| Visible window (ms) | 7451.50 **MISS** | 5631.08 **MISS** |
+| Painted source (ms) | 8273.50 **MISS** | 7727.08 **MISS** |
+| Full workbench (ms) | 21377.59 **MISS** | 24730.42 **MISS** |
+| Edit/paint (ms) | 20.17 **MISS** | 8.04 |
+| Rank 50,000 paths (ms) | 33.16 | 211.04 **MISS** |
+| Used heap (MiB) | 53.03 | 29.43 |
+| RSS (MiB) | 500.09 | 500.11 |
+
+The baseline control also missed edit/paint, while the final repeat passed it; the final repeat’s ranking tail still missed. These results do **not** establish a clean desktop performance pass. The same-JVM alternating ranker diagnostic returns identical lists and similar CPU p95 (**11.67 / 11.85 ms**, baseline/final; wall **12.56 / 12.48 ms**). A separate instrumented desktop diagnostic also reproduced ranking stalls in the old build (one process p95 **161.24 ms**); all three instrumented final processes had ranking p95 below 35 ms. Its CPU/GC instrumentation is explicitly diagnostic, not a replacement acceptance benchmark. It shows the stalls are not exclusive to the new artifact; it does not prove their precise cause.
+
+A final counterbalanced attempt used the **unmodified production probe** and original budget/percentile functions, with intended AB BA AB BA AB process ordering. It completed only one baseline process (full startup **55,962 ms**) before the next process timed out. At that point the eight-logical-CPU host reported a one-minute load around **398**. The incomplete attempt is retained; it is not pooled into a completed five-run result. Desktop performance preservation remains **unverified under these conditions**, with no claim that the extra tails have been conclusively attributed or resolved. Repeat a counterbalanced comparison on a stable host before closing this gate. [Original pair and commands](performance/ui-stage4/comparison.json), [control/repeat and isolation](performance/ui-stage4/performance-followup.json), [counterbalanced partial run](performance/ui-stage4/interleaved-progress.json).
+
+The fixed 500,000-line model workload passed in both JARs: edit/caret/convergence p95 **0.232 / 0.367 / 131.633 ms** before and **0.243 / 2.285 / 125.537 ms** after, within the unchanged 16/16/250 ms limits. The 100 MiB paged-file check also passed in both, three iterations each, with editing explicitly unsupported. Cold-open p95 was **1916.30 / 1997.32 ms**, warm-open **1061.84 / 1222.41 ms**, scroll **2.49 / 2.81 ms**; cold-open heap delta was **3,213,368 bytes** in both. The fixture has 104,857,600 bytes and SHA-256 `c96a64d76b9b5f17714f2e282a7275747eaee36748fafa10ff515bb6455e626e`. The clean-file `save` is a no-op under the existing guard, not streamed-write throughput evidence. Three samples do not establish a tail-speed change.
+
+Raw original results are [baseline desktop](performance/ui-stage4/paired-baseline-desktop.json), [final desktop](performance/ui-stage4/paired-final-desktop.json), [baseline control](performance/ui-stage4/baseline-control-desktop.json), [final repeat](performance/ui-stage4/final-repeat-desktop.json), [model before](performance/ui-stage4/paired-baseline-editing.log) / [after](performance/ui-stage4/paired-final-editing.log), and [paged before](performance/ui-stage4/paired-baseline-paged.log) / [after](performance/ui-stage4/paired-final-paged.log). [Isolated ranker samples](performance/ui-stage4/picker-isolation.json) and [instrumented diagnostics](performance/ui-stage4/diagnostic/valid-runs.json) remain separate.
+
+## Completion ledger and remaining work
+
+| Requirement | State / authoritative evidence |
+| --- | --- |
+| 1. Workspace/document/split/tool navigation and active context | Implemented; navigation/focus/session integration cases, editor/layout journeys and current captures. |
+| 2. Commands/settings organization | Implemented; production palette/settings captures, real zoom submission, invalid-draft/filter/reset integration cases and SettingsApplication tests. |
+| 3. Shared typography/spacing/colors/icons/states/scaling | Implemented; current font-size assertion, light/dark/150% captures and the fifteen consolidated findings in INTERFACE_DESIGN. |
+| 4. Loading/cancellation/empty/error/noninterrupting completion | Implemented; real task failure/cancellation/hidden completion, search/replace/Git result admission and retained model/output tests. |
+| 5. Existing approval/review semantics | Implemented; normal Apply/Undo journey, explicit no-mutation-on-open assertions, domain tests and unchanged compared approval classes. |
+| 6. Eight tools/dialogs; specialized surfaces | Implemented; gallery coverage, complete Swing suite including retained source/terminal/notebook behavior, and unchanged editor/model benchmark classes. |
+| 7. Narrow/long/enlarged/light/dark/prefs/layout recovery | Implemented; all eight narrow/enlarged tools, duplicate/long paths, manual dock/inner divider, floating bounds and session-theme ownership checks. |
+| 8. Keyboard/focus/accessibility/static states | Local checks pass; native focus integration, accessible/mapped actions, names/tooltips and control-state capture. External reader/IME and other platforms remain unverified. |
+| Four real journeys | Pass against the final packaged JAR; 18 captures plus assertions. |
+| Headless package / relevant Swing / gallery | Pass at the scope and counts recorded above. |
+| Desktop performance preservation | **OPEN:** original misses, inconsistent controls and a counterbalanced timeout on an overloaded host prevent a conclusive attribution/completion claim. |
+| Large-file/model performance | Both preserved-JAR checks pass; scope and no-op-save caveat above. |
+| Prototype cleanup | Complete in `6a00a11c`: rejected source/toolchains/dependencies removed, decision evidence and reusable capture/accessibility helpers retained. Default Maven/launch/dependency paths remain unchanged. |
+| Handoff / release | Current implementation, evidence, coupling and the open gate documented here and in INTERFACE_DESIGN / WORKBENCH_LAYOUT. No release published. |
+
+Remaining coupling is deliberate: Texteditor still composes owner-aware controllers, global appearance/key routing, native dialogs, pane attachment, syntax/LSP overlays and specialized surfaces. Tool controllers still use the legacy owner internally. WorkbenchLayout is a tested UI-independent placement model, not a live registry enforcing every Swing reparenting. The ports are practical migration seams, not proof that the entire frontend is now detachable.
+
+Do not start another UI/framework stage yet. The next authorized action is to finish the desktop performance gate once host conditions support a comparable run, inspect attribution if a regression reproduces, and then perform the completion audit. Windows/Linux native behavior, multi-monitor/font/zoom combinations beyond the recorded cases, IME hardware and external readers require a separate verification environment. Historical startup misses and the current raw failures remain visible rather than being replaced by a speedup claim.
+
+## Reproduction
+
+Resolve Java 21 and Maven with `scripts/resolve-toolchain.sh home` / `maven`, then run Maven `-B -q -Djava.awt.headless=true package` and `-B -q -Djava.awt.headless=false -Dtest=TexteditorSwingIntegrationTest test` in sequence. Preserve the JAR and reports outside `target` before a clean build. Compile `InterfaceGalleryProbe`, `OwnedWindowCapture`, `WorkbenchAccessibilityProbe` and `WorkbenchJourneyProbe` from `src/benchmark/java/shed` against that supplied JAR into a separate classes directory; put only those probe/helper classes ahead of the JAR on the classpath. Run `shed.InterfaceGalleryProbe <output>` and `-Dshed.journey.nativeInput=false shed.WorkbenchJourneyProbe <output>` with a display. The probes record their JAR hashes and reject production source overlays.
+
+After all builds/tests/captures finish, invoke the unchanged `scripts/benchmark-editor.py --jar <preserved-jar> --runs 5 --label <label> --output <outside-target.json>` for each artifact. Run `java -Xms64m -Xmx512m -cp <jar> shed.EditorResponsivenessBenchmark` and `shed.LargeFileBenchmark --iterations 3 <same-100-MiB-fixture>`. Exact executed commands and exit codes are retained in the linked verification/comparison JSON. The diagnostic source copies and counterbalanced scheduling driver under performance/ui-stage4 are evidence/reproduction aids; they do not replace the unchanged acceptance workload.

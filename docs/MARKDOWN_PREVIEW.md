@@ -26,3 +26,7 @@ Raw HTML supports a sanitized Swing-compatible subset: `div`, headings, paragrap
 Remote images require `https`, no user-info or non-default port, a non-local host, a successful public-address check, a 12 MiB response limit, and dimensions no larger than 4096 px or 16 megapixels. SVG responses are rejected when active content is present, rendered with scripts and external resources disabled, then converted to PNG. Set `"markdown.preview.remote.images" = false` to keep previews local-only. Notebook Markdown remains local-only.
 
 Mermaid source is capped at 64 KiB per block and rendered images at 4096 px per side. Invalid TeX stays as source text; Mermaid failures show a preview error and preserve the original fence.
+
+## Packaged-runtime regression
+
+The shaded distribution must merge dependency service registrations for GraalJS and its regex language. The opt-in [packaged Markdown smoke test](PACKAGED_MARKDOWN_TEST.md) verifies the actual JAR independently of the development classpath, including Mermaid, math, local images and invalid-diagram handling.

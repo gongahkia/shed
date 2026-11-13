@@ -1,130 +1,97 @@
-# Shack architecture
+# Controller architecture
 
-Go with CGO disabled keeps builds and distribution independent of C toolchains
-and separately installed runtimes. This is a distribution and maintenance choice,
-not evidence that Go is faster than another language.
+This is the dependency inventory for `src/main/java/shed` as of the Java 21 baseline. It records the current shape; it is not a claim that the current shape is fully decoupled.
 
-`internal/text` owns a persistent, newline-indexed piece tree. Nodes also flag
-non-ASCII/control bytes so printable ASCII positioning can avoid scanning large
-prefixes. Unchanged branches are shared. UTF-8 edits validate against one source
-version. Undo retains 256 groups, with bounded typing coalescing and inverse edit
-sequences for rebasing other pane selections. Staging clones share immutable text
-while isolating mutable history. Selection movement does not copy the document.
+## Composition and seams
 
-`internal/editor` owns the single event loop, buffers, panes, commands, safe file
-operations, previews and background results. tcell supplies terminal I/O; Chroma
-supplies bundled lexers. Ordinary rendering updates the logical screen and lets
-tcell emit changed cells; it does not request a physical full-screen clear.
+`Texteditor` is the Swing application, composition root, and shared editor-state owner. It constructs the services, feature controllers, `CommandHandler`, and `AsyncJobService`.
 
-Unicode layout uses an application-wide cache of 64 line/width entries, each
-with at most 512 sparse grapheme checkpoints. Indexing extends only as a query
-requires; checkpoints compact for long lines. A few recent boundaries keep
-sequential screen rows local. Edits retain verified unchanged prefixes and discard
-stale suffixes; replaced documents and skipped versions invalidate their entries.
-Rope readers extend lookahead across UTF-8/grapheme boundaries without repeatedly
-flattening whole lines. Word traversal streams class runs. Oversized grapheme
-measurements are bounded and never retain source strings; terminal painting uses
-a placeholder for clusters longer than 256 bytes while storage remains unchanged.
-Cold navigation to a distant position still scans intervening Unicode text.
+```
+Swing input and timers
+        |
+InputController / CommandHandler
+        |
+Texteditor shared UI, state, and service references
+        |
+feature controllers ----> stateless and stateful services
+        |
+AsyncJobService workers ----> EDT completion handlers
+```
 
-Pane layout is a bounded binary split tree with per-divider ratios; session
-restoration prunes missing leaves and preserves nested orientation. The file tree
-is built from the existing bounded project index, never from per-frame filesystem
-walks. The optional minimap samples short line prefixes into cached immutable
-rows on a coalescing worker; neither syntax lexing nor a full-file copy is needed.
+The supported entry seams are:
 
-`internal/terminal` owns each explicitly started PTY and terminal emulator. An
-actor serializes emulation, input, resize and scrollback, publishing immutable
-frames through an atomic pointer. Separate goroutines read/write the PTY. The UI
-never waits on terminal I/O or acquires an emulator lock. Queues, dimensions,
-scrollback cells and update frequency are capped; no terminal resources are
-allocated until requested. Closing cancels blocked I/O and signals the shell and
-foreground process groups. Only the active view controls a shared PTY's size.
+- `Texteditor.main` and `Texteditor(String[])` start and compose the application.
+- `CommandHandler.execute` is the ex-command dispatch seam.
+- `AsyncJobService.submit` is the asynchronous work seam; its completion runs on the EDT under the [threading policy](THREADING.md).
+- Public service classes (`ConfigManager`, `FileBuffer`, `GitService`, `LspService`, `QuickfixService`, `SearchManager`, and `TreeService`) are reusable feature/data seams. Their callers must preserve the EDT policy when the result reaches UI state.
 
-Workspace previews retain bounded document snapshots. Every included target is
-validated and staged before publishing any change to live buffers. Version and
-disk-fingerprint checks reject stale edits. The latest workspace transaction has
-guarded group undo/redo. File saves remain individually atomic, not a multi-file
-filesystem transaction. Reports are read-only transient buffers without edit history.
+All current `*Controller` classes are package-private. Each is constructed with exactly one `Texteditor` reference; no controller directly holds another controller. `Texteditor` owns controllers while they retain their owner reference, so that composition cycle already exists and is a migration boundary rather than a pattern to extend.
 
-`internal/project` discovers up to 10,000 files using Git's native ignore semantics
-when available, or a standalone directory-exclusion walker. Canonical paths prevent
-symlinked roots from duplicating an already-open file. Search runs off the UI thread
-with limits on input file size, retained bytes and matches. Cancellation and request
-identity prevent outdated search results from replacing current results.
+`PaletteFilterSession` is a per-dialog UI helper owned by `PaletteController`. It takes picker widgets, a background matcher and an acceptance callback; it has no application or feature-controller reference. It owns query generations, debounce, selection acceptance and cancellation. `NavigationHistory` is a bounded, UI-independent history model; `EditActionController` resolves its buffer identifiers against currently open documents. `BufferViewState` belongs to each `EditorPane`, so switching buffers preserves each split's selection and viewport independently.
 
-`internal/lsp` owns framed JSON-RPC, subprocess lifecycle and UTF-16 conversion.
-One process is shared per root/server command, up to four combinations. Documents
-carry session identities as well as versions, so delayed sync/close work cannot
-replace a newly reopened document. UI results check source versions and positions.
-Workspace refactoring enters the same preview path as project replacement.
-Server-command actions support lazy resolution and ordered edit-then-command
-execution. Reverse applyEdit requests run off the protocol reader and wait for an
-all-or-none preview result; cancellation/closed-session guards prevent stale
-application. Incoming review payloads are capped at 8 MiB / four requests; client
-requests at 32; small replies use one bounded writer queue.
+`WorkspaceRootResolver.normalizedIdentity` resolves filesystem aliases through an existing parent, including for files that have not been created yet. `pathWithinRoot` checks that identity and returns a contained path using the configured root's spelling. Remote/container session lookups, debugger source paths and workspace labels use these helpers so a path alias cannot silently select a different execution context. Display labels and persisted root strings need not all adopt the same spelling.
 
-`internal/fileops` plans ordered file/directory changes in a bounded virtual
-snapshot, checking containment, file kinds, overwrite options and directory
-membership. The resource preview captures immutable buffer state; it validates
-again before committing on a worker. Staging preserves originals until all steps
-succeed, and rollback never overwrites a detected concurrent writer. Failure
-reports retain originals for manual recovery when rollback cannot finish. The
-protocol advertises best-effort undo rather than transactional filesystem support.
-Open buffers follow renames; deleted contents remain exportable reports. Resource
-undo/redo checks buffer identities/versions and disk snapshots, recognizes guarded
-Save All changes and restores both. Completion is consumed before normal recovery
-shutdown; there is no persistent filesystem transaction journal. Text-only ordered
-edits use a single validated document sequence and one undo entry.
+## Controller inventory
 
-`internal/gitmerge` reads bounded, literal-pathspec Git index records and immutable
-stage blobs. Its linear conflict parser produces UTF-8 byte ranges for merge,
-diff3/zdiff3 and longer marker widths. Resolution uses ordinary editor previews;
-modify/delete choices reuse the resource transaction path. Stage reports are
-read-only. Explicit staging validates saved content and the captured unmerged
-index entries, while leaving commits and merge completion to Git. No merge work
-or subprocess runs until requested.
+| Controller | Ownership | Primary collaborators through `Texteditor` |
+| --- | --- | --- |
+| `InputController` | key dispatch, modes, command/search input | `ModeEngine`, `SearchManager`, command routing |
+| `EditActionController` | editing and motion actions | editor state, buffers, text area |
+| `PaneBufferController` | panes, splits, buffers, empty startup buffer, layouts | `FileBuffer`, `EditorPane` |
+| `EditorUiController` | UI assembly, painting, diagnostics | `QuickfixService`, `PerfService` |
+| `SyntaxUiController` | syntax and breadcrumb presentation | `SyntaxHighlightService`, `SymbolService`, `PerfService` |
+| `SearchReplaceController` | search and substitution UI effects | `SearchManager`, `SubstituteService` |
+| `JobQuickfixController` | tasks, shell jobs, quickfix navigation | `AsyncJobService`, `TaskService`, `VsCodeTaskImporter`, `QuickfixService`, explicit remote/Dev Container session services |
+| `ProblemsController` | live diagnostic and retained quickfix aggregation | `ProblemsService`, `LspClient`, tool-window host |
+| `TestController` | explicit test discovery/run session state and Problems projection | `TestService`, `TestAdapterRegistry`, `AsyncJobService` |
+| `TerminalController` | PTY terminal panes and lifecycle | `PtyTerminalPane`, pane/buffer state, explicit remote/Dev Container session services |
+| `NotebookController` | local Jupyter notebook presentation/save/explicit execution | `NotebookDocument`, `NotebookPanel`, `AsyncJobService` |
+| `ScmController` | built-in SCM command routing | `ScmContributionService` |
+| `RemoteWorkspaceController` | explicit mirror lifecycle, session activation, and loopback SSH forwards | `RemoteWorkspaceProvider`, `AsyncJobService`, `RemoteWorkspaceSessionService`, `SshPortForwardService`, workspace roots |
+| `DevContainerController` | explicit local Dev Container CLI bridge | `AsyncJobService`, `DevContainerSessionService`, remote workspace mirrors |
+| `TreeGitController` | file tree and Git actions | `TreeService`, `GitService` |
+| `LspController` | language-server requests, diagnostics, edits, symbols | `LspService`, `LspClient`, `QuickfixService`, `WorkspaceSymbolCoordinator` |
+| `DebugSessionController` | explicit DAP lifecycle, breakpoints, inspection, and configuration selection | `DebugSessionService`, `DebugAdapterRegistry`, `VsCodeLaunchConfigurationImporter`, `VsCodeTaskImporter`, `AsyncJobService` |
+| `MarkdownController` | Markdown tables, folds, snippets, brackets | `MarkdownService`, `SnippetService`, `BracketColorService` |
+| `PaletteController` | file, buffer, symbol, and command palettes | `FuzzyMatchService`, `SymbolService` |
+| `SessionConfigController` | sessions, workspaces, config and help | `ConfigManager`, `HelpService` |
+| `RecoveryController` | file watching, recovery snapshots, conflicts | `FileWatcherService`, `FileBuffer` |
+| `FocusModeController` | Goyo layout, Limelight, minimap | Swing UI state |
 
-`internal/snippet` parses bounded LSP snippets into an immutable program. The
-editor retains explicit linked ranges and applies precise edits to preserve pane
-and breakpoint positions. Nested replacements regenerate stop metadata; cached
-transforms stay off the typing path. Expansion and regex refresh run on a worker,
-with source-version, selection and request checks before publishing. Regex
-compilation, evaluation, recursion and expanded output have explicit bounds.
+`WorkspaceController` owns the ordered folder set and the Explorer's selected folder. `WorkspaceManifest` is its portable import/export boundary; it accepts validated local folder entries. An imported standard `.code-workspace` may retain its validated folder `name` only as session display metadata; paths remain the sole root identity. It may additionally remain a read-only source for the strict task/launch compatibility importers and the session-only `WorkspaceEditorSettings` snapshot while its resolved folder set still exactly matches. That snapshot reads only bounded tab width/tab-expansion values, Explorer-only boolean `files.exclude` globs, and Search/Project Replace-only boolean `search.exclude` globs, including a per-folder `.vscode/settings.json` layer. `WorkspaceIndexService` applies the latter after its Git-ignore pass only for those two callers. The snapshot is refreshed only by explicit import/reload or matching-session restoration; all other settings and workspace data remain inert. Resource-scoped controllers resolve the deepest configured folder containing the current file before falling back to that selection. This keeps sibling projects isolated for task discovery, editor indentation, Explorer filtering, search filtering, SCM and Dev Container actions without changing the Explorer merely by switching files.
 
-`internal/dap` implements bounded framed requests, cancellation, output retention
-and lifecycle for explicitly chosen stdio/TCP adapters. A dedicated writer keeps
-adapter I/O off the event loop. Spawned adapters get their own OS session, so a
-debuggee cannot seize the editor's controlling terminal. Closing the transport
-allows a bounded cleanup interval before process-group termination. The editor
-tracks stopped-state epochs and rejects stale frame/variable results. Breakpoint
-synchronization is serialized per file and limited to four concurrent files;
-line anchors rebase through normal and workspace edits. Output uses a byte ring
-and is copied into a report only when that report was requested. Attach cleanup
-requests detachment; launch cleanup requests target termination.
+`WorkspaceSymbolCoordinator` owns only explicit local fallback requests for `:workspace symbols`. Its `WorkspaceSymbolService` is controller-free and scans the existing ignore-filtered file index off the EDT, with per-file and result limits. `SymbolService` uses the JDK parser for Java declaration names only, with no type resolution, project source loading, annotation processing, or compilation; its other language outlines remain lexical. `LspController` remains the preferred LSP-symbol path and cancels stale local work before each new request; neither component creates a background project-symbol index.
 
-`internal/recovery` stores bounded, private, atomically replaced snapshots with
-live-session locks and monotonically sequenced writes. Recovery retains original
-fingerprints, protecting later saves against outside changes. Project session
-metadata is stored separately and never substitutes for dirty-buffer recovery.
+`VsCodeLaunchConfigurationImporter` is deterministic, controller-free JSONC parsing and profile translation for `.vscode/launch.json` or the `launch` object of a validated imported `.code-workspace`. It contributes only validated in-memory configuration objects to `DebugAdapterRegistry`; it neither reads adapter commands from the project file nor writes global or project configuration. A `preLaunchTask` label can resolve only through `VsCodeTaskImporter`'s uniquely accepted compatible task-label map. `DebugSessionController` owns source merging/presentation and makes every resulting launch remain explicit.
 
-`internal/process` runs explicit noninteractive tasks with bounded output,
-process-group cancellation and throttled updates. The same boundary supports
-optional Git commands. Tasks do not run on project open. No new runtime dependency
-is required for ordinary editing, recovery, splits, search, or configuration.
+`VsCodeTaskImporter` is the analogous controller-free reader for a strict `.vscode/tasks.json` or validated imported `.code-workspace` process/POSIX-shell task subset. It produces ephemeral `TaskService.WorkspaceTask` values with exact direct argv or separately retained shell arguments, plus only explicit sequential unambiguous label dependencies; it neither changes a project file nor makes execution automatic. `TaskService` resolves every requested graph before any stage starts. `JobQuickfixController` owns source merging for the current workspace and still applies the normal plan, remote/Dev Container routing, and explicit-run gates.
 
-`internal/markup` bundles Markdown and Org parsing and produces bounded terminal
-text, style spans, links and source locations. One coalescing worker renders live
-read-only previews; ordinary frames reuse their cached text. Document content
-cannot execute code or load local include files. Preview navigation can return to
-the corresponding source; limits and format coverage are documented in USAGE.md.
+## Explicit remote-session ownership
 
-`internal/folding` discovers bounded structural and outline ranges on demand.
-Collapsed state belongs to a pane, never to the text document. Sorted ranges
-project visible rows without walking hidden lines. Edits expand intersected folds
-and rebase unaffected ranges; jumps reveal their target. The scanner is heuristic,
-not a complete parser for every language.
+`RemoteWorkspaceController` owns remote connection lifecycle and the `SshPortForwardService` processes associated with SSH connections. `RemoteWorkspaceSessionService` separately records only user-activated provider execution mappings. `TerminalController` and `JobQuickfixController` query that service through `Texteditor` for the deepest matching local mirror; they do not call the remote controller. A session is removed by `:remote unuse`, remote close/replacement, or application exit.
 
-Large-file mode bounds optional services. The editor does not claim constant-memory
-opening, constant-time cold Unicode navigation, universal encodings or mature
-IDE parity. Original Zenbu remains in Git history and `archive/zenbu-before-shack`.
+`DevContainerSessionService` has the equivalent narrow role for an explicitly connected local Dev Container. Both services are in-memory routing state, not remote-server, credential, or reconnect managers. The task/terminal lookup gives an active remote workspace precedence over an overlapping Dev Container, then falls back to the local process path. This preserves explicit execution selection without creating controller-to-controller dependencies.
+
+## Dependency rules
+
+- Do not add a controller-to-controller field, constructor parameter, static lookup, or callback registration. Coordinate through a narrow `Texteditor` operation or extract shared non-UI behavior into a service.
+- Do not add `Texteditor` or any controller dependency to a service. Services remain usable without Swing composition.
+- Do not make a controller public solely to let another controller call it. Extend an existing service seam or introduce a focused interface owned by the composition root.
+- Do not add cross-feature mutation of another controller's state. Pass immutable data or a narrow callback at the owning boundary.
+- Keep Swing mutation in controllers or `Texteditor` on the EDT; keep I/O and process work behind `AsyncJobService` or a service boundary.
+
+## Approved reduction direction
+
+New work should first extract deterministic, non-UI logic into a service with explicit constructor dependencies and focused tests. When a controller needs only part of `Texteditor`, introduce a narrow interface at the composition root and migrate that controller without changing unrelated controllers. This reduces the existing owner-reference surface incrementally while preserving Java, Swing, and Maven.
+
+## Stage 1 application boundaries
+
+Settings inspector reads and persistent updates now use `SettingsApplication` and its immutable `Setting` records. `ConfigSettingsApplication` implements validation/repair/persistence against the existing `ConfigManager`; `Texteditor` injects the existing runtime-apply callback. `SessionConfigController.setConfigOptionPersistent` delegates to that same use case. UI styling and neighboring settings actions remain in Swing.
+
+File and buffer picker invocations use `PaletteSession`, implemented by `FilePalette` and `BufferPalette`. These services own immutable candidate snapshots, query rules and acceptance validation. The Swing controller supplies narrow open/activate callbacks and resolves captured buffer identities against the current list. `PaletteFilterSession` retains EDT-owned debounce/cancellation/result-generation behavior. See [UI modernization](UI_MODERNIZATION.md) for ownership, verification and the deliberately retained legacy coupling.
+
+## Stage 2 document and surface boundaries
+
+`LegacyDocumentStore` owns the canonical FileBuffer list; `Texteditor.buffers` is a compatibility alias, not another store. Application metadata/identities are exposed through `DocumentWorkspace`, implemented by `DocumentWorkbench`. `SwingWorkbenchHost` integrates the existing load/save/close/layout/history pipelines. `WorkspaceRoots` and `DocumentNavigation` are application state owned at composition. The folder manager uses `WorkspaceFoldersApplication`; the legacy workspace controller retains manifest and presentation integration.
+
+Each EditorPane owns an `EditorSurface` adapter and its per-document captured views. `SwingEditorSurface` retains the actual text widget attachment and document-owned history; `EditorSurface.View` hides BufferViewState's live Swing Positions. Document content and undo are shared across splits; directed selection/viewport state remains per pane. `DocumentRequests` handles latest-target load admission, including pane-close invalidation. See [UI modernization](UI_MODERNIZATION.md) for migrated callers, evidence and residual legacy dependencies.

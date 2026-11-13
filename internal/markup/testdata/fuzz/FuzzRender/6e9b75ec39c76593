@@ -1,3 +1,0 @@
-go test fuzz v1
-string("# h*w# (\x00lo@l*\r*world0*")
-bool(false)

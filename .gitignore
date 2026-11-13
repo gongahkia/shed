@@ -1,6 +1,5 @@
-/build/
-/dist/
-*.test
-coverage.out
-.DS_Store
+*.class
+build/Shed.jar
 AGENTS.md
+target/
+.shed-large-file-fixtures/

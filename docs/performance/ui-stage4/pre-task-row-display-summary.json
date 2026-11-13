@@ -1,0 +1,16 @@
+{
+  "tests": 92,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 2,
+  "skips": [
+    {
+      "test": "testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree",
+      "reason": "org.opentest4j.TestAbortedException: Assumption failed: CMake, CTest, and CPack are unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.TexteditorSwingIntegrationTest.testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree(TexteditorSwingIntegrationTest.java:2945)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)"
+    },
+    {
+      "test": "documentNavigationRetainsFocusAndToolRefreshDoesNotTakeIt",
+      "reason": "org.opentest4j.TestAbortedException: Assumption failed: Desktop must grant native focus\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.TexteditorSwingIntegrationTest.documentNavigationRetainsFocusAndToolRefreshDoesNotTakeIt(TexteditorSwingIntegrationTest.java:3633)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)"
+    }
+  ]
+}

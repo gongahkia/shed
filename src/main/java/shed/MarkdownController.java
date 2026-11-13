@@ -167,130 +167,33 @@ final class MarkdownController {
     }
 
 
-    String toggleFoldAtCursor() {
-        FileBuffer buf = editor.getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) {
-            return "";
-        }
-        int line = editor.getCurrentCaretLine();
-        String[] lines = getCurrentLines();
-        if (line < 0 || line >= lines.length) return "";
-        if (!editor.markdownService.isHeading(lines[line])) {
-            return "Not on a heading line";
-        }
-        MarkdownService.FoldRange range = editor.markdownService.computeFoldRange(lines, line);
-        if (range == null) {
-            return "Nothing to fold";
-        }
-        Boolean folded = editor.foldedLines.get(line);
-        if (folded != null && folded) {
-            return unfoldHeading(line, lines);
-        } else {
-            return foldHeading(line, range, lines);
-        }
-    }
+    // Folding must remain presentation-only. Until that view exists, never edit
+    // the shared source document (including through direct helper calls).
+    private static final String FOLDING_UNAVAILABLE =
+        "Markdown folding is temporarily unavailable";
 
+    String toggleFoldAtCursor() {
+        return FOLDING_UNAVAILABLE;
+    }
 
     String foldHeading(int headingLine, MarkdownService.FoldRange range, String[] lines) {
-        try {
-            int foldCount = range.endLine - range.startLine;
-            int startOffset = editor.writingArea.getLineStartOffset(range.startLine + 1);
-            int endOffset = editor.writingArea.getLineEndOffset(range.endLine);
-            String hidden = editor.writingArea.getText().substring(startOffset, endOffset);
-            editor.foldHiddenContent.put(headingLine, hidden);
-            editor.foldedLines.put(headingLine, true);
-            editor.suppressDocumentEvents = true;
-            editor.writingArea.replaceRange("", startOffset, endOffset);
-            // Append fold indicator to heading line
-            int headingEnd = editor.writingArea.getLineEndOffset(headingLine);
-            String indicator = " ... (" + foldCount + " lines)";
-            editor.writingArea.insert(indicator, headingEnd - 1);
-            editor.suppressDocumentEvents = false;
-            return "Folded " + foldCount + " lines";
-        } catch (BadLocationException e) {
-            editor.suppressDocumentEvents = false;
-            return "Fold error: " + e.getMessage();
-        }
+        return FOLDING_UNAVAILABLE;
     }
-
 
     String unfoldHeading(int headingLine, String[] lines) {
-        String hidden = editor.foldHiddenContent.get(headingLine);
-        if (hidden == null) return "Nothing to unfold";
-        try {
-            // Remove fold indicator from heading line
-            String headingText = lines[headingLine];
-            int indicatorIdx = headingText.indexOf(" ... (");
-            if (indicatorIdx > 0) {
-                int headingStart = editor.writingArea.getLineStartOffset(headingLine);
-                int headingEnd = editor.writingArea.getLineEndOffset(headingLine);
-                String cleanHeading = headingText.substring(0, indicatorIdx);
-                editor.suppressDocumentEvents = true;
-                editor.writingArea.replaceRange(cleanHeading + "\n" + hidden, headingStart, headingEnd);
-                editor.suppressDocumentEvents = false;
-            } else {
-                int afterHeading = editor.writingArea.getLineEndOffset(headingLine);
-                editor.suppressDocumentEvents = true;
-                editor.writingArea.insert(hidden, afterHeading);
-                editor.suppressDocumentEvents = false;
-            }
-            editor.foldedLines.put(headingLine, false);
-            editor.foldHiddenContent.remove(headingLine);
-            return "Unfolded";
-        } catch (BadLocationException e) {
-            editor.suppressDocumentEvents = false;
-            return "Unfold error: " + e.getMessage();
-        }
+        return FOLDING_UNAVAILABLE;
     }
-
 
     String foldAll() {
-        FileBuffer buf = editor.getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "";
-        String[] lines = getCurrentLines();
-        List<MarkdownService.FoldRange> ranges = editor.markdownService.computeAllFoldRanges(lines);
-        int count = 0;
-        // Fold from bottom to top to preserve line numbers
-        for (int i = ranges.size() - 1; i >= 0; i--) {
-            MarkdownService.FoldRange range = ranges.get(i);
-            if (!Boolean.TRUE.equals(editor.foldedLines.get(range.startLine))) {
-                lines = getCurrentLines();
-                foldHeading(range.startLine, range, lines);
-                count++;
-            }
-        }
-        return count > 0 ? "Folded " + count + " sections" : "Nothing to fold";
+        return FOLDING_UNAVAILABLE;
     }
-
 
     String unfoldAll() {
-        if (editor.foldHiddenContent.isEmpty()) return "Nothing to unfold";
-        // Unfold from bottom to top
-        List<Integer> foldedHeadings = new ArrayList<>(editor.foldedLines.keySet());
-        foldedHeadings.sort(Collections.reverseOrder());
-        int count = 0;
-        for (int heading : foldedHeadings) {
-            if (Boolean.TRUE.equals(editor.foldedLines.get(heading))) {
-                String[] lines = getCurrentLines();
-                if (heading < lines.length) {
-                    unfoldHeading(heading, lines);
-                    count++;
-                }
-            }
-        }
-        editor.foldedLines.clear();
-        editor.foldHiddenContent.clear();
-        return count > 0 ? "Unfolded " + count + " sections" : "Nothing to unfold";
+        return FOLDING_UNAVAILABLE;
     }
 
-
     String globalFoldCycle() {
-        boolean anyFolded = editor.foldedLines.values().stream().anyMatch(v -> v);
-        if (anyFolded) {
-            return unfoldAll();
-        } else {
-            return foldAll();
-        }
+        return FOLDING_UNAVAILABLE;
     }
 
 
@@ -338,328 +241,271 @@ final class MarkdownController {
     }
 
 
-    String markdownHeadingShift(boolean demote) {
-        String[] lines = getCurrentLines();
-        int line = editor.getCurrentCaretLine();
-        if (line < 0 || line >= lines.length) return "";
-        if (!editor.markdownService.isHeading(lines[line])) {
-            return editor.applyLineOperator(demote ? '>' : '<');
-        }
-        String newLine = demote ? editor.markdownService.demoteHeading(lines[line]) : editor.markdownService.promoteHeading(lines[line]);
-        if (newLine.equals(lines[line])) {
-            return demote ? "Already at h6" : "Already at h1";
-        }
-        try {
-            int startOffset = editor.writingArea.getLineStartOffset(line);
-            int endOffset = editor.writingArea.getLineEndOffset(line);
-            editor.suppressDocumentEvents = true;
-            editor.writingArea.replaceRange(newLine + "\n", startOffset, endOffset);
-            editor.suppressDocumentEvents = false;
-            editor.markModified();
-            return demote ? "Demoted heading" : "Promoted heading";
-        } catch (BadLocationException e) {
-            editor.suppressDocumentEvents = false;
-            return "Error: " + e.getMessage();
-        }
+    private String mutationUnavailable() {
+        EditorPane pane = editor.getActivePane();
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null) return "No buffer";
+        if (buffer.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
+        return sourceWritable(pane, buffer) ? null : "Markdown edit unavailable: read-only or unsupported surface";
     }
 
+    private boolean sourceWritable(EditorPane pane, FileBuffer buffer) {
+        return pane != null && pane == editor.getActivePane() && buffer == editor.getCurrentBuffer()
+            && pane.getBuffer() == buffer && !buffer.isLargeFile() && !buffer.isShowingPreviewOnly()
+            && !pane.isMarkdownPreview() && pane.getAlternateComponent() == null && pane.getTerminalPane() == null
+            && pane.getTextArea() == editor.writingArea && editor.writingArea.getDocument() == buffer.getDocument()
+            && editor.writingArea.isEnabled() && !editor.suppressDocumentEvents
+            // Vim disables ordinary typing in normal/visual/command modes, not source commands.
+            && (pane.surface().editable() || editor.configManager.getKeymapProfile() == KeymapProfile.VIM
+                && !editor.editorState.mode.isEditable());
+    }
+
+    private String replace(int start, int end, String text, int caret, String success) throws BadLocationException {
+        EditorPane pane = editor.getActivePane();
+        FileBuffer buffer = editor.getCurrentBuffer();
+        MarkdownEdit edit = new MarkdownEdit(buffer, editor.writingArea, pane.surface(),
+            () -> sourceWritable(pane, buffer), start, end);
+        String failure = edit.apply(text, caret);
+        return failure.isEmpty() ? success : failure;
+    }
+
+    private record SourceLine(int start, int end, String text) { }
+
+    /** Excludes only the actual terminator; the final line need not have one. */
+    private SourceLine sourceLine(int line) throws BadLocationException {
+        int start = editor.writingArea.getLineStartOffset(line);
+        int end = Math.min(editor.writingArea.getLineEndOffset(line), editor.writingArea.getDocument().getLength());
+        if (end > start && editor.writingArea.getText(end - 1, 1).equals("\n")) end--;
+        return new SourceLine(start, end, editor.writingArea.getText(start, end - start));
+    }
+
+    String markdownHeadingShift(boolean demote) {
+        String unavailable = mutationUnavailable();
+        if (unavailable != null) return unavailable;
+        try {
+            SourceLine line = sourceLine(editor.getCurrentCaretLine());
+            String changed;
+            String success;
+            if (!editor.markdownService.isHeading(line.text())) {
+                if (demote) changed = (editor.effectiveExpandTab() ? " ".repeat(editor.writingArea.getTabSize()) : "\t") + line.text();
+                else {
+                    int count = 0;
+                    while (count < line.text().length() && count < editor.writingArea.getTabSize()
+                        && Character.isWhitespace(line.text().charAt(count))) count++;
+                    changed = line.text().substring(count);
+                }
+                success = "Line updated";
+            } else {
+                changed = demote ? editor.markdownService.demoteHeading(line.text()) : editor.markdownService.promoteHeading(line.text());
+                if (changed.equals(line.text())) return demote ? "Already at h6" : "Already at h1";
+                success = demote ? "Demoted heading" : "Promoted heading";
+            }
+            return replace(line.start(), line.end(), changed, -1, success);
+        } catch (BadLocationException error) { return "Markdown edit unavailable: invalid line"; }
+    }
 
     String markdownSubtreeShift(boolean demote) {
-        String[] lines = getCurrentLines();
-        int line = editor.getCurrentCaretLine();
-        if (line < 0 || line >= lines.length || !editor.markdownService.isHeading(lines[line])) {
-            return "Not on a heading line";
-        }
-        String[] newLines = demote ? editor.markdownService.demoteSubtree(lines, line) : editor.markdownService.promoteSubtree(lines, line);
-        MarkdownService.FoldRange range = editor.markdownService.computeFoldRange(lines, line);
-        int start = line;
-        int end = range != null ? range.endLine : line;
+        String unavailable = mutationUnavailable();
+        if (unavailable != null) return unavailable;
         try {
-            int startOffset = editor.writingArea.getLineStartOffset(start);
-            int endOffset = editor.writingArea.getLineEndOffset(end);
-            StringBuilder replacement = new StringBuilder();
-            for (int i = start; i <= end; i++) {
-                if (i > start) replacement.append("\n");
-                replacement.append(newLines[i]);
+            int lineIndex = editor.getCurrentCaretLine();
+            SourceLine first = sourceLine(lineIndex), last = first;
+            int level = editor.markdownService.headingLevel(first.text());
+            if (level == 0) return "Not on a heading line";
+            StringBuilder changed = new StringBuilder(demote ? editor.markdownService.demoteHeading(first.text())
+                : editor.markdownService.promoteHeading(first.text()));
+            for (int i = lineIndex + 1; i < editor.writingArea.getLineCount(); i++) {
+                SourceLine line = sourceLine(i);
+                int nextLevel = editor.markdownService.headingLevel(line.text());
+                if (nextLevel > 0 && nextLevel <= level) break;
+                if (line.end() - first.start() > MarkdownService.MAX_TABLE_CHARS) return "Markdown subtree too large to edit safely";
+                changed.append('\n').append(demote ? editor.markdownService.demoteHeading(line.text())
+                    : editor.markdownService.promoteHeading(line.text()));
+                last = line;
             }
-            replacement.append("\n");
-            editor.suppressDocumentEvents = true;
-            editor.writingArea.replaceRange(replacement.toString(), startOffset, endOffset);
-            editor.suppressDocumentEvents = false;
-            editor.markModified();
-            return demote ? "Demoted subtree" : "Promoted subtree";
-        } catch (BadLocationException e) {
-            editor.suppressDocumentEvents = false;
-            return "Error: " + e.getMessage();
-        }
+            return replace(first.start(), last.end(), changed.toString(), -1, demote ? "Demoted subtree" : "Promoted subtree");
+        } catch (BadLocationException error) { return "Markdown edit unavailable: invalid line"; }
     }
-
 
     boolean isOnTableLine() {
-        String[] lines = getCurrentLines();
-        int line = editor.getCurrentCaretLine();
-        return line >= 0 && line < lines.length && editor.markdownService.isTableRow(lines[line]);
+        try { return editor.markdownService.isTableRow(sourceLine(editor.getCurrentCaretLine()).text()); }
+        catch (BadLocationException error) { return false; }
     }
 
+    private record TableRange(int start, int end, int currentRow, String[] lines) { }
+
+    private TableRange currentTable() throws BadLocationException {
+        int current = editor.getCurrentCaretLine(), first = current, last = current;
+        if (!editor.markdownService.isTableRow(sourceLine(current).text())) throw new IllegalArgumentException("Not inside a table");
+        int currentStart = sourceLine(current).start();
+        while (first > 0 && editor.markdownService.isTableRow(sourceLine(first - 1).text())) {
+            first--;
+            if (currentStart - sourceLine(first).start() > MarkdownService.MAX_TABLE_CHARS) throw new IllegalArgumentException("Table too large to edit safely");
+        }
+        int start = sourceLine(first).start();
+        while (last + 1 < editor.writingArea.getLineCount() && editor.markdownService.isTableRow(sourceLine(last + 1).text())) {
+            last++;
+            if (sourceLine(last).end() - start > MarkdownService.MAX_TABLE_CHARS) throw new IllegalArgumentException("Table too large to edit safely");
+        }
+        int end = sourceLine(last).end();
+        if (end - start > MarkdownService.MAX_TABLE_CHARS) throw new IllegalArgumentException("Table too large to edit safely");
+        String[] lines = editor.writingArea.getText(start, end - start).split("\n", -1);
+        editor.markdownService.validateEditableTable(lines, 0, lines.length - 1);
+        return new TableRange(start, end, current - first, lines);
+    }
 
     String markdownTableNextCell(boolean reverse) {
+        String unavailable = mutationUnavailable();
+        if (unavailable != null) return unavailable;
         try {
-            int line = editor.getCurrentCaretLine();
-            String[] lines = getCurrentLines();
-            if (line < 0 || line >= lines.length) return "";
-            String currentLine = lines[line];
-            int lineStart = editor.writingArea.getLineStartOffset(line);
-            int posInLine = editor.writingArea.getCaretPosition() - lineStart;
-
+            TableRange table = currentTable();
+            SourceLine line = sourceLine(editor.getCurrentCaretLine());
+            int columnOffset = editor.writingArea.getCaretPosition() - line.start();
             if (reverse) {
-                int offset = editor.markdownService.prevCellOffset(currentLine, posInLine);
-                editor.writingArea.setCaretPosition(lineStart + offset);
+                editor.writingArea.setCaretPosition(line.start() + editor.markdownService.prevCellOffset(line.text(), columnOffset));
                 return "";
             }
-
-            int nextOffset = editor.markdownService.nextCellOffset(currentLine, posInLine + 1);
-            if (nextOffset <= posInLine + 1 || nextOffset >= currentLine.length() - 1) {
-                // Move to next row or create new row
-                int tableStart = editor.markdownService.tableStartLine(lines, line);
-                int tableEnd = editor.markdownService.tableEndLine(lines, line);
-                if (line >= tableEnd) {
-                    // Create new row
-                    String[] cells = editor.markdownService.parseCells(currentLine);
-                    int[] widths = new int[cells.length];
-                    for (int c = 0; c < cells.length; c++) widths[c] = Math.max(3, cells[c].length());
-                    String newRow = editor.markdownService.newTableRow(cells.length, widths);
-                    int endOfLine = editor.writingArea.getLineEndOffset(line);
-                    editor.suppressDocumentEvents = true;
-                    editor.writingArea.insert("\n" + newRow, endOfLine - 1);
-                    editor.suppressDocumentEvents = false;
-                    editor.markModified();
-                    // Move to first cell of new row
-                    int newLineStart = editor.writingArea.getLineStartOffset(line + 1);
-                    String newLineText = lines.length > line + 1 ? newRow : editor.writingArea.getText().split("\n", -1)[line + 1];
-                    int firstCell = editor.markdownService.nextCellOffset(newLineText, 0);
-                    editor.writingArea.setCaretPosition(newLineStart + firstCell);
-                } else {
-                    // Skip separator lines
-                    int nextLine = line + 1;
-                    while (nextLine <= tableEnd && editor.markdownService.isTableSeparator(lines[nextLine])) {
-                        nextLine++;
-                    }
-                    if (nextLine <= tableEnd) {
-                        int nextLineStart = editor.writingArea.getLineStartOffset(nextLine);
-                        int firstCell = editor.markdownService.nextCellOffset(lines[nextLine], 0);
-                        editor.writingArea.setCaretPosition(nextLineStart + firstCell);
-                    }
-                }
-            } else {
-                editor.writingArea.setCaretPosition(lineStart + nextOffset);
+            int next = editor.markdownService.nextCellOffset(line.text(), columnOffset + 1);
+            if (next > columnOffset + 1 && next < line.text().length() - 1) {
+                editor.writingArea.setCaretPosition(line.start() + next);
+                return "";
+            }
+            if (table.currentRow() == table.lines().length - 1) {
+                String[] cells = editor.markdownService.parseCells(line.text());
+                int[] widths = new int[cells.length];
+                for (int c = 0; c < cells.length; c++) widths[c] = Math.max(3, cells[c].length());
+                String row = editor.markdownService.newTableRow(cells.length, widths);
+                return replace(line.end(), line.end(), "\n" + row,
+                    line.end() + 1 + editor.markdownService.nextCellOffset(row, 0), "");
+            }
+            int nextRow = table.currentRow() + 1;
+            if (editor.markdownService.isTableSeparator(table.lines()[nextRow])) nextRow++;
+            if (nextRow < table.lines().length) {
+                int nextStart = line.end() + 1;
+                for (int i = table.currentRow() + 1; i < nextRow; i++) nextStart += table.lines()[i].length() + 1;
+                editor.writingArea.setCaretPosition(nextStart + editor.markdownService.nextCellOffset(table.lines()[nextRow], 0));
             }
             return "";
-        } catch (BadLocationException e) {
-            return "Table navigation error";
-        }
+        } catch (BadLocationException error) { return "Table navigation unavailable"; }
+        catch (IllegalArgumentException error) { return error.getMessage(); }
     }
 
+    public String alignMarkdownTable() { return transformTable("align", ""); }
+    public String sortMarkdownTable(String args) { return transformTable("sort", args); }
+    public String insertTableColumn(String args) { return transformTable("insert", args); }
+    public String deleteTableColumn(String args) { return transformTable("delete", args); }
 
-    public String alignMarkdownTable() {
-        FileBuffer buf = editor.getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        String[] lines = getCurrentLines();
-        int line = editor.getCurrentCaretLine();
-        if (!editor.markdownService.isInsideTable(lines, line)) return "Not inside a table";
-        int start = editor.markdownService.tableStartLine(lines, line);
-        int end = editor.markdownService.tableEndLine(lines, line);
-        String aligned = editor.markdownService.alignTable(lines, start, end);
+    private String transformTable(String operation, String args) {
+        String unavailable = mutationUnavailable();
+        if (unavailable != null) return unavailable;
         try {
-            int startOffset = editor.writingArea.getLineStartOffset(start);
-            int endOffset = editor.writingArea.getLineEndOffset(end);
-            editor.suppressDocumentEvents = true;
-            editor.writingArea.replaceRange(aligned + "\n", startOffset, endOffset);
-            editor.suppressDocumentEvents = false;
-            editor.markModified();
-            return "Table aligned";
-        } catch (BadLocationException e) {
-            editor.suppressDocumentEvents = false;
-            return "Error aligning table: " + e.getMessage();
-        }
+            TableRange table = currentTable();
+            String[] lines = table.lines();
+            int last = lines.length - 1;
+            int columns = editor.markdownService.parseCells(lines[0]).length;
+            SourceLine line = sourceLine(editor.getCurrentCaretLine());
+            int column = editor.markdownService.cellColumn(line.text(), editor.writingArea.getCaretPosition() - line.start());
+            String result, success;
+            switch (operation) {
+                case "align" -> { result = editor.markdownService.alignTable(lines, 0, last); success = "Table aligned"; }
+                case "sort" -> {
+                    String[] parts = args == null || args.isBlank() ? new String[]{"1"} : args.trim().split("\\s+");
+                    column = Integer.parseInt(parts[0]) - 1;
+                    if (column < 0 || column >= columns || parts.length > 2
+                        || parts.length == 2 && !parts[1].equalsIgnoreCase("asc") && !parts[1].equalsIgnoreCase("desc"))
+                        return "Invalid table sort column or direction";
+                    result = editor.markdownService.sortTable(lines, 0, last, column, parts.length < 2 || !parts[1].equalsIgnoreCase("desc"));
+                    success = "Table sorted by column " + (column + 1);
+                }
+                case "insert" -> { result = editor.markdownService.insertColumn(lines, 0, last, column); success = "Column inserted"; }
+                default -> {
+                    if (args != null && !args.isBlank()) column = Integer.parseInt(args.trim()) - 1;
+                    if (column < 0 || column >= columns || columns == 1) return "Invalid table column deletion";
+                    result = editor.markdownService.deleteColumn(lines, 0, last, column); success = "Column deleted";
+                }
+            }
+            if (result.length() > MarkdownService.MAX_TABLE_CHARS) return "Formatted table too large to edit safely";
+            return replace(table.start(), table.end(), result, -1, success);
+        } catch (BadLocationException error) { return "Table edit unavailable: invalid range"; }
+        catch (NumberFormatException error) { return "Invalid table column"; }
+        catch (IllegalArgumentException error) { return error.getMessage(); }
     }
-
-
-    public String sortMarkdownTable(String args) {
-        FileBuffer buf = editor.getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        String[] lines = getCurrentLines();
-        int line = editor.getCurrentCaretLine();
-        if (!editor.markdownService.isInsideTable(lines, line)) return "Not inside a table";
-        int col = 0;
-        boolean ascending = true;
-        if (args != null && !args.isEmpty()) {
-            String[] parts = args.trim().split("\\s+");
-            try {
-                col = Integer.parseInt(parts[0]) - 1;
-            } catch (NumberFormatException ignored) {}
-            if (parts.length > 1 && parts[1].equalsIgnoreCase("desc")) ascending = false;
-        }
-        int start = editor.markdownService.tableStartLine(lines, line);
-        int end = editor.markdownService.tableEndLine(lines, line);
-        String sorted = editor.markdownService.sortTable(lines, start, end, col, ascending);
-        try {
-            int startOffset = editor.writingArea.getLineStartOffset(start);
-            int endOffset = editor.writingArea.getLineEndOffset(end);
-            editor.suppressDocumentEvents = true;
-            editor.writingArea.replaceRange(sorted + "\n", startOffset, endOffset);
-            editor.suppressDocumentEvents = false;
-            editor.markModified();
-            return "Table sorted by column " + (col + 1);
-        } catch (BadLocationException e) {
-            editor.suppressDocumentEvents = false;
-            return "Error sorting table: " + e.getMessage();
-        }
-    }
-
-
-    public String insertTableColumn(String args) {
-        FileBuffer buf = editor.getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        String[] lines = getCurrentLines();
-        int line = editor.getCurrentCaretLine();
-        if (!editor.markdownService.isInsideTable(lines, line)) return "Not inside a table";
-        int start = editor.markdownService.tableStartLine(lines, line);
-        int end = editor.markdownService.tableEndLine(lines, line);
-        int lineStart = 0;
-        try { lineStart = editor.writingArea.getLineStartOffset(line); } catch (BadLocationException ignored) {}
-        int col = editor.markdownService.cellColumn(lines[line], editor.writingArea.getCaretPosition() - lineStart);
-        String result = editor.markdownService.insertColumn(lines, start, end, col);
-        try {
-            int startOffset = editor.writingArea.getLineStartOffset(start);
-            int endOffset = editor.writingArea.getLineEndOffset(end);
-            editor.suppressDocumentEvents = true;
-            editor.writingArea.replaceRange(result + "\n", startOffset, endOffset);
-            editor.suppressDocumentEvents = false;
-            editor.markModified();
-            return "Column inserted";
-        } catch (BadLocationException e) {
-            editor.suppressDocumentEvents = false;
-            return "Error inserting column: " + e.getMessage();
-        }
-    }
-
-
-    public String deleteTableColumn(String args) {
-        FileBuffer buf = editor.getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        String[] lines = getCurrentLines();
-        int line = editor.getCurrentCaretLine();
-        if (!editor.markdownService.isInsideTable(lines, line)) return "Not inside a table";
-        int start = editor.markdownService.tableStartLine(lines, line);
-        int end = editor.markdownService.tableEndLine(lines, line);
-        int col = 0;
-        if (args != null && !args.isEmpty()) {
-            try { col = Integer.parseInt(args.trim()) - 1; } catch (NumberFormatException ignored) {}
-        } else {
-            int lineStart = 0;
-            try { lineStart = editor.writingArea.getLineStartOffset(line); } catch (BadLocationException ignored) {}
-            col = editor.markdownService.cellColumn(lines[line], editor.writingArea.getCaretPosition() - lineStart);
-        }
-        String result = editor.markdownService.deleteColumn(lines, start, end, col);
-        try {
-            int startOffset = editor.writingArea.getLineStartOffset(start);
-            int endOffset = editor.writingArea.getLineEndOffset(end);
-            editor.suppressDocumentEvents = true;
-            editor.writingArea.replaceRange(result + "\n", startOffset, endOffset);
-            editor.suppressDocumentEvents = false;
-            editor.markModified();
-            return "Column deleted";
-        } catch (BadLocationException e) {
-            editor.suppressDocumentEvents = false;
-            return "Error deleting column: " + e.getMessage();
-        }
-    }
-
 
     public String insertTableTemplate(String args) {
+        String unavailable = mutationUnavailable();
+        if (unavailable != null) return unavailable;
         int cols = 3, rows = 2;
-        if (args != null && !args.isEmpty()) {
-            String[] parts = args.trim().split("[xX]");
-            try {
-                if (parts.length >= 1) cols = Integer.parseInt(parts[0].trim());
-                if (parts.length >= 2) rows = Integer.parseInt(parts[1].trim());
-            } catch (NumberFormatException ignored) {}
-        }
-        String template = editor.markdownService.createTableTemplate(cols, rows);
-        editor.writingArea.insert(template, editor.writingArea.getCaretPosition());
-        editor.markModified();
-        return "Table inserted (" + cols + "x" + rows + ")";
+        try {
+            if (args != null && !args.isBlank()) {
+                String[] parts = args.trim().split("[xX]", 3);
+                if (parts.length > 2) return "Invalid table dimensions";
+                cols = Integer.parseInt(parts[0].trim());
+                if (parts.length == 2) rows = Integer.parseInt(parts[1].trim());
+            }
+            return insertTemplate(editor.markdownService.createTableTemplate(cols, rows), "Table inserted (" + cols + "x" + rows + ")");
+        } catch (IllegalArgumentException error) { return "Invalid table dimensions or size"; }
     }
-
 
     public String toggleCheckbox() {
-        String[] lines = getCurrentLines();
-        int line = editor.getCurrentCaretLine();
-        if (line < 0 || line >= lines.length) return "";
-        if (!editor.markdownService.isCheckbox(lines[line])) return "Not a checkbox line";
-        String toggled = editor.markdownService.toggleCheckbox(lines[line]);
+        String unavailable = mutationUnavailable();
+        if (unavailable != null) return unavailable;
         try {
-            int startOffset = editor.writingArea.getLineStartOffset(line);
-            int endOffset = editor.writingArea.getLineEndOffset(line);
-            editor.suppressDocumentEvents = true;
-            editor.writingArea.replaceRange(toggled + "\n", startOffset, endOffset);
-            editor.suppressDocumentEvents = false;
-            editor.markModified();
-            return toggled.contains("[x]") ? "Checked" : "Unchecked";
-        } catch (BadLocationException e) {
-            editor.suppressDocumentEvents = false;
-            return "Error: " + e.getMessage();
-        }
+            SourceLine line = sourceLine(editor.getCurrentCaretLine());
+            if (!editor.markdownService.isCheckbox(line.text())) return "Not a checkbox line";
+            String toggled = editor.markdownService.toggleCheckbox(line.text());
+            return replace(line.start(), line.end(), toggled, -1, toggled.contains("[x]") ? "Checked" : "Unchecked");
+        } catch (BadLocationException error) { return "Markdown edit unavailable: invalid line"; }
     }
-
 
     String handleMarkdownEnter() {
-        String[] lines = getCurrentLines();
-        int line = editor.getCurrentCaretLine();
-        if (line < 0 || line >= lines.length) return null;
-        String currentLine = lines[line];
-
-        if (editor.markdownService.isEmptyListItem(currentLine)) {
-            // Remove the empty list prefix
-            try {
-                int startOffset = editor.writingArea.getLineStartOffset(line);
-                int endOffset = editor.writingArea.getLineEndOffset(line);
-                editor.suppressDocumentEvents = true;
-                editor.writingArea.replaceRange("\n", startOffset, endOffset);
-                editor.suppressDocumentEvents = false;
-                editor.lastInsertedText += "\n";
-                return "";
-            } catch (BadLocationException e) {
-                editor.suppressDocumentEvents = false;
-                return null;
+        String unavailable = mutationUnavailable();
+        if (unavailable != null) return unavailable;
+        try {
+            int start = editor.writingArea.getSelectionStart(), end = editor.writingArea.getSelectionEnd();
+            int lineIndex = editor.writingArea.getLineOfOffset(start);
+            SourceLine line = sourceLine(lineIndex);
+            // Continue the prefix before the selection/caret, never a different active editor later.
+            String before = editor.writingArea.getText(line.start(), start - line.start());
+            if (editor.markdownService.isEmptyListItem(before) && before.equals(line.text()) && start == end) {
+                int rangeEnd = line.end() < editor.writingArea.getDocument().getLength() ? line.end() + 1 : line.end();
+                String result = replace(line.start(), rangeEnd, "\n", line.start() + 1, "");
+                if (result.isEmpty()) recordContinuation("\n");
+                return result;
             }
-        }
-
-        String continuation = editor.markdownService.listContinuation(currentLine);
-        if (continuation != null) {
-            SwingUtilities.invokeLater(() -> {
-                editor.writingArea.insert(continuation, editor.writingArea.getCaretPosition());
-            });
-            editor.lastInsertedText += "\n" + continuation;
-            return "";
-        }
-        return null;
+            String continuation = editor.markdownService.listContinuation(before);
+            if (continuation == null) {
+                if (editor.configManager.getKeymapProfile() != KeymapProfile.VIM) return null;
+                int indent = 0;
+                while (indent < before.length() && (before.charAt(indent) == ' ' || before.charAt(indent) == '\t')) indent++;
+                continuation = editor.configManager.getAutoIndent() ? before.substring(0, indent) : "";
+            }
+            String inserted = "\n" + continuation;
+            String result = replace(start, end, inserted, start + inserted.length(), "");
+            if (result.isEmpty()) recordContinuation(inserted);
+            return result;
+        } catch (BadLocationException error) { return "Markdown continuation unavailable"; }
+        catch (IllegalArgumentException error) { return error.getMessage(); }
     }
 
+    private void recordContinuation(String inserted) {
+        if (editor.configManager.getKeymapProfile() == KeymapProfile.VIM) editor.lastInsertedText += inserted;
+    }
+
+    private String insertTemplate(String template, String success) {
+        try {
+            int start = editor.writingArea.getCaretPosition();
+            return replace(start, start, template, start + template.length(), success);
+        } catch (BadLocationException error) { return "Markdown edit unavailable: invalid range"; }
+    }
 
     public String insertLink() {
-        String template = editor.markdownService.insertLinkTemplate();
-        editor.writingArea.insert(template, editor.writingArea.getCaretPosition());
-        editor.markModified();
-        return "Link template inserted";
+        String unavailable = mutationUnavailable();
+        return unavailable != null ? unavailable : insertTemplate(editor.markdownService.insertLinkTemplate(), "Link template inserted");
     }
 
-
     public String insertImage() {
-        String template = editor.markdownService.insertImageTemplate();
-        editor.writingArea.insert(template, editor.writingArea.getCaretPosition());
-        editor.markModified();
-        return "Image template inserted";
+        String unavailable = mutationUnavailable();
+        return unavailable != null ? unavailable : insertTemplate(editor.markdownService.insertImageTemplate(), "Image template inserted");
     }
 
 
@@ -715,25 +561,17 @@ final class MarkdownController {
 
 
     String completeCodeFenceLanguage() {
+        String unavailable = mutationUnavailable();
+        if (unavailable != null) return unavailable;
         try {
-            int line = editor.getCurrentCaretLine();
-            int lineStart = editor.writingArea.getLineStartOffset(line);
-            int lineEnd = editor.writingArea.getLineEndOffset(line);
-            String lineText = editor.writingArea.getText(lineStart, lineEnd - lineStart).trim();
-            if (!lineText.startsWith("```")) return "Not a code fence line";
-            String prefix = lineText.substring(3).trim();
-            String[] matches = editor.markdownService.filterCodeFenceLanguages(prefix);
+            SourceLine line = sourceLine(editor.getCurrentCaretLine());
+            String text = line.text().trim();
+            if (!text.startsWith("```")) return "Not a code fence line";
+            String[] matches = editor.markdownService.filterCodeFenceLanguages(text.substring(3).trim());
             if (matches.length == 0) return "No matching language";
-            String chosen = matches[0];
-            // Replace the line with the completed fence
-            editor.suppressDocumentEvents = true;
-            editor.writingArea.replaceRange("```" + chosen + "\n", lineStart, lineEnd);
-            editor.suppressDocumentEvents = false;
-            editor.markModified();
-            return "Language: " + chosen;
-        } catch (BadLocationException e) {
-            return "Error: " + e.getMessage();
-        }
+            int languageStart = line.start() + line.text().indexOf("```") + 3;
+            return replace(languageStart, line.end(), matches[0], -1, "Language: " + matches[0]);
+        } catch (BadLocationException error) { return "Markdown edit unavailable: invalid line"; }
     }
 
 
@@ -741,6 +579,10 @@ final class MarkdownController {
         FileBuffer buf = editor.getCurrentBuffer();
         if (buf == null) return "No buffer";
         FileType ft = buf.getFileType();
+        if (ft == FileType.MARKDOWN) {
+            String unavailable = mutationUnavailable();
+            if (unavailable != null) return unavailable;
+        }
         int pos = editor.writingArea.getCaretPosition();
         String text = editor.writingArea.getText();
 
@@ -755,6 +597,11 @@ final class MarkdownController {
         if (snippet == null) return "No snippet: " + trigger;
         String expanded = editor.snippetService.expand(snippet);
         int cursorOffset = editor.snippetService.cursorOffset(snippet);
+        if (ft == FileType.MARKDOWN) {
+            try {
+                return replace(wordStart, pos, expanded, wordStart + (cursorOffset >= 0 ? cursorOffset : expanded.length()), "Expanded: " + trigger);
+            } catch (BadLocationException error) { return "Markdown edit unavailable: invalid snippet range"; }
+        }
         editor.suppressDocumentEvents = true;
         editor.writingArea.replaceRange(expanded, wordStart, pos);
         editor.suppressDocumentEvents = false;

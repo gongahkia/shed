@@ -449,6 +449,7 @@ final class InputController {
             }
         }
         if (!editor.extraSelections.isEmpty() && handlePlainMultiSelectionClipboard(event)) return;
+        if (handleMarkdownEnterKey(event)) return;
         PlainKeymap.Action action = PlainKeymap.actionFor(event);
         if (action == PlainKeymap.Action.NONE) {
             if (!editor.extraSelections.isEmpty() && switch (event.getKeyCode()) {
@@ -630,7 +631,25 @@ final class InputController {
         if (resolution.consume()) {
             event.consume();
         }
+        if (!resolution.consume() && handleMarkdownEnterKey(event)) return;
         executeEmacsAction(resolution.action());
+    }
+
+    private boolean handleMarkdownEnterKey(KeyEvent event) {
+        if (event.getKeyCode() != KeyEvent.VK_ENTER || event.isControlDown() || event.isAltDown()
+            || event.isMetaDown() || composingText || !editor.extraSelections.isEmpty()
+            || event.isShiftDown() && editor.configManager.getKeymapProfile() != KeymapProfile.VIM) return false;
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || buffer.getFileType() != FileType.MARKDOWN) return false;
+        if (event.getComponent() != editor.writingArea) {
+            event.consume();
+            return true;
+        }
+        String result = editor.handleMarkdownEnter();
+        if (result == null) return false;
+        event.consume();
+        if (!result.isEmpty()) editor.showMessage(result);
+        return true;
     }
 
     private void ensureNonModalEditing() {
@@ -987,6 +1006,7 @@ final class InputController {
 
         // Handle pending keys (multi-key commands)
         if (editor.editorState.pendingKey != '\0') {
+            if (editor.editorState.pendingKey == 'z' && (c == 'a' || c == 'M' || c == 'R')) e.consume();
             handlePendingKey(c, code);
             return;
         }
@@ -1363,11 +1383,12 @@ final class InputController {
             }
         }
 
-        // TAB: markdown fold cycling on heading lines
+        // TAB: retain the Markdown fold binding while folding is unavailable
         else if (code == KeyEvent.VK_TAB) {
             editor.editorState.pendingCount = "";
             FileBuffer buf = editor.getCurrentBuffer();
             if (buf != null && buf.getFileType() == FileType.MARKDOWN) {
+                e.consume();
                 if (e.isShiftDown()) {
                     editor.showMessage(editor.globalFoldCycle());
                 } else {
@@ -1899,6 +1920,7 @@ final class InputController {
 
     void handleInsertMode(KeyEvent e) {
         int code = e.getKeyCode();
+        if (composingText && code == KeyEvent.VK_ENTER) return;
         if ((code == KeyEvent.VK_TAB || (e.isShiftDown() && code == KeyEvent.VK_TAB)) && moveSnippetPlaceholder(e.isShiftDown() ? -1 : 1)) {
             e.consume();
             return;
@@ -2001,6 +2023,7 @@ final class InputController {
             }
         }
 
+        if (handleMarkdownEnterKey(e)) return;
         if (!e.isControlDown() && !e.isAltDown()) {
             char c = e.getKeyChar();
             FileBuffer currentBuf = editor.getCurrentBuffer();
@@ -2015,13 +2038,8 @@ final class InputController {
                 editor.lastInsertedText += " ".repeat(editor.writingArea.getTabSize());
                 e.consume();
             } else if (c == '\n') {
-                if (isMarkdown) {
-                    String continued = editor.handleMarkdownEnter();
-                    if (continued != null) {
-                        e.consume();
-                        return;
-                    }
-                }
+                // Markdown Enter is synchronous above; never queue an active-editor lookup here.
+                if (isMarkdown) return;
                 if (editor.configManager.getAutoIndent()) {
                     String indent = editor.indentationForNewLine();
                     if (editor.macroPlaybackDepth > 0) {

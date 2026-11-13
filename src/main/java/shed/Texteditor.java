@@ -231,9 +231,6 @@ public class Texteditor extends JFrame implements KeyListener {
     SubstituteService substituteService;
     List<int[]> diagnosticRanges = new ArrayList<>(); // [startOffset, endOffset, severity]
     javax.swing.Timer diagnosticRefreshTimer;
-    Map<Integer, Boolean> foldedLines; // headingLine -> folded
-    String foldedContent; // stores hidden content per fold
-    Map<Integer, String> foldHiddenContent; // headingLine -> hidden text
     int concealLevel; // 0=show all, 1=conceal some, 2=full conceal
     List<Object> bracketHighlightTags;
     final List<Object> matchBracketTags = new ArrayList<>();
@@ -471,8 +468,6 @@ public class Texteditor extends JFrame implements KeyListener {
         taskService = new TaskService();
         fileWatcherService = new FileWatcherService();
         substituteService = new SubstituteService();
-        foldedLines = new HashMap<>();
-        foldHiddenContent = new HashMap<>();
         concealLevel = 0;
         bracketHighlightTags = new ArrayList<>();
         markdownHighlightTags = new ArrayList<>();

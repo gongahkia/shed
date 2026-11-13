@@ -231,16 +231,63 @@ public class MarkdownService {
         return end;
     }
 
+    // Bounds explicit table formatting/template commands, including padding amplification.
+    static final int MAX_TABLE_CHARS = 1024 * 1024;
+    static final int MAX_TABLE_COLUMNS = 256;
+    static final int MAX_TABLE_ROWS = 10_000;
+
+    private boolean delimiter(String line, int index) {
+        if (line.charAt(index) != '|') return false;
+        int slashes = 0;
+        for (int i = index - 1; i >= 0 && line.charAt(i) == '\\'; i--) slashes++;
+        return slashes % 2 == 0;
+    }
+
     public String[] parseCells(String line) {
         if (line == null) return new String[0];
         String trimmed = line.trim();
-        if (trimmed.startsWith("|")) trimmed = trimmed.substring(1);
-        if (trimmed.endsWith("|")) trimmed = trimmed.substring(0, trimmed.length() - 1);
-        String[] cells = trimmed.split("\\|", -1);
-        for (int i = 0; i < cells.length; i++) {
-            cells[i] = cells[i].trim();
+        int start = trimmed.startsWith("|") ? 1 : 0;
+        int end = trimmed.length();
+        if (end > start && delimiter(trimmed, end - 1)) end--;
+        List<String> cells = new ArrayList<>();
+        for (int i = start; i < end; i++) {
+            if (delimiter(trimmed, i)) {
+                cells.add(trimmed.substring(start, i).trim());
+                start = i + 1;
+            }
         }
-        return cells;
+        cells.add(trimmed.substring(start, end).trim());
+        return cells.toArray(new String[0]);
+    }
+
+    /** The legacy formatter supports rectangular, standalone pipe tables only. */
+    void validateEditableTable(String[] lines, int first, int last) {
+        if (first < 0 || last >= lines.length || last <= first || last - first > MAX_TABLE_ROWS)
+            throw new IllegalArgumentException("Unsupported table structure");
+        int columns = parseCells(lines[first]).length;
+        if (columns < 1 || columns > MAX_TABLE_COLUMNS) throw new IllegalArgumentException("Unsupported table dimensions");
+        int[] widths = new int[columns];
+        long sourceSize = 0;
+        for (int i = first; i <= last; i++) {
+            String line = lines[i];
+            sourceSize += line.length() + 1L;
+            if (sourceSize > MAX_TABLE_CHARS) throw new IllegalArgumentException("Table too large to edit safely");
+            if (!line.startsWith("|") || !line.stripTrailing().endsWith("|")
+                || !delimiter(line.stripTrailing(), line.stripTrailing().length() - 1) || line.indexOf('`') >= 0)
+                throw new IllegalArgumentException("Unsupported complex table syntax");
+            String[] cells = parseCells(line);
+            if (cells.length != columns) throw new IllegalArgumentException("Unsupported uneven table rows");
+            for (int c = 0; c < columns; c++) {
+                if (i == first + 1 && !cells[c].matches(":?-{3,}:?"))
+                    throw new IllegalArgumentException("Unsupported table separator");
+                if (i != first + 1) widths[c] = Math.max(widths[c], Math.max(3, cells[c].length()));
+            }
+            if (i != first + 1 && isTableSeparator(line)) throw new IllegalArgumentException("Ambiguous table separator");
+        }
+        long rowSize = 1;
+        for (int width : widths) rowSize += width + 3L;
+        if ((rowSize + 1) * (last - first + 1L) > MAX_TABLE_CHARS)
+            throw new IllegalArgumentException("Formatted table too large to edit safely");
     }
 
     public String formatRow(String[] cells, int[] widths) {
@@ -471,6 +518,9 @@ public class MarkdownService {
     }
 
     public String createTableTemplate(int cols, int rows) {
+        if (cols < 1 || rows < 1 || cols > MAX_TABLE_COLUMNS || rows > MAX_TABLE_ROWS
+            || rows + 2L > MAX_TABLE_CHARS / (11L * cols + 2))
+            throw new IllegalArgumentException("Invalid table dimensions or size");
         int[] widths = new int[cols];
         Arrays.fill(widths, 8);
         String[] header = new String[cols];
@@ -494,7 +544,7 @@ public class MarkdownService {
         if (line == null || charOffset < 0) return 0;
         int col = 0;
         for (int i = 0; i < Math.min(charOffset, line.length()); i++) {
-            if (line.charAt(i) == '|') col++;
+            if (delimiter(line, i)) col++;
         }
         return Math.max(0, col - 1);
     }
@@ -502,7 +552,7 @@ public class MarkdownService {
     public int nextCellOffset(String line, int currentOffset) {
         if (line == null) return currentOffset;
         for (int i = currentOffset; i < line.length(); i++) {
-            if (line.charAt(i) == '|' && i + 1 < line.length()) {
+            if (delimiter(line, i) && i + 1 < line.length()) {
                 int next = i + 1;
                 while (next < line.length() && line.charAt(next) == ' ') next++;
                 return Math.min(next, line.length() - 1);
@@ -517,7 +567,7 @@ public class MarkdownService {
         int lastPipe = -1;
         int secondLastPipe = -1;
         for (int i = 0; i < Math.min(currentOffset, line.length()); i++) {
-            if (line.charAt(i) == '|') {
+            if (delimiter(line, i)) {
                 pipeCount++;
                 secondLastPipe = lastPipe;
                 lastPipe = i;
@@ -576,8 +626,13 @@ public class MarkdownService {
         if (ordered.matches()) {
             if (ordered.group(3).trim().isEmpty()) return null;
             String indent = ordered.group(1);
-            int num = Integer.parseInt(ordered.group(2));
-            return indent + (num + 1) + ". ";
+            try {
+                int num = Integer.parseInt(ordered.group(2));
+                if (num == Integer.MAX_VALUE) throw new NumberFormatException();
+                return indent + (num + 1) + ". ";
+            } catch (NumberFormatException error) {
+                throw new IllegalArgumentException("Ordered list number too large to continue safely");
+            }
         }
 
         Matcher unordered = UNORDERED_LIST.matcher(currentLine);
@@ -602,6 +657,8 @@ public class MarkdownService {
         if (unordered.matches() && unordered.group(3).trim().isEmpty()) return true;
         Matcher cb = CHECKBOX_UNCHECKED.matcher(line);
         if (cb.matches() && cb.group(2).trim().isEmpty()) return true;
+        Matcher checked = CHECKBOX_CHECKED.matcher(line);
+        if (checked.matches() && checked.group(2).trim().isEmpty()) return true;
         return line.matches("^\\s*>\\s*$");
     }
 

@@ -2078,33 +2078,230 @@ public class TexteditorSwingIntegrationTest {
             MarkdownPreviewPane preview = onEdt(() -> (MarkdownPreviewPane) editor.editorPanes.stream()
                 .filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow().getComponent());
 
+            preparePreviewScrollGeometry(editor, preview);
             onEdt(() -> {
                 javax.swing.JScrollBar sourceBar = source.getScrollPane().getVerticalScrollBar();
                 sourceBar.setValue(sourceBar.getMaximum() - sourceBar.getVisibleAmount());
                 return null;
             });
-            flushEdt();
-            int sourceScrollPosition = onEdt(preview::getVerticalScrollPosition);
-            assertTrue(sourceScrollPosition > 0);
+            awaitPreviewScrollAtSource(editor, source, preview);
+            PreviewScrollState sourceScroll = onEdt(() -> previewScrollState(preview));
+            assertTrue(sourceScroll.value() > 0);
 
             onEdt(() -> {
                 source.getTextArea().setCaretPosition(source.getTextArea().getDocument().getLength());
                 return null;
             });
-            flushEdt();
-            assertTrue(onEdt(preview::getVerticalScrollPosition) >= sourceScrollPosition);
-            int caretScrollPosition = onEdt(preview::getVerticalScrollPosition);
-
-            onEdt(() -> {
+            awaitPreviewScrollAtSource(editor, source, preview);
+            assertTrue(onEdt(preview::getVerticalScrollPosition) >= sourceScroll.value(),
+                () -> "Before caret: " + sourceScroll);
+            PreviewScrollState beforeDisable = onEdt(() -> {
+                editor.validate();
+                PreviewScrollState state = previewScrollState(preview);
+                assertEquals(state.maximum(), state.value(), "The EOF caret must synchronize to the preview bottom");
                 editor.configManager.set("markdown.preview.scroll.sync", "false");
                 source.getScrollPane().getVerticalScrollBar().setValue(0);
-                return null;
+                return state;
             });
             flushEdt();
-            assertEquals(caretScrollPosition, onEdt(preview::getVerticalScrollPosition));
+            onEdt(() -> {
+                editor.validate();
+                assertEquals(beforeDisable, previewScrollState(preview),
+                    "Source scrolling while sync is disabled must preserve position and settled geometry");
+                return null;
+            });
         } finally {
+            onEdt(() -> { editor.disposeMarkdownPreviews(); return null; });
             disposeEditor(editor);
         }
+    }
+
+    @Test
+    void markdownPreviewDisabledSyncClampsToNewRangeWhenNotificationExpires() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("preview-expiry.md"),
+            "## Section\n\nContent\n\n".repeat(180));
+        Texteditor editor = createEditor(tempDir.resolve("home-preview-expiry"), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            EditorPane source = onEdt(editor::getActivePane);
+            FileBuffer buffer = onEdt(editor::getCurrentBuffer);
+            assertEquals("Markdown preview opened", onEdt(() -> editor.commandHandler.execute("markdown preview")));
+            MarkdownPreviewPane preview = onEdt(() -> (MarkdownPreviewPane) editor.editorPanes.stream()
+                .filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow().getComponent());
+            onEdt(() -> {
+                editor.showMessage("Temporary preview test notification");
+                stopTimer(editor.messageResetTimer);
+                editor.validate();
+                source.getTextArea().setCaretPosition(buffer.getDocument().getLength());
+                return null;
+            });
+            awaitPreviewScrollAtSource(editor, source, preview);
+            onEdt(() -> {
+                PreviewSourceState sourceBefore = previewSourceState(buffer);
+                PreviewScrollState before = previewScrollState(preview);
+                assertEquals(before.maximum(), before.value());
+                editor.configManager.set("markdown.preview.scroll.sync", "false");
+                // Exercise the real notification expiry handler, without a wall-clock delay.
+                for (var listener : editor.messageResetTimer.getActionListeners())
+                    listener.actionPerformed(new ActionEvent(editor.messageResetTimer, ActionEvent.ACTION_PERFORMED, "expire"));
+                editor.validate();
+                PreviewScrollState after = previewScrollState(preview);
+                assertEquals(before.contentHeight(), after.contentHeight());
+                assertTrue(after.extentHeight() > before.extentHeight(), "Hiding the command row must enlarge the viewport");
+                assertEquals(Math.min(before.value(), after.maximum()), after.value(),
+                    "Swing must clamp a scroll value that is outside the new range, even with sync disabled");
+                assertEquals(sourceBefore, previewSourceState(buffer));
+                return null;
+            });
+        } finally {
+            onEdt(() -> { editor.disposeMarkdownPreviews(); return null; });
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void markdownPreviewDebounceSplitsAndBufferSwitchKeepContentAndListenersIsolated() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("preview-lifecycle.md"), "# Original\n\ntext\n");
+        Texteditor editor = createEditor(tempDir.resolve("home-preview-lifecycle"), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> { editor.splitWindow(true); return null; });
+            EditorPane source = onEdt(editor::getActivePane);
+            EditorPane sibling = onEdt(() -> editor.editorPanes.stream().filter(pane -> pane != source).findFirst().orElseThrow());
+            FileBuffer buffer = onEdt(editor::getCurrentBuffer);
+            int caretListeners = onEdt(() -> source.getTextArea().getCaretListeners().length);
+            int scrollListeners = onEdt(() -> source.getScrollPane().getVerticalScrollBar().getAdjustmentListeners().length);
+            assertEquals("Markdown preview opened", onEdt(() -> editor.commandHandler.execute("markdown preview")));
+            MarkdownPreviewPane first = onEdt(() -> (MarkdownPreviewPane) editor.editorPanes.stream()
+                .filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow().getComponent());
+            var sourceListener = onEdt(() -> Arrays.stream(buffer.getDocument().getDocumentListeners())
+                .filter(listener -> listener.getClass().getEnclosingClass() == MarkdownPreviewPane.class)
+                .findFirst().orElseThrow());
+            onEdt(() -> {
+                assertEquals(1, Arrays.stream(buffer.getDocument().getDocumentListeners())
+                    .filter(listener -> listener.getClass().getEnclosingClass() == MarkdownPreviewPane.class).count());
+                assertEquals(caretListeners + 1, source.getTextArea().getCaretListeners().length);
+                assertEquals(scrollListeners + 1, source.getScrollPane().getVerticalScrollBar().getAdjustmentListeners().length);
+                editor.activateEditorPane(sibling);
+                assertSame(source.getTextArea().getDocument(), sibling.getTextArea().getDocument());
+                int start = editor.writingArea.getDocument().getLength();
+                editor.writingArea.append("\n## Obsolete");
+                editor.writingArea.replaceRange("\n## Intermediate", start, editor.writingArea.getDocument().getLength());
+                editor.writingArea.replaceRange("\n## Latest", start, editor.writingArea.getDocument().getLength());
+                return null;
+            });
+            PreviewSourceState latest = onEdt(() -> previewSourceState(buffer));
+            assertTrue(awaitUiState(() -> first.getHtml().contains("id=\"latest\"")));
+            onEdt(() -> {
+                assertFalse(first.getHtml().contains("Obsolete"));
+                assertFalse(first.getHtml().contains("Intermediate"));
+                assertEquals(latest, previewSourceState(buffer), "Debounced rendering must not edit shared source or history");
+                assertEquals("Markdown preview refreshed", editor.commandHandler.execute("markdown refresh"));
+                assertEquals(latest, previewSourceState(buffer));
+                editor.activateEditorPane(source);
+                return null;
+            });
+            Path otherFile = Files.writeString(tempDir.resolve("other-preview.md"), "# Other\n");
+            FileBuffer other = new FileBuffer(otherFile.toFile());
+            String closedHtml = onEdt(() -> {
+                editor.writingArea.append("\n## Pending old document render");
+                String html = first.getHtml();
+                editor.buffers.add(other);
+                editor.loadBufferIntoEditor(other); // Closes the preview and cancels its pending debounce.
+                assertTrue(editor.editorPanes.stream().noneMatch(EditorPane::isMarkdownPreview));
+                assertFalse(Arrays.asList(buffer.getDocument().getDocumentListeners()).contains(sourceListener));
+                assertEquals(caretListeners, source.getTextArea().getCaretListeners().length);
+                assertEquals(scrollListeners, source.getScrollPane().getVerticalScrollBar().getAdjustmentListeners().length);
+                return html;
+            });
+            assertEquals("Markdown preview opened", onEdt(() -> editor.commandHandler.execute("markdown preview")));
+            MarkdownPreviewPane current = onEdt(() -> (MarkdownPreviewPane) editor.editorPanes.stream()
+                .filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow().getComponent());
+            onEdt(() -> { editor.writingArea.append("\n## Current final\n"); return null; });
+            PreviewSourceState currentSource = onEdt(() -> previewSourceState(other));
+            // Waiting for the newer debounce also lets the older deadline pass; no arbitrary sleep.
+            assertTrue(awaitUiState(() -> current.getHtml().contains("id=\"current-final\"")));
+            onEdt(() -> {
+                assertFalse(current.getHtml().contains("Original"));
+                assertFalse(current.getHtml().contains("Pending old document render"));
+                assertEquals(closedHtml, first.getHtml(), "A disposed preview must ignore its older pending update");
+                assertEquals(currentSource, previewSourceState(other));
+                assertEquals("Markdown preview closed", editor.commandHandler.execute("markdown close"));
+                assertTrue(editor.editorPanes.stream().noneMatch(EditorPane::isMarkdownPreview));
+                assertEquals(currentSource, previewSourceState(other));
+                return null;
+            });
+            Path large = Files.writeString(tempDir.resolve("preview-projected.md"), "# Large\n" + "body\n".repeat(1001));
+            onEdt(() -> { editor.configManager.set("large.file.line.threshold", "1000"); return null; });
+            FileBuffer projected = new FileBuffer(large.toFile(), editor.configManager);
+            onEdt(() -> {
+                assertTrue(projected.isLargeFile());
+                editor.buffers.add(projected); editor.loadBufferIntoEditor(projected);
+                PreviewSourceState before = previewSourceState(projected);
+                assertEquals("Markdown preview unavailable for a large file", editor.commandHandler.execute("markdown preview"));
+                assertEquals(before, previewSourceState(projected));
+                return null;
+            });
+        } finally {
+            onEdt(() -> { editor.disposeMarkdownPreviews(); return null; });
+            disposeEditor(editor);
+        }
+    }
+
+    private record PreviewSourceState(String text, long revision, VersionedTextSnapshot snapshot,
+                                      boolean dirty, String saved, int undoEntries, long undoBytes,
+                                      boolean canUndo, boolean canRedo) { }
+
+    private static PreviewSourceState previewSourceState(FileBuffer buffer) {
+        BoundedUndoManager history = (BoundedUndoManager) buffer.getUndoManager();
+        return new PreviewSourceState(buffer.getContent(), buffer.documentRevision(), buffer.textSnapshot(),
+            buffer.isModified(), buffer.getSavedContent(), history.retainedEditCount(), history.retainedBytes(),
+            history.canUndo(), history.canRedo());
+    }
+
+    private record PreviewScrollState(int value, int maximum, int contentHeight, int extentWidth, int extentHeight) { }
+
+    private static PreviewScrollState previewScrollState(MarkdownPreviewPane preview) {
+        var scroll = descendants(preview, javax.swing.JScrollPane.class).getFirst();
+        var viewport = scroll.getViewport();
+        var bar = scroll.getVerticalScrollBar();
+        return new PreviewScrollState(bar.getValue(), bar.getMaximum() - bar.getVisibleAmount(),
+            viewport.getViewSize().height, viewport.getExtentSize().width, viewport.getExtentSize().height);
+    }
+
+    private static void preparePreviewScrollGeometry(Texteditor editor, MarkdownPreviewPane preview) throws Exception {
+        assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+        onEdt(() -> {
+            // The startup notification's expiry changes footer height independently of source synchronization.
+            // Keep that row present while comparing exact pixels; production timer behavior is unchanged.
+            editor.showMessage("Preview scroll synchronization test");
+            stopTimer(editor.messageResetTimer);
+            editor.validate();
+            return null;
+        });
+        assertTrue(awaitUiState(() -> {
+            editor.validate();
+            var scroll = descendants(preview, javax.swing.JScrollPane.class).getFirst();
+            var viewport = scroll.getViewport();
+            var bar = scroll.getVerticalScrollBar();
+            return scroll.isValid() && viewport.getExtentSize().height > 0
+                && bar.getVisibleAmount() == viewport.getExtentSize().height
+                && bar.getMaximum() == viewport.getViewSize().height;
+        }), "The real preview layout and scrollbar model must agree before measuring synchronization");
+    }
+
+    private static void awaitPreviewScrollAtSource(Texteditor editor, EditorPane source, MarkdownPreviewPane preview) throws Exception {
+        assertTrue(awaitUiState(() -> {
+            editor.validate();
+            var sourceBar = source.getScrollPane().getVerticalScrollBar();
+            int sourceMaximum = sourceBar.getMaximum() - sourceBar.getVisibleAmount();
+            PreviewScrollState state = previewScrollState(preview);
+            if (sourceMaximum <= 0 || state.maximum() <= 0) return false;
+            int expected = (int) Math.round((double) sourceBar.getValue() / sourceMaximum * state.maximum());
+            return state.value() == expected;
+        }), "Wait for the queued source-to-preview update at the current layout, not a fixed EDT turn count");
     }
 
     @Test
@@ -3671,6 +3868,574 @@ public class TexteditorSwingIntegrationTest {
             assertTrue(awaitUiState(() -> editor.writingArea.isFocusOwner()), "Background refresh must not steal editor focus");
             onEdt(() -> { editor.toolWindowHost.focus(ToolWindowHost.Tab.PROBLEMS); return null; });
             assertTrue(awaitUiState(() -> descendants(editor.toolWindowHost.problemsPanel().component(), javax.swing.JTextField.class).getFirst().isFocusOwner()));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownFoldingPreservesSourceRevisionsAndEventsForAllSections() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("fold.md"), "# Initial\nbody\n");
+        Texteditor editor = createEditor(tempDir.resolve("fold-home"), file);
+        try {
+            onEdt(() -> {
+                for (String text : List.of("# Heading\nbody\n", "# Parent\n## Child\nbody\n# Next\n",
+                    "# Empty\n# Next\n", "# Final", "# Heading\n ... (2 lines)\noriginal indicator-like text")) {
+                    editor.getCurrentBuffer().setContent(text, false);
+                    editor.writingArea.setCaretPosition(0);
+                    assertMarkdownFoldsUnchanged(editor);
+                    editor.writingArea.append(" ordinary edit");
+                    assertTrue(editor.getCurrentBuffer().isModified());
+                    assertMarkdownFoldsUnchanged(editor);
+                }
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownFoldingPreservesSaveRecoveryUndoAndRedo() throws Exception {
+        assumeSwingAvailable();
+        Path file = tempDir.resolve("fold-persistence.md");
+        byte[] original = "\ufeff# Heading\r\nbody \uD83D\uDC69\u200D\uD83D\uDCBB\r\n## Final".getBytes(StandardCharsets.UTF_8);
+        Files.write(file, original);
+        Texteditor editor = createEditor(tempDir.resolve("fold-save-home"), file);
+        try {
+            FileBuffer buffer = onEdt(editor::getCurrentBuffer);
+            onEdt(() -> { assertMarkdownFoldsUnchanged(editor); return null; });
+            FileBuffer.SaveSnapshot save = onEdt(() -> buffer.captureSaveSnapshot(null));
+            buffer.writeSaveSnapshot(save);
+            onEdt(() -> { buffer.completeSaveSnapshot(save); return null; });
+            org.junit.jupiter.api.Assertions.assertArrayEquals(original, Files.readAllBytes(file));
+            assertEquals(onEdt(buffer::getContent), new FileBuffer(file.toFile()).getContent());
+            String before = onEdt(buffer::getContent);
+            onEdt(() -> {
+                editor.writingArea.append(" draft");
+                assertMarkdownFoldsUnchanged(editor);
+                buffer.getUndoManager().undo();
+                assertEquals(before, buffer.getContent());
+                assertMarkdownFoldsUnchanged(editor);
+                buffer.getUndoManager().redo();
+                assertEquals(before + " draft", buffer.getContent());
+                assertMarkdownFoldsUnchanged(editor);
+                editor.persistRecoverySnapshots();
+                return null;
+            });
+            Path recovery = editor.recoveryStoreDir.toPath();
+            assertTrue(awaitUiState(() -> {
+                try {
+                    RecoveryJournal.Journal journal = RecoveryJournal.read(recovery);
+                    return journal != null && journal.entries().stream().anyMatch(e -> e.content().equals(before + " draft"));
+                } catch (java.io.IOException error) { return false; }
+            }));
+            RecoveryJournal.Entry entry = RecoveryJournal.read(recovery).entries().stream()
+                .filter(e -> e.content().equals(before + " draft")).findFirst().orElseThrow();
+            FileBuffer restored = new FileBuffer(file.toFile());
+            restored.setContent(entry.content(), true);
+            assertTrue(restored.isModified());
+            assertEquals(before + " draft", restored.getContent());
+            org.junit.jupiter.api.Assertions.assertArrayEquals(original, Files.readAllBytes(file));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownFoldingIsIsolatedAcrossBuffersSplitsAndReadOnlyViews() throws Exception {
+        assumeSwingAvailable();
+        Path a = Files.writeString(tempDir.resolve("fold-a.md"), "# A\nbody A\n");
+        Path b = Files.writeString(tempDir.resolve("fold-b.md"), "# B\nbody B\n");
+        Texteditor editor = createEditor(tempDir.resolve("fold-isolation-home"), a, b);
+        try {
+            onEdt(() -> {
+                FileBuffer first = editor.buffers.stream().filter(x -> a.toFile().equals(x.getFile())).findFirst().orElseThrow();
+                FileBuffer second = editor.getCurrentBuffer();
+                editor.loadBufferIntoEditor(first);
+                editor.splitWindow(true);
+                assertSame(editor.editorPanes.get(0).getTextArea().getDocument(), editor.editorPanes.get(1).getTextArea().getDocument());
+                assertMarkdownFoldsUnchanged(editor);
+                editor.writingArea.setEditable(false);
+                assertMarkdownFoldsUnchanged(editor);
+                editor.loadBufferIntoEditor(second);
+                assertMarkdownFoldsUnchanged(editor);
+                editor.loadBufferIntoEditor(first);
+                assertMarkdownFoldsUnchanged(editor);
+                assertEquals("# A\nbody A\n", first.getContent());
+                assertEquals("# B\nbody B\n", second.getContent());
+                assertEquals("Markdown preview opened", editor.commandHandler.execute("mdpreview"));
+                EditorPane preview = editor.editorPanes.stream().filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow();
+                editor.activateEditorPane(preview);
+                assertMarkdownFoldsUnchanged(editor);
+                return null;
+            });
+            Path large = tempDir.resolve("fold-large.md");
+            Files.writeString(large, "# Large\n" + "body\n".repeat(1001));
+            onEdt(() -> {
+                editor.configManager.set("large.file.line.threshold", "1000");
+                return null;
+            });
+            FileBuffer projected = new FileBuffer(large.toFile(), editor.configManager);
+            onEdt(() -> {
+                assertTrue(projected.isLargeFile());
+                // Use a source pane rather than replacing the preview surface.
+                editor.activateEditorPane(editor.editorPanes.stream().filter(pane -> !pane.isMarkdownPreview()).findFirst().orElseThrow());
+                editor.buffers.add(projected);
+                editor.loadBufferIntoEditor(projected);
+                assertMarkdownFoldsUnchanged(editor);
+                assertFalse(editor.writingArea.isEditable());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownFoldShortcutsStayHarmlessAndHeadingNavigationStillWorks() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("fold-keys.md"), "# First\nbody\n## Second\ntext\n");
+        Texteditor editor = createEditor(tempDir.resolve("fold-keys-home"), file);
+        try {
+            onEdt(() -> {
+                enableVim(editor);
+                FileBuffer buffer = editor.getCurrentBuffer();
+                String text = buffer.getContent();
+                long revision = buffer.documentRevision();
+                for (int modifiers : new int[]{0, KeyEvent.SHIFT_DOWN_MASK}) {
+                    KeyEvent tab = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, modifiers, KeyEvent.VK_TAB, '\t');
+                    editor.keyPressed(tab);
+                    assertTrue(tab.isConsumed());
+                    assertEquals(text, buffer.getContent());
+                }
+                for (char command : new char[]{'a', 'M', 'R'}) {
+                    press(editor, 'z');
+                    KeyEvent key = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0,
+                        KeyEvent.getExtendedKeyCodeForChar(command), command);
+                    editor.keyPressed(key);
+                    assertTrue(key.isConsumed());
+                    KeyEvent typed = new KeyEvent(editor.writingArea, KeyEvent.KEY_TYPED, 0, 0, KeyEvent.VK_UNDEFINED, command);
+                    editor.keyTyped(typed);
+                    assertTrue(typed.isConsumed());
+                    assertEquals('\0', editor.editorState.pendingKey);
+                }
+                assertEquals(revision, buffer.documentRevision());
+                assertEquals(text, buffer.getContent());
+                editor.writingArea.setCaretPosition(0);
+                press(editor, ']'); press(editor, ']');
+                assertEquals(2, editor.getCurrentCaretLine());
+                press(editor, '['); press(editor, '[');
+                assertEquals(0, editor.getCurrentCaretLine());
+                for (String profile : List.of("plain", "emacs")) {
+                    editor.configManager.set("keymap.profile", profile);
+                    assertMarkdownFoldsUnchanged(editor);
+                    KeyEvent typed = new KeyEvent(editor.writingArea, KeyEvent.KEY_TYPED, 0, 0, KeyEvent.VK_UNDEFINED, 'z');
+                    editor.keyTyped(typed);
+                    assertFalse(typed.isConsumed(), "Non-Vim typing must retain its normal route");
+                }
+                assertEquals("Table of contents opened", editor.showTableOfContents());
+                assertTrue(Arrays.stream(editor.getOwnedWindows()).anyMatch(MarkdownOutlineDialog.class::isInstance));
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    private static void assertMarkdownFoldsUnchanged(Texteditor editor) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        String text = buffer.getContent(), saved = buffer.getSavedContent();
+        long revision = buffer.documentRevision();
+        VersionedTextSnapshot snapshot = buffer.textSnapshot();
+        boolean dirty = buffer.isModified();
+        BoundedUndoManager history = (BoundedUndoManager) buffer.getUndoManager();
+        int entries = history.retainedEditCount();
+        long bytes = history.retainedBytes();
+        boolean undo = history.canUndo(), redo = history.canRedo();
+        int dot = editor.writingArea.getCaretPosition(), mark = editor.writingArea.getCaret().getMark();
+        int[] events = {0};
+        javax.swing.event.DocumentListener listener = new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent event) { events[0]++; }
+            public void removeUpdate(javax.swing.event.DocumentEvent event) { events[0]++; }
+            public void changedUpdate(javax.swing.event.DocumentEvent event) { events[0]++; }
+        };
+        buffer.getDocument().addDocumentListener(listener);
+        try {
+            for (String result : List.of(editor.toggleFoldAtCursor(), editor.foldHeading(0, null, null),
+                editor.unfoldHeading(0, null), editor.foldAll(), editor.unfoldAll(), editor.globalFoldCycle())) {
+                assertEquals("Markdown folding is temporarily unavailable", result);
+            }
+            assertEquals(0, events[0]);
+            assertEquals(text, buffer.getContent());
+            assertEquals(saved, buffer.getSavedContent());
+            assertEquals(revision, buffer.documentRevision());
+            assertSame(snapshot, buffer.textSnapshot());
+            assertEquals(dirty, buffer.isModified());
+            assertEquals(entries, history.retainedEditCount());
+            assertEquals(bytes, history.retainedBytes());
+            assertEquals(undo, history.canUndo()); assertEquals(redo, history.canRedo());
+            assertEquals(dot, editor.writingArea.getCaretPosition()); assertEquals(mark, editor.writingArea.getCaret().getMark());
+        } finally { buffer.getDocument().removeDocumentListener(listener); }
+    }
+
+    @Test
+    void markdownRangeCommandsPreserveEofAndAtomicUndoRedo() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("markdown-edits.md"), "# start");
+        Texteditor editor = createEditor(tempDir.resolve("markdown-edits-home"), file);
+        try {
+            String indent = onEdt(() -> editor.effectiveExpandTab() ? " ".repeat(editor.writingArea.getTabSize()) : "\t");
+            for (String eof : List.of("", "\n")) {
+                assertMarkdownCommandUndo(editor, "- [ ] café" + eof, "- [x] café" + eof,
+                    () -> editor.commandHandler.execute("markdown checkbox toggle"));
+                assertMarkdownCommandUndo(editor, "## café" + eof, "# café" + eof, () -> editor.markdownHeadingShift(false));
+                assertMarkdownCommandUndo(editor, "# café" + eof, "## café" + eof, () -> editor.markdownHeadingShift(true));
+                assertMarkdownCommandUndo(editor, "# parent\nbody\n## child" + eof, "## parent\nbody\n### child" + eof,
+                    () -> editor.markdownSubtreeShift(true));
+                assertMarkdownCommandUndo(editor, "## parent\nbody\n### child" + eof, "# parent\nbody\n## child" + eof,
+                    () -> editor.markdownSubtreeShift(false));
+                assertMarkdownCommandUndo(editor, "```py" + eof, "```python" + eof, editor::completeCodeFenceLanguage);
+                assertMarkdownCommandUndo(editor, "  ```py" + eof, "  ```python" + eof, editor::completeCodeFenceLanguage);
+                String table = "| a | b |\n| --- | --- |\n| 2 | z |\n| 1 | y |";
+                String aligned = "| a   | b   |\n| --- | --- |\n| 2   | z   |\n| 1   | y   |";
+                assertMarkdownCommandUndo(editor, table + eof, aligned + eof, editor::alignMarkdownTable);
+                assertMarkdownCommandUndo(editor, table + eof,
+                    "| a   | b   |\n| --- | --- |\n| 1   | y   |\n| 2   | z   |" + eof,
+                    () -> editor.sortMarkdownTable("1 asc"));
+                assertMarkdownCommandUndo(editor, table + eof,
+                    "| a   |     | b   |\n| --- | --- | --- |\n| 2   |     | z   |\n| 1   |     | y   |" + eof,
+                    () -> editor.insertTableColumn(""));
+                assertMarkdownCommandUndo(editor, table + eof,
+                    "| b   |\n| --- |\n| z   |\n| y   |" + eof, () -> editor.deleteTableColumn("1"));
+                assertMarkdownCommandUndo(editor, "préface" + eof,
+                    editor.markdownService.insertLinkTemplate() + "préface" + eof, editor::insertLink);
+                assertMarkdownCommandUndo(editor, "préface" + eof,
+                    editor.markdownService.insertImageTemplate() + "préface" + eof, editor::insertImage);
+                assertMarkdownCommandUndo(editor, "" + eof,
+                    editor.markdownService.createTableTemplate(1, 1) + eof, () -> editor.insertTableTemplate("1x1"));
+                assertMarkdownCommandUndo(editor, "body" + eof,
+                    indent + "body" + eof,
+                    () -> editor.markdownHeadingShift(true));
+                assertMarkdownCommandUndo(editor, "préface" + eof,
+                    "pré" + editor.markdownService.insertLinkTemplate() + "face" + eof, () -> {
+                        editor.writingArea.select(1, 3);
+                        return editor.insertLink();
+                    });
+                assertMarkdownCommandUndo(editor, "# title" + eof, "## title" + eof, () -> {
+                    enableVim(editor); press(editor, '>'); press(editor, '>'); return "Vim heading shift";
+                });
+            }
+        } finally { disposeEditor(editor); }
+    }
+
+    private static void assertMarkdownCommandUndo(Texteditor editor, String before, String after, Callable<String> command) throws Exception {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            onEdt(() -> { assertMarkdownCommandUndo(editor, before, after, command); return null; });
+            return;
+        }
+        FileBuffer buffer = editor.getCurrentBuffer();
+        buffer.setContent(before, false);
+        editor.setMode(EditorMode.INSERT);
+        editor.writingArea.setCaretPosition(0);
+        BoundedUndoManager history = (BoundedUndoManager) buffer.getUndoManager();
+        history.discardAllEdits();
+        String saved = buffer.getSavedContent();
+        String message = command.call();
+        assertEquals(after, editor.writingArea.getText(), message);
+        assertEquals(after, buffer.textSnapshot().text());
+        assertEquals(saved, buffer.getSavedContent());
+        assertTrue(buffer.isModified());
+        assertEquals(1, history.retainedEditCount(), message);
+        history.undo(); assertEquals(before, editor.writingArea.getText()); assertFalse(history.canUndo());
+        history.redo(); assertEquals(after, editor.writingArea.getText()); assertFalse(history.canRedo());
+    }
+
+    @Test
+    void markdownEnterUsesOneCapturedEditAcrossPlainVimAndEmacs() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("markdown-enter.md"), "- item");
+        Texteditor editor = createEditor(tempDir.resolve("markdown-enter-home"), file);
+        try {
+            onEdt(() -> {
+                for (String profile : List.of("plain", "vim", "emacs")) {
+                    editor.configManager.set("keymap.profile", profile);
+                    for (String[] example : new String[][] {
+                        {"- item", "- item\n- "}, {"1. item", "1. item\n2. "},
+                        {"  - nested item", "  - nested item\n  - "},
+                        {"- [ ] task", "- [ ] task\n- [ ] "}, {"- [x] task", "- [x] task\n- [ ] "},
+                        {"> quoted text", "> quoted text\n> "},
+                        {"- ", "\n"}, {"1. ", "\n"}, {"- [ ] ", "\n"}, {"- [x] ", "\n"}, {"> ", "\n"}
+                    }) {
+                        assertMarkdownCommandUndo(editor, example[0], example[1], () -> {
+                            editor.writingArea.setCaretPosition(example[0].length());
+                            KeyEvent event = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ENTER, '\n');
+                            editor.keyPressed(event);
+                            assertTrue(event.isConsumed(), profile);
+                            assertEquals(example[1].length(), editor.writingArea.getCaretPosition());
+                            return profile;
+                        });
+                    }
+                    assertMarkdownCommandUndo(editor, "- item\nnext", "- item\n- \nnext", () -> {
+                        editor.writingArea.setCaretPosition(6);
+                        editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ENTER, '\n'));
+                        assertEquals(9, editor.writingArea.getCaretPosition());
+                        return profile;
+                    });
+                    assertMarkdownCommandUndo(editor, "- \nnext", "\nnext", () -> {
+                        editor.writingArea.setCaretPosition(2);
+                        editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ENTER, '\n'));
+                        assertEquals(1, editor.writingArea.getCaretPosition());
+                        return profile;
+                    });
+                    assertMarkdownCommandUndo(editor, "- abcd tail", "- ab\n-  tail", () -> {
+                        editor.writingArea.select(4, 6);
+                        editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ENTER, '\n'));
+                        assertEquals(7, editor.writingArea.getCaretPosition());
+                        return profile;
+                    });
+                }
+                editor.configManager.set("keymap.profile", "vim");
+                editor.configManager.set("auto.indent", "true");
+                assertMarkdownCommandUndo(editor, "  text", "  text\n  ", () -> {
+                    editor.writingArea.setCaretPosition(6);
+                    KeyEvent enter = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ENTER, '\n');
+                    editor.keyPressed(enter); assertTrue(enter.isConsumed());
+                    return "Vim ordinary Markdown Enter";
+                });
+                return null;
+            });
+            // Flushing the queue proves there is no deferred prefix that can edit a newly activated buffer.
+            onEdt(() -> {
+                FileBuffer previous = editor.getCurrentBuffer();
+                FileBuffer other = FileBuffer.createScratch("other.md", "untouched");
+                editor.buffers.add(other); editor.loadBufferIntoEditor(other);
+                assertEquals("untouched", other.getContent());
+                assertEquals("  text\n  ", previous.getContent());
+                return null;
+            });
+            flushEdt();
+            assertEquals("untouched", onEdt(() -> editor.writingArea.getText()));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownTablesHandleEscapesAndRejectAmbiguousSyntaxAndDimensionsWithoutEvents() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("markdown-tables.md"), "# start");
+        Texteditor editor = createEditor(tempDir.resolve("markdown-tables-home"), file);
+        try {
+            onEdt(() -> {
+                assertMarkdownCommandUndo(editor, "| a\\|b | c |\n| --- | --- |",
+                    "| a\\|b | c   |\n| ---- | --- |", editor::alignMarkdownTable);
+                for (String source : List.of("| `a|b` | c |\n| --- | --- |", "| a | b |\n| --- | --- |\n| c |",
+                    "  | a |\n  | --- |", "| a |\n| -- |")) {
+                    editor.getCurrentBuffer().setContent(source, false);
+                    editor.writingArea.setCaretPosition(0);
+                    assertMarkdownRejectedUnchanged(editor, () -> List.of(editor.alignMarkdownTable(), editor.sortMarkdownTable("1"),
+                        editor.insertTableColumn(""), editor.deleteTableColumn("1"), editor.markdownTableNextCell(false)));
+                }
+                for (String dimensions : List.of("-1x2", "1x-1", "0x1", "1x0", "2147483647x2147483647", "256x10000", "bad", "2x", "2x3x4", "x".repeat(100_000)))
+                    assertMarkdownRejectedUnchanged(editor, () -> List.of(editor.insertTableTemplate(dimensions)));
+                assertMarkdownCommandUndo(editor, "| a | b |\n| --- | --- |\n| c | d |",
+                    "| a | b |\n| --- | --- |\n| c | d |\n|     |     |", () -> {
+                        editor.writingArea.setCaretPosition(editor.writingArea.getDocument().getLength() - 2);
+                        KeyEvent tab = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_TAB, '\t');
+                        editor.configManager.set("keymap.profile", "vim");
+                        editor.keyPressed(tab); assertTrue(tab.isConsumed());
+                        return "new table row at EOF";
+                    });
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownMutationsRejectReadOnlyPreviewAlternateAndLargeFileSurfaces() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("markdown-permissions.md"), "- [ ] task");
+        Texteditor editor = createEditor(tempDir.resolve("markdown-permissions-home"), file);
+        try {
+            onEdt(() -> {
+                editor.setMode(EditorMode.INSERT);
+                editor.writingArea.setEditable(false);
+                assertAllMarkdownMutationsRejected(editor);
+                for (String profile : List.of("plain", "vim", "emacs")) {
+                    editor.configManager.set("keymap.profile", profile);
+                    assertMarkdownRejectedUnchanged(editor, () -> {
+                        KeyEvent enter = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ENTER, '\n');
+                        editor.keyPressed(enter); assertTrue(enter.isConsumed());
+                        return List.of("read-only Enter rejected");
+                    });
+                }
+                editor.writingArea.setEditable(true);
+                EditorPane pane = editor.getActivePane();
+                pane.setMarkdownPreviewComponent(new javax.swing.JPanel());
+                assertAllMarkdownMutationsRejected(editor); pane.clearMarkdownPreviewComponent();
+                pane.setAlternateComponent(new javax.swing.JPanel());
+                assertAllMarkdownMutationsRejected(editor); pane.clearAlternateComponent();
+                editor.writingArea.setEnabled(false);
+                assertAllMarkdownMutationsRejected(editor); editor.writingArea.setEnabled(true);
+                editor.getCurrentBuffer().getDocument().setDocumentFilter(new javax.swing.text.DocumentFilter());
+                assertMarkdownRejectedUnchanged(editor, () -> List.of(editor.toggleCheckbox(), editor.insertLink(), editor.insertImage()));
+                editor.getCurrentBuffer().getDocument().setDocumentFilter(null);
+                return null;
+            });
+            Path large = Files.writeString(tempDir.resolve("markdown-projected.md"), "# Large\n" + "body\n".repeat(1001));
+            onEdt(() -> { editor.configManager.set("large.file.line.threshold", "1000"); return null; });
+            FileBuffer projected = new FileBuffer(large.toFile(), editor.configManager);
+            onEdt(() -> {
+                assertTrue(projected.isLargeFile());
+                editor.buffers.add(projected); editor.loadBufferIntoEditor(projected);
+                assertAllMarkdownMutationsRejected(editor);
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    private static void assertAllMarkdownMutationsRejected(Texteditor editor) throws Exception {
+        assertMarkdownRejectedUnchanged(editor, () -> Arrays.asList(editor.toggleCheckbox(), editor.markdownHeadingShift(true),
+            editor.markdownSubtreeShift(true), editor.alignMarkdownTable(), editor.sortMarkdownTable("1"),
+            editor.insertTableColumn(""), editor.deleteTableColumn("1"), editor.insertTableTemplate("2x2"),
+            editor.insertLink(), editor.insertImage(), editor.completeCodeFenceLanguage(), editor.handleMarkdownEnter(),
+            editor.markdownTableNextCell(false), editor.markdownTableNextCell(true), editor.expandSnippetAtCursor()));
+    }
+
+    private static void assertMarkdownRejectedUnchanged(Texteditor editor, Callable<List<String>> commands) throws Exception {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        String source = editor.writingArea.getText(), saved = buffer.getSavedContent();
+        VersionedTextSnapshot snapshot = buffer.textSnapshot();
+        long revision = buffer.documentRevision();
+        boolean dirty = buffer.isModified();
+        BoundedUndoManager history = (BoundedUndoManager) buffer.getUndoManager();
+        int count = history.retainedEditCount(), dot = editor.writingArea.getCaret().getDot(), mark = editor.writingArea.getCaret().getMark();
+        long bytes = history.retainedBytes();
+        boolean undo = history.canUndo(), redo = history.canRedo();
+        int[] events = {0};
+        var document = editor.writingArea.getDocument();
+        javax.swing.event.DocumentListener listener = new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent event) { events[0]++; }
+            public void removeUpdate(javax.swing.event.DocumentEvent event) { events[0]++; }
+            public void changedUpdate(javax.swing.event.DocumentEvent event) { events[0]++; }
+        };
+        document.addDocumentListener(listener);
+        try {
+            for (String message : commands.call()) assertTrue(message != null && !message.isBlank());
+            assertEquals(0, events[0]); assertEquals(source, editor.writingArea.getText());
+            assertEquals(saved, buffer.getSavedContent()); assertSame(snapshot, buffer.textSnapshot());
+            assertEquals(revision, buffer.documentRevision()); assertEquals(dirty, buffer.isModified());
+            assertEquals(count, history.retainedEditCount()); assertEquals(bytes, history.retainedBytes());
+            assertEquals(undo, history.canUndo()); assertEquals(redo, history.canRedo());
+            assertEquals(dot, editor.writingArea.getCaret().getDot()); assertEquals(mark, editor.writingArea.getCaret().getMark());
+        } finally { document.removeDocumentListener(listener); }
+    }
+
+    @Test
+    void markdownCommandHistoryIsSharedAndVimNormalCommandsRemainWritable() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("markdown-splits.md"), "- [ ] task");
+        Texteditor editor = createEditor(tempDir.resolve("markdown-splits-home"), file);
+        try {
+            onEdt(() -> {
+                FileBuffer buffer = editor.getCurrentBuffer();
+                editor.splitWindow(true);
+                enableVim(editor);
+                assertFalse(editor.writingArea.isEditable());
+                editor.writingArea.append("!");
+                assertEquals("Checked", editor.toggleCheckbox());
+                for (EditorPane pane : editor.editorPanes) assertEquals("- [x] task!", pane.getTextArea().getText());
+                buffer.getUndoManager().undo(); assertEquals("- [ ] task!", editor.writingArea.getText());
+                buffer.getUndoManager().undo(); assertEquals("- [ ] task", editor.writingArea.getText());
+                buffer.getUndoManager().redo(); buffer.getUndoManager().redo();
+                for (EditorPane pane : editor.editorPanes) assertEquals("- [x] task!", pane.getTextArea().getText());
+                EditorPane capturedPane = editor.getActivePane();
+                MarkdownEdit pending = new MarkdownEdit(buffer, editor.writingArea, capturedPane.surface(),
+                    () -> editor.getActivePane() == capturedPane && editor.getCurrentBuffer() == buffer, 0, 5);
+                FileBuffer other = FileBuffer.createScratch("other.md", "- [ ] other");
+                editor.buffers.add(other); editor.loadBufferIntoEditor(other);
+                String failure = pending.apply("oops", -1);
+                assertFalse(failure.isEmpty());
+                assertEquals("- [ ] other", editor.writingArea.getText());
+                assertEquals("- [x] task!", buffer.getContent());
+                editor.loadBufferIntoEditor(buffer);
+                assertMarkdownFoldsUnchanged(editor);
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownEnterRespectsCompositionPrefixesAndUnrelatedKeys() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("markdown-ime.md"), "- item");
+        Texteditor editor = createEditor(tempDir.resolve("markdown-ime-home"), file);
+        try {
+            onEdt(() -> {
+                for (String profile : List.of("plain", "vim", "emacs")) {
+                    editor.configManager.set("keymap.profile", profile); editor.setMode(EditorMode.INSERT);
+                    editor.writingArea.setCaretPosition(6);
+                    var composition = new java.awt.event.InputMethodEvent(editor.writingArea,
+                        java.awt.event.InputMethodEvent.INPUT_METHOD_TEXT_CHANGED,
+                        new java.text.AttributedString("あ").getIterator(), 0, null, null);
+                    for (var listener : editor.writingArea.getInputMethodListeners()) listener.inputMethodTextChanged(composition);
+                    KeyEvent enter = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ENTER, '\n');
+                    editor.keyPressed(enter);
+                    assertFalse(enter.isConsumed()); assertEquals("- item", editor.writingArea.getText());
+                    var committed = new java.awt.event.InputMethodEvent(editor.writingArea,
+                        java.awt.event.InputMethodEvent.INPUT_METHOD_TEXT_CHANGED, null, 0, null, null);
+                    for (var listener : editor.writingArea.getInputMethodListeners()) listener.inputMethodTextChanged(committed);
+                    KeyEvent otherKey = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_F2, KeyEvent.CHAR_UNDEFINED);
+                    editor.keyPressed(otherKey); assertFalse(otherKey.isConsumed());
+                }
+                editor.configManager.set("keymap.profile", "emacs");
+                editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, KeyEvent.CTRL_DOWN_MASK, KeyEvent.VK_X, 'x'));
+                KeyEvent prefixed = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ENTER, '\n');
+                editor.keyPressed(prefixed); assertTrue(prefixed.isConsumed());
+                assertEquals("- item", editor.writingArea.getText());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownCommandsPersistExactNewlineBomBytesAndCaptureDirtyRecovery() throws Exception {
+        assumeSwingAvailable();
+        Path initial = Files.writeString(tempDir.resolve("markdown-codec-start.md"), "# start");
+        Texteditor editor = createEditor(tempDir.resolve("markdown-codec-home"), initial);
+        try {
+            for (String separator : List.of("\n", "\r\n", "\r\nbody\n")) {
+                for (boolean eof : List.of(false, true)) {
+                    Path file = tempDir.resolve("markdown-codec-" + Math.abs(separator.hashCode()) + "-" + eof + ".md");
+                    String original = "\ufeff# Heading" + separator + "- [ ] café" + (eof ? "\r\n" : "");
+                    Files.write(file, original.getBytes(StandardCharsets.UTF_8));
+                    FileBuffer buffer = new FileBuffer(file.toFile());
+                    onEdt(() -> {
+                        editor.buffers.add(buffer); editor.loadBufferIntoEditor(buffer); editor.setMode(EditorMode.INSERT);
+                        editor.writingArea.setCaretPosition(editor.writingArea.getText().indexOf("[ ]"));
+                        assertEquals("Checked", editor.toggleCheckbox());
+                        buffer.getUndoManager().undo();
+                        assertEquals(original.substring(1).replace("\r\n", "\n"), editor.writingArea.getText());
+                        buffer.getUndoManager().redo();
+                        return null;
+                    });
+                    FileBuffer.SaveSnapshot save = onEdt(() -> buffer.captureSaveSnapshot(null));
+                    buffer.writeSaveSnapshot(save);
+                    onEdt(() -> { buffer.completeSaveSnapshot(save); return null; });
+                    org.junit.jupiter.api.Assertions.assertArrayEquals(original.replace("[ ]", "[x]").getBytes(StandardCharsets.UTF_8), Files.readAllBytes(file));
+                    assertEquals(onEdt(buffer::getContent), new FileBuffer(file.toFile()).getContent());
+                }
+            }
+            String recoveryText = onEdt(() -> {
+                FileBuffer buffer = editor.getCurrentBuffer();
+                editor.writingArea.append(" draft");
+                editor.writingArea.setCaretPosition(editor.writingArea.getText().indexOf("[x]"));
+                assertEquals("Unchecked", editor.toggleCheckbox());
+                assertTrue(buffer.isModified());
+                editor.persistRecoverySnapshots();
+                return editor.writingArea.getText();
+            });
+            Path recovery = editor.recoveryStoreDir.toPath();
+            assertTrue(awaitUiState(() -> {
+                try {
+                    var journal = RecoveryJournal.read(recovery);
+                    return journal != null && journal.entries().stream().anyMatch(entry -> entry.content().equals(recoveryText));
+                } catch (java.io.IOException error) { return false; }
+            }));
+            var entry = RecoveryJournal.read(recovery).entries().stream().filter(e -> e.content().equals(recoveryText)).findFirst().orElseThrow();
+            FileBuffer restored = FileBuffer.createScratch("restored.md", "");
+            restored.setContent(entry.content(), true);
+            assertEquals(recoveryText, restored.getContent()); assertTrue(restored.isModified());
         } finally { disposeEditor(editor); }
     }
 

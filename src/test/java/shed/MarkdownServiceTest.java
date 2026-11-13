@@ -325,4 +325,54 @@ class MarkdownServiceTest {
         assertEquals("text", result[2]);
         assertEquals("# Another", result[3]); // not in subtree
     }
+
+    @Test
+    void escapedPipesAreContentIncludingBackslashParityAndCellNavigation() {
+        String row = "| a\\|b | c |";
+        assertArrayEquals(new String[]{"a\\|b", "c"}, service.parseCells(row));
+        assertEquals(0, service.cellColumn(row, row.indexOf('b')));
+        assertEquals(row.indexOf('c'), service.nextCellOffset(row, 2));
+        assertEquals(2, service.prevCellOffset(row, row.indexOf('c')));
+        assertArrayEquals(new String[]{"a\\\\", "b"}, service.parseCells("| a\\\\| b |"));
+        String[] table = {row, "| --- | --- |", "| d | e |"};
+        service.validateEditableTable(table, 0, 2);
+        assertTrue(service.alignTable(table, 0, 2).contains("a\\|b"));
+        assertTrue(service.insertColumn(table, 0, 2, 0).contains("a\\|b"));
+        assertTrue(service.sortTable(table, 0, 2, 0, true).contains("a\\|b"));
+    }
+
+    @Test
+    void unsupportedTableSyntaxAndPaddingAmplificationAreRejected() {
+        for (String[] lines : new String[][]{
+            {"| `a|b` | c |", "| --- | --- |"},
+            {"  | a | b |", "  | --- | --- |"},
+            {"| a | b |", "| --- | --- |", "| c |"},
+            {"| a |", "| -- |"},
+            {"| a |", "| --- |", "| --- |"},
+            {"| a |"},
+            {"| a | b |", "| --- | --- |", "| c | d\\|"}
+        }) assertThrows(IllegalArgumentException.class, () -> service.validateEditableTable(lines, 0, lines.length - 1));
+        String[] amplified = new String[20];
+        java.util.Arrays.fill(amplified, "| b |");
+        amplified[0] = "| " + "a".repeat(100_000) + " |";
+        amplified[1] = "| --- |";
+        assertThrows(IllegalArgumentException.class, () -> service.validateEditableTable(amplified, 0, 19));
+    }
+
+    @Test
+    void tableTemplatesValidateBeforeAllocation() {
+        for (int[] dimensions : new int[][]{{-1, 2}, {1, -1}, {0, 1}, {1, 0},
+            {Integer.MAX_VALUE, Integer.MAX_VALUE}, {257, 2}, {1, 10001}, {256, 10000}}) {
+            assertThrows(IllegalArgumentException.class, () -> service.createTableTemplate(dimensions[0], dimensions[1]));
+        }
+        assertTrue(service.createTableTemplate(1, 1).contains("Col 1"));
+    }
+
+    @Test
+    void continuationRejectsOverflowAndCheckedEmptyItemsExit() {
+        assertThrows(IllegalArgumentException.class, () -> service.listContinuation("2147483647. item"));
+        assertThrows(IllegalArgumentException.class, () -> service.listContinuation("99999999999999999999. item"));
+        assertTrue(service.isEmptyListItem("- [x] "));
+        assertEquals("  + ", service.listContinuation("  + item"));
+    }
 }

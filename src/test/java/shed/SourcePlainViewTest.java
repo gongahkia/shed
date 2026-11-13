@@ -94,6 +94,11 @@ class SourcePlainViewTest {
                     public void removeUpdate(javax.swing.event.DocumentEvent e) { optimized.getPreferredSize(); }
                     public void changedUpdate(javax.swing.event.DocumentEvent e) { optimized.getPreferredSize(); }
                 });
+                // A non-first line boundary can replace line Elements even without inserting a newline.
+                document.insertString(6, "W", null); equalGeometry(stock, optimized);
+                history.undo(); equalGeometry(stock, optimized);
+                history.redo(); equalGeometry(stock, optimized);
+                document.remove(6, 1); equalGeometry(stock, optimized);
                 Random random = new Random(981452);
                 for (int n = 0; n < 240; n++) {
                     if (n % 6 == 0 && history.canUndo()) {

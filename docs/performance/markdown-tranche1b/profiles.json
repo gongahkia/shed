@@ -1,0 +1,391 @@
+[
+  {
+    "phase": "before",
+    "recording": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/before-paired-profile/ui-mixed-10485760-0/profile.jfr",
+    "execution_or_native_samples": 1291,
+    "overlapping_stack_presence_counts": {
+      "EDT DefaultDocumentEvent.undo": 469,
+      "EDT FontDesignMetrics": 487,
+      "EDT GapContent": 6,
+      "EDT PlainView": 671,
+      "EDT UndoManager.undo": 471,
+      "EDT VersionedTextSnapshot": 22,
+      "EDT javax.swing.text.PlainView.calculateLongestLine": 661,
+      "other GapContent": 11,
+      "other GrammarHighlightService": 1,
+      "other VersionedTextSnapshot": 13,
+      "other highlightSnapshot": 1
+    },
+    "top_stacks": [
+      {
+        "key": "EDT sun.font.FontDesignMetrics.getLatinCharWidth;sun.font.FontDesignMetrics.charsWidth;sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$55;shed.MarkdownPerformanceProbe$$Lambda.0x000000080041e910.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800336448.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 190
+      },
+      {
+        "key": "other sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000080030cfd8.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 148
+      },
+      {
+        "key": "other sun.font.CFont.createNativeFont;sun.font.CFont.getNativeFontPtr;sun.font.CFont.getWidth;sun.font.FontFamily.preferredWidth;sun.font.FontFamily.setFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerFont;sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000080030cfd8.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 118
+      },
+      {
+        "key": "EDT sun.font.FontDesignMetrics.getLatinCharWidth;sun.font.FontDesignMetrics.charsWidth;sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$31;shed.MarkdownPerformanceProbe$$Lambda.0x00000008004159b0.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800336448.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 90
+      },
+      {
+        "key": "EDT sun.font.FontDesignMetrics.getLatinCharWidth;sun.font.FontDesignMetrics.charsWidth;sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument.handleRemove;javax.swing.text.AbstractDocument.remove;javax.swing.text.AbstractDocument.replace;javax.swing.JTextArea.replaceRange;shed.MarkdownPerformanceProbe.lambda$ui$33;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800415e00.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800336448.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 80
+      },
+      {
+        "key": "other sun.java2d.metal.MTLRenderQueue.flushBuffer;sun.java2d.metal.MTLRenderQueue.flushBuffer;sun.java2d.metal.MTLRenderQueue$QueueFlusher.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 74
+      },
+      {
+        "key": "EDT sun.font.FontDesignMetrics.getLatinCharWidth;sun.font.FontDesignMetrics.charsWidth;sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$48;shed.MarkdownPerformanceProbe$$Lambda.0x000000080041c668.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800336448.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 61
+      },
+      {
+        "key": "EDT sun.font.FontDesignMetrics.getLatinCharWidth;sun.font.FontDesignMetrics.charsWidth;sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;javax.swing.text.PlainView.insertUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.insertUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.insertUpdate;javax.swing.text.AbstractDocument.fireInsertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;javax.swing.text.AbstractDocument.replace;javax.swing.text.JTextComponent.replaceSelection;javax.swing.text.DefaultEditorKit$InsertBreakAction.actionPerformed;javax.swing.plaf.basic.BasicTextUI$TextActionWrapper.actionPerformed;shed.MarkdownPerformanceProbe.typed;shed.MarkdownPerformanceProbe.lambda$ui$35;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800416240.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800336448.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 44
+      },
+      {
+        "key": "EDT javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$55;shed.MarkdownPerformanceProbe$$Lambda.0x000000080041e910.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800336448.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 33
+      },
+      {
+        "key": "other java.lang.ProcessHandleImpl.waitForProcessExit0;java.lang.ProcessHandleImpl$1.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run;jdk.internal.misc.InnocuousThread.run",
+        "value": 30
+      },
+      {
+        "key": "other sun.lwawt.macosx.LWCToolkit.initAppkit;sun.lwawt.macosx.LWCToolkit.lambda$new$0;sun.lwawt.macosx.LWCToolkit$$Lambda.0x00000008001204a8.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.lwawt.macosx.LWCToolkit.<init>;sun.awt.PlatformGraphicsInfo.createToolkit;java.awt.Toolkit.getDefaultToolkit;java.awt.Toolkit.getEventQueue;java.awt.EventQueue.isDispatchThread;javax.swing.SwingUtilities.isEventDispatchThread;shed.MarkdownPerformanceProbe.edt;shed.MarkdownPerformanceProbe.open;shed.MarkdownPerformanceProbe.ui;shed.MarkdownPerformanceProbe.main",
+        "value": 24
+      },
+      {
+        "key": "EDT javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument.handleRemove;javax.swing.text.AbstractDocument.remove;javax.swing.text.AbstractDocument.replace;javax.swing.JTextArea.replaceRange;shed.MarkdownPerformanceProbe.lambda$ui$33;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800415e00.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800336448.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 19
+      },
+      {
+        "key": "EDT javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$31;shed.MarkdownPerformanceProbe$$Lambda.0x00000008004159b0.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800336448.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 18
+      },
+      {
+        "key": "EDT javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$48;shed.MarkdownPerformanceProbe$$Lambda.0x000000080041c668.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800336448.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 15
+      },
+      {
+        "key": "EDT java.util.ArrayList.grow;java.util.ArrayList.grow;java.util.ArrayList.add;java.util.ArrayList.add;javax.swing.text.SegmentCache.releaseSegment;javax.swing.text.SegmentCache.releaseSharedSegment;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument.handleRemove;javax.swing.text.AbstractDocument.remove;javax.swing.text.AbstractDocument.replace;javax.swing.JTextArea.replaceRange;shed.MarkdownPerformanceProbe.lambda$ui$33;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800415e00.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800336448.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 14
+      },
+      {
+        "key": "EDT java.util.ArrayList.grow;java.util.ArrayList.grow;java.util.ArrayList.add;java.util.ArrayList.add;javax.swing.text.SegmentCache.releaseSegment;javax.swing.text.SegmentCache.releaseSharedSegment;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$55;shed.MarkdownPerformanceProbe$$Lambda.0x000000080041e910.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800336448.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 13
+      },
+      {
+        "key": "other java.lang.ProcessImpl.forkAndExec;java.lang.ProcessImpl.<init>;java.lang.ProcessImpl.start;java.lang.ProcessBuilder.start;java.lang.ProcessBuilder.start;shed.SyntaxUiController.loadGitBlame;shed.SyntaxUiController.lambda$startPendingGitBlame$2;shed.SyntaxUiController$$Lambda.0x0000000800381130.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e2d0.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 11
+      },
+      {
+        "key": "EDT javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;javax.swing.text.PlainView.insertUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.insertUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.insertUpdate;javax.swing.text.AbstractDocument.fireInsertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;javax.swing.text.AbstractDocument.replace;javax.swing.text.JTextComponent.replaceSelection;javax.swing.text.DefaultEditorKit$InsertBreakAction.actionPerformed;javax.swing.plaf.basic.BasicTextUI$TextActionWrapper.actionPerformed;shed.MarkdownPerformanceProbe.typed;shed.MarkdownPerformanceProbe.lambda$ui$35;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800416240.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800336448.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 10
+      }
+    ],
+    "allocation_samples": 2999,
+    "top_weighted_allocation_samples_not_retained": [
+      {
+        "key": "[B",
+        "value": 265420400
+      },
+      {
+        "key": "[C",
+        "value": 97069744
+      },
+      {
+        "key": "shed.OpenBufferCompletionIndex$WordStats",
+        "value": 81984848
+      },
+      {
+        "key": "java.util.regex.Pattern$CharProperty",
+        "value": 67903960
+      },
+      {
+        "key": "[Ljava.lang.Object;",
+        "value": 60199528
+      },
+      {
+        "key": "java.lang.String",
+        "value": 46147720
+      },
+      {
+        "key": "[I",
+        "value": 30840216
+      },
+      {
+        "key": "java.awt.geom.AffineTransform",
+        "value": 17790184
+      },
+      {
+        "key": "sun.nio.fs.UnixPath",
+        "value": 11283712
+      },
+      {
+        "key": "sun.nio.fs.UnixFileAttributes",
+        "value": 9622336
+      },
+      {
+        "key": "javax.swing.text.AbstractDocument$LeafElement",
+        "value": 9270848
+      },
+      {
+        "key": "java.awt.Rectangle",
+        "value": 7698360
+      },
+      {
+        "key": "javax.swing.text.GapContent$MarkData",
+        "value": 7227560
+      },
+      {
+        "key": "java.awt.Insets",
+        "value": 5110360
+      },
+      {
+        "key": "[Ljava.nio.file.LinkOption;",
+        "value": 4676552
+      }
+    ],
+    "gc_pause_ms": [
+      7.928457,
+      2.313103,
+      0.103316,
+      6.074418,
+      5.324426,
+      1.831603,
+      0.113489,
+      2.709901,
+      0.214731,
+      2.508612,
+      9.262584,
+      5.597878,
+      4.805323,
+      0.058108,
+      3.176226,
+      0.058305,
+      2.576653,
+      0.073799,
+      1.984162,
+      0.13862,
+      1.676555,
+      2.026292,
+      14.020343,
+      12.458813,
+      11.372191,
+      9.225438,
+      2.905479,
+      0.375905,
+      5.148561,
+      18.89868,
+      5.277382,
+      1.48064,
+      7.646174,
+      3.971858,
+      0.138829,
+      5.795505,
+      1.747499,
+      14.031664,
+      13.736958
+    ],
+    "gc_pause_total_ms": 188.78848
+  },
+  {
+    "phase": "after",
+    "recording": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/after-paired-profile/ui-mixed-10485760-0/profile.jfr",
+    "execution_or_native_samples": 843,
+    "overlapping_stack_presence_counts": {
+      "EDT DefaultDocumentEvent.undo": 265,
+      "EDT FontDesignMetrics": 270,
+      "EDT GapContent": 4,
+      "EDT PlainView": 378,
+      "EDT SourcePlainView": 351,
+      "EDT UndoManager.undo": 265,
+      "EDT VersionedTextSnapshot": 13,
+      "EDT javax.swing.text.PlainView.calculateLongestLine": 364,
+      "other GapContent": 13,
+      "other GrammarHighlightService": 1,
+      "other VersionedTextSnapshot": 10,
+      "other highlightSnapshot": 1
+    },
+    "top_stacks": [
+      {
+        "value": 135,
+        "key": "EDT sun.font.FontDesignMetrics.getLatinCharWidth;sun.font.FontDesignMetrics.charsWidth;sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;shed.SourcePlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$55;shed.MarkdownPerformanceProbe$$Lambda.0x000000080041e8e0.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800332cc0.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run"
+      },
+      {
+        "value": 111,
+        "key": "other sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000080030cfd8.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 87,
+        "key": "other sun.font.CFont.createNativeFont;sun.font.CFont.getNativeFontPtr;sun.font.CFont.getWidth;sun.font.FontFamily.preferredWidth;sun.font.FontFamily.setFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerFont;sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000080030cfd8.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 65,
+        "key": "EDT sun.font.FontDesignMetrics.getLatinCharWidth;sun.font.FontDesignMetrics.charsWidth;sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;shed.SourcePlainView.updateDamage;javax.swing.text.PlainView.insertUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.insertUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.insertUpdate;javax.swing.text.AbstractDocument.fireInsertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;javax.swing.text.AbstractDocument.replace;javax.swing.text.JTextComponent.replaceSelection;javax.swing.text.DefaultEditorKit$InsertBreakAction.actionPerformed;javax.swing.plaf.basic.BasicTextUI$TextActionWrapper.actionPerformed;shed.MarkdownPerformanceProbe.typed;shed.MarkdownPerformanceProbe.lambda$ui$35;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800416020.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800332cc0.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run"
+      },
+      {
+        "value": 50,
+        "key": "EDT sun.font.FontDesignMetrics.getLatinCharWidth;sun.font.FontDesignMetrics.charsWidth;sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;shed.SourcePlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$48;shed.MarkdownPerformanceProbe$$Lambda.0x000000080041c440.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800332cc0.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run"
+      },
+      {
+        "value": 46,
+        "key": "other sun.java2d.metal.MTLRenderQueue.flushBuffer;sun.java2d.metal.MTLRenderQueue.flushBuffer;sun.java2d.metal.MTLRenderQueue$QueueFlusher.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 28,
+        "key": "EDT javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;shed.SourcePlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$55;shed.MarkdownPerformanceProbe$$Lambda.0x000000080041e8e0.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800332cc0.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run"
+      },
+      {
+        "value": 25,
+        "key": "other java.lang.ProcessHandleImpl.waitForProcessExit0;java.lang.ProcessHandleImpl$1.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run;jdk.internal.misc.InnocuousThread.run"
+      },
+      {
+        "value": 19,
+        "key": "EDT javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;shed.SourcePlainView.updateDamage;javax.swing.text.PlainView.insertUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.insertUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.insertUpdate;javax.swing.text.AbstractDocument.fireInsertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;javax.swing.text.AbstractDocument.replace;javax.swing.text.JTextComponent.replaceSelection;javax.swing.text.DefaultEditorKit$InsertBreakAction.actionPerformed;javax.swing.plaf.basic.BasicTextUI$TextActionWrapper.actionPerformed;shed.MarkdownPerformanceProbe.typed;shed.MarkdownPerformanceProbe.lambda$ui$35;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800416020.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800332cc0.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run"
+      },
+      {
+        "value": 17,
+        "key": "other sun.lwawt.macosx.LWCToolkit.initAppkit;sun.lwawt.macosx.LWCToolkit.lambda$new$0;sun.lwawt.macosx.LWCToolkit$$Lambda.0x00000008001206e0.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.lwawt.macosx.LWCToolkit.<init>;sun.awt.PlatformGraphicsInfo.createToolkit;java.awt.Toolkit.getDefaultToolkit;java.awt.Toolkit.getEventQueue;java.awt.EventQueue.isDispatchThread;javax.swing.SwingUtilities.isEventDispatchThread;shed.MarkdownPerformanceProbe.edt;shed.MarkdownPerformanceProbe.open;shed.MarkdownPerformanceProbe.ui;shed.MarkdownPerformanceProbe.main"
+      },
+      {
+        "value": 11,
+        "key": "EDT java.util.ArrayList.grow;java.util.ArrayList.grow;java.util.ArrayList.add;java.util.ArrayList.add;javax.swing.text.SegmentCache.releaseSegment;javax.swing.text.SegmentCache.releaseSharedSegment;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;shed.SourcePlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$55;shed.MarkdownPerformanceProbe$$Lambda.0x000000080041e8e0.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800332cc0.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run"
+      },
+      {
+        "value": 11,
+        "key": "EDT javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;shed.SourcePlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$48;shed.MarkdownPerformanceProbe$$Lambda.0x000000080041c440.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800332cc0.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run"
+      },
+      {
+        "value": 9,
+        "key": "EDT javax.swing.text.SegmentCache.releaseSegment;javax.swing.text.SegmentCache.releaseSharedSegment;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;shed.SourcePlainView.updateDamage;javax.swing.text.PlainView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.removeUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.removeUpdate;javax.swing.text.AbstractDocument.fireRemoveUpdate;javax.swing.text.AbstractDocument$DefaultDocumentEvent.undo;javax.swing.text.AbstractDocument$DefaultDocumentEventUndoableWrapper.undo;javax.swing.undo.UndoManager.undoTo;javax.swing.undo.UndoManager.tryUndoOrRedo;javax.swing.undo.UndoManager.undo;shed.MarkdownPerformanceProbe.lambda$ui$55;shed.MarkdownPerformanceProbe$$Lambda.0x000000080041e8e0.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800332cc0.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run"
+      },
+      {
+        "value": 7,
+        "key": "other java.lang.ProcessImpl.forkAndExec;java.lang.ProcessImpl.<init>;java.lang.ProcessImpl.start;java.lang.ProcessBuilder.start;java.lang.ProcessBuilder.start;shed.SyntaxUiController.loadGitBlame;shed.SyntaxUiController.lambda$startPendingGitBlame$2;shed.SyntaxUiController$$Lambda.0x000000080033edf8.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e2d0.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 7,
+        "key": "other sun.java2d.metal.MTLLayer.blitTexture;sun.java2d.metal.MTLLayer.lambda$drawInMTLContext$4;sun.java2d.metal.MTLLayer$$Lambda.0x000000080034c850.run;sun.lwawt.macosx.CFRetainedResource.execute;sun.java2d.metal.MTLLayer.drawInMTLContext"
+      },
+      {
+        "value": 5,
+        "key": "EDT javax.swing.text.SegmentCache.releaseSegment;javax.swing.text.SegmentCache.releaseSharedSegment;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateDamage;shed.SourcePlainView.updateDamage;javax.swing.text.PlainView.insertUpdate;javax.swing.plaf.basic.BasicTextUI$RootView.insertUpdate;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.insertUpdate;javax.swing.text.AbstractDocument.fireInsertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;javax.swing.text.AbstractDocument.replace;javax.swing.text.JTextComponent.replaceSelection;javax.swing.text.DefaultEditorKit$InsertBreakAction.actionPerformed;javax.swing.plaf.basic.BasicTextUI$TextActionWrapper.actionPerformed;shed.MarkdownPerformanceProbe.typed;shed.MarkdownPerformanceProbe.lambda$ui$35;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800416020.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$22;shed.MarkdownPerformanceProbe$$Lambda.0x0000000800332cc0.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run"
+      },
+      {
+        "value": 5,
+        "key": "other javax.swing.text.GapContent.findSortIndex;javax.swing.text.GapContent.createPosition;javax.swing.text.AbstractDocument.createPosition;javax.swing.text.AbstractDocument$LeafElement.<init>;javax.swing.text.AbstractDocument.createLeafElement;javax.swing.text.PlainDocument.insertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;shed.FileBuffer.setDocumentText;shed.FileBuffer.load;shed.FileBuffer.<init>;shed.LegacyDocumentStore.load;shed.PaneBufferController.lambda$openFileAsync$11;shed.PaneBufferController$$Lambda.0x000000080030fa00.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e2d0.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 5,
+        "key": "EDT sun.font.FontDesignMetrics.getLatinCharWidth;sun.font.FontDesignMetrics.charsWidth;sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateMetrics;javax.swing.text.PlainView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.ScrollPaneLayout.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validate;javax.swing.SwingUtilities.updateComponentTreeUI;shed.EditorUiController.applyUiTheme;shed.EditorUiController.applyUiTheme;shed.SyntaxUiController.applyThemeColors;shed.Texteditor.applyThemeColors;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x000000080038c850.run;java.awt.event.InvocationEvent.dispatch"
+      }
+    ],
+    "allocation_samples": 2175,
+    "top_weighted_allocation_samples_not_retained": [
+      {
+        "value": 396451816,
+        "key": "[B"
+      },
+      {
+        "value": 129112616,
+        "key": "[Ljava.lang.Object;"
+      },
+      {
+        "value": 101061488,
+        "key": "[C"
+      },
+      {
+        "value": 93543720,
+        "key": "java.util.ArrayList"
+      },
+      {
+        "value": 31714088,
+        "key": "java.lang.String"
+      },
+      {
+        "value": 26716760,
+        "key": "[I"
+      },
+      {
+        "value": 26220376,
+        "key": "[Z"
+      },
+      {
+        "value": 20916240,
+        "key": "java.awt.geom.AffineTransform"
+      },
+      {
+        "value": 16673920,
+        "key": "shed.OpenBufferCompletionIndex$WordStats"
+      },
+      {
+        "value": 8435680,
+        "key": "java.util.regex.Pattern$BmpCharProperty"
+      },
+      {
+        "value": 7257576,
+        "key": "sun.nio.fs.UnixFileAttributes"
+      },
+      {
+        "value": 6675512,
+        "key": "java.awt.Rectangle"
+      },
+      {
+        "value": 6643880,
+        "key": "sun.java2d.SunGraphics2D"
+      },
+      {
+        "value": 6586264,
+        "key": "java.util.regex.Matcher"
+      },
+      {
+        "value": 6496920,
+        "key": "javax.swing.text.AbstractDocument$LeafElement"
+      }
+    ],
+    "gc_pause_ms": [
+      1.476687,
+      0.07474,
+      5.829751,
+      4.695527,
+      4.485571,
+      0.093547,
+      1.914897,
+      0.100806,
+      11.558208,
+      7.796728,
+      8.971665,
+      5.95743,
+      4.234168,
+      3.768825,
+      2.461981,
+      0.118419,
+      2.451949,
+      0.161856,
+      9.340564,
+      3.618448,
+      14.788471,
+      5.258438,
+      2.693571,
+      2.290999,
+      3.81287,
+      1.225043,
+      5.811163,
+      3.097726,
+      0.124802,
+      5.093056,
+      1.694411,
+      11.986135,
+      10.764508
+    ],
+    "gc_pause_total_ms": 147.75296
+  }
+]

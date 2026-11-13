@@ -89,8 +89,12 @@ public final class MarkdownPerformanceProbe {
         var source=row("source_installed_forced_paint");source.put("epoch_ms",System.currentTimeMillis());out("MD_META ",source);
         if(!edt(() -> editor.getCurrentBuffer().isLargeFile())) {
             // A real controller + Swing typed action, delivered through the EDT, before full workbench readiness.
+            boolean wasModified=edt(() -> editor.getCurrentBuffer().isModified());
             uiText("startup_input_acceptance",() -> typed('x'),true);
-            edt(() -> {editor.getCurrentBuffer().getUndoManager().undo();return null;});
+            edt(() -> {editor.getCurrentBuffer().getUndoManager().undo();
+                // Fixture reset, outside the input timing. Undo restores bytes but ordinarily leaves dirty=true.
+                // Otherwise staged startup can discover this probe's own newly written recovery journal.
+                editor.getCurrentBuffer().setModified(wasModified);return null;});
             var input=row("input_accepted");input.put("epoch_ms",System.currentTimeMillis());out("MD_META ",input);
         }
         await(() -> !editor.stagedStartupPending,30);
@@ -102,6 +106,12 @@ public final class MarkdownPerformanceProbe {
         full.put("editor_font",edt(() -> editor.writingArea.getFont().toString()));
         full.put("viewport",edt(() -> editor.getActivePane().getScrollPane().getViewport().getExtentSize().toString()));
         full.put("lsp_clients",edt(() -> editor.lspClients.size()));full.put("syntax_enabled",edt(() -> editor.getCurrentBuffer().isSyntaxHighlightingEnabled()));out("MD_META ",full);
+        await(() -> !(boolean)field(editor.recoveryController,"recoveryJournalLoading"),10);
+        edt(() -> {for(Window window:Window.getWindows())
+            if(window instanceof Dialog dialog && dialog.isModal() && dialog.isVisible())
+                throw new AssertionError("Visible modal dialog contaminates benchmark: "+dialog.getTitle());return null;});
+        out("MD_META ",Map.of("operation","startup_fixture_reset_verified","visible_modal_dialogs",0,
+            "source_dirty",edt(() -> editor.getCurrentBuffer().isModified())));
         memory("full_ui_no_forced_gc");
     }
     private static void typed(char c) {
@@ -272,16 +282,25 @@ public final class MarkdownPerformanceProbe {
             out("MD_SAMPLE ",edt(() -> timed("preview_layout_and_forced_paint",() -> {editor.validate();var pane=editor.editorPanes.stream().filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow();var component=(JComponent)pane.getComponent();component.paintImmediately(component.getVisibleRect());})));
             var previewPane=edt(() -> (JEditorPane)((JScrollPane)((MarkdownPreviewPane)editor.editorPanes.stream().filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow().getComponent()).getComponent(1)).getViewport().getView());
             long imageStart=System.nanoTime();await(() -> imagesReady(previewPane),5);
-            var image=row("preview_images_ready");image.put("wall_ms",(System.nanoTime()-imageStart)/1e6);out("MD_SAMPLE ",image);
+            var image=row("preview_images_ready");image.put("wall_ms",(System.nanoTime()-imageStart)/1e6);
+            image.put("image_views",edt(() -> imageCount(previewPane.getUI().getRootView(previewPane))));out("MD_SAMPLE ",image);
             String htmlText=edt(() -> ((MarkdownPreviewPane)editor.editorPanes.stream().filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow().getComponent()).getHtml());
             out("MD_META ",Map.of("mermaid_error_fallback",htmlText.contains("Mermaid preview error"),"html_characters",htmlText.length()));
             memory("preview_active");
             for(int j=0;j<Math.min(samples,5);j++) out("MD_SAMPLE ",edt(() -> timed("preview_refresh_end_to_end_edt",() -> editor.commandHandler.execute("markdown refresh"))));
+            var sourceBuffer=edt(editor::getCurrentBuffer);String beforeBurst=edt(() -> documentHash(sourceBuffer.getDocument()));
+            long burstStart=System.nanoTime();
+            edt(() -> {for(int n=0;n<10;n++)sourceBuffer.getDocument().insertString(sourceBuffer.getDocument().getLength(),"\nbenchmark-preview-burst-"+n+"\n",null);return null;});
+            await(() -> ((MarkdownPreviewPane)editor.editorPanes.stream().filter(EditorPane::isMarkdownPreview).findFirst().orElseThrow().getComponent()).getHtml().contains("benchmark-preview-burst-9"),10);
+            var burst=row("preview_edit_burst_10_latest_html");burst.put("wall_ms",(System.nanoTime()-burstStart)/1e6);out("MD_SAMPLE ",burst);
+            edt(() -> {for(int n=0;n<10;n++)sourceBuffer.getUndoManager().undo();return null;});
+            if(!beforeBurst.equals(edt(() -> documentHash(sourceBuffer.getDocument()))))throw new AssertionError("Preview burst undo changed source");
             out("MD_SAMPLE ",edt(() -> timed("preview_close_edt",() -> editor.commandHandler.execute("markdown close"))));memory("preview_closed_no_forced_gc");
         }
         // Warm, non-additive replay of actual production stages; excludes HTML installation.
         try(MarkdownPreviewAssets assets=new MarkdownPreviewAssets()) {
-            String source=edt(() -> editor.getCurrentBuffer().getFullContent());
+            String[] captured={null};out("MD_SAMPLE ",edt(() -> timed("stage_replay_source_capture",() -> captured[0]=editor.getCurrentBuffer().getFullContent())));
+            String source=captured[0];
             Object[] prepared={source},tree={null},html={null};
             out("MD_SAMPLE ",edt(() -> timed("stage_replay_preprocessing",() -> prepared[0]=invoke(MarkdownPreviewRenderer.class,"prepare",new Class<?>[]{String.class,MarkdownPreviewAssets.class,Color.class},source,assets,Color.BLACK))));
             var parser=(org.commonmark.parser.Parser)field(MarkdownPreviewRenderer.class,"PARSER");
@@ -355,15 +374,19 @@ public final class MarkdownPerformanceProbe {
     }
     private static boolean imagesReady(View view) {
         if(view instanceof javax.swing.text.html.ImageView image) {
-            Image value=image.getImage();if(value!=null && (Toolkit.getDefaultToolkit().checkImage(value,-1,-1,null)&java.awt.image.ImageObserver.ALLBITS)==0)return false;
+            Image value=image.getImage();if(value==null || (Toolkit.getDefaultToolkit().checkImage(value,-1,-1,null)&java.awt.image.ImageObserver.ALLBITS)==0)return false;
         }
         for(int i=0;i<view.getViewCount();i++)if(!imagesReady(view.getView(i)))return false;return true;
+    }
+    private static int imageCount(View view) {
+        int count=view instanceof javax.swing.text.html.ImageView?1:0;
+        for(int i=0;i<view.getViewCount();i++)count+=imageCount(view.getView(i));return count;
     }
     public static void main(String[] args) throws Exception {
         if(args.length!=6)throw new IllegalArgumentException("mode disposable.md samples warmups wrap preview");
         file=Path.of(args[1]).toRealPath();samples=Integer.parseInt(args[2]);warmups=Integer.parseInt(args[3]);empty=args[0].equals("startup-empty");wrap=Boolean.parseBoolean(args[4]);withPreview=Boolean.parseBoolean(args[5]);
         try {
-            switch(args[0]){case "model"->model();case "ui"->ui();case "startup", "startup-empty"->open();case "assets"->assets();case "preview"->preview();case "search"->search();case "syntax"->syntax();default->throw new IllegalArgumentException("Unknown mode");}
+            switch(args[0]){case "model"->model();case "ui"->ui();case "startup", "startup-empty"->open();case "assets"->assets();case "assets-ready"->{open();assets();}case "preview"->preview();case "search"->search();case "syntax"->syntax();default->throw new IllegalArgumentException("Unknown mode");}
             if(editor!=null)out("MD_META ",edt(() -> Map.of("perf",editor.perfService.report(),"jobs",editor.asyncJobService.list().stream().map(j -> j.getDescription()+":"+j.getStatus()).toList())));
         } finally {
             if(editor!=null)edt(() -> {editor.disposeMarkdownPreviews();editor.shutdownSyntaxUi();editor.shutdownLspScheduling();editor.asyncJobService.shutdownNow();if(editor.backupScheduler!=null)editor.backupScheduler.close();if(editor.externalChangeTimer!=null)editor.externalChangeTimer.stop();if(editor.recoverySnapshotTimer!=null)editor.recoverySnapshotTimer.stop();if(editor.messageResetTimer!=null)editor.messageResetTimer.stop();editor.fileWatcherService.stop();editor.dispose();return null;});

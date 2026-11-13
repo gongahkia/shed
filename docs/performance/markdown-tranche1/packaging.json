@@ -1,0 +1,8 @@
+{
+  "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+  "application_classes_compared": 1290,
+  "class_byte_mismatches": [],
+  "provider_service": "META-INF/services/com.oracle.truffle.api.TruffleLanguage$Provider",
+  "packaged_service_contents": "com.oracle.truffle.js.lang.JavaScriptLanguageProvider\n",
+  "regex_provider_class_present": true
+}

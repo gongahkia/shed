@@ -3,7 +3,6 @@
 No production instrumentation or dependencies; complements benchmark-editor.py and its probe.
 """
 import argparse
-import base64
 import hashlib
 import importlib.util
 import json
@@ -14,7 +13,6 @@ import shutil
 import subprocess
 import struct
 import zlib
-import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -153,7 +151,10 @@ def execute(java, jar, classes, output, case, fixture_path, samples, warmups, ti
                         try: subprocess.run([str(java / 'bin/jcmd'), str(child.pid), 'VM.native_memory', 'summary'], stdout=native, stderr=subprocess.STDOUT, timeout=5)
                         except (OSError, subprocess.TimeoutExpired): pass
                 rss = command_output(['ps', '-o', 'rss=', '-p', str(child.pid)])
-                try: record['rss_samples_mib'].append({'seconds': time.monotonic() - started, 'epoch_ms': time.time()*1000, 'mib': int(rss['text']) / 1024})
+                try:
+                    kib = int(rss['text'])
+                    if kib > 0:
+                        record['rss_samples_mib'].append({'seconds': time.monotonic() - started, 'epoch_ms': time.time()*1000, 'mib': kib / 1024})
                 except (ValueError, KeyError): pass
                 time.sleep(.25)
         finally:
@@ -182,7 +183,7 @@ def main():
     parser.add_argument('--jar', type=Path, default=ROOT / 'target/shed-2.0.0.jar')
     parser.add_argument('--classpath-file', type=Path, help='Optional existing dependency classpath for a separately labeled packaged-vs-classpath control')
     parser.add_argument('--generate-only', action='store_true')
-    parser.add_argument('--mode', choices=['startup', 'startup-empty', 'ui', 'model', 'preview', 'assets', 'search', 'syntax'], default='model')
+    parser.add_argument('--mode', choices=['startup', 'startup-empty', 'ui', 'model', 'preview', 'assets', 'assets-ready', 'search', 'syntax'], default='model')
     parser.add_argument('--shapes', nargs='+', choices=SHAPES, default=['mixed'])
     parser.add_argument('--sizes', nargs='+', type=int, default=list(SIZES), help='Exact bytes, <=100 MiB each')
     parser.add_argument('--samples', type=int, default=100)
@@ -221,7 +222,7 @@ def main():
     report = {'jar_sha256': digest(jar), 'runner_sha256': digest(Path(__file__)),
               'runtime_classpath_sha256': hashlib.sha256(classpath.encode()).hexdigest(), 'packaged_jar_runtime': args.classpath_file is None, 'java': command_output([str(java / 'bin/java'), '-version']),
               'probe_hashes': {str(p.relative_to(ROOT)): digest(p) for p in sources}, 'arguments': vars(args).copy(),
-              'fixtures': manifest, 'cases': []}
+              'fixtures': manifest, 'local_image_sha256': digest(fixtures / 'swatch.png'), 'cases': []}
     report['arguments'] = {k: str(v) if isinstance(v, Path) else v for k, v in report['arguments'].items()}
     for entry in manifest:
         for iteration in range(args.runs):

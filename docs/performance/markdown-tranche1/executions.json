@@ -1,0 +1,1121 @@
+[
+  {
+    "source": "executions.json",
+    "records": [
+      {
+        "name": "final-model",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-model",
+          "--mode",
+          "model",
+          "--sizes",
+          "102400",
+          "1048576",
+          "10485760",
+          "52428800",
+          "104857600",
+          "--samples",
+          "100",
+          "--warmups",
+          "10",
+          "--timeout",
+          "45"
+        ],
+        "exit": 0,
+        "seconds": 24.54024430399295
+      },
+      {
+        "name": "final-ui",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-ui",
+          "--mode",
+          "ui",
+          "--sizes",
+          "102400",
+          "1048576",
+          "10485760",
+          "--samples",
+          "100",
+          "--warmups",
+          "10",
+          "--timeout",
+          "90"
+        ],
+        "exit": 0,
+        "seconds": 95.57540156898904
+      },
+      {
+        "name": "wrapped",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/wrapped",
+          "--mode",
+          "ui",
+          "--sizes",
+          "102400",
+          "1048576",
+          "10485760",
+          "--samples",
+          "100",
+          "--warmups",
+          "10",
+          "--timeout",
+          "90",
+          "--wrap"
+        ],
+        "exit": 0,
+        "seconds": 66.25072779401671
+      },
+      {
+        "name": "adversarial-model",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/adversarial-model",
+          "--mode",
+          "model",
+          "--shapes",
+          "long-line",
+          "nested",
+          "table",
+          "fence",
+          "headings",
+          "markers",
+          "--sizes",
+          "1048576",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--timeout",
+          "45"
+        ],
+        "exit": 0,
+        "seconds": 20.594075614004396
+      },
+      {
+        "name": "adversarial-ui",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/adversarial-ui",
+          "--mode",
+          "ui",
+          "--shapes",
+          "long-line",
+          "headings",
+          "table",
+          "--sizes",
+          "1048576",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--timeout",
+          "60"
+        ],
+        "exit": 1,
+        "seconds": 84.72673670199583
+      },
+      {
+        "name": "preview-plain",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/preview-plain",
+          "--mode",
+          "preview",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "102400",
+          "1048576",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--timeout",
+          "30"
+        ],
+        "exit": 0,
+        "seconds": 21.691963616991416
+      },
+      {
+        "name": "preview-media",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/preview-media",
+          "--mode",
+          "preview",
+          "--sizes",
+          "4096",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--timeout",
+          "35"
+        ],
+        "exit": 0,
+        "seconds": 11.04079437899054
+      },
+      {
+        "name": "assets",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/assets",
+          "--mode",
+          "assets",
+          "--sizes",
+          "4096",
+          "--samples",
+          "6",
+          "--warmups",
+          "0",
+          "--timeout",
+          "35"
+        ],
+        "exit": 1,
+        "seconds": 10.046520616015187
+      },
+      {
+        "name": "ui-preview",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/ui-preview",
+          "--mode",
+          "ui",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "102400",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--timeout",
+          "60",
+          "--preview"
+        ],
+        "exit": 0,
+        "seconds": 19.186265697993804
+      },
+      {
+        "name": "startup-empty",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/startup-empty",
+          "--mode",
+          "startup-empty",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "4096",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--runs",
+          "3",
+          "--timeout",
+          "30"
+        ],
+        "exit": 0,
+        "seconds": 22.56075735599734
+      },
+      {
+        "name": "startup-default",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/startup-default",
+          "--mode",
+          "startup",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "102400",
+          "1048576",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--runs",
+          "3",
+          "--timeout",
+          "30"
+        ],
+        "exit": 0,
+        "seconds": 45.2232526979933
+      },
+      {
+        "name": "startup-custom",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/startup-custom",
+          "--mode",
+          "startup",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "102400",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--runs",
+          "3",
+          "--timeout",
+          "30",
+          "--font",
+          "Dialog"
+        ],
+        "exit": 0,
+        "seconds": 22.18215638300171
+      },
+      {
+        "name": "constrained-model",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/constrained-model",
+          "--mode",
+          "model",
+          "--sizes",
+          "10485760",
+          "52428800",
+          "104857600",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--timeout",
+          "45",
+          "--heap",
+          "128"
+        ],
+        "exit": 1,
+        "seconds": 18.138442455005134
+      },
+      {
+        "name": "constrained-ui",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/constrained-ui",
+          "--mode",
+          "ui",
+          "--sizes",
+          "102400",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--timeout",
+          "60",
+          "--heap",
+          "128"
+        ],
+        "exit": 0,
+        "seconds": 15.328222574986285
+      },
+      {
+        "name": "profile-ui",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/profile-ui",
+          "--mode",
+          "ui",
+          "--sizes",
+          "10485760",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--timeout",
+          "60",
+          "--profile"
+        ],
+        "exit": 0,
+        "seconds": 18.354216804989846
+      },
+      {
+        "name": "profile-preview",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/profile-preview",
+          "--mode",
+          "preview",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "1048576",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--timeout",
+          "30",
+          "--profile"
+        ],
+        "exit": 0,
+        "seconds": 14.859051290986827
+      },
+      {
+        "name": "profile-startup",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/profile-startup",
+          "--mode",
+          "startup-empty",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "4096",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--timeout",
+          "30",
+          "--profile"
+        ],
+        "exit": 0,
+        "seconds": 9.324938563018804
+      }
+    ]
+  },
+  {
+    "source": "supplemental-executions.json",
+    "records": [
+      {
+        "name": "ui-complete",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/ui-complete",
+          "--mode",
+          "ui",
+          "--sizes",
+          "102400",
+          "1048576",
+          "10485760",
+          "--samples",
+          "100",
+          "--warmups",
+          "10",
+          "--timeout",
+          "90"
+        ],
+        "exit": 0
+      },
+      {
+        "name": "syntax-production",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/syntax-production",
+          "--mode",
+          "syntax",
+          "--sizes",
+          "102400",
+          "1048576",
+          "10485760",
+          "--samples",
+          "3",
+          "--warmups",
+          "0",
+          "--timeout",
+          "60"
+        ],
+        "exit": 0
+      },
+      {
+        "name": "search-complete",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/search-complete",
+          "--mode",
+          "search",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "102400",
+          "1048576",
+          "--samples",
+          "3",
+          "--warmups",
+          "0",
+          "--timeout",
+          "45"
+        ],
+        "exit": 0
+      },
+      {
+        "name": "assets-jar",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/assets-jar",
+          "--mode",
+          "assets",
+          "--sizes",
+          "4096",
+          "--samples",
+          "6",
+          "--warmups",
+          "0",
+          "--timeout",
+          "35"
+        ],
+        "exit": 1
+      },
+      {
+        "name": "assets-classpath-control",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/assets-classpath-control",
+          "--mode",
+          "assets",
+          "--sizes",
+          "4096",
+          "--samples",
+          "6",
+          "--warmups",
+          "0",
+          "--timeout",
+          "35",
+          "--classpath-file",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/maven-runtime-classpath.txt"
+        ],
+        "exit": 0
+      },
+      {
+        "name": "media-valid-image",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/media-valid-image",
+          "--mode",
+          "preview",
+          "--sizes",
+          "4096",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--timeout",
+          "35"
+        ],
+        "exit": 0
+      }
+    ]
+  },
+  {
+    "source": "clean-executions.json",
+    "records": [
+      {
+        "name": "clean-ui",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-ui",
+          "--mode",
+          "ui",
+          "--sizes",
+          "102400",
+          "1048576",
+          "10485760",
+          "--samples",
+          "100",
+          "--warmups",
+          "10",
+          "--timeout",
+          "90"
+        ],
+        "exit": 0,
+        "seconds": 58.795106243982445
+      },
+      {
+        "name": "clean-wrapped",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-wrapped",
+          "--mode",
+          "ui",
+          "--sizes",
+          "102400",
+          "1048576",
+          "10485760",
+          "--samples",
+          "100",
+          "--warmups",
+          "10",
+          "--timeout",
+          "90",
+          "--wrap"
+        ],
+        "exit": 0,
+        "seconds": 78.98290661501233
+      },
+      {
+        "name": "clean-syntax",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-syntax",
+          "--mode",
+          "syntax",
+          "--sizes",
+          "102400",
+          "1048576",
+          "10485760",
+          "--samples",
+          "3",
+          "--warmups",
+          "0",
+          "--timeout",
+          "60"
+        ],
+        "exit": 0,
+        "seconds": 28.866739841003437
+      },
+      {
+        "name": "clean-preview",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-preview",
+          "--mode",
+          "preview",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "102400",
+          "1048576",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--timeout",
+          "30"
+        ],
+        "exit": 0,
+        "seconds": 25.518433504999848
+      },
+      {
+        "name": "clean-media",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-media",
+          "--mode",
+          "preview",
+          "--sizes",
+          "4096",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--timeout",
+          "35"
+        ],
+        "exit": 0,
+        "seconds": 13.396433475980302
+      },
+      {
+        "name": "clean-ui-preview",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-ui-preview",
+          "--mode",
+          "ui",
+          "--preview",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "102400",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--timeout",
+          "60"
+        ],
+        "exit": 0,
+        "seconds": 20.410178889986128
+      },
+      {
+        "name": "clean-startup-empty",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-startup-empty",
+          "--mode",
+          "startup-empty",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "4096",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--runs",
+          "3",
+          "--timeout",
+          "30"
+        ],
+        "exit": 0,
+        "seconds": 22.733887723996304
+      },
+      {
+        "name": "clean-startup-default",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-startup-default",
+          "--mode",
+          "startup",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "102400",
+          "1048576",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--runs",
+          "3",
+          "--timeout",
+          "30"
+        ],
+        "exit": 0,
+        "seconds": 43.07220448300359
+      },
+      {
+        "name": "clean-startup-custom",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-startup-custom",
+          "--mode",
+          "startup",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "102400",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--runs",
+          "3",
+          "--timeout",
+          "30",
+          "--font",
+          "Dialog"
+        ],
+        "exit": 0,
+        "seconds": 23.72523847699631
+      },
+      {
+        "name": "clean-adversarial",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-adversarial",
+          "--mode",
+          "ui",
+          "--shapes",
+          "long-line",
+          "headings",
+          "table",
+          "--sizes",
+          "1048576",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--timeout",
+          "60"
+        ],
+        "exit": 1,
+        "seconds": 81.56849412198062
+      },
+      {
+        "name": "clean-search",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-search",
+          "--mode",
+          "search",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "102400",
+          "1048576",
+          "--samples",
+          "3",
+          "--warmups",
+          "0",
+          "--timeout",
+          "45"
+        ],
+        "exit": 0,
+        "seconds": 16.55380988601246
+      },
+      {
+        "name": "clean-constrained-ui",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-constrained-ui",
+          "--mode",
+          "ui",
+          "--sizes",
+          "102400",
+          "--heap",
+          "128",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--timeout",
+          "60"
+        ],
+        "exit": 0,
+        "seconds": 11.134919041011017
+      }
+    ]
+  },
+  {
+    "source": "final-executions.json",
+    "records": [
+      {
+        "name": "final-preview",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-preview",
+          "--mode",
+          "preview",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "102400",
+          "1048576",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--timeout",
+          "40"
+        ],
+        "exit": 0,
+        "seconds": 28.263728691003053
+      },
+      {
+        "name": "final-media",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-media",
+          "--mode",
+          "preview",
+          "--sizes",
+          "4096",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--timeout",
+          "40"
+        ],
+        "exit": 0,
+        "seconds": 10.907970074011246
+      },
+      {
+        "name": "font-ready-assets-jar",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/font-ready-assets-jar",
+          "--mode",
+          "assets-ready",
+          "--sizes",
+          "4096",
+          "--samples",
+          "6",
+          "--warmups",
+          "0",
+          "--timeout",
+          "45"
+        ],
+        "exit": 1,
+        "seconds": 10.299043159990106
+      },
+      {
+        "name": "font-ready-assets-classpath",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/font-ready-assets-classpath",
+          "--mode",
+          "assets-ready",
+          "--sizes",
+          "4096",
+          "--samples",
+          "6",
+          "--warmups",
+          "0",
+          "--timeout",
+          "45",
+          "--classpath-file",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/maven-runtime-classpath.txt"
+        ],
+        "exit": 0,
+        "seconds": 19.347964469983708
+      },
+      {
+        "name": "final-profile-ui",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-profile-ui",
+          "--mode",
+          "ui",
+          "--sizes",
+          "10485760",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--timeout",
+          "60",
+          "--profile"
+        ],
+        "exit": 0,
+        "seconds": 14.871879653976066
+      },
+      {
+        "name": "final-profile-preview",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-profile-preview",
+          "--mode",
+          "preview",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "1048576",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--timeout",
+          "40",
+          "--profile"
+        ],
+        "exit": 0,
+        "seconds": 14.794370400020853
+      },
+      {
+        "name": "final-profile-startup",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-profile-startup",
+          "--mode",
+          "startup-empty",
+          "--shapes",
+          "plain",
+          "--sizes",
+          "4096",
+          "--samples",
+          "1",
+          "--warmups",
+          "0",
+          "--timeout",
+          "30",
+          "--profile"
+        ],
+        "exit": 0,
+        "seconds": 8.842705121991457
+      }
+    ]
+  },
+  {
+    "source": "extra-executions.json",
+    "records": [
+      {
+        "name": "final-profile-long-line",
+        "command": [
+          "python3",
+          "scripts/benchmark-markdown.py",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-profile-long-line",
+          "--mode",
+          "ui",
+          "--shapes",
+          "long-line",
+          "--sizes",
+          "1048576",
+          "--samples",
+          "30",
+          "--warmups",
+          "3",
+          "--timeout",
+          "60",
+          "--profile"
+        ],
+        "exit": 0,
+        "seconds": 55.74433569397661
+      }
+    ]
+  },
+  {
+    "source": "verification.json",
+    "records": [
+      {
+        "name": "legacy-desktop",
+        "command": [
+          "python3",
+          "scripts/benchmark-editor.py",
+          "--jar",
+          "target/shed-2.0.0.jar",
+          "--runs",
+          "3",
+          "--label",
+          "markdown-tranche1-reference",
+          "--output",
+          "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/legacy-desktop.json"
+        ],
+        "exit": 1,
+        "seconds": 38.8303406869818
+      },
+      {
+        "name": "legacy-model",
+        "command": [
+          "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+          "-Xms64m",
+          "-Xmx512m",
+          "-cp",
+          "target/shed-2.0.0.jar",
+          "shed.EditorResponsivenessBenchmark",
+          "--samples=3"
+        ],
+        "exit": 0,
+        "seconds": 1.1314851240022108
+      },
+      {
+        "name": "python-tooling",
+        "command": [
+          "python3",
+          "-m",
+          "unittest",
+          "discover",
+          "-s",
+          "scripts",
+          "-p",
+          "test_benchmark_markdown.py"
+        ],
+        "exit": 0,
+        "seconds": 0.2321007229911629
+      },
+      {
+        "name": "maven-all",
+        "command": [
+          "/Users/gabrielongtemasek/.local/share/shed-tools/maven/bin/mvn",
+          "-o",
+          "-B",
+          "-Djava.awt.headless=false",
+          "-DargLine=-Xmx512m",
+          "test"
+        ],
+        "exit": 0,
+        "seconds": 200.2544410119881
+      }
+    ]
+  },
+  {
+    "source": "final-verification.json",
+    "records": {
+      "command": [
+        "/Users/gabrielongtemasek/.local/share/shed-tools/maven/bin/mvn",
+        "-o",
+        "-B",
+        "-Djava.awt.headless=false",
+        "-DargLine=-Xmx512m",
+        "test"
+      ],
+      "environment": {
+        "JAVA_HOME": "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21"
+      },
+      "exit": 0,
+      "seconds": 201.75666953498148
+    }
+  }
+]

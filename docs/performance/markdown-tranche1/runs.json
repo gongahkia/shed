@@ -1,0 +1,1477 @@
+[
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "8ac430f19595d99273e49c3bc46256f5219508367df34c0f8b88909bcdf166ba",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "ff2f32d9b66e4448ab8287fd9b80f05c59d8956dff619fe50c9060fc3f5447f3"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/current-model",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "model",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        102400,
+        1048576,
+        10485760,
+        52428800,
+        104857600
+      ],
+      "samples": 100,
+      "warmups": 10,
+      "runs": 1,
+      "timeout": 45,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/current-model/fixtures/mixed-102400.md",
+        "bytes": 102400,
+        "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 53,
+        "padding_bytes": 1541,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/current-model/fixtures/mixed-1048576.md",
+        "bytes": 1048576,
+        "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 551,
+        "padding_bytes": 23,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/current-model/fixtures/mixed-10485760.md",
+        "bytes": 10485760,
+        "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 5510,
+        "padding_bytes": 230,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/current-model/fixtures/mixed-52428800.md",
+        "bytes": 52428800,
+        "sha256": "5d64ce782474f58a5fdc9325b621983f3449da43e9f92ed095a6ffdf32c85c62",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 27550,
+        "padding_bytes": 1150,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/current-model/fixtures/mixed-104857600.md",
+        "bytes": 104857600,
+        "sha256": "eca330cbc4f7e1754a31004a77622207b944967a70fa3a5c9420e77ebba1d924",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 55101,
+        "padding_bytes": 397,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "current-model"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "2a07151f9192f218889e5abd0025f921860ca3c54f5eb1b3991e67dd6341660c"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/adversarial-model",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "generate_only": false,
+      "mode": "model",
+      "shapes": [
+        "long-line",
+        "nested",
+        "table",
+        "fence",
+        "headings",
+        "markers"
+      ],
+      "sizes": [
+        1048576
+      ],
+      "samples": 30,
+      "warmups": 3,
+      "runs": 1,
+      "timeout": 45,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/adversarial-model/fixtures/long-line-1048576.md",
+        "bytes": 1048576,
+        "sha256": "2ef0426e1b35128e1a0e1324e6ee2e14da18d21a801aa8fa46a23b19d87ae2dd",
+        "shape": "long-line",
+        "generator": 1,
+        "complete_blocks": 3,
+        "padding_bytes": 262105,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/adversarial-model/fixtures/nested-1048576.md",
+        "bytes": 1048576,
+        "sha256": "368377b2e9efd53f3e8a69c66398944ada091ee093dea66616efb0354fea866b",
+        "shape": "nested",
+        "generator": 1,
+        "complete_blocks": 58,
+        "padding_bytes": 1792,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/adversarial-model/fixtures/table-1048576.md",
+        "bytes": 1048576,
+        "sha256": "c051453e6d926ea3a3858ee8d238bcb55fb7f8adbe241fbbbe4d7c74ee8d99c9",
+        "shape": "table",
+        "generator": 1,
+        "complete_blocks": 20,
+        "padding_bytes": 12356,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/adversarial-model/fixtures/fence-1048576.md",
+        "bytes": 1048576,
+        "sha256": "caede2de0dc749a714d69ce8187cb79765551927b085b6e3d6379bee75bb42a3",
+        "shape": "fence",
+        "generator": 1,
+        "complete_blocks": 4,
+        "padding_bytes": 80528,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/adversarial-model/fixtures/headings-1048576.md",
+        "bytes": 1048576,
+        "sha256": "287436d9066ea9ba5382c5564d8b32e46de138942b5dd54c2f9e14bf8686862c",
+        "shape": "headings",
+        "generator": 1,
+        "complete_blocks": 116,
+        "padding_bytes": 5040,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/adversarial-model/fixtures/markers-1048576.md",
+        "bytes": 1048576,
+        "sha256": "c53de5c9de3a31009a60d807ac30d1a7017aa87764ab2bd0d494c6c396711598",
+        "shape": "markers",
+        "generator": 1,
+        "complete_blocks": 186,
+        "padding_bytes": 838,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "run_group": "adversarial-model"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "d857c67f7255fddafe2a8040c0d6afe6570acc3856bcf788755fc4d1cef78d3f",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "827cadc82bd3864c16a7c5a185eaca3260e5e6aca8e8ee3ecae7481b704943e5"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/assets-jar",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "assets",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        4096
+      ],
+      "samples": 6,
+      "warmups": 0,
+      "runs": 1,
+      "timeout": 35,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/assets-jar/fixtures/mixed-4096.md",
+        "bytes": 4096,
+        "sha256": "ed43be0a5b6eefcabd8681bd142f7ef8f3931e13d6f963870c45f8160c57c4fa",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 2,
+        "padding_bytes": 290,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "run_group": "assets-jar"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "d857c67f7255fddafe2a8040c0d6afe6570acc3856bcf788755fc4d1cef78d3f",
+    "runtime_classpath_sha256": "88995df39c911046081bd1d5a6f3e2a7ca1deabdd57f762a31e629b92f9c2003",
+    "packaged_jar_runtime": false,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "827cadc82bd3864c16a7c5a185eaca3260e5e6aca8e8ee3ecae7481b704943e5"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/assets-classpath-control",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/maven-runtime-classpath.txt",
+      "generate_only": false,
+      "mode": "assets",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        4096
+      ],
+      "samples": 6,
+      "warmups": 0,
+      "runs": 1,
+      "timeout": 35,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/assets-classpath-control/fixtures/mixed-4096.md",
+        "bytes": 4096,
+        "sha256": "ed43be0a5b6eefcabd8681bd142f7ef8f3931e13d6f963870c45f8160c57c4fa",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 2,
+        "padding_bytes": 290,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "run_group": "assets-classpath-control"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "2a07151f9192f218889e5abd0025f921860ca3c54f5eb1b3991e67dd6341660c"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/constrained-model",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "generate_only": false,
+      "mode": "model",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        10485760,
+        52428800,
+        104857600
+      ],
+      "samples": 30,
+      "warmups": 3,
+      "runs": 1,
+      "timeout": 45,
+      "heap": 128,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/constrained-model/fixtures/mixed-10485760.md",
+        "bytes": 10485760,
+        "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 5510,
+        "padding_bytes": 230,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/constrained-model/fixtures/mixed-52428800.md",
+        "bytes": 52428800,
+        "sha256": "5d64ce782474f58a5fdc9325b621983f3449da43e9f92ed095a6ffdf32c85c62",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 27550,
+        "padding_bytes": 1150,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/constrained-model/fixtures/mixed-104857600.md",
+        "bytes": 104857600,
+        "sha256": "eca330cbc4f7e1754a31004a77622207b944967a70fa3a5c9420e77ebba1d924",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 55101,
+        "padding_bytes": 397,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "run_group": "constrained-model"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "d857c67f7255fddafe2a8040c0d6afe6570acc3856bcf788755fc4d1cef78d3f",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "1d87ad2ae1576c9a23b09f712dc1bb2a70a89e68602534faabb76811f10e426f"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/constrained-save-control",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "model",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        10485760
+      ],
+      "samples": 30,
+      "warmups": 3,
+      "runs": 1,
+      "timeout": 45,
+      "heap": 128,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/constrained-save-control/fixtures/mixed-10485760.md",
+        "bytes": 10485760,
+        "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 5510,
+        "padding_bytes": 230,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "run_group": "constrained-save-control"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "7d765e3f063d50ee9741cc5f586347e8e1c6e49667a79782e17ed9fa7f4791ce",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "99a6b7490bbfc536f309cafe3d79c730a2b403411d701e7979c45761fa6aef6a"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-ui",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "ui",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        102400,
+        1048576,
+        10485760
+      ],
+      "samples": 100,
+      "warmups": 10,
+      "runs": 1,
+      "timeout": 90,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-ui/fixtures/mixed-102400.md",
+        "bytes": 102400,
+        "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 53,
+        "padding_bytes": 1541,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-ui/fixtures/mixed-1048576.md",
+        "bytes": 1048576,
+        "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 551,
+        "padding_bytes": 23,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-ui/fixtures/mixed-10485760.md",
+        "bytes": 10485760,
+        "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 5510,
+        "padding_bytes": 230,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "clean-ui"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "7d765e3f063d50ee9741cc5f586347e8e1c6e49667a79782e17ed9fa7f4791ce",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "99a6b7490bbfc536f309cafe3d79c730a2b403411d701e7979c45761fa6aef6a"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-wrapped",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "ui",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        102400,
+        1048576,
+        10485760
+      ],
+      "samples": 100,
+      "warmups": 10,
+      "runs": 1,
+      "timeout": 90,
+      "heap": 512,
+      "wrap": true,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-wrapped/fixtures/mixed-102400.md",
+        "bytes": 102400,
+        "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 53,
+        "padding_bytes": 1541,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-wrapped/fixtures/mixed-1048576.md",
+        "bytes": 1048576,
+        "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 551,
+        "padding_bytes": 23,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-wrapped/fixtures/mixed-10485760.md",
+        "bytes": 10485760,
+        "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 5510,
+        "padding_bytes": 230,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "clean-wrapped"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "7d765e3f063d50ee9741cc5f586347e8e1c6e49667a79782e17ed9fa7f4791ce",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "99a6b7490bbfc536f309cafe3d79c730a2b403411d701e7979c45761fa6aef6a"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-syntax",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "syntax",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        102400,
+        1048576,
+        10485760
+      ],
+      "samples": 3,
+      "warmups": 0,
+      "runs": 1,
+      "timeout": 60,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-syntax/fixtures/mixed-102400.md",
+        "bytes": 102400,
+        "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 53,
+        "padding_bytes": 1541,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-syntax/fixtures/mixed-1048576.md",
+        "bytes": 1048576,
+        "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 551,
+        "padding_bytes": 23,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-syntax/fixtures/mixed-10485760.md",
+        "bytes": 10485760,
+        "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 5510,
+        "padding_bytes": 230,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "clean-syntax"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "7d765e3f063d50ee9741cc5f586347e8e1c6e49667a79782e17ed9fa7f4791ce",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "99a6b7490bbfc536f309cafe3d79c730a2b403411d701e7979c45761fa6aef6a"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-ui-preview",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "ui",
+      "shapes": [
+        "plain"
+      ],
+      "sizes": [
+        102400
+      ],
+      "samples": 30,
+      "warmups": 3,
+      "runs": 1,
+      "timeout": 60,
+      "heap": 512,
+      "wrap": false,
+      "preview": true,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-ui-preview/fixtures/plain-102400.md",
+        "bytes": 102400,
+        "sha256": "656231662ceb4ae3741873fa411d2af7bde1c1de8a320962eced765196b9d3a6",
+        "shape": "plain",
+        "generator": 1,
+        "complete_blocks": 66,
+        "padding_bytes": 166,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "clean-ui-preview"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "7d765e3f063d50ee9741cc5f586347e8e1c6e49667a79782e17ed9fa7f4791ce",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "99a6b7490bbfc536f309cafe3d79c730a2b403411d701e7979c45761fa6aef6a"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-startup-empty",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "startup-empty",
+      "shapes": [
+        "plain"
+      ],
+      "sizes": [
+        4096
+      ],
+      "samples": 1,
+      "warmups": 0,
+      "runs": 3,
+      "timeout": 30,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-startup-empty/fixtures/plain-4096.md",
+        "bytes": 4096,
+        "sha256": "ffc9e6d6a8e1e0b0a4c59202b4404ad3ebe1f83407a8ac7f97d65c57134cd4e0",
+        "shape": "plain",
+        "generator": 1,
+        "complete_blocks": 2,
+        "padding_bytes": 998,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "clean-startup-empty"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "7d765e3f063d50ee9741cc5f586347e8e1c6e49667a79782e17ed9fa7f4791ce",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "99a6b7490bbfc536f309cafe3d79c730a2b403411d701e7979c45761fa6aef6a"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-startup-default",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "startup",
+      "shapes": [
+        "plain"
+      ],
+      "sizes": [
+        102400,
+        1048576
+      ],
+      "samples": 1,
+      "warmups": 0,
+      "runs": 3,
+      "timeout": 30,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-startup-default/fixtures/plain-102400.md",
+        "bytes": 102400,
+        "sha256": "656231662ceb4ae3741873fa411d2af7bde1c1de8a320962eced765196b9d3a6",
+        "shape": "plain",
+        "generator": 1,
+        "complete_blocks": 66,
+        "padding_bytes": 166,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-startup-default/fixtures/plain-1048576.md",
+        "bytes": 1048576,
+        "sha256": "4d2e2353d46f3d11642076fc2d58c975459187b14fe3bfa1867822d20ee5c175",
+        "shape": "plain",
+        "generator": 1,
+        "complete_blocks": 676,
+        "padding_bytes": 1452,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "clean-startup-default"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "7d765e3f063d50ee9741cc5f586347e8e1c6e49667a79782e17ed9fa7f4791ce",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "99a6b7490bbfc536f309cafe3d79c730a2b403411d701e7979c45761fa6aef6a"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-startup-custom",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "startup",
+      "shapes": [
+        "plain"
+      ],
+      "sizes": [
+        102400
+      ],
+      "samples": 1,
+      "warmups": 0,
+      "runs": 3,
+      "timeout": 30,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": "Dialog"
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-startup-custom/fixtures/plain-102400.md",
+        "bytes": 102400,
+        "sha256": "656231662ceb4ae3741873fa411d2af7bde1c1de8a320962eced765196b9d3a6",
+        "shape": "plain",
+        "generator": 1,
+        "complete_blocks": 66,
+        "padding_bytes": 166,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "clean-startup-custom"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "7d765e3f063d50ee9741cc5f586347e8e1c6e49667a79782e17ed9fa7f4791ce",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "4243a37de563149495270c5b1cecb2f1d1dbbd0c61c903c5c4d1b4d254572623"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-adversarial",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "ui",
+      "shapes": [
+        "long-line",
+        "headings",
+        "table"
+      ],
+      "sizes": [
+        1048576
+      ],
+      "samples": 30,
+      "warmups": 3,
+      "runs": 1,
+      "timeout": 60,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-adversarial/fixtures/long-line-1048576.md",
+        "bytes": 1048576,
+        "sha256": "2ef0426e1b35128e1a0e1324e6ee2e14da18d21a801aa8fa46a23b19d87ae2dd",
+        "shape": "long-line",
+        "generator": 1,
+        "complete_blocks": 3,
+        "padding_bytes": 262105,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-adversarial/fixtures/headings-1048576.md",
+        "bytes": 1048576,
+        "sha256": "287436d9066ea9ba5382c5564d8b32e46de138942b5dd54c2f9e14bf8686862c",
+        "shape": "headings",
+        "generator": 1,
+        "complete_blocks": 116,
+        "padding_bytes": 5040,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-adversarial/fixtures/table-1048576.md",
+        "bytes": 1048576,
+        "sha256": "c051453e6d926ea3a3858ee8d238bcb55fb7f8adbe241fbbbe4d7c74ee8d99c9",
+        "shape": "table",
+        "generator": 1,
+        "complete_blocks": 20,
+        "padding_bytes": 12356,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "clean-adversarial"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "7d765e3f063d50ee9741cc5f586347e8e1c6e49667a79782e17ed9fa7f4791ce",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "4243a37de563149495270c5b1cecb2f1d1dbbd0c61c903c5c4d1b4d254572623"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-search",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "search",
+      "shapes": [
+        "plain"
+      ],
+      "sizes": [
+        102400,
+        1048576
+      ],
+      "samples": 3,
+      "warmups": 0,
+      "runs": 1,
+      "timeout": 45,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-search/fixtures/plain-102400.md",
+        "bytes": 102400,
+        "sha256": "656231662ceb4ae3741873fa411d2af7bde1c1de8a320962eced765196b9d3a6",
+        "shape": "plain",
+        "generator": 1,
+        "complete_blocks": 66,
+        "padding_bytes": 166,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-search/fixtures/plain-1048576.md",
+        "bytes": 1048576,
+        "sha256": "4d2e2353d46f3d11642076fc2d58c975459187b14fe3bfa1867822d20ee5c175",
+        "shape": "plain",
+        "generator": 1,
+        "complete_blocks": 676,
+        "padding_bytes": 1452,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "clean-search"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "7d765e3f063d50ee9741cc5f586347e8e1c6e49667a79782e17ed9fa7f4791ce",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "4243a37de563149495270c5b1cecb2f1d1dbbd0c61c903c5c4d1b4d254572623"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-constrained-ui",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "ui",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        102400
+      ],
+      "samples": 30,
+      "warmups": 3,
+      "runs": 1,
+      "timeout": 60,
+      "heap": 128,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/clean-constrained-ui/fixtures/mixed-102400.md",
+        "bytes": 102400,
+        "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 53,
+        "padding_bytes": 1541,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "clean-constrained-ui"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "8ac430f19595d99273e49c3bc46256f5219508367df34c0f8b88909bcdf166ba",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "ff2f32d9b66e4448ab8287fd9b80f05c59d8956dff619fe50c9060fc3f5447f3"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-preview",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "preview",
+      "shapes": [
+        "plain"
+      ],
+      "sizes": [
+        102400,
+        1048576
+      ],
+      "samples": 1,
+      "warmups": 0,
+      "runs": 1,
+      "timeout": 40,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-preview/fixtures/plain-102400.md",
+        "bytes": 102400,
+        "sha256": "656231662ceb4ae3741873fa411d2af7bde1c1de8a320962eced765196b9d3a6",
+        "shape": "plain",
+        "generator": 1,
+        "complete_blocks": 66,
+        "padding_bytes": 166,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      },
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-preview/fixtures/plain-1048576.md",
+        "bytes": 1048576,
+        "sha256": "4d2e2353d46f3d11642076fc2d58c975459187b14fe3bfa1867822d20ee5c175",
+        "shape": "plain",
+        "generator": 1,
+        "complete_blocks": 676,
+        "padding_bytes": 1452,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "final-preview"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "8ac430f19595d99273e49c3bc46256f5219508367df34c0f8b88909bcdf166ba",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "ff2f32d9b66e4448ab8287fd9b80f05c59d8956dff619fe50c9060fc3f5447f3"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-media",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "preview",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        4096
+      ],
+      "samples": 1,
+      "warmups": 0,
+      "runs": 1,
+      "timeout": 40,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-media/fixtures/mixed-4096.md",
+        "bytes": 4096,
+        "sha256": "ed43be0a5b6eefcabd8681bd142f7ef8f3931e13d6f963870c45f8160c57c4fa",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 2,
+        "padding_bytes": 290,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "final-media"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "8ac430f19595d99273e49c3bc46256f5219508367df34c0f8b88909bcdf166ba",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "ff2f32d9b66e4448ab8287fd9b80f05c59d8956dff619fe50c9060fc3f5447f3"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/font-ready-assets-jar",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "assets-ready",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        4096
+      ],
+      "samples": 6,
+      "warmups": 0,
+      "runs": 1,
+      "timeout": 45,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/font-ready-assets-jar/fixtures/mixed-4096.md",
+        "bytes": 4096,
+        "sha256": "ed43be0a5b6eefcabd8681bd142f7ef8f3931e13d6f963870c45f8160c57c4fa",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 2,
+        "padding_bytes": 290,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "font-ready-assets-jar"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "8ac430f19595d99273e49c3bc46256f5219508367df34c0f8b88909bcdf166ba",
+    "runtime_classpath_sha256": "88995df39c911046081bd1d5a6f3e2a7ca1deabdd57f762a31e629b92f9c2003",
+    "packaged_jar_runtime": false,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "ff2f32d9b66e4448ab8287fd9b80f05c59d8956dff619fe50c9060fc3f5447f3"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/font-ready-assets-classpath",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/maven-runtime-classpath.txt",
+      "generate_only": false,
+      "mode": "assets-ready",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        4096
+      ],
+      "samples": 6,
+      "warmups": 0,
+      "runs": 1,
+      "timeout": 45,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": false,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/font-ready-assets-classpath/fixtures/mixed-4096.md",
+        "bytes": 4096,
+        "sha256": "ed43be0a5b6eefcabd8681bd142f7ef8f3931e13d6f963870c45f8160c57c4fa",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 2,
+        "padding_bytes": 290,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "font-ready-assets-classpath"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "8ac430f19595d99273e49c3bc46256f5219508367df34c0f8b88909bcdf166ba",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "ff2f32d9b66e4448ab8287fd9b80f05c59d8956dff619fe50c9060fc3f5447f3"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-profile-ui",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "ui",
+      "shapes": [
+        "mixed"
+      ],
+      "sizes": [
+        10485760
+      ],
+      "samples": 30,
+      "warmups": 3,
+      "runs": 1,
+      "timeout": 60,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": true,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-profile-ui/fixtures/mixed-10485760.md",
+        "bytes": 10485760,
+        "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
+        "shape": "mixed",
+        "generator": 1,
+        "complete_blocks": 5510,
+        "padding_bytes": 230,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "final-profile-ui"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "8ac430f19595d99273e49c3bc46256f5219508367df34c0f8b88909bcdf166ba",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "ff2f32d9b66e4448ab8287fd9b80f05c59d8956dff619fe50c9060fc3f5447f3"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-profile-preview",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "preview",
+      "shapes": [
+        "plain"
+      ],
+      "sizes": [
+        1048576
+      ],
+      "samples": 1,
+      "warmups": 0,
+      "runs": 1,
+      "timeout": 40,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": true,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-profile-preview/fixtures/plain-1048576.md",
+        "bytes": 1048576,
+        "sha256": "4d2e2353d46f3d11642076fc2d58c975459187b14fe3bfa1867822d20ee5c175",
+        "shape": "plain",
+        "generator": 1,
+        "complete_blocks": 676,
+        "padding_bytes": 1452,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "final-profile-preview"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "8ac430f19595d99273e49c3bc46256f5219508367df34c0f8b88909bcdf166ba",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "ff2f32d9b66e4448ab8287fd9b80f05c59d8956dff619fe50c9060fc3f5447f3"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-profile-startup",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "startup-empty",
+      "shapes": [
+        "plain"
+      ],
+      "sizes": [
+        4096
+      ],
+      "samples": 1,
+      "warmups": 0,
+      "runs": 1,
+      "timeout": 30,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": true,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-profile-startup/fixtures/plain-4096.md",
+        "bytes": 4096,
+        "sha256": "ffc9e6d6a8e1e0b0a4c59202b4404ad3ebe1f83407a8ac7f97d65c57134cd4e0",
+        "shape": "plain",
+        "generator": 1,
+        "complete_blocks": 2,
+        "padding_bytes": 998,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "final-profile-startup"
+  },
+  {
+    "jar_sha256": "d0e8a3016989fcad23e9fc409dd585474e02062ed0723a111773ea254528fb97",
+    "runner_sha256": "8ac430f19595d99273e49c3bc46256f5219508367df34c0f8b88909bcdf166ba",
+    "runtime_classpath_sha256": "2d721a374f4a9a5922f45060715d98c905a0673e5c9643695a101ced91b74e12",
+    "packaged_jar_runtime": true,
+    "java": {
+      "exit": 0,
+      "text": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode)"
+    },
+    "probe_hashes": {
+      "src/benchmark/java/shed/EditorWorkflowProbe.java": "04c96f210d9ed9b89b71a96cf979072a7dfe86e9e031564519e822b022dc3382",
+      "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "ff2f32d9b66e4448ab8287fd9b80f05c59d8956dff619fe50c9060fc3f5447f3"
+    },
+    "arguments": {
+      "output": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-profile-long-line",
+      "jar": "/Users/gabrielongtemasek/Desktop/personal/shed/target/shed-2.0.0.jar",
+      "classpath_file": null,
+      "generate_only": false,
+      "mode": "ui",
+      "shapes": [
+        "long-line"
+      ],
+      "sizes": [
+        1048576
+      ],
+      "samples": 30,
+      "warmups": 3,
+      "runs": 1,
+      "timeout": 60,
+      "heap": 512,
+      "wrap": false,
+      "preview": false,
+      "profile": true,
+      "font": ""
+    },
+    "fixtures": [
+      {
+        "path": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-markdown-tranche1-d_uxpp_4/final-profile-long-line/fixtures/long-line-1048576.md",
+        "bytes": 1048576,
+        "sha256": "2ef0426e1b35128e1a0e1324e6ee2e14da18d21a801aa8fa46a23b19d87ae2dd",
+        "shape": "long-line",
+        "generator": 1,
+        "complete_blocks": 3,
+        "padding_bytes": 262105,
+        "encoding": "ASCII/UTF-8",
+        "eof_newline": true
+      }
+    ],
+    "local_image_sha256": "992fdcb83950d35e2795e97b7af87412de24c9ae65e440cb1d2424e368dc03ee",
+    "run_group": "final-profile-long-line"
+  }
+]

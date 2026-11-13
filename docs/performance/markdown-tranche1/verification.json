@@ -1,0 +1,58 @@
+{
+  "full_maven_final": {
+    "command": [
+      "/Users/gabrielongtemasek/.local/share/shed-tools/maven/bin/mvn",
+      "-o",
+      "-B",
+      "-Djava.awt.headless=false",
+      "-DargLine=-Xmx512m",
+      "test"
+    ],
+    "environment": {
+      "JAVA_HOME": "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21"
+    },
+    "exit": 0,
+    "seconds": 201.75666953498148
+  },
+  "maven_totals": {
+    "tests": 1309,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5
+  },
+  "passing_tests": 1304,
+  "full_suite_runs": 2,
+  "python_tooling_tests": {
+    "tests": 4,
+    "failures": 0,
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p test_benchmark_markdown.py"
+  },
+  "primary_case_count": 53,
+  "primary_case_states": {
+    "OK": 50,
+    "ERROR": 2,
+    "TIMEOUT": 1
+  },
+  "raw_sample_count": 9712,
+  "mixed_preview_completed_with_mermaid_error_fallback": true,
+  "original_file_sha256_preserved": {
+    "src/main/java/shed/InputController.java": "9804b033a740e9df46b84bd6b05d10878f67147b4a5e281cd40c29421f5ece3f",
+    "src/main/java/shed/MarkdownController.java": "0494464355940e183021c46246e8ecc868a304107c797a81d6194fcd51b485fe",
+    "src/main/java/shed/MarkdownService.java": "52ba5582c6a283f15fe166c3d428f53c5c108242cb6824704e9f77b97091711e",
+    "src/main/java/shed/Texteditor.java": "bb4d2d028feb273fc59682e81532946d792b33050d03136e186a2423eac38822",
+    "src/test/java/shed/MarkdownServiceTest.java": "671fa2115fba1d0faf5fbdb2034d494942c823e3797a5a603bf5f2deac020583",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java": "84a5aae77df4998efe7f056c374074e46e4f55952303cf8f8be85245db4c7c28",
+    "src/main/java/shed/MarkdownEdit.java": "0a88f671fa357edca2c52251f4c6db4c40e5c820cdf6112a7e7386c839cc9687",
+    "src/test/java/shed/MarkdownEditTest.java": "0922436d601cc8e514097043baa30400bf6b7423a4d9f6aea8601d93d29877dd",
+    "src/test/java/shed/MarkdownFoldingTest.java": "5faa53a06cb945b567981fd970bec66edc253683cfcf694e742799c46e6dd7ed",
+    "README.md": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e"
+  },
+  "readme_sha256_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_sha256_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "git_diff_check_exit": 0,
+  "production_changes_in_current_patch": [],
+  "head_initial": "c6b819a0a88dc621c090a0d2dec69b9558c27acb",
+  "head_current": "81c7e17987e48d2228ab821bf5ab384a072e542f",
+  "agent_created_commits": 0,
+  "no_production_optimization": true
+}

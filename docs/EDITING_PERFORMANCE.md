@@ -23,7 +23,9 @@ java -cp target/shed-2.0.0.jar shed.EditorResponsivenessBenchmark
 
 It creates a deterministic Java-like 500,000-line fixture and takes 25 warm samples. Exit status is non-zero when either edit or caret p95 exceeds 16 ms, or when deferred visual convergence p95 exceeds 250 ms. The measurement is intentionally outside Maven's normal test suite because it is hardware-sensitive.
 
-The convergence sample covers virtualized syntax tokens, symbols, open-buffer completion words, and diff markers. It reports the slowest independent background task, as those jobs run concurrently. It measures model and background-work time, not Swing painting or language-server network latency.
+The convergence sample covers virtualized syntax tokens, symbols, open-buffer completion words, and diff markers. The harness executes these computations separately and reports their maximum duration; it does not observe their concurrent scheduling or actual UI convergence. It measures model and background-work time, not Swing painting or language-server network latency.
+
+The opt-in [Markdown performance baseline](MARKDOWN_PERFORMANCE_BASELINE.md) measures the actual source painting path, production syntax jobs, preview installation/layout, search interaction, and verified saves separately. Its Markdown viewport investigation also documents the full-prefix fallback in `GrammarHighlightService`; the viewport description above must not be interpreted as a viewport-bounded Markdown scan.
 
 ## Repeatable desktop workflow benchmark
 

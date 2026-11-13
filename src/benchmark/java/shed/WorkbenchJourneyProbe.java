@@ -266,7 +266,10 @@ public final class WorkbenchJourneyProbe {
             require(table.getSelectedRow() >= 0, "Cancelled task selection was lost");
             Rectangle status = table.getCellRect(table.getSelectedRow(), 1, true);
             reveal(table, status);
-            require(table.getVisibleRect().contains(status), "Task status row is unreadable at narrow width and 150% scale: cell=" + status + " visible=" + table.getVisibleRect());
+            if (!table.getVisibleRect().contains(status)) {
+                captureRoot(editor, "task-scaling-failure");
+                throw new IllegalStateException("Task status row is unreadable at narrow width and 150% scale: cell=" + status + " visible=" + table.getVisibleRect() + geometry(table));
+            }
             return null;
         });
         revealTaskOutput();
@@ -283,6 +286,18 @@ public final class WorkbenchJourneyProbe {
         component.scrollRectToVisible(area);
         for (Container parent = component.getParent(); parent != null; parent = parent.getParent()) if (parent instanceof JViewport view)
             view.scrollRectToVisible(SwingUtilities.convertRectangle(component, area, view));
+    }
+
+    private static String geometry(Component component) {
+        StringBuilder result = new StringBuilder();
+        for (Component current = component; current != null; current = current.getParent()) {
+            result.append("\n").append(current.getClass().getName()).append(" bounds=").append(current.getBounds())
+                .append(" min=").append(current.getMinimumSize()).append(" preferred=").append(current.getPreferredSize());
+            if (current instanceof JComponent view) result.append(" visible=").append(view.getVisibleRect());
+            if (current instanceof JSplitPane split) result.append(" divider=").append(split.getDividerLocation());
+            if (current instanceof JViewport viewport) result.append(" position=").append(viewport.getViewPosition());
+        }
+        return result.toString();
     }
 
     private void key(Robot robot, int key, boolean mod, boolean shift) throws Exception {

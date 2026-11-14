@@ -47,7 +47,7 @@ public final class HtmlReaderMemoryProbe {
     static <T>T edt(Callable<T> work)throws Exception{FutureTask<T> r=new FutureTask<>(work);SwingUtilities.invokeAndWait(r);return r.get();}
     static String digest(String text)throws Exception{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}
     static String tree(Document d){StringBuilder s=new StringBuilder();ElementIterator it=new ElementIterator(d);Element e;while((e=it.next())!=null){s.append(e.getName()).append('/').append(e.getStartOffset()).append('/').append(e.getEndOffset()).append(' ');TreeMap<String,String>a=new TreeMap<>();var keys=e.getAttributes().getAttributeNames();while(keys.hasMoreElements()){Object k=keys.nextElement();if(k!=StyleConstants.ResolveAttribute)a.put(k.toString(),String.valueOf(e.getAttributes().getAttribute(k)));}s.append(a).append('\n');}return s.toString();}
-    static List<String> code(HTMLDocument d)throws Exception{List<String> result=new ArrayList<>();ElementIterator it=new ElementIterator(d);Element e;while((e=it.next())!=null)if(e.getAttributes().getAttribute(StyleConstants.NameAttribute)==HTML.Tag.PRE)result.add(d.getText(e.getStartOffset(),Math.min(d.getLength(),e.getEndOffset())-e.getStartOffset()));return result;}
+    static List<String> code(HTMLDocument d)throws Exception{List<String> result=new ArrayList<>();ElementIterator it=new ElementIterator(d);Element e;while((e=it.next())!=null)if(e.getAttributes().getAttribute(StyleConstants.NameAttribute)==HTML.Tag.PRE)result.add(d.getText(e.getStartOffset(),e.getEndOffset()-e.getStartOffset()));return result;}
     static Object reflected(String name)throws Exception{var f=MarkdownPreviewRenderer.class.getDeclaredField(name);f.setAccessible(true);return f.get(null);}
     static String render(String source,Path file)throws Exception{
         // Replays are separately labelled, not additive partitions of the final render.
@@ -63,6 +63,12 @@ public final class HtmlReaderMemoryProbe {
     static void peaksReset(){for(MemoryPoolMXBean p:ManagementFactory.getMemoryPoolMXBeans())if(p.getType()==MemoryType.HEAP)p.resetPeakUsage();}
     static long peaks(){return ManagementFactory.getMemoryPoolMXBeans().stream().filter(p->p.getType()==MemoryType.HEAP).mapToLong(p->p.getPeakUsage().getUsed()).sum();}
     static int[] pixels(JEditorPane p){BufferedImage image=new BufferedImage(600,400,BufferedImage.TYPE_INT_ARGB);var g=image.createGraphics();try{p.paint(g);}finally{g.dispose();}return image.getRGB(0,0,600,400,null,0,600);}
+    static JEditorPane previewEditor(Container parent){for(Component child:parent.getComponents()){if(child instanceof JEditorPane p)return p;if(child instanceof Container c){JEditorPane found=previewEditor(c);if(found!=null)return found;}}return null;}
+    static void verifyCode(HTMLDocument document,String source)throws Exception{
+        var parsed=org.commonmark.parser.Parser.builder().build().parse(source);List<String> expected=new ArrayList<>();
+        for(var n=parsed.getFirstChild();n!=null;n=n.getNext())if(n instanceof org.commonmark.node.FencedCodeBlock f)expected.add(f.getLiteral());
+        if(!expected.isEmpty()&&!expected.equals(code(document)))throw new AssertionError("Code text differs from CommonMark literal");
+    }
     public static void main(String[] args)throws Exception {
         Path file=Path.of(args[0]);String route=args[1],mode=args[2];int samples=Integer.parseInt(args[3]);
         String source=timed("source.read",()->Files.readString(file));String html=route.equals("raw")?source:render(source,file);
@@ -71,13 +77,17 @@ public final class HtmlReaderMemoryProbe {
             edt(()->{FileBuffer b=new FileBuffer(file.toFile());JTextArea area=new JTextArea();area.setDocument(b.getDocument());EditorPane pane=new EditorPane(area,null,new JScrollPane(area),null);pane.setBuffer(b);long rev=b.documentRevision();var snap=b.textSnapshot();
                 SwingUtilities.invokeLater(()->emit("HR_SOURCE ",Map.of("queue_ms",(System.nanoTime()-posted)/1e6)));posted=System.nanoTime();
                 MarkdownPreviewPane preview=timed("production.preview_constructor_no_layout",()->new MarkdownPreviewPane(b,()->new Font(Font.DIALOG,0,13),()->Color.WHITE,()->Color.BLACK,h->{},()->{},()->false,()->false,pane,null));
-                if(b.documentRevision()!=rev||b.textSnapshot()!=snap)throw new AssertionError("Preview changed source");
-                emit("HR_DOCUMENT ",Map.of("html_matches",preview.getHtml().equals(html),"source_unchanged",true));preview.disposePreview();return null;});
+                try {
+                    if(b.documentRevision()!=rev||b.textSnapshot()!=snap||b.isModified()||b.getUndoManager().canUndo())throw new AssertionError("Preview changed source/history");
+                    if(!preview.getHtml().equals(html))throw new AssertionError("Production HTML differs");
+                    JEditorPane editor=previewEditor(preview);HTMLDocument document=(HTMLDocument)editor.getDocument();verifyCode(document,source);
+                    emit("HR_DOCUMENT ",Map.of("html_matches",true,"source_unchanged",true,"independent_code_equal",true,"text_sha256",digest(document.getText(0,document.getLength())),"tree_sha256",digest(tree(document)),"editor_kit",editor.getEditorKit().getClass().getName(),"heap_used_after",ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed(),"heap_peak_pool_sum_upper_bound",peaks()));
+                } finally {preview.disposePreview();}return null;});
         }else{
             for(int i=0;i<samples;i++){
                 System.gc();Thread.sleep(50);peaksReset();long before=ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed();
                 SliceKit counted=mode.equals("counted")||mode.equals("slice")?new SliceKit(mode.equals("slice")):null;
-                HTMLEditorKit kit=counted==null?new HTMLEditorKit():counted;
+                HTMLEditorKit kit=mode.equals("repaired")?(HTMLEditorKit)Class.forName("shed.MarkdownPreviewHtmlKit").getDeclaredConstructor().newInstance():counted==null?new HTMLEditorKit():counted;
                 HTMLDocument d=(HTMLDocument)kit.createDefaultDocument();
                 if(route.equals("setText")){
                     HTMLDocument[] holder={null};edt(()->{JEditorPane p=new JEditorPane();p.setEditorKit(kit);p.setEditable(false);posted=System.nanoTime();SwingUtilities.invokeLater(()->emit("HR_SOURCE ",Map.of("queue_ms",(System.nanoTime()-posted)/1e6)));

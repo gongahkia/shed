@@ -64,7 +64,7 @@ final class MarkdownPreviewPane extends JPanel {
         title = new JLabel("Markdown Preview — " + source.getDisplayName(), SwingConstants.LEADING);
         title.setBorder(BorderFactory.createEmptyBorder(7, 10, 7, 10));
         preview = new JEditorPane();
-        preview.setContentType("text/html");
+        preview.setEditorKit(new MarkdownPreviewHtmlKit());
         preview.setEditable(false);
         preview.addKeyListener(editorKeyListener);
         preview.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE);

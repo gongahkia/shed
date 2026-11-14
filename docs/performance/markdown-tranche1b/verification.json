@@ -1,7 +1,7 @@
 {
   "starting_head": "ad5d996e8779600992efdb1bb313a359320164f6",
   "starting_status": "",
-  "current_head": "f03ed442caca66855cfac282346818987ed34368",
+  "current_head": "c5bcd21be08b8770a5556e9424b3691330416d0a",
   "commits_created_by_agent": false,
   "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
   "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
@@ -134,5 +134,17 @@
   },
   "case_count": 36,
   "sample_count": 32415,
-  "measured_source_view_class_matches_tested_class": true
+  "measured_source_view_class_matches_tested_class": true,
+  "paint_unavailable_samples": [],
+  "archived_witness_matches_user_commit": {
+    "cases.json": true,
+    "runs.json": true,
+    "profiles.json": true,
+    "samples.jsonl.gz": true
+  },
+  "test_tooling_passed": true,
+  "development_comparator_failures": [
+    "Shared tabSize document property prevented the second setter from updating its reference view; use independent identical documents for font/tab tests.",
+    "Stock PlainView can retain removed Element after bulk removal; compare remaining extent with a fresh stock view."
+  ]
 }

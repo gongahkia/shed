@@ -334,6 +334,55 @@ public final class MarkdownPerformanceProbe {
             out("MD_SAMPLE ",edt(() -> timed("stage_replay_preferred_size_layout_offscreen",() -> {replay.setSize(600,600);sink=replay.getPreferredSize();})));
         }
     }
+    /** Diagnostic only: worker-owned detached HTML does not make live Swing view layout asynchronous. */
+    private static void previewInstallation() throws Exception {
+        open();
+        FileBuffer buffer=edt(editor::getCurrentBuffer);
+        VersionedTextSnapshot snapshot=edt(buffer::textSnapshot);
+        String source=snapshot.text();
+        Font font=edt(editor::resolveUiFont);
+        Color background=edt(editor.configManager::getNormalColor), foreground=edt(editor.configManager::getEditorForeground);
+        out("MD_META ",Map.of("operation","detached_installation_diagnostic","snapshot_version",snapshot.version(),
+            "notification_row_visible",edt(() -> editor.messageResetTimer!=null && editor.messageResetTimer.isRunning())));
+        try(MarkdownPreviewAssets assets=new MarkdownPreviewAssets()) {
+            for(int i=0;i<Math.min(samples,5);i++) {
+                String[] html={null};
+                out("MD_SAMPLE ",timed("detached_markdown_render_worker",() -> html[0]=MarkdownPreviewRenderer.render(source,
+                    file.getFileName().toString(),font,background,foreground,assets,file.toFile())));
+                // Each kit/document is independently owned here. No live component or document is
+                // touched by this thread. JEditorPane's own asynchronous PageLoader also calls
+                // EditorKit.read on a worker; component installation/layout remain EDT operations.
+                var kit=new javax.swing.text.html.HTMLEditorKit();
+                var document=(javax.swing.text.html.HTMLDocument)kit.createDefaultDocument();
+                out("MD_SAMPLE ",timed("detached_html_read_worker",() -> kit.read(new java.io.StringReader(html[0]),document,0)));
+                JEditorPane target=edt(() -> {
+                    JEditorPane pane=new JEditorPane();pane.setContentType("text/html");pane.setEditable(false);
+                    pane.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES,Boolean.TRUE);
+                    pane.setFont(font);pane.setBackground(background);pane.setForeground(foreground);pane.setSize(600,600);return pane;
+                });
+                java.util.concurrent.atomic.AtomicBoolean dispatched=new java.util.concurrent.atomic.AtomicBoolean();
+                edt(() -> {
+                    long posted=System.nanoTime();
+                    SwingUtilities.invokeLater(() -> {
+                        var queued=row("source_callback_after_detached_install");
+                        queued.put("queue_ms",(System.nanoTime()-posted)/1e6);
+                        try {typed('x');buffer.getUndoManager().undo();}
+                        catch(Exception error){throw new RuntimeException(error);}
+                        out("MD_SAMPLE ",queued);dispatched.set(true);
+                    });
+                    out("MD_SAMPLE ",timed("detached_document_install_edt",() -> target.setDocument(document)));
+                    out("MD_SAMPLE ",timed("detached_document_layout_edt",() -> sink=target.getPreferredSize()));
+                    out("MD_SAMPLE ",timed("detached_document_paint_edt",() -> {
+                        var image=new java.awt.image.BufferedImage(600,600,java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                        var graphics=image.createGraphics();try{target.paint(graphics);}finally{graphics.dispose();}
+                    }));return null;
+                });
+                await(dispatched::get,5);
+                if(!hash(file).equals(edt(() -> documentHash(buffer.getDocument()))))throw new AssertionError("Diagnostic input undo changed source");
+            }
+        }
+        memory("after_detached_diagnostic");
+    }
     private static String iLabel(String name,int i){return name+"_"+i;}
     private static void search() throws Exception {
         open();FileBuffer buffer=edt(editor::getCurrentBuffer);String original=hash(file);
@@ -405,7 +454,7 @@ public final class MarkdownPerformanceProbe {
         if(args.length!=6)throw new IllegalArgumentException("mode disposable.md samples warmups wrap preview");
         file=Path.of(args[1]).toRealPath();samples=Integer.parseInt(args[2]);warmups=Integer.parseInt(args[3]);empty=args[0].equals("startup-empty");wrap=Boolean.parseBoolean(args[4]);withPreview=Boolean.parseBoolean(args[5]);
         try {
-            switch(args[0]){case "model"->model();case "ui"->ui();case "startup", "startup-empty"->open();case "assets"->assets();case "assets-ready"->{open();assets();}case "preview"->preview();case "search"->search();case "syntax"->syntax();default->throw new IllegalArgumentException("Unknown mode");}
+            switch(args[0]){case "model"->model();case "ui"->ui();case "startup", "startup-empty"->open();case "assets"->assets();case "assets-ready"->{open();assets();}case "preview"->preview();case "preview-install"->previewInstallation();case "search"->search();case "syntax"->syntax();default->throw new IllegalArgumentException("Unknown mode");}
             if(editor!=null)out("MD_META ",edt(() -> Map.of("perf",editor.perfService.report(),"jobs",editor.asyncJobService.list().stream().map(j -> j.getDescription()+":"+j.getStatus()).toList())));
         } finally {
             if(editor!=null)edt(() -> {editor.disposeMarkdownPreviews();editor.shutdownSyntaxUi();editor.shutdownLspScheduling();editor.asyncJobService.shutdownNow();if(editor.backupScheduler!=null)editor.backupScheduler.close();if(editor.externalChangeTimer!=null)editor.externalChangeTimer.stop();if(editor.recoverySnapshotTimer!=null)editor.recoverySnapshotTimer.stop();if(editor.messageResetTimer!=null)editor.messageResetTimer.stop();editor.fileWatcherService.stop();editor.dispose();return null;});

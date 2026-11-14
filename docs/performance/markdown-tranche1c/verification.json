@@ -1,0 +1,137 @@
+{
+  "status": "PARTIAL: stopping condition; bounded HTML installation not established",
+  "initial_head": "c5bcd21be08b8770a5556e9424b3691330416d0a",
+  "initial_status": " M docs/performance/markdown-tranche1b/executions.json\n M docs/performance/markdown-tranche1b/manifest.json\n M docs/performance/markdown-tranche1b/profiles.json\n M docs/performance/markdown-tranche1b/verification.json\n",
+  "agent_created_commits": false,
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "changed_initial_tracked_files": [
+    "scripts/benchmark-markdown.py",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java",
+    "src/main/java/shed/MarkdownPreviewPane.java"
+  ],
+  "missing_initial_tracked_files": [],
+  "initial_user_changes_preserved": {
+    "docs/performance/markdown-tranche1b/executions.json": true,
+    "docs/performance/markdown-tranche1b/manifest.json": true,
+    "docs/performance/markdown-tranche1b/profiles.json": true,
+    "docs/performance/markdown-tranche1b/verification.json": true
+  },
+  "tranche1_original_evidence_preserved": true,
+  "production_source_changed_since_build": [],
+  "tests": {
+    "tests": 1317,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5
+  },
+  "packaged_smoke": {
+    "jar_sha256": "8ff401830509ef3f1f13924a7dde18ba58996f83ccd0f10c8eb6d292cbe401da",
+    "jar_bytes": 49963133,
+    "probe_sha256": "ed8d0390725b9ddc385018c9b8ece877fb7c5529abe99351672666b85ed67f8f",
+    "command": [
+      "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+      "-Xms64m",
+      "-Xmx512m",
+      "-Djava.awt.headless=true",
+      "-Duser.home=/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-packaged-markdown-moqalb2m/home",
+      "-cp",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-packaged-markdown-moqalb2m/classes:/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-preview-1c-287473su/after.jar",
+      "shed.PackagedMarkdownSmoke",
+      "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-preview-1c-287473su/after.jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-packaged-markdown-moqalb2m"
+    ],
+    "state": "PASS",
+    "exit": 0,
+    "stdout": "SMOKE {\"providers\":[\"com.oracle.truffle.js.lang.JavaScriptLanguageProvider\",\"com.oracle.truffle.regex.RegexLanguageProvider\"],\"application_origin\":\"/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-preview-1c-287473su/after.jar\",\"classpath\":\"/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-packaged-markdown-moqalb2m/classes:/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-preview-1c-287473su/after.jar\",\"provider_descriptors\":1,\"operation\":\"runtime\"}\nSMOKE {\"heap_used_bytes\":6291456,\"heap_committed_bytes\":67108864,\"threads\":7,\"operation\":\"before_assets\"}\nSMOKE {\"heap_used_bytes\":23068672,\"heap_committed_bytes\":67108864,\"threads\":9,\"operation\":\"plain_before_first_mermaid\"}\nSMOKE {\"render_ms\":278.515576,\"operation\":\"math_first\"}\nSMOKE {\"render_ms\":5980.363873,\"operation\":\"mermaid_first_after_plain_and_math\"}\nSMOKE {\"render_ms\":0.011407,\"operation\":\"mermaid_identical_cached\"}\nSMOKE {\"render_ms\":0.005288,\"operation\":\"mermaid_identical_cached\"}\nSMOKE {\"render_ms\":0.005348,\"operation\":\"mermaid_identical_cached\"}\nSMOKE {\"render_ms\":2762.282998,\"operation\":\"mermaid_multiple_nodes\"}\nSMOKE {\"render_ms\":1512.212557,\"operation\":\"mermaid_changed\"}\nSMOKE {\"render_ms\":0.004754,\"operation\":\"mermaid_valid_after_invalid\"}\nSMOKE {\"render_ms\":1325.499455,\"operation\":\"mermaid_changed_after_invalid\"}\nSMOKE {\"heap_used_bytes\":369098752,\"heap_committed_bytes\":445644800,\"threads\":14,\"operation\":\"after_renders_no_forced_gc\"}\nSMOKE {\"heap_used_bytes\":283639808,\"heap_committed_bytes\":464519168,\"threads\":13,\"operation\":\"after_assets_close_no_forced_gc\"}\nSMOKE_PASS\n",
+    "stderr": "[GraalJS] Creating context...\n[GraalJS] Context created in 162 ms\n[GraalJS] Bindings set in 409 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 4623 ms\n[GraalJS] Result read in 1 ms\n[GraalJS] Creating context...\n[GraalJS] Context created in 1 ms\n[GraalJS] Bindings set in 7 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 2487 ms\n[GraalJS] Result read in 0 ms\n[GraalJS] Creating context...\n[GraalJS] Context created in 1 ms\n[GraalJS] Bindings set in 4 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 1412 ms\n[GraalJS] Result read in 1 ms\n[GraalJS] Creating context...\n[GraalJS] Context created in 1 ms\n[GraalJS] Bindings set in 7 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 1090 ms\n[GraalJS] Result read in 1 ms\n[MermaidRenderer] Render failed: ERROR:UnknownDiagramError: No diagram type detected matching given configuration for text: this is not a Mermaid diagram\nSTACK: UnknownDiagramError: No diagram type detected matching given configuration for text: this is not a Mermaid diagram\n    at detectType (Unnamed:3301:74)\n    at Function.fromText (Unnamed:6014:6680)\n    at Object.render (Unnamed:6022:1191)\n    at Unnamed:6022:5541\n    at new Promise (native)\n    at performCall (Unnamed:6022:5518)\n    at executeQueue (Unnamed:6022:5178)\n    at Unnamed:6022:5665\n    at new Promise (native)\n    at Object.render (Unnamed:6022:5486)\n[GraalJS] Creating context...\n[GraalJS] Context created in 1 ms\n[GraalJS] Bindings set in 5 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 1011 ms\n[GraalJS] Result read in 0 ms\n[MermaidRenderer] Render failed: ERROR:UnknownDiagramError: No diagram type detected matching given configuration for text: this is not a Mermaid diagram\nSTACK: UnknownDiagramError: No diagram type detected matching given configuration for text: this is not a Mermaid diagram\n    at detectType (Unnamed:3301:74)\n    at Function.fromText (Unnamed:6014:6680)\n    at Object.render (Unnamed:6022:1191)\n    at Unnamed:6022:5541\n    at new Promise (native)\n    at performCall (Unnamed:6022:5518)\n    at executeQueue (Unnamed:6022:5178)\n    at Unnamed:6022:5665\n    at new Promise (native)\n    at Object.render (Unnamed:6022:5486)\n[GraalJS] Creating context...\n[GraalJS] Context created in 1 ms\n[GraalJS] Bindings set in 4 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 1198 ms\n[GraalJS] Result read in 0 ms\n[GraalJS] Creating context...\n[GraalJS] Context created in 1 ms\n[GraalJS] Bindings set in 4 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 1098 ms\n[GraalJS] Result read in 0 ms\n",
+    "events": [
+      {
+        "providers": [
+          "com.oracle.truffle.js.lang.JavaScriptLanguageProvider",
+          "com.oracle.truffle.regex.RegexLanguageProvider"
+        ],
+        "application_origin": "/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-preview-1c-287473su/after.jar",
+        "classpath": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-packaged-markdown-moqalb2m/classes:/private/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-preview-1c-287473su/after.jar",
+        "provider_descriptors": 1,
+        "operation": "runtime"
+      },
+      {
+        "heap_used_bytes": 6291456,
+        "heap_committed_bytes": 67108864,
+        "threads": 7,
+        "operation": "before_assets"
+      },
+      {
+        "heap_used_bytes": 23068672,
+        "heap_committed_bytes": 67108864,
+        "threads": 9,
+        "operation": "plain_before_first_mermaid"
+      },
+      {
+        "render_ms": 278.515576,
+        "operation": "math_first"
+      },
+      {
+        "render_ms": 5980.363873,
+        "operation": "mermaid_first_after_plain_and_math"
+      },
+      {
+        "render_ms": 0.011407,
+        "operation": "mermaid_identical_cached"
+      },
+      {
+        "render_ms": 0.005288,
+        "operation": "mermaid_identical_cached"
+      },
+      {
+        "render_ms": 0.005348,
+        "operation": "mermaid_identical_cached"
+      },
+      {
+        "render_ms": 2762.282998,
+        "operation": "mermaid_multiple_nodes"
+      },
+      {
+        "render_ms": 1512.212557,
+        "operation": "mermaid_changed"
+      },
+      {
+        "render_ms": 0.004754,
+        "operation": "mermaid_valid_after_invalid"
+      },
+      {
+        "render_ms": 1325.499455,
+        "operation": "mermaid_changed_after_invalid"
+      },
+      {
+        "heap_used_bytes": 369098752,
+        "heap_committed_bytes": 445644800,
+        "threads": 14,
+        "operation": "after_renders_no_forced_gc"
+      },
+      {
+        "heap_used_bytes": 283639808,
+        "heap_committed_bytes": 464519168,
+        "threads": 13,
+        "operation": "after_assets_close_no_forced_gc"
+      }
+    ]
+  },
+  "artifacts": {
+    "before.jar": {
+      "sha256": "06661ebc00b3bb001c0ae24050d76afc759a88c036bdd0a203d29ed72badf0e0",
+      "bytes": 49963135
+    },
+    "after.jar": {
+      "sha256": "8ff401830509ef3f1f13924a7dde18ba58996f83ccd0f10c8eb6d292cbe401da",
+      "bytes": 49963133
+    }
+  },
+  "diff_check": 0,
+  "case_count": 23,
+  "sample_count": 8657,
+  "async_production_pipeline_implemented": false,
+  "bounded_html_installation_implemented": false,
+  "measured_preview_class_matches_tested_class": true
+}

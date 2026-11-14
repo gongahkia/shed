@@ -620,5 +620,41 @@
     ],
     "exit": 0,
     "seconds": 0.18340277302195318
+  },
+  {
+    "name": "final-profile-analysis-0",
+    "command": [
+      "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/javac",
+      "-cp",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
+      "-d",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-jfr-classes",
+      "src/benchmark/java/shed/MarkdownJfrSummary.java"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "final-profile-analysis-1",
+    "command": [
+      "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+      "-Xmx256m",
+      "-cp",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-jfr-classes:/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
+      "shed.MarkdownJfrSummary",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-profile/ui-mixed-10485760-0/profile.jfr"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "final-profile-analysis-2",
+    "command": [
+      "/Users/gabrielongtemasek/.local/share/shed-tools/jdk-21/bin/java",
+      "-Xmx256m",
+      "-cp",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-jfr-classes:/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary.jar",
+      "shed.MarkdownJfrSummary",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-profile/ui-mixed-10485760-0/profile.jfr"
+    ],
+    "exit": 0
   }
 ]

@@ -100,7 +100,6 @@ final class MarkdownPreviewPane extends JPanel {
         sourcePane.getTextArea().addCaretListener(sourceCaretListener);
         sourcePane.getScrollPane().getVerticalScrollBar().addAdjustmentListener(sourceScrollListener);
         refreshAppearance();
-        renderNow();
     }
 
     void refreshAppearance() {

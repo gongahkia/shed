@@ -1,6 +1,7 @@
 [
   {
     "phase": "before",
+    "summary_tool_sha256": "74e97cecbd5b8dc7df66e761c4777232b4e3ff65a885d285e5fce4557d50bf67",
     "recording": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-before-profile/ui-mixed-10485760-0/profile.jfr",
     "execution_or_native_samples": 1189,
     "overlapping_stack_presence_counts": {
@@ -192,6 +193,7 @@
   },
   {
     "phase": "after",
+    "summary_tool_sha256": "74e97cecbd5b8dc7df66e761c4777232b4e3ff65a885d285e5fce4557d50bf67",
     "recording": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-source-view-1b-pc40q3n7/summary-after-profile/ui-mixed-10485760-0/profile.jfr",
     "execution_or_native_samples": 771,
     "overlapping_stack_presence_counts": {

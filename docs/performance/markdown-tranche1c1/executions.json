@@ -1,0 +1,402 @@
+[
+  {
+    "group": "qualified-prose-100k",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/qualified-prose-100k",
+      "--shape",
+      "prose",
+      "--size",
+      "102400",
+      "--samples",
+      "100",
+      "--timeout",
+      "120"
+    ],
+    "exit": 0,
+    "seconds": 33.8214949539979
+  },
+  {
+    "group": "qualified-prose-1m",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/qualified-prose-1m",
+      "--shape",
+      "prose",
+      "--size",
+      "1048576",
+      "--samples",
+      "100",
+      "--timeout",
+      "120"
+    ],
+    "exit": 0,
+    "seconds": 88.02984420899884
+  },
+  {
+    "group": "qualified-blocks-1m",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/qualified-blocks-1m",
+      "--shape",
+      "blocks",
+      "--size",
+      "1048576",
+      "--samples",
+      "100",
+      "--timeout",
+      "120"
+    ],
+    "exit": 1,
+    "seconds": 11.723392471991247
+  },
+  {
+    "group": "qualified-rich-4k",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/qualified-rich-4k",
+      "--shape",
+      "mixed",
+      "--size",
+      "4096",
+      "--samples",
+      "20",
+      "--timeout",
+      "120"
+    ],
+    "exit": 0,
+    "seconds": 20.59439669601852
+  },
+  {
+    "group": "qualified-legacy-1m",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/qualified-legacy-1m",
+      "--shape",
+      "plain",
+      "--size",
+      "1048576",
+      "--samples",
+      "100",
+      "--timeout",
+      "120"
+    ],
+    "exit": 0,
+    "seconds": 58.29787152897916
+  },
+  {
+    "group": "qualified-prose-repeat",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/qualified-prose-repeat",
+      "--shape",
+      "prose",
+      "--size",
+      "1048576",
+      "--samples",
+      "100",
+      "--timeout",
+      "120"
+    ],
+    "exit": 0,
+    "seconds": 85.32458526297705
+  },
+  {
+    "group": "qualified-profile",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/qualified-profile",
+      "--shape",
+      "prose",
+      "--size",
+      "1048576",
+      "--samples",
+      "20",
+      "--timeout",
+      "120",
+      "--profile"
+    ],
+    "exit": 0,
+    "seconds": 67.46599515498383
+  },
+  {
+    "group": "final-prose100",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/final-prose100",
+      "--shape",
+      "prose",
+      "--size",
+      "102400",
+      "--samples",
+      "100",
+      "--timeout",
+      "120"
+    ],
+    "exit": 0,
+    "seconds": 27.829535697994288
+  },
+  {
+    "group": "final-prose1m",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/final-prose1m",
+      "--shape",
+      "prose",
+      "--size",
+      "1048576",
+      "--samples",
+      "100",
+      "--timeout",
+      "120"
+    ],
+    "exit": 0,
+    "seconds": 90.46324948099209
+  },
+  {
+    "group": "final-compact",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/final-compact",
+      "--shape",
+      "compact-blocks",
+      "--size",
+      "1048576",
+      "--samples",
+      "100",
+      "--timeout",
+      "120"
+    ],
+    "exit": 0,
+    "seconds": 42.685862343001645
+  },
+  {
+    "group": "final-rich",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/final-rich",
+      "--shape",
+      "mixed",
+      "--size",
+      "4096",
+      "--samples",
+      "20",
+      "--timeout",
+      "120"
+    ],
+    "exit": 0,
+    "seconds": 21.218684784980724
+  },
+  {
+    "group": "final-legacy",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/final-legacy",
+      "--shape",
+      "plain",
+      "--size",
+      "1048576",
+      "--samples",
+      "100",
+      "--timeout",
+      "120"
+    ],
+    "exit": 0,
+    "seconds": 57.61751300399192
+  },
+  {
+    "group": "final-repeat",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/final-repeat",
+      "--shape",
+      "prose",
+      "--size",
+      "1048576",
+      "--samples",
+      "100",
+      "--timeout",
+      "120"
+    ],
+    "exit": 1,
+    "seconds": 62.88276583698462
+  },
+  {
+    "group": "final-profile",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/final-profile",
+      "--shape",
+      "prose",
+      "--size",
+      "1048576",
+      "--samples",
+      "20",
+      "--timeout",
+      "120",
+      "--profile"
+    ],
+    "exit": 0,
+    "seconds": 69.75766541599296
+  },
+  {
+    "group": "final-resource",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/final-resource",
+      "--shape",
+      "blocks",
+      "--size",
+      "1048576",
+      "--samples",
+      "5",
+      "--timeout",
+      "120"
+    ],
+    "exit": 1,
+    "seconds": 9.569904628995573
+  },
+  {
+    "group": "corrected-prose",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/corrected-prose",
+      "--shape",
+      "prose",
+      "--size",
+      "1048576",
+      "--samples",
+      "100",
+      "--timeout",
+      "120"
+    ],
+    "exit": 0,
+    "seconds": 69.34247016898007
+  },
+  {
+    "group": "corrected-composite",
+    "command": [
+      "python3",
+      "scripts/benchmark-preview-layout.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/corrected-composite",
+      "--shape",
+      "compact-blocks",
+      "--size",
+      "1048576",
+      "--samples",
+      "100",
+      "--timeout",
+      "120"
+    ],
+    "exit": 0,
+    "seconds": 30.49015982801211
+  },
+  {
+    "name": "maven",
+    "command": [
+      "/Users/gabrielongtemasek/.local/share/shed-tools/maven/bin/mvn",
+      "-o",
+      "-B",
+      "-Djava.awt.headless=false",
+      "-DargLine=-Xmx512m",
+      "test"
+    ],
+    "exit": 0,
+    "seconds": 204.10259953100467
+  },
+  {
+    "name": "packaged",
+    "command": [
+      "python3",
+      "scripts/test-packaged-markdown.py",
+      "--jar",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/measured.jar",
+      "--output",
+      "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-html-feasibility-jekl414r/packaged.json"
+    ],
+    "exit": 0,
+    "seconds": 22.01767333902535
+  },
+  {
+    "name": "tooling",
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "scripts",
+      "-p",
+      "test_benchmark_markdown.py"
+    ],
+    "exit": 0,
+    "seconds": 0.23278210600255989
+  }
+]

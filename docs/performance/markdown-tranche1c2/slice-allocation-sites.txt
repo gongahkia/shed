@@ -1,0 +1,30 @@
+
+                                                                                           Allocation by Site
+
+Method                                                                                                                                                                              Allocation Pressure
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- -------------------
+javax.swing.text.html.parser.Parser.parseContent()                                                                                                                                               37.53%
+java.util.LinkedHashMap.sequencedKeySet()                                                                                                                                                        26.43%
+java.util.Arrays.copyOfRangeByte(byte[], int, int)                                                                                                                                               21.15%
+java.util.TreeMap.addEntryToEmptyMap(Object, Object)                                                                                                                                              1.67%
+java.util.concurrent.ConcurrentHashMap.initTable()                                                                                                                                                1.38%
+java.lang.Object.clone()                                                                                                                                                                          0.92%
+java.util.Arrays.copyOf(byte[], int)                                                                                                                                                              0.92%
+java.util.Arrays.copyOfRange(byte[], int, int)                                                                                                                                                    0.64%
+java.lang.AbstractStringBuilder.<init>(int)                                                                                                                                                       0.55%
+java.util.LinkedHashMap$LinkedKeySet.iterator()                                                                                                                                                   0.53%
+java.util.LinkedHashMap.newNode(int, Object, Object, HashMap$Node)                                                                                                                                0.44%
+java.util.ArrayList.grow(int)                                                                                                                                                                     0.40%
+java.util.HashMap.resize()                                                                                                                                                                        0.40%
+javax.swing.text.GapContent.allocateArray(int)                                                                                                                                                    0.35%
+java.util.Collections.enumeration(Collection)                                                                                                                                                     0.30%
+java.util.Arrays.copyOf(char[], int)                                                                                                                                                              0.30%
+java.util.LinkedHashMap$LinkedEntrySet.iterator()                                                                                                                                                 0.27%
+java.util.Vector.<init>(int, int)                                                                                                                                                                 0.24%
+javax.swing.text.SimpleAttributeSet.<init>()                                                                                                                                                      0.24%
+java.lang.StringLatin1.newString(byte[], int, int)                                                                                                                                                0.23%
+java.lang.StringLatin1.toChars(byte[])                                                                                                                                                            0.22%
+java.util.regex.Matcher.<init>(Pattern, CharSequence)                                                                                                                                             0.20%
+javax.swing.text.DefaultStyledDocument$ElementBuffer$ElemChanges.<init>(DefaultStyledDocument$ElementBuffer, Element, int, boolean)                                                               0.18%
+java.util.regex.Pattern.matcher(CharSequence)                                                                                                                                                     0.17%
+javax.swing.text.html.parser.ContentModelState.advance(Object)                                                                                                                                    0.17%

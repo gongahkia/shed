@@ -1,0 +1,1614 @@
+{
+  "discover-128-counted": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 131100,
+    "input_sha256": "6dda06ffa86f6bde189c2dca19bc9a61af2c2a9064b07240d75f635a7d68937e",
+    "html_characters": 148656,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 552.222476,
+        "thread_cpu_ms": 347.657,
+        "allocated_bytes": 676391000,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 407.509917,
+        "thread_cpu_ms": 295.335,
+        "allocated_bytes": 676203408,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 314.883808,
+        "thread_cpu_ms": 179.456,
+        "allocated_bytes": 676125144,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 438818120,
+    "sampled_peak_rss_mib": 779.10546875,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 11581264
+      },
+      {
+        "after_release_requested_gc": 11583944
+      },
+      {
+        "after_release_requested_gc": 11584808
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-128-slice": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 131100,
+    "input_sha256": "6dda06ffa86f6bde189c2dca19bc9a61af2c2a9064b07240d75f635a7d68937e",
+    "html_characters": 148656,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 125.004428,
+        "thread_cpu_ms": 107.89,
+        "allocated_bytes": 140323640,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 76.002038,
+        "thread_cpu_ms": 64.273,
+        "allocated_bytes": 140135344,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 50.308261,
+        "thread_cpu_ms": 42.331,
+        "allocated_bytes": 140133568,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 49501792,
+    "sampled_peak_rss_mib": 443.11328125,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9501656
+      },
+      {
+        "after_release_requested_gc": 9504176
+      },
+      {
+        "after_release_requested_gc": 9504720
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-256-slice": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 262172,
+    "input_sha256": "6485830ddc919f014b3e89819e38125b89678b14777014b71a80032dad32fe31",
+    "html_characters": 296112,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 192.802944,
+        "thread_cpu_ms": 170.245,
+        "allocated_bytes": 548017368,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 141.920383,
+        "thread_cpu_ms": 127.887,
+        "allocated_bytes": 547668304,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 158.645949,
+        "thread_cpu_ms": 135.294,
+        "allocated_bytes": 547664576,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 137478216,
+    "sampled_peak_rss_mib": 597.94140625,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9869536
+      },
+      {
+        "after_release_requested_gc": 9871752
+      },
+      {
+        "after_release_requested_gc": 9874528
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-64-counted": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 65564,
+    "input_sha256": "f0abbcb47d5efd402ca382d0374a77e40d88bb5895b9026fd668f2a544589848",
+    "html_characters": 74928,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 307.367353,
+        "thread_cpu_ms": 167.793,
+        "allocated_bytes": 170686488,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 138.737007,
+        "thread_cpu_ms": 98.085,
+        "allocated_bytes": 170496616,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 115.951458,
+        "thread_cpu_ms": 86.105,
+        "allocated_bytes": 170497912,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 158376160,
+    "sampled_peak_rss_mib": 528.9921875,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9304608
+      },
+      {
+        "after_release_requested_gc": 9305696
+      },
+      {
+        "after_release_requested_gc": 9307496
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-64-slice": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 65564,
+    "input_sha256": "f0abbcb47d5efd402ca382d0374a77e40d88bb5895b9026fd668f2a544589848",
+    "html_characters": 74928,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 47.604417,
+        "thread_cpu_ms": 44.584,
+        "allocated_bytes": 36870056,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 21.26347,
+        "thread_cpu_ms": 19.8,
+        "allocated_bytes": 36680552,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 16.546265,
+        "thread_cpu_ms": 16.061,
+        "allocated_bytes": 36683064,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 46970424,
+    "sampled_peak_rss_mib": 435.37890625,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9287464
+      },
+      {
+        "after_release_requested_gc": 9288952
+      },
+      {
+        "after_release_requested_gc": 9291696
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-original-production": {
+    "state": "ERROR",
+    "oom": true,
+    "input_bytes": 1048576,
+    "input_sha256": "2bd8379d31ec16a14bd860a6550dd76fd774045354839709dd2bac5179c46825",
+    "html_characters": 1100701,
+    "operation_rows": [],
+    "heap_peak_pool_sum_upper_bound_max": null,
+    "sampled_peak_rss_mib": 922.89453125,
+    "requested_gc_occupancy": [],
+    "source_callbacks": []
+  },
+  "discover-original-slice": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 1048576,
+    "input_sha256": "2bd8379d31ec16a14bd860a6550dd76fd774045354839709dd2bac5179c46825",
+    "html_characters": 1100701,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 359.75748,
+        "thread_cpu_ms": 320.749,
+        "allocated_bytes": 507865808,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 340.150919,
+        "thread_cpu_ms": 291.252,
+        "allocated_bytes": 507222296,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 239.612172,
+        "thread_cpu_ms": 208.172,
+        "allocated_bytes": 506599832,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 156537464,
+    "sampled_peak_rss_mib": 675.91796875,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 15700456
+      },
+      {
+        "after_release_requested_gc": 15702936
+      },
+      {
+        "after_release_requested_gc": 15703664
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-original-stock": {
+    "state": "ERROR",
+    "oom": true,
+    "input_bytes": 1048576,
+    "input_sha256": "2bd8379d31ec16a14bd860a6550dd76fd774045354839709dd2bac5179c46825",
+    "html_characters": 1100701,
+    "operation_rows": [],
+    "heap_peak_pool_sum_upper_bound_max": null,
+    "sampled_peak_rss_mib": 916.765625,
+    "requested_gc_occupancy": [],
+    "source_callbacks": []
+  },
+  "discover-prose-slice": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 1048576,
+    "input_sha256": "4d2e2353d46f3d11642076fc2d58c975459187b14fe3bfa1867822d20ee5c175",
+    "html_characters": 1068512,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 149.470513,
+        "thread_cpu_ms": 127.237,
+        "allocated_bytes": 21655208,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 57.569425,
+        "thread_cpu_ms": 55.55,
+        "allocated_bytes": 21353592,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 32.633076,
+        "thread_cpu_ms": 31.845,
+        "allocated_bytes": 21291424,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 47456480,
+    "sampled_peak_rss_mib": 465.625,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 13291280
+      },
+      {
+        "after_release_requested_gc": 13293104
+      },
+      {
+        "after_release_requested_gc": 13294224
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-prose-stock": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 1048576,
+    "input_sha256": "4d2e2353d46f3d11642076fc2d58c975459187b14fe3bfa1867822d20ee5c175",
+    "html_characters": 1068512,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 114.974141,
+        "thread_cpu_ms": 111.638,
+        "allocated_bytes": 21655600,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 61.016019,
+        "thread_cpu_ms": 59.576,
+        "allocated_bytes": 21291664,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 26.402646,
+        "thread_cpu_ms": 25.889,
+        "allocated_bytes": 21292808,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 47896096,
+    "sampled_peak_rss_mib": 465.73046875,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 13294072
+      },
+      {
+        "after_release_requested_gc": 13296128
+      },
+      {
+        "after_release_requested_gc": 13298856
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-raw-slice": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 131122,
+    "input_sha256": "3d45418c1119bd2f937d26f61021e2333872f4b151d2046839c794956341abf1",
+    "html_characters": 131122,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 106.515888,
+        "thread_cpu_ms": 92.615,
+        "allocated_bytes": 140086000,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 61.185877,
+        "thread_cpu_ms": 57.641,
+        "allocated_bytes": 139910976,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 24.862021,
+        "thread_cpu_ms": 22.032,
+        "allocated_bytes": 139910800,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 84064072,
+    "sampled_peak_rss_mib": 142.125,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 5284960
+      },
+      {
+        "after_release_requested_gc": 5286920
+      },
+      {
+        "after_release_requested_gc": 5288344
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-raw-stock": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 131122,
+    "input_sha256": "3d45418c1119bd2f937d26f61021e2333872f4b151d2046839c794956341abf1",
+    "html_characters": 131122,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 376.06973,
+        "thread_cpu_ms": 249.667,
+        "allocated_bytes": 676154056,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 305.423029,
+        "thread_cpu_ms": 198.74,
+        "allocated_bytes": 675978976,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 289.502924,
+        "thread_cpu_ms": 162.009,
+        "allocated_bytes": 675978440,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 388538960,
+    "sampled_peak_rss_mib": 429.73046875,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 5279936
+      },
+      {
+        "after_release_requested_gc": 5281944
+      },
+      {
+        "after_release_requested_gc": 5282920
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-single-slice": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 262172,
+    "input_sha256": "926c3477c5906933944b3d266dbc6d83c234688c4b46d0e601449b3196e48a7c",
+    "html_characters": 298296,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 157.953099,
+        "thread_cpu_ms": 137.17,
+        "allocated_bytes": 542446808,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 132.618166,
+        "thread_cpu_ms": 107.437,
+        "allocated_bytes": 542256760,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 112.81697,
+        "thread_cpu_ms": 100.646,
+        "allocated_bytes": 542256760,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 115105976,
+    "sampled_peak_rss_mib": 538.08984375,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9886392
+      },
+      {
+        "after_release_requested_gc": 9887192
+      },
+      {
+        "after_release_requested_gc": 9887632
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-single-stock": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 262172,
+    "input_sha256": "926c3477c5906933944b3d266dbc6d83c234688c4b46d0e601449b3196e48a7c",
+    "html_characters": 298296,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 194.074917,
+        "thread_cpu_ms": 170.553,
+        "allocated_bytes": 542447064,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 131.48967,
+        "thread_cpu_ms": 118.351,
+        "allocated_bytes": 542256752,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 108.793561,
+        "thread_cpu_ms": 98.599,
+        "allocated_bytes": 542257280,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 148646672,
+    "sampled_peak_rss_mib": 568.56640625,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9886984
+      },
+      {
+        "after_release_requested_gc": 9887712
+      },
+      {
+        "after_release_requested_gc": 9888896
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-small-counted": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 4124,
+    "input_sha256": "71bfa34659ca82bef945819cd57f9529538cef907a5a9d90cde0bef928c3c466",
+    "html_characters": 5808,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 17.128598,
+        "thread_cpu_ms": 16.654,
+        "allocated_bytes": 1157288,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 6.412115,
+        "thread_cpu_ms": 6.368,
+        "allocated_bytes": 971328,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 6.695335,
+        "thread_cpu_ms": 6.712,
+        "allocated_bytes": 970104,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 10776576,
+    "sampled_peak_rss_mib": 414.203125,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9116800
+      },
+      {
+        "after_release_requested_gc": 9119232
+      },
+      {
+        "after_release_requested_gc": 9120368
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-small-stock": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 4124,
+    "input_sha256": "71bfa34659ca82bef945819cd57f9529538cef907a5a9d90cde0bef928c3c466",
+    "html_characters": 5808,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 20.830518,
+        "thread_cpu_ms": 19.734,
+        "allocated_bytes": 1159296,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 8.161495,
+        "thread_cpu_ms": 6.953,
+        "allocated_bytes": 970200,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 6.822033,
+        "thread_cpu_ms": 6.469,
+        "allocated_bytes": 970096,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 10776408,
+    "sampled_peak_rss_mib": 361.25,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9115840
+      },
+      {
+        "after_release_requested_gc": 9117328
+      },
+      {
+        "after_release_requested_gc": 9118464
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-special-slice": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 76828,
+    "input_sha256": "2325836776155976759d458a27ea395980d00499d925bf286c4d31bf3d2b16e3",
+    "html_characters": 100528,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 69.377211,
+        "thread_cpu_ms": 67.01,
+        "allocated_bytes": 6090992,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 25.850723,
+        "thread_cpu_ms": 25.379,
+        "allocated_bytes": 5383552,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 14.719472,
+        "thread_cpu_ms": 14.561,
+        "allocated_bytes": 5382672,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 19321744,
+    "sampled_peak_rss_mib": 423.59765625,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 10587192
+      },
+      {
+        "after_release_requested_gc": 10591096
+      },
+      {
+        "after_release_requested_gc": 10592280
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-special-stock": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 76828,
+    "input_sha256": "2325836776155976759d458a27ea395980d00499d925bf286c4d31bf3d2b16e3",
+    "html_characters": 100528,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 160.837395,
+        "thread_cpu_ms": 118.044,
+        "allocated_bytes": 141992888,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 103.246875,
+        "thread_cpu_ms": 74.936,
+        "allocated_bytes": 141283504,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 90.93885,
+        "thread_cpu_ms": 66.282,
+        "allocated_bytes": 141284080,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 149311040,
+    "sampled_peak_rss_mib": 497.9609375,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 10629752
+      },
+      {
+        "after_release_requested_gc": 10630864
+      },
+      {
+        "after_release_requested_gc": 10632096
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-table-slice": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 65536,
+    "input_sha256": "439cde906572ff7adb91b876ed830cdb2bef36a0b2ee55d2764eea5f2439a433",
+    "html_characters": 104706,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 149.548426,
+        "thread_cpu_ms": 135.094,
+        "allocated_bytes": 27912072,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 85.064702,
+        "thread_cpu_ms": 81.592,
+        "allocated_bytes": 27015472,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 54.469559,
+        "thread_cpu_ms": 53.874,
+        "allocated_bytes": 26331496,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 54354712,
+    "sampled_peak_rss_mib": 474.85546875,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9264848
+      },
+      {
+        "after_release_requested_gc": 9267360
+      },
+      {
+        "after_release_requested_gc": 9267856
+      }
+    ],
+    "source_callbacks": []
+  },
+  "discover-table-stock": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 65536,
+    "input_sha256": "439cde906572ff7adb91b876ed830cdb2bef36a0b2ee55d2764eea5f2439a433",
+    "html_characters": 104706,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 151.129508,
+        "thread_cpu_ms": 137.257,
+        "allocated_bytes": 27277112,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 76.701397,
+        "thread_cpu_ms": 74.482,
+        "allocated_bytes": 26631376,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 55.34965,
+        "thread_cpu_ms": 54.818,
+        "allocated_bytes": 26567080,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 54478648,
+    "sampled_peak_rss_mib": 475.29296875,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9268016
+      },
+      {
+        "after_release_requested_gc": 9270744
+      },
+      {
+        "after_release_requested_gc": 9271600
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-128-after": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 131100,
+    "input_sha256": "6dda06ffa86f6bde189c2dca19bc9a61af2c2a9064b07240d75f635a7d68937e",
+    "html_characters": 148656,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 77.654829,
+        "thread_cpu_ms": 70.945,
+        "allocated_bytes": 140323768,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 51.476901,
+        "thread_cpu_ms": 47.743,
+        "allocated_bytes": 140135472,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 27.97414,
+        "thread_cpu_ms": 25.57,
+        "allocated_bytes": 140133560,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 49531456,
+    "sampled_peak_rss_mib": 467.2109375,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9524448
+      },
+      {
+        "after_release_requested_gc": 9527216
+      },
+      {
+        "after_release_requested_gc": 9527912
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-128-before": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 131100,
+    "input_sha256": "6dda06ffa86f6bde189c2dca19bc9a61af2c2a9064b07240d75f635a7d68937e",
+    "html_characters": 148656,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 351.657537,
+        "thread_cpu_ms": 236.123,
+        "allocated_bytes": 676391944,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 277.991978,
+        "thread_cpu_ms": 201.004,
+        "allocated_bytes": 676203464,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 277.686472,
+        "thread_cpu_ms": 178.833,
+        "allocated_bytes": 676125600,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 429076128,
+    "sampled_peak_rss_mib": 725.24609375,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9516880
+      },
+      {
+        "after_release_requested_gc": 9520200
+      },
+      {
+        "after_release_requested_gc": 9521632
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-64-after": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 65564,
+    "input_sha256": "f0abbcb47d5efd402ca382d0374a77e40d88bb5895b9026fd668f2a544589848",
+    "html_characters": 74928,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 44.525531,
+        "thread_cpu_ms": 42.108,
+        "allocated_bytes": 36870008,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 26.763059,
+        "thread_cpu_ms": 25.388,
+        "allocated_bytes": 36680544,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 18.708894,
+        "thread_cpu_ms": 18.603,
+        "allocated_bytes": 36682112,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 46980712,
+    "sampled_peak_rss_mib": 433.2890625,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9297672
+      },
+      {
+        "after_release_requested_gc": 9298936
+      },
+      {
+        "after_release_requested_gc": 9300736
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-64-before": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 65564,
+    "input_sha256": "f0abbcb47d5efd402ca382d0374a77e40d88bb5895b9026fd668f2a544589848",
+    "html_characters": 74928,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 132.482023,
+        "thread_cpu_ms": 107.607,
+        "allocated_bytes": 170686632,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 100.229,
+        "thread_cpu_ms": 69.295,
+        "allocated_bytes": 170496544,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 83.184704,
+        "thread_cpu_ms": 61.448,
+        "allocated_bytes": 170497448,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 150925096,
+    "sampled_peak_rss_mib": 458.70703125,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9298688
+      },
+      {
+        "after_release_requested_gc": 9299928
+      },
+      {
+        "after_release_requested_gc": 9301272
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-64-edt-after": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 65564,
+    "input_sha256": "f0abbcb47d5efd402ca382d0374a77e40d88bb5895b9026fd668f2a544589848",
+    "html_characters": 74928,
+    "operation_rows": [
+      {
+        "operation": "reader.setText_edt",
+        "wall_ms": 103.002261,
+        "thread_cpu_ms": 77.715,
+        "allocated_bytes": 38596552,
+        "thread": "AWT-EventQueue-0"
+      },
+      {
+        "operation": "reader.setText_edt",
+        "wall_ms": 68.310305,
+        "thread_cpu_ms": 34.803,
+        "allocated_bytes": 38390168,
+        "thread": "AWT-EventQueue-0"
+      },
+      {
+        "operation": "reader.setText_edt",
+        "wall_ms": 86.497914,
+        "thread_cpu_ms": 31.117,
+        "allocated_bytes": 38390760,
+        "thread": "AWT-EventQueue-0"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 49660720,
+    "sampled_peak_rss_mib": 443.140625,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 10475464
+      },
+      {
+        "after_release_requested_gc": 10477824
+      },
+      {
+        "after_release_requested_gc": 10479848
+      }
+    ],
+    "source_callbacks": [
+      {
+        "queue_ms": 104.232293
+      },
+      {
+        "queue_ms": 84.93414
+      },
+      {
+        "queue_ms": 86.79971
+      }
+    ]
+  },
+  "paired-64-edt-before": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 65564,
+    "input_sha256": "f0abbcb47d5efd402ca382d0374a77e40d88bb5895b9026fd668f2a544589848",
+    "html_characters": 74928,
+    "operation_rows": [
+      {
+        "operation": "reader.setText_edt",
+        "wall_ms": 351.665619,
+        "thread_cpu_ms": 139.058,
+        "allocated_bytes": 172412736,
+        "thread": "AWT-EventQueue-0"
+      },
+      {
+        "operation": "reader.setText_edt",
+        "wall_ms": 168.857544,
+        "thread_cpu_ms": 80.223,
+        "allocated_bytes": 172206360,
+        "thread": "AWT-EventQueue-0"
+      },
+      {
+        "operation": "reader.setText_edt",
+        "wall_ms": 220.325898,
+        "thread_cpu_ms": 87.348,
+        "allocated_bytes": 172206536,
+        "thread": "AWT-EventQueue-0"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 154584256,
+    "sampled_peak_rss_mib": 528.546875,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 10471864
+      },
+      {
+        "after_release_requested_gc": 10475968
+      },
+      {
+        "after_release_requested_gc": 10478288
+      }
+    ],
+    "source_callbacks": [
+      {
+        "queue_ms": 371.274842
+      },
+      {
+        "queue_ms": 179.245543
+      },
+      {
+        "queue_ms": 235.018913
+      }
+    ]
+  },
+  "paired-original-after": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 1048576,
+    "input_sha256": "2bd8379d31ec16a14bd860a6550dd76fd774045354839709dd2bac5179c46825",
+    "html_characters": 1100701,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 281.199823,
+        "thread_cpu_ms": 261.596,
+        "allocated_bytes": 507403896,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 233.0687,
+        "thread_cpu_ms": 207.655,
+        "allocated_bytes": 506513312,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 191.897125,
+        "thread_cpu_ms": 176.105,
+        "allocated_bytes": 507096720,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 177696440,
+    "sampled_peak_rss_mib": 644.31640625,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 13560800
+      },
+      {
+        "after_release_requested_gc": 13562624
+      },
+      {
+        "after_release_requested_gc": 13563232
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-production-after-0": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 1048576,
+    "input_sha256": "2bd8379d31ec16a14bd860a6550dd76fd774045354839709dd2bac5179c46825",
+    "html_characters": 1100701,
+    "operation_rows": [
+      {
+        "operation": "production.preview_constructor_no_layout",
+        "wall_ms": 764.119326,
+        "thread_cpu_ms": 731.183,
+        "allocated_bytes": 605199392,
+        "thread": "AWT-EventQueue-0"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 164626432,
+    "sampled_peak_rss_mib": 578.89453125,
+    "requested_gc_occupancy": [],
+    "source_callbacks": [
+      {
+        "queue_ms": 850.494913
+      }
+    ]
+  },
+  "paired-production-after-1": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 1048576,
+    "input_sha256": "2bd8379d31ec16a14bd860a6550dd76fd774045354839709dd2bac5179c46825",
+    "html_characters": 1100701,
+    "operation_rows": [
+      {
+        "operation": "production.preview_constructor_no_layout",
+        "wall_ms": 771.036035,
+        "thread_cpu_ms": 736.924,
+        "allocated_bytes": 603737880,
+        "thread": "AWT-EventQueue-0"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 167772160,
+    "sampled_peak_rss_mib": 589.296875,
+    "requested_gc_occupancy": [],
+    "source_callbacks": [
+      {
+        "queue_ms": 865.222129
+      }
+    ]
+  },
+  "paired-production-after-2": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 1048576,
+    "input_sha256": "2bd8379d31ec16a14bd860a6550dd76fd774045354839709dd2bac5179c46825",
+    "html_characters": 1100701,
+    "operation_rows": [
+      {
+        "operation": "production.preview_constructor_no_layout",
+        "wall_ms": 769.55126,
+        "thread_cpu_ms": 738.018,
+        "allocated_bytes": 604849728,
+        "thread": "AWT-EventQueue-0"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 168820736,
+    "sampled_peak_rss_mib": 580.33984375,
+    "requested_gc_occupancy": [],
+    "source_callbacks": [
+      {
+        "queue_ms": 856.595569
+      }
+    ]
+  },
+  "paired-prose-after": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 1048576,
+    "input_sha256": "d12829ac2702bccc191205e115327f1b7a2cda4edc231d1a07b47ba3e9d55478",
+    "html_characters": 1068512,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 94.111488,
+        "thread_cpu_ms": 92.317,
+        "allocated_bytes": 21655336,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 52.803002,
+        "thread_cpu_ms": 52.699,
+        "allocated_bytes": 21464304,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 31.862128,
+        "thread_cpu_ms": 31.002,
+        "allocated_bytes": 21466640,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 47905200,
+    "sampled_peak_rss_mib": 445.48046875,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 13303176
+      },
+      {
+        "after_release_requested_gc": 13304048
+      },
+      {
+        "after_release_requested_gc": 13307184
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-prose-before": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 1048576,
+    "input_sha256": "d12829ac2702bccc191205e115327f1b7a2cda4edc231d1a07b47ba3e9d55478",
+    "html_characters": 1068512,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 92.266919,
+        "thread_cpu_ms": 90.633,
+        "allocated_bytes": 21655648,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 49.207976,
+        "thread_cpu_ms": 48.809,
+        "allocated_bytes": 21464240,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 27.08913,
+        "thread_cpu_ms": 26.298,
+        "allocated_bytes": 21464592,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 47870256,
+    "sampled_peak_rss_mib": 451.3984375,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 13267848
+      },
+      {
+        "after_release_requested_gc": 13269488
+      },
+      {
+        "after_release_requested_gc": 13270576
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-single-after": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 262172,
+    "input_sha256": "926c3477c5906933944b3d266dbc6d83c234688c4b46d0e601449b3196e48a7c",
+    "html_characters": 298296,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 228.192376,
+        "thread_cpu_ms": 197.579,
+        "allocated_bytes": 542447000,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 157.150375,
+        "thread_cpu_ms": 139.682,
+        "allocated_bytes": 542256752,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 171.100648,
+        "thread_cpu_ms": 117.02,
+        "allocated_bytes": 542256752,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 106674000,
+    "sampled_peak_rss_mib": 517.00390625,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9928768
+      },
+      {
+        "after_release_requested_gc": 9929496
+      },
+      {
+        "after_release_requested_gc": 9929936
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-single-before": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 262172,
+    "input_sha256": "926c3477c5906933944b3d266dbc6d83c234688c4b46d0e601449b3196e48a7c",
+    "html_characters": 298296,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 168.427052,
+        "thread_cpu_ms": 146.665,
+        "allocated_bytes": 542447064,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 207.010662,
+        "thread_cpu_ms": 157.341,
+        "allocated_bytes": 542256752,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 107.284165,
+        "thread_cpu_ms": 97.321,
+        "allocated_bytes": 542256752,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 103547224,
+    "sampled_peak_rss_mib": 554.9609375,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9886096
+      },
+      {
+        "after_release_requested_gc": 9886824
+      },
+      {
+        "after_release_requested_gc": 9887264
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-special-after": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 76828,
+    "input_sha256": "2325836776155976759d458a27ea395980d00499d925bf286c4d31bf3d2b16e3",
+    "html_characters": 100528,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 61.048992,
+        "thread_cpu_ms": 59.42,
+        "allocated_bytes": 6090944,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 24.069305,
+        "thread_cpu_ms": 23.654,
+        "allocated_bytes": 5383288,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 14.116015,
+        "thread_cpu_ms": 13.797,
+        "allocated_bytes": 5382600,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 19323080,
+    "sampled_peak_rss_mib": 423.828125,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 10634328
+      },
+      {
+        "after_release_requested_gc": 10636664
+      },
+      {
+        "after_release_requested_gc": 10637648
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-special-before": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 76828,
+    "input_sha256": "2325836776155976759d458a27ea395980d00499d925bf286c4d31bf3d2b16e3",
+    "html_characters": 100528,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 144.707714,
+        "thread_cpu_ms": 109.546,
+        "allocated_bytes": 141992768,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 87.984832,
+        "thread_cpu_ms": 68.742,
+        "allocated_bytes": 141283728,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 72.880715,
+        "thread_cpu_ms": 54.86,
+        "allocated_bytes": 141283984,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 154554496,
+    "sampled_peak_rss_mib": 523.328125,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 10629584
+      },
+      {
+        "after_release_requested_gc": 10630792
+      },
+      {
+        "after_release_requested_gc": 10631848
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-table-after": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 65536,
+    "input_sha256": "439cde906572ff7adb91b876ed830cdb2bef36a0b2ee55d2764eea5f2439a433",
+    "html_characters": 104706,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 142.023909,
+        "thread_cpu_ms": 137.496,
+        "allocated_bytes": 27284088,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 83.227304,
+        "thread_cpu_ms": 82.407,
+        "allocated_bytes": 27015728,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 79.02718,
+        "thread_cpu_ms": 78.397,
+        "allocated_bytes": 27015272,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 55384728,
+    "sampled_peak_rss_mib": 461.54296875,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9225768
+      },
+      {
+        "after_release_requested_gc": 9228000
+      },
+      {
+        "after_release_requested_gc": 9229672
+      }
+    ],
+    "source_callbacks": []
+  },
+  "paired-table-before": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 65536,
+    "input_sha256": "439cde906572ff7adb91b876ed830cdb2bef36a0b2ee55d2764eea5f2439a433",
+    "html_characters": 104706,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 140.793789,
+        "thread_cpu_ms": 136.723,
+        "allocated_bytes": 27284216,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 170.405433,
+        "thread_cpu_ms": 152.994,
+        "allocated_bytes": 27016440,
+        "thread": "main"
+      },
+      {
+        "operation": "reader.detached",
+        "wall_ms": 109.446502,
+        "thread_cpu_ms": 103.179,
+        "allocated_bytes": 27014240,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 55453208,
+    "sampled_peak_rss_mib": 459.0546875,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9220960
+      },
+      {
+        "after_release_requested_gc": 9223992
+      },
+      {
+        "after_release_requested_gc": 9224744
+      }
+    ],
+    "source_callbacks": []
+  },
+  "pilot-slice-small": {
+    "state": "ERROR",
+    "oom": false,
+    "input_bytes": 4124,
+    "input_sha256": "71bfa34659ca82bef945819cd57f9529538cef907a5a9d90cde0bef928c3c466",
+    "html_characters": 5808,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 28.019679,
+        "thread_cpu_ms": 23.397,
+        "allocated_bytes": 657952,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 10777152,
+    "sampled_peak_rss_mib": 409.2890625,
+    "requested_gc_occupancy": [],
+    "source_callbacks": []
+  },
+  "pilot-small-exact": {
+    "state": "OK",
+    "oom": false,
+    "input_bytes": 4124,
+    "input_sha256": "71bfa34659ca82bef945819cd57f9529538cef907a5a9d90cde0bef928c3c466",
+    "html_characters": 5808,
+    "operation_rows": [
+      {
+        "operation": "reader.detached",
+        "wall_ms": 33.289394,
+        "thread_cpu_ms": 20.094,
+        "allocated_bytes": 659840,
+        "thread": "main"
+      }
+    ],
+    "heap_peak_pool_sum_upper_bound_max": 10777192,
+    "sampled_peak_rss_mib": 375.4609375,
+    "requested_gc_occupancy": [
+      {
+        "after_release_requested_gc": 9119192
+      }
+    ],
+    "source_callbacks": []
+  }
+}

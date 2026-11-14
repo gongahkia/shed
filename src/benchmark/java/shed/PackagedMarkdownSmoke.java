@@ -118,7 +118,9 @@ public final class PackagedMarkdownSmoke {
             while (images.find()) { image(images.group(1)); count++; }
             require(count >= 3, "Expected local, math and Mermaid images");
             SwingUtilities.invokeAndWait(() -> {
-                JEditorPane pane = new JEditorPane("text/html", html);
+                JEditorPane pane = new JEditorPane();
+                pane.setEditorKit(new MarkdownPreviewHtmlKit());
+                pane.setText(html);
                 pane.setSize(640, 480);
                 require(pane.getPreferredSize().height > 0, "HTML installation/layout failed");
             });

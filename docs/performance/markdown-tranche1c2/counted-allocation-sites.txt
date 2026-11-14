@@ -1,0 +1,30 @@
+
+                                                                                           Allocation by Site
+
+Method                                                                                                                                                                              Allocation Pressure
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- -------------------
+java.lang.Object.clone()                                                                                                                                                                         39.67%
+javax.swing.text.html.parser.Parser.parseContent()                                                                                                                                               24.12%
+java.util.Arrays.copyOf(char[], int)                                                                                                                                                             20.52%
+javax.swing.text.html.HTMLDocument$HTMLReader.blockClose(HTML$Tag)                                                                                                                                8.69%
+java.lang.Thread.beforeSleep(long)                                                                                                                                                                4.27%
+java.util.Arrays.copyOf(byte[], int)                                                                                                                                                              1.58%
+java.util.Arrays.copyOfRangeByte(byte[], int, int)                                                                                                                                                0.27%
+java.lang.StringLatin1.toLowerCase(String, byte[], Locale)                                                                                                                                        0.09%
+jdk.internal.org.objectweb.asm.ByteVector.enlarge(int)                                                                                                                                            0.08%
+java.lang.AbstractStringBuilder.<init>(int)                                                                                                                                                       0.06%
+jdk.internal.misc.Unsafe.allocateUninitializedArray0(Class, int)                                                                                                                                  0.05%
+java.io.ByteArrayOutputStream.<init>(int)                                                                                                                                                         0.05%
+jdk.internal.org.objectweb.asm.MethodWriter.visitFrameStart(int, int, int)                                                                                                                        0.04%
+java.util.zip.InflaterInputStream.<init>(InputStream, Inflater, int)                                                                                                                              0.04%
+sun.security.util.DerInputStream.getDerValue()                                                                                                                                                    0.03%
+java.util.regex.Pattern.matcher(CharSequence)                                                                                                                                                     0.03%
+javax.swing.text.html.parser.Parser.handleText(TagElement)                                                                                                                                        0.03%
+java.util.Hashtable.addEntry(int, Object, Object, int)                                                                                                                                            0.03%
+java.io.BufferedInputStream.fill()                                                                                                                                                                0.03%
+java.nio.ByteBuffer.wrap(byte[], int, int)                                                                                                                                                        0.02%
+sun.security.provider.X509Factory.readFully(InputStream, ByteArrayOutputStream, int)                                                                                                              0.02%
+org.commonmark.parser.SourceLine.of(CharSequence, SourceSpan)                                                                                                                                     0.02%
+jdk.internal.org.objectweb.asm.SymbolTable.addConstantUtf8(String)                                                                                                                                0.02%
+java.util.regex.Matcher.<init>(Pattern, CharSequence)                                                                                                                                             0.02%
+java.security.Provider.putPropertyStrings(Provider$Service)                                                                                                                                       0.02%

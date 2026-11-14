@@ -102,6 +102,37 @@ class MarkdownPreviewHtmlKitTest {
         assertTrue(structure(document).contains("relative.md"));
     }
 
+    @Test void actualPreviewUsesRepairedReaderWithoutChangingSource() throws Exception {
+        Path file = Files.writeString(temporary.resolve("preview.md"), "```text\n" + "  code < &\n".repeat(64) + "```\n");
+        FutureTask<Void> check = new FutureTask<>(() -> {
+            FileBuffer buffer = new FileBuffer(file.toFile());
+            var area = new javax.swing.JTextArea(); area.setDocument(buffer.getDocument());
+            var source = new EditorPane(area, null, new javax.swing.JScrollPane(area), null); source.setBuffer(buffer);
+            var snapshot = buffer.textSnapshot(); long revision = buffer.documentRevision();
+            var preview = new MarkdownPreviewPane(buffer, () -> new Font(Font.DIALOG, 0, 13), () -> Color.WHITE,
+                () -> Color.BLACK, href -> {}, () -> {}, () -> false, () -> false, source, null);
+            try {
+                var scroll = (javax.swing.JScrollPane) preview.getComponent(1);
+                var editor = (JEditorPane) scroll.getViewport().getView();
+                assertInstanceOf(MarkdownPreviewHtmlKit.class, editor.getEditorKit());
+                ElementIterator iterator = new ElementIterator(editor.getDocument());
+                boolean foundCode = false;
+                for (Element e; (e = iterator.next()) != null;) {
+                    if (e.getAttributes().getAttribute(StyleConstants.NameAttribute) == HTML.Tag.PRE) {
+                        assertEquals("  code < &\n".repeat(64), editor.getDocument().getText(
+                            e.getStartOffset(), e.getEndOffset() - e.getStartOffset()));
+                        foundCode = true;
+                    }
+                }
+                assertTrue(foundCode);
+                assertSame(snapshot, buffer.textSnapshot()); assertEquals(revision, buffer.documentRevision());
+                assertFalse(buffer.isModified()); assertFalse(buffer.getUndoManager().canUndo());
+            } finally { preview.disposePreview(); }
+            return null;
+        });
+        SwingUtilities.invokeAndWait(check); check.get();
+    }
+
     @Test void renderedMarkdownGeometryPixelsSelectionAndNavigationMatchStock() throws Exception {
         Path source = Files.writeString(temporary.resolve("input.md"), "# Original\n");
         ImageIO.write(new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB), "png", temporary.resolve("local.png").toFile());

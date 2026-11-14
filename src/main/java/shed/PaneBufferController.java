@@ -33,6 +33,7 @@ final class PaneBufferController {
             FileBuffer buffer = getCurrentBuffer();
             FileBuffer.DocumentTextChange textChange = buffer != null && event != null && event.getDocument() == buffer.getDocument()
                 ? buffer.applyDocumentChange(event) : null;
+            editor.syntaxUiController.markdownDocumentChanged(buffer, textChange);
             editor.editorUiController.noteEditorDocumentChange();
             markModified(event, textChange);
             editor.updateCurrentLineHighlight();
@@ -683,6 +684,7 @@ final class PaneBufferController {
         }
         editor.closeTerminalSession(buffer);
         editor.buffers.remove(buffer);
+        editor.syntaxUiController.forgetMarkdownState(buffer);
         editor.persistRecoverySnapshotsSafely();
         if (editor.buffers.isEmpty()) {
             openEmptyBuffer();
@@ -777,6 +779,7 @@ final class PaneBufferController {
         }
         editor.closeTerminalSession(buffer);
         editor.buffers.remove(buffer);
+        editor.syntaxUiController.forgetMarkdownState(buffer);
         editor.currentBufferIndex = 0;
         editor.persistRecoverySnapshotsSafely();
         openEmptyBuffer();
@@ -813,6 +816,7 @@ final class PaneBufferController {
         if (editor.isTreeBuffer(closingBuffer)) {
             editor.treeLineTargets.remove(closingBuffer);
             editor.buffers.remove(closingBuffer);
+            editor.syntaxUiController.forgetMarkdownState(closingBuffer);
             if (closingBuffer == editor.treeBuffer) {
                 editor.treeBuffer = null;
             }

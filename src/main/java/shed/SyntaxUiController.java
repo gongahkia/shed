@@ -29,7 +29,11 @@ final class SyntaxUiController {
     private VersionedTextSnapshot cachedSymbolText;
     private List<SymbolService.Symbol> cachedSymbols = List.of();
     private int syntaxJobId = -1;
-    private long syntaxGeneration;
+    private volatile long syntaxGeneration;
+    private SyntaxRequest pendingSyntax;
+    private boolean syntaxShutdown;
+    private static final int MAX_MARKDOWN_CACHES = 8;
+    private final Map<FileBuffer, GrammarHighlightService.MarkdownCache> markdownCaches = new WeakHashMap<>();
     private int symbolJobId = -1;
     private long symbolGeneration;
     private FileBuffer pendingSymbolBuffer;
@@ -119,6 +123,10 @@ final class SyntaxUiController {
     }
 
     void shutdown() {
+        syntaxShutdown = true;
+        syntaxGeneration++;
+        pendingSyntax = null;
+        markdownCaches.clear();
         if (syntaxHighlightTimer != null) syntaxHighlightTimer.stop();
         if (symbolRefreshTimer != null) symbolRefreshTimer.stop();
         if (gitBlameTimer != null) gitBlameTimer.stop();
@@ -533,6 +541,9 @@ final class SyntaxUiController {
 
 
     void applySyntaxHighlighting() {
+        if (syntaxShutdown) return;
+        long generation = ++syntaxGeneration;
+        pendingSyntax = null;
         FileBuffer buffer = editor.getCurrentBuffer();
         if (!shouldHighlightSyntax(buffer)) {
             clearSyntaxHighlighting();
@@ -546,30 +557,71 @@ final class SyntaxUiController {
             return;
         }
         Range visible = syntaxViewport(text);
-        boolean virtualized = text.length() > MAX_FULL_SYNTAX_CHARS || text.lineCount() > MAX_FULL_SYNTAX_LINES;
+        boolean markdown = buffer.getFileType() == FileType.MARKDOWN;
+        boolean virtualized = markdown || text.length() > MAX_FULL_SYNTAX_CHARS || text.lineCount() > MAX_FULL_SYNTAX_LINES;
+        GrammarHighlightService.MarkdownCache cache = markdown ? markdownCache(buffer) : null;
+        long cacheGeneration = cache == null ? 0 : cache.bind(text);
         SyntaxRequest request = new SyntaxRequest(buffer, text, buffer.getFileType(), syntaxColors(),
-            editor.configManager.getShowWhitespace(), virtualized, visible.start(), visible.end(), ++syntaxGeneration);
-        if (syntaxJobId >= 0) editor.asyncJobService.cancel(syntaxJobId);
+            editor.configManager.getShowWhitespace(), virtualized, visible.start(), visible.end(), generation,
+            buffer.getDocument(), buffer.documentRevision(), cache, cacheGeneration);
+        // One queued/running job and one replaceable newest request. Superseded work
+        // checks syntaxGeneration cooperatively, without filling the executor with cancelled Futures.
+        if (syntaxJobId >= 0) pendingSyntax = request;
+        else startSyntaxJob(request);
+    }
+
+    private void startSyntaxJob(SyntaxRequest request) {
         syntaxJobId = editor.asyncJobService.submit("Syntax highlighting", token -> highlightSnapshot(request, token),
             (snapshot, result, error) -> applySyntaxSnapshot(snapshot, result, error));
     }
 
+    private GrammarHighlightService.MarkdownCache markdownCache(FileBuffer buffer) {
+        markdownCaches.keySet().removeIf(value -> !editor.buffers.contains(value));
+        GrammarHighlightService.MarkdownCache cache = markdownCaches.get(buffer);
+        if (cache == null) {
+            if (markdownCaches.size() >= MAX_MARKDOWN_CACHES) markdownCaches.remove(markdownCaches.keySet().iterator().next());
+            cache = new GrammarHighlightService.MarkdownCache();
+            markdownCaches.put(buffer, cache);
+        }
+        return cache;
+    }
+
+    void markdownDocumentChanged(FileBuffer buffer, FileBuffer.DocumentTextChange change) {
+        GrammarHighlightService.MarkdownCache cache = markdownCaches.get(buffer);
+        if (cache == null || change == null) return;
+        if (change.incremental()) cache.changed(change.before(), change.after(), change.offset(), change.removedLength());
+        else cache.bind(change.after());
+    }
+
+    void forgetMarkdownState(FileBuffer buffer) { markdownCaches.remove(buffer); }
+
     private SyntaxResult highlightSnapshot(SyntaxRequest request, AsyncJobService.JobToken token) {
         long started = System.nanoTime();
-        if (token.isCancelled()) return null;
+        java.util.function.BooleanSupplier cancelled = () -> token.isCancelled() || request.generation() != syntaxGeneration;
+        if (cancelled.getAsBoolean()) return null;
         List<SyntaxSpan> spans = new ArrayList<>();
-        GrammarHighlightService grammar = new GrammarHighlightService();
         List<GrammarHighlightService.Token> tokens;
-        int scanEnd = request.virtualized()
-            ? request.text().lineEndOffset(request.text().positionAt(request.visibleEnd()).line())
-            : request.text().length();
-        String source = request.text().substring(0, scanEnd);
-        tokens = request.virtualized()
-            ? grammar.highlightViewport(source, request.fileType(), request.visibleStart(), request.visibleEnd(), token::isCancelled)
-            : grammar.highlightSnapshot(source, request.fileType(), token::isCancelled);
-        if (token.isCancelled()) return null;
+        String detail;
+        if (request.markdownCache() != null) {
+            GrammarHighlightService.MarkdownResult result = editor.grammarHighlightService.highlightMarkdown(request.text(),
+                request.visibleStart(), request.visibleEnd(), request.markdownCache(), request.cacheGeneration(), cancelled);
+            if (result == null) return null;
+            tokens = result.tokens();
+            detail = "scanChars=" + result.scannedCharacters() + " readChars=" + result.readCharacters()
+                + " scanStart=" + result.scanStart() + " checkpoints=" + result.checkpoints();
+        } else {
+            GrammarHighlightService grammar = new GrammarHighlightService();
+            int scanEnd = request.virtualized()
+                ? request.text().lineEndOffset(request.text().positionAt(request.visibleEnd()).line()) : request.text().length();
+            String source = request.text().substring(0, scanEnd);
+            tokens = request.virtualized()
+                ? grammar.highlightViewport(source, request.fileType(), request.visibleStart(), request.visibleEnd(), cancelled)
+                : grammar.highlightSnapshot(source, request.fileType(), cancelled);
+            detail = "scanChars=" + source.length();
+        }
+        if (cancelled.getAsBoolean()) return null;
         for (GrammarHighlightService.Token value : tokens) {
-            if (token.isCancelled()) return null;
+            if (cancelled.getAsBoolean()) return null;
             Color color = request.colors().get(value.scope());
             if (color != null) spans.add(new SyntaxSpan(value.start(), value.end(), color));
         }
@@ -578,17 +630,24 @@ final class SyntaxUiController {
                 request.virtualized() ? request.visibleEnd() : request.text().length()) : List.of();
         if (editor.perfService != null) {
             editor.perfService.recordDuration("syntax.highlight", started,
-                "scanChars=" + source.length() + " totalChars=" + request.text().length());
+                detail + " totalChars=" + request.text().length() + " tokens=" + tokens.size());
         }
         return new SyntaxResult(request, List.copyOf(spans), trailingWhitespace);
     }
 
     private void applySyntaxSnapshot(AsyncJobService.JobSnapshot job, SyntaxResult result, Exception error) {
-        if (job == null || job.getStatus() != AsyncJobService.Status.SUCCEEDED || result == null || error != null) return;
+        if (job == null || job.getId() != syntaxJobId) return;
         syntaxJobId = -1;
+        if (!syntaxShutdown && pendingSyntax != null) {
+            SyntaxRequest next = pendingSyntax;
+            pendingSyntax = null;
+            startSyntaxJob(next);
+        }
+        if (syntaxShutdown || job.getStatus() != AsyncJobService.Status.SUCCEEDED || result == null || error != null) return;
         SyntaxRequest request = result.request();
         if (request.generation() != syntaxGeneration || request.buffer() != editor.getCurrentBuffer()
-            || request.buffer().textSnapshot() != request.text()) return;
+            || request.buffer().textSnapshot() != request.text() || request.document() != editor.writingArea.getDocument()
+            || request.buffer().documentRevision() != request.revision()) return;
         clearSyntaxHighlighting();
         editor.syntaxForegroundSpans.addAll(result.spans());
         Highlighter highlighter = editor.writingArea.getHighlighter();
@@ -662,7 +721,9 @@ final class SyntaxUiController {
 
     private record SyntaxRequest(FileBuffer buffer, VersionedTextSnapshot text, FileType fileType,
                                  EnumMap<GrammarHighlightService.Scope, Color> colors, boolean showWhitespace,
-                                 boolean virtualized, int visibleStart, int visibleEnd, long generation) { }
+                                 boolean virtualized, int visibleStart, int visibleEnd, long generation,
+                                 javax.swing.text.Document document, long revision,
+                                 GrammarHighlightService.MarkdownCache markdownCache, long cacheGeneration) { }
     private record SyntaxResult(SyntaxRequest request, List<SyntaxSpan> spans, List<Range> trailingWhitespace) { }
     private record SymbolRequest(FileBuffer buffer, VersionedTextSnapshot text, FileType fileType, long generation) { }
     private record SymbolResult(SymbolRequest request, List<SymbolService.Symbol> symbols) { }

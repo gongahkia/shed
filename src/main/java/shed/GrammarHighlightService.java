@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.lang.ref.WeakReference;
+import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 
 /** Incremental, stateful lexical grammars for Shed's built-in file types. */
@@ -90,7 +93,7 @@ final class GrammarHighlightService {
                                   BooleanSupplier cancelled) {
         if (text == null || text.isEmpty()) return List.of();
         FileType type = fileType == null ? FileType.TEXT : fileType;
-        if (type == FileType.HTML || type == FileType.MARKDOWN) return highlightSnapshot(text, type, cancelled);
+        if (type == FileType.HTML) return highlightSnapshot(text, type, cancelled);
         int start = Math.max(0, Math.min(visibleStart, text.length()));
         int end = Math.max(start, Math.min(visibleEnd, text.length()));
         int firstLine = text.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
@@ -103,15 +106,21 @@ final class GrammarHighlightService {
             if ((line++ & 127) == 0 && cancelled.getAsBoolean()) return List.of();
             int lineEnd = text.indexOf('\n', lineStart);
             if (lineEnd < 0) lineEnd = text.length();
-            state = code(text, lineStart, lineEnd, type, state.mode, null).withEmbedded(state.embedded, state.marker);
+            state = type == FileType.MARKDOWN ? markdown(text.substring(lineStart, lineEnd), state, null)
+                : code(text, lineStart, lineEnd, type, state.mode, null).withEmbedded(state.embedded, state.marker);
             lineStart = lineEnd + 1;
         }
         List<Token> tokens = new ArrayList<>();
+        List<Token> local = new ArrayList<>();
         while (lineStart <= lastLine) {
             if ((line++ & 127) == 0 && cancelled.getAsBoolean()) return List.of();
             int lineEnd = text.indexOf('\n', lineStart);
             if (lineEnd < 0 || lineEnd > lastLine) lineEnd = lastLine;
-            state = code(text, lineStart, lineEnd, type, state.mode, tokens).withEmbedded(state.embedded, state.marker);
+            if (type == FileType.MARKDOWN) {
+                local.clear();
+                state = markdown(text.substring(lineStart, lineEnd), state, local);
+                for (Token value : local) tokens.add(new Token(lineStart + value.start(), lineStart + value.end(), value.scope()));
+            } else state = code(text, lineStart, lineEnd, type, state.mode, tokens).withEmbedded(state.embedded, state.marker);
             if (lineEnd == lastLine) break;
             lineStart = lineEnd + 1;
         }
@@ -120,6 +129,179 @@ final class GrammarHighlightService {
 
     void invalidate(FileBuffer buffer) {
         if (buffer != null) caches.remove(buffer);
+    }
+
+    record MarkdownResult(List<Token> tokens, long scannedCharacters, long readCharacters, int scannedLines,
+                          int scanStart, int checkpoints) { }
+
+    /** Metadata only: no buffer, pane, source strings, token lists or strong snapshot references. */
+    static final class MarkdownCache {
+        static final int MAX_CHECKPOINTS = 1024;
+        private WeakReference<VersionedTextSnapshot> snapshot = new WeakReference<>(null);
+        private TreeMap<Integer, Checkpoint> checkpoints = initialCheckpoints();
+        private TreeMap<Integer, Checkpoint> suffix = new TreeMap<>();
+        private volatile long generation;
+
+        synchronized long bind(VersionedTextSnapshot text) {
+            if (snapshot.get() != text) {
+                checkpoints = initialCheckpoints();
+                suffix.clear();
+                snapshot = new WeakReference<>(text);
+                generation++;
+            }
+            return generation;
+        }
+
+        synchronized void changed(VersionedTextSnapshot before, VersionedTextSnapshot after, int offset, int removed) {
+            // Unverified candidates from an earlier edit cannot be carried across a second edit.
+            suffix.clear();
+            if (snapshot.get() == before) {
+                int line = before.positionAt(offset).line();
+                int characters = after.length() - before.length();
+                int lines = after.lineCount() - before.lineCount();
+                for (var point : checkpoints.tailMap(line, false).entrySet()) {
+                    // Strictly beyond the removed range: the preceding newline still exists.
+                    if (point.getValue().offset() > offset + removed) {
+                        suffix.put(point.getKey() + lines,
+                            new Checkpoint(point.getValue().offset() + characters, point.getValue().state()));
+                    }
+                }
+                // State at the start of the changed line depends only on its unchanged prefix.
+                checkpoints.tailMap(line, false).clear();
+            } else {
+                checkpoints = initialCheckpoints();
+            }
+            snapshot = new WeakReference<>(after);
+            generation++;
+        }
+
+        private synchronized MarkdownPlan plan(VersionedTextSnapshot text, long expected) {
+            return generation == expected && snapshot.get() == text
+                ? new MarkdownPlan(new TreeMap<>(checkpoints), new TreeMap<>(suffix)) : null;
+        }
+
+        private synchronized void publish(VersionedTextSnapshot text, long expected, MarkdownPlan next) {
+            if (generation == expected && snapshot.get() == text) {
+                checkpoints = next.points(); suffix = next.suffix();
+            }
+        }
+
+        synchronized int checkpointCount() { return checkpoints.size() + suffix.size(); }
+
+        private static TreeMap<Integer, Checkpoint> initialCheckpoints() {
+            TreeMap<Integer, Checkpoint> points = new TreeMap<>();
+            points.put(0, new Checkpoint(0, State.normal()));
+            return points;
+        }
+    }
+
+    private record Checkpoint(int offset, State state) { }
+    private record MarkdownPlan(TreeMap<Integer, Checkpoint> points, TreeMap<Integer, Checkpoint> suffix) { }
+
+    /** Worker-owned scan; the shared keyword tables are read-only after construction. */
+    MarkdownResult highlightMarkdown(VersionedTextSnapshot text, int visibleStart, int visibleEnd,
+                                     MarkdownCache cache, long generation, BooleanSupplier cancelled) {
+        MarkdownPlan plan = cache.plan(text, generation);
+        if (plan == null) return null;
+        TreeMap<Integer, Checkpoint> points = plan.points();
+        BooleanSupplier obsolete = () -> cancelled.getAsBoolean() || cache.generation != generation;
+        int firstLine = text.positionAt(visibleStart).line();
+        int lastLine = text.positionAt(Math.max(visibleStart, visibleEnd)).line();
+        var restart = points.floorEntry(firstLine);
+        int line = restart.getKey();
+        int offset = restart.getValue().offset();
+        int scanStart = offset;
+        State state = restart.getValue().state();
+        int stride = Math.max(128, (text.lineCount() + 511) / 512);
+        List<Token> tokens = new ArrayList<>();
+        List<Token> local = new ArrayList<>(8);
+        SnapshotLines source = new SnapshotLines(text, offset, obsolete);
+        long characters = 0;
+        long previousReads = 0;
+        int lines = 0;
+        try {
+            while (line <= lastLine) {
+                if (obsolete.getAsBoolean()) return null;
+                Checkpoint candidate = plan.suffix().remove(line);
+                if (candidate != null && candidate.offset() == offset && candidate.state().equals(state)) {
+                    // Same lexical state at an unchanged line boundary proves the remaining
+                    // unchanged suffix has identical states. No source/token cache is needed.
+                    points.put(line, candidate);
+                    points.putAll(plan.suffix()); plan.suffix().clear();
+                    var jump = points.floorEntry(firstLine);
+                    if (line < firstLine && jump.getKey() > line) {
+                        line = jump.getKey(); offset = jump.getValue().offset(); state = jump.getValue().state();
+                        previousReads += source.readCharacters;
+                        source = new SnapshotLines(text, offset, obsolete);
+                    }
+                    compact(points, firstLine);
+                }
+                if (line == firstLine || line % stride == 0) {
+                    points.put(line, new Checkpoint(offset, state));
+                    compact(points, firstLine);
+                }
+                String value = source.next();
+                local.clear();
+                state = markdown(value, state, line < firstLine ? null : local);
+                for (Token token : local) tokens.add(new Token(offset + token.start(), offset + token.end(), token.scope()));
+                int consumed = value.length() + (offset + value.length() < text.length() ? 1 : 0);
+                characters += consumed;
+                offset += consumed;
+                line++;
+                lines++;
+            }
+        } catch (CancellationException ignored) {
+            return null;
+        }
+        if (obsolete.getAsBoolean()) return null;
+        int count = points.size() + plan.suffix().size();
+        cache.publish(text, generation, plan);
+        return new MarkdownResult(List.copyOf(tokens), characters, previousReads + source.readCharacters, lines, scanStart, count);
+    }
+
+    private static void compact(TreeMap<Integer, Checkpoint> points, int protectedLine) {
+        while (points.size() > MarkdownCache.MAX_CHECKPOINTS / 2) {
+            int index = 0;
+            var iterator = points.keySet().iterator();
+            while (iterator.hasNext()) {
+                int line = iterator.next();
+                if (line != 0 && line != protectedLine && (index++ & 1) == 0) iterator.remove();
+            }
+        }
+    }
+
+    /** Sequential bounded reads avoid repeated tree line lookups and any flattened prefix. */
+    private static final class SnapshotLines {
+        private final VersionedTextSnapshot text;
+        private final BooleanSupplier cancelled;
+        private String chunk = "";
+        private int index;
+        private int next;
+        private long readCharacters;
+
+        SnapshotLines(VersionedTextSnapshot text, int offset, BooleanSupplier cancelled) {
+            this.text = text; this.next = offset; this.cancelled = cancelled;
+        }
+
+        String next() {
+            StringBuilder joined = null;
+            while (true) {
+                if (cancelled.getAsBoolean()) throw new CancellationException();
+                if (index == chunk.length()) {
+                    if (next == text.length()) return joined == null ? "" : joined.toString();
+                    chunk = text.substring(next, Math.min(16 * 1024, text.length() - next));
+                    readCharacters += chunk.length();
+                    next += chunk.length(); index = 0;
+                }
+                int newline = chunk.indexOf('\n', index);
+                if (newline >= 0) {
+                    String tail = chunk.substring(index, newline); index = newline + 1;
+                    return joined == null ? tail : joined.append(tail).toString();
+                }
+                if (joined == null) joined = new StringBuilder();
+                joined.append(chunk, index, chunk.length()); index = chunk.length();
+            }
+        }
     }
 
     private final class Cache {
@@ -194,6 +376,7 @@ final class GrammarHighlightService {
             String language = trimmed.substring(3).trim().split("\\s+", 2)[0];
             return new State(Mode.FENCE, fenceLanguage(language), Mode.NORMAL, marker);
         }
+        if (tokens == null) return State.normal(); // Only fences/embedded modes affect later lines.
         if (trimmed.matches("#{1,6}\\s+.*")) add(tokens, lead, text.length(), Scope.KEYWORD);
         else if (trimmed.startsWith(">")) add(tokens, lead, Math.min(text.length(), lead + 1), Scope.KEYWORD);
         else if (trimmed.matches("[-*+]\\s+.*") || trimmed.matches("\\d+[.)]\\s+.*")) add(tokens, lead, Math.min(text.length(), lead + markerLength(trimmed)), Scope.KEYWORD);
@@ -401,7 +584,7 @@ final class GrammarHighlightService {
             if (isIdentifierStart(current) || (isDollarLanguage(type) && current == '$')) {
                 int start = index++;
                 while (index < to && (isIdentifier(text.charAt(index)) || (isDollarLanguage(type) && text.charAt(index) == '$'))) index++;
-                Scope scope = wordScope(text, start, index, to, type);
+                Scope scope = tokens == null ? null : wordScope(text, start, index, to, type);
                 if (scope != null) add(tokens, start, index, scope);
                 continue;
             }

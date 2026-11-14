@@ -416,7 +416,7 @@ public final class MarkdownPerformanceProbe {
     }
     private static void syntax() throws Exception {
         open();
-        for(int position=0;position<3;position++) for(int repeat=0;repeat<3;repeat++) {
+        for(int position=0;position<3;position++) for(int repeat=-warmups;repeat<samples;repeat++) {
             final int p=position;long before=edt(() -> (long)field(editor.syntaxUiController,"syntaxGeneration"));
             long began=System.nanoTime();
             edt(() -> {
@@ -433,7 +433,11 @@ public final class MarkdownPerformanceProbe {
                     && job!=null && job.getStatus()==AsyncJobService.Status.SUCCEEDED;
             },15);
             var v=row("production_viewport_highlight_"+p);v.put("debounce_and_convergence_ms",(System.nanoTime()-began)/1e6);
+            if(repeat<0)v.put("state","WARMUP");
             edt(() -> {v.put("worker_ms",metric("syntax.highlight")[1]/1e6);v.put("foreground_spans",editor.syntaxForegroundSpans.size());
+                var viewportMethod=editor.syntaxUiController.getClass().getDeclaredMethod("syntaxViewport",VersionedTextSnapshot.class);viewportMethod.setAccessible(true);
+                Object range=viewportMethod.invoke(editor.syntaxUiController,editor.getCurrentBuffer().textSnapshot());int from=(int)field(range,"start"),to=(int)field(range,"end");
+                v.put("context_start",from);v.put("context_end",to);v.put("outside_context_spans",editor.syntaxForegroundSpans.stream().filter(s->s.start<from||s.end>to).count());
                 v.put("perf_report",editor.perfService.report());v.put("generation",field(editor.syntaxUiController,"syntaxGeneration"));return null;});out("MD_SAMPLE ",v);
         }
     }

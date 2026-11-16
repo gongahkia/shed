@@ -4505,6 +4505,120 @@ public class TexteditorSwingIntegrationTest {
         } finally { disposeEditor(editor); }
     }
 
+    @Test
+    void markdownHighlightCoalescesSaturatedWorkersAndRejectsSupersededBuffers() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("highlight-first.md"), "# First `code`\n".repeat(1000));
+        Texteditor editor = createEditor(tempDir.resolve("highlight-queue-home"), file);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var started = new java.util.concurrent.CountDownLatch(1);
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            executor.submit(() -> { started.countDown(); release.await(); return null; });
+            assertTrue(started.await(5, TimeUnit.SECONDS));
+            onEdt(() -> {
+                editor.shutdownSyntaxUi(); editor.asyncJobService.shutdownNow();
+                editor.asyncJobService = new AsyncJobService(executor, 200, null);
+                editor.syntaxUiController = new SyntaxUiController(editor);
+                FileBuffer original = editor.getCurrentBuffer();
+                long revision = original.documentRevision(); var source = original.textSnapshot();
+                for (int i = 0; i < 50; i++) editor.applySyntaxHighlighting();
+                assertEquals(1, editor.asyncJobService.list().stream().filter(j -> j.getDescription().equals("Syntax highlighting")).count());
+                FileBuffer other = new FileBuffer(Files.writeString(tempDir.resolve("highlight-other.md"), "# Second\n`other`\n").toFile());
+                editor.buffers.add(other); editor.loadBufferIntoEditor(other);
+                for (int i = 0; i < 50; i++) editor.applySyntaxHighlighting();
+                assertEquals(1, editor.asyncJobService.list().stream().filter(j -> j.getDescription().equals("Syntax highlighting")).count());
+                assertSame(source, original.textSnapshot()); assertEquals(revision, original.documentRevision());
+                return null;
+            });
+            release.countDown();
+            assertTrue(awaitUiState(() -> markdownSyntaxSettled(editor)));
+            onEdt(() -> { assertCurrentMarkdownSyntax(editor); return null; });
+        } finally { release.countDown(); disposeEditor(editor); executor.shutdownNow(); }
+    }
+
+    @Test
+    void markdownHighlightSharesCheckpointsAcrossSplitsEditsUndoAndBufferReopening() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("highlight-splits.md"), "# Header `code`\nplain\n".repeat(2000));
+        Texteditor editor = createEditor(tempDir.resolve("highlight-split-home"), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            FileBuffer buffer = onEdt(editor::getCurrentBuffer);
+            String original = onEdt(buffer::getContent);
+            onEdt(() -> {
+                editor.writingArea.setCaretPosition(editor.writingArea.getDocument().getLength());
+                editor.splitWindow(true); editor.applySyntaxHighlighting(); return null;
+            });
+            assertTrue(awaitUiState(() -> markdownSyntaxSettled(editor)));
+            onEdt(() -> {
+                assertCurrentMarkdownSyntax(editor);
+                assertEquals(1, ((java.util.Map<?, ?>) syntaxField(editor, "markdownCaches")).size());
+                editor.writingArea.insert("```java\n/* open\n", 0);
+                assertFalse(editor.syntaxUiController.markdownSyntaxIsCurrent(editor.writingArea.getDocument()));
+                editor.applySyntaxHighlighting(); return null;
+            });
+            assertTrue(awaitUiState(() -> markdownSyntaxSettled(editor)));
+            onEdt(() -> {
+                assertCurrentMarkdownSyntax(editor); buffer.getUndoManager().undo(); editor.applySyntaxHighlighting(); return null;
+            });
+            assertTrue(awaitUiState(() -> markdownSyntaxSettled(editor)));
+            onEdt(() -> {
+                assertEquals(original, buffer.getContent()); assertCurrentMarkdownSyntax(editor);
+                buffer.getUndoManager().redo(); editor.applySyntaxHighlighting(); return null;
+            });
+            assertTrue(awaitUiState(() -> markdownSyntaxSettled(editor)));
+            onEdt(() -> {
+                assertCurrentMarkdownSyntax(editor); buffer.getUndoManager().undo();
+                editor.activateEditorPane(editor.editorPanes.get(0)); editor.applySyntaxHighlighting(); return null;
+            });
+            assertTrue(awaitUiState(() -> markdownSyntaxSettled(editor)));
+            onEdt(() -> {
+                assertCurrentMarkdownSyntax(editor);
+                assertSame(buffer.getDocument(), editor.editorPanes.get(1).getTextArea().getDocument());
+                assertEquals(original, buffer.getContent());
+                FileBuffer other = new FileBuffer(Files.writeString(tempDir.resolve("other.md"), "# Other\n").toFile());
+                editor.buffers.add(other);
+                editor.commandHandler.execute("bd!");
+                assertFalse(((java.util.Map<?, ?>) syntaxField(editor, "markdownCaches")).containsKey(buffer));
+                FileBuffer reopened = new FileBuffer(file.toFile());
+                editor.buffers.add(reopened); editor.loadBufferIntoEditor(reopened); editor.applySyntaxHighlighting(); return null;
+            });
+            assertTrue(awaitUiState(() -> markdownSyntaxSettled(editor)));
+            onEdt(() -> { assertCurrentMarkdownSyntax(editor); assertEquals(original, editor.getCurrentBuffer().getContent()); return null; });
+        } finally { disposeEditor(editor); }
+    }
+
+    private static boolean markdownSyntaxSettled(Texteditor editor) throws Exception {
+        if ((int) syntaxField(editor, "syntaxJobId") != -1 || syntaxField(editor, "pendingSyntax") != null) return false;
+        var timer = (javax.swing.Timer) syntaxField(editor, "syntaxHighlightTimer");
+        if (timer != null && timer.isRunning()) return false;
+        try { assertCurrentMarkdownSyntax(editor); return true; }
+        catch (AssertionError intermediateViewportOrRevision) { return false; }
+    }
+
+    private static Object syntaxField(Texteditor editor, String name) throws Exception {
+        var field = SyntaxUiController.class.getDeclaredField(name); field.setAccessible(true);
+        return field.get(editor.syntaxUiController);
+    }
+
+    private static void assertCurrentMarkdownSyntax(Texteditor editor) throws Exception {
+        assertTrue(editor.syntaxUiController.markdownSyntaxIsCurrent(editor.writingArea.getDocument()));
+        var snapshot = editor.getCurrentBuffer().textSnapshot();
+        var viewport = SyntaxUiController.class.getDeclaredMethod("syntaxViewport", VersionedTextSnapshot.class); viewport.setAccessible(true);
+        Object range = viewport.invoke(editor.syntaxUiController, snapshot);
+        var start = range.getClass().getDeclaredMethod("start"); start.setAccessible(true);
+        var end = range.getClass().getDeclaredMethod("end"); end.setAccessible(true);
+        int first = (int) start.invoke(range), last = (int) end.invoke(range);
+        var colorsMethod = SyntaxUiController.class.getDeclaredMethod("syntaxColors"); colorsMethod.setAccessible(true);
+        @SuppressWarnings("unchecked") var colors = (java.util.Map<GrammarHighlightService.Scope, java.awt.Color>) colorsMethod.invoke(editor.syntaxUiController);
+        List<String> expected = new GrammarHighlightService().highlightSnapshot(snapshot.text(), FileType.MARKDOWN).stream()
+            .filter(t -> t.start() >= first && t.end() <= last && colors.get(t.scope()) != null)
+            .map(t -> t.start() + ":" + t.end() + ":" + colors.get(t.scope()).getRGB()).toList();
+        assertEquals(expected, editor.syntaxForegroundSpans.stream().map(s -> s.start + ":" + s.end + ":" + s.color.getRGB()).toList());
+    }
+
     private static <T extends Component> List<T> descendants(Component root, Class<T> type) {
         List<T> result = new ArrayList<>();
         if (root == null) return result;

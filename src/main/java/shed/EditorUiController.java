@@ -1954,6 +1954,8 @@ final class EditorUiController {
 
 
     void paintSyntaxForegroundOverlay(Graphics g, JTextArea area) {
+        if (area != null && editor.syntaxUiController != null
+            && !editor.syntaxUiController.markdownSyntaxIsCurrent(area.getDocument())) return;
         paintForegroundSpans(g, area, editor.syntaxForegroundSpans, "syntax.paint");
     }
 

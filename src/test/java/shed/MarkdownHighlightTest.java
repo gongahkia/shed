@@ -131,6 +131,32 @@ class MarkdownHighlightTest {
         compare(replacement, 0, replacement.length(), cache);
     }
 
+    @Test void editDuringWorkerScanRejectsPublicationWithoutHoldingTheCacheLock() throws Exception {
+        var text = VersionedTextSnapshot.of("plain\n".repeat(3000));
+        var cache = new GrammarHighlightService.MarkdownCache(); long generation = cache.bind(text);
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var once = new java.util.concurrent.atomic.AtomicBoolean();
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            var future = executor.submit(() -> grammar.highlightMarkdown(text, text.length() - 20, text.length(), cache, generation, () -> {
+                if (once.compareAndSet(false, true)) {
+                    entered.countDown();
+                    try { if (!release.await(5, java.util.concurrent.TimeUnit.SECONDS)) throw new AssertionError("Worker gate timed out"); }
+                    catch (InterruptedException e) { Thread.currentThread().interrupt(); return true; }
+                }
+                return false;
+            }));
+            assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+            var edited = text.replace(0, 0, "~~~java\n");
+            cache.changed(text, edited, 0, 0);
+            release.countDown();
+            assertNull(future.get(5, java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals(1, cache.checkpointCount());
+            compare(edited, edited.length() - 20, edited.length(), cache);
+        } finally { release.countDown(); executor.shutdownNow(); }
+    }
+
     @Test void statelessViewportAlsoEmitsOnlyItsLineContext() {
         String text = "# before\n".repeat(100) + "```java\nclass Visible {}\n```\n# after\n";
         int start = text.indexOf("class Visible"); int end = start + 4;

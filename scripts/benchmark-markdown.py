@@ -194,7 +194,7 @@ def main():
     parser.add_argument('--jar', type=Path, default=ROOT / 'target/shed-2.0.0.jar')
     parser.add_argument('--classpath-file', type=Path, help='Optional existing dependency classpath for a separately labeled packaged-vs-classpath control')
     parser.add_argument('--generate-only', action='store_true')
-    parser.add_argument('--mode', choices=['startup', 'startup-empty', 'ui', 'model', 'preview', 'preview-install', 'assets', 'assets-ready', 'search', 'syntax'], default='model')
+    parser.add_argument('--mode', choices=['startup', 'startup-empty', 'ui', 'model', 'preview', 'preview-install', 'assets', 'assets-ready', 'search', 'syntax', 'syntax-lexical'], default='model')
     parser.add_argument('--shapes', nargs='+', choices=SHAPES, default=['mixed'])
     parser.add_argument('--sizes', nargs='+', type=int, default=list(SIZES), help='Exact bytes, <=100 MiB each')
     parser.add_argument('--samples', type=int, default=100)
@@ -209,6 +209,8 @@ def main():
     parser.add_argument('--font-size', type=int, default=0, help='0 keeps existing default; otherwise 8..48 pt')
     parser.add_argument('--tab-size', type=int, default=0, help='0 keeps existing default; otherwise 1..16')
     args = parser.parse_args()
+    if args.mode == 'syntax-lexical' and (args.samples > 25 or any(n > 10 * 1024**2 for n in args.sizes)):
+        parser.error('Lexical replay bounds: at most 25 samples and 10 MiB fixtures')
     if args.font_size != 0 and not 8 <= args.font_size <= 48 or args.tab_size != 0 and not 1 <= args.tab_size <= 16:
         parser.error('Font size must be 0 or 8..48; tab size must be 0 or 1..16')
     if not 1 <= args.samples <= 200 or not 0 <= args.warmups <= 25 or not 1 <= args.runs <= 5 or not 5 <= args.timeout <= 180 or not 128 <= args.heap <= 768:
@@ -232,7 +234,7 @@ def main():
     classpath = args.classpath_file.read_text().strip() if args.classpath_file else str(jar)
     java = Path(subprocess.check_output([str(ROOT / 'scripts/resolve-toolchain.sh'), 'home'], text=True).strip())
     classes = output / 'classes'; classes.mkdir()
-    sources = [ROOT / f'src/benchmark/java/shed/{name}.java' for name in ('EditorWorkflowProbe', 'MarkdownPerformanceProbe')]
+    sources = [ROOT / f'src/benchmark/java/shed/{name}.java' for name in ('EditorWorkflowProbe', 'MarkdownPerformanceProbe', 'MarkdownLexicalProbe')]
     subprocess.run([str(java / 'bin/javac'), '-cp', str(jar), '-d', str(classes)] + list(map(str, sources)), check=True)
     report = {'jar_sha256': digest(jar), 'runner_sha256': digest(Path(__file__)),
               'runtime_classpath_sha256': hashlib.sha256(classpath.encode()).hexdigest(), 'packaged_jar_runtime': args.classpath_file is None, 'java': command_output([str(java / 'bin/java'), '-version']),

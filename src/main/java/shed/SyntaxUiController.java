@@ -34,6 +34,9 @@ final class SyntaxUiController {
     private boolean syntaxShutdown;
     private static final int MAX_MARKDOWN_CACHES = 8;
     private final Map<FileBuffer, GrammarHighlightService.MarkdownCache> markdownCaches = new WeakHashMap<>();
+    private java.lang.ref.WeakReference<VersionedTextSnapshot> installedMarkdownText = new java.lang.ref.WeakReference<>(null);
+    private java.lang.ref.WeakReference<javax.swing.text.Document> installedMarkdownDocument = new java.lang.ref.WeakReference<>(null);
+    private long installedMarkdownRevision = -1;
     private int symbolJobId = -1;
     private long symbolGeneration;
     private FileBuffer pendingSymbolBuffer;
@@ -127,6 +130,7 @@ final class SyntaxUiController {
         syntaxGeneration++;
         pendingSyntax = null;
         markdownCaches.clear();
+        installedMarkdownText.clear(); installedMarkdownDocument.clear();
         if (syntaxHighlightTimer != null) syntaxHighlightTimer.stop();
         if (symbolRefreshTimer != null) symbolRefreshTimer.stop();
         if (gitBlameTimer != null) gitBlameTimer.stop();
@@ -650,6 +654,11 @@ final class SyntaxUiController {
             || request.buffer().documentRevision() != request.revision()) return;
         clearSyntaxHighlighting();
         editor.syntaxForegroundSpans.addAll(result.spans());
+        if (request.fileType() == FileType.MARKDOWN) {
+            installedMarkdownText = new java.lang.ref.WeakReference<>(request.text());
+            installedMarkdownDocument = new java.lang.ref.WeakReference<>(request.document());
+            installedMarkdownRevision = request.revision();
+        }
         Highlighter highlighter = editor.writingArea.getHighlighter();
         for (Range range : result.trailingWhitespace()) {
             try {
@@ -659,6 +668,13 @@ final class SyntaxUiController {
         }
         editor.applyBracketHighlighting();
         editor.writingArea.repaint();
+    }
+
+    boolean markdownSyntaxIsCurrent(javax.swing.text.Document document) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        return buffer == null || buffer.getFileType() != FileType.MARKDOWN
+            || (installedMarkdownText.get() == buffer.textSnapshot() && installedMarkdownDocument.get() == document
+                && buffer.getDocument() == document && installedMarkdownRevision == buffer.documentRevision());
     }
 
     private EnumMap<GrammarHighlightService.Scope, Color> syntaxColors() {

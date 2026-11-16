@@ -1,0 +1,888 @@
+[
+  {
+    "case": "semantic-mixed/mixed-102400",
+    "state": "PASS",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 41.570913,
+        "p95_ms": 41.570913,
+        "p99_ms": null,
+        "max_ms": 41.570913
+      },
+      "semantic_parse/wall_ms": {
+        "n": 20,
+        "p50_ms": 14.500527,
+        "p95_ms": 28.015215,
+        "p99_ms": null,
+        "max_ms": 29.835666
+      }
+    },
+    "rows": 25,
+    "records": 2174,
+    "allocations": [
+      6510248,
+      6510200,
+      6500656,
+      6399384,
+      6396720,
+      6326096,
+      6322944,
+      6155616,
+      6034448,
+      6005616,
+      5957256,
+      5957256,
+      5957256,
+      5957256,
+      5957256,
+      5957256,
+      5957320,
+      5957256,
+      5957256,
+      5957256
+    ],
+    "first_use_ms": 221.204105,
+    "memory_observation": {
+      "operation": "memory_observation",
+      "state": "OBSERVED",
+      "result_released_source_held_heap_bytes": 4682112,
+      "source_held_heap_bytes": 4283368,
+      "gc_count": 7,
+      "committed_heap_bytes": 67108864,
+      "gc_millis": 24,
+      "result_and_source_held_heap_bytes": 4938384
+    },
+    "estimated_model_retained_bytes": 256272,
+    "process_peak_rss_bytes": 113963008
+  },
+  {
+    "case": "semantic-mixed/mixed-1048576",
+    "state": "PASS",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 46.599115,
+        "p95_ms": 46.599115,
+        "p99_ms": null,
+        "max_ms": 46.599115
+      },
+      "semantic_parse/wall_ms": {
+        "n": 20,
+        "p50_ms": 79.782134,
+        "p95_ms": 124.860106,
+        "p99_ms": null,
+        "max_ms": 131.611656
+      }
+    },
+    "rows": 25,
+    "records": 22592,
+    "allocations": [
+      62216104,
+      61771056,
+      61771056,
+      61691712,
+      61206752,
+      61206752,
+      61206840,
+      61206920,
+      61214224,
+      61127464,
+      61127408,
+      61127408,
+      61127544,
+      61127408,
+      61127488,
+      61127408,
+      61127408,
+      61127408,
+      61127408,
+      61088112
+    ],
+    "first_use_ms": 488.808904,
+    "memory_observation": {
+      "state": "OBSERVED",
+      "result_released_source_held_heap_bytes": 5643632,
+      "source_held_heap_bytes": 5239688,
+      "gc_count": 25,
+      "committed_heap_bytes": 67108864,
+      "gc_millis": 212,
+      "result_and_source_held_heap_bytes": 8304248,
+      "operation": "memory_observation"
+    },
+    "estimated_model_retained_bytes": 2660616,
+    "process_peak_rss_bytes": 322842624
+  },
+  {
+    "case": "semantic-mixed/mixed-10485760",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 114.270553,
+        "p95_ms": 114.270553,
+        "p99_ms": null,
+        "max_ms": 114.270553
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 35.832431,
+    "memory_observation": {
+      "committed_heap_bytes": 67108864,
+      "gc_millis": 13,
+      "result_and_source_held_heap_bytes": 14897616,
+      "operation": "memory_observation",
+      "state": "OBSERVED",
+      "result_released_source_held_heap_bytes": 14897640,
+      "source_held_heap_bytes": 14778832,
+      "gc_count": 3
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 84094976
+  },
+  {
+    "case": "semantic-adverse/headings-1048576",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 38.777551,
+        "p95_ms": 38.777551,
+        "p99_ms": null,
+        "max_ms": 38.777551
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 34.638972,
+    "memory_observation": {
+      "state": "OBSERVED",
+      "result_released_source_held_heap_bytes": 5359176,
+      "source_held_heap_bytes": 5239688,
+      "gc_count": 3,
+      "committed_heap_bytes": 67108864,
+      "gc_millis": 7,
+      "result_and_source_held_heap_bytes": 5359152,
+      "operation": "memory_observation"
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 45649920
+  },
+  {
+    "case": "semantic-adverse/long-line-1048576",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 40.788518,
+        "p95_ms": 40.788518,
+        "p99_ms": null,
+        "max_ms": 40.788518
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 25.468166,
+    "memory_observation": {
+      "operation": "memory_observation",
+      "result_and_source_held_heap_bytes": 5358952,
+      "gc_millis": 8,
+      "committed_heap_bytes": 67108864,
+      "gc_count": 3,
+      "source_held_heap_bytes": 5239688,
+      "result_released_source_held_heap_bytes": 5358976,
+      "state": "OBSERVED"
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 45494272
+  },
+  {
+    "case": "semantic-adverse/markers-1048576",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 39.430378,
+        "p95_ms": 39.430378,
+        "p99_ms": null,
+        "max_ms": 39.430378
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 1228.842224,
+    "memory_observation": {
+      "result_released_source_held_heap_bytes": 5568984,
+      "source_held_heap_bytes": 5239688,
+      "gc_count": 13,
+      "committed_heap_bytes": 67108864,
+      "gc_millis": 123,
+      "result_and_source_held_heap_bytes": 5568960,
+      "operation": "memory_observation",
+      "state": "OBSERVED"
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 250667008
+  },
+  {
+    "case": "semantic-adverse/nested-1048576",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 38.51725,
+        "p95_ms": 38.51725,
+        "p99_ms": null,
+        "max_ms": 38.51725
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 391.849811,
+    "memory_observation": {
+      "committed_heap_bytes": 67108864,
+      "gc_millis": 55,
+      "result_and_source_held_heap_bytes": 5490416,
+      "operation": "memory_observation",
+      "state": "OBSERVED",
+      "result_released_source_held_heap_bytes": 5490440,
+      "source_held_heap_bytes": 5239688,
+      "gc_count": 9
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 145481728
+  },
+  {
+    "case": "semantic-adverse/single-fence-1048576",
+    "state": "PASS",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 39.861783,
+        "p95_ms": 39.861783,
+        "p99_ms": null,
+        "max_ms": 39.861783
+      },
+      "semantic_parse/wall_ms": {
+        "n": 5,
+        "p50_ms": 22.440975,
+        "p95_ms": 26.981429,
+        "p99_ms": null,
+        "max_ms": 26.981429
+      }
+    },
+    "rows": 8,
+    "records": 2,
+    "allocations": [
+      12989216,
+      13904288,
+      13904288,
+      13904288,
+      13904288
+    ],
+    "first_use_ms": 126.532897,
+    "memory_observation": {
+      "state": "OBSERVED",
+      "operation": "memory_observation",
+      "result_and_source_held_heap_bytes": 6029152,
+      "gc_millis": 13,
+      "committed_heap_bytes": 67108864,
+      "gc_count": 5,
+      "source_held_heap_bytes": 5239688,
+      "result_released_source_held_heap_bytes": 5495992
+    },
+    "estimated_model_retained_bytes": 533160,
+    "process_peak_rss_bytes": 113606656
+  },
+  {
+    "case": "semantic-adverse/table-1048576",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 39.97213,
+        "p95_ms": 39.97213,
+        "p99_ms": null,
+        "max_ms": 39.97213
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 565.719284,
+    "memory_observation": {
+      "state": "OBSERVED",
+      "operation": "memory_observation",
+      "result_and_source_held_heap_bytes": 5492320,
+      "gc_millis": 67,
+      "committed_heap_bytes": 67108864,
+      "gc_count": 9,
+      "source_held_heap_bytes": 5239680,
+      "result_released_source_held_heap_bytes": 5492344
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 193343488
+  },
+  {
+    "case": "semantic-final-mixed/mixed-102400",
+    "state": "PASS",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 36.396936,
+        "p95_ms": 36.396936,
+        "p99_ms": null,
+        "max_ms": 36.396936
+      },
+      "semantic_parse/wall_ms": {
+        "n": 20,
+        "p50_ms": 17.246565,
+        "p95_ms": 31.167203,
+        "p99_ms": null,
+        "max_ms": 35.56481
+      }
+    },
+    "rows": 25,
+    "records": 2174,
+    "allocations": [
+      6516680,
+      6515880,
+      6507768,
+      6510904,
+      6510720,
+      6510784,
+      6298536,
+      6295776,
+      6295824,
+      6295728,
+      6295416,
+      6295416,
+      6292072,
+      6174424,
+      6174480,
+      6174424,
+      6174488,
+      6141472,
+      6126128,
+      6066672
+    ],
+    "first_use_ms": 200.810583,
+    "memory_observation": {
+      "gc_count": 7,
+      "committed_heap_bytes": 67108864,
+      "gc_millis": 23,
+      "result_and_source_held_heap_bytes": 4938536,
+      "operation": "memory_observation",
+      "state": "OBSERVED",
+      "result_released_source_held_heap_bytes": 4682264,
+      "source_held_heap_bytes": 4283480
+    },
+    "estimated_model_retained_bytes": 256272,
+    "process_peak_rss_bytes": 98553856
+  },
+  {
+    "case": "semantic-final-mixed/mixed-1048576",
+    "state": "PASS",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 45.492533,
+        "p95_ms": 45.492533,
+        "p99_ms": null,
+        "max_ms": 45.492533
+      },
+      "semantic_parse/wall_ms": {
+        "n": 20,
+        "p50_ms": 76.288585,
+        "p95_ms": 139.627157,
+        "p99_ms": null,
+        "max_ms": 159.344852
+      }
+    },
+    "rows": 25,
+    "records": 22592,
+    "allocations": [
+      62379432,
+      62379432,
+      62163680,
+      61784352,
+      61321464,
+      59804984,
+      59804984,
+      59804984,
+      59804984,
+      59804984,
+      59804984,
+      59750304,
+      59725640,
+      59725696,
+      59725696,
+      59725640,
+      59725640,
+      59725640,
+      59725640,
+      59725640
+    ],
+    "first_use_ms": 470.159684,
+    "memory_observation": {
+      "operation": "memory_observation",
+      "result_and_source_held_heap_bytes": 8298352,
+      "gc_millis": 160,
+      "committed_heap_bytes": 67108864,
+      "gc_count": 21,
+      "source_held_heap_bytes": 5239800,
+      "result_released_source_held_heap_bytes": 5637736,
+      "state": "OBSERVED"
+    },
+    "estimated_model_retained_bytes": 2660616,
+    "process_peak_rss_bytes": 288096256
+  },
+  {
+    "case": "semantic-final-mixed/mixed-10485760",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 101.601664,
+        "p95_ms": 101.601664,
+        "p99_ms": null,
+        "max_ms": 101.601664
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 28.074795,
+    "memory_observation": {
+      "state": "OBSERVED",
+      "operation": "memory_observation",
+      "result_and_source_held_heap_bytes": 14897536,
+      "gc_millis": 12,
+      "committed_heap_bytes": 67108864,
+      "gc_count": 3,
+      "source_held_heap_bytes": 14778944,
+      "result_released_source_held_heap_bytes": 14897560
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 83582976
+  },
+  {
+    "case": "semantic-final-adverse/headings-102400",
+    "state": "PASS",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 35.070842,
+        "p95_ms": 35.070842,
+        "p99_ms": null,
+        "max_ms": 35.070842
+      },
+      "semantic_parse/wall_ms": {
+        "n": 5,
+        "p50_ms": 55.037968,
+        "p95_ms": 81.854131,
+        "p99_ms": null,
+        "max_ms": 81.854131
+      }
+    },
+    "rows": 8,
+    "records": 11265,
+    "allocations": [
+      29955760,
+      29272168,
+      29271904,
+      29236392,
+      28467696
+    ],
+    "first_use_ms": 273.531381,
+    "memory_observation": {
+      "operation": "memory_observation",
+      "result_and_source_held_heap_bytes": 6137912,
+      "gc_millis": 47,
+      "committed_heap_bytes": 67108864,
+      "gc_count": 8,
+      "source_held_heap_bytes": 4283504,
+      "result_released_source_held_heap_bytes": 4651512,
+      "state": "OBSERVED"
+    },
+    "estimated_model_retained_bytes": 1486400,
+    "process_peak_rss_bytes": 118521856
+  },
+  {
+    "case": "semantic-final-adverse/headings-1048576",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 46.050895,
+        "p95_ms": 46.050895,
+        "p99_ms": null,
+        "max_ms": 46.050895
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 41.01684,
+    "memory_observation": {
+      "committed_heap_bytes": 67108864,
+      "gc_count": 3,
+      "source_held_heap_bytes": 5239800,
+      "result_released_source_held_heap_bytes": 5359248,
+      "state": "OBSERVED",
+      "operation": "memory_observation",
+      "result_and_source_held_heap_bytes": 5359224,
+      "gc_millis": 8
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 45764608
+  },
+  {
+    "case": "semantic-final-adverse/long-line-102400",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 37.050336,
+        "p95_ms": 37.050336,
+        "p99_ms": null,
+        "max_ms": 37.050336
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 29.682208,
+    "memory_observation": {
+      "operation": "memory_observation",
+      "result_and_source_held_heap_bytes": 4401992,
+      "gc_millis": 8,
+      "committed_heap_bytes": 67108864,
+      "gc_count": 3,
+      "source_held_heap_bytes": 4283504,
+      "result_released_source_held_heap_bytes": 4402016,
+      "state": "OBSERVED"
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 42594304
+  },
+  {
+    "case": "semantic-final-adverse/long-line-1048576",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 44.925897,
+        "p95_ms": 44.925897,
+        "p99_ms": null,
+        "max_ms": 44.925897
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 32.037119,
+    "memory_observation": {
+      "gc_millis": 9,
+      "result_and_source_held_heap_bytes": 5358824,
+      "operation": "memory_observation",
+      "state": "OBSERVED",
+      "result_released_source_held_heap_bytes": 5358848,
+      "source_held_heap_bytes": 5239800,
+      "gc_count": 3,
+      "committed_heap_bytes": 67108864
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 45109248
+  },
+  {
+    "case": "semantic-final-adverse/markers-102400",
+    "state": "PASS",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 36.393787,
+        "p95_ms": 36.393787,
+        "p99_ms": null,
+        "max_ms": 36.393787
+      },
+      "semantic_parse/wall_ms": {
+        "n": 5,
+        "p50_ms": 187.439682,
+        "p95_ms": 207.686504,
+        "p99_ms": null,
+        "max_ms": 207.686504
+      }
+    },
+    "rows": 8,
+    "records": 13843,
+    "allocations": [
+      64273976,
+      62355896,
+      62355992,
+      60953096,
+      60919976
+    ],
+    "first_use_ms": 410.304003,
+    "memory_observation": {
+      "result_released_source_held_heap_bytes": 4622600,
+      "source_held_heap_bytes": 4283504,
+      "gc_count": 11,
+      "committed_heap_bytes": 67108864,
+      "gc_millis": 109,
+      "result_and_source_held_heap_bytes": 7048176,
+      "operation": "memory_observation",
+      "state": "OBSERVED"
+    },
+    "estimated_model_retained_bytes": 2425576,
+    "process_peak_rss_bytes": 222351360
+  },
+  {
+    "case": "semantic-final-adverse/markers-1048576",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 47.695214,
+        "p95_ms": 47.695214,
+        "p99_ms": null,
+        "max_ms": 47.695214
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 1553.53767,
+    "memory_observation": {
+      "result_and_source_held_heap_bytes": 5572368,
+      "gc_millis": 139,
+      "committed_heap_bytes": 67108864,
+      "gc_count": 13,
+      "source_held_heap_bytes": 5239800,
+      "result_released_source_held_heap_bytes": 5572392,
+      "state": "OBSERVED",
+      "operation": "memory_observation"
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 277024768
+  },
+  {
+    "case": "semantic-final-adverse/nested-102400",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 39.777025,
+        "p95_ms": 39.777025,
+        "p99_ms": null,
+        "max_ms": 39.777025
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 171.24865,
+    "memory_observation": {
+      "result_released_source_held_heap_bytes": 4534216,
+      "state": "OBSERVED",
+      "operation": "memory_observation",
+      "result_and_source_held_heap_bytes": 4534104,
+      "gc_millis": 16,
+      "committed_heap_bytes": 67108864,
+      "gc_count": 3,
+      "source_held_heap_bytes": 4283496
+    },
+    "estimated_model_retained_bytes": -112,
+    "process_peak_rss_bytes": 56614912
+  },
+  {
+    "case": "semantic-final-adverse/nested-1048576",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 44.142003,
+        "p95_ms": 44.142003,
+        "p99_ms": null,
+        "max_ms": 44.142003
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 444.38194,
+    "memory_observation": {
+      "state": "OBSERVED",
+      "result_released_source_held_heap_bytes": 5490272,
+      "source_held_heap_bytes": 5239800,
+      "gc_count": 9,
+      "committed_heap_bytes": 67108864,
+      "gc_millis": 65,
+      "result_and_source_held_heap_bytes": 5490248,
+      "operation": "memory_observation"
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 145883136
+  },
+  {
+    "case": "semantic-final-adverse/single-fence-102400",
+    "state": "PASS",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 37.063663,
+        "p95_ms": 37.063663,
+        "p99_ms": null,
+        "max_ms": 37.063663
+      },
+      "semantic_parse/wall_ms": {
+        "n": 5,
+        "p50_ms": 5.782262,
+        "p95_ms": 6.397147,
+        "p99_ms": null,
+        "max_ms": 6.397147
+      }
+    },
+    "rows": 8,
+    "records": 2,
+    "allocations": [
+      1270656,
+      1270880,
+      1270152,
+      1270152,
+      1270152
+    ],
+    "first_use_ms": 107.938216,
+    "memory_observation": {
+      "operation": "memory_observation",
+      "result_and_source_held_heap_bytes": 4589072,
+      "gc_millis": 10,
+      "committed_heap_bytes": 67108864,
+      "gc_count": 3,
+      "source_held_heap_bytes": 4283504,
+      "result_released_source_held_heap_bytes": 4536544,
+      "state": "OBSERVED"
+    },
+    "estimated_model_retained_bytes": 52528,
+    "process_peak_rss_bytes": 54718464
+  },
+  {
+    "case": "semantic-final-adverse/single-fence-1048576",
+    "state": "PASS",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 43.929618,
+        "p95_ms": 43.929618,
+        "p99_ms": null,
+        "max_ms": 43.929618
+      },
+      "semantic_parse/wall_ms": {
+        "n": 5,
+        "p50_ms": 25.010738,
+        "p95_ms": 30.888315,
+        "p99_ms": null,
+        "max_ms": 30.888315
+      }
+    },
+    "rows": 8,
+    "records": 2,
+    "allocations": [
+      12989216,
+      13904288,
+      13904288,
+      13904288,
+      13904288
+    ],
+    "first_use_ms": 148.156768,
+    "memory_observation": {
+      "gc_count": 5,
+      "committed_heap_bytes": 67108864,
+      "gc_millis": 14,
+      "result_and_source_held_heap_bytes": 6029256,
+      "operation": "memory_observation",
+      "state": "OBSERVED",
+      "result_released_source_held_heap_bytes": 5498448,
+      "source_held_heap_bytes": 5239800
+    },
+    "estimated_model_retained_bytes": 530808,
+    "process_peak_rss_bytes": 112947200
+  },
+  {
+    "case": "semantic-final-adverse/table-102400",
+    "state": "PASS",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 35.743006,
+        "p95_ms": 35.743006,
+        "p99_ms": null,
+        "max_ms": 35.743006
+      },
+      "semantic_parse/wall_ms": {
+        "n": 5,
+        "p50_ms": 34.87764,
+        "p95_ms": 54.390212,
+        "p99_ms": null,
+        "max_ms": 54.390212
+      }
+    },
+    "rows": 8,
+    "records": 6007,
+    "allocations": [
+      13059816,
+      13059592,
+      12489784,
+      12483216,
+      11999888
+    ],
+    "first_use_ms": 181.648454,
+    "memory_observation": {
+      "committed_heap_bytes": 67108864,
+      "gc_count": 5,
+      "source_held_heap_bytes": 4283480,
+      "result_released_source_held_heap_bytes": 4551008,
+      "state": "OBSERVED",
+      "operation": "memory_observation",
+      "result_and_source_held_heap_bytes": 5215776,
+      "gc_millis": 22
+    },
+    "estimated_model_retained_bytes": 664768,
+    "process_peak_rss_bytes": 92065792
+  },
+  {
+    "case": "semantic-final-adverse/table-1048576",
+    "state": "UNSUPPORTED",
+    "summary": {
+      "source_acquisition/wall_ms": {
+        "n": 1,
+        "p50_ms": 41.424593,
+        "p95_ms": 41.424593,
+        "p99_ms": null,
+        "max_ms": 41.424593
+      }
+    },
+    "rows": 3,
+    "records": 0,
+    "allocations": [],
+    "first_use_ms": 626.95414,
+    "memory_observation": {
+      "state": "OBSERVED",
+      "result_released_source_held_heap_bytes": 5492488,
+      "source_held_heap_bytes": 5239792,
+      "gc_count": 9,
+      "committed_heap_bytes": 67108864,
+      "gc_millis": 70,
+      "result_and_source_held_heap_bytes": 5492464,
+      "operation": "memory_observation"
+    },
+    "estimated_model_retained_bytes": -24,
+    "process_peak_rss_bytes": 193347584
+  }
+]

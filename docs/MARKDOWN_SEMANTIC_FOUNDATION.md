@@ -91,11 +91,22 @@ Exact commands, final counts, measurements, artifact identities and unchanged-fi
 
 Measurements are isolated caller-thread **full semantic API costs**, including preflight, parser/extension construction, snapshot reads, AST processing and projection. They are not typing, EDT, highlighting-convergence or application-startup measurements. The file-acquisition row measures disposable UTF-8 file reading and snapshot creation; real `Source.capture` shares the existing snapshot rather than reading a file or flattening source.
 
-Final measured values and resource observations are in the evidence index. Ordinary fixtures use 20 samples after three warmups; adversarial controls use five after one, or stop at the first unsupported result. No p99 is inferred at these counts. Host load, hardware, pressure, Java/artifact/fixture identities and raw samples are retained. Used-heap observations after explicit GC are estimates, not exact retained-size proofs; RSS is whole-process peak, allocation is cumulative thread allocation, and neither is equated with retained model size.
+Final measurements on the recorded 8 GiB Intel MacBookPro15,2 (Java 21, 512 MiB child heap) are:
+
+| Full semantic API | Samples / warmups | Median / p95 | Median allocation | Records | Estimated model retention |
+| --- | --- | --- | --- | --- | --- |
+| 100 KiB mixed | 20 / 3 | 17.25 / 31.17 ms | 6.00 MiB | 2,174 | 0.24 MiB |
+| 1 MiB mixed | 20 / 3 | 76.29 / 139.63 ms | 57.03 MiB | 22,592 | 2.54 MiB |
+| 1 MiB single fenced block | 5 / 1 | 25.01 / 30.89 ms | 13.26 MiB | 2 | 0.51 MiB |
+| 10 MiB mixed | Unsupported before parsing | No successful-parse statistic | — | 0 | No model retained |
+
+Cold first calls in the mixed children took 200.81 / 470.16 ms, including deferred class initialization. Peak whole-process RSS was 94.0 / 274.8 MiB for the 100 KiB / 1 MiB mixed children, including repeated parses and transient heap. An adversarial 1 MiB marker input was rejected at the node limit after 1,553.54 ms and 555.59 MiB cumulative thread allocation (264.2 MiB peak RSS). A 1 MiB table was similarly rejected after AST work; line/size limits reject before that work. This distinction is important: the adapter is isolated and capped, not a hard allocation-budget parser.
+
+Ordinary fixtures use 20 samples after three warmups; adversarial controls use five after one, or stop at the first unsupported result. No p99 is inferred at these counts; n=5 p95 is just the maximum. Host load, hardware, pressure, Java/artifact/fixture identities and raw samples are retained. The host already had about 3.9 GiB swap used; measurements are exploratory, not quiet-machine qualification. Used-heap observations after explicit GC are estimates, not exact retained-size proofs; RSS is whole-process peak, allocation is cumulative thread allocation, and neither is equated with retained model size. The evidence index includes smaller table/heading/marker controls and all negative cases.
 
 Memory grows with projected records, line segments and metadata strings, plus a reference to the **shared** immutable source. There is no duplicate persistent source text, complete token list, AST, parser state per keystroke or document/pane registry. Temporary CommonMark allocations can be much larger than the retained model; dense-marker/table controls document this limitation. The 1 MiB full-parse ceiling should remain until real consumers justify incrementalization or changed limits.
 
-All pre-existing application classes are checked against the preserved pre-2A JAR. No source-view/highlighting/startup path is modified. Startup is not rebenchmarked; absence of integration/eager initialization establishes isolation, not a newly measured startup improvement.
+All **19,117** pre-existing classes are byte-identical to the preserved pre-2A JAR; the 21 added classes increase the shaded artifact by 33,739 bytes. No source-view/highlighting/startup path is modified. Startup is not rebenchmarked; absence of integration/eager initialization establishes isolation, not a newly measured startup improvement. Final verification: **1,343 Maven tests passed, five existing skips, zero failures/errors**; 13 new headless cases passed; ten existing Python benchmark-tooling checks passed; the final packaged Markdown/Mermaid/math/image smoke passed.
 
 ## Proposed Tranche 2B handoff — not implemented
 
@@ -110,4 +121,4 @@ Acceptance: current-revision outline/navigation agrees with CommonMark for ATX/S
 
 No existing production file, dependency, UI component or consumer is changed. Visual identity, design system, layout, typography, themes, syntax colors, navigation, keymaps, focus, selection, scrolling, split ownership, saves, recovery and LSP behavior remain unchanged. Tranches 0A/0B/0B.1/1A/1B/1C/1D are preserved. The broader Swing preview-layout limitation remains deferred.
 
-README before/after SHA-256: `48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e`. No README change, commit, push or existing-work replacement is authorized or performed. This tranche stops at the isolated semantic foundation; Tranche 2B remains a proposal.
+README before/after SHA-256: `48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e`. No README change or existing-work replacement was performed. No commit or push command was issued by this task. During verification, HEAD advanced externally from `9dbef8d1a` to `74f2a9558`, incorporating earlier files; that commit was preserved. Every pre-existing file's bytes still match the captured starting baseline. This tranche stops at the isolated semantic foundation; Tranche 2B remains a proposal.

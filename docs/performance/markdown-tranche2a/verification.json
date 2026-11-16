@@ -1,0 +1,129 @@
+{
+  "baseline_head": "9dbef8d1a1e6e7557fadc751f960a7c4c59026a5",
+  "final_head": "74f2a9558d553cc24bd4790af893caaa216fc176",
+  "external_head_movement": true,
+  "commits_or_push_commands_issued_by_task": false,
+  "baseline_status": " M docs/MARKDOWN_HIGHLIGHTING_PERFORMANCE.md\n?? docs/performance/markdown-tranche1d/\n",
+  "final_status": " M docs/MARKDOWN_SEMANTIC_FOUNDATION.md\n?? docs/performance/markdown-tranche2a/\n",
+  "baseline_files_checked": 1065,
+  "changed_or_missing_baseline_files": [],
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "source_sha256": {
+    "src/main/java/shed/MarkdownSourceRange.java": "05dd1de7b7a9cb062d355719d438210e2c63ef57a5a552f713caad7edef04f63",
+    "src/main/java/shed/MarkdownSemanticSnapshot.java": "ab4cf0f029b00d63b011b2b906ecb7119260420418cad219c3e6dc40f310b5b0",
+    "src/main/java/shed/MarkdownSemanticParser.java": "bf0d02395c4524fe931310c666390c79281291b5c72dae2fa18c381bc664aea5",
+    "src/test/java/shed/MarkdownSemanticParserTest.java": "ecea617f79fe288eb92185259253a1c9993be6290677bfe4d89582401b2fb16a",
+    "src/benchmark/java/shed/MarkdownSemanticProbe.java": "b30d7ae37143d768c42b4cbedf42d543ef518af302fa94612c6d6bafa0a5a7cf",
+    "scripts/benchmark-markdown-semantics.py": "aaa89bd0e48a7e213917b0f210a9dc6c255735595a3c360550ae03509d6151c5",
+    "docs/MARKDOWN_SEMANTIC_FOUNDATION.md": "8af7ed1ac794f8cde59261b64e09e9c44ccca712e24bd5608973790f2f7f493a"
+  },
+  "jar_sha256": "177393d330f0dd5e78821abe63a0c2cd66fd6c0962e6d8c772d7c26132a00e8a",
+  "pre_tranche_jar_sha256": "9ebcf97563d9a8e61571a48c8548f26f87c06c6e8a68f2d25d5098c4d4c187d2",
+  "jar_class_isolation": {
+    "pre_existing_classes": 19117,
+    "changed": [],
+    "removed": [],
+    "added": [
+      "shed/MarkdownSemanticParser$LimitExceeded.class",
+      "shed/MarkdownSemanticParser$Projection.class",
+      "shed/MarkdownSemanticParser$SnapshotReader.class",
+      "shed/MarkdownSemanticParser.class",
+      "shed/MarkdownSemanticSnapshot$Block.class",
+      "shed/MarkdownSemanticSnapshot$BlockKind.class",
+      "shed/MarkdownSemanticSnapshot$CodeBlock.class",
+      "shed/MarkdownSemanticSnapshot$Coverage.class",
+      "shed/MarkdownSemanticSnapshot$Heading.class",
+      "shed/MarkdownSemanticSnapshot$Inline.class",
+      "shed/MarkdownSemanticSnapshot$InlineKind.class",
+      "shed/MarkdownSemanticSnapshot$Limitation.class",
+      "shed/MarkdownSemanticSnapshot$Link.class",
+      "shed/MarkdownSemanticSnapshot$LinkKind.class",
+      "shed/MarkdownSemanticSnapshot$Location.class",
+      "shed/MarkdownSemanticSnapshot$ReferenceDefinition.class",
+      "shed/MarkdownSemanticSnapshot$Source.class",
+      "shed/MarkdownSemanticSnapshot$Status.class",
+      "shed/MarkdownSemanticSnapshot$TaskMarker.class",
+      "shed/MarkdownSemanticSnapshot.class",
+      "shed/MarkdownSourceRange.class"
+    ],
+    "before_classes_digest": "4d786faca3b11d483692dedc4e87876b8cbc34383b2f35b7d5259aa64456783b",
+    "after_classes_digest": "4d786faca3b11d483692dedc4e87876b8cbc34383b2f35b7d5259aa64456783b",
+    "before_jar_bytes": 49976987,
+    "after_jar_bytes": 50010726
+  },
+  "diff_check": {
+    "exit": 0,
+    "output": "",
+    "new_files": [
+      {
+        "file": "src/main/java/shed/MarkdownSourceRange.java",
+        "exit": 1,
+        "output": ""
+      },
+      {
+        "file": "src/main/java/shed/MarkdownSemanticSnapshot.java",
+        "exit": 1,
+        "output": ""
+      },
+      {
+        "file": "src/main/java/shed/MarkdownSemanticParser.java",
+        "exit": 1,
+        "output": ""
+      },
+      {
+        "file": "src/test/java/shed/MarkdownSemanticParserTest.java",
+        "exit": 1,
+        "output": ""
+      },
+      {
+        "file": "src/benchmark/java/shed/MarkdownSemanticProbe.java",
+        "exit": 1,
+        "output": ""
+      },
+      {
+        "file": "scripts/benchmark-markdown-semantics.py",
+        "exit": 1,
+        "output": ""
+      },
+      {
+        "file": "docs/MARKDOWN_SEMANTIC_FOUNDATION.md",
+        "exit": 1,
+        "output": ""
+      },
+      {
+        "file": "docs/performance/markdown-tranche2a/INDEX.md",
+        "exit": 1,
+        "output": ""
+      }
+    ]
+  },
+  "full_suite": {
+    "tests": 1348,
+    "passed": 1343,
+    "skipped": 5,
+    "failures": 0,
+    "errors": 0
+  },
+  "new_headless_tests": 13,
+  "python_tooling_tests": 10,
+  "packaged_smoke": "PASS",
+  "notes": [
+    "No existing production/test/build files modified; no new dependencies/workers/caches/startup hook or consumer calls.",
+    "IDs are workspace-scoped; source matching also checks actual snapshot identity and complete-source flag.",
+    "Unsupported cap/precision cases are explicit. Node/span caps apply after CommonMark AST creation; transient allocation is not a hard budget.",
+    "Existing source-view/lexer/preview/editor classes byte-identical. Startup/editor/highlight performance not rebenchmarked for this unused API.",
+    "External HEAD advanced during verification; original files remain byte-identical to starting hashes."
+  ],
+  "commands": [
+    "JAVA_HOME=\"$(scripts/resolve-toolchain.sh home)\" \"$(scripts/resolve-toolchain.sh maven)\" -o -B -Djava.awt.headless=true -DargLine=-Xmx512m -Dtest=MarkdownSemanticParserTest test",
+    "JAVA_HOME=\"$(scripts/resolve-toolchain.sh home)\" \"$(scripts/resolve-toolchain.sh maven)\" -o -B -Djava.awt.headless=false -DargLine=-Xmx512m test",
+    "JAVA_HOME=\"$(scripts/resolve-toolchain.sh home)\" \"$(scripts/resolve-toolchain.sh maven)\" -o -B -DskipTests -Dmaven.jar.forceCreation=true package",
+    "PYTHONDONTWRITEBYTECODE=1 python3 scripts/benchmark-markdown-semantics.py --jar target/shed-2.0.0.jar --sizes 102400 1048576 10485760 --shapes mixed --samples 20 --warmups 3 --timeout 90 --output \"/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-semantic-fhxbkkyk/semantic-final-mixed\"",
+    "PYTHONDONTWRITEBYTECODE=1 python3 scripts/benchmark-markdown-semantics.py --jar target/shed-2.0.0.jar --sizes 102400 1048576 --shapes single-fence table nested headings markers long-line --samples 5 --warmups 1 --timeout 90 --output \"/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-semantic-fhxbkkyk/semantic-final-adverse\"",
+    "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-packaged-markdown.py --jar target/shed-2.0.0.jar --output \"/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-semantic-fhxbkkyk/packaged-smoke-final.json\"",
+    "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_benchmark*.py'",
+    "git diff --check",
+    "shasum -a 256 README.md"
+  ]
+}

@@ -1,0 +1,129 @@
+INPUT | a\|b *c* [l](x) | d |\n|---|---|\n
+Document [] 
+ TableBlock [SourceSpan{line=0, column=0, input=0, length=23}, SourceSpan{line=1, column=0, input=24, length=9}] 
+   raw=| a\|b *c* [l](x) | d |
+   raw=|---|---|
+  TableHead [SourceSpan{line=0, column=0, input=0, length=23}] 
+    raw=| a\|b *c* [l](x) | d |
+   TableRow [SourceSpan{line=0, column=0, input=0, length=23}] 
+     raw=| a\|b *c* [l](x) | d |
+    TableCell [SourceSpan{line=0, column=1, input=1, length=17}] 
+      raw= a\|b *c* [l](x) 
+     Text [SourceSpan{line=0, column=2, input=2, length=4}] 
+       raw=a\|b
+     Emphasis [SourceSpan{line=0, column=6, input=6, length=3}] 
+       raw= *c
+      Text [SourceSpan{line=0, column=7, input=7, length=1}] 
+        raw=*
+     Text [SourceSpan{line=0, column=9, input=9, length=1}] 
+       raw=*
+     Link [SourceSpan{line=0, column=10, input=10, length=6}] x
+       raw= [l](x
+      Text [SourceSpan{line=0, column=11, input=11, length=1}] 
+        raw=[
+    TableCell [SourceSpan{line=0, column=19, input=19, length=3}] 
+      raw= d 
+     Text [SourceSpan{line=0, column=20, input=20, length=1}] 
+       raw=d
+INPUT # 😀 *head* `x`\r\n> [a][r]\r\n> next\r\n\r\n[r]: <a\(b> "title"\r\n
+Document [] 
+ Heading [SourceSpan{line=0, column=0, input=0, length=15}] 
+   raw=# 😀 *head* `x`
+  Text [SourceSpan{line=0, column=2, input=2, length=3}] 
+    raw=😀 
+  Emphasis [SourceSpan{line=0, column=5, input=5, length=6}] 
+    raw=*head*
+   Text [SourceSpan{line=0, column=6, input=6, length=4}] 
+     raw=head
+  Text [SourceSpan{line=0, column=11, input=11, length=1}] 
+    raw= 
+  Code [SourceSpan{line=0, column=12, input=12, length=3}] 
+    raw=`x`
+ BlockQuote [SourceSpan{line=1, column=0, input=17, length=8}, SourceSpan{line=2, column=0, input=27, length=6}] 
+   raw=> [a][r]
+   raw=> next
+  Paragraph [SourceSpan{line=1, column=2, input=19, length=6}, SourceSpan{line=2, column=2, input=29, length=4}] 
+    raw=[a][r]
+    raw=next
+   Link [SourceSpan{line=1, column=2, input=19, length=6}] a(b
+     raw=[a][r]
+    Text [SourceSpan{line=1, column=3, input=20, length=1}] 
+      raw=a
+   SoftLineBreak [] 
+   Text [SourceSpan{line=2, column=2, input=29, length=4}] 
+     raw=next
+ LinkReferenceDefinition [SourceSpan{line=4, column=0, input=37, length=19}] r=a(b
+   raw=[r]: <a\(b> "title"
+INPUT > ```mermaid\n> A --> B\n> ```\n
+Document [] 
+ BlockQuote [SourceSpan{line=0, column=0, input=0, length=12}, SourceSpan{line=1, column=0, input=13, length=9}, SourceSpan{line=2, column=0, input=23, length=5}] 
+   raw=> ```mermaid
+   raw=> A --> B
+   raw=> ```
+  FencedCodeBlock [SourceSpan{line=0, column=2, input=2, length=10}, SourceSpan{line=1, column=2, input=15, length=7}, SourceSpan{line=2, column=2, input=25, length=3}] mermaid lengths=3/3
+    raw=```mermaid
+    raw=A --> B
+    raw=```
+INPUT - [x] task\n\n| a\|b | *c* |\n|---|---|\n| e | f |\n
+Document [] 
+ BulletList [SourceSpan{line=0, column=0, input=0, length=10}] 
+   raw=- [x] task
+  ListItem [SourceSpan{line=0, column=0, input=0, length=10}] 
+    raw=- [x] task
+   TaskListItemMarker [] 
+   Paragraph [SourceSpan{line=0, column=2, input=2, length=8}] 
+     raw=[x] task
+    Text [SourceSpan{line=0, column=2, input=2, length=8}] 
+      raw=[x] task
+ TableBlock [SourceSpan{line=2, column=0, input=12, length=14}, SourceSpan{line=3, column=0, input=27, length=9}, SourceSpan{line=4, column=0, input=37, length=9}] 
+   raw=| a\|b | *c* |
+   raw=|---|---|
+   raw=| e | f |
+  TableHead [SourceSpan{line=2, column=0, input=12, length=14}] 
+    raw=| a\|b | *c* |
+   TableRow [SourceSpan{line=2, column=0, input=12, length=14}] 
+     raw=| a\|b | *c* |
+    TableCell [SourceSpan{line=2, column=1, input=13, length=6}] 
+      raw= a\|b 
+     Text [SourceSpan{line=2, column=2, input=14, length=3}] 
+       raw=a\|
+    TableCell [SourceSpan{line=2, column=8, input=20, length=5}] 
+      raw= *c* 
+     Emphasis [SourceSpan{line=2, column=9, input=21, length=3}] 
+       raw=*c*
+      Text [SourceSpan{line=2, column=10, input=22, length=1}] 
+        raw=c
+  TableBody [SourceSpan{line=4, column=0, input=37, length=9}] 
+    raw=| e | f |
+   TableRow [SourceSpan{line=4, column=0, input=37, length=9}] 
+     raw=| e | f |
+    TableCell [SourceSpan{line=4, column=1, input=38, length=3}] 
+      raw= e 
+     Text [SourceSpan{line=4, column=2, input=39, length=1}] 
+       raw=e
+    TableCell [SourceSpan{line=4, column=5, input=42, length=3}] 
+      raw= f 
+     Text [SourceSpan{line=4, column=6, input=43, length=1}] 
+       raw=f
+INPUT [u][missing] [x](a\(b) ![x](a.png) <https://x.test>\n
+Document [] 
+ Paragraph [SourceSpan{line=0, column=0, input=0, length=51}] 
+   raw=[u][missing] [x](a\(b) ![x](a.png) <https://x.test>
+  Text [SourceSpan{line=0, column=0, input=0, length=13}] 
+    raw=[u][missing] 
+  Link [SourceSpan{line=0, column=13, input=13, length=9}] a(b
+    raw=[x](a\(b)
+   Text [SourceSpan{line=0, column=14, input=14, length=1}] 
+     raw=x
+  Text [SourceSpan{line=0, column=22, input=22, length=1}] 
+    raw= 
+  Image [SourceSpan{line=0, column=23, input=23, length=11}] 
+    raw=![x](a.png)
+   Text [SourceSpan{line=0, column=25, input=25, length=1}] 
+     raw=x
+  Text [SourceSpan{line=0, column=34, input=34, length=1}] 
+    raw= 
+  Link [SourceSpan{line=0, column=35, input=35, length=16}] https://x.test
+    raw=<https://x.test>
+   Text [SourceSpan{line=0, column=36, input=36, length=14}] 
+     raw=https://x.test

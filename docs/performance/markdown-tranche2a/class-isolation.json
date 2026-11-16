@@ -1,0 +1,32 @@
+{
+  "pre_existing_classes": 19117,
+  "changed": [],
+  "removed": [],
+  "added": [
+    "shed/MarkdownSemanticParser$LimitExceeded.class",
+    "shed/MarkdownSemanticParser$Projection.class",
+    "shed/MarkdownSemanticParser$SnapshotReader.class",
+    "shed/MarkdownSemanticParser.class",
+    "shed/MarkdownSemanticSnapshot$Block.class",
+    "shed/MarkdownSemanticSnapshot$BlockKind.class",
+    "shed/MarkdownSemanticSnapshot$CodeBlock.class",
+    "shed/MarkdownSemanticSnapshot$Coverage.class",
+    "shed/MarkdownSemanticSnapshot$Heading.class",
+    "shed/MarkdownSemanticSnapshot$Inline.class",
+    "shed/MarkdownSemanticSnapshot$InlineKind.class",
+    "shed/MarkdownSemanticSnapshot$Limitation.class",
+    "shed/MarkdownSemanticSnapshot$Link.class",
+    "shed/MarkdownSemanticSnapshot$LinkKind.class",
+    "shed/MarkdownSemanticSnapshot$Location.class",
+    "shed/MarkdownSemanticSnapshot$ReferenceDefinition.class",
+    "shed/MarkdownSemanticSnapshot$Source.class",
+    "shed/MarkdownSemanticSnapshot$Status.class",
+    "shed/MarkdownSemanticSnapshot$TaskMarker.class",
+    "shed/MarkdownSemanticSnapshot.class",
+    "shed/MarkdownSourceRange.class"
+  ],
+  "before_classes_digest": "4d786faca3b11d483692dedc4e87876b8cbc34383b2f35b7d5259aa64456783b",
+  "after_classes_digest": "4d786faca3b11d483692dedc4e87876b8cbc34383b2f35b7d5259aa64456783b",
+  "before_jar_bytes": 49976987,
+  "after_jar_bytes": 50010726
+}

@@ -12,7 +12,7 @@ The historical Tranche 1 evidence remains unchanged. Fresh paired baseline/candi
 
 ## B. Architecture and implementation
 
-The authoritative Swing document, `FileBuffer`, immutable snapshot tree, undo, persistence, recovery and LSP ownership are unchanged.
+The authoritative Swing document, `FileBuffer`, immutable snapshot tree, undo, persistence, recovery and LSP ownership are unchanged. Current implementation locations: `SyntaxUiController.java:547` (capture/coalescing), `:593` (change invalidation), `:642` (installation checks); `GrammarHighlightService.java:138` (metadata ownership), `:202` (worker scan), `:274` (chunk reads); `PaneBufferController.java:36` (existing change records) and `EditorUiController.java:1957` (paint validation).
 
 Markdown workers now consume the existing immutable snapshot through sequential **16 KiB reads**. They do not flatten its prefix. They begin at a valid sparse checkpoint, advance lexical state without producing prefix tokens, and emit tokens only for complete lines in the existing viewport/context range. Markdown retains the existing 120-line viewport context; other languages keep their existing range policy. The old string-based Markdown viewport API also emits only its line context, but remains stateless because it has no document/revision identity.
 
@@ -44,9 +44,44 @@ Some working changes were committed externally while the session ran. File prese
 
 All GUI convergence measurements include the unchanged **120 ms debounce**, scheduling, worker work, result installation and the existing 10 ms state-polling resolution. They are not isolated lexer timings or physical keyboard-to-paint measurements. Each final GUI position has 100 measured requests after five warmups. Source-edit controls have 100 samples pooled across beginning/middle/end after ten warmups; per-position groups have 33/34 samples and no meaningful p99.
 
-<!-- FINAL_MEASUREMENTS -->
+Final-artifact pair (16 November): the 10 MiB end target is met in this measured workload: **574.24 → 136.67 ms p95**. These are fresh processes with warm/uncontrolled OS caches, not cold-cache qualification. The 14 November paired candidate had already measured **376.65 → 136.57 ms p95** at the same position. Candidate and final lexical classes are byte-identical; the final artifact additionally validates installed Markdown spans before painting.
+
+The actual machine is an Intel MacBookPro15,2 (i5-8279U, eight logical CPUs, 8 GiB RAM), macOS 15.7.7, Temurin 21.0.12.1+1-LTS, 2× display scaling, Monospaced 16 pt in isolated benchmark homes, 64–512 MiB heaps. The final runs experienced one-minute load averages as high as approximately 35 and several GiB of existing swap. This is exploratory same-host evidence under substantial variable load, not a quiet-machine product guarantee. Large p99 outliers remain in the table; fewer worker allocations do not eliminate operating-system/application scheduling delays.
+
+Before artifact SHA-256: `8a07b7575367f5ff607e48049addfda7dc9e573dc364ca22946a269fff74cd7f`. Final: `9ebcf97563d9a8e61571a48c8548f26f87c06c6e8a68f2d25d5098c4d4c187d2`.
+
+Final convergence, ms; p50 / p95 / p99; 100 samples per position.
+
+| Size | Position | Before | After | After worker p95 | After spans |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 102,400 bytes | beginning | 135.60 / 166.87 / 202.80 | 131.68 / 163.95 / 229.01 | 2.98 | 84 |
+| 102,400 bytes | middle | 134.67 / 141.02 / 144.63 | 133.69 / 162.92 / 177.55 | 4.22 | 151 |
+| 102,400 bytes | end | 134.89 / 142.38 / 872.46 | 133.08 / 185.12 / 248.04 | 2.01 | 81 |
+| 1,048,576 bytes | beginning | 131.45 / 138.34 / 145.01 | 130.46 / 141.70 / 201.19 | 1.90 | 84 |
+| 1,048,576 bytes | middle | 145.55 / 174.29 / 467.57 | 132.34 / 142.53 / 147.90 | 2.50 | 152 |
+| 1,048,576 bytes | end | 158.14 / 216.62 / 286.10 | 132.10 / 147.18 / 161.48 | 2.57 | 81 |
+| 10,485,760 bytes | beginning | 131.18 / 162.21 / 732.57 | 130.44 / 137.82 / 139.15 | 2.11 | 84 |
+| 10,485,760 bytes | middle | 251.47 / 390.47 / 666.20 | 131.42 / 146.21 / 770.27 | 2.38 | 152 |
+| 10,485,760 bytes | end | 342.28 / 574.24 / 881.02 | 130.36 / 136.67 / 137.99 | 1.30 | 81 |
+
+Final source controls: p95 ms, 100 samples pooled over document positions.
+
+| Size | Insert before → after | Undo before → after | Scroll paint before → after |
+| --- | ---: | ---: | ---: |
+| 102400 | 4.23 → 5.55 | 3.63 → 4.87 | 1.90 → 5.52 |
+| 1048576 | 5.44 → 29.68 | 4.05 → 14.81 | 1.50 → 3.48 |
+| 10485760 | 14.07 → 12.83 | 5.14 → 8.85 | 3.89 → 1.67 |
+
+The initial final-artifact 1 MiB editing pair contains a material outlier: insertion p95 rose to **29.68 ms**. It is retained, not discarded or described as regression-free. Two bounded reverse-order controls at lower observed load did not reproduce it: before/after insertion p95 **7.16 / 6.57 ms**, undo **6.54 / 5.32 ms**, newline **7.00 / 5.78 ms**. The cause of the original spikes is not established. In those controls scroll-paint p95 was **2.57 / 5.51 ms**; small editing/scroll differences are not called zero-cost or statistically equivalent.
+
+A separately labelled headless replay of the synchronous cache invalidation API has 130 observations: **0.085 ms median / 0.315 ms p95 / 6.212 ms maximum**, CPU p95 **0.294 ms**. This includes reflection/diagnostic overhead and runs on the replay caller, not a live EDT. It demonstrates bounded metadata work, not an end-to-end input guarantee. The actual source controls separately include EDT mutation/listener time, queue delay, completed Swing paint, caret/selection/scroll and shared-split operations. They restore exact fixture source hashes. Their typing loops do not guarantee sustained overlap with highlighting; the 120 ms debounce can postpone analysis during rapid input.
+
+Three fresh-process 100 KiB startup observations per artifact show median launch-to-verified-input **3.320 → 2.239 seconds**, and launch-to-full-workbench paint **8.210 → 8.447 seconds**. n=3, ordering/font/OS cache effects and high load prevent an optimization or startup-equivalence claim. No new eager initialization is present by inspection. Full per-launch window/source-paint/input/ready marks and heap/RSS/GC observations remain in the raw data.
+
 
 The real GUI request includes the existing viewport geometry. The lexical replay uses a separately labelled ±60-line context. Its isolated calling-thread allocation numbers include prefix materialization/service construction in the old path, and snapshot/state/cache operations in the new path. They exclude colour-span installation, painting and unrelated concurrent IDE work. Do not substitute those numbers for a full concurrent worker allocation census.
+
+Convergence ends at validated result application, not at a compositor-visible highlight paint. Source-input-to-Swing-paint is measured separately. Per-operation EDT wall/CPU/allocation and paint observations are retained; a global maximum EDT-dispatch census and isolated timing of every syntax installation callback were not collected.
 
 Representative paired replay medians at 10 MiB:
 
@@ -98,6 +133,8 @@ Transient memory includes snapshot chunks, one complete logical line for the leg
 
 No parser, eager full-document indexing, new worker, persistent profiler, telemetry service or end-user setting was added. Existing startup grammar initialization is reused. Startup observations and their sample limits are reported with the results; no cold-cache or universal startup improvement is claimed.
 
+The packaged JAR grows by **11,323 bytes**, adding five internal lexical-metadata/helper classes. Changed application classes belong only to the four production files listed above (including their generated nested classes/debug line tables). Other entries, dependencies, service descriptors, `FileBuffer`, snapshot classes, `SourcePlainView` and Markdown preview/rendering classes are byte-preserved. Benchmark classes are not shipped.
+
 ## H. Regression verification
 
 Exact commands, test totals, skip reasons, failures and packaged smoke results are recorded in the evidence index and `verification.json`. Heavy benchmarks remain explicitly opt-in.
@@ -113,7 +150,14 @@ JAVA_HOME="$(scripts/resolve-toolchain.sh home)" \
 
 Real viewport geometry, painting, focus, scroll and split integration require a graphical/virtual display. Running the whole suite headlessly skips that coverage and is not an equivalent final GUI qualification. The packaged Mermaid/math/image smoke is already headless. Headful runs are reserved for those GUI/performance checks.
 
-<!-- FINAL_VERIFICATION -->
+- Full suite: **1,335 cases; 1,330 passed, five existing skips, zero failures/errors**.
+- Final focused headful run: **18 passed** (nine new lexer tests, seven existing grammar tests, two new integration tests).
+- Explicit headless lexer/grammar run: **16 passed**, zero skips/failures/errors.
+- Python benchmark tooling: **10 passed**.
+- Actual shaded-distribution Markdown/Mermaid/math/local-image smoke: **PASS**, with a headless child and no development classpath fallback.
+- Every bounded benchmark case completed; source fixture hashes and differential assertions pass. The earlier new-test intermediate-viewport failure is archived.
+- Previous folding, guarded Markdown edits, preview synchronization, reader memory correction, source view, persistence/recovery, undo and LSP/IDE tests remain in the complete suite. No existing assertion was weakened or test disabled.
+
 
 ## I. UI/UX compliance
 
@@ -133,6 +177,10 @@ The broader Tranche 1C HTML-layout, large-table, resize and rich-asset lifecycle
 
 ## L. Final verdict
 
-<!-- FINAL_VERDICT -->
+**GO for the implemented Tranche 1D optimization.** Differential correctness, bounded ownership/state, full regressions and the measured deep-file convergence target are satisfied. The implementation removes repeated prefix tokenization and materially reduces allocations. It remains compatible with the established document and presentation architecture.
+
+Do not interpret this as universal latency qualification. The high-load 1 MiB source-edit outlier did not reproduce in the bounded reverse-order check; its cause remains unknown. A quiet-machine follow-up should verify small editing/scrolling equivalence and tail latency before setting a hard cross-machine performance gate. All negative/noisy observations are preserved.
+
+The repository is ready to begin **Tranche 2** with these limitations recorded. The deferred 1C presentation work is independent. This report authorizes no automatic next-tranche work.
 
 Tranche 2 should build on the existing source/snapshot/revision contracts, and may eventually replace this lexical state with shared semantic state. The cache is intentionally narrow and does not create a competing Markdown AST or document authority. No Tranche 2 implementation was begun.

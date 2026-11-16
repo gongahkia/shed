@@ -1,0 +1,476 @@
+{
+  "before": {
+    "path": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-highlighting-yyaiip0t/profile-before/syntax-mixed-10485760-0/profile.jfr",
+    "sha256": "4f6059453200cfcf189e21bffee4d628310ba68c2bca34a7630d3b6e7000a290",
+    "bytes": 1956700,
+    "summary": {
+      "recording": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-highlighting-yyaiip0t/profile-before/syntax-mixed-10485760-0/profile.jfr",
+      "execution_or_native_samples": 951,
+      "overlapping_stack_presence_counts": {
+        "EDT FontDesignMetrics": 8,
+        "EDT GapContent": 1,
+        "EDT PlainView": 39,
+        "EDT SourcePlainView": 20,
+        "EDT javax.swing.text.PlainView.calculateLongestLine": 18,
+        "EDT source-width-summary-rebuild": 14,
+        "other GapContent": 8,
+        "other GrammarHighlightService": 233,
+        "other VersionedTextSnapshot": 10,
+        "other highlightSnapshot": 236
+      },
+      "top_stacks": [
+        {
+          "key": "other sun.font.CFont.createNativeFont;sun.font.CFont.getNativeFontPtr;sun.font.CFont.getWidth;sun.font.FontFamily.preferredWidth;sun.font.FontFamily.setFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerFont;sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000080030cdb0.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 312
+        },
+        {
+          "key": "other sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000080030cdb0.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 126
+        },
+        {
+          "key": "other java.util.regex.Matcher.reset;java.util.regex.Matcher.<init>;java.util.regex.Pattern.matcher;java.util.regex.Pattern.matches;java.lang.String.matches;shed.GrammarHighlightService.markdown;shed.GrammarHighlightService.tokenizeLine;shed.GrammarHighlightService.highlightSnapshot;shed.GrammarHighlightService.highlightViewport;shed.SyntaxUiController.highlightSnapshot;shed.SyntaxUiController.lambda$applySyntaxHighlighting$12;shed.SyntaxUiController$$Lambda.0x000000080032a468.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e0a8.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 27
+        },
+        {
+          "key": "other sun.lwawt.macosx.LWCToolkit.initAppkit;sun.lwawt.macosx.LWCToolkit.lambda$new$0;sun.lwawt.macosx.LWCToolkit$$Lambda.0x0000000800120fe8.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.lwawt.macosx.LWCToolkit.<init>;sun.awt.PlatformGraphicsInfo.createToolkit;java.awt.Toolkit.getDefaultToolkit;java.awt.Toolkit.getEventQueue;java.awt.EventQueue.isDispatchThread;javax.swing.SwingUtilities.isEventDispatchThread;shed.MarkdownPerformanceProbe.edt;shed.MarkdownPerformanceProbe.open;shed.MarkdownPerformanceProbe.syntax;shed.MarkdownPerformanceProbe.main",
+          "value": 26
+        },
+        {
+          "key": "other java.lang.ProcessHandleImpl.waitForProcessExit0;java.lang.ProcessHandleImpl$1.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run;jdk.internal.misc.InnocuousThread.run",
+          "value": 20
+        },
+        {
+          "key": "other sun.lwawt.macosx.CPlatformWindow.nativeGetTopmostPlatformWindowUnderMouse;sun.lwawt.macosx.LWCToolkit.getPlatformWindowUnderMouse;sun.lwawt.LWWindowPeer.notifyMouseEvent;sun.lwawt.macosx.CPlatformResponder.handleMouseEvent;sun.lwawt.macosx.CPlatformView.deliverMouseEvent",
+          "value": 20
+        },
+        {
+          "key": "other java.util.regex.Pattern.expr;java.util.regex.Pattern.compile;java.util.regex.Pattern.<init>;java.util.regex.Pattern.compile;java.util.regex.Pattern.matches;java.lang.String.matches;shed.GrammarHighlightService.markdown;shed.GrammarHighlightService.tokenizeLine;shed.GrammarHighlightService.highlightSnapshot;shed.GrammarHighlightService.highlightViewport;shed.SyntaxUiController.highlightSnapshot;shed.SyntaxUiController.lambda$applySyntaxHighlighting$12;shed.SyntaxUiController$$Lambda.0x000000080032a468.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e0a8.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 20
+        },
+        {
+          "key": "other shed.GrammarHighlightService.markdown;shed.GrammarHighlightService.tokenizeLine;shed.GrammarHighlightService.highlightSnapshot;shed.GrammarHighlightService.highlightViewport;shed.SyntaxUiController.highlightSnapshot;shed.SyntaxUiController.lambda$applySyntaxHighlighting$12;shed.SyntaxUiController$$Lambda.0x000000080032a468.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e0a8.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 16
+        },
+        {
+          "key": "other java.util.regex.Pattern.sequence;java.util.regex.Pattern.expr;java.util.regex.Pattern.compile;java.util.regex.Pattern.<init>;java.util.regex.Pattern.compile;java.util.regex.Pattern.matches;java.lang.String.matches;shed.GrammarHighlightService.markdown;shed.GrammarHighlightService.tokenizeLine;shed.GrammarHighlightService.highlightSnapshot;shed.GrammarHighlightService.highlightViewport;shed.SyntaxUiController.highlightSnapshot;shed.SyntaxUiController.lambda$applySyntaxHighlighting$12;shed.SyntaxUiController$$Lambda.0x000000080032a468.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e0a8.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 15
+        },
+        {
+          "key": "other java.util.regex.Pattern.escape;java.util.regex.Pattern.atom;java.util.regex.Pattern.sequence;java.util.regex.Pattern.expr;java.util.regex.Pattern.compile;java.util.regex.Pattern.<init>;java.util.regex.Pattern.compile;java.util.regex.Pattern.matches;java.lang.String.matches;shed.GrammarHighlightService.markdown;shed.GrammarHighlightService.tokenizeLine;shed.GrammarHighlightService.highlightSnapshot;shed.GrammarHighlightService.highlightViewport;shed.SyntaxUiController.highlightSnapshot;shed.SyntaxUiController.lambda$applySyntaxHighlighting$12;shed.SyntaxUiController$$Lambda.0x000000080032a468.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e0a8.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 14
+        },
+        {
+          "key": "other java.util.HashMap$HashIterator.nextNode;java.util.HashMap$KeyIterator.next;shed.GrammarHighlightService.isKeyword;shed.GrammarHighlightService.wordScope;shed.GrammarHighlightService.code;shed.GrammarHighlightService.markdown;shed.GrammarHighlightService.tokenizeLine;shed.GrammarHighlightService.highlightSnapshot;shed.GrammarHighlightService.highlightViewport;shed.SyntaxUiController.highlightSnapshot;shed.SyntaxUiController.lambda$applySyntaxHighlighting$12;shed.SyntaxUiController$$Lambda.0x000000080032a468.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e0a8.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 14
+        },
+        {
+          "key": "other java.lang.String.hashCode;java.util.HashMap.hash;java.util.HashMap.getNode;java.util.HashMap.get;shed.OpenBufferCompletionIndex.build;shed.InputController.lambda$submitOpenBufferWordIndex$3;shed.InputController$$Lambda.0x000000080031e210.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e0a8.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 12
+        },
+        {
+          "key": "other shed.GrammarHighlightService.inlineMarkdownCode;shed.GrammarHighlightService.markdown;shed.GrammarHighlightService.tokenizeLine;shed.GrammarHighlightService.highlightSnapshot;shed.GrammarHighlightService.highlightViewport;shed.SyntaxUiController.highlightSnapshot;shed.SyntaxUiController.lambda$applySyntaxHighlighting$12;shed.SyntaxUiController$$Lambda.0x000000080032a468.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e0a8.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 11
+        },
+        {
+          "key": "other java.util.regex.Pattern.atom;java.util.regex.Pattern.sequence;java.util.regex.Pattern.expr;java.util.regex.Pattern.compile;java.util.regex.Pattern.<init>;java.util.regex.Pattern.compile;java.util.regex.Pattern.matches;java.lang.String.matches;shed.GrammarHighlightService.markdown;shed.GrammarHighlightService.tokenizeLine;shed.GrammarHighlightService.highlightSnapshot;shed.GrammarHighlightService.highlightViewport;shed.SyntaxUiController.highlightSnapshot;shed.SyntaxUiController.lambda$applySyntaxHighlighting$12;shed.SyntaxUiController$$Lambda.0x000000080032a468.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e0a8.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 9
+        },
+        {
+          "key": "other java.util.regex.Pattern.closure;java.util.regex.Pattern.sequence;java.util.regex.Pattern.expr;java.util.regex.Pattern.compile;java.util.regex.Pattern.<init>;java.util.regex.Pattern.compile;java.util.regex.Pattern.matches;java.lang.String.matches;shed.GrammarHighlightService.markdown;shed.GrammarHighlightService.tokenizeLine;shed.GrammarHighlightService.highlightSnapshot;shed.GrammarHighlightService.highlightViewport;shed.SyntaxUiController.highlightSnapshot;shed.SyntaxUiController.lambda$applySyntaxHighlighting$12;shed.SyntaxUiController$$Lambda.0x000000080032a468.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e0a8.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 9
+        },
+        {
+          "key": "other sun.java2d.metal.MTLLayer.blitTexture;sun.java2d.metal.MTLLayer.lambda$drawInMTLContext$4;sun.java2d.metal.MTLLayer$$Lambda.0x000000080034c648.run;sun.lwawt.macosx.CFRetainedResource.execute;sun.java2d.metal.MTLLayer.drawInMTLContext",
+          "value": 8
+        },
+        {
+          "key": "other java.util.regex.Pattern.clazz;java.util.regex.Pattern.sequence;java.util.regex.Pattern.expr;java.util.regex.Pattern.compile;java.util.regex.Pattern.<init>;java.util.regex.Pattern.compile;java.util.regex.Pattern.matches;java.lang.String.matches;shed.GrammarHighlightService.markdown;shed.GrammarHighlightService.tokenizeLine;shed.GrammarHighlightService.highlightSnapshot;shed.GrammarHighlightService.highlightViewport;shed.SyntaxUiController.highlightSnapshot;shed.SyntaxUiController.lambda$applySyntaxHighlighting$12;shed.SyntaxUiController$$Lambda.0x000000080032a468.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e0a8.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 8
+        },
+        {
+          "key": "other shed.GrammarHighlightService.isKeyword;shed.GrammarHighlightService.wordScope;shed.GrammarHighlightService.code;shed.GrammarHighlightService.markdown;shed.GrammarHighlightService.tokenizeLine;shed.GrammarHighlightService.highlightSnapshot;shed.GrammarHighlightService.highlightViewport;shed.SyntaxUiController.highlightSnapshot;shed.SyntaxUiController.lambda$applySyntaxHighlighting$12;shed.SyntaxUiController$$Lambda.0x000000080032a468.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e0a8.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 8
+        }
+      ],
+      "allocation_samples": 3482,
+      "top_weighted_allocation_samples_not_retained": [
+        {
+          "key": "[B",
+          "value": 2297818768
+        },
+        {
+          "key": "[Z",
+          "value": 1497973800
+        },
+        {
+          "key": "[I",
+          "value": 1493909504
+        },
+        {
+          "key": "java.util.regex.Matcher",
+          "value": 1120813624
+        },
+        {
+          "key": "java.util.ArrayList",
+          "value": 519336896
+        },
+        {
+          "key": "[Ljava.lang.Object;",
+          "value": 374563208
+        },
+        {
+          "key": "java.util.regex.Pattern$Start",
+          "value": 372036112
+        },
+        {
+          "key": "[Ljava.util.regex.Pattern$GroupHead;",
+          "value": 305553872
+        },
+        {
+          "key": "java.util.regex.Pattern",
+          "value": 268129568
+        },
+        {
+          "key": "java.util.regex.Pattern$BmpCharProperty",
+          "value": 125727416
+        },
+        {
+          "key": "java.util.regex.Pattern$TreeInfo",
+          "value": 112604488
+        },
+        {
+          "key": "java.util.regex.Pattern$BmpCharPropertyGreedy",
+          "value": 108741640
+        },
+        {
+          "key": "[C",
+          "value": 85184160
+        },
+        {
+          "key": "shed.GrammarHighlightService$State",
+          "value": 73908888
+        },
+        {
+          "key": "java.util.HashMap$Node",
+          "value": 71135976
+        }
+      ],
+      "gc_pause_ms": [
+        6.371725,
+        1.480532,
+        0.103665,
+        4.794739,
+        4.47281,
+        0.102321,
+        3.710744,
+        0.106873,
+        6.489997,
+        5.396138,
+        3.959196,
+        12.963855,
+        12.158533,
+        2.281594,
+        2.574471,
+        31.29386,
+        2.17159,
+        0.144753,
+        2.896243,
+        0.122852,
+        5.839025,
+        2.560811,
+        2.164356,
+        3.871122,
+        2.804392,
+        0.154856,
+        1.148775,
+        1.192916,
+        7.293865,
+        3.25149,
+        0.323502,
+        4.062197,
+        0.176993,
+        4.183626,
+        5.583505,
+        3.768879,
+        7.706502,
+        10.745234,
+        4.166562,
+        8.114997,
+        2.622944,
+        0.147062,
+        7.47569,
+        7.855442,
+        4.35071,
+        7.740467,
+        6.974297,
+        4.957875,
+        5.242915,
+        2.806417,
+        0.187209,
+        3.138427,
+        0.233402,
+        2.622855,
+        0.173841,
+        2.403927,
+        7.380645,
+        2.153587,
+        3.564785,
+        4.933489,
+        2.721116,
+        2.738842,
+        0.12436,
+        2.820593,
+        0.157281,
+        2.400819,
+        0.184125,
+        4.568181,
+        5.40681,
+        3.761812,
+        4.128076,
+        4.046082,
+        3.704579,
+        6.797831,
+        3.189148,
+        2.409032,
+        0.149475,
+        2.619938,
+        0.14527,
+        2.446851,
+        0.148224,
+        3.799,
+        5.189091,
+        3.217098,
+        4.29654,
+        3.428472,
+        3.660247,
+        7.169033,
+        3.127883,
+        4.648939,
+        0.168145,
+        4.541843,
+        3.085768,
+        3.841932,
+        4.759561,
+        4.036513,
+        4.145081,
+        3.516335,
+        4.410566,
+        2.593512,
+        0.178946,
+        2.87125,
+        0.144766,
+        2.507519,
+        2.430689,
+        0.141289,
+        2.299214,
+        0.206223,
+        2.582538,
+        0.116028,
+        2.976546,
+        0.131569,
+        4.238927,
+        7.055219,
+        4.382666,
+        3.451763,
+        3.553167,
+        8.725811,
+        3.354791,
+        3.37429,
+        5.106118,
+        3.528026,
+        0.12794,
+        2.523038,
+        0.130684,
+        4.183072,
+        3.578256
+      ],
+      "gc_pause_total_ms": 461.880431
+    }
+  },
+  "after": {
+    "path": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-highlighting-yyaiip0t/profile-after/syntax-mixed-10485760-0/profile.jfr",
+    "sha256": "eef51b38f96cf79ea7439f43d629214b3f4e8d2e47ca5dbd1ed8162f0e1ca453",
+    "bytes": 1270792,
+    "summary": {
+      "recording": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-highlighting-yyaiip0t/profile-after/syntax-mixed-10485760-0/profile.jfr",
+      "execution_or_native_samples": 460,
+      "overlapping_stack_presence_counts": {
+        "EDT FontDesignMetrics": 7,
+        "EDT PlainView": 38,
+        "EDT SourcePlainView": 24,
+        "EDT VersionedTextSnapshot": 3,
+        "EDT javax.swing.text.PlainView.calculateLongestLine": 14,
+        "EDT source-width-summary-rebuild": 21,
+        "other GapContent": 11,
+        "other GrammarHighlightService": 4,
+        "other VersionedTextSnapshot": 10,
+        "other highlightSnapshot": 4
+      },
+      "top_stacks": [
+        {
+          "key": "other sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000080030cfd8.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 125
+        },
+        {
+          "key": "other sun.font.CFont.createNativeFont;sun.font.CFont.getNativeFontPtr;sun.font.CFont.getWidth;sun.font.FontFamily.preferredWidth;sun.font.FontFamily.setFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerFont;sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000080030cfd8.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 93
+        },
+        {
+          "key": "other java.lang.ProcessHandleImpl.waitForProcessExit0;java.lang.ProcessHandleImpl$1.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run;jdk.internal.misc.InnocuousThread.run",
+          "value": 24
+        },
+        {
+          "key": "other sun.lwawt.macosx.LWCToolkit.initAppkit;sun.lwawt.macosx.LWCToolkit.lambda$new$0;sun.lwawt.macosx.LWCToolkit$$Lambda.0x0000000800121560.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.lwawt.macosx.LWCToolkit.<init>;sun.awt.PlatformGraphicsInfo.createToolkit;java.awt.Toolkit.getDefaultToolkit;java.awt.Toolkit.getEventQueue;java.awt.EventQueue.isDispatchThread;javax.swing.SwingUtilities.isEventDispatchThread;shed.MarkdownPerformanceProbe.edt;shed.MarkdownPerformanceProbe.open;shed.MarkdownPerformanceProbe.syntax;shed.MarkdownPerformanceProbe.main",
+          "value": 21
+        },
+        {
+          "key": "other java.lang.ProcessImpl.forkAndExec;java.lang.ProcessImpl.<init>;java.lang.ProcessImpl.start;java.lang.ProcessBuilder.start;java.lang.ProcessBuilder.start;shed.SyntaxUiController.loadGitBlame;shed.SyntaxUiController.lambda$startPendingGitBlame$2;shed.SyntaxUiController$$Lambda.0x0000000800387678.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e2d0.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 10
+        },
+        {
+          "key": "other java.util.HashMap.getNode;java.util.HashMap.get;shed.OpenBufferCompletionIndex.build;shed.InputController.lambda$submitOpenBufferWordIndex$3;shed.InputController$$Lambda.0x000000080031db58.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e2d0.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 7
+        },
+        {
+          "key": "EDT shed.SourcePlainView.put;shed.SourcePlainView.rebuild;shed.SourcePlainView.ensureSummary;shed.SourcePlainView.getPreferredSpan;javax.swing.plaf.basic.BasicTextUI$RootView.getPreferredSpan;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.ScrollPaneLayout.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validate;javax.swing.SwingUtilities.updateComponentTreeUI;shed.EditorUiController.applyUiFontWithProfile;shed.EditorUiController.applyUiFont;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x0000000800394e80.run;java.awt.event.InvocationEvent.dispatch",
+          "value": 6
+        },
+        {
+          "key": "EDT shed.SourcePlainView.put;shed.SourcePlainView.rebuild;shed.SourcePlainView.ensureSummary;shed.SourcePlainView.getPreferredSpan;javax.swing.plaf.basic.BasicTextUI$RootView.getPreferredSpan;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.ScrollPaneLayout.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validate;javax.swing.RepaintManager$3.run;javax.swing.RepaintManager$3.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;javax.swing.RepaintManager.validateInvalidComponents;javax.swing.RepaintManager$ProcessingRunnable.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+          "value": 6
+        },
+        {
+          "key": "other sun.java2d.metal.MTLLayer.blitTexture;sun.java2d.metal.MTLLayer.lambda$drawInMTLContext$4;sun.java2d.metal.MTLLayer$$Lambda.0x000000080034e6e8.run;sun.lwawt.macosx.CFRetainedResource.execute;sun.java2d.metal.MTLLayer.drawInMTLContext",
+          "value": 6
+        },
+        {
+          "key": "other java.lang.Character.getType;java.lang.Character.isLetterOrDigit;java.lang.Character.isLetterOrDigit;shed.OpenBufferCompletionIndex.isWordCharacter;shed.OpenBufferCompletionIndex.build;shed.InputController.lambda$submitOpenBufferWordIndex$3;shed.InputController$$Lambda.0x000000080031db58.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e2d0.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 5
+        },
+        {
+          "key": "other sun.java2d.metal.MTLRenderQueue.flushBuffer;sun.java2d.metal.MTLRenderQueue.flushBuffer;sun.java2d.metal.MTLRenderQueue$QueueFlusher.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 5
+        },
+        {
+          "key": "other shed.OpenBufferCompletionIndex.build;shed.InputController.lambda$submitOpenBufferWordIndex$3;shed.InputController$$Lambda.0x000000080031db58.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e2d0.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 4
+        },
+        {
+          "key": "other sun.security.provider.SHA2.implCompress0;sun.security.provider.SHA2.implCompress;sun.security.provider.DigestBase.implCompressMultiBlock0;sun.security.provider.DigestBase.implCompressMultiBlock;sun.security.provider.DigestBase.engineUpdate;java.security.MessageDigest$Delegate.engineUpdate;java.security.MessageDigest.update;java.security.MessageDigest.digest;shed.FileBuffer.digest;shed.FileBuffer.load;shed.FileBuffer.<init>;shed.LegacyDocumentStore.load;shed.PaneBufferController.lambda$openFileAsync$11;shed.PaneBufferController$$Lambda.0x000000080030f5d8.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e2d0.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 4
+        },
+        {
+          "key": "other javax.swing.text.GapVector.replace;javax.swing.text.GapContent$MarkVector.insertElementAt;javax.swing.text.GapContent.createPosition;javax.swing.text.AbstractDocument.createPosition;javax.swing.text.AbstractDocument$LeafElement.<init>;javax.swing.text.AbstractDocument.createLeafElement;javax.swing.text.PlainDocument.insertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;shed.FileBuffer.setDocumentText;shed.FileBuffer.load;shed.FileBuffer.<init>;shed.LegacyDocumentStore.load;shed.PaneBufferController.lambda$openFileAsync$11;shed.PaneBufferController$$Lambda.0x000000080030f5d8.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e2d0.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 3
+        },
+        {
+          "key": "EDT sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateMetrics;javax.swing.text.PlainView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.ScrollPaneLayout.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validate;javax.swing.SwingUtilities.updateComponentTreeUI;shed.EditorUiController.applyUiTheme;shed.EditorUiController.applyUiTheme;shed.SyntaxUiController.applyThemeColors;shed.Texteditor.applyThemeColors;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x0000000800394e80.run;java.awt.event.InvocationEvent.dispatch",
+          "value": 3
+        },
+        {
+          "key": "EDT sun.font.FontDesignMetrics.getLatinCharWidth;sun.font.FontDesignMetrics.charsWidth;sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;shed.SourcePlainView.width;shed.SourcePlainView.put;shed.SourcePlainView.rebuild;shed.SourcePlainView.ensureSummary;shed.SourcePlainView.getPreferredSpan;javax.swing.plaf.basic.BasicTextUI$RootView.getPreferredSpan;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.ScrollPaneLayout.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validate;javax.swing.RepaintManager$3.run;javax.swing.RepaintManager$3.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;javax.swing.RepaintManager.validateInvalidComponents;javax.swing.RepaintManager$ProcessingRunnable.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+          "value": 3
+        },
+        {
+          "key": "other javax.swing.text.PlainDocument.insertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;shed.FileBuffer.setDocumentText;shed.FileBuffer.load;shed.FileBuffer.<init>;shed.LegacyDocumentStore.load;shed.PaneBufferController.lambda$openFileAsync$11;shed.PaneBufferController$$Lambda.0x000000080030f5d8.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000080030e2d0.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+          "value": 3
+        },
+        {
+          "key": "other jdk.internal.event.ThreadSleepEvent.commit;java.lang.Thread.afterSleep;java.lang.Thread.sleep;shed.MarkdownPerformanceProbe.await;shed.MarkdownPerformanceProbe.open;shed.MarkdownPerformanceProbe.syntax;shed.MarkdownPerformanceProbe.main",
+          "value": 3
+        }
+      ],
+      "allocation_samples": 2100,
+      "top_weighted_allocation_samples_not_retained": [
+        {
+          "key": "[B",
+          "value": 331007088
+        },
+        {
+          "key": "java.lang.String",
+          "value": 91160400
+        },
+        {
+          "key": "[C",
+          "value": 85145688
+        },
+        {
+          "key": "[I",
+          "value": 52722976
+        },
+        {
+          "key": "[Ljava.util.concurrent.ConcurrentHashMap$Node;",
+          "value": 24489760
+        },
+        {
+          "key": "java.util.regex.Matcher",
+          "value": 16683744
+        },
+        {
+          "key": "shed.OpenBufferCompletionIndex$WordStats",
+          "value": 7185704
+        },
+        {
+          "key": "[Ljava.lang.Object;",
+          "value": 6995400
+        },
+        {
+          "key": "javax.swing.text.GapContent$StickyPosition",
+          "value": 6162112
+        },
+        {
+          "key": "javax.swing.text.GapContent$MarkData",
+          "value": 6152416
+        },
+        {
+          "key": "javax.swing.text.AbstractDocument$LeafElement",
+          "value": 6044224
+        },
+        {
+          "key": "java.awt.Insets",
+          "value": 4212040
+        },
+        {
+          "key": "java.util.ArrayList$Itr",
+          "value": 4194952
+        },
+        {
+          "key": "shed.GrammarHighlightService$State",
+          "value": 3498544
+        },
+        {
+          "key": "[Ljava.lang.Class;",
+          "value": 2649000
+        }
+      ],
+      "gc_pause_ms": [
+        5.411153,
+        1.637855,
+        0.105147,
+        8.215441,
+        0.078535,
+        5.154589,
+        3.678368,
+        22.176239,
+        1.868567,
+        0.096945,
+        3.122956,
+        0.194703,
+        14.828939,
+        14.162573,
+        2.693761,
+        2.92432,
+        16.64179,
+        4.994128,
+        2.139122,
+        0.164482,
+        7.920376,
+        2.320672,
+        1.497525,
+        3.456332,
+        7.577061
+      ],
+      "gc_pause_total_ms": 133.061579
+    }
+  }
+}

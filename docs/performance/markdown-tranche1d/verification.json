@@ -1,0 +1,105 @@
+{
+  "task_start_head": "b70206e6c7212b2e1e27ed492039e01b95e82541",
+  "final_head": "9dbef8d1a1e6e7557fadc751f960a7c4c59026a5",
+  "task_start_status": "",
+  "final_status": " M docs/MARKDOWN_HIGHLIGHTING_PERFORMANCE.md\n?? docs/performance/markdown-tranche1d/\n",
+  "initial_changed": [
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java",
+    "scripts/benchmark-markdown.py",
+    "src/main/java/shed/SyntaxUiController.java",
+    "src/main/java/shed/PaneBufferController.java",
+    "src/main/java/shed/EditorUiController.java",
+    "src/main/java/shed/GrammarHighlightService.java",
+    "scripts/test_benchmark_markdown.py"
+  ],
+  "initial_missing": [],
+  "all_other_initial_files_preserved": true,
+  "prior_tranche_evidence_preserved": true,
+  "agent_created_commits": false,
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "git_diff_check": 0,
+  "task_source_diff_check": 0,
+  "full_test_totals": {
+    "tests": 1335,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5,
+    "passed": 1330
+  },
+  "headless_subset": {
+    "tests": 16,
+    "passed": 16,
+    "skipped": 0,
+    "java_awt_headless": true
+  },
+  "python_tests": {
+    "tests": 10,
+    "passed": 10
+  },
+  "focused_final": {
+    "tests": 18,
+    "passed": 18
+  },
+  "packaged_smoke": "PASS",
+  "code_hashes": {
+    "scripts/benchmark-markdown.py": "d0728276e1cf7398e4b34fd33928b6537c70ceb01ae3afc9a3b09ad3004644c9",
+    "scripts/test_benchmark_markdown.py": "aeb7dbead889017de439f06b02f27f94705fb7f56b0e28869aa82f0c7aeecc46",
+    "src/benchmark/java/shed/MarkdownLexicalProbe.java": "a14105c3f99749a46bf546b5eec28a6d60c27bba30354f162ed01a2e3289952e",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "89791b05f336e8ca1e0f0f55419ec4b4ae89c855afe7df734254458182d2acef",
+    "src/main/java/shed/EditorUiController.java": "ef6073ec356b49cc41b3506cd359dfb45efcbbbe3c40e16bf8c5baf484b09647",
+    "src/main/java/shed/GrammarHighlightService.java": "9f8111002be8082b1458f4092874c31f694ee81315fc98a71e478d4709ee367e",
+    "src/main/java/shed/PaneBufferController.java": "f3492c8578b6f0a16f45270206752d165165e70918c0e9c5e4efb505dc61d29a",
+    "src/main/java/shed/SyntaxUiController.java": "ff4b346f36987210b263753c534d09a84efd321af30265cf496de4a2997efdea",
+    "src/test/java/shed/MarkdownHighlightTest.java": "320fb24f92ab7a6de56ea8fd7f62d7dcaab7229ebd86ef66953c369f843bf9b9",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java": "dde0c0a83e1801ffc513824533a965b0e7eedc2fe9686d0201297a563334a03b"
+  },
+  "jar_before_sha256": "8a07b7575367f5ff607e48049addfda7dc9e573dc364ca22946a269fff74cd7f",
+  "jar_final_sha256": "9ebcf97563d9a8e61571a48c8548f26f87c06c6e8a68f2d25d5098c4d4c187d2",
+  "jar_before_bytes": 49965664,
+  "jar_final_bytes": 49976987,
+  "archive": {
+    "added": [
+      "shed/GrammarHighlightService$Checkpoint.class",
+      "shed/GrammarHighlightService$MarkdownCache.class",
+      "shed/GrammarHighlightService$MarkdownPlan.class",
+      "shed/GrammarHighlightService$MarkdownResult.class",
+      "shed/GrammarHighlightService$SnapshotLines.class"
+    ],
+    "changed": [
+      "shed/EditorUiController.class",
+      "shed/GrammarHighlightService$1.class",
+      "shed/GrammarHighlightService$Cache.class",
+      "shed/GrammarHighlightService$Line.class",
+      "shed/GrammarHighlightService$Mode.class",
+      "shed/GrammarHighlightService$Scope.class",
+      "shed/GrammarHighlightService$State.class",
+      "shed/GrammarHighlightService$TagResult.class",
+      "shed/GrammarHighlightService$Token.class",
+      "shed/GrammarHighlightService.class",
+      "shed/PaneBufferController$1.class",
+      "shed/PaneBufferController$DiffGutterRequest.class",
+      "shed/PaneBufferController$DiffGutterResult.class",
+      "shed/PaneBufferController.class",
+      "shed/SyntaxUiController$1.class",
+      "shed/SyntaxUiController$2.class",
+      "shed/SyntaxUiController$BracketRequest.class",
+      "shed/SyntaxUiController$BracketResult.class",
+      "shed/SyntaxUiController$GitBlameKey.class",
+      "shed/SyntaxUiController$Range.class",
+      "shed/SyntaxUiController$SymbolRequest.class",
+      "shed/SyntaxUiController$SymbolResult.class",
+      "shed/SyntaxUiController$SyntaxRequest.class",
+      "shed/SyntaxUiController$SyntaxResult.class",
+      "shed/SyntaxUiController.class"
+    ],
+    "removed": []
+  },
+  "candidate_final_lexer_classes_identical": true,
+  "no_benchmark_classes_shipped": true,
+  "owned_benchmark_processes": [],
+  "external_run_root": "/var/folders/pq/lllswlg16q396qgx147zv_mm0000gn/T/shed-highlighting-yyaiip0t",
+  "no_new_dependencies": true,
+  "no_production_workers_added": true
+}

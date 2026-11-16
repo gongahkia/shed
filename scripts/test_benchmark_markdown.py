@@ -68,5 +68,14 @@ class MarkdownBenchmarkTest(unittest.TestCase):
         self.assertIsNone(bench.summarize(rows[:3])['insert_0/wall_ms']['p99_ms'])
         self.assertEqual({}, bench.summarize([{'state': 'UNSUPPORTED', 'operation': 'save', 'wall_ms': 0}]))
 
+    def test_highlighting_warmups_do_not_enter_latency_percentiles(self):
+        operation = 'production_viewport_highlight_2'
+        rows = [{'state': 'WARMUP', 'operation': operation, 'debounce_and_convergence_ms': 10000}] * 5
+        rows += [{'state': 'OK', 'operation': operation, 'debounce_and_convergence_ms': n} for n in range(1, 101)]
+        result = bench.summarize(rows)[operation + '/debounce_and_convergence_ms']
+        self.assertEqual(100, result['n'])
+        self.assertEqual(95, result['p95_ms'])
+        self.assertEqual(99, result['p99_ms'])
+
 
 if __name__ == '__main__': unittest.main()

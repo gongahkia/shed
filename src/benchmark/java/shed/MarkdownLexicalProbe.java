@@ -71,7 +71,16 @@ final class MarkdownLexicalProbe {
     }
 
     private void change(VersionedTextSnapshot before, VersionedTextSnapshot after, int at, int removed) throws Exception {
-        if (cache != null) changed.invoke(cache, before, after, at, removed);
+        if (cache != null) {
+            long cpu = threads.getCurrentThreadCpuTime(), allocated = threads.getThreadAllocatedBytes(Thread.currentThread().threadId());
+            long began = System.nanoTime();
+            changed.invoke(cache, before, after, at, removed);
+            long elapsed = System.nanoTime() - began;
+            System.out.println("MD_SAMPLE " + MiniJson.stringify(Map.of("operation", "lexical_cache_invalidation", "state", "OK",
+                "wall_ms", elapsed / 1e6, "thread_cpu_ms", (threads.getCurrentThreadCpuTime() - cpu) / 1e6,
+                "allocated_bytes", threads.getThreadAllocatedBytes(Thread.currentThread().threadId()) - allocated,
+                "offset", at, "total_characters", before.length())));
+        }
     }
 
     static void run(Path file, int samples, int warmups) throws Exception {

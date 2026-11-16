@@ -124,7 +124,8 @@ def execute(java, jar, classes, output, case, fixture_path, samples, warmups, ti
     source = directory / 'input.md'
     shutil.copyfile(fixture_path, source)
     shutil.copyfile(fixture_path.parent / 'swatch.png', directory / 'swatch.png')
-    command = [str(java / 'bin/java'), '-Xms64m', f'-Xmx{heap}m', '-Djava.awt.headless=false', f'-Duser.home={home}',
+    command = [str(java / 'bin/java'), '-Xms64m', f'-Xmx{heap}m',
+               '-Djava.awt.headless=true' if case['mode'] == 'syntax-lexical' else '-Djava.awt.headless=false', f'-Duser.home={home}',
                f'-Xlog:gc*,safepoint:file={directory}/gc.log:time,uptime,level,tags']
     if tab_size:
         command.append(f'-Dshed.benchmark.tabSize={tab_size}')

@@ -4528,13 +4528,24 @@ public class TexteditorSwingIntegrationTest {
                 FileBuffer other = new FileBuffer(Files.writeString(tempDir.resolve("highlight-other.md"), "# Second\n`other`\n").toFile());
                 editor.buffers.add(other); editor.loadBufferIntoEditor(other);
                 for (int i = 0; i < 50; i++) editor.applySyntaxHighlighting();
+                for (int i = 0; i < 12; i++) {
+                    FileBuffer extra = new FileBuffer(Files.writeString(tempDir.resolve("highlight-extra-" + i + ".md"), "# Extra " + i + "\n").toFile());
+                    editor.buffers.add(extra); editor.loadBufferIntoEditor(extra); editor.applySyntaxHighlighting();
+                    assertTrue(((java.util.Map<?, ?>) syntaxField(editor, "markdownCaches")).size() <= 8);
+                }
                 assertEquals(1, editor.asyncJobService.list().stream().filter(j -> j.getDescription().equals("Syntax highlighting")).count());
                 assertSame(source, original.textSnapshot()); assertEquals(revision, original.documentRevision());
                 return null;
             });
             release.countDown();
             assertTrue(awaitUiState(() -> markdownSyntaxSettled(editor)));
-            onEdt(() -> { assertCurrentMarkdownSyntax(editor); return null; });
+            onEdt(() -> {
+                assertCurrentMarkdownSyntax(editor);
+                editor.shutdownSyntaxUi();
+                assertTrue(((java.util.Map<?, ?>) syntaxField(editor, "markdownCaches")).isEmpty());
+                assertFalse(editor.syntaxUiController.markdownSyntaxIsCurrent(editor.writingArea.getDocument()));
+                return null;
+            });
         } finally { release.countDown(); disposeEditor(editor); executor.shutdownNow(); }
     }
 
@@ -4554,6 +4565,7 @@ public class TexteditorSwingIntegrationTest {
             assertTrue(awaitUiState(() -> markdownSyntaxSettled(editor)));
             onEdt(() -> {
                 assertCurrentMarkdownSyntax(editor);
+                assertMarkdownViewportPixelsMatchFullScan(editor);
                 assertEquals(1, ((java.util.Map<?, ?>) syntaxField(editor, "markdownCaches")).size());
                 editor.writingArea.insert("```java\n/* open\n", 0);
                 assertFalse(editor.syntaxUiController.markdownSyntaxIsCurrent(editor.writingArea.getDocument()));
@@ -4596,6 +4608,31 @@ public class TexteditorSwingIntegrationTest {
         if (timer != null && timer.isRunning()) return false;
         try { assertCurrentMarkdownSyntax(editor); return true; }
         catch (AssertionError intermediateViewportOrRevision) { return false; }
+    }
+
+    private static void assertMarkdownViewportPixelsMatchFullScan(Texteditor editor) throws Exception {
+        var method = SyntaxUiController.class.getDeclaredMethod("syntaxColors"); method.setAccessible(true);
+        @SuppressWarnings("unchecked") var colors = (java.util.Map<GrammarHighlightService.Scope, Color>) method.invoke(editor.syntaxUiController);
+        var original = new ArrayList<>(editor.syntaxForegroundSpans);
+        int[] bounded = markdownViewportPixels(editor.writingArea);
+        try {
+            editor.syntaxForegroundSpans.clear();
+            for (var token : new GrammarHighlightService().highlightSnapshot(editor.getCurrentBuffer().textSnapshot().text(), FileType.MARKDOWN)) {
+                if (colors.get(token.scope()) != null) editor.syntaxForegroundSpans.add(new SyntaxSpan(token.start(), token.end(), colors.get(token.scope())));
+            }
+            org.junit.jupiter.api.Assertions.assertArrayEquals(bounded, markdownViewportPixels(editor.writingArea));
+        } finally {
+            editor.syntaxForegroundSpans.clear(); editor.syntaxForegroundSpans.addAll(original);
+        }
+    }
+
+    private static int[] markdownViewportPixels(JTextArea area) {
+        Rectangle visible = area.getVisibleRect();
+        var image = new java.awt.image.BufferedImage(visible.width, visible.height, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var graphics = image.createGraphics();
+        try { graphics.translate(-visible.x, -visible.y); area.paint(graphics); }
+        finally { graphics.dispose(); }
+        return image.getRGB(0, 0, visible.width, visible.height, null, 0, visible.width);
     }
 
     private static Object syntaxField(Texteditor editor, String name) throws Exception {

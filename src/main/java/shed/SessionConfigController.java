@@ -1601,6 +1601,7 @@ final class SessionConfigController {
 
         editor.specialBufferReturns.pop();
         editor.buffers.remove(current);
+        editor.markdownSourceClosed(current);
         if (current == editor.quickfixBuffer) {
             editor.quickfixBuffer = null;
         }

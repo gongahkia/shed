@@ -14,6 +14,37 @@ import java.util.List;
 final class MarkdownController {
     private final Texteditor editor;
     private final Map<FileBuffer, PreviewBinding> previews = new IdentityHashMap<>();
+    private MarkdownAnalysisService headingAnalysis;
+
+    MarkdownAnalysisService headingAnalysis() {
+        if (headingAnalysis == null) headingAnalysis = new MarkdownAnalysisService(editor.asyncJobService);
+        return headingAnalysis;
+    }
+
+    void requestHeadings(Object owner, FileBuffer buffer, java.util.function.BooleanSupplier current,
+                         java.util.function.Consumer<MarkdownHeadingAnalysis> completion) {
+        var source = MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(buffer), buffer);
+        headingAnalysis().request(owner, source, () -> editor.isMarkdownSourceCurrent(buffer, source) && current.getAsBoolean(), completion);
+    }
+
+    void cancelHeadings(Object owner) { if (headingAnalysis != null) headingAnalysis.cancel(owner); }
+
+    void headingSourceClosed(FileBuffer buffer) {
+        if (headingAnalysis != null) headingAnalysis.documentClosed(editor.documentStore.id(buffer));
+        for (Window window : editor.getOwnedWindows()) if (window instanceof MarkdownOutlineDialog dialog) dialog.sourceClosed(buffer);
+    }
+
+    String showSemanticSymbols(String argument) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        EditorPane pane = editor.getActivePane();
+        requestHeadings(pane, buffer, () -> pane == editor.getActivePane() && pane.getBuffer() == buffer
+            && editor.editorPanes.contains(pane), result -> {
+                if (result.path() == MarkdownHeadingAnalysis.Path.FAILED) { editor.showMessage("Markdown headings unavailable; request again"); return; }
+                if (result.path() != MarkdownHeadingAnalysis.Path.CANCELLED)
+                    editor.showMarkdownSymbolResults(buffer, pane, result, argument);
+            });
+        return "Loading document symbols";
+    }
 
     MarkdownController(Texteditor editor) {
         this.editor = editor;
@@ -73,6 +104,7 @@ final class MarkdownController {
     }
 
     void detachPreview(EditorPane pane) {
+        cancelHeadings(pane);
         Iterator<Map.Entry<FileBuffer, PreviewBinding>> iterator = previews.entrySet().iterator();
         while (iterator.hasNext()) {
             PreviewBinding binding = iterator.next().getValue();
@@ -84,6 +116,11 @@ final class MarkdownController {
     }
 
     void disposePreviews() {
+        if (headingAnalysis != null) {
+            if (editor.closingDown) { headingAnalysis.close(); headingAnalysis = null; }
+            else headingAnalysis.clear();
+        }
+        for (Window window : editor.getOwnedWindows()) if (window instanceof MarkdownOutlineDialog dialog) dialog.dispose();
         for (PreviewBinding binding : previews.values()) binding.preview.disposePreview();
         previews.clear();
     }
@@ -200,6 +237,7 @@ final class MarkdownController {
     String navigateHeading(boolean forward) {
         FileBuffer buf = editor.getCurrentBuffer();
         if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "";
+        if (!buf.isLargeFile()) return navigateSemanticHeading(forward, 0);
         String[] lines = getCurrentLines();
         int currentLine = editor.getCurrentCaretLine();
         int target = forward ? editor.markdownService.nextHeading(lines, currentLine) : editor.markdownService.prevHeading(lines, currentLine);
@@ -214,6 +252,7 @@ final class MarkdownController {
     String navigateHeadingAtLevel(boolean forward, int level) {
         FileBuffer buf = editor.getCurrentBuffer();
         if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "";
+        if (!buf.isLargeFile()) return navigateSemanticHeading(forward, level);
         String[] lines = getCurrentLines();
         int currentLine = editor.getCurrentCaretLine();
         int target = forward ? editor.markdownService.nextHeadingAtLevel(lines, currentLine, level) : editor.markdownService.prevHeadingAtLevel(lines, currentLine, level);
@@ -228,7 +267,7 @@ final class MarkdownController {
     public String showTableOfContents() {
         FileBuffer buf = editor.getCurrentBuffer();
         if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        MarkdownOutlineDialog.showFor(editor, buf, getCurrentLines());
+        MarkdownOutlineDialog.showFor(editor, buf, buf.isLargeFile() ? getCurrentLines() : null);
         return "Table of contents opened";
     }
 
@@ -236,8 +275,29 @@ final class MarkdownController {
     public String showOutline() {
         FileBuffer buf = editor.getCurrentBuffer();
         if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        MarkdownOutlineDialog.showFor(editor, buf, getCurrentLines());
+        MarkdownOutlineDialog.showFor(editor, buf, buf.isLargeFile() ? getCurrentLines() : null);
         return "Outline opened";
+    }
+
+    private String navigateSemanticHeading(boolean forward, int level) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        EditorPane pane = editor.getActivePane();
+        int dot = pane.getTextArea().getCaret().getDot(), mark = pane.getTextArea().getCaret().getMark();
+        int line = editor.getCurrentCaretLine() + 1;
+        String[] message = {"Loading headings"};
+        requestHeadings(pane, buffer, () -> pane == editor.getActivePane() && pane.getBuffer() == buffer
+            && editor.editorPanes.contains(pane) && pane.getTextArea().getDocument() == buffer.getDocument()
+            && pane.getTextArea().getCaret().getDot() == dot && pane.getTextArea().getCaret().getMark() == mark, result -> {
+                if (result.path() == MarkdownHeadingAnalysis.Path.CANCELLED || result.path() == MarkdownHeadingAnalysis.Path.FAILED) {
+                    message[0] = "Markdown headings unavailable; request again"; editor.showMessage(message[0]); return;
+                }
+                var target = result.target(forward, line, level);
+                message[0] = target.isEmpty() ? "No " + (forward ? "next" : "previous")
+                    + (level == 0 ? " heading" : " h" + level + " heading")
+                    : editor.gotoMarkdownHeading(buffer, result.source(), target.get());
+                editor.showMessage(message[0]);
+            });
+        return message[0];
     }
 
 

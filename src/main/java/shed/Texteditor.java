@@ -1424,6 +1424,40 @@ public class Texteditor extends JFrame implements KeyListener {
         markdownController.disposePreviews();
     }
 
+    void requestMarkdownHeadings(Object owner, FileBuffer buffer, java.util.function.BooleanSupplier current,
+                                 java.util.function.Consumer<MarkdownHeadingAnalysis> completion) {
+        markdownController.requestHeadings(owner, buffer, current, completion);
+    }
+
+    void cancelMarkdownHeadings(Object owner) { markdownController.cancelHeadings(owner); }
+
+    void markdownSourceClosed(FileBuffer buffer) {
+        if (buffer.getFileType() == FileType.MARKDOWN) markdownController.headingSourceClosed(buffer);
+    }
+
+    boolean isMarkdownSourceCurrent(FileBuffer buffer, MarkdownSemanticSnapshot.Source source) {
+        return !closingDown && buffers.contains(buffer) && source.matches(
+            MarkdownSemanticSnapshot.Source.capture(documentStore.id(buffer), buffer));
+    }
+
+    String gotoMarkdownHeading(FileBuffer buffer, MarkdownSemanticSnapshot.Source source, MarkdownHeadingAnalysis.Heading heading) {
+        if (getCurrentBuffer() != buffer || writingArea.getDocument() != buffer.getDocument()
+            || !isMarkdownSourceCurrent(buffer, source)) return "Markdown headings changed; request again";
+        if (heading == null) return "No heading selected";
+        try { new MarkdownSourceRange(heading.offset(), heading.offset()).validate(source.text()); }
+        catch (IllegalArgumentException invalid) { return "Markdown heading location unavailable"; }
+        if (source.text().positionAt(heading.offset()).line() + 1 != heading.line()) return "Markdown heading location unavailable";
+        String message = gotoLine(heading.line());
+        writingArea.setCaretPosition(heading.offset());
+        return message;
+    }
+
+    String showMarkdownSymbols(String argument) { return markdownController.showSemanticSymbols(argument); }
+
+    void showMarkdownSymbolResults(FileBuffer buffer, EditorPane pane, MarkdownHeadingAnalysis result, String argument) {
+        paletteController.showMarkdownSymbols(buffer, pane, result, argument);
+    }
+
     void refreshMarkdownPreviews() {
         markdownController.refreshPreviews();
     }

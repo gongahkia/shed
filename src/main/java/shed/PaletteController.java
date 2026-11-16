@@ -288,7 +288,28 @@ final class PaletteController {
         if (buffer == null) {
             return "No buffer";
         }
+        if (buffer.getFileType() == FileType.MARKDOWN && !buffer.isLargeFile()) return editor.showMarkdownSymbols(argument);
         List<SymbolService.Symbol> symbols = editor.symbolService.collectSymbols(editor.writingArea.getText(), buffer.getFileType());
+        return showLocalSymbols(symbols, argument, () -> true, symbol -> editor.gotoLine(symbol.getLine()));
+    }
+
+    void showMarkdownSymbols(FileBuffer buffer, EditorPane pane, MarkdownHeadingAnalysis result, String argument) {
+        Map<SymbolService.Symbol, MarkdownHeadingAnalysis.Heading> targets = new java.util.IdentityHashMap<>();
+        List<SymbolService.Symbol> symbols = new ArrayList<>();
+        for (var heading : result.headings()) {
+            if (result.path() != MarkdownHeadingAnalysis.Path.SEMANTIC && heading.title().isEmpty()) continue;
+            var symbol = new SymbolService.Symbol(heading.title(), "heading", heading.line(), heading.level());
+            symbols.add(symbol); targets.put(symbol, heading);
+        }
+        String message = showLocalSymbols(symbols, argument,
+            () -> editor.getActivePane() == pane && pane.getBuffer() == buffer && editor.editorPanes.contains(pane)
+                && editor.isMarkdownSourceCurrent(buffer, result.source()),
+            symbol -> editor.gotoMarkdownHeading(buffer, result.source(), targets.get(symbol)));
+        editor.showMessage(message);
+    }
+
+    private String showLocalSymbols(List<SymbolService.Symbol> symbols, String argument,
+                                    java.util.function.BooleanSupplier current, java.util.function.Function<SymbolService.Symbol, String> navigate) {
         if (symbols.isEmpty()) {
             return "No symbols found";
         }
@@ -325,7 +346,8 @@ final class PaletteController {
         if (selected == null) {
             return "Invalid symbol selection";
         }
-        return editor.gotoLine(selected.getLine());
+        if (!current.getAsBoolean()) return "Markdown headings changed; request again";
+        return navigate.apply(selected);
     }
 
     String showLspSymbols(List<LspClient.NavigationSymbol> symbols, String argument, boolean workspace) {

@@ -5,6 +5,8 @@ import java.awt.Font;
 import java.awt.Window;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -24,7 +26,7 @@ import javax.swing.event.DocumentListener;
 
 /** Searchable Markdown heading outline that navigates to the source document. */
 final class MarkdownOutlineDialog extends JDialog {
-    record Heading(int line, int level, String title) {
+    record Heading(int line, int level, String title, int offset) {
         @Override public String toString() {
             return "  ".repeat(level - 1) + title + "   ·   " + line;
         }
@@ -32,6 +34,9 @@ final class MarkdownOutlineDialog extends JDialog {
 
     private final Texteditor editor;
     private FileBuffer source;
+    private MarkdownHeadingAnalysis analysis;
+    private MarkdownSemanticSnapshot.Source requestedSource;
+    private long generation;
     private final List<Heading> headings = new ArrayList<>();
     private final DefaultListModel<Heading> model = new DefaultListModel<>();
     private final JList<Heading> list = new JList<>(model);
@@ -68,6 +73,14 @@ final class MarkdownOutlineDialog extends JDialog {
         editor.editorUiController.prepareDialog(this, 560, 530);
         pack();
         setLocationRelativeTo(editor);
+        addWindowFocusListener(new WindowAdapter() {
+            @Override public void windowGainedFocus(WindowEvent event) {
+                if (source == null) return;
+                if (!editor.buffers.contains(source)) { dispose(); return; }
+                if (!source.isLargeFile() && requestedSource != null && !editor.isMarkdownSourceCurrent(source, requestedSource))
+                    load(source, null, false);
+            }
+        });
     }
 
     private JPanel header() {
@@ -122,22 +135,43 @@ final class MarkdownOutlineDialog extends JDialog {
     }
 
     private void load(FileBuffer buffer, String[] lines) {
+        load(buffer, lines, true);
+    }
+
+    private void load(FileBuffer buffer, String[] lines, boolean resetSearch) {
+        editor.cancelMarkdownHeadings(this);
+        long request = ++generation;
         source = buffer;
+        analysis = null;
+        requestedSource = buffer.isLargeFile() ? null : MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(buffer), buffer);
         headings.clear();
-        for (int index = 0; index < lines.length; index++) {
-            int level = editor.markdownService.headingLevel(lines[index]);
-            if (level > 0) headings.add(new Heading(index + 1, level, editor.markdownService.headingText(lines[index])));
-        }
-        search.setText("");
+        if (resetSearch) search.setText("");
         filter();
+        if (buffer.isLargeFile()) {
+            // Keep the established projection-local legacy path; never claim full-file semantics.
+            for (int index = 0; lines != null && index < lines.length; index++) {
+                int level = editor.markdownService.headingLevel(lines[index]);
+                if (level > 0) headings.add(new Heading(index + 1, level, editor.markdownService.headingText(lines[index]), -1));
+            }
+            filter();
+            return;
+        }
+        editor.requestMarkdownHeadings(this, buffer, () -> isDisplayable() && generation == request && source == buffer,
+            result -> {
+                if (result.path() == MarkdownHeadingAnalysis.Path.CANCELLED) return;
+                if (result.path() == MarkdownHeadingAnalysis.Path.FAILED) { editor.showMessage("Markdown headings unavailable; reopen outline to retry"); return; }
+                analysis = result;
+                headings.clear();
+                for (var heading : result.headings()) headings.add(new Heading(heading.line(), heading.level(), heading.title(), heading.offset()));
+                filter();
+            });
     }
 
     private void filter() {
         String query = search.getText().trim().toLowerCase(Locale.ROOT);
         model.clear();
-        for (Heading heading : headings) {
-            if (heading.title().toLowerCase(Locale.ROOT).contains(query)) model.addElement(heading);
-        }
+        model.addAll(query.isEmpty() ? headings : headings.stream()
+            .filter(heading -> heading.title().toLowerCase(Locale.ROOT).contains(query)).toList());
         count.setText(model.size() + " heading" + (model.size() == 1 ? "" : "s"));
         if (!model.isEmpty()) list.setSelectedIndex(0);
     }
@@ -145,9 +179,25 @@ final class MarkdownOutlineDialog extends JDialog {
     private void goToSelection() {
         Heading heading = list.getSelectedValue();
         if (heading == null) return;
+        if (!editor.buffers.contains(source)) { dispose(); return; }
+        if (analysis != null && !editor.isMarkdownSourceCurrent(source, analysis.source())) {
+            load(source, null, false);
+            editor.showMessage("Markdown headings changed; outline refreshed");
+            return;
+        }
         if (editor.getCurrentBuffer() != source) editor.loadBufferIntoEditor(source);
-        editor.gotoLine(heading.line());
+        if (analysis == null) editor.gotoLine(heading.line());
+        else editor.gotoMarkdownHeading(source, analysis.source(), new MarkdownHeadingAnalysis.Heading(heading.offset(), heading.line(), heading.level(), heading.title()));
         editor.toFront();
         editor.writingArea.requestFocusInWindow();
     }
+
+    @Override public void dispose() {
+        generation++;
+        editor.cancelMarkdownHeadings(this);
+        analysis = null; requestedSource = null; source = null; headings.clear(); model.clear();
+        super.dispose();
+    }
+
+    void sourceClosed(FileBuffer buffer) { if (source == buffer) dispose(); }
 }

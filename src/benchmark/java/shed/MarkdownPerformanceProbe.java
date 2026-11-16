@@ -31,23 +31,23 @@ public final class MarkdownPerformanceProbe {
     private static Object invoke(Class<?> type, String name, Class<?>[] signature, Object... args) throws Exception {
         Method m = type.getDeclaredMethod(name, signature); m.setAccessible(true); return m.invoke(null, args);
     }
-    private static <T> T edt(Callable<T> action) throws Exception {
+    static <T> T edt(Callable<T> action) throws Exception {
         if (SwingUtilities.isEventDispatchThread()) return action.call();
         FutureTask<T> task = new FutureTask<>(action); SwingUtilities.invokeAndWait(task); return task.get();
     }
-    private static void await(Callable<Boolean> ready, int seconds) throws Exception {
+    static void await(Callable<Boolean> ready, int seconds) throws Exception {
         long until = System.nanoTime() + seconds * 1_000_000_000L;
         while (!edt(ready)) {
             if (System.nanoTime() > until) throw new TimeoutException("UI state did not converge");
             Thread.sleep(10); // Poll state, not a timing sample; production paint duration comes from PerfService.
         }
     }
-    private static void out(String prefix, Map<String, Object> row) { Map<String,Object> value=new LinkedHashMap<>(row);value.putIfAbsent("epoch_ms",System.currentTimeMillis()); System.out.println(prefix + MiniJson.stringify(value)); System.out.flush(); }
-    private static Map<String, Object> row(String name) {
+    static void out(String prefix, Map<String, Object> row) { Map<String,Object> value=new LinkedHashMap<>(row);value.putIfAbsent("epoch_ms",System.currentTimeMillis()); System.out.println(prefix + MiniJson.stringify(value)); System.out.flush(); }
+    static Map<String, Object> row(String name) {
         Map<String, Object> row = new LinkedHashMap<>(); row.put("operation", name); row.put("state", "OK"); return row;
     }
     private static long allocated() { return THREADS.getThreadAllocatedBytes(Thread.currentThread().threadId()); }
-    private static void memory(String phase) {
+    static void memory(String phase) {
         var heap = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
         var gc = ManagementFactory.getGarbageCollectorMXBeans();
         Map<String,Object> value = row(phase); value.put("heap_used_mib", heap.getUsed()/1048576d);
@@ -118,7 +118,7 @@ public final class MarkdownPerformanceProbe {
             "source_dirty",edt(() -> editor.getCurrentBuffer().isModified())));
         memory("full_ui_no_forced_gc");
     }
-    private static void typed(char c) {
+    static void typed(char c) {
         KeyEvent key=new KeyEvent(editor.writingArea,KeyEvent.KEY_PRESSED,System.currentTimeMillis(),0,
             c=='\n'?KeyEvent.VK_ENTER:KeyEvent.getExtendedKeyCodeForChar(c),c);
         editor.keyPressed(key);
@@ -127,7 +127,7 @@ public final class MarkdownPerformanceProbe {
             editor.writingArea.getActionMap().get(action).actionPerformed(new ActionEvent(editor.writingArea,ActionEvent.ACTION_PERFORMED,String.valueOf(c)));
         }
     }
-    private static void uiText(String name, Work work, boolean measured) throws Exception {
+    static void uiText(String name, Work work, boolean measured) throws Exception {
         long[] before=edt(() -> metric("edit.input-to-paint")); long posted=System.nanoTime();
         Map<String,Object> value=edt(() -> {
             long entered=System.nanoTime();
@@ -458,7 +458,7 @@ public final class MarkdownPerformanceProbe {
         if(args.length!=6)throw new IllegalArgumentException("mode disposable.md samples warmups wrap preview");
         file=Path.of(args[1]).toRealPath();samples=Integer.parseInt(args[2]);warmups=Integer.parseInt(args[3]);empty=args[0].equals("startup-empty");wrap=Boolean.parseBoolean(args[4]);withPreview=Boolean.parseBoolean(args[5]);
         try {
-            switch(args[0]){case "model"->model();case "ui"->ui();case "startup", "startup-empty"->open();case "assets"->assets();case "assets-ready"->{open();assets();}case "preview"->preview();case "preview-install"->previewInstallation();case "search"->search();case "syntax"->syntax();case "syntax-lexical"->MarkdownLexicalProbe.run(file,samples,warmups);default->throw new IllegalArgumentException("Unknown mode");}
+            switch(args[0]){case "model"->model();case "ui"->ui();case "startup", "startup-empty"->open();case "assets"->assets();case "assets-ready"->{open();assets();}case "preview"->preview();case "preview-install"->previewInstallation();case "search"->search();case "syntax"->syntax();case "syntax-lexical"->MarkdownLexicalProbe.run(file,samples,warmups);case "semantic-consumers"->{open();Class.forName("shed.MarkdownConsumerProbe").getDeclaredMethod("run",Texteditor.class,int.class,int.class).invoke(null,editor,samples,warmups);}default->throw new IllegalArgumentException("Unknown mode");}
             if(editor!=null)out("MD_META ",edt(() -> Map.of("perf",editor.perfService.report(),"jobs",editor.asyncJobService.list().stream().map(j -> j.getDescription()+":"+j.getStatus()).toList())));
         } finally {
             if(editor!=null)edt(() -> {editor.disposeMarkdownPreviews();editor.shutdownSyntaxUi();editor.shutdownLspScheduling();editor.asyncJobService.shutdownNow();if(editor.backupScheduler!=null)editor.backupScheduler.close();if(editor.externalChangeTimer!=null)editor.externalChangeTimer.stop();if(editor.recoverySnapshotTimer!=null)editor.recoverySnapshotTimer.stop();if(editor.messageResetTimer!=null)editor.messageResetTimer.stop();editor.fileWatcherService.stop();editor.dispose();return null;});

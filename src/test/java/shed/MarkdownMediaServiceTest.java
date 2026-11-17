@@ -199,6 +199,7 @@ class MarkdownMediaServiceTest {
             try (var result = handle.take(source, 1)) {
                 assertEquals(State.READY, result.state(), result.detail()); var lease = result.lease().orElseThrow();
                 assertEquals(12, lease.width()); assertEquals(8, lease.height());
+                assertThrows(NullPointerException.class, () -> lease.paint(null, 0, 0));
                 var canvas = new BufferedImage(12, 8, BufferedImage.TYPE_INT_ARGB); var g = canvas.createGraphics(); lease.paint(g, 0, 0); g.dispose();
                 assertEquals(Color.RED.getRGB(), canvas.getRGB(0, 0));
                 canvas.setRGB(0, 0, Color.BLUE.getRGB());
@@ -325,6 +326,66 @@ class MarkdownMediaServiceTest {
         try (var service = fake(renderer)) {
             assertEquals(0, service.metrics().running()); assertEquals(0, service.metrics().sessions()); assertEquals(0, renderer.calls.get());
             SwingUtilities.invokeAndWait(() -> assertThrows(IllegalStateException.class, () -> service.awaitIdle(1, TimeUnit.MILLISECONDS)));
+        }
+    }
+    @Test void themeChangeGetsANewMermaidAssetAndSupersedesTheOldLease() throws Exception {
+        var source = source("```mermaid\ngraph TD\nA-->B\n```"); var semantic = semantic(source);
+        try (var service = new MarkdownMediaService(); var session = service.open(source, 1)) {
+            var handle = session.request(diagram(source)); idle(service); var old = handle.take(source, 1); var lease = old.lease().orElseThrow();
+            String identity = lease.info().identity(); session.update(source, 2); assertFalse(lease.isCurrent(source, 1));
+            var themed = mermaid(semantic, source, semantic.codeBlocks().getFirst(), new Options(Theme.DARK, Color.WHITE.getRGB(), 16, 2048, 2048), 2);
+            var next = session.request(themed); idle(service);
+            try (var result = next.take(source, 2)) {
+                assertEquals(State.READY, result.state()); assertNotEquals(identity, result.lease().orElseThrow().info().identity());
+                assertEquals(Theme.DARK, result.lease().orElseThrow().info().options().theme());
+            }
+            old.close(); assertEquals(2, service.metrics().rendered());
+        }
+    }
+    @Test void localRasterSizingPreservesAspectRatioAndNeverUpscales() throws Exception {
+        png(temp.resolve("x.png"), 20, 10, Color.RED.getRGB()); var source = source("![x](x.png)"); var sem = semantic(source);
+        try (var service = new MarkdownMediaService(); var session = service.open(source, 1)) {
+            var scaled = image(sem, source, sem.links().getFirst(), new Options(Theme.DEFAULT, Color.BLACK.getRGB(), 16, 10, 10), new Context(temp.resolve("x.md"), List.of(temp)), 1);
+            var handle = session.request(scaled); idle(service);
+            try (var result = handle.take(source, 1)) { assertEquals(10, result.lease().orElseThrow().width()); assertEquals(5, result.lease().orElseThrow().height()); }
+            var natural = session.request(picture(source)); idle(service);
+            try (var result = natural.take(source, 1)) { assertEquals(20, result.lease().orElseThrow().width()); assertEquals(10, result.lease().orElseThrow().height()); }
+        }
+    }
+    @Test void deletedImageDuringDecodingCannotPublishAnAsset() throws Exception {
+        png(temp.resolve("x.png"), 4, 4, 0); var source = source("![x](x.png)");
+        var entered = new CountDownLatch(1); var release = new CountDownLatch(1); var delegate = new MarkdownMediaRenderer();
+        var renderer = new MarkdownMediaService.Renderer() {
+            public MarkdownMediaService.Prepared prepare(Request request, java.util.function.BooleanSupplier stop) throws Exception { return delegate.prepare(request, stop); }
+            public BufferedImage render(MarkdownMediaService.Prepared prepared, java.util.function.BooleanSupplier stop) throws Exception {
+                entered.countDown(); assertTrue(release.await(10, TimeUnit.SECONDS)); return delegate.render(prepared, stop);
+            }
+            public void validate(MarkdownMediaService.Prepared prepared, java.util.function.BooleanSupplier stop) throws Exception { delegate.validate(prepared, stop); }
+        };
+        try (var service = new MarkdownMediaService(MarkdownMediaService.Budget.desktop(), renderer); var session = service.open(source, 1)) {
+            var handle = session.request(picture(source)); assertTrue(entered.await(10, TimeUnit.SECONDS));
+            Files.delete(temp.resolve("x.png")); release.countDown(); idle(service);
+            assertEquals(State.UNSUPPORTED, handle.state()); assertEquals(0, service.metrics().residentBytes());
+        }
+    }
+    @Test void consumerAndSessionBudgetsAlsoBoundCompletedCacheHits() throws Exception {
+        var renderer = new Gate(); renderer.release.countDown(); var source = source("$x$");
+        var budget = new MarkdownMediaService.Budget(2, 2, 1, 4, 1024, 2048, 512);
+        try (var service = new MarkdownMediaService(budget, renderer); var session = service.open(source, 1)) {
+            assertThrows(IllegalArgumentException.class, () -> service.open(source, 1));
+            var first = session.request(formula(source)); idle(service); var second = session.request(formula(source)); idle(service);
+            assertEquals(State.RESOURCE_LIMIT, session.request(formula(source)).state());
+            first.close(); var third = session.request(formula(source)); idle(service); assertEquals(State.READY, third.state());
+            assertEquals(2, service.metrics().consumers()); assertEquals(1, renderer.calls.get()); second.close(); third.close();
+        }
+    }
+    @Test void aNewRevisionCanCancelAPendingTakeWithoutWaitingForRendering() throws Exception {
+        var renderer = new Gate(); var source = source("$x$");
+        try (var service = fake(renderer); var session = service.open(source, 1)) {
+            var handle = session.request(formula(source)); assertTrue(renderer.entered.await(10, TimeUnit.SECONDS));
+            assertEquals(State.SUPERSEDED, handle.take(new Source(source.documentId(), 8, source.text()), 1).state());
+            assertEquals(0, service.metrics().consumers()); assertEquals(1, service.metrics().running()); renderer.release.countDown(); idle(service);
+            assertEquals(0, service.metrics().residentBytes());
         }
     }
 }

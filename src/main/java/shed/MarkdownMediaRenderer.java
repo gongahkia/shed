@@ -76,7 +76,12 @@ final class MarkdownMediaRenderer implements Renderer {
                     if (svg.length() > MAX_SVG_CHARS) throw new Rejected(State.RESOURCE_LIMIT, "SVG source budget");
                     yield svg(svg, options);
                 }
-                try { yield MarkdownPreviewAssets.decodeRasterImage(bytes, Math.max(options.maxWidth(), options.maxHeight()), 4L * 1024 * 1024); }
+                try {
+                    BufferedImage original = MarkdownPreviewAssets.decodeRasterImage(bytes, 2048, 4L * 1024 * 1024);
+                    BufferedImage sized = MarkdownPreviewAssets.scaleWithinBounds(original, options.maxWidth(), options.maxHeight(), 4L * 1024 * 1024);
+                    if (sized != original) original.flush();
+                    yield sized;
+                }
                 catch (IOException error) {
                     throw new Rejected(error.getMessage() != null && error.getMessage().contains("dimensions exceed") ? State.RESOURCE_LIMIT : State.UNSUPPORTED, "Image decoding unavailable or over budget");
                 }
@@ -102,17 +107,24 @@ final class MarkdownMediaRenderer implements Renderer {
         factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, ""); factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        factory.setAttribute("http://www.oracle.com/xml/jaxp/properties/maxElementDepth", "128");
         Document document = factory.newDocumentBuilder().parse(new org.xml.sax.InputSource(new StringReader(source)));
+        if (!"svg".equals(document.getDocumentElement().getLocalName()) || !"http://www.w3.org/2000/svg".equals(document.getDocumentElement().getNamespaceURI()))
+            throw new Rejected(State.UNSUPPORTED, "SVG root namespace required");
         var elements = document.getElementsByTagName("*");
         if (elements.getLength() > 16384) throw new Rejected(State.RESOURCE_LIMIT, "SVG element budget");
         for (int i = 0; i < elements.getLength(); i++) {
             var element = elements.item(i); String name = element.getLocalName();
-            if (Set.of("script", "foreignObject", "image", "use", "a", "animate", "set").contains(name)) throw new Rejected(State.UNSUPPORTED, "SVG active or external content unsupported");
+            if (name == null || Set.of("script", "foreignObject", "image", "use", "a", "animate", "set", "filter", "mask", "pattern", "feImage").contains(name))
+                throw new Rejected(State.UNSUPPORTED, "SVG active or external content unsupported");
+            if (name.equals("style")) safeCss(element.getTextContent());
             var attributes = element.getAttributes();
             for (int j = 0; j < attributes.getLength(); j++) {
                 var attr = attributes.item(j); String value = attr.getNodeValue().toLowerCase(Locale.ROOT);
-                if (attr.getNodeName().toLowerCase(Locale.ROOT).startsWith("on") || value.contains("javascript:") || value.contains("@import")
-                        || value.matches("(?s).*url\\(\\s*['\"]?\\s*(?!#)[^)].*")) throw new Rejected(State.UNSUPPORTED, "SVG resource unsupported");
+                String attribute = attr.getNodeName().toLowerCase(Locale.ROOT);
+                if (attribute.startsWith("on") || value.contains("javascript:") || ((attribute.endsWith("href") || attribute.equals("src")) && !value.startsWith("#")))
+                    throw new Rejected(State.UNSUPPORTED, "SVG resource unsupported");
+                safeCss(value);
             }
         }
         // Batik's own resource policy also applies to style text and nested resource references.
@@ -135,6 +147,15 @@ final class MarkdownMediaRenderer implements Renderer {
         transcoder.transcode(new TranscoderInput(document), new TranscoderOutput());
         if (transcoder.result == null) throw new IOException("SVG produced no image");
         return transcoder.result;
+    }
+    private static void safeCss(String value) throws Rejected {
+        String lower = value.toLowerCase(Locale.ROOT);
+        if (lower.contains("@import") || lower.indexOf('\\') >= 0) throw new Rejected(State.UNSUPPORTED, "SVG CSS escape/import unsupported");
+        var urls = java.util.regex.Pattern.compile("(?is)url\\s*\\((.*?)\\)").matcher(value);
+        while (urls.find()) {
+            String target = urls.group(1).replace("\"", "").replace("'", "").strip();
+            if (!target.startsWith("#") || target.length() == 1) throw new Rejected(State.UNSUPPORTED, "SVG external CSS resource unsupported");
+        }
     }
     private static final Set<String> MATH_COMMANDS = Set.of(
         "frac", "dfrac", "tfrac", "sqrt", "sum", "prod", "int", "iint", "oint", "lim", "limits", "nolimits",

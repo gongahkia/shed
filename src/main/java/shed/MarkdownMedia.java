@@ -28,18 +28,22 @@ final class MarkdownMedia {
             if (roots.isEmpty() || roots.size() > 16) throw new IllegalArgumentException("Media project scope required (at most 16 roots)");
         }
     }
-    record Stamp(DocumentWorkspace.Id document, long revision, WeakReference<VersionedTextSnapshot> snapshot, long generation) {
+    record Stamp(DocumentWorkspace.Id document, long revision, WeakReference<VersionedTextSnapshot> snapshot, boolean complete, long generation) {
+        Stamp {
+            Objects.requireNonNull(document); Objects.requireNonNull(snapshot);
+            if (revision < 0 || generation < 0) throw new IllegalArgumentException("Negative media revision/generation");
+        }
         static Stamp of(Source source, long generation) {
-            return new Stamp(source.documentId(), source.revision(), new WeakReference<>(source.text()), generation);
+            return new Stamp(source.documentId(), source.revision(), new WeakReference<>(source.text()), source.completeSource(), generation);
         }
         boolean matches(Source source, long currentGeneration) {
-            return source != null && source.completeSource() && document.equals(source.documentId())
+            return complete && source != null && source.completeSource() && document.equals(source.documentId())
                 && revision == source.revision() && snapshot.get() == source.text() && generation == currentGeneration;
         }
         boolean same(Stamp other) {
             var text = snapshot.get();
             return text != null && other != null && document.equals(other.document) && revision == other.revision
-                && generation == other.generation && text == other.snapshot.get();
+                && complete == other.complete && generation == other.generation && text == other.snapshot.get();
         }
     }
     record Request(Kind kind, Stamp stamp, List<MarkdownSourceRange> ranges, Optional<MarkdownSourceRange> contentRange,

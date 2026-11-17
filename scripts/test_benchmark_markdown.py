@@ -10,6 +10,17 @@ spec.loader.exec_module(bench)
 
 
 class MarkdownBenchmarkTest(unittest.TestCase):
+    def test_media_service_admission_is_checked_before_output_creation(self):
+        import subprocess, sys
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'must-not-exist'
+            for bounds in (['--samples', '101', '--sizes', '4096'], ['--sizes', str(1024**2 + 1)]):
+                result = subprocess.run([sys.executable, str(bench.ROOT / 'scripts/benchmark-markdown.py'),
+                    '--mode', 'media-service', '--output', str(output), '--generate-only'] + bounds, capture_output=True, text=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn('Media service bounds', result.stderr)
+                self.assertFalse(output.exists())
+
     def test_edit_and_memory_modes_reject_excess_work_before_creating_output(self):
         import subprocess, sys
         with tempfile.TemporaryDirectory() as directory:

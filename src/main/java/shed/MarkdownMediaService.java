@@ -62,9 +62,10 @@ final class MarkdownMediaService implements AutoCloseable {
         int width() { synchronized (MarkdownMediaService.this) { return require().image.getWidth(); } }
         int height() { synchronized (MarkdownMediaService.this) { return require().image.getHeight(); } }
         void paint(Graphics2D graphics, int x, int y) {
-            // The pin keeps the raster alive after releasing the service lock; no expensive paint holds it.
-            BufferedImage image; synchronized (MarkdownMediaService.this) { image = require().image; }
-            graphics.drawImage(image, x, y, null);
+            // A temporary pin also covers a concurrent consumer close; painting holds no service lock.
+            Entry painted; synchronized (MarkdownMediaService.this) { painted = require(); painted.pins++; }
+            try { graphics.drawImage(painted.image, x, y, null); }
+            finally { synchronized (MarkdownMediaService.this) { unpin(painted); } }
         }
         private Entry require() { if (entry == null) throw new IllegalStateException("Media lease closed"); return entry; }
         @Override public void close() {

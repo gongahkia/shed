@@ -92,24 +92,24 @@ final class MarkdownPreviewAssets implements AutoCloseable {
     /** Shared renderer serialization; no preview session/cache crosses into the media worker. */
     static BufferedImage renderMathImage(String formula, boolean display, Color foreground, float size, int maxWidth, int maxHeight) throws IOException {
         synchronized (MATH_LOCK) {
-        TeXFormula tex = new TeXFormula(formula);
-        TeXIcon icon = tex.createTeXIcon(display ? TeXConstants.STYLE_DISPLAY : TeXConstants.STYLE_TEXT, size);
-        icon.setForeground(foreground);
-        int width = icon.getIconWidth() + 8;
-        int height = icon.getIconHeight() + 8;
-        if (width <= 0 || height <= 0 || width > maxWidth || height > maxHeight) {
-            throw new IOException("math result is too large");
-        }
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D graphics = image.createGraphics();
-        try {
-            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-            icon.paintIcon(null, graphics, 4, 4);
-        } finally {
-            graphics.dispose();
-        }
-        return image;
+            TeXFormula tex = new TeXFormula(formula);
+            TeXIcon icon = tex.createTeXIcon(display ? TeXConstants.STYLE_DISPLAY : TeXConstants.STYLE_TEXT, size);
+            icon.setForeground(foreground);
+            int width = icon.getIconWidth() + 8;
+            int height = icon.getIconHeight() + 8;
+            if (width <= 0 || height <= 0 || width > maxWidth || height > maxHeight) {
+                throw new IOException("math result is too large");
+            }
+            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D graphics = image.createGraphics();
+            try {
+                graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                icon.paintIcon(null, graphics, 4, 4);
+            } finally {
+                graphics.dispose();
+            }
+            return image;
         }
     }
 
@@ -342,10 +342,14 @@ final class MarkdownPreviewAssets implements AutoCloseable {
     }
 
     private static BufferedImage scaleWithinBounds(BufferedImage source) throws IOException {
+        return scaleWithinBounds(source, MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, MAX_IMAGE_PIXELS);
+    }
+
+    static BufferedImage scaleWithinBounds(BufferedImage source, int maxWidth, int maxHeight, long maxPixels) throws IOException {
         if (source == null || source.getWidth() <= 0 || source.getHeight() <= 0) throw new IOException("image is invalid");
-        double scale = Math.min(1.0, Math.min((double) MAX_IMAGE_DIMENSION / source.getWidth(), (double) MAX_IMAGE_DIMENSION / source.getHeight()));
+        double scale = Math.min(1.0, Math.min((double) maxWidth / source.getWidth(), (double) maxHeight / source.getHeight()));
         long pixels = (long) source.getWidth() * source.getHeight();
-        if (pixels > MAX_IMAGE_PIXELS) scale = Math.min(scale, Math.sqrt((double) MAX_IMAGE_PIXELS / pixels));
+        if (pixels > maxPixels) scale = Math.min(scale, Math.sqrt((double) maxPixels / pixels));
         if (scale >= 1.0) return source;
         int width = Math.max(1, (int) Math.round(source.getWidth() * scale));
         int height = Math.max(1, (int) Math.round(source.getHeight() * scale));

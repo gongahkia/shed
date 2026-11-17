@@ -53,6 +53,7 @@ final class MarkdownPreviewAssets implements AutoCloseable {
     private static final int MAX_REMOTE_IMAGE_REQUESTS = 32;
     private static final Duration REMOTE_IMAGE_TIMEOUT = Duration.ofSeconds(12);
     private static final Object MERMAID_LOCK = new Object();
+    private static final Object MATH_LOCK = new Object();
     private final Path directory;
     private final HttpClient remoteHttp;
     private final Map<String, String> renderedAssets = new HashMap<>();
@@ -85,12 +86,18 @@ final class MarkdownPreviewAssets implements AutoCloseable {
         String key = "math|" + display + "|" + foreground.getRGB() + "|" + formula;
         String cached = renderedAssets.get(key);
         if (cached != null) return cached;
+        return writePng(key, renderMathImage(formula, display, foreground, display ? 20f : 16f, MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION));
+    }
+
+    /** Shared renderer serialization; no preview session/cache crosses into the media worker. */
+    static BufferedImage renderMathImage(String formula, boolean display, Color foreground, float size, int maxWidth, int maxHeight) throws IOException {
+        synchronized (MATH_LOCK) {
         TeXFormula tex = new TeXFormula(formula);
-        TeXIcon icon = tex.createTeXIcon(display ? TeXConstants.STYLE_DISPLAY : TeXConstants.STYLE_TEXT, display ? 20f : 16f);
+        TeXIcon icon = tex.createTeXIcon(display ? TeXConstants.STYLE_DISPLAY : TeXConstants.STYLE_TEXT, size);
         icon.setForeground(foreground);
         int width = icon.getIconWidth() + 8;
         int height = icon.getIconHeight() + 8;
-        if (width <= 0 || height <= 0 || width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+        if (width <= 0 || height <= 0 || width > maxWidth || height > maxHeight) {
             throw new IOException("math result is too large");
         }
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
@@ -102,7 +109,12 @@ final class MarkdownPreviewAssets implements AutoCloseable {
         } finally {
             graphics.dispose();
         }
-        return writePng(key, image);
+        return image;
+        }
+    }
+
+    static String renderMermaidSvg(String source) {
+        synchronized (MERMAID_LOCK) { return Mermaid.render(source); }
     }
 
     String renderMermaid(String source) throws IOException {
@@ -298,6 +310,10 @@ final class MarkdownPreviewAssets implements AutoCloseable {
     }
 
     private static BufferedImage decodeRasterImage(byte[] content) throws IOException {
+        return decodeRasterImage(content, MAX_IMAGE_DIMENSION, MAX_IMAGE_PIXELS);
+    }
+
+    static BufferedImage decodeRasterImage(byte[] content, int maxDimension, long maxPixels) throws IOException {
         try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(content))) {
             if (input == null) throw new IOException("remote image format is unsupported");
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
@@ -307,8 +323,8 @@ final class MarkdownPreviewAssets implements AutoCloseable {
                 reader.setInput(input, true, true);
                 int width = reader.getWidth(0);
                 int height = reader.getHeight(0);
-                if (width <= 0 || height <= 0 || width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION
-                    || (long) width * height > MAX_IMAGE_PIXELS) {
+                if (width <= 0 || height <= 0 || width > maxDimension || height > maxDimension
+                    || (long) width * height > maxPixels) {
                     throw new IOException("remote image dimensions exceed 4096 px or 16 megapixels");
                 }
                 BufferedImage image = reader.read(0);

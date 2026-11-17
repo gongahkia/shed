@@ -19,11 +19,12 @@ final class MarkdownController {
     private PendingHeadingEdit pendingHeadingEdit;
     private record PendingHeadingEdit(FileBuffer buffer, EditorPane pane, MarkdownSemanticSnapshot.Source source,
                                       int dot, int mark, EditorMode mode, KeymapProfile profile, long keyPress,
-                                      javax.swing.event.CaretListener caretListener) { }
+                                      javax.swing.event.CaretListener caretListener, java.awt.event.FocusListener focusListener) { }
 
     void cancelHeadingEdit() {
         if (pendingHeadingEdit != null) {
             pendingHeadingEdit.pane().getTextArea().removeCaretListener(pendingHeadingEdit.caretListener());
+            pendingHeadingEdit.pane().getTextArea().removeFocusListener(pendingHeadingEdit.focusListener());
             pendingHeadingEdit = null;
             cancelHeadings(headingEditOwner);
         }
@@ -365,7 +366,7 @@ final class MarkdownController {
     }
 
     private boolean sourceWritable(EditorPane pane, FileBuffer buffer) {
-        return pane != null && pane == editor.getActivePane() && buffer == editor.getCurrentBuffer()
+        return !editor.closingDown && editor.isDisplayable() && pane != null && pane == editor.getActivePane() && buffer == editor.getCurrentBuffer()
             && pane.getBuffer() == buffer && !buffer.isLargeFile() && !buffer.isShowingPreviewOnly()
             && !pane.isMarkdownPreview() && pane.getAlternateComponent() == null && pane.getTerminalPane() == null
             && pane.getTextArea() == editor.writingArea && editor.writingArea.getDocument() == buffer.getDocument()
@@ -407,24 +408,29 @@ final class MarkdownController {
             SourceLine line = sourceLine(editor.getCurrentCaretLine());
             int dot = editor.writingArea.getCaret().getDot(), mark = editor.writingArea.getCaret().getMark();
             javax.swing.event.CaretListener listener = event -> cancelHeadingEdit();
+            var focusListener = new java.awt.event.FocusAdapter() {
+                @Override public void focusLost(java.awt.event.FocusEvent event) { cancelHeadingEdit(); }
+            };
             var request = new PendingHeadingEdit(buffer, pane, source, dot, mark, editor.editorState.mode,
-                editor.configManager.getKeymapProfile(), editor.inputController.lastKeyPressNanos(), listener);
-            pendingHeadingEdit = request; pane.getTextArea().addCaretListener(listener);
+                editor.configManager.getKeymapProfile(), editor.inputController.lastKeyPressNanos(), listener, focusListener);
+            pendingHeadingEdit = request; pane.getTextArea().addCaretListener(listener); pane.getTextArea().addFocusListener(focusListener);
             String[] message = {"Loading heading edit"};
-            requestHeadings(headingEditOwner, buffer, () -> {
+            headingAnalysis().request(headingEditOwner, source, () -> {
                 if (headingEditCurrent(request)) return true;
                 // Detach only local state here: the coordinator may be pruning its subscriber map.
                 if (pendingHeadingEdit == request) {
                     pane.getTextArea().removeCaretListener(listener); pendingHeadingEdit = null;
+                    pane.getTextArea().removeFocusListener(focusListener);
                 }
                 return false;
             }, result -> {
-                pane.getTextArea().removeCaretListener(listener); pendingHeadingEdit = null;
+                pane.getTextArea().removeCaretListener(listener); pane.getTextArea().removeFocusListener(focusListener); pendingHeadingEdit = null;
                 var planned = MarkdownHeadingEditPlan.plan(result.semantic(), dot, mark, demote);
                 if (planned.edit().isPresent()) {
                     String failure = MarkdownEdit.applyPlan(planned.edit().get(),
                         MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(buffer), buffer), buffer,
                         pane.getTextArea(), pane.surface(), () -> sourceWritable(pane, buffer));
+                    if (failure.isEmpty()) editor.activateEditorPane(pane);
                     message[0] = failure.isEmpty() ? planned.message() : failure;
                 } else if (planned.status() == MarkdownHeadingEditPlan.Status.NOT_HEADING && !line.text().contains("#")) {
                     // Preserve ordinary-line indentation without reinterpreting semantic no-match as a heading.

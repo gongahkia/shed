@@ -290,11 +290,15 @@ public class TexteditorSwingIntegrationTest {
                 editor.persistRecoverySnapshots();
                 EditorPane first = editor.getActivePane(); editor.splitWindow(true);
                 assertSame(first.getTextArea().getDocument(), editor.writingArea.getDocument());
-                first.getTextArea().select(17, 19);
                 editor.requestMarkdownHeadings(new Object(), editor.getCurrentBuffer(), () -> true, splitAnalysis::set); return null;
             });
             assertTrue(awaitUiState(() -> splitAnalysis.get() != null));
-            onEdt(() -> { editor.writingArea.setCaretPosition(0); editor.markdownHeadingShift(false); return null; });
+            EditorPane splitTarget = onEdt(editor::getActivePane);
+            onEdt(() -> {
+                editor.editorPanes.getFirst().getTextArea().select(17, 19);
+                editor.activateEditorPane(splitTarget); editor.writingArea.setCaretPosition(0);
+                editor.markdownHeadingShift(false); assertSame(splitTarget, editor.getActivePane()); return null;
+            });
             assertTrue(awaitUiState(() -> editor.writingArea.getText().equals(text)));
             onEdt(() -> {
                 assertEquals(16, editor.editorPanes.getFirst().getTextArea().getSelectionStart());
@@ -307,6 +311,16 @@ public class TexteditorSwingIntegrationTest {
                     return journal != null && journal.entries().stream().anyMatch(e -> e.content().equals("#" + text));
                 } catch (java.io.IOException error) { return false; }
             }));
+            var previewAnalysis = new java.util.concurrent.atomic.AtomicReference<MarkdownHeadingAnalysis>();
+            onEdt(() -> {
+                assertEquals("Markdown preview opened", editor.openMarkdownPreview());
+                editor.requestMarkdownHeadings(new Object(), editor.getCurrentBuffer(), () -> true, previewAnalysis::set); return null;
+            });
+            assertTrue(awaitUiState(() -> previewAnalysis.get() != null));
+            onEdt(() -> { editor.writingArea.setCaretPosition(0); editor.markdownHeadingShift(true); return null; });
+            assertTrue(awaitUiState(() -> editor.writingArea.getText().equals("##" + text)));
+            assertTrue(awaitUiState(() -> editor.editorPanes.stream().filter(EditorPane::isMarkdownPreview)
+                .map(p -> (MarkdownPreviewPane) p.getComponent()).anyMatch(p -> p.getHtml().contains("<h4"))));
             assertEquals(text, Files.readString(file));
         } finally { disposeEditor(editor); }
     }
@@ -314,7 +328,7 @@ public class TexteditorSwingIntegrationTest {
     @Test
     void pendingSemanticEditsCannotSurviveTypingCaretBufferModeOrLifetimeChanges() throws Exception {
         assumeSwingAvailable();
-        for (String action : List.of("typing", "caret-return", "buffer-return", "mode-key", "close", "split", "undo-redo")) {
+        for (String action : List.of("typing", "caret-return", "buffer-return", "mode-key", "focus", "close", "split", "undo-redo")) {
             Path home = Files.createDirectories(tempDir.resolve("home-edit-gate-" + action));
             Path first = Files.writeString(tempDir.resolve("edit-gate-a-" + action + ".md"), "## A\nbody");
             Path second = Files.writeString(tempDir.resolve("edit-gate-b-" + action + ".md"), "## B\nother");
@@ -342,6 +356,10 @@ public class TexteditorSwingIntegrationTest {
                         case "caret-return" -> { editor.writingArea.setCaretPosition(3); editor.writingArea.setCaretPosition(0); }
                         case "buffer-return" -> { editor.loadBufferIntoEditor(b); editor.loadBufferIntoEditor(a); }
                         case "mode-key" -> { editor.setMode(EditorMode.NORMAL); editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ESCAPE, (char) 27)); editor.setMode(EditorMode.INSERT); }
+                        case "focus" -> {
+                            var event = new FocusEvent(editor.writingArea, FocusEvent.FOCUS_LOST);
+                            for (var listener : editor.writingArea.getFocusListeners()) listener.focusLost(event);
+                        }
                         case "close" -> editor.closeActiveBufferWithoutExiting(true);
                         case "split" -> editor.splitWindow(true);
                         case "undo-redo" -> { a.getDocument().insertString(a.getDocument().getLength(), "x", null); a.getUndoManager().undo(); a.getUndoManager().redo(); }
@@ -358,7 +376,9 @@ public class TexteditorSwingIntegrationTest {
                     assertEquals(expected.history(), ((BoundedUndoManager) a.getUndoManager()).retainedEditCount());
                     assertEquals(expected.bytes(), ((BoundedUndoManager) a.getUndoManager()).retainedBytes());
                     assertEquals("## B\nother", b.getContent()); assertFalse(b.isModified());
-                    assertEquals(0, service.diagnostics().subscribers()); return null;
+                    assertEquals(0, service.diagnostics().subscribers());
+                    var pending = MarkdownController.class.getDeclaredField("pendingHeadingEdit"); pending.setAccessible(true);
+                    assertEquals(null, pending.get(editor.markdownController), "Obsolete edit must release its source/selection stamp"); return null;
                 });
             } finally { release.countDown(); disposeEditor(editor); }
         }

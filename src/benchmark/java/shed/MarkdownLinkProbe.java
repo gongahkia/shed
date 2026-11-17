@@ -22,7 +22,7 @@ final class MarkdownLinkProbe {
             uiText("index_inactive_typing", () -> typed('x'), i >= 0);
             uiText("index_inactive_undo", () -> buffer.getUndoManager().undo(), i >= 0);
         }
-        edt(() -> { buffer.setModified(false); return null; }); settle("before_project_index");
+        edt(() -> { buffer.setModified(false); return null; }); settle(editor, "before_project_index");
         long cold = System.nanoTime();
         double requestMs = edt(() -> {
             editor.workspaceRoots.add(root); long start = System.nanoTime(); editor.markdownLinks().request(root); return (System.nanoTime() - start) / 1e6;
@@ -40,7 +40,7 @@ final class MarkdownLinkProbe {
         out("MD_META ", Map.of("operation", "project_workload", "files", count + 1, "typing_samples_overlapping_worker", overlapping,
             "status", edt(() -> editor.markdownLinks().backlinks(root, target).state().name()),
             "metrics", edt(() -> editor.markdownLinks().metrics(root).orElseThrow().toString()), "diagnostics", edt(() -> editor.markdownLinks().diagnostics().toString())));
-        settle("retained_project_index");
+        settle(editor, "retained_project_index");
         for (int i = -warmups; i < samples; i++) {
             boolean measured = i >= 0;
             edt(() -> {
@@ -66,10 +66,25 @@ final class MarkdownLinkProbe {
         WeakReference<MarkdownProjectLinks> released = edt(() -> {
             var service = editor.markdownLinks(); var weak = new WeakReference<>(service); editor.disposeMarkdownPreviews(); return weak;
         });
-        settle("after_project_disposal"); out("MD_META ", Map.of("operation", "project_service_collected", "collected", released.get() == null));
-        builderMeasurements(root, target, Math.min(20, samples));
+        settle(editor, "after_project_disposal"); out("MD_META ", Map.of("operation", "project_service_collected", "collected", released.get() == null));
+        concurrentProject(editor, notes, buffer, samples);
+        builderMeasurements(editor, root, target, Math.min(20, samples));
     }
-    private static void builderMeasurements(Path root, Path target, int samples) throws Exception {
+    private static void concurrentProject(Texteditor editor, Path notes, FileBuffer buffer, int samples) throws Exception {
+        var service = edt(() -> new MarkdownProjectLinks(() -> List.of(notes), List::of));
+        edt(() -> { service.request(notes); return null; }); int overlapping = 0;
+        for (int i = 0; i < samples; i++) {
+            if (edt(() -> service.diagnostics().running() > 0)) overlapping++;
+            uiText("unrelated_project_index_typing", () -> typed('x'), true);
+            uiText("unrelated_project_index_undo", () -> buffer.getUndoManager().undo(), true);
+        }
+        await(() -> service.diagnostics().running() == 0, 30);
+        out("MD_META ", Map.of("operation", "independent_project_concurrency", "typing_samples_overlapping_worker", overlapping,
+            "diagnostics", edt(() -> service.diagnostics().toString())));
+        edt(() -> { service.close(); return null; });
+    }
+
+    private static void builderMeasurements(Texteditor editor, Path root, Path target, int samples) throws Exception {
         var threads = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean(); long id = Thread.currentThread().threadId();
         MarkdownLinkIndex.Snapshot previous = null;
         for (int i = 0; i < 3; i++) {
@@ -93,8 +108,24 @@ final class MarkdownLinkProbe {
             long start = System.nanoTime(); previous = MarkdownLinkIndex.build(root, List.of(root), previous, List.of(), Set.of(target), () -> false);
             out("MD_SAMPLE ", Map.of("operation", "single_file_refresh", "state", "OK", "worker_ms", (System.nanoTime() - start) / 1e6, "parsed", previous.metrics().parsed()));
         }
+        settle(editor, "after_repeated_builder_operations");
     }
-    private static void settle(String phase) throws Exception {
+    private static void settle(Texteditor editor, String phase) throws Exception {
+        await(() -> {
+            for (Object owner : List.of(editor, editor.syntaxUiController, editor.inputController, editor.recoveryController, editor.lspController, editor.paneBufferController)) {
+                for (var field : owner.getClass().getDeclaredFields()) {
+                    if (field.getType() == javax.swing.Timer.class) {
+                        field.setAccessible(true); var timer = (javax.swing.Timer) field.get(owner);
+                        if (timer != null && !timer.isRepeats() && timer.isRunning()) return false;
+                    } else if (java.util.Map.class.isAssignableFrom(field.getType())) {
+                        field.setAccessible(true); var map = (java.util.Map<?, ?>) field.get(owner);
+                        if (map != null) for (var value : map.values())
+                            if (value instanceof javax.swing.Timer timer && !timer.isRepeats() && timer.isRunning()) return false;
+                    }
+                }
+            }
+            return editor.asyncJobService.list().stream().noneMatch(job -> job.getStatus() == AsyncJobService.Status.RUNNING);
+        }, 30);
         for (int i = 0; i < 3; i++) { System.gc(); Thread.sleep(60); }
         memory(phase);
         var process = new ProcessBuilder("ps", "-o", "rss=", "-p", Long.toString(ProcessHandle.current().pid())).start();

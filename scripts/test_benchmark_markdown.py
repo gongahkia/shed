@@ -14,12 +14,12 @@ class MarkdownBenchmarkTest(unittest.TestCase):
         import subprocess, sys
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'must-not-exist'
-            for mode in ('semantic-edits', 'semantic-memory', 'semantic-memory-control'):
+            for mode in ('semantic-edits', 'semantic-memory', 'semantic-memory-control', 'project-links', 'link-navigation'):
                 for bounds in (['--samples', '101', '--sizes', '4096'], ['--sizes', str(3 * 1024**2)]):
                     result = subprocess.run([sys.executable, str(bench.ROOT / 'scripts/benchmark-markdown.py'),
                         '--mode', mode, '--output', str(output), '--generate-only'] + bounds, capture_output=True, text=True)
                     self.assertEqual(2, result.returncode)
-                    self.assertIn('Semantic edit/memory bounds', result.stderr)
+                    self.assertIn('Project link bounds' if mode in ('project-links', 'link-navigation') else 'Semantic edit/memory bounds', result.stderr)
                     self.assertFalse(output.exists())
 
     def test_width_fixture_has_one_widest_line_and_tabs_fixture_contains_tabs(self):

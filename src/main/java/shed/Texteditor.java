@@ -1422,7 +1422,7 @@ public class Texteditor extends JFrame implements KeyListener {
         markdownController.detachPreview(pane);
     }
 
-    /** Headless infrastructure only; no startup caller or navigation command is attached. */
+    /** Shared infrastructure stays lazy until an explicit Markdown navigation/index request. */
     MarkdownProjectLinks markdownLinks() {
         if (markdownLinks == null) markdownLinks = new MarkdownProjectLinks(workspaceRoots::all, () -> {
             var sources = new java.util.ArrayList<MarkdownLinkIndex.Overlay>();
@@ -1443,6 +1443,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     void markdownLinkRootsChanged() {
+        if (markdownController != null) markdownController.cancelLinkNavigation();
         if (markdownLinks != null) { markdownLinks.reconcileRoots(); markdownLinks.documentsChanged(null, false); }
     }
 
@@ -1459,6 +1460,8 @@ public class Texteditor extends JFrame implements KeyListener {
     void cancelMarkdownHeadings(Object owner) { markdownController.cancelHeadings(owner); }
 
     void cancelMarkdownHeadingEdit() { markdownController.cancelHeadingEdit(); }
+
+    void cancelMarkdownLinkNavigation() { markdownController.cancelLinkNavigation(); }
 
     void markdownSourceClosed(FileBuffer buffer) {
         if (buffer.isModified()) markdownLinksChanged(buffer, false);
@@ -1603,6 +1606,8 @@ public class Texteditor extends JFrame implements KeyListener {
     public String insertImage() {
         return markdownController.insertImage();
     }
+
+    String showMarkdownLinks(boolean incoming) { return markdownController.showLinks(incoming); }
 
     public String goToMarkdownLink() {
         return markdownController.goToMarkdownLink();
@@ -2904,6 +2909,12 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public void openFileAsync(File file, java.util.function.Consumer<IOException> completion) {
         paneBufferController.openFileAsync(file, completion);
+    }
+
+    void openMarkdownTarget(MarkdownLinkNavigation.Target target, java.util.function.BooleanSupplier current, Runnable accepted,
+                            java.util.function.Consumer<java.io.IOException> completion) {
+        paneBufferController.openFileCheckedAsync(target.openPath().toFile(), current,
+            buffer -> target.accepts(documentStore.id(buffer), buffer), buffer -> target.loaded(buffer, () -> false), accepted, completion);
     }
 
     String openFileAtAsync(File file, int line, int column, String successMessage) {

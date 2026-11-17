@@ -758,6 +758,7 @@ final class EditorUiController {
             return;
         }
         editor.cancelMarkdownHeadingEdit();
+        editor.cancelMarkdownLinkNavigation();
         editor.writingArea = pane.getTextArea();
         editor.lineNumberPanel = pane.getLineNumberPanel();
         editor.editorScrollPane = pane.getScrollPane();

@@ -472,13 +472,38 @@ final class PaneBufferController {
     }
 
     void openFileAsync(File file, java.util.function.Consumer<IOException> completion) {
-        if (findBufferByPath(file) != getCurrentBuffer()) editor.recordJumpPosition();
-        persistCurrentBufferState();
+        openFileAsync(file, () -> true, buffer -> true, buffer -> true, false, () -> { }, completion);
+    }
+
+    void openFileCheckedAsync(File file, java.util.function.BooleanSupplier current,
+                              java.util.function.Predicate<FileBuffer> openValid,
+                              java.util.function.Predicate<FileBuffer> loadedValid, Runnable beforeInstall,
+                              java.util.function.Consumer<IOException> completion) {
+        openFileAsync(file, current, openValid, loadedValid, true, beforeInstall, completion);
+    }
+
+    private void openFileAsync(File file, java.util.function.BooleanSupplier current,
+                               java.util.function.Predicate<FileBuffer> openValid,
+                               java.util.function.Predicate<FileBuffer> loadedValid, boolean checked, Runnable beforeInstall,
+                               java.util.function.Consumer<IOException> completion) {
+        if (!current.getAsBoolean()) { if (checked && completion != null) completion.accept(new IOException("Markdown navigation cancelled")); return; }
+        if (!checked && findBufferByPath(file) != getCurrentBuffer()) editor.recordJumpPosition();
+        if (!checked) persistCurrentBufferState();
         EditorPane targetPane = editor.getActivePane();
         long request = openRequests.issue(targetPane);
-        String projectConfigMessage = applyProjectConfigurationForFile(file);
+        String projectConfigMessage = checked ? null : applyProjectConfigurationForFile(file);
         FileBuffer existing = findBufferByPath(file);
         if (existing != null) {
+            if (!current.getAsBoolean() || !openValid.test(existing)) {
+                if (completion != null) completion.accept(new IOException("Markdown target changed; request again"));
+                return;
+            }
+            if (checked) {
+                String configuration = applyProjectConfigurationForFile(file);
+                if (!current.getAsBoolean() || !openValid.test(existing)) { if (completion != null) completion.accept(new IOException("Markdown navigation cancelled")); return; }
+                beforeInstall.run(); editor.recordJumpPosition(); persistCurrentBufferState();
+                if (configuration != null && !configuration.isEmpty()) editor.showMessage(configuration);
+            }
             loadBufferIntoEditor(existing);
             editor.showAlternateSurfaceIfAvailable(editor.getActivePane(), existing);
             if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) editor.showMessage(projectConfigMessage);
@@ -488,14 +513,20 @@ final class PaneBufferController {
         editor.asyncJobService.submit("open file", token -> {
             long started = System.nanoTime();
             try {
-                return editor.documentStore.load(file.toPath());
+                FileBuffer loaded = editor.documentStore.load(file.toPath());
+                if (token.isCancelled() || !loadedValid.test(loaded)) throw new IOException("Markdown target changed while opening; request again");
+                return loaded;
             } finally {
                 editor.perfService.recordDuration("file.open.load", started, "bytes=" + file.length());
             }
         }, (job, loaded, error) -> {
-                if (editor.closingDown || job.getStatus() == AsyncJobService.Status.CANCELLED) return;
+                if (editor.closingDown || job.getStatus() == AsyncJobService.Status.CANCELLED || !current.getAsBoolean()) {
+                    if (checked && completion != null) completion.accept(new IOException("Markdown navigation cancelled")); return;
+                }
                 if (targetPane != null && (!openRequests.current(targetPane, request)
-                    || !editor.editorPanes.contains(targetPane))) return;
+                    || !editor.editorPanes.contains(targetPane))) {
+                    if (checked && completion != null) completion.accept(new IOException("Markdown navigation superseded")); return;
+                }
                 if (error != null || loaded == null) {
                     IOException failure = error instanceof IOException io ? io
                         : new IOException(error == null ? "unknown error" : error.getMessage(), error);
@@ -503,10 +534,21 @@ final class PaneBufferController {
                     if (completion != null) completion.accept(failure);
                     return;
                 }
+                FileBuffer concurrent = findBufferByPath(file);
+                if (concurrent != null && !openValid.test(concurrent)) {
+                    if (completion != null) completion.accept(new IOException("Markdown target changed; request again"));
+                    return;
+                }
                 EditorPane pane = targetPane != null && editor.editorPanes.contains(targetPane)
                     ? targetPane : editor.getActivePane();
+                String configuration = projectConfigMessage;
+                if (checked) {
+                    configuration = applyProjectConfigurationForFile(file);
+                    if (!current.getAsBoolean()) { if (completion != null) completion.accept(new IOException("Markdown navigation cancelled")); return; }
+                    beforeInstall.run(); editor.recordJumpPosition(); persistCurrentBufferState();
+                }
                 long installStarted = System.nanoTime();
-                installLoadedBuffer(file, loaded, projectConfigMessage, pane);
+                installLoadedBuffer(file, loaded, configuration, pane);
                 editor.perfService.recordDuration("file.open.install", installStarted,
                     "chars=" + loaded.textSnapshot().length());
                 if (completion != null) completion.accept(null);

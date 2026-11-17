@@ -43,6 +43,299 @@ public class TexteditorSwingIntegrationTest {
     Path tempDir;
 
     @Test
+    void markdownActualOutgoingPickerAcceptsAlreadyOpenTargetAfterModalFocusRestoration() throws Exception {
+        assumeSwingAvailable(); Path project = Files.createDirectories(tempDir.resolve("outgoing-accept-project"));
+        Path source = Files.writeString(project.resolve("source.md"), "[[target]]"); Path target = Files.writeString(project.resolve("target.md"), "# Target");
+        Texteditor editor = createEditor(tempDir.resolve("outgoing-accept-home"), source);
+        var accepted = new java.util.concurrent.CountDownLatch(1); var error = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        var events = new java.util.concurrent.atomic.AtomicInteger();
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending)); var original = onEdt(editor::getCurrentBuffer); var text = onEdt(original::textSnapshot);
+            onEdt(() -> {
+                editor.workspaceRoots.add(project); editor.openFile(target.toFile()); editor.switchToBuffer(editor.buffers.indexOf(original)); editor.writingArea.setCaretPosition(3);
+                original.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                    public void insertUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
+                    public void removeUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
+                    public void changedUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
+                });
+                javax.swing.Timer driver = new javax.swing.Timer(5, event -> {
+                    var dialog = Arrays.stream(editor.getOwnedWindows()).filter(window -> window instanceof javax.swing.JDialog d && d.isShowing()
+                        && d.getTitle().equals("Markdown Outgoing Links")).map(window -> (javax.swing.JDialog) window).findFirst().orElse(null);
+                    if (dialog == null) return; ((javax.swing.Timer) event.getSource()).stop();
+                    try { descendants(dialog, javax.swing.JTextField.class).getFirst().postActionEvent(); }
+                    catch (Throwable failure) { error.set(failure); dialog.dispose(); }
+                    finally { accepted.countDown(); }
+                }); driver.start(); editor.showMessage(editor.commandHandler.execute("markdown outgoing")); return null;
+            });
+            assertTrue(accepted.await(20, TimeUnit.SECONDS)); if (error.get() != null) throw new AssertionError(error.get()); assertTrue(awaitCurrentFile(editor, target));
+            assertTrue(awaitUiState(() -> editor.markdownController.linkDiagnostics().worker() == 0));
+            onEdt(() -> { assertSame(text, original.textSnapshot()); assertEquals(0, events.get()); assertFalse(original.isModified()); assertFalse(original.getUndoManager().canUndo());
+                assertEquals(2, editor.buffers.size()); editor.commandHandler.execute("back"); assertSame(original, editor.getCurrentBuffer()); assertEquals(3, editor.writingArea.getCaretPosition()); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownExternalNavigationWithoutProjectUsesSemanticCodeExclusionAndCreatesNoIndex() throws Exception {
+        assumeSwingAvailable(); String text = "[web](https://example.invalid)\n`[fake](https://example.invalid)`";
+        Path file = Files.writeString(tempDir.resolve("external.md"), text); Texteditor editor = createEditor(tempDir.resolve("external-home"), file);
+        var opened = new java.util.concurrent.atomic.AtomicInteger();
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> { editor.markdownController.linkBrowser = uri -> { opened.incrementAndGet(); return "External checked"; };
+                assertTrue(editor.workspaceRoots.all().isEmpty()); editor.writingArea.setCaretPosition(2); editor.showMessage(editor.goToMarkdownLink()); return null;
+            }); assertTrue(awaitUiState(() -> opened.get() == 1 && editor.markdownController.linkDiagnostics().active() == 0));
+            onEdt(() -> { editor.writingArea.setCaretPosition(text.indexOf("fake")); editor.showMessage(editor.goToMarkdownLink()); return null; });
+            assertTrue(awaitUiState(() -> editor.markdownController.linkDiagnostics().active() == 0));
+            onEdt(() -> { assertEquals(1, opened.get()); var field = Texteditor.class.getDeclaredField("markdownLinks"); field.setAccessible(true); assertEquals(null, field.get(editor));
+                assertEquals(text, editor.getCurrentBuffer().getContent()); assertFalse(editor.getCurrentBuffer().isModified()); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownActualAmbiguousPickerAcceptsKeyboardChoiceAndCanonicalAliasesHaveBacklinks() throws Exception {
+        assumeSwingAvailable(); Path project = Files.createDirectories(tempDir.resolve("keyboard-link-project"));
+        Path source = Files.writeString(project.resolve("source.md"), "[[note]]");
+        Files.createDirectories(project.resolve("a")); Files.createDirectories(project.resolve("b"));
+        Files.writeString(project.resolve("a/note.md"), "# A"); Path target = Files.writeString(project.resolve("b/note.md"), "# B");
+        Texteditor editor = createEditor(tempDir.resolve("keyboard-link-home"), source);
+        var done = new java.util.concurrent.CountDownLatch(1); var error = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.workspaceRoots.add(project); editor.writingArea.setCaretPosition(3);
+                javax.swing.Timer driver = new javax.swing.Timer(10, event -> {
+                    var dialog = Arrays.stream(editor.getOwnedWindows()).filter(w -> w instanceof javax.swing.JDialog d && d.isShowing()
+                        && d.getTitle().equals("Markdown Link Targets")).map(w -> (javax.swing.JDialog) w).findFirst().orElse(null);
+                    if (dialog == null) return; ((javax.swing.Timer) event.getSource()).stop();
+                    try {
+                        var field = descendants(dialog, javax.swing.JTextField.class).getFirst(); var list = descendants(dialog, javax.swing.JList.class).getFirst();
+                        assertEquals(2, list.getModel().getSize());
+                        Object next = field.getInputMap().get(javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0));
+                        field.getActionMap().get(next).actionPerformed(new ActionEvent(field, 0, "down"));
+                        assertTrue(list.getSelectedValue().toString().contains("b/note.md")); field.postActionEvent();
+                    } catch (Throwable failure) { error.set(failure); dialog.dispose(); }
+                    finally { done.countDown(); }
+                }); driver.start(); editor.showMessage(editor.goToMarkdownLink()); return null;
+            });
+            assertTrue(done.await(20, TimeUnit.SECONDS)); if (error.get() != null) throw new AssertionError(error.get()); assertTrue(awaitCurrentFile(editor, target));
+            Path alias = project.resolve("alias.md"); Files.createSymbolicLink(alias, target);
+            Files.writeString(project.resolve("reference.md"), "[[b/note]]");
+            onEdt(() -> { editor.openFile(alias.toFile()); editor.markdownController.linkPicker = (title, rows) -> {
+                assertEquals("Markdown Backlinks", title); assertTrue(rows.stream().anyMatch(row -> row.contains("reference.md"))); return null;
+            }; editor.showMessage(editor.commandHandler.execute("markdown backlinks")); return null; });
+            assertTrue(awaitUiState(() -> editor.markdownController.linkDiagnostics().active() == 0 && editor.markdownController.linkDiagnostics().worker() == 0));
+            assertEquals(alias.toString(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownRapidNavigationUnderWorkerSaturationCoalescesAndSupersededResultsCannotCancelNewest() throws Exception {
+        assumeSwingAvailable(); Path project = Files.createDirectories(tempDir.resolve("saturated-link-project"));
+        Path source = Files.writeString(project.resolve("source.md"), "[[target]]"); Path target = Files.writeString(project.resolve("target.md"), "# Target");
+        Texteditor editor = createEditor(tempDir.resolve("saturated-link-home"), source);
+        int workers = AsyncJobService.workerCount(); var entered = new java.util.concurrent.CountDownLatch(workers); var release = new java.util.concurrent.CountDownLatch(1);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> { editor.workspaceRoots.add(project); editor.markdownLinks().request(project); return null; });
+            assertTrue(awaitUiState(() -> editor.markdownLinks().diagnostics().running() == 0));
+            onEdt(() -> { for (int i = 0; i < workers; i++) editor.asyncJobService.submit("navigation worker gate", token -> {
+                entered.countDown(); release.await(20, TimeUnit.SECONDS); return null;
+            }, null); return null; });
+            assertTrue(entered.await(20, TimeUnit.SECONDS));
+            onEdt(() -> { editor.writingArea.setCaretPosition(3); editor.showMessage(editor.goToMarkdownLink()); return null; });
+            assertTrue(awaitUiState(() -> editor.markdownController.linkDiagnostics().worker() == 1));
+            onEdt(() -> { for (int i = 0; i < 20; i++) editor.goToMarkdownLink(); return null; });
+            assertTrue(awaitUiState(() -> editor.markdownLinks().diagnostics().running() == 0));
+            onEdt(() -> {
+                assertEquals(1, editor.markdownController.linkDiagnostics().worker()); assertTrue(editor.markdownController.linkDiagnostics().queued() <= 1);
+                assertEquals(1, editor.buffers.size()); assertFalse(editor.getCurrentBuffer().isModified());
+                assertTrue(editor.asyncJobService.list().stream().filter(job -> job.getDescription().equals("Resolve Markdown source identity")
+                    || job.getDescription().equals("Validate Markdown navigation")).count() <= 1); return null;
+            }); release.countDown(); assertTrue(awaitCurrentFile(editor, target));
+            assertTrue(awaitUiState(() -> editor.markdownController.linkDiagnostics().active() == 0 && editor.markdownController.linkDiagnostics().worker() == 0));
+        } finally { release.countDown(); disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownUsesActualPickerFilteringKeyboardDismissalAndReleasesListeners() throws Exception {
+        assumeSwingAvailable(); Path project = Files.createDirectories(tempDir.resolve("real-link-picker"));
+        Path source = Files.writeString(project.resolve("source.md"), "[[a]] [[b]]");
+        Files.writeString(project.resolve("a.md"), ""); Files.writeString(project.resolve("b.md"), "");
+        Texteditor editor = createEditor(tempDir.resolve("real-link-picker-home"), source);
+        var completed = new java.util.concurrent.CountDownLatch(1); var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        var field = new java.util.concurrent.atomic.AtomicReference<javax.swing.JTextField>();
+        var dialogRef = new java.util.concurrent.atomic.AtomicReference<javax.swing.JDialog>();
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending)); var buffer = onEdt(editor::getCurrentBuffer); var snapshot = onEdt(buffer::textSnapshot);
+            int listenerCount = onEdt(() -> editor.writingArea.getCaretListeners().length);
+            onEdt(() -> {
+                editor.workspaceRoots.add(project);
+                javax.swing.Timer driver = new javax.swing.Timer(10, event -> {
+                    var dialog = Arrays.stream(editor.getOwnedWindows()).filter(w -> w instanceof javax.swing.JDialog d && d.isShowing()
+                        && d.getTitle().equals("Markdown Outgoing Links")).map(w -> (javax.swing.JDialog) w).findFirst().orElse(null);
+                    if (dialog == null) return; ((javax.swing.Timer) event.getSource()).stop(); dialogRef.set(dialog);
+                    try {
+                        var filter = descendants(dialog, javax.swing.JTextField.class).getFirst(); field.set(filter);
+                        var list = descendants(dialog, javax.swing.JList.class).getFirst();
+                        assertEquals(editor.resolveUiFont(), list.getFont()); assertEquals(editor.configManager.getCommandBarBackground(), list.getBackground());
+                        assertEquals(2, list.getModel().getSize()); assertTrue(list.getModel().getElementAt(0).toString().contains(":1:1"));
+                        filter.setText("b");
+                        dialog.getRootPane().getActionMap().get("dismiss").actionPerformed(new ActionEvent(dialog, 0, "escape"));
+                    } catch (Throwable error) { failure.set(error); dialog.dispose(); }
+                    finally { completed.countDown(); }
+                }); driver.start(); editor.showMessage(editor.commandHandler.execute("markdown outgoing")); return null;
+            });
+            assertTrue(completed.await(20, TimeUnit.SECONDS)); if (failure.get() != null) throw new AssertionError(failure.get());
+            assertTrue(awaitUiState(() -> editor.markdownController.linkDiagnostics().active() == 0));
+            onEdt(() -> {
+                assertFalse(dialogRef.get().isDisplayable()); assertEquals(0, field.get().getActionListeners().length);
+                assertEquals(listenerCount, editor.writingArea.getCaretListeners().length); assertSame(snapshot, buffer.textSnapshot());
+                assertSame(buffer, editor.getCurrentBuffer()); assertFalse(buffer.isModified()); assertFalse(buffer.getUndoManager().canUndo()); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownPendingNavigationCancelsOnPaneProjectAndBufferChangesWithoutHistoryOrMutation() throws Exception {
+        assumeSwingAvailable(); Path project = Files.createDirectories(tempDir.resolve("pending-link-project"));
+        Path source = Files.writeString(project.resolve("source.md"), "[[target]]"); Files.writeString(project.resolve("target.md"), "# Target");
+        Texteditor editor = createEditor(tempDir.resolve("pending-link-home"), source);
+        var entered = new java.util.concurrent.CountDownLatch(1); var release = new java.util.concurrent.CountDownLatch(1);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending)); var original = onEdt(editor::getCurrentBuffer);
+            onEdt(() -> {
+                editor.workspaceRoots.add(project);
+                var service = new MarkdownProjectLinks(editor.workspaceRoots::all, List::of, (root, roots, old, overlays, force, stop) -> {
+                    entered.countDown(); if (!release.await(20, TimeUnit.SECONDS)) throw new AssertionError("worker gate timed out");
+                    return MarkdownLinkIndex.build(root, roots, old, overlays, force, () -> false);
+                });
+                var field = Texteditor.class.getDeclaredField("markdownLinks"); field.setAccessible(true); field.set(editor, service);
+                editor.writingArea.setCaretPosition(3); editor.showMessage(editor.goToMarkdownLink()); return null;
+            });
+            assertTrue(entered.await(20, TimeUnit.SECONDS));
+            onEdt(() -> { editor.splitWindow(true); assertEquals(0, editor.markdownController.linkDiagnostics().active());
+                editor.workspaceRoots.remove(project); editor.markdownLinkRootsChanged(); return null;
+            }); release.countDown();
+            assertTrue(awaitUiState(() -> editor.markdownLinks().diagnostics().running() == 0));
+            onEdt(() -> {
+                assertSame(original, editor.getCurrentBuffer()); assertEquals("[[target]]", original.getContent()); assertFalse(original.isModified());
+                assertFalse(original.getUndoManager().canUndo()); assertEquals(1, editor.buffers.size());
+                assertEquals(0, editor.markdownLinks().diagnostics().partitions()); return null;
+            });
+        } finally { release.countDown(); disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownLinkCommandsFollowWikiRelativeFragmentsAndPreserveHistorySplitsAndSource() throws Exception {
+        assumeSwingAvailable(); Path project = Files.createDirectories(tempDir.resolve("navigation-project"));
+        String text = "[link](folder/note.md#second) [[folder/note#Second|Alias]]\n`[[wrong]]`\n```\n[[wrong]]\n```";
+        Path source = Files.writeString(project.resolve("source.md"), text); Files.createDirectories(project.resolve("folder"));
+        Path target = Files.writeString(project.resolve("folder/note.md"), "# First\n\n## Second\n");
+        Texteditor editor = createEditor(tempDir.resolve("navigation-home"), source);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            FileBuffer original = onEdt(editor::getCurrentBuffer); var snapshot = onEdt(original::textSnapshot); long revision = onEdt(original::documentRevision);
+            int caretListeners = onEdt(() -> editor.writingArea.getCaretListeners().length);
+            onEdt(() -> { editor.workspaceRoots.add(project); editor.writingArea.setCaretPosition(2); editor.showMessage(editor.commandHandler.execute("markdown link follow")); return null; });
+            assertTrue(awaitCurrentFile(editor, target)); assertTrue(awaitUiState(() -> editor.writingArea.getCaretPosition() == 9));
+            onEdt(() -> { editor.commandHandler.execute("back"); return null; });
+            assertTrue(awaitCurrentFile(editor, source)); assertEquals(2, onEdt(() -> editor.writingArea.getCaretPosition()));
+            onEdt(() -> {
+                assertSame(snapshot, original.textSnapshot()); assertEquals(revision, original.documentRevision()); assertFalse(original.isModified()); assertFalse(original.getUndoManager().canUndo());
+                editor.splitWindow(true); editor.writingArea.setCaretPosition(text.indexOf("Alias")); editor.showMessage(editor.goToMarkdownLink()); return null;
+            });
+            assertTrue(awaitCurrentFile(editor, target)); assertTrue(awaitUiState(() -> editor.writingArea.getCaretPosition() == 9));
+            onEdt(() -> {
+                assertEquals(1, editor.buffers.stream().filter(b -> b.hasFilePath() && b.getFilePath().equals(target.toString())).count());
+                assertTrue(editor.editorPanes.stream().anyMatch(p -> p.getBuffer() == original));
+                assertEquals(text, original.getContent()); assertFalse(original.isModified());
+                assertEquals(caretListeners, editor.writingArea.getCaretListeners().length); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownLinkPickersUseExistingRowsAndRejectSourceOrIndexChanges() throws Exception {
+        assumeSwingAvailable(); Path project = Files.createDirectories(tempDir.resolve("picker-links"));
+        Path source = Files.writeString(project.resolve("source.md"), "[[note]] [[note]]");
+        Path a = Files.createDirectories(project.resolve("a")); Path b = Files.createDirectories(project.resolve("b"));
+        Path chosen = Files.writeString(b.resolve("note.md"), "# Note"); Files.writeString(a.resolve("note.md"), "# Other");
+        Texteditor editor = createEditor(tempDir.resolve("picker-links-home"), source);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending)); var original = onEdt(editor::getCurrentBuffer);
+            onEdt(() -> {
+                editor.workspaceRoots.add(project); editor.markdownController.linkPicker = (title, rows) -> {
+                    assertEquals("Markdown Link Targets", title); assertEquals(2, rows.size());
+                    return rows.stream().filter(row -> row.contains("b/note.md")).findFirst().orElseThrow();
+                }; editor.writingArea.setCaretPosition(3); editor.showMessage(editor.goToMarkdownLink()); return null;
+            });
+            assertTrue(awaitCurrentFile(editor, chosen));
+            onEdt(() -> { editor.switchToBuffer(editor.buffers.indexOf(original));
+                editor.markdownController.linkPicker = (title, rows) -> {
+                    assertEquals("Markdown Outgoing Links", title); assertEquals(2, rows.size()); assertTrue(rows.getFirst().contains(":1:1"));
+                    editor.writingArea.append(" changed"); return rows.getFirst();
+                }; editor.showMessage(editor.commandHandler.execute("markdown outgoing")); return null;
+            });
+            assertTrue(awaitUiState(() -> editor.writingArea.getText().endsWith(" changed")));
+            onEdt(() -> {
+                assertSame(original, editor.getCurrentBuffer()); assertEquals("[[note]] [[note]] changed", original.getContent());
+                editor.markdownController.linkPicker = (title, rows) -> { editor.markdownLinks().refresh(project); return rows.getFirst(); };
+                editor.showMessage(editor.commandHandler.execute("markdown outgoing")); return null;
+            });
+            assertTrue(awaitUiState(() -> editor.markdownLinks().diagnostics().running() == 0 && editor.markdownLinks().diagnostics().pending() == 0));
+            onEdt(() -> { assertSame(original, editor.getCurrentBuffer()); return null; });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownBacklinksNavigateUnsavedReferringSourceAndRejectDiscardedPickerRows() throws Exception {
+        assumeSwingAvailable(); Path project = Files.createDirectories(tempDir.resolve("backlinks-project"));
+        Path source = Files.writeString(project.resolve("source.md"), "preface\n"); Path target = Files.writeString(project.resolve("target.md"), "# Target");
+        Texteditor editor = createEditor(tempDir.resolve("backlinks-home"), source);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending)); var referring = onEdt(editor::getCurrentBuffer);
+            onEdt(() -> { editor.workspaceRoots.add(project); editor.writingArea.append("[[target]]"); return null; });
+            onEdt(() -> { editor.openFile(target.toFile()); return null; });
+            onEdt(() -> {
+                editor.markdownController.linkPicker = (title, rows) -> { assertEquals("Markdown Backlinks", title); assertEquals(1, rows.size()); assertTrue(rows.getFirst().contains("source.md")); return rows.getFirst(); };
+                editor.showMessage(editor.commandHandler.execute("markdown backlinks")); return null;
+            });
+            assertTrue(awaitCurrentFile(editor, source)); assertTrue(awaitUiState(() -> editor.writingArea.getCaretPosition() == 8));
+            onEdt(() -> { assertSame(referring, editor.getCurrentBuffer()); assertEquals("preface\n[[target]]", referring.getContent()); assertTrue(referring.isModified());
+                editor.writingArea.replaceRange("", 8, referring.getDocument().getLength()); editor.openFile(target.toFile());
+                editor.markdownController.linkPicker = (title, rows) -> { throw new AssertionError("Removed reference cannot be displayed"); };
+                editor.showMessage(editor.commandHandler.execute("markdown backlinks")); return null;
+            });
+            assertTrue(awaitUiState(() -> editor.markdownLinks().backlinks(project, target).state() == MarkdownLink.State.COMPLETE));
+            assertTrue(onEdt(() -> editor.markdownLinks().backlinks(project, target).edges().isEmpty()));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownNavigationRejectsCodeAndUsesExternalPolicyInEveryProfileWithoutMutatingReadOnlySource() throws Exception {
+        assumeSwingAvailable(); Path project = Files.createDirectories(tempDir.resolve("link-modes"));
+        String text = "`[[note]]`\n```\n[x](note.md)\n```\n[web](https://example.invalid)\n[[missing]]";
+        Path source = Files.writeString(project.resolve("source.md"), text); Files.writeString(project.resolve("note.md"), "# Note");
+        Texteditor editor = createEditor(tempDir.resolve("link-modes-home"), source); var browsed = new java.util.concurrent.atomic.AtomicInteger();
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending)); var original = onEdt(editor::getCurrentBuffer);
+            onEdt(() -> { editor.workspaceRoots.add(project); editor.markdownController.linkBrowser = uri -> { assertEquals("https", uri.getScheme()); browsed.incrementAndGet(); return "External checked"; }; return null; });
+            for (String profile : List.of("plain", "vim", "emacs")) {
+                int expected = browsed.get() + 1;
+                onEdt(() -> { editor.configManager.set("keymap.profile", profile); editor.sessionConfigController.applyRuntimeConfigFromSettings(); editor.writingArea.setEditable(false);
+                    editor.writingArea.setCaretPosition(text.indexOf("web")); editor.showMessage(editor.commandHandler.execute("markdown link follow")); return null;
+                });
+                assertTrue(awaitUiState(() -> browsed.get() >= expected));
+                onEdt(() -> { editor.writingArea.setCaretPosition(3); editor.showMessage(editor.goToMarkdownLink()); return null; });
+                assertTrue(awaitUiState(() -> editor.markdownLinks().diagnostics().running() == 0 && editor.markdownLinks().diagnostics().pending() == 0));
+                onEdt(() -> { assertSame(original, editor.getCurrentBuffer()); assertEquals(text, original.getContent()); assertFalse(original.isModified()); assertFalse(original.getUndoManager().canUndo()); return null; });
+            }
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void headlessMarkdownLinkServiceUsesExistingEditSaveDiscardAndSplitLifecycle() throws Exception {
         assumeSwingAvailable();
         Path project = Files.createDirectories(tempDir.resolve("link-project"));

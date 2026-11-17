@@ -195,7 +195,7 @@ def main():
     parser.add_argument('--jar', type=Path, default=ROOT / 'target/shed-2.0.0.jar')
     parser.add_argument('--classpath-file', type=Path, help='Optional existing dependency classpath for a separately labeled packaged-vs-classpath control')
     parser.add_argument('--generate-only', action='store_true')
-    parser.add_argument('--mode', choices=['startup', 'startup-empty', 'ui', 'model', 'preview', 'preview-install', 'assets', 'assets-ready', 'search', 'syntax', 'syntax-lexical', 'semantic-consumers', 'semantic-edits', 'semantic-memory', 'semantic-memory-control', 'project-links'], default='model')
+    parser.add_argument('--mode', choices=['startup', 'startup-empty', 'ui', 'model', 'preview', 'preview-install', 'assets', 'assets-ready', 'search', 'syntax', 'syntax-lexical', 'semantic-consumers', 'semantic-edits', 'semantic-memory', 'semantic-memory-control', 'project-links', 'link-navigation'], default='model')
     parser.add_argument('--shapes', nargs='+', choices=SHAPES, default=['mixed'])
     parser.add_argument('--sizes', nargs='+', type=int, default=list(SIZES), help='Exact bytes, <=100 MiB each')
     parser.add_argument('--samples', type=int, default=100)
@@ -214,7 +214,7 @@ def main():
         parser.error('Semantic consumer bounds: at most 100 samples and 10 MiB fixtures')
     if args.mode.startswith(('semantic-edits', 'semantic-memory')) and (args.samples > 100 or any(n > 2 * 1024**2 for n in args.sizes)):
         parser.error('Semantic edit/memory bounds: at most 100 samples and 2 MiB fixtures')
-    if args.mode == 'project-links' and (args.samples > 100 or any(n > 2 * 1024**2 for n in args.sizes)):
+    if args.mode in ('project-links', 'link-navigation') and (args.samples > 100 or any(n > 2 * 1024**2 for n in args.sizes)):
         parser.error('Project link bounds: at most 100 samples and 2 MiB fixtures; at most 1000 generated notes')
     if args.mode == 'syntax-lexical' and (args.samples > 25 or any(n > 10 * 1024**2 for n in args.sizes)):
         parser.error('Lexical replay bounds: at most 25 samples and 10 MiB fixtures')
@@ -248,6 +248,8 @@ def main():
         sources.append(ROOT / 'src/benchmark/java/shed/MarkdownEditingProbe.java')
     if args.mode == 'project-links':
         sources.append(ROOT / 'src/benchmark/java/shed/MarkdownLinkProbe.java')
+    if args.mode == 'link-navigation':
+        sources.append(ROOT / 'src/benchmark/java/shed/MarkdownNavigationProbe.java')
     subprocess.run([str(java / 'bin/javac'), '-cp', str(jar), '-d', str(classes)] + list(map(str, sources)), check=True)
     report = {'jar_sha256': digest(jar), 'runner_sha256': digest(Path(__file__)),
               'runtime_classpath_sha256': hashlib.sha256(classpath.encode()).hexdigest(), 'packaged_jar_runtime': args.classpath_file is None, 'java': command_output([str(java / 'bin/java'), '-version']),

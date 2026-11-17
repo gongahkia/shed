@@ -43,24 +43,40 @@ final class MarkdownLinkResolver {
             Resolution path = paths.get(key);
             if (path == null) { path = resolvePath(key); paths.put(key, path); }
             if (path.status() != Status.RESOLVED) return path;
-            Path target = path.candidates().getFirst(); Facts facts = catalog.get(target);
-            if (fragment == null || fragment.isEmpty()) return new Resolution(Status.RESOLVED, path.candidates(), Optional.empty(),
-                facts == null ? Optional.empty() : Optional.of(facts.origin().version()));
-            if (facts == null) return Resolution.of(Status.HEADING_UNSUPPORTED, path.candidates());
-            if (facts.state() != State.COMPLETE) return new Resolution(Status.HEADING_PENDING, path.candidates(), Optional.empty(), Optional.of(facts.origin().version()));
-            String wanted = fragment;
-            var headings = wiki ? facts.headings().stream().filter(h -> h.text().equals(wanted)).toList() : List.<Heading>of();
-            if (headings.isEmpty()) headings = facts.headings().stream().filter(h -> h.anchor().equals(wanted)).toList();
-            if (headings.size() != 1) return new Resolution(headings.isEmpty() ? Status.MISSING_HEADING : Status.AMBIGUOUS_HEADING, path.candidates(), Optional.empty(), Optional.of(facts.origin().version()));
-            return new Resolution(Status.RESOLVED, path.candidates(), Optional.of(headings.getFirst()), Optional.of(facts.origin().version()));
+            return heading(wiki, fragment, path);
         } catch (java.net.URISyntaxException | java.nio.charset.CharacterCodingException | IllegalArgumentException error) { return Resolution.of(Status.UNSUPPORTED, List.of()); }
+    }
+
+    Resolution choose(Occurrence occurrence, Path candidate) {
+        Resolution ambiguous = resolve(occurrence);
+        if (ambiguous.status() != Status.AMBIGUOUS || !ambiguous.candidates().contains(candidate)) return Resolution.of(Status.UNSUPPORTED, List.of());
+        Resolution eligible = eligible(candidate); if (eligible.status() != Status.RESOLVED) return eligible;
+        boolean wiki = occurrence.kind() == Kind.WIKI; String fragment = occurrence.fragment().orElse(null);
+        try {
+            if (!wiki && fragment != null) fragment = decode(new URI("#" + fragment).getRawFragment());
+            return heading(wiki, fragment, eligible);
+        } catch (java.net.URISyntaxException | java.nio.charset.CharacterCodingException error) { return Resolution.of(Status.UNSUPPORTED, List.of()); }
+    }
+
+    private Resolution heading(boolean wiki, String fragment, Resolution path) {
+        Path target = path.candidates().getFirst(); Facts facts = catalog.get(target);
+        if (fragment == null || fragment.isEmpty()) return new Resolution(Status.RESOLVED, path.candidates(), Optional.empty(),
+            facts == null ? Optional.empty() : Optional.of(facts.origin().version()));
+        if (facts == null) return Resolution.of(Status.HEADING_UNSUPPORTED, path.candidates());
+        if (!facts.anchorsCompatible()) return Resolution.of(Status.HEADING_UNSUPPORTED, path.candidates());
+        if (facts.state() != State.COMPLETE) return new Resolution(Status.HEADING_PENDING, path.candidates(), Optional.empty(), Optional.of(facts.origin().version()));
+        String wanted = fragment;
+        var headings = wiki ? facts.headings().stream().filter(h -> h.text().equals(wanted)).toList() : List.<Heading>of();
+        if (headings.isEmpty()) headings = facts.headings().stream().filter(h -> h.anchor().equals(wanted)).toList();
+        if (headings.size() != 1) return new Resolution(headings.isEmpty() ? Status.MISSING_HEADING : Status.AMBIGUOUS_HEADING, path.candidates(), Optional.empty(), Optional.of(facts.origin().version()));
+        return new Resolution(Status.RESOLVED, path.candidates(), Optional.of(headings.getFirst()), Optional.of(facts.origin().version()));
     }
 
     private Resolution resolvePath(Key key) {
         if (key.path().isEmpty()) return eligible(key.source());
         Path path = Path.of(key.path());
         if (path.isAbsolute()) return Resolution.of(Status.OUT_OF_SCOPE, List.of());
-        if (key.wiki() && path.getNameCount() == 1 && !key.path().startsWith(".")) {
+        if (key.wiki() && path.getNameCount() == 1 && !key.path().equals(".") && !key.path().equals("..")) {
             var candidates = new TreeSet<Path>();
             for (Path candidate : basenames.getOrDefault(nameKey(key.path()), List.of())) {
                 String name = candidate.getFileName().toString();
@@ -88,6 +104,21 @@ final class MarkdownLinkResolver {
             if (candidates.size() == 1) target = candidates.getFirst();
         }
         return eligible(target);
+    }
+
+    /** Reuse only catalog-addressed paths; a symlink alias can retarget independently of its destination. */
+    static boolean directCatalogTarget(Path root, Edge edge) {
+        try {
+            String raw = edge.occurrence().destination().split("#", 2)[0]; boolean wiki = edge.occurrence().kind() == Kind.WIKI;
+            if (!wiki) raw = decode(new URI(raw.replace(" ", "%20")).getRawPath());
+            if (raw == null) return false;
+            Path path = Path.of(raw); Path target = edge.resolution().target().orElseThrow();
+            if (wiki && !raw.isEmpty() && path.getNameCount() == 1 && !raw.equals(".") && !raw.equals("..")) return true;
+            Path base = wiki && !raw.startsWith("./") && !raw.startsWith("../") ? root : edge.occurrence().source().file().getParent();
+            Path direct = raw.isEmpty() ? edge.occurrence().source().file() : base.resolve(path).normalize();
+            return direct.equals(target) || wiki && !ProjectFileScanner.markdown(direct)
+                && (Path.of(direct + ".md").equals(target) || Path.of(direct + ".markdown").equals(target));
+        } catch (java.net.URISyntaxException | java.nio.charset.CharacterCodingException | IllegalArgumentException error) { return false; }
     }
 
     private static String decode(String raw) throws java.nio.charset.CharacterCodingException {

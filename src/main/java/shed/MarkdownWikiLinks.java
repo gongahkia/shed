@@ -10,7 +10,7 @@ final class MarkdownWikiLinks {
     private final VersionedTextSnapshot source;
     private final Map<Integer, MarkdownSemanticSnapshot.WikiLink> found = new TreeMap<>();
     private final Set<Integer> unavailable = new HashSet<>();
-    private final Map<Node, Boolean> html = new IdentityHashMap<>();
+    private final Map<Node, Boolean> opaque = new IdentityHashMap<>();
     private int omitted;
     MarkdownWikiLinks(VersionedTextSnapshot source) { this.source = source; }
     static boolean potential(Node node) { return node instanceof Text t && t.getLiteral().contains("[[") || node instanceof Link; }
@@ -18,10 +18,13 @@ final class MarkdownWikiLinks {
     void collect(Node node, MarkdownSemanticSnapshot.Location location) {
         for (Node parent = node.getParent(); parent != null; parent = parent.getParent()) {
             if (parent instanceof Link || parent instanceof Image || parent instanceof HtmlBlock) return;
-            if (html.computeIfAbsent(parent, p -> {
-                for (Node child = p.getFirstChild(); child != null; child = child.getNext()) if (child instanceof HtmlInline) return true;
+            if (opaque.computeIfAbsent(parent, p -> {
+                for (Node child = p.getFirstChild(); child != null; child = child.getNext()) if (child instanceof HtmlInline || child instanceof Text t && t.getLiteral().indexOf('$') >= 0) return true;
                 return false;
-            })) return;
+            })) {
+                if (node instanceof Text t && t.getLiteral().contains("[[")) missing(-1 - unavailable.size());
+                return;
+            }
         }
         if (location.segments().isEmpty()) {
             if (node instanceof Text t && t.getLiteral().contains("[[")) missing(-1 - unavailable.size());

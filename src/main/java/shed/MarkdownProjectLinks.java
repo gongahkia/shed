@@ -24,15 +24,15 @@ final class MarkdownProjectLinks implements AutoCloseable {
         MarkdownLinkIndex.Snapshot snapshot;
     }
     private record Work(Path root, long generation, List<MarkdownLinkIndex.Overlay> sources, AtomicBoolean stop, boolean truncated, Set<Path> forced) { }
-    private final Supplier<List<Path>> roots;
-    private final Supplier<List<MarkdownLinkIndex.Overlay>> overlays;
+    private Supplier<List<Path>> roots;
+    private Supplier<List<MarkdownLinkIndex.Overlay>> overlays;
     private final Builder builder;
     private final Map<Path, Partition> partitions = new LinkedHashMap<>();
     private final Timer debounce;
     private AsyncJobService jobs;
     private Work running;
     private boolean closed;
-    private long submitted, coalesced, staleRejected;
+    private long sequence, submitted, coalesced, staleRejected;
     private Runnable changed = () -> { };
 
     MarkdownProjectLinks(Supplier<List<Path>> roots, Supplier<List<MarkdownLinkIndex.Overlay>> overlays) {
@@ -40,7 +40,7 @@ final class MarkdownProjectLinks implements AutoCloseable {
     }
     MarkdownProjectLinks(Supplier<List<Path>> roots, Supplier<List<MarkdownLinkIndex.Overlay>> overlays, Builder builder) {
         edt(); this.roots = roots; this.overlays = overlays; this.builder = builder;
-        debounce = new Timer(180, event -> startNext()); debounce.setRepeats(false);
+        debounce = new Timer(180, event -> { ((Timer) event.getSource()).stop(); startNext(); }); debounce.setRepeats(false);
     }
     void onChanged(Runnable listener) { edt(); changed = Objects.requireNonNull(listener); }
 
@@ -50,11 +50,11 @@ final class MarkdownProjectLinks implements AutoCloseable {
         if (!roots.get().contains(root)) return false;
         if (partitions.containsKey(root)) { coalesced++; return true; }
         if (partitions.size() >= 4) return false;
-        var partition = new Partition(); partition.pending = true; partitions.put(root, partition); startNext(); return true;
+        var partition = new Partition(); partition.generation = ++sequence; partition.pending = true; partitions.put(root, partition); startNext(); return true;
     }
     void refresh(Path root) {
         edt(); if (!request(root)) return;
-        invalidate(partitions.get(root.toAbsolutePath().normalize()), null); startNext();
+        invalidate(partitions.get(root.toAbsolutePath().normalize()), null); debounce.stop(); startNext();
     }
     /** Called only by established document/save/external-change/close notifications, after source state updates. */
     void documentsChanged(Path path, boolean diskChanged) {
@@ -64,7 +64,7 @@ final class MarkdownProjectLinks implements AutoCloseable {
         debounce.restart();
     }
     private void invalidate(Partition partition, Path force) {
-        partition.generation++; partition.pending = true; if (force != null) {
+        partition.generation = ++sequence; partition.pending = true; if (force != null) {
             if (partition.force.size() < 64) partition.force.add(force.toAbsolutePath().normalize());
             else partition.forceLimited = true;
         } partition.state = State.PENDING;
@@ -75,7 +75,7 @@ final class MarkdownProjectLinks implements AutoCloseable {
         for (Path root : List.copyOf(partitions.keySet())) if (!current.contains(root)) closeScope(root);
     }
     private void startNext() {
-        edt(); if (closed || running != null) return;
+        edt(); if (closed || running != null || debounce.isRunning()) return;
         for (var entry : partitions.entrySet()) {
             var partition = entry.getValue(); if (!partition.pending) continue;
             var all = overlays.get(); boolean truncated = all.size() > 64;
@@ -134,6 +134,15 @@ final class MarkdownProjectLinks implements AutoCloseable {
         return new Query(partition.state, query.edges(), query.incompleteFiles(), query.detail()
             + (partition.state != query.state() ? "; Facade source/invalidation admission limit" : ""));
     }
+    Optional<MarkdownLinkIndex.Snapshot> view(Path root) {
+        edt(); var partition = partitions.get(root.toAbsolutePath().normalize());
+        return partition != null && (partition.state == State.COMPLETE || partition.state == State.PARTIAL)
+            ? Optional.ofNullable(partition.snapshot) : Optional.empty();
+    }
+    long generation(Path root) {
+        edt(); var partition = partitions.get(root.toAbsolutePath().normalize()); return partition == null ? -1 : partition.generation;
+    }
+
     Optional<MarkdownLinkIndex.Metrics> metrics(Path root) {
         edt(); var partition = partitions.get(root.toAbsolutePath().normalize());
         return partition == null || partition.snapshot == null ? Optional.empty() : Optional.of(partition.snapshot.metrics());
@@ -144,7 +153,7 @@ final class MarkdownProjectLinks implements AutoCloseable {
     }
     void cancel(Path root) {
         edt(); var partition = partitions.get(root.toAbsolutePath().normalize()); if (partition == null) return;
-        partition.generation++; partition.pending = false; partition.state = State.CANCELLED;
+        partition.generation = ++sequence; partition.pending = false; partition.state = State.CANCELLED;
         if (running != null && partitions.get(running.root()) == partition) running.stop().set(true);
     }
     void closeScope(Path root) {
@@ -156,6 +165,7 @@ final class MarkdownProjectLinks implements AutoCloseable {
         (int) partitions.values().stream().filter(p -> p.pending).count()); }
     @Override public void close() {
         edt(); if (closed) return; closed = true; debounce.stop(); partitions.clear();
+        roots = List::of; overlays = List::of;
         if (running != null) running.stop().set(true); running = null; changed = () -> { };
         if (jobs != null) { jobs.shutdownNow(); jobs = null; }
     }

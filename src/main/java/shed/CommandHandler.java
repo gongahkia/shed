@@ -445,11 +445,15 @@ public class CommandHandler {
                 ? editor.toggleCheckbox() : "Usage: :markdown checkbox toggle";
             case "table" -> "insert".equalsIgnoreCase(command.argument())
                 ? handleTableCommand("") : "Usage: :markdown table insert";
-            case "link" -> "insert".equalsIgnoreCase(command.argument())
-                ? editor.insertLink() : "Usage: :markdown link insert";
+            case "link" -> switch (command.argument().toLowerCase(java.util.Locale.ROOT)) {
+                case "insert" -> editor.insertLink(); case "follow" -> editor.goToMarkdownLink();
+                default -> "Usage: :markdown link insert|follow";
+            };
+            case "outgoing", "backlinks" -> command.argument().isEmpty()
+                ? editor.showMarkdownLinks(command.name().equals("backlinks")) : "Usage: :markdown outgoing|backlinks";
             case "image" -> "insert".equalsIgnoreCase(command.argument())
                 ? editor.insertImage() : "Usage: :markdown image insert";
-            default -> "Usage: :markdown preview|close|refresh|toc|outline|checkbox toggle|table insert|link insert|image insert";
+            default -> "Usage: :markdown preview|close|refresh|toc|outline|outgoing|backlinks|checkbox toggle|table insert|link insert|link follow|image insert";
         };
     }
 

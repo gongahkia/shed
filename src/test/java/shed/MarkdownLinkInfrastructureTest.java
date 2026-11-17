@@ -121,8 +121,9 @@ class MarkdownLinkInfrastructureTest {
     @Test void splitIdentityDeduplicatesAndConflictingBuffersDoNotChooseArbitrarily() throws Exception {
         Path a = file("a.md", ""); Path b = file("b.md", ""); var overlay = overlay(a, 1, 1, "[[b]]");
         assertEquals(1, build(null, overlay, overlay).backlinks(b).edges().size());
-        var conflict = build(null, overlay, overlay(a, 2, 1, "[[b]]"));
+        var second = overlay(a, 2, 1, "[[b]]"); var conflict = build(null, overlay, second);
         assertEquals(State.CONFLICT, conflict.effective().get(a).state()); assertTrue(conflict.backlinks(b).edges().isEmpty());
+        assertEquals(1, build(conflict, second).backlinks(b).edges().size());
     }
     @Test void reusedRevisionAvoidsParsingAndRenameDeleteAdditionRebuildEdges() throws Exception {
         Path a = file("a.md", "[[b]]"); Path b = file("b.md", "[[a]]"); var first = build(null); var warm = build(first);
@@ -179,7 +180,7 @@ class MarkdownLinkInfrastructureTest {
             var links = new MarkdownProjectLinks(() -> List.of(directory), sources::get, (root, roots, previous, overlays, force, stop) -> {
                 if (calls.incrementAndGet() == 1) { entered.countDown(); assertTrue(release.await(20, TimeUnit.SECONDS)); }
                 return MarkdownLinkIndex.build(root, roots, previous, overlays, force, () -> false);
-            }); service.set(links); links.onChanged(() -> { if (links.diagnostics().running() == 0) done.countDown(); }); links.request(directory);
+            }); service.set(links); links.onChanged(() -> { if (links.diagnostics().running() == 0 && links.diagnostics().pending() == 0) done.countDown(); }); links.request(directory);
         });
         assertTrue(entered.await(20, TimeUnit.SECONDS)); SwingUtilities.invokeAndWait(() -> {
             sources.set(List.of(overlay(a, 1, 2, "no link"))); service.get().documentsChanged(a, false);
@@ -198,6 +199,9 @@ class MarkdownLinkInfrastructureTest {
         var available = new MarkdownLinkIndex.Overlay(a, overlay.source(), Optional.of(semantic));
         var first = build(null, available); assertEquals(1, first.metrics().parsed()); assertEquals(1, first.metrics().reused());
         var second = build(first, available); assertEquals(0, second.metrics().parsed()); assertEquals(1, second.backlinks(a).edges().size());
+        var cancelled = MarkdownSemanticSnapshot.unavailable(overlay.source(), MarkdownSemanticSnapshot.Status.CANCELLED, "injected");
+        var interrupted = build(null, new MarkdownLinkIndex.Overlay(a, overlay.source(), Optional.of(cancelled)));
+        assertEquals(1, build(interrupted, available).backlinks(a).edges().size());
         var stale = new MarkdownLinkIndex.Overlay(a, overlay(a, 1, 4, "empty").source(), Optional.of(semantic));
         assertTrue(build(second, stale).backlinks(a).edges().isEmpty());
     }
@@ -257,7 +261,7 @@ class MarkdownLinkInfrastructureTest {
             var links = new MarkdownProjectLinks(() -> List.of(directory), List::of, (root, roots, old, sources, force, stop) -> {
                 if (calls.incrementAndGet() == 1) { entered.countDown(); assertTrue(release.await(20, TimeUnit.SECONDS)); }
                 return MarkdownLinkIndex.build(root, roots, old, sources, force, stop);
-            }); service.set(links); links.onChanged(() -> { if (links.diagnostics().running() == 0) done.countDown(); }); links.request(directory);
+            }); service.set(links); links.onChanged(() -> { if (links.diagnostics().running() == 0 && links.diagnostics().pending() == 0) done.countDown(); }); links.request(directory);
         });
         assertTrue(entered.await(20, TimeUnit.SECONDS)); SwingUtilities.invokeAndWait(() -> {
             var links = service.get(); links.cancel(directory); assertEquals(State.CANCELLED, links.backlinks(directory, a).state());
@@ -282,5 +286,34 @@ class MarkdownLinkInfrastructureTest {
             for (int i = 0; i < 4; i++) assertTrue(links.request(roots.get(i))); assertFalse(links.request(roots.get(4)));
             assertEquals(1, links.diagnostics().running()); assertEquals(3, links.diagnostics().pending()); assertEquals(1, links.diagnostics().submitted());
         }); assertTrue(entered.await(20, TimeUnit.SECONDS)); SwingUtilities.invokeAndWait(() -> service.get().close()); release.countDown();
+    }
+    @Test void opaqueInlineHtmlAndDeferredMathDoNotInventWikiLocations() {
+        for (String input : List.of("<span>x</span> [[note]]", "$[[note]]$", "$$\n[[note]]\n$$")) {
+            var semantic = parse(input); assertTrue(semantic.wikiLinks().isEmpty()); assertTrue(semantic.unavailableWikiLocations() > 0);
+            assertFalse(new MarkdownOccurrences(semantic).sourceLocationsComplete());
+        }
+    }
+    @Test void missingHeadingStillRetainsVerifiedFileBacklink() throws Exception {
+        Path target = file("note.md", "# Title"); file("source.md", "[x](note.md#absent)");
+        var edges = build(null).backlinks(target).edges(); assertEquals(1, edges.size()); assertEquals(Status.MISSING_HEADING, edges.getFirst().resolution().status());
+    }
+    @Test void incrementalEdgesReuseOnlyUnchangedCatalogTargets() throws Exception {
+        Path target = file("note.md", "# One"); Path source = file("source.md", "[x](note.md#one)");
+        var first = build(null); var warm = build(first); assertEquals(1, warm.metrics().reusedEdges());
+        assertSame(first.outgoing(source).edges().getFirst(), warm.outgoing(source).edges().getFirst());
+        Files.writeString(target, "# Changed"); var changed = build(warm);
+        assertEquals(Status.MISSING_HEADING, changed.outgoing(source).edges().getFirst().resolution().status()); assertEquals(0, changed.metrics().reusedEdges());
+    }
+    @Test void symlinkRetargetingCannotReuseAnOldEdge() throws Exception {
+        Path first = file("first.md", ""); Path second = file("second.md", "");
+        Path alias = directory.resolve("alias.md"); Files.createSymbolicLink(alias, first);
+        Path source = file("source.md", "[x](alias.md)"); var index = build(null);
+        Files.delete(alias); Files.createSymbolicLink(alias, second); var next = build(index);
+        assertEquals(second, next.outgoing(source).edges().getFirst().resolution().target().orElseThrow()); assertEquals(0, next.metrics().reusedEdges());
+    }
+    @Test void previewMathAnchorDifferencesStayExplicitlyUnsupported() throws Exception {
+        Path target = file("note.md", "# $x$\n# Title"); file("source.md", "[x](note.md#title)");
+        var index = build(null); assertEquals(State.PARTIAL, index.state());
+        assertEquals(Status.HEADING_UNSUPPORTED, index.backlinks(target).edges().getFirst().resolution().status());
     }
 }

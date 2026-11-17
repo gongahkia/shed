@@ -15,12 +15,17 @@ final class MarkdownLink {
     }
     record Occurrence(Origin source, Kind kind, List<MarkdownSourceRange> ranges, String destination,
                       Optional<String> rawDestination, Optional<String> fragment, Optional<String> alias,
-                      Optional<String> reference) {
-        Occurrence { ranges = List.copyOf(ranges); if (ranges.isEmpty()) throw new IllegalArgumentException("Verified range required"); }
+                      Optional<String> reference, int line, int column) {
+        Occurrence(Origin source, Kind kind, List<MarkdownSourceRange> ranges, String destination,
+                   Optional<String> rawDestination, Optional<String> fragment, Optional<String> alias, Optional<String> reference) {
+            this(source, kind, ranges, destination, rawDestination, fragment, alias, reference, 0, 0);
+        }
+        Occurrence { if (line < 0 || column < 0) throw new IllegalArgumentException("Invalid source location"); ranges = List.copyOf(ranges); if (ranges.isEmpty()) throw new IllegalArgumentException("Verified range required"); }
         int offset() { return ranges.getFirst().start(); }
     }
     record Heading(String text, String anchor, int offset) { }
-    record Facts(Origin origin, State state, List<Occurrence> links, List<Heading> headings, String detail) {
+    record Facts(Origin origin, State state, List<Occurrence> links, List<Heading> headings, String detail, boolean anchorsCompatible) {
+        Facts(Origin origin, State state, List<Occurrence> links, List<Heading> headings, String detail) { this(origin, state, links, headings, detail, true); }
         Facts { links = List.copyOf(links); headings = List.copyOf(headings); }
         static Facts unavailable(Origin origin, State state, String detail) { return new Facts(origin, state, List.of(), List.of(), detail); }
     }
@@ -42,7 +47,8 @@ final class MarkdownLink {
         }, semantic.detail());
         var occurrences = new MarkdownOccurrences(semantic);
         var links = new java.util.ArrayList<Occurrence>(); var headings = new java.util.ArrayList<Heading>();
-        boolean complete = occurrences.sourceLocationsComplete();
+        boolean anchorsCompatible = semantic.headings().stream().noneMatch(heading -> heading.text().indexOf('$') >= 0);
+        boolean complete = occurrences.sourceLocationsComplete() && anchorsCompatible;
         long retainedUnits = 0;
         for (var occurrence : occurrences.stream().toList()) {
             if (occurrence.destination().isEmpty()) continue;
@@ -56,8 +62,9 @@ final class MarkdownLink {
                 case WIKI_LINK -> Kind.WIKI; case IMAGE -> Kind.IMAGE; case REFERENCE_DEFINITION -> Kind.DEFINITION;
                 default -> occurrence.referenceStatus() == MarkdownOccurrences.ReferenceStatus.RESOLVED ? Kind.REFERENCE : Kind.MARKDOWN;
             };
+            var position = semantic.source().text().positionAt(occurrence.location().segments().getFirst().start());
             links.add(new Occurrence(origin, kind, occurrence.location().segments(), destination, occurrence.rawDestination(), occurrence.fragment(),
-                occurrence.displayAlias().or(() -> occurrence.label()), occurrence.referenceIdentifier()));
+                occurrence.displayAlias().or(() -> occurrence.label()), occurrence.referenceIdentifier(), position.line() + 1, position.character() + 1));
         }
         for (var heading : semantic.headings()) {
             if (heading.location().segments().isEmpty() || headings.size() >= 2048 || heading.text().length() + heading.anchor().length() > 4096
@@ -67,6 +74,6 @@ final class MarkdownLink {
         }
         links.sort(java.util.Comparator.comparingInt(Occurrence::offset).thenComparing(Occurrence::kind));
         return new Facts(origin, complete ? State.COMPLETE : State.PARTIAL, links, headings,
-            complete ? "Verified supported link syntax; unresolved CommonMark reference text remains unclassified" : "Unavailable source spans or compact-record admission limit");
+            complete ? "Verified supported link syntax; unresolved CommonMark reference text remains unclassified" : "Unavailable source spans, preview-anchor compatibility or compact-record admission limit", anchorsCompatible);
     }
 }

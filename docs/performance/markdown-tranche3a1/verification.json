@@ -1,0 +1,92 @@
+{
+  "task_start_head": "1444c64fda20eacb244a2019626ec654a531f7ed",
+  "task_start_status": " M docs/MARKDOWN_SEMANTIC_EDIT_PLANS.md\n M src/benchmark/java/shed/MarkdownEditingProbe.java\n M src/main/java/shed/MarkdownController.java\n M src/test/java/shed/TexteditorSwingIntegrationTest.java\n?? docs/performance/markdown-tranche2c/\n",
+  "observed_external_heads": [
+    "6a0d53469c38024485aa2917a1ee06bb4e0f2d4a",
+    "521b6d37e5776c6c06881d8730df82b21092d6cc"
+  ],
+  "final_observed_head": "521b6d37e5776c6c06881d8730df82b21092d6cc",
+  "current_status": " M scripts/test_benchmark_markdown.py\n M src/benchmark/java/shed/MarkdownLinkProbe.java\n M src/main/java/shed/MarkdownLink.java\n M src/main/java/shed/MarkdownLinkIndex.java\n M src/main/java/shed/MarkdownLinkResolver.java\n M src/main/java/shed/MarkdownProjectLinks.java\n M src/main/java/shed/MarkdownWikiLinks.java\n M src/test/java/shed/MarkdownLinkInfrastructureTest.java\n?? docs/MARKDOWN_LINK_INFRASTRUCTURE.md\n?? docs/performance/markdown-tranche3a1/\n",
+  "readme_before_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "before_jar_sha256": "7f3d6f0a9cd3523e686c498d9052824a0440c36e0e1591a8a0b5c22cd6b3f19a",
+  "final_jar_sha256": "015ad8a09ff2f467518124c73998afde591bcaf10a1f38ecd5b55b993dac81de",
+  "baseline_files": 1115,
+  "changed_baseline_files": [
+    "scripts/benchmark-markdown.py",
+    "scripts/test_benchmark_markdown.py",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java",
+    "src/main/java/shed/MarkdownAnalysisService.java",
+    "src/main/java/shed/MarkdownController.java",
+    "src/main/java/shed/MarkdownOccurrences.java",
+    "src/main/java/shed/MarkdownSemanticParser.java",
+    "src/main/java/shed/MarkdownSemanticSnapshot.java",
+    "src/main/java/shed/PaneBufferController.java",
+    "src/main/java/shed/ProjectFileScanner.java",
+    "src/main/java/shed/RecoveryController.java",
+    "src/main/java/shed/Texteditor.java",
+    "src/main/java/shed/WorkspaceController.java",
+    "src/test/java/shed/MarkdownSemanticParserTest.java",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java"
+  ],
+  "added_files_excluding_evidence": [
+    "docs/MARKDOWN_LINK_INFRASTRUCTURE.md",
+    "src/benchmark/java/shed/MarkdownLinkProbe.java",
+    "src/main/java/shed/MarkdownLink.java",
+    "src/main/java/shed/MarkdownLinkIndex.java",
+    "src/main/java/shed/MarkdownLinkResolver.java",
+    "src/main/java/shed/MarkdownProjectLinks.java",
+    "src/main/java/shed/MarkdownWikiLinks.java",
+    "src/test/java/shed/MarkdownLinkInfrastructureTest.java"
+  ],
+  "missing_baseline_files": [],
+  "previous_performance_files_preserved": 213,
+  "maven": {
+    "tests": 1416,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5,
+    "passed": 1411
+  },
+  "tooling": {
+    "passed": 11,
+    "failures": 0
+  },
+  "packaged_smoke": "PASS",
+  "filesystem_case_insensitive_on_test_volume": true,
+  "diff_check": 0,
+  "agent_created_commits_or_pushes": false,
+  "all_task_diff_check": 0,
+  "final_doc_report_sha256": "c96de84ec3d3dc12151e2e69a0234286f76179c68bd96165647622c546196cb2",
+  "commands": [
+    {
+      "command": "mvn -B -Djava.awt.headless=false -DargLine=-Xmx512m test",
+      "log": "full-suite-complete.log",
+      "exit": 0
+    },
+    {
+      "command": "mvn -B -DskipTests package",
+      "log": "package-verified.log",
+      "exit": 0
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_benchmark*.py'",
+      "log": "tooling-final.log",
+      "exit": 0
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-packaged-markdown.py --jar target/shed-2.0.0.jar --output /tmp/shed-tranche3a1-run/packaged-smoke-verified.json",
+      "log": "packaged-smoke-verified.log",
+      "exit": 0
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/benchmark-markdown.py --jar target/shed-2.0.0.jar --mode project-links --shapes plain --sizes 4096 102400 1048576 --samples 100 --warmups 5 --timeout 90 --output /tmp/shed-tranche3a1-verified",
+      "log": "verified-benchmark.log",
+      "exit": 0
+    }
+  ],
+  "toolchain": {
+    "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+    "maven": "/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn"
+  }
+}

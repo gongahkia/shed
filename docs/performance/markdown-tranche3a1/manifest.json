@@ -1,0 +1,46 @@
+{
+  "files": [
+    {
+      "path": "INDEX.md",
+      "bytes": 14408,
+      "sha256": "f000911c2a1f4cbd502d76fca4f55f246ea35c2dcfe981b50c413d029e853be5"
+    },
+    {
+      "path": "baseline-files.json.gz",
+      "bytes": 54842,
+      "sha256": "a1530544b20e2329eb33d0584e922c624286c32fc46b1acab7773b1ca44e2b6d"
+    },
+    {
+      "path": "cases.json.gz",
+      "bytes": 999122,
+      "sha256": "7749256f0e8da39415fd38498f091ea1eca2afa675e7f97061678b13692c43a9"
+    },
+    {
+      "path": "measurements.json",
+      "bytes": 42281,
+      "sha256": "c2677f20b8efab6807b54974a82d0b5aa7ce5d927d5c18e5eca2cecc9dbc0255"
+    },
+    {
+      "path": "packaged-smoke.json",
+      "bytes": 7328,
+      "sha256": "326bd22234e6d5c5401e970b478e6a09aebad6e88173ce12a68ec0d83c3fdf8f"
+    },
+    {
+      "path": "regression-suites.json",
+      "bytes": 44497,
+      "sha256": "04f01336bad85825d7922668dd0c7546b041f64ffc0e3746225cbe397d9ff3af"
+    },
+    {
+      "path": "verification-logs.json.gz",
+      "bytes": 31167,
+      "sha256": "b232f419da2c851ed5d03031c2c760613ccb2f0010287de28ab3f041a69519be"
+    },
+    {
+      "path": "verification.json",
+      "bytes": 4377,
+      "sha256": "4b6f6072d42669467f7deef983db922edd24efec2eff365a69369bc5983354ed"
+    }
+  ],
+  "before_artifact": "7f3d6f0a9cd3523e686c498d9052824a0440c36e0e1591a8a0b5c22cd6b3f19a",
+  "final_artifact": "015ad8a09ff2f467518124c73998afde591bcaf10a1f38ecd5b55b993dac81de"
+}

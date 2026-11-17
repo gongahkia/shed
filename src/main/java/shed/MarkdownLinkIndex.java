@@ -9,6 +9,7 @@ import static shed.MarkdownLink.*;
 /** Disposable project partition. Building is worker-only; installed snapshots contain compact facts only. */
 final class MarkdownLinkIndex {
     static final int MAX_RECORDS = 16384;
+    static final int MAX_RANGE_SEGMENTS = 32768;
     static final int MAX_RETAINED_UNITS = 1024 * 1024;
     static final int MAX_PASS_UNITS = 16 * 1024 * 1024;
     record Overlay(Path path, MarkdownSemanticSnapshot.Source source, Optional<MarkdownSemanticSnapshot> available) {
@@ -16,7 +17,7 @@ final class MarkdownLinkIndex {
     }
     record Stamp(long size, java.nio.file.attribute.FileTime modified, Object key) { }
     record Saved(Stamp stamp, Facts facts) { }
-    record Metrics(int parsed, int reused, int visited, long workerNanos, int records, long retainedUnits) { }
+    record Metrics(int parsed, int reused, int visited, long workerNanos, int records, long retainedUnits, int reusedEdges) { }
     record Snapshot(Path root, Path requestedRoot, Map<Path, Saved> saved, Map<Path, Facts> effective,
                     Map<Path, List<Edge>> outgoing, Map<Path, List<Edge>> backlinks,
                     Map<DocumentWorkspace.Id, java.lang.ref.WeakReference<VersionedTextSnapshot>> overlaySnapshots,
@@ -61,8 +62,7 @@ final class MarkdownLinkIndex {
                 Stamp stamp = new Stamp(attributes.size(), attributes.lastModifiedTime(), attributes.fileKey());
                 Saved old = previous == null ? null : previous.saved().get(file);
                 Facts facts;
-                if (!forceIdentities.contains(file) && old != null && stamp.equals(old.stamp()) && old.facts().state() != State.PENDING && old.facts().state() != State.CANCELLED && old.facts().state() != State.CONFLICT
-                        && !old.facts().detail().equals("Project retention budget")) {
+                if (!forceIdentities.contains(file) && old != null && stamp.equals(old.stamp()) && reusable(old.facts())) {
                     facts = old.facts(); reused++;
                 } else if (units >= MAX_PASS_UNITS) facts = Facts.unavailable(origin, State.PENDING, "Per-pass source budget; refresh to continue");
                 else {
@@ -104,7 +104,7 @@ final class MarkdownLinkIndex {
             }
             Facts old = previous == null ? null : previous.effective().get(file);
             if (old != null && old.origin().equals(origin) && previous.overlaySnapshots().containsKey(source.documentId())
-                    && previous.overlaySnapshots().get(source.documentId()).get() == source.text() && !old.detail().equals("Project retention budget")) { effective.put(file, old); reused++; continue; }
+                    && previous.overlaySnapshots().get(source.documentId()).get() == source.text() && reusable(old)) { effective.put(file, old); reused++; continue; }
             Facts facts;
             if (units >= MAX_PASS_UNITS) facts = Facts.unavailable(origin, State.PENDING, "Per-pass source budget");
             else {
@@ -113,27 +113,45 @@ final class MarkdownLinkIndex {
                 facts = available.isPresent() ? MarkdownLink.project(origin, available.orElseThrow()) : project(origin, source, cancelled);
                 if (available.isPresent()) reused++; else parsed++;
             }
+            Path logical = overlay.path().startsWith(requestedRoot.toAbsolutePath().normalize())
+                ? root.resolve(requestedRoot.toAbsolutePath().normalize().relativize(overlay.path())) : overlay.path();
+            if (!logical.getParent().equals(file.getParent())) facts = Facts.unavailable(origin, State.UNSUPPORTED,
+                "Source symlink alias has an unverified relative-link base");
             effective.put(file, facts);
         }
-        int records = 0; long retained = 0;
+        int records = 0, segments = 0; long retained = 0;
         // Bound saved + effective separately; saved facts are needed to restore discarded overlays.
         var admitted = Collections.newSetFromMap(new IdentityHashMap<Facts, Boolean>());
         var denied = Collections.newSetFromMap(new IdentityHashMap<Facts, Boolean>());
         for (Facts facts : java.util.stream.Stream.concat(saved.values().stream().map(Saved::facts), effective.values().stream()).toList()) {
             if (!admitted.add(facts)) continue;
             int count = facts.links().size() + facts.headings().size(); long size = units(facts);
-            if (records + count > MAX_RECORDS || retained + size > MAX_RETAINED_UNITS) { denied.add(facts); continue; }
-            records += count; retained += size;
+            int spans = facts.links().stream().mapToInt(link -> link.ranges().size()).sum();
+            if (records + count > MAX_RECORDS || retained + size > MAX_RETAINED_UNITS || segments + spans > MAX_RANGE_SEGMENTS) { denied.add(facts); continue; }
+            records += count; retained += size; segments += spans;
         }
         saved.replaceAll((file, contribution) -> new Saved(contribution.stamp(), denied.contains(contribution.facts())
             ? Facts.unavailable(contribution.facts().origin(), State.PARTIAL, "Project retention budget") : contribution.facts()));
         effective.replaceAll((file, facts) -> denied.contains(facts) ? Facts.unavailable(facts.origin(), State.PARTIAL, "Project retention budget") : facts);
+        int reusedEdges = 0;
         var resolver = new MarkdownLinkResolver(root, nested, effective, scan.complete() && !overlayLimit);
         var outgoing = new TreeMap<Path, List<Edge>>(); var incoming = new TreeMap<Path, List<Edge>>();
+        boolean stableCatalog = previous != null && scan.complete() && previous.state() == State.COMPLETE
+            && previous.effective().keySet().equals(effective.keySet());
         for (var entry : effective.entrySet()) {
             check(cancelled); var edges = new ArrayList<Edge>();
+            var oldEdges = stableCatalog && previous.effective().get(entry.getKey()) == entry.getValue()
+                ? previous.outgoing().getOrDefault(entry.getKey(), List.of()) : List.<Edge>of();
+            int edgeIndex = 0;
             for (Occurrence link : entry.getValue().links()) {
-                check(cancelled); Edge edge = new Edge(link, resolver.resolve(link)); edges.add(edge);
+                check(cancelled);
+                Edge prior = edgeIndex < oldEdges.size() ? oldEdges.get(edgeIndex) : null; edgeIndex++;
+                boolean reuse = prior != null && prior.occurrence().equals(link) && prior.resolution().target().isPresent()
+                    && effective.containsKey(prior.resolution().target().orElseThrow())
+                    && effective.get(prior.resolution().target().orElseThrow()) == previous.effective().get(prior.resolution().target().orElseThrow())
+                    && MarkdownLinkResolver.directCatalogTarget(root, prior);
+                if (reuse) reusedEdges++;
+                Edge edge = reuse ? prior : new Edge(link, resolver.resolve(link)); edges.add(edge);
                 if (link.kind() != Kind.DEFINITION) edge.resolution().target().ifPresent(target -> incoming.computeIfAbsent(target, ignored -> new ArrayList<>()).add(edge));
             }
             outgoing.put(entry.getKey(), List.copyOf(edges));
@@ -143,7 +161,7 @@ final class MarkdownLinkIndex {
         boolean complete = scan.complete() && !overlayLimit && incomplete.isEmpty();
         return new Snapshot(root, requestedRoot.toAbsolutePath().normalize(), saved, effective, outgoing, incoming, overlaySnapshots, complete ? State.COMPLETE : State.PARTIAL, incomplete,
             "Discovery: " + scan.visited() + " entries, limited=" + scan.limited() + ", unreadable=" + scan.failures() + "; overlayLimit=" + overlayLimit,
-            new Metrics(parsed, reused, scan.visited(), System.nanoTime() - start, records, retained));
+            new Metrics(parsed, reused, scan.visited(), System.nanoTime() - start, records, retained, reusedEdges));
     }
     private static Facts project(Origin origin, MarkdownSemanticSnapshot.Source source, BooleanSupplier cancelled) {
         // Preserve 2B's dense-input admission without running its legacy fallback scan.
@@ -157,6 +175,10 @@ final class MarkdownLinkIndex {
             }
         }
         return MarkdownLink.project(origin, new MarkdownSemanticParser().parse(source, cancelled));
+    }
+    private static boolean reusable(Facts facts) {
+        return (facts.state() == State.COMPLETE || facts.state() == State.PARTIAL || facts.state() == State.UNSUPPORTED)
+            && !facts.detail().equals("Project retention budget");
     }
     private static long units(Facts facts) {
         long size = facts.origin().file().toString().length() + facts.origin().version().length();

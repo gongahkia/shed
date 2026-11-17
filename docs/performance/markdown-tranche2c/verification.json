@@ -1,0 +1,901 @@
+{
+  "recorded_utc": "2026-11-17T02:27:03.232782+00:00",
+  "head_before": "9a12c55b41aa7052e4365ffe2d590d70c6ef8166",
+  "head_after": "1444c64fda20eacb244a2019626ec654a531f7ed",
+  "external_commits": [
+    "1444c64fda20eacb244a2019626ec654a531f7ed newcapturingthings",
+    "f8a2d7fff052886e71b79ca10b3f323842f849b2 newcapturingthings",
+    "9f96c29b4f25b06ecd1b84b8892291d7fd28b32b newcapturingthings",
+    "d683529b22aa76c04baac307489ca4d1fae82a30 newcapturingthings"
+  ],
+  "status_before": " M docs/MARKDOWN_SEMANTIC_CONSUMERS.md\n M src/benchmark/java/shed/MarkdownConsumerProbe.java\n M src/test/java/shed/MarkdownConsumersTest.java\n M src/test/java/shed/TexteditorSwingIntegrationTest.java\n?? docs/performance/markdown-tranche2b/\n",
+  "status_after": " M docs/MARKDOWN_SEMANTIC_EDIT_PLANS.md\n M src/benchmark/java/shed/MarkdownEditingProbe.java\n M src/main/java/shed/MarkdownController.java\n M src/test/java/shed/TexteditorSwingIntegrationTest.java\n?? docs/performance/markdown-tranche2c/\n",
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_edited": false,
+  "commands": {
+    "edit-after.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-edits",
+        "--sizes",
+        "4096",
+        "102400",
+        "1048576",
+        "2097152",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "100",
+        "--warmups",
+        "5",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/edit-after"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "edit-after-final.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-edits",
+        "--sizes",
+        "4096",
+        "102400",
+        "1048576",
+        "2097152",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "100",
+        "--warmups",
+        "5",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/edit-after-final"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "edit-before.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "/tmp/shed-tranche2c-run/before.jar",
+        "--mode",
+        "semantic-edits",
+        "--sizes",
+        "4096",
+        "102400",
+        "1048576",
+        "2097152",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "3",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/edit-before"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "edit-before-final.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "/tmp/shed-tranche2c-run/before.jar",
+        "--mode",
+        "semantic-edits",
+        "--sizes",
+        "4096",
+        "102400",
+        "1048576",
+        "2097152",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "100",
+        "--warmups",
+        "5",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/edit-before-final"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "edit-final-artifact.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-edits",
+        "--sizes",
+        "4096",
+        "102400",
+        "1048576",
+        "2097152",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "100",
+        "--warmups",
+        "5",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/edit-final-artifact"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "edit-reverse-after.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-edits",
+        "--sizes",
+        "102400",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "100",
+        "--warmups",
+        "5",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/edit-reverse-after"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "edit-reverse-before.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "/tmp/shed-tranche2c-run/before.jar",
+        "--mode",
+        "semantic-edits",
+        "--sizes",
+        "102400",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "100",
+        "--warmups",
+        "5",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/edit-reverse-before"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-after.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-memory",
+        "--sizes",
+        "102400",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-after"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-after-control.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-memory-control",
+        "--sizes",
+        "102400",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-after-control"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-before.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "/tmp/shed-tranche2c-run/before.jar",
+        "--mode",
+        "semantic-memory",
+        "--sizes",
+        "102400",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-before"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-before-control.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "/tmp/shed-tranche2c-run/before.jar",
+        "--mode",
+        "semantic-memory-control",
+        "--sizes",
+        "102400",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-before-control"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-profile-after.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-memory",
+        "--sizes",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-profile-after",
+        "--profile"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-profile-before.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "/tmp/shed-tranche2c-run/before.jar",
+        "--mode",
+        "semantic-memory",
+        "--sizes",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-profile-before",
+        "--profile"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-qualified-after.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-memory",
+        "--sizes",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-qualified-after"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-settled-after.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-memory",
+        "--sizes",
+        "102400",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-settled-after"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-settled-after-control.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-memory-control",
+        "--sizes",
+        "102400",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-settled-after-control"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-settled-before.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "/tmp/shed-tranche2c-run/before.jar",
+        "--mode",
+        "semantic-memory",
+        "--sizes",
+        "102400",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-settled-before"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-settled-before-control.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "/tmp/shed-tranche2c-run/before.jar",
+        "--mode",
+        "semantic-memory-control",
+        "--sizes",
+        "102400",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-settled-before-control"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-settled-profile-after.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-memory",
+        "--sizes",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-settled-profile-after",
+        "--profile"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "memory-settled-profile-before.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "/tmp/shed-tranche2c-run/before.jar",
+        "--mode",
+        "semantic-memory",
+        "--sizes",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "30",
+        "--warmups",
+        "0",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/memory-settled-profile-before",
+        "--profile"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "paired-qualified-after.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-edits",
+        "--sizes",
+        "4096",
+        "102400",
+        "1048576",
+        "2097152",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "100",
+        "--warmups",
+        "5",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/paired-qualified-after"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "paired-qualified-before.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "/tmp/shed-tranche2c-run/before.jar",
+        "--mode",
+        "semantic-edits",
+        "--sizes",
+        "4096",
+        "102400",
+        "1048576",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "100",
+        "--warmups",
+        "5",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/paired-qualified-before"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "unsupported-final.log": {
+      "argv": [
+        "python3",
+        "scripts/benchmark-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--mode",
+        "semantic-edits",
+        "--sizes",
+        "2097152",
+        "--shapes",
+        "mixed",
+        "--samples",
+        "100",
+        "--warmups",
+        "5",
+        "--timeout",
+        "90",
+        "--output",
+        "/tmp/shed-tranche2c-run/unsupported-final"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "focused.log": {
+      "argv": [
+        "/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn",
+        "-B",
+        "-Djava.awt.headless=true",
+        "-DargLine=-Xmx512m",
+        "-Dtest=MarkdownHeadingEditPlanTest,MarkdownEditTest,MarkdownConsumersTest,MarkdownSemanticParserTest",
+        "test"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home"
+      }
+    },
+    "integration.log": {
+      "argv": [
+        "/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn",
+        "-B",
+        "-Djava.awt.headless=false",
+        "-DargLine=-Xmx512m",
+        "-Dtest=MarkdownHeadingEditPlanTest,MarkdownEditTest,MarkdownHighlightTest,TexteditorSwingIntegrationTest#semanticHeadingEditsPreserveKeymapsSplitsRecoveryAndCurrentHighlighting+pendingSemanticEditsCannotSurviveTypingCaretBufferModeOrLifetimeChanges+semanticHeadingRejectionDoesNotFallBackToFencedEscapedOrSetextMarkers+markdownRangeCommandsPreserveEofAndAtomicUndoRedo",
+        "test"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home"
+      }
+    },
+    "integration-corrected.log": {
+      "argv": [
+        "/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn",
+        "-B",
+        "-Djava.awt.headless=false",
+        "-DargLine=-Xmx512m",
+        "-Dtest=MarkdownHeadingEditPlanTest,MarkdownEditTest,MarkdownHighlightTest,TexteditorSwingIntegrationTest#semanticHeadingEditsPreserveKeymapsSplitsRecoveryAndCurrentHighlighting+pendingSemanticEditsCannotSurviveTypingCaretBufferModeOrLifetimeChanges+semanticHeadingRejectionDoesNotFallBackToFencedEscapedOrSetextMarkers+markdownRangeCommandsPreserveEofAndAtomicUndoRedo",
+        "test"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home"
+      }
+    },
+    "integration-final.log": {
+      "argv": [
+        "/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn",
+        "-B",
+        "-Djava.awt.headless=false",
+        "-DargLine=-Xmx512m",
+        "-Dtest=MarkdownHeadingEditPlanTest,MarkdownEditTest,MarkdownHighlightTest,TexteditorSwingIntegrationTest#semanticHeadingEditsPreserveKeymapsSplitsRecoveryAndCurrentHighlighting+pendingSemanticEditsCannotSurviveTypingCaretBufferModeOrLifetimeChanges+semanticHeadingRejectionDoesNotFallBackToFencedEscapedOrSetextMarkers+markdownRangeCommandsPreserveEofAndAtomicUndoRedo+bufferPickerResolvesCapturedIdentityAfterLiveListReordering",
+        "test"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home"
+      }
+    },
+    "split-viewports.log": {
+      "argv": [
+        "/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn",
+        "-B",
+        "-Djava.awt.headless=false",
+        "-DargLine=-Xmx512m",
+        "-Dtest=TexteditorSwingIntegrationTest#semanticMarkerEditPreservesAnInactiveSplitViewportAtAnIndependentCaret+semanticHeadingEditsPreserveKeymapsSplitsRecoveryAndCurrentHighlighting",
+        "test"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home"
+      }
+    },
+    "full-suite.log": {
+      "argv": [
+        "/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn",
+        "-B",
+        "-Djava.awt.headless=false",
+        "-DargLine=-Xmx512m",
+        "test"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home"
+      }
+    },
+    "full-suite-final.log": {
+      "argv": [
+        "/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn",
+        "-B",
+        "-Djava.awt.headless=false",
+        "-DargLine=-Xmx512m",
+        "test"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home"
+      }
+    },
+    "full-suite-qualified.log": {
+      "argv": [
+        "/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn",
+        "-B",
+        "-Djava.awt.headless=false",
+        "-DargLine=-Xmx512m",
+        "test"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home"
+      }
+    },
+    "package.log": {
+      "argv": [
+        "/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn",
+        "-B",
+        "-DskipTests",
+        "package"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home"
+      }
+    },
+    "package-final.log": {
+      "argv": [
+        "/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn",
+        "-B",
+        "-DskipTests",
+        "package"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home"
+      }
+    },
+    "package-qualified.log": {
+      "argv": [
+        "/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn",
+        "-B",
+        "-DskipTests",
+        "package"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home"
+      }
+    },
+    "tooling.log": {
+      "argv": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts",
+        "-p",
+        "test_benchmark*.py"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    },
+    "packaged-qualified.log": {
+      "argv": [
+        "python3",
+        "scripts/test-packaged-markdown.py",
+        "--jar",
+        "target/shed-2.0.0.jar",
+        "--output",
+        "/tmp/shed-tranche2c-run/packaged-qualified.json"
+      ],
+      "environment": {
+        "JAVA_HOME": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      }
+    }
+  },
+  "java_version": "openjdk version \"21.0.13\" 2026-10-20 LTS\nOpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.13+9 (build 21.0.13+9-LTS, mixed mode, sharing)\n",
+  "before_jar": {
+    "path": "/tmp/shed-tranche2c-run/before.jar",
+    "sha256": "22b07df9a2f9affc74dbb78aad087ce61c9eb4e30e5c51f125d99dc06e143fc5"
+  },
+  "final_jar": {
+    "path": "target/shed-2.0.0.jar",
+    "sha256": "7f3d6f0a9cd3523e686c498d9052824a0440c36e0e1591a8a0b5c22cd6b3f19a",
+    "bytes": 50055961
+  },
+  "modified_existing_files_from_task_baseline": [
+    "scripts/benchmark-markdown.py",
+    "scripts/test_benchmark_markdown.py",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java",
+    "src/main/java/shed/EditorUiController.java",
+    "src/main/java/shed/InputController.java",
+    "src/main/java/shed/MarkdownController.java",
+    "src/main/java/shed/MarkdownEdit.java",
+    "src/main/java/shed/Texteditor.java",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java"
+  ],
+  "added_sources_and_report": [
+    "src/main/java/shed/MarkdownHeadingEditPlan.java",
+    "src/test/java/shed/MarkdownHeadingEditPlanTest.java",
+    "src/benchmark/java/shed/MarkdownEditingProbe.java",
+    "docs/MARKDOWN_SEMANTIC_EDIT_PLANS.md"
+  ],
+  "evidence_files": [
+    "docs/performance/markdown-tranche2c/INDEX.md",
+    "docs/performance/markdown-tranche2c/baseline-files.json.gz",
+    "docs/performance/markdown-tranche2c/cases.json.gz",
+    "docs/performance/markdown-tranche2c/measurements.json",
+    "docs/performance/markdown-tranche2c/memory.json",
+    "docs/performance/markdown-tranche2c/packaged-smoke.json",
+    "docs/performance/markdown-tranche2c/profiles.json",
+    "docs/performance/markdown-tranche2c/regression-suites.json",
+    "docs/performance/markdown-tranche2c/verification-logs.json.gz",
+    "docs/performance/markdown-tranche2c/verification.json",
+    "docs/performance/markdown-tranche2c/manifest.json"
+  ],
+  "source_files_sha256": {
+    "scripts/benchmark-markdown.py": "259bc6a9f0f2a4c3eb721e6273c435a48cb25bcdc9f3c810fcdba30869151f3b",
+    "scripts/test_benchmark_markdown.py": "dd8f7787ce97851d1b18cc9bde85c278a859e6ad01b8c3155133280f677c75b5",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "7086cd09296edd12120f0b49c666fa269ed28f12c978ade2c6b53925a5990ab7",
+    "src/main/java/shed/EditorUiController.java": "b093024174feda414bff199509696cf7de458a73f6d2aeeda26dfe7a29c13f39",
+    "src/main/java/shed/InputController.java": "31a039c763ceaf2d3d8d816eb28c3f27aee9efa1e5a7618b744670a46f4570cf",
+    "src/main/java/shed/MarkdownController.java": "d3f3a66a011e22191d5187193246725a10aa6e93cdb5da4a4dfa8acfcc2f274d",
+    "src/main/java/shed/MarkdownEdit.java": "a3662827e8da030cb894b1328798ac991305bbbe83cf92105de51da3e8d4a862",
+    "src/main/java/shed/Texteditor.java": "23f9f9d9c298479ff3b51de64e85d045c36b89e03ce7fe6847b796c43ff8d667",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java": "d61457b1b95a5435d3d5c844d7d5ae65e0e5b5f238a601dc7d08afcf39804d2b",
+    "src/main/java/shed/MarkdownHeadingEditPlan.java": "f3bb0d1fa33e02cf224fde8ebfb07a95a71595133267cb4d6f59af17a575c0eb",
+    "src/test/java/shed/MarkdownHeadingEditPlanTest.java": "ae1f45a9b8b8b06c277858808b419946f2363bf7b29487183e0ab1dc43d164e4",
+    "src/benchmark/java/shed/MarkdownEditingProbe.java": "66d89fb22dbf41e9fec87d597403af206114f754d82e93a776ff9d633bfbee47",
+    "docs/MARKDOWN_SEMANTIC_EDIT_PLANS.md": "d4a85ed84eacebf09e4dbcb045423836f95e59e6f89e84dd161dab8fea7e05f6"
+  },
+  "preserved_baseline_files": 1091,
+  "shared_test_preservation": "All original task-start lines remain in order; additions only.",
+  "prior_2b_evidence_and_other_modified_files_preserved": true,
+  "document_models_parser_ranges_highlighting_source_view_manifests_dependencies_unchanged": true,
+  "diff_check": "PASS",
+  "maven_final": {
+    "tests": 1377,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5
+  },
+  "maven_passed": 1372,
+  "python_tooling_passed": 11,
+  "packaged_smoke": "PASS",
+  "benchmark_states": {
+    "OK": 50,
+    "ERROR": 1
+  },
+  "all_qualified_benchmark_cases_passed": true,
+  "qualified_pair_same_probe_hashes": true,
+  "qualified_unchanged_revision_parse_delta_zero": true,
+  "earlier_failures": [
+    "One new split setup/completion integration failure",
+    "One full run with a new split selection assertion failure and an existing picker timeout; later focused and complete runs passed",
+    "One 2 MiB benchmark ERROR due to probe dirty-state reset; corrected cases passed"
+  ],
+  "limitations": [
+    "High fixed/native desktop RSS remains an unresolved qualification; no complete native byte attribution",
+    "100 KiB typing timings vary across orderings; no statistical equivalence claim",
+    "Setext, subtree semantic transforms and uncertain mutation spans deferred",
+    "No actual external Markdown LSP traffic measurement",
+    "No native keyboard/compositor, cold-cache or second-platform performance qualification"
+  ],
+  "no_commits_pushes_reset_clean_revert_issued": true,
+  "later_tranches_started": false
+}

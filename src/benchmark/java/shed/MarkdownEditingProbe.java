@@ -87,10 +87,13 @@ final class MarkdownEditingProbe {
             final String[] message = {""};
             var beforeCommand = edt(buffer::textSnapshot);
             if (eligible) uiText("paired_heading_edit", () -> message[0] = editor.markdownHeadingShift(true), i >= 0);
-            else edt(() -> {
-                long began = System.nanoTime(); message[0] = editor.markdownHeadingShift(true);
-                out("MD_SAMPLE ", Map.of("operation", "unsupported_heading_request", "state", "OK", "edt_ms", (System.nanoTime() - began) / 1e6)); return null;
-            });
+            else {
+                boolean measured = i >= 0;
+                edt(() -> {
+                    long began = System.nanoTime(); message[0] = editor.markdownHeadingShift(true);
+                    out("MD_SAMPLE ", Map.of("operation", "unsupported_heading_request", "state", measured ? "OK" : "WARMUP", "edt_ms", (System.nanoTime() - began) / 1e6)); return null;
+                });
+            }
             if (eligible) {
                 await(() -> editor.writingArea.getText(0, Math.min(3, editor.writingArea.getDocument().getLength())).startsWith("##"), 30);
                 if (i >= 0 && i < 10) {

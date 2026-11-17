@@ -6,13 +6,13 @@ import java.util.stream.Stream;
 
 /** Lazy read-only views over one semantic revision, not another retained AST or resource resolver. */
 final class MarkdownOccurrences {
-    enum Kind { LINK, IMAGE, REFERENCE_DEFINITION, CODE_FENCE, MERMAID }
+    enum Kind { LINK, IMAGE, REFERENCE_DEFINITION, CODE_FENCE, MERMAID, WIKI_LINK }
     enum ReferenceStatus { NOT_REFERENCE, RESOLVED, DEFINITION, UNKNOWN }
     record Occurrence(MarkdownSemanticSnapshot.Source source, Kind kind, MarkdownSemanticSnapshot.Location location,
                       Optional<String> destination, Optional<String> rawDestination, Optional<String> referenceIdentifier,
                       Optional<String> label, Optional<String> fragment, ReferenceStatus referenceStatus,
                       Optional<String> language, Optional<MarkdownSourceRange> openingMarker,
-                      Optional<MarkdownSourceRange> closingMarker) {
+                      Optional<MarkdownSourceRange> closingMarker, Optional<String> displayAlias) {
         /** Exact single segment only. Multi-line/container occurrences retain their disjoint segments. */
         Optional<MarkdownSourceRange> exactRange() {
             return location.segments().size() == 1 ? Optional.of(location.segments().getFirst()) : Optional.empty();
@@ -28,7 +28,7 @@ final class MarkdownOccurrences {
     java.util.Set<MarkdownSemanticSnapshot.Limitation> limitations() { return semantic.limitations(); }
     /** Precision of recognized link/reference/fence locations, not support for deferred syntax. */
     boolean sourceLocationsComplete() {
-        return status() == MarkdownSemanticSnapshot.Status.SUCCEEDED && unavailableLinkLocations() == 0
+        return status() == MarkdownSemanticSnapshot.Status.SUCCEEDED && unavailableLinkLocations() == 0 && semantic.unavailableWikiLocations() == 0
             && semantic.references().stream().noneMatch(r -> r.location().segments().isEmpty())
             && semantic.codeBlocks().stream().noneMatch(c -> c.location().segments().isEmpty());
     }
@@ -39,14 +39,27 @@ final class MarkdownOccurrences {
 
     Stream<Occurrence> stream() {
         if (status() != MarkdownSemanticSnapshot.Status.SUCCEEDED) return Stream.empty();
-        Stream<Occurrence> links = semantic.links().stream().filter(l -> !l.location().segments().isEmpty()).map(this::link);
+        Stream<Occurrence> links = semantic.links().stream().filter(l -> !l.location().segments().isEmpty() && !insideWiki(l.location())).map(this::link);
+        Stream<Occurrence> wiki = semantic.wikiLinks().stream().map(w -> new Occurrence(source(), Kind.WIKI_LINK,
+            new MarkdownSemanticSnapshot.Location(java.util.List.of(w.range())), Optional.of(w.destination()), Optional.of(w.destination()),
+            Optional.empty(), w.alias(), w.fragment(), ReferenceStatus.NOT_REFERENCE, Optional.empty(),
+            Optional.of(new MarkdownSourceRange(w.range().start(), w.content().start())),
+            Optional.of(new MarkdownSourceRange(w.content().end(), w.range().end())), w.alias()));
         Stream<Occurrence> definitions = semantic.references().stream().filter(r -> !r.location().segments().isEmpty()).map(r ->
             occurrence(Kind.REFERENCE_DEFINITION, r.location(), Optional.of(r.destination()), Optional.empty(),
                 Optional.of(r.label()), Optional.of(r.label()), ReferenceStatus.DEFINITION, Optional.empty(), Optional.empty(), Optional.empty()));
         Stream<Occurrence> fences = semantic.codeBlocks().stream().filter(c -> !c.location().segments().isEmpty()).map(c ->
             occurrence(c.mermaid() ? Kind.MERMAID : Kind.CODE_FENCE, c.location(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), ReferenceStatus.NOT_REFERENCE, Optional.of(c.language()), c.openingMarker(), c.closingMarker()));
-        return Stream.concat(Stream.concat(links, definitions), fences);
+        return Stream.concat(Stream.concat(Stream.concat(links, wiki), definitions), fences);
+    }
+
+    private boolean insideWiki(MarkdownSemanticSnapshot.Location location) {
+        if (location.segments().isEmpty()) return false;
+        int start = location.segments().getFirst().start(), end = location.segments().getLast().end();
+        var list = semantic.wikiLinks(); int low = 0, high = list.size();
+        while (low < high) { int mid = (low + high) >>> 1; if (list.get(mid).range().start() <= start) low = mid + 1; else high = mid; }
+        return low > 0 && list.get(low - 1).range().end() >= end;
     }
 
     private Occurrence link(MarkdownSemanticSnapshot.Link link) {
@@ -74,6 +87,6 @@ final class MarkdownOccurrences {
         Optional<String> fragment = destination.flatMap(d -> {
             int hash = d.indexOf('#'); return hash < 0 ? Optional.empty() : Optional.of(d.substring(hash + 1));
         });
-        return new Occurrence(source(), kind, location, destination, rawDestination, reference, label, fragment, status, language, opening, closing);
+        return new Occurrence(source(), kind, location, destination, rawDestination, reference, label, fragment, status, language, opening, closing, Optional.empty());
     }
 }

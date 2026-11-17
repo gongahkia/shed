@@ -10,7 +10,15 @@ record MarkdownSemanticSnapshot(
         Source source, Status status, Coverage coverage, MarkdownSourceRange coveredRange,
         List<Block> blocks, List<Heading> headings, List<CodeBlock> codeBlocks,
         List<Inline> inlines, List<Link> links, List<ReferenceDefinition> references,
-        List<TaskMarker> tasks, Set<Limitation> limitations, String detail) {
+        List<TaskMarker> tasks, Set<Limitation> limitations, String detail,
+        List<WikiLink> wikiLinks, int unavailableWikiLocations) {
+
+    MarkdownSemanticSnapshot(Source source, Status status, Coverage coverage, MarkdownSourceRange coveredRange,
+            List<Block> blocks, List<Heading> headings, List<CodeBlock> codeBlocks, List<Inline> inlines,
+            List<Link> links, List<ReferenceDefinition> references, List<TaskMarker> tasks, Set<Limitation> limitations, String detail) {
+        this(source, status, coverage, coveredRange, blocks, headings, codeBlocks, inlines, links, references,
+            tasks, limitations, detail, List.of(), 0);
+    }
 
     enum Status { SUCCEEDED, UNSUPPORTED, CANCELLED, FAILED }
     enum Coverage { COMPLETE, NONE }
@@ -22,7 +30,7 @@ record MarkdownSemanticSnapshot(
     enum Limitation {
         MATH_AND_WIKI_LINKS_DEFERRED, UNRESOLVED_REFERENCES_ARE_TEXT,
         LINK_FORM_AND_DESTINATION_RANGES_UNAVAILABLE, EXTENSION_DETAILS_NOT_PROJECTED,
-        TABLE_INLINE_LOCATIONS_UNAVAILABLE, MISSING_OR_INVALID_PARSER_SPANS
+        TABLE_INLINE_LOCATIONS_UNAVAILABLE, MISSING_OR_INVALID_PARSER_SPANS, MATH_DEFERRED, WIKI_LOCATIONS_UNAVAILABLE
     }
 
     /** IDs are workspace-scoped. Exact snapshot identity also prevents cross-workspace/reload reuse. */
@@ -77,6 +85,8 @@ record MarkdownSemanticSnapshot(
     /** Destinations are decoded parser values, UNTRUSTED and unresolved against the filesystem/network. */
     record Link(LinkKind kind, String destination, Optional<String> title, Location location) { }
     record ReferenceDefinition(String label, String destination, Optional<String> title, Location location) { }
+    record WikiLink(String destination, String path, Optional<String> fragment, Optional<String> alias,
+                    MarkdownSourceRange range, MarkdownSourceRange content) { }
     /** CommonMark's task marker has no source spans; checked state is reliable, location explicitly absent. */
     record TaskMarker(boolean checked, Location location) { }
 
@@ -86,13 +96,16 @@ record MarkdownSemanticSnapshot(
         blocks = List.copyOf(blocks); headings = List.copyOf(headings); codeBlocks = List.copyOf(codeBlocks);
         inlines = List.copyOf(inlines); links = List.copyOf(links); references = List.copyOf(references);
         tasks = List.copyOf(tasks); limitations = Set.copyOf(limitations); Objects.requireNonNull(detail);
+        wikiLinks = List.copyOf(wikiLinks);
+        if (unavailableWikiLocations < 0) throw new IllegalArgumentException("Negative unavailable wiki locations");
+        for (var wiki : wikiLinks) { wiki.range().validate(source.text()); wiki.content().validate(source.text()); }
         if ((status == Status.SUCCEEDED) != (coverage == Coverage.COMPLETE)
                 || !coveredRange.equals(new MarkdownSourceRange(0, coverage == Coverage.COMPLETE ? source.text().length() : 0))) {
             throw new IllegalArgumentException("Inconsistent semantic coverage");
         }
         if (coverage == Coverage.COMPLETE && !source.completeSource()) throw new IllegalArgumentException("Projected source cannot be complete semantics");
         if (coverage == Coverage.NONE && !(blocks.isEmpty() && headings.isEmpty() && codeBlocks.isEmpty()
-                && inlines.isEmpty() && links.isEmpty() && references.isEmpty() && tasks.isEmpty())) {
+                && inlines.isEmpty() && links.isEmpty() && references.isEmpty() && tasks.isEmpty() && wikiLinks.isEmpty() && unavailableWikiLocations == 0)) {
             throw new IllegalArgumentException("Failed/capped analysis cannot publish partial records");
         }
     }

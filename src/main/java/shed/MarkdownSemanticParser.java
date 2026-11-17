@@ -123,12 +123,13 @@ final class MarkdownSemanticParser {
         private final List<MarkdownSemanticSnapshot.Link> links = new ArrayList<>();
         private final List<ReferenceDefinition> references = new ArrayList<>();
         private final List<TaskMarker> tasks = new ArrayList<>();
-        private final EnumSet<Limitation> limitations = EnumSet.of(Limitation.MATH_AND_WIKI_LINKS_DEFERRED,
+        private final EnumSet<Limitation> limitations = EnumSet.of(Limitation.MATH_DEFERRED,
             Limitation.UNRESOLVED_REFERENCES_ARE_TEXT, Limitation.LINK_FORM_AND_DESTINATION_RANGES_UNAVAILABLE);
+        private final MarkdownWikiLinks wiki;
         private final IdGenerator anchors = IdGenerator.builder().build();
         private int nodes, spans;
 
-        Projection(Source source, BooleanSupplier cancelled) { this.source = source; this.cancelled = cancelled; }
+        Projection(Source source, BooleanSupplier cancelled) { this.source = source; this.cancelled = cancelled; wiki = new MarkdownWikiLinks(source.text()); }
 
         MarkdownSemanticSnapshot project(Node root) {
             // Iterative traversal: no additional recursive visitor/retained AST parent graph.
@@ -145,6 +146,7 @@ final class MarkdownSemanticParser {
                 }
                 BlockKind kind = blockKind(node);
                 InlineKind inline = inlineKind(node);
+                if (MarkdownWikiLinks.potential(node)) wiki.collect(node, location(node));
                 if (kind == null && inline == null && !(node instanceof org.commonmark.node.Link)
                         && !(node instanceof Image) && !(node instanceof LinkReferenceDefinition)
                         && !(node instanceof TaskListItemMarker)) continue;
@@ -182,9 +184,10 @@ final class MarkdownSemanticParser {
                     inlines.add(new Inline(inline, location, markers.get(0), markers.get(1)));
                 }
             }
+            if (wiki.unavailable() > 0) limitations.add(Limitation.WIKI_LOCATIONS_UNAVAILABLE);
             return new MarkdownSemanticSnapshot(source, Status.SUCCEEDED, Coverage.COMPLETE,
                 new MarkdownSourceRange(0, source.text().length()), blocks, headings, code, inlines, links, references,
-                tasks, limitations, "Complete captured source parsed; feature/range limitations are explicit");
+                tasks, limitations, "Complete captured source parsed; feature/range limitations are explicit", wiki.links(), wiki.unavailable());
         }
 
         private Location location(Node node) {

@@ -427,10 +427,17 @@ final class MarkdownController {
                 pane.getTextArea().removeCaretListener(listener); pane.getTextArea().removeFocusListener(focusListener); pendingHeadingEdit = null;
                 var planned = MarkdownHeadingEditPlan.plan(result.semantic(), dot, mark, demote);
                 if (planned.edit().isPresent()) {
+                    Map<EditorPane, EditorSurface.Viewport> otherViews = new IdentityHashMap<>();
+                    for (EditorPane other : editor.editorPanes) if (other != pane && other.getBuffer() == buffer
+                        && !other.isMarkdownPreview() && other.getAlternateComponent() == null && other.getTerminalPane() == null)
+                        otherViews.put(other, other.surface().viewport());
                     String failure = MarkdownEdit.applyPlan(planned.edit().get(),
                         MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(buffer), buffer), buffer,
                         pane.getTextArea(), pane.surface(), () -> sourceWritable(pane, buffer));
-                    if (failure.isEmpty()) editor.activateEditorPane(pane);
+                    if (failure.isEmpty()) {
+                        otherViews.forEach((other, viewport) -> other.surface().scrollTo(viewport));
+                        editor.activateEditorPane(pane);
+                    }
                     message[0] = failure.isEmpty() ? planned.message() : failure;
                 } else if (planned.status() == MarkdownHeadingEditPlan.Status.NOT_HEADING && !line.text().contains("#")) {
                     // Preserve ordinary-line indentation without reinterpreting semantic no-match as a heading.

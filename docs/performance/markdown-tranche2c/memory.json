@@ -1,0 +1,3761 @@
+[
+  {
+    "group": "memory-after",
+    "bytes": 102400,
+    "state": "OK",
+    "jar_sha256": "97e748742399519b867bc53e691905c57180c275c5698b27c8d493ccc67c83a2",
+    "profiled": false,
+    "quiescence": "jobs-only exploratory; pending debounce timers may allocate afterward",
+    "max_observed_rss_mib": 662.359375,
+    "median_semantic_allocation_mib": 5.883335113525391,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 31.454856872558594,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 4,
+        "thread_count": 20,
+        "epoch_ms": 1794880047056
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 31.454856872558594,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 4,
+        "thread_count": 20,
+        "epoch_ms": 1794880047059
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "rss_mib": 626.75,
+        "epoch_ms": 1794880047066
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.677261352539062,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 10,
+        "thread_count": 20,
+        "epoch_ms": 1794880047073
+      },
+      {
+        "operation": "settled_before_semantics_after_gc_rss",
+        "rss_mib": 632.875,
+        "epoch_ms": 1794880047077
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 22.677261352539062,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 10,
+        "thread_count": 20,
+        "epoch_ms": 1794880047156
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 635.8125,
+        "epoch_ms": 1794880047160
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.141868591308594,
+        "heap_committed_mib": 64.0,
+        "gc_count": 6,
+        "gc_total_ms": 17,
+        "thread_count": 20,
+        "epoch_ms": 1794880047167
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "rss_mib": 636.546875,
+        "epoch_ms": 1794880047171
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 20.451400756835938,
+        "heap_committed_mib": 64.0,
+        "gc_count": 11,
+        "gc_total_ms": 20,
+        "thread_count": 20,
+        "epoch_ms": 1794880047616
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 661.453125,
+        "epoch_ms": 1794880047620
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.159896850585938,
+        "heap_committed_mib": 64.0,
+        "gc_count": 12,
+        "gc_total_ms": 26,
+        "thread_count": 20,
+        "epoch_ms": 1794880047626
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "rss_mib": 661.75,
+        "epoch_ms": 1794880047630
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.159896850585938,
+        "heap_committed_mib": 64.0,
+        "gc_count": 12,
+        "gc_total_ms": 26,
+        "thread_count": 20,
+        "epoch_ms": 1794880047635
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "rss_mib": 661.9375,
+        "epoch_ms": 1794880047641
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.166007995605469,
+        "heap_committed_mib": 64.0,
+        "gc_count": 13,
+        "gc_total_ms": 34,
+        "thread_count": 20,
+        "epoch_ms": 1794880047650
+      },
+      {
+        "operation": "after_buffer_switch_after_gc_rss",
+        "rss_mib": 662.1875,
+        "epoch_ms": 1794880047654
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.166007995605469,
+        "heap_committed_mib": 64.0,
+        "gc_count": 13,
+        "gc_total_ms": 34,
+        "thread_count": 20,
+        "epoch_ms": 1794880047667
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "rss_mib": 662.140625,
+        "epoch_ms": 1794880047671
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.92950439453125,
+        "heap_committed_mib": 64.0,
+        "gc_count": 14,
+        "gc_total_ms": 43,
+        "thread_count": 20,
+        "epoch_ms": 1794880047681
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "rss_mib": 662.359375,
+        "epoch_ms": 1794880047685
+      },
+      {
+        "source_still_open": false,
+        "operation": "semantic_release",
+        "analyses": 30,
+        "collected": true,
+        "epoch_ms": 1794880047685
+      }
+    ]
+  },
+  {
+    "group": "memory-after",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "97e748742399519b867bc53e691905c57180c275c5698b27c8d493ccc67c83a2",
+    "profiled": false,
+    "quiescence": "jobs-only exploratory; pending debounce timers may allocate afterward",
+    "max_observed_rss_mib": 791.328125,
+    "median_semantic_allocation_mib": 58.91417694091797,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 25.582679748535156,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 11,
+        "thread_count": 20,
+        "epoch_ms": 1794880050081
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 25.582679748535156,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 11,
+        "thread_count": 20,
+        "epoch_ms": 1794880050084
+      },
+      {
+        "rss_mib": 655.296875,
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "epoch_ms": 1794880050089
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.789871215820312,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 17,
+        "thread_count": 20,
+        "epoch_ms": 1794880050096
+      },
+      {
+        "rss_mib": 655.671875,
+        "operation": "settled_before_semantics_after_gc_rss",
+        "epoch_ms": 1794880050100
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 46.18952941894531,
+        "heap_committed_mib": 66.0,
+        "gc_count": 12,
+        "gc_total_ms": 24,
+        "thread_count": 20,
+        "epoch_ms": 1794880050312
+      },
+      {
+        "rss_mib": 665.15625,
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794880050316
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.713035583496094,
+        "heap_committed_mib": 66.0,
+        "gc_count": 13,
+        "gc_total_ms": 33,
+        "thread_count": 20,
+        "epoch_ms": 1794880050326
+      },
+      {
+        "rss_mib": 665.1875,
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794880050330
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 87.57225036621094,
+        "heap_committed_mib": 168.0,
+        "gc_count": 40,
+        "gc_total_ms": 95,
+        "thread_count": 20,
+        "epoch_ms": 1794880052005
+      },
+      {
+        "rss_mib": 790.703125,
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794880052009
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.75457763671875,
+        "heap_committed_mib": 97.0,
+        "gc_count": 41,
+        "gc_total_ms": 104,
+        "thread_count": 20,
+        "epoch_ms": 1794880052018
+      },
+      {
+        "rss_mib": 791.28125,
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794880052022
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 26.75457763671875,
+        "heap_committed_mib": 97.0,
+        "gc_count": 41,
+        "gc_total_ms": 104,
+        "thread_count": 20,
+        "epoch_ms": 1794880052040
+      },
+      {
+        "rss_mib": 791.3125,
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "epoch_ms": 1794880052044
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.761444091796875,
+        "heap_committed_mib": 97.0,
+        "gc_count": 42,
+        "gc_total_ms": 112,
+        "thread_count": 20,
+        "epoch_ms": 1794880052053
+      },
+      {
+        "rss_mib": 791.328125,
+        "operation": "after_buffer_switch_after_gc_rss",
+        "epoch_ms": 1794880052057
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 27.761444091796875,
+        "heap_committed_mib": 97.0,
+        "gc_count": 42,
+        "gc_total_ms": 112,
+        "thread_count": 20,
+        "epoch_ms": 1794880052070
+      },
+      {
+        "rss_mib": 791.328125,
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "epoch_ms": 1794880052074
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 24.176719665527344,
+        "heap_committed_mib": 84.0,
+        "gc_count": 43,
+        "gc_total_ms": 122,
+        "thread_count": 20,
+        "epoch_ms": 1794880052083
+      },
+      {
+        "rss_mib": 791.328125,
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "epoch_ms": 1794880052087
+      },
+      {
+        "collected": true,
+        "analyses": 30,
+        "operation": "semantic_release",
+        "source_still_open": false,
+        "epoch_ms": 1794880052087
+      }
+    ]
+  },
+  {
+    "group": "memory-after-control",
+    "bytes": 102400,
+    "state": "OK",
+    "jar_sha256": "97e748742399519b867bc53e691905c57180c275c5698b27c8d493ccc67c83a2",
+    "profiled": false,
+    "quiescence": "jobs-only exploratory; pending debounce timers may allocate afterward",
+    "max_observed_rss_mib": 634.9375,
+    "median_semantic_allocation_mib": null,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 30.679359436035156,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 18,
+        "thread_count": 20,
+        "epoch_ms": 1794880055720
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 31.679359436035156,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 18,
+        "thread_count": 20,
+        "epoch_ms": 1794880055723
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "rss_mib": 625.53125,
+        "epoch_ms": 1794880055727
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.692962646484375,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 25,
+        "thread_count": 20,
+        "epoch_ms": 1794880055735
+      },
+      {
+        "operation": "settled_before_semantics_after_gc_rss",
+        "rss_mib": 632.1875,
+        "epoch_ms": 1794880055739
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.692962646484375,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 25,
+        "thread_count": 20,
+        "epoch_ms": 1794880055749
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 632.546875,
+        "epoch_ms": 1794880055753
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.670135498046875,
+        "heap_committed_mib": 64.0,
+        "gc_count": 6,
+        "gc_total_ms": 31,
+        "thread_count": 20,
+        "epoch_ms": 1794880055759
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "rss_mib": 633.703125,
+        "epoch_ms": 1794880055763
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 18.670135498046875,
+        "heap_committed_mib": 64.0,
+        "gc_count": 6,
+        "gc_total_ms": 31,
+        "thread_count": 20,
+        "epoch_ms": 1794880055829
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 634.75,
+        "epoch_ms": 1794880055833
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.6754150390625,
+        "heap_committed_mib": 64.0,
+        "gc_count": 7,
+        "gc_total_ms": 38,
+        "thread_count": 20,
+        "epoch_ms": 1794880055841
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "rss_mib": 634.828125,
+        "epoch_ms": 1794880055844
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.6754150390625,
+        "heap_committed_mib": 64.0,
+        "gc_count": 7,
+        "gc_total_ms": 38,
+        "thread_count": 20,
+        "epoch_ms": 1794880055850
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "rss_mib": 634.859375,
+        "epoch_ms": 1794880055854
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.682861328125,
+        "heap_committed_mib": 64.0,
+        "gc_count": 8,
+        "gc_total_ms": 46,
+        "thread_count": 20,
+        "epoch_ms": 1794880055861
+      },
+      {
+        "operation": "after_buffer_switch_after_gc_rss",
+        "rss_mib": 634.890625,
+        "epoch_ms": 1794880055865
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.682861328125,
+        "heap_committed_mib": 64.0,
+        "gc_count": 8,
+        "gc_total_ms": 46,
+        "thread_count": 20,
+        "epoch_ms": 1794880055873
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "rss_mib": 634.921875,
+        "epoch_ms": 1794880055877
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.691375732421875,
+        "heap_committed_mib": 64.0,
+        "gc_count": 9,
+        "gc_total_ms": 53,
+        "thread_count": 20,
+        "epoch_ms": 1794880055885
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "rss_mib": 634.9375,
+        "epoch_ms": 1794880055889
+      },
+      {
+        "source_still_open": false,
+        "operation": "semantic_release",
+        "analyses": 0,
+        "collected": true,
+        "epoch_ms": 1794880055889
+      }
+    ]
+  },
+  {
+    "group": "memory-after-control",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "97e748742399519b867bc53e691905c57180c275c5698b27c8d493ccc67c83a2",
+    "profiled": false,
+    "quiescence": "jobs-only exploratory; pending debounce timers may allocate afterward",
+    "max_observed_rss_mib": 654.875,
+    "median_semantic_allocation_mib": null,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 54.98603057861328,
+        "heap_committed_mib": 66.0,
+        "gc_count": 5,
+        "gc_total_ms": 7,
+        "thread_count": 20,
+        "epoch_ms": 1794880058580
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 54.98603057861328,
+        "heap_committed_mib": 66.0,
+        "gc_count": 5,
+        "gc_total_ms": 7,
+        "thread_count": 20,
+        "epoch_ms": 1794880058584
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "rss_mib": 651.59375,
+        "epoch_ms": 1794880058589
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.760154724121094,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 16,
+        "thread_count": 20,
+        "epoch_ms": 1794880058600
+      },
+      {
+        "operation": "settled_before_semantics_after_gc_rss",
+        "rss_mib": 653.3125,
+        "epoch_ms": 1794880058605
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.760154724121094,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 16,
+        "thread_count": 20,
+        "epoch_ms": 1794880058614
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 653.796875,
+        "epoch_ms": 1794880058618
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.791969299316406,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 23,
+        "thread_count": 20,
+        "epoch_ms": 1794880058625
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "rss_mib": 653.921875,
+        "epoch_ms": 1794880058630
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 28.791969299316406,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 23,
+        "thread_count": 20,
+        "epoch_ms": 1794880058719
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 654.765625,
+        "epoch_ms": 1794880058723
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.798721313476562,
+        "heap_committed_mib": 66.0,
+        "gc_count": 8,
+        "gc_total_ms": 31,
+        "thread_count": 20,
+        "epoch_ms": 1794880058732
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "rss_mib": 654.765625,
+        "epoch_ms": 1794880058736
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 23.798721313476562,
+        "heap_committed_mib": 66.0,
+        "gc_count": 8,
+        "gc_total_ms": 31,
+        "thread_count": 20,
+        "epoch_ms": 1794880058752
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "rss_mib": 654.796875,
+        "epoch_ms": 1794880058756
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.80579376220703,
+        "heap_committed_mib": 66.0,
+        "gc_count": 9,
+        "gc_total_ms": 39,
+        "thread_count": 20,
+        "epoch_ms": 1794880058765
+      },
+      {
+        "operation": "after_buffer_switch_after_gc_rss",
+        "rss_mib": 654.8125,
+        "epoch_ms": 1794880058769
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.80579376220703,
+        "heap_committed_mib": 66.0,
+        "gc_count": 9,
+        "gc_total_ms": 39,
+        "thread_count": 20,
+        "epoch_ms": 1794880058782
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "rss_mib": 654.859375,
+        "epoch_ms": 1794880058786
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.813987731933594,
+        "heap_committed_mib": 66.0,
+        "gc_count": 10,
+        "gc_total_ms": 48,
+        "thread_count": 20,
+        "epoch_ms": 1794880058795
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "rss_mib": 654.875,
+        "epoch_ms": 1794880058799
+      },
+      {
+        "analyses": 0,
+        "operation": "semantic_release",
+        "source_still_open": false,
+        "collected": true,
+        "epoch_ms": 1794880058799
+      }
+    ]
+  },
+  {
+    "group": "memory-before",
+    "bytes": 102400,
+    "state": "OK",
+    "jar_sha256": "22b07df9a2f9affc74dbb78aad087ce61c9eb4e30e5c51f125d99dc06e143fc5",
+    "profiled": false,
+    "quiescence": "jobs-only exploratory; pending debounce timers may allocate afterward",
+    "max_observed_rss_mib": 648.015625,
+    "median_semantic_allocation_mib": 5.775115966796875,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 30.830841064453125,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 9,
+        "thread_count": 20,
+        "epoch_ms": 1794879277093
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 31.830841064453125,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 9,
+        "thread_count": 20,
+        "epoch_ms": 1794879277098
+      },
+      {
+        "rss_mib": 632.421875,
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "epoch_ms": 1794879277104
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.2041015625,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 28,
+        "thread_count": 20,
+        "epoch_ms": 1794879277127
+      },
+      {
+        "rss_mib": 639.59375,
+        "operation": "settled_before_semantics_after_gc_rss",
+        "epoch_ms": 1794879277134
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.2041015625,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 28,
+        "thread_count": 20,
+        "epoch_ms": 1794879277221
+      },
+      {
+        "rss_mib": 641.203125,
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794879277225
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.691307067871094,
+        "heap_committed_mib": 64.0,
+        "gc_count": 6,
+        "gc_total_ms": 76,
+        "thread_count": 20,
+        "epoch_ms": 1794879277276
+      },
+      {
+        "rss_mib": 643.59375,
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794879277283
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 19.81866455078125,
+        "heap_committed_mib": 64.0,
+        "gc_count": 11,
+        "gc_total_ms": 90,
+        "thread_count": 20,
+        "epoch_ms": 1794879277780
+      },
+      {
+        "rss_mib": 647.53125,
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794879277785
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.715774536132812,
+        "heap_committed_mib": 64.0,
+        "gc_count": 12,
+        "gc_total_ms": 104,
+        "thread_count": 20,
+        "epoch_ms": 1794879277801
+      },
+      {
+        "rss_mib": 647.828125,
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794879277805
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.715774536132812,
+        "heap_committed_mib": 64.0,
+        "gc_count": 12,
+        "gc_total_ms": 104,
+        "thread_count": 20,
+        "epoch_ms": 1794879277812
+      },
+      {
+        "rss_mib": 647.796875,
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "epoch_ms": 1794879277817
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.718620300292969,
+        "heap_committed_mib": 64.0,
+        "gc_count": 13,
+        "gc_total_ms": 123,
+        "thread_count": 20,
+        "epoch_ms": 1794879277837
+      },
+      {
+        "rss_mib": 647.796875,
+        "operation": "after_buffer_switch_after_gc_rss",
+        "epoch_ms": 1794879277843
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.718620300292969,
+        "heap_committed_mib": 64.0,
+        "gc_count": 13,
+        "gc_total_ms": 123,
+        "thread_count": 20,
+        "epoch_ms": 1794879277858
+      },
+      {
+        "rss_mib": 647.765625,
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "epoch_ms": 1794879277864
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.477134704589844,
+        "heap_committed_mib": 64.0,
+        "gc_count": 14,
+        "gc_total_ms": 143,
+        "thread_count": 20,
+        "epoch_ms": 1794879277886
+      },
+      {
+        "rss_mib": 647.78125,
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "epoch_ms": 1794879277890
+      },
+      {
+        "collected": true,
+        "analyses": 30,
+        "operation": "semantic_release",
+        "source_still_open": false,
+        "epoch_ms": 1794879277892
+      }
+    ]
+  },
+  {
+    "group": "memory-before",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "22b07df9a2f9affc74dbb78aad087ce61c9eb4e30e5c51f125d99dc06e143fc5",
+    "profiled": false,
+    "quiescence": "jobs-only exploratory; pending debounce timers may allocate afterward",
+    "max_observed_rss_mib": 804.46875,
+    "median_semantic_allocation_mib": 58.41149139404297,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 32.848602294921875,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 27,
+        "thread_count": 20,
+        "epoch_ms": 1794879281235
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 33.848602294921875,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 27,
+        "thread_count": 20,
+        "epoch_ms": 1794879281241
+      },
+      {
+        "rss_mib": 651.921875,
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "epoch_ms": 1794879281246
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.775833129882812,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 53,
+        "thread_count": 20,
+        "epoch_ms": 1794879281283
+      },
+      {
+        "rss_mib": 653.71875,
+        "operation": "settled_before_semantics_after_gc_rss",
+        "epoch_ms": 1794879281290
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 48.005462646484375,
+        "heap_committed_mib": 66.0,
+        "gc_count": 12,
+        "gc_total_ms": 73,
+        "thread_count": 21,
+        "epoch_ms": 1794879281549
+      },
+      {
+        "rss_mib": 663.84375,
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794879281555
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.74816131591797,
+        "heap_committed_mib": 66.0,
+        "gc_count": 13,
+        "gc_total_ms": 97,
+        "thread_count": 21,
+        "epoch_ms": 1794879281583
+      },
+      {
+        "rss_mib": 663.921875,
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794879281589
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 144.41915893554688,
+        "heap_committed_mib": 180.0,
+        "gc_count": 37,
+        "gc_total_ms": 238,
+        "thread_count": 21,
+        "epoch_ms": 1794879283594
+      },
+      {
+        "rss_mib": 804.109375,
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794879283609
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.76781463623047,
+        "heap_committed_mib": 97.0,
+        "gc_count": 38,
+        "gc_total_ms": 260,
+        "thread_count": 21,
+        "epoch_ms": 1794879283633
+      },
+      {
+        "rss_mib": 804.203125,
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794879283638
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 26.76781463623047,
+        "heap_committed_mib": 97.0,
+        "gc_count": 38,
+        "gc_total_ms": 260,
+        "thread_count": 21,
+        "epoch_ms": 1794879283655
+      },
+      {
+        "rss_mib": 804.234375,
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "epoch_ms": 1794879283663
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.772743225097656,
+        "heap_committed_mib": 94.0,
+        "gc_count": 39,
+        "gc_total_ms": 278,
+        "thread_count": 21,
+        "epoch_ms": 1794879283685
+      },
+      {
+        "rss_mib": 804.25,
+        "operation": "after_buffer_switch_after_gc_rss",
+        "epoch_ms": 1794879283689
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 27.772743225097656,
+        "heap_committed_mib": 94.0,
+        "gc_count": 39,
+        "gc_total_ms": 278,
+        "thread_count": 21,
+        "epoch_ms": 1794879283717
+      },
+      {
+        "rss_mib": 804.421875,
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "epoch_ms": 1794879283724
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 24.193031311035156,
+        "heap_committed_mib": 84.0,
+        "gc_count": 40,
+        "gc_total_ms": 305,
+        "thread_count": 21,
+        "epoch_ms": 1794879283759
+      },
+      {
+        "rss_mib": 706.796875,
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "epoch_ms": 1794879283766
+      },
+      {
+        "source_still_open": false,
+        "collected": true,
+        "analyses": 30,
+        "operation": "semantic_release",
+        "epoch_ms": 1794879283768
+      }
+    ]
+  },
+  {
+    "group": "memory-before-control",
+    "bytes": 102400,
+    "state": "OK",
+    "jar_sha256": "22b07df9a2f9affc74dbb78aad087ce61c9eb4e30e5c51f125d99dc06e143fc5",
+    "profiled": false,
+    "quiescence": "jobs-only exploratory; pending debounce timers may allocate afterward",
+    "max_observed_rss_mib": 629.671875,
+    "median_semantic_allocation_mib": null,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 31.247764587402344,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 3,
+        "thread_count": 20,
+        "epoch_ms": 1794879110728
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 31.247764587402344,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 3,
+        "thread_count": 20,
+        "epoch_ms": 1794879110731
+      },
+      {
+        "rss_mib": 620.359375,
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "epoch_ms": 1794879110735
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.705177307128906,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 9,
+        "thread_count": 20,
+        "epoch_ms": 1794879110743
+      },
+      {
+        "rss_mib": 625.890625,
+        "operation": "settled_before_semantics_after_gc_rss",
+        "epoch_ms": 1794879110747
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.705177307128906,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 9,
+        "thread_count": 20,
+        "epoch_ms": 1794879110753
+      },
+      {
+        "rss_mib": 626.375,
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794879110758
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.627792358398438,
+        "heap_committed_mib": 64.0,
+        "gc_count": 6,
+        "gc_total_ms": 15,
+        "thread_count": 20,
+        "epoch_ms": 1794879110764
+      },
+      {
+        "rss_mib": 628.0625,
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794879110767
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 18.627792358398438,
+        "heap_committed_mib": 64.0,
+        "gc_count": 6,
+        "gc_total_ms": 15,
+        "thread_count": 20,
+        "epoch_ms": 1794879110833
+      },
+      {
+        "rss_mib": 629.203125,
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794879110837
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.63214111328125,
+        "heap_committed_mib": 64.0,
+        "gc_count": 7,
+        "gc_total_ms": 22,
+        "thread_count": 20,
+        "epoch_ms": 1794879110845
+      },
+      {
+        "rss_mib": 629.265625,
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794879110848
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 13.63214111328125,
+        "heap_committed_mib": 64.0,
+        "gc_count": 7,
+        "gc_total_ms": 22,
+        "thread_count": 20,
+        "epoch_ms": 1794879110853
+      },
+      {
+        "rss_mib": 629.296875,
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "epoch_ms": 1794879110857
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.638923645019531,
+        "heap_committed_mib": 64.0,
+        "gc_count": 8,
+        "gc_total_ms": 29,
+        "thread_count": 20,
+        "epoch_ms": 1794879110865
+      },
+      {
+        "rss_mib": 629.453125,
+        "operation": "after_buffer_switch_after_gc_rss",
+        "epoch_ms": 1794879110868
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.638923645019531,
+        "heap_committed_mib": 64.0,
+        "gc_count": 8,
+        "gc_total_ms": 29,
+        "thread_count": 20,
+        "epoch_ms": 1794879110876
+      },
+      {
+        "rss_mib": 629.484375,
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "epoch_ms": 1794879110880
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.647125244140625,
+        "heap_committed_mib": 64.0,
+        "gc_count": 9,
+        "gc_total_ms": 37,
+        "thread_count": 20,
+        "epoch_ms": 1794879110887
+      },
+      {
+        "rss_mib": 629.484375,
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "epoch_ms": 1794879110891
+      },
+      {
+        "source_still_open": false,
+        "collected": true,
+        "analyses": 0,
+        "operation": "semantic_release",
+        "epoch_ms": 1794879110891
+      }
+    ]
+  },
+  {
+    "group": "memory-before-control",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "22b07df9a2f9affc74dbb78aad087ce61c9eb4e30e5c51f125d99dc06e143fc5",
+    "profiled": false,
+    "quiescence": "jobs-only exploratory; pending debounce timers may allocate afterward",
+    "max_observed_rss_mib": 662.6875,
+    "median_semantic_allocation_mib": null,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 53.695960998535156,
+        "heap_committed_mib": 66.0,
+        "gc_count": 5,
+        "gc_total_ms": 7,
+        "thread_count": 20,
+        "epoch_ms": 1794879113858
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.67096710205078,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 9,
+        "thread_count": 20,
+        "epoch_ms": 1794879113863
+      },
+      {
+        "rss_mib": 654.046875,
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "epoch_ms": 1794879113867
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.798248291015625,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 14,
+        "thread_count": 20,
+        "epoch_ms": 1794879113874
+      },
+      {
+        "rss_mib": 654.59375,
+        "operation": "settled_before_semantics_after_gc_rss",
+        "epoch_ms": 1794879113877
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 23.798248291015625,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 14,
+        "thread_count": 20,
+        "epoch_ms": 1794879113899
+      },
+      {
+        "rss_mib": 656.765625,
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794879113903
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.831146240234375,
+        "heap_committed_mib": 66.0,
+        "gc_count": 8,
+        "gc_total_ms": 21,
+        "thread_count": 20,
+        "epoch_ms": 1794879113910
+      },
+      {
+        "rss_mib": 660.375,
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794879113914
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 28.831146240234375,
+        "heap_committed_mib": 66.0,
+        "gc_count": 8,
+        "gc_total_ms": 21,
+        "thread_count": 20,
+        "epoch_ms": 1794879114082
+      },
+      {
+        "rss_mib": 662.234375,
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794879114086
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.83685302734375,
+        "heap_committed_mib": 66.0,
+        "gc_count": 9,
+        "gc_total_ms": 29,
+        "thread_count": 20,
+        "epoch_ms": 1794879114094
+      },
+      {
+        "rss_mib": 662.234375,
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794879114098
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.83685302734375,
+        "heap_committed_mib": 66.0,
+        "gc_count": 9,
+        "gc_total_ms": 29,
+        "thread_count": 20,
+        "epoch_ms": 1794879114116
+      },
+      {
+        "rss_mib": 662.46875,
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "epoch_ms": 1794879114120
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.8438720703125,
+        "heap_committed_mib": 66.0,
+        "gc_count": 10,
+        "gc_total_ms": 37,
+        "thread_count": 20,
+        "epoch_ms": 1794879114128
+      },
+      {
+        "rss_mib": 662.484375,
+        "operation": "after_buffer_switch_after_gc_rss",
+        "epoch_ms": 1794879114132
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.8438720703125,
+        "heap_committed_mib": 66.0,
+        "gc_count": 10,
+        "gc_total_ms": 37,
+        "thread_count": 20,
+        "epoch_ms": 1794879114150
+      },
+      {
+        "rss_mib": 662.671875,
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "epoch_ms": 1794879114154
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.852142333984375,
+        "heap_committed_mib": 66.0,
+        "gc_count": 11,
+        "gc_total_ms": 45,
+        "thread_count": 20,
+        "epoch_ms": 1794879114162
+      },
+      {
+        "rss_mib": 662.6875,
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "epoch_ms": 1794879114166
+      },
+      {
+        "collected": true,
+        "source_still_open": false,
+        "operation": "semantic_release",
+        "analyses": 0,
+        "epoch_ms": 1794879114166
+      }
+    ]
+  },
+  {
+    "group": "memory-profile-after",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "28e7e4bb1d70eb6c195b0986674c2eba1f7679dd524a974605f57ff44b74b5cf",
+    "profiled": true,
+    "quiescence": "jobs-only exploratory; pending debounce timers may allocate afterward",
+    "max_observed_rss_mib": 873.390625,
+    "median_semantic_allocation_mib": 59.88232421875,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 66.49099731445312,
+        "heap_committed_mib": 77.0,
+        "gc_count": 6,
+        "gc_total_ms": 8,
+        "thread_count": 23,
+        "epoch_ms": 1794880902940
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 55.94883728027344,
+        "heap_committed_mib": 77.0,
+        "gc_count": 7,
+        "gc_total_ms": 10,
+        "thread_count": 23,
+        "epoch_ms": 1794880902948
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "rss_mib": 681.234375,
+        "epoch_ms": 1794880902955
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 25.40862274169922,
+        "heap_committed_mib": 77.0,
+        "gc_count": 9,
+        "gc_total_ms": 20,
+        "thread_count": 23,
+        "epoch_ms": 1794880902964
+      },
+      {
+        "operation": "settled_before_semantics_after_gc_rss",
+        "rss_mib": 683.109375,
+        "epoch_ms": 1794880902968
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 39.95478057861328,
+        "heap_committed_mib": 77.0,
+        "gc_count": 12,
+        "gc_total_ms": 27,
+        "thread_count": 24,
+        "epoch_ms": 1794880904183
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 700.046875,
+        "epoch_ms": 1794880904188
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 28.440406799316406,
+        "heap_committed_mib": 77.0,
+        "gc_count": 14,
+        "gc_total_ms": 36,
+        "thread_count": 24,
+        "epoch_ms": 1794880904197
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "rss_mib": 700.203125,
+        "epoch_ms": 1794880904201
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 115.77031707763672,
+        "heap_committed_mib": 231.0,
+        "gc_count": 28,
+        "gc_total_ms": 74,
+        "thread_count": 24,
+        "epoch_ms": 1794880906711
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 870.890625,
+        "epoch_ms": 1794880906715
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 28.460250854492188,
+        "heap_committed_mib": 104.0,
+        "gc_count": 29,
+        "gc_total_ms": 84,
+        "thread_count": 24,
+        "epoch_ms": 1794880906725
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "rss_mib": 873.390625,
+        "epoch_ms": 1794880906729
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 29.460250854492188,
+        "heap_committed_mib": 104.0,
+        "gc_count": 29,
+        "gc_total_ms": 84,
+        "thread_count": 24,
+        "epoch_ms": 1794880907753
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "rss_mib": 744.765625,
+        "epoch_ms": 1794880907757
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 28.474754333496094,
+        "heap_committed_mib": 100.0,
+        "gc_count": 30,
+        "gc_total_ms": 93,
+        "thread_count": 24,
+        "epoch_ms": 1794880907767
+      },
+      {
+        "operation": "after_buffer_switch_after_gc_rss",
+        "rss_mib": 744.859375,
+        "epoch_ms": 1794880907770
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 30.474754333496094,
+        "heap_committed_mib": 100.0,
+        "gc_count": 30,
+        "gc_total_ms": 93,
+        "thread_count": 24,
+        "epoch_ms": 1794880908808
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "rss_mib": 741.09375,
+        "epoch_ms": 1794880908812
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 25.887977600097656,
+        "heap_committed_mib": 90.0,
+        "gc_count": 31,
+        "gc_total_ms": 104,
+        "thread_count": 24,
+        "epoch_ms": 1794880908823
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "rss_mib": 741.09375,
+        "epoch_ms": 1794880908827
+      },
+      {
+        "collected": true,
+        "analyses": 30,
+        "operation": "semantic_release",
+        "source_still_open": false,
+        "epoch_ms": 1794880909826
+      }
+    ]
+  },
+  {
+    "group": "memory-profile-before",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "22b07df9a2f9affc74dbb78aad087ce61c9eb4e30e5c51f125d99dc06e143fc5",
+    "profiled": true,
+    "quiescence": "jobs-only exploratory; pending debounce timers may allocate afterward",
+    "max_observed_rss_mib": 847.796875,
+    "median_semantic_allocation_mib": 59.870548248291016,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 28.763099670410156,
+        "heap_committed_mib": 74.0,
+        "gc_count": 9,
+        "gc_total_ms": 12,
+        "thread_count": 23,
+        "epoch_ms": 1794880891887
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 29.763099670410156,
+        "heap_committed_mib": 74.0,
+        "gc_count": 9,
+        "gc_total_ms": 12,
+        "thread_count": 23,
+        "epoch_ms": 1794880891890
+      },
+      {
+        "rss_mib": 685.84375,
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "epoch_ms": 1794880891894
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 29.44452667236328,
+        "heap_committed_mib": 74.0,
+        "gc_count": 10,
+        "gc_total_ms": 20,
+        "thread_count": 23,
+        "epoch_ms": 1794880891903
+      },
+      {
+        "rss_mib": 690.328125,
+        "operation": "settled_before_semantics_after_gc_rss",
+        "epoch_ms": 1794880891908
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 48.063377380371094,
+        "heap_committed_mib": 74.0,
+        "gc_count": 15,
+        "gc_total_ms": 27,
+        "thread_count": 24,
+        "epoch_ms": 1794880893866
+      },
+      {
+        "rss_mib": 701.6875,
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794880893870
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 28.50830078125,
+        "heap_committed_mib": 74.0,
+        "gc_count": 16,
+        "gc_total_ms": 36,
+        "thread_count": 24,
+        "epoch_ms": 1794880893880
+      },
+      {
+        "rss_mib": 702.4375,
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794880893884
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 44.836570739746094,
+        "heap_committed_mib": 137.0,
+        "gc_count": 59,
+        "gc_total_ms": 126,
+        "thread_count": 24,
+        "epoch_ms": 1794880896478
+      },
+      {
+        "rss_mib": 794.453125,
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794880896482
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 28.528587341308594,
+        "heap_committed_mib": 100.0,
+        "gc_count": 60,
+        "gc_total_ms": 135,
+        "thread_count": 24,
+        "epoch_ms": 1794880896491
+      },
+      {
+        "rss_mib": 794.609375,
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794880896494
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 29.528587341308594,
+        "heap_committed_mib": 100.0,
+        "gc_count": 60,
+        "gc_total_ms": 135,
+        "thread_count": 24,
+        "epoch_ms": 1794880897545
+      },
+      {
+        "rss_mib": 747.015625,
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "epoch_ms": 1794880897549
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 28.539108276367188,
+        "heap_committed_mib": 100.0,
+        "gc_count": 61,
+        "gc_total_ms": 144,
+        "thread_count": 24,
+        "epoch_ms": 1794880897559
+      },
+      {
+        "rss_mib": 747.09375,
+        "operation": "after_buffer_switch_after_gc_rss",
+        "epoch_ms": 1794880897563
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 30.539108276367188,
+        "heap_committed_mib": 100.0,
+        "gc_count": 61,
+        "gc_total_ms": 144,
+        "thread_count": 24,
+        "epoch_ms": 1794880898613
+      },
+      {
+        "rss_mib": 747.65625,
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "epoch_ms": 1794880898617
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 25.939498901367188,
+        "heap_committed_mib": 90.0,
+        "gc_count": 62,
+        "gc_total_ms": 155,
+        "thread_count": 24,
+        "epoch_ms": 1794880898628
+      },
+      {
+        "rss_mib": 747.671875,
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "epoch_ms": 1794880898632
+      },
+      {
+        "collected": true,
+        "analyses": 30,
+        "operation": "semantic_release",
+        "source_still_open": false,
+        "epoch_ms": 1794880899632
+      }
+    ]
+  },
+  {
+    "group": "memory-qualified-after",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "7f3d6f0a9cd3523e686c498d9052824a0440c36e0e1591a8a0b5c22cd6b3f19a",
+    "profiled": false,
+    "quiescence": "timers-and-jobs",
+    "max_observed_rss_mib": 770.53125,
+    "median_semantic_allocation_mib": 60.43183135986328,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.46307373046875,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 10,
+        "thread_count": 20,
+        "epoch_ms": 1794882030329
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 36.46307373046875,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 10,
+        "thread_count": 20,
+        "epoch_ms": 1794882031513
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "rss_mib": 660.203125,
+        "epoch_ms": 1794882031523
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.89665985107422,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 22,
+        "thread_count": 20,
+        "epoch_ms": 1794882031537
+      },
+      {
+        "operation": "settled_before_semantics_after_gc_rss",
+        "rss_mib": 660.734375,
+        "epoch_ms": 1794882031543
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 40.173606872558594,
+        "heap_committed_mib": 66.0,
+        "gc_count": 13,
+        "gc_total_ms": 31,
+        "thread_count": 20,
+        "epoch_ms": 1794882032764
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 668.65625,
+        "epoch_ms": 1794882032769
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.76171112060547,
+        "heap_committed_mib": 66.0,
+        "gc_count": 14,
+        "gc_total_ms": 39,
+        "thread_count": 20,
+        "epoch_ms": 1794882032778
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "rss_mib": 669.671875,
+        "epoch_ms": 1794882032783
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 32.54773712158203,
+        "heap_committed_mib": 130.0,
+        "gc_count": 58,
+        "gc_total_ms": 117,
+        "thread_count": 20,
+        "epoch_ms": 1794882035649
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 742.328125,
+        "epoch_ms": 1794882035667
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.795814514160156,
+        "heap_committed_mib": 100.0,
+        "gc_count": 60,
+        "gc_total_ms": 135,
+        "thread_count": 20,
+        "epoch_ms": 1794882035682
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "rss_mib": 742.6875,
+        "epoch_ms": 1794882035688
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 27.795814514160156,
+        "heap_committed_mib": 100.0,
+        "gc_count": 60,
+        "gc_total_ms": 135,
+        "thread_count": 20,
+        "epoch_ms": 1794882035852
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "rss_mib": 725.5625,
+        "epoch_ms": 1794882035861
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.760116577148438,
+        "heap_committed_mib": 97.0,
+        "gc_count": 61,
+        "gc_total_ms": 149,
+        "thread_count": 20,
+        "epoch_ms": 1794882035876
+      },
+      {
+        "operation": "after_buffer_switch_after_gc_rss",
+        "rss_mib": 725.59375,
+        "epoch_ms": 1794882035881
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 27.760116577148438,
+        "heap_committed_mib": 97.0,
+        "gc_count": 61,
+        "gc_total_ms": 149,
+        "thread_count": 20,
+        "epoch_ms": 1794882037097
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "rss_mib": 725.84375,
+        "epoch_ms": 1794882037109
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 24.176025390625,
+        "heap_committed_mib": 87.0,
+        "gc_count": 62,
+        "gc_total_ms": 169,
+        "thread_count": 20,
+        "epoch_ms": 1794882037130
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "rss_mib": 725.984375,
+        "epoch_ms": 1794882037138
+      },
+      {
+        "operation": "semantic_release",
+        "source_still_open": false,
+        "collected": true,
+        "analyses": 30,
+        "epoch_ms": 1794882037139
+      }
+    ]
+  },
+  {
+    "group": "memory-settled-after",
+    "bytes": 102400,
+    "state": "OK",
+    "jar_sha256": "28e7e4bb1d70eb6c195b0986674c2eba1f7679dd524a974605f57ff44b74b5cf",
+    "profiled": false,
+    "quiescence": "timers-and-jobs",
+    "max_observed_rss_mib": 662.359375,
+    "median_semantic_allocation_mib": 5.77508544921875,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 28.620704650878906,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 4,
+        "thread_count": 20,
+        "epoch_ms": 1794881158668
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 29.620704650878906,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 4,
+        "thread_count": 20,
+        "epoch_ms": 1794881158785
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "rss_mib": 622.6875,
+        "epoch_ms": 1794881158789
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.693099975585938,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 12,
+        "thread_count": 20,
+        "epoch_ms": 1794881158799
+      },
+      {
+        "operation": "settled_before_semantics_after_gc_rss",
+        "rss_mib": 629.609375,
+        "epoch_ms": 1794881158802
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 26.693099975585938,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 12,
+        "thread_count": 20,
+        "epoch_ms": 1794881159569
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 638.21875,
+        "epoch_ms": 1794881159586
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.279647827148438,
+        "heap_committed_mib": 64.0,
+        "gc_count": 6,
+        "gc_total_ms": 26,
+        "thread_count": 20,
+        "epoch_ms": 1794881159601
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "rss_mib": 638.9375,
+        "epoch_ms": 1794881159608
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 20.59796142578125,
+        "heap_committed_mib": 64.0,
+        "gc_count": 11,
+        "gc_total_ms": 28,
+        "thread_count": 20,
+        "epoch_ms": 1794881160814
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 661.0625,
+        "epoch_ms": 1794881160831
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.294853210449219,
+        "heap_committed_mib": 64.0,
+        "gc_count": 12,
+        "gc_total_ms": 41,
+        "thread_count": 20,
+        "epoch_ms": 1794881160845
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "rss_mib": 661.265625,
+        "epoch_ms": 1794881160851
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.294853210449219,
+        "heap_committed_mib": 64.0,
+        "gc_count": 12,
+        "gc_total_ms": 41,
+        "thread_count": 20,
+        "epoch_ms": 1794881161009
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "rss_mib": 661.34375,
+        "epoch_ms": 1794881161017
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.296463012695312,
+        "heap_committed_mib": 64.0,
+        "gc_count": 13,
+        "gc_total_ms": 52,
+        "thread_count": 20,
+        "epoch_ms": 1794881161028
+      },
+      {
+        "operation": "after_buffer_switch_after_gc_rss",
+        "rss_mib": 661.40625,
+        "epoch_ms": 1794881161034
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 15.296463012695312,
+        "heap_committed_mib": 64.0,
+        "gc_count": 13,
+        "gc_total_ms": 52,
+        "thread_count": 20,
+        "epoch_ms": 1794881161193
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "rss_mib": 661.9375,
+        "epoch_ms": 1794881161201
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.056144714355469,
+        "heap_committed_mib": 64.0,
+        "gc_count": 14,
+        "gc_total_ms": 66,
+        "thread_count": 20,
+        "epoch_ms": 1794881161216
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "rss_mib": 662.359375,
+        "epoch_ms": 1794881161221
+      },
+      {
+        "operation": "semantic_release",
+        "analyses": 30,
+        "collected": true,
+        "source_still_open": false,
+        "epoch_ms": 1794881161221
+      }
+    ]
+  },
+  {
+    "group": "memory-settled-after",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "28e7e4bb1d70eb6c195b0986674c2eba1f7679dd524a974605f57ff44b74b5cf",
+    "profiled": false,
+    "quiescence": "timers-and-jobs",
+    "max_observed_rss_mib": 772.46875,
+    "median_semantic_allocation_mib": 59.94479751586914,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 54.66754913330078,
+        "heap_committed_mib": 66.0,
+        "gc_count": 5,
+        "gc_total_ms": 8,
+        "thread_count": 20,
+        "epoch_ms": 1794881164005
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 33.445526123046875,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 10,
+        "thread_count": 20,
+        "epoch_ms": 1794881164121
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "rss_mib": 654.34375,
+        "epoch_ms": 1794881164124
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.89672088623047,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 15,
+        "thread_count": 20,
+        "epoch_ms": 1794881164131
+      },
+      {
+        "operation": "settled_before_semantics_after_gc_rss",
+        "rss_mib": 655.671875,
+        "epoch_ms": 1794881164135
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 56.437408447265625,
+        "heap_committed_mib": 66.0,
+        "gc_count": 12,
+        "gc_total_ms": 21,
+        "thread_count": 20,
+        "epoch_ms": 1794881165361
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 669.546875,
+        "epoch_ms": 1794881165370
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.885765075683594,
+        "heap_committed_mib": 66.0,
+        "gc_count": 13,
+        "gc_total_ms": 35,
+        "thread_count": 20,
+        "epoch_ms": 1794881165385
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "rss_mib": 669.640625,
+        "epoch_ms": 1794881165391
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 88.75447845458984,
+        "heap_committed_mib": 152.0,
+        "gc_count": 55,
+        "gc_total_ms": 99,
+        "thread_count": 20,
+        "epoch_ms": 1794881168138
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 772.234375,
+        "epoch_ms": 1794881168148
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.996597290039062,
+        "heap_committed_mib": 97.0,
+        "gc_count": 56,
+        "gc_total_ms": 114,
+        "thread_count": 20,
+        "epoch_ms": 1794881168163
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "rss_mib": 772.46875,
+        "epoch_ms": 1794881168169
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 27.996597290039062,
+        "heap_committed_mib": 97.0,
+        "gc_count": 56,
+        "gc_total_ms": 114,
+        "thread_count": 20,
+        "epoch_ms": 1794881168330
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "rss_mib": 716.5625,
+        "epoch_ms": 1794881168337
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.986953735351562,
+        "heap_committed_mib": 97.0,
+        "gc_count": 57,
+        "gc_total_ms": 126,
+        "thread_count": 20,
+        "epoch_ms": 1794881168351
+      },
+      {
+        "operation": "after_buffer_switch_after_gc_rss",
+        "rss_mib": 716.5625,
+        "epoch_ms": 1794881168356
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 27.986953735351562,
+        "heap_committed_mib": 97.0,
+        "gc_count": 57,
+        "gc_total_ms": 126,
+        "thread_count": 20,
+        "epoch_ms": 1794881169574
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "rss_mib": 717.015625,
+        "epoch_ms": 1794881169592
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 24.285850524902344,
+        "heap_committed_mib": 84.0,
+        "gc_count": 58,
+        "gc_total_ms": 144,
+        "thread_count": 20,
+        "epoch_ms": 1794881169610
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "rss_mib": 717.015625,
+        "epoch_ms": 1794881169616
+      },
+      {
+        "operation": "semantic_release",
+        "source_still_open": false,
+        "collected": true,
+        "analyses": 30,
+        "epoch_ms": 1794881169616
+      }
+    ]
+  },
+  {
+    "group": "memory-settled-after-control",
+    "bytes": 102400,
+    "state": "OK",
+    "jar_sha256": "28e7e4bb1d70eb6c195b0986674c2eba1f7679dd524a974605f57ff44b74b5cf",
+    "profiled": false,
+    "quiescence": "timers-and-jobs",
+    "max_observed_rss_mib": 636.078125,
+    "median_semantic_allocation_mib": null,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 31.543991088867188,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 3,
+        "thread_count": 20,
+        "epoch_ms": 1794881173400
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 32.54399108886719,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 3,
+        "thread_count": 20,
+        "epoch_ms": 1794881173516
+      },
+      {
+        "rss_mib": 624.296875,
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "epoch_ms": 1794881173520
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.702644348144531,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 11,
+        "thread_count": 20,
+        "epoch_ms": 1794881173529
+      },
+      {
+        "rss_mib": 631.375,
+        "operation": "settled_before_semantics_after_gc_rss",
+        "epoch_ms": 1794881173534
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 17.70264434814453,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 11,
+        "thread_count": 20,
+        "epoch_ms": 1794881174293
+      },
+      {
+        "rss_mib": 633.96875,
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794881174306
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.712898254394531,
+        "heap_committed_mib": 64.0,
+        "gc_count": 6,
+        "gc_total_ms": 26,
+        "thread_count": 20,
+        "epoch_ms": 1794881174322
+      },
+      {
+        "rss_mib": 634.1875,
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794881174329
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 20.71289825439453,
+        "heap_committed_mib": 64.0,
+        "gc_count": 6,
+        "gc_total_ms": 26,
+        "thread_count": 20,
+        "epoch_ms": 1794881175162
+      },
+      {
+        "rss_mib": 635.671875,
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794881175180
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.717948913574219,
+        "heap_committed_mib": 64.0,
+        "gc_count": 7,
+        "gc_total_ms": 40,
+        "thread_count": 20,
+        "epoch_ms": 1794881175195
+      },
+      {
+        "rss_mib": 635.875,
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794881175200
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.717948913574219,
+        "heap_committed_mib": 64.0,
+        "gc_count": 7,
+        "gc_total_ms": 40,
+        "thread_count": 20,
+        "epoch_ms": 1794881175358
+      },
+      {
+        "rss_mib": 635.9375,
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "epoch_ms": 1794881175368
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.719161987304688,
+        "heap_committed_mib": 64.0,
+        "gc_count": 8,
+        "gc_total_ms": 53,
+        "thread_count": 20,
+        "epoch_ms": 1794881175383
+      },
+      {
+        "rss_mib": 635.9375,
+        "operation": "after_buffer_switch_after_gc_rss",
+        "epoch_ms": 1794881175388
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.719161987304688,
+        "heap_committed_mib": 64.0,
+        "gc_count": 8,
+        "gc_total_ms": 53,
+        "thread_count": 20,
+        "epoch_ms": 1794881175520
+      },
+      {
+        "rss_mib": 636.0625,
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "epoch_ms": 1794881175527
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.725326538085938,
+        "heap_committed_mib": 64.0,
+        "gc_count": 9,
+        "gc_total_ms": 65,
+        "thread_count": 20,
+        "epoch_ms": 1794881175540
+      },
+      {
+        "rss_mib": 636.078125,
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "epoch_ms": 1794881175546
+      },
+      {
+        "analyses": 0,
+        "collected": true,
+        "source_still_open": false,
+        "operation": "semantic_release",
+        "epoch_ms": 1794881175546
+      }
+    ]
+  },
+  {
+    "group": "memory-settled-after-control",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "28e7e4bb1d70eb6c195b0986674c2eba1f7679dd524a974605f57ff44b74b5cf",
+    "profiled": false,
+    "quiescence": "timers-and-jobs",
+    "max_observed_rss_mib": 666.875,
+    "median_semantic_allocation_mib": null,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.59832763671875,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 10,
+        "thread_count": 20,
+        "epoch_ms": 1794881178273
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 35.59832763671875,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 10,
+        "thread_count": 20,
+        "epoch_ms": 1794881178390
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "rss_mib": 662.625,
+        "epoch_ms": 1794881178395
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.82990264892578,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 17,
+        "thread_count": 20,
+        "epoch_ms": 1794881178404
+      },
+      {
+        "operation": "settled_before_semantics_after_gc_rss",
+        "rss_mib": 663.84375,
+        "epoch_ms": 1794881178408
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 41.82990264892578,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 17,
+        "thread_count": 20,
+        "epoch_ms": 1794881179631
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 665.640625,
+        "epoch_ms": 1794881179643
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.948753356933594,
+        "heap_committed_mib": 66.0,
+        "gc_count": 8,
+        "gc_total_ms": 28,
+        "thread_count": 20,
+        "epoch_ms": 1794881179655
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "rss_mib": 665.921875,
+        "epoch_ms": 1794881179662
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 39.948753356933594,
+        "heap_committed_mib": 66.0,
+        "gc_count": 8,
+        "gc_total_ms": 28,
+        "thread_count": 20,
+        "epoch_ms": 1794881180976
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 666.59375,
+        "epoch_ms": 1794881180991
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.953895568847656,
+        "heap_committed_mib": 66.0,
+        "gc_count": 9,
+        "gc_total_ms": 45,
+        "thread_count": 20,
+        "epoch_ms": 1794881181008
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "rss_mib": 666.6875,
+        "epoch_ms": 1794881181014
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.953895568847656,
+        "heap_committed_mib": 66.0,
+        "gc_count": 9,
+        "gc_total_ms": 45,
+        "thread_count": 20,
+        "epoch_ms": 1794881181186
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "rss_mib": 666.71875,
+        "epoch_ms": 1794881181194
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.938858032226562,
+        "heap_committed_mib": 66.0,
+        "gc_count": 10,
+        "gc_total_ms": 60,
+        "thread_count": 20,
+        "epoch_ms": 1794881181210
+      },
+      {
+        "operation": "after_buffer_switch_after_gc_rss",
+        "rss_mib": 666.734375,
+        "epoch_ms": 1794881181215
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.938858032226562,
+        "heap_committed_mib": 66.0,
+        "gc_count": 10,
+        "gc_total_ms": 60,
+        "thread_count": 20,
+        "epoch_ms": 1794881182431
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "rss_mib": 666.875,
+        "epoch_ms": 1794881182443
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.94293212890625,
+        "heap_committed_mib": 66.0,
+        "gc_count": 11,
+        "gc_total_ms": 76,
+        "thread_count": 20,
+        "epoch_ms": 1794881182459
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "rss_mib": 666.875,
+        "epoch_ms": 1794881182465
+      },
+      {
+        "source_still_open": false,
+        "operation": "semantic_release",
+        "analyses": 0,
+        "collected": true,
+        "epoch_ms": 1794881182466
+      }
+    ]
+  },
+  {
+    "group": "memory-settled-before",
+    "bytes": 102400,
+    "state": "OK",
+    "jar_sha256": "22b07df9a2f9affc74dbb78aad087ce61c9eb4e30e5c51f125d99dc06e143fc5",
+    "profiled": false,
+    "quiescence": "timers-and-jobs",
+    "max_observed_rss_mib": 660.859375,
+    "median_semantic_allocation_mib": 5.791965484619141,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 29.5341796875,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 3,
+        "thread_count": 20,
+        "epoch_ms": 1794881143975
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 30.5341796875,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 3,
+        "thread_count": 20,
+        "epoch_ms": 1794881144092
+      },
+      {
+        "rss_mib": 625.671875,
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "epoch_ms": 1794881144095
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.741111755371094,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 9,
+        "thread_count": 20,
+        "epoch_ms": 1794881144103
+      },
+      {
+        "rss_mib": 632.59375,
+        "operation": "settled_before_semantics_after_gc_rss",
+        "epoch_ms": 1794881144106
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 25.741111755371094,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 9,
+        "thread_count": 20,
+        "epoch_ms": 1794881144863
+      },
+      {
+        "rss_mib": 640.15625,
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794881144877
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.295822143554688,
+        "heap_committed_mib": 64.0,
+        "gc_count": 6,
+        "gc_total_ms": 22,
+        "thread_count": 20,
+        "epoch_ms": 1794881144891
+      },
+      {
+        "rss_mib": 640.859375,
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794881144897
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 21.550201416015625,
+        "heap_committed_mib": 64.0,
+        "gc_count": 11,
+        "gc_total_ms": 25,
+        "thread_count": 20,
+        "epoch_ms": 1794881146117
+      },
+      {
+        "rss_mib": 660.046875,
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794881146134
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.310935974121094,
+        "heap_committed_mib": 64.0,
+        "gc_count": 12,
+        "gc_total_ms": 36,
+        "thread_count": 20,
+        "epoch_ms": 1794881146146
+      },
+      {
+        "rss_mib": 660.296875,
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794881146152
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.310935974121094,
+        "heap_committed_mib": 64.0,
+        "gc_count": 12,
+        "gc_total_ms": 36,
+        "thread_count": 20,
+        "epoch_ms": 1794881146306
+      },
+      {
+        "rss_mib": 660.375,
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "epoch_ms": 1794881146313
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.311912536621094,
+        "heap_committed_mib": 64.0,
+        "gc_count": 13,
+        "gc_total_ms": 47,
+        "thread_count": 20,
+        "epoch_ms": 1794881146325
+      },
+      {
+        "rss_mib": 660.421875,
+        "operation": "after_buffer_switch_after_gc_rss",
+        "epoch_ms": 1794881146330
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 15.311912536621094,
+        "heap_committed_mib": 64.0,
+        "gc_count": 13,
+        "gc_total_ms": 47,
+        "thread_count": 20,
+        "epoch_ms": 1794881146478
+      },
+      {
+        "rss_mib": 660.6875,
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "epoch_ms": 1794881146484
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 14.073554992675781,
+        "heap_committed_mib": 64.0,
+        "gc_count": 14,
+        "gc_total_ms": 58,
+        "thread_count": 20,
+        "epoch_ms": 1794881146500
+      },
+      {
+        "rss_mib": 660.859375,
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "epoch_ms": 1794881146505
+      },
+      {
+        "operation": "semantic_release",
+        "analyses": 30,
+        "collected": true,
+        "source_still_open": false,
+        "epoch_ms": 1794881146505
+      }
+    ]
+  },
+  {
+    "group": "memory-settled-before",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "22b07df9a2f9affc74dbb78aad087ce61c9eb4e30e5c51f125d99dc06e143fc5",
+    "profiled": false,
+    "quiescence": "timers-and-jobs",
+    "max_observed_rss_mib": 785.09375,
+    "median_semantic_allocation_mib": 61.20830535888672,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 58.986907958984375,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 9,
+        "thread_count": 20,
+        "epoch_ms": 1794881149421
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 34.03173828125,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 9,
+        "thread_count": 20,
+        "epoch_ms": 1794881149536
+      },
+      {
+        "rss_mib": 659.671875,
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "epoch_ms": 1794881149540
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.85163116455078,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 15,
+        "thread_count": 20,
+        "epoch_ms": 1794881149546
+      },
+      {
+        "rss_mib": 660.828125,
+        "operation": "settled_before_semantics_after_gc_rss",
+        "epoch_ms": 1794881149550
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 42.602760314941406,
+        "heap_committed_mib": 66.0,
+        "gc_count": 13,
+        "gc_total_ms": 26,
+        "thread_count": 20,
+        "epoch_ms": 1794881150784
+      },
+      {
+        "rss_mib": 668.28125,
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794881150791
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.854171752929688,
+        "heap_committed_mib": 66.0,
+        "gc_count": 14,
+        "gc_total_ms": 37,
+        "thread_count": 20,
+        "epoch_ms": 1794881150802
+      },
+      {
+        "rss_mib": 668.40625,
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794881150808
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 130.0679473876953,
+        "heap_committed_mib": 164.0,
+        "gc_count": 60,
+        "gc_total_ms": 118,
+        "thread_count": 20,
+        "epoch_ms": 1794881153567
+      },
+      {
+        "rss_mib": 784.859375,
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794881153578
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.872894287109375,
+        "heap_committed_mib": 97.0,
+        "gc_count": 61,
+        "gc_total_ms": 132,
+        "thread_count": 20,
+        "epoch_ms": 1794881153593
+      },
+      {
+        "rss_mib": 785.09375,
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794881153598
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 27.872894287109375,
+        "heap_committed_mib": 97.0,
+        "gc_count": 61,
+        "gc_total_ms": 132,
+        "thread_count": 20,
+        "epoch_ms": 1794881153773
+      },
+      {
+        "rss_mib": 717.046875,
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "epoch_ms": 1794881153780
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 26.870582580566406,
+        "heap_committed_mib": 97.0,
+        "gc_count": 62,
+        "gc_total_ms": 145,
+        "thread_count": 20,
+        "epoch_ms": 1794881153794
+      },
+      {
+        "rss_mib": 717.078125,
+        "operation": "after_buffer_switch_after_gc_rss",
+        "epoch_ms": 1794881153799
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 27.870582580566406,
+        "heap_committed_mib": 97.0,
+        "gc_count": 62,
+        "gc_total_ms": 145,
+        "thread_count": 20,
+        "epoch_ms": 1794881155015
+      },
+      {
+        "rss_mib": 717.5,
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "epoch_ms": 1794881155026
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 24.253623962402344,
+        "heap_committed_mib": 84.0,
+        "gc_count": 63,
+        "gc_total_ms": 165,
+        "thread_count": 20,
+        "epoch_ms": 1794881155047
+      },
+      {
+        "rss_mib": 717.625,
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "epoch_ms": 1794881155053
+      },
+      {
+        "operation": "semantic_release",
+        "analyses": 30,
+        "collected": true,
+        "source_still_open": false,
+        "epoch_ms": 1794881155054
+      }
+    ]
+  },
+  {
+    "group": "memory-settled-before-control",
+    "bytes": 102400,
+    "state": "OK",
+    "jar_sha256": "22b07df9a2f9affc74dbb78aad087ce61c9eb4e30e5c51f125d99dc06e143fc5",
+    "profiled": false,
+    "quiescence": "timers-and-jobs",
+    "max_observed_rss_mib": 632.65625,
+    "median_semantic_allocation_mib": null,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 29.93512725830078,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 5,
+        "thread_count": 20,
+        "epoch_ms": 1794881129857
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 31.93512725830078,
+        "heap_committed_mib": 64.0,
+        "gc_count": 4,
+        "gc_total_ms": 5,
+        "thread_count": 20,
+        "epoch_ms": 1794881129973
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "rss_mib": 619.953125,
+        "epoch_ms": 1794881129978
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.711494445800781,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 12,
+        "thread_count": 20,
+        "epoch_ms": 1794881129986
+      },
+      {
+        "operation": "settled_before_semantics_after_gc_rss",
+        "rss_mib": 625.265625,
+        "epoch_ms": 1794881129990
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 16.71149444580078,
+        "heap_committed_mib": 64.0,
+        "gc_count": 5,
+        "gc_total_ms": 12,
+        "thread_count": 20,
+        "epoch_ms": 1794881130751
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 629.984375,
+        "epoch_ms": 1794881130759
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.65478515625,
+        "heap_committed_mib": 64.0,
+        "gc_count": 6,
+        "gc_total_ms": 22,
+        "thread_count": 20,
+        "epoch_ms": 1794881130770
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "rss_mib": 631.15625,
+        "epoch_ms": 1794881130776
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 20.65478515625,
+        "heap_committed_mib": 64.0,
+        "gc_count": 6,
+        "gc_total_ms": 22,
+        "thread_count": 20,
+        "epoch_ms": 1794881131612
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 631.9375,
+        "epoch_ms": 1794881131629
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.65863037109375,
+        "heap_committed_mib": 64.0,
+        "gc_count": 7,
+        "gc_total_ms": 37,
+        "thread_count": 20,
+        "epoch_ms": 1794881131645
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "rss_mib": 632.546875,
+        "epoch_ms": 1794881131651
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 13.65863037109375,
+        "heap_committed_mib": 64.0,
+        "gc_count": 7,
+        "gc_total_ms": 37,
+        "thread_count": 20,
+        "epoch_ms": 1794881131804
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "rss_mib": 632.59375,
+        "epoch_ms": 1794881131811
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.659187316894531,
+        "heap_committed_mib": 64.0,
+        "gc_count": 8,
+        "gc_total_ms": 50,
+        "thread_count": 20,
+        "epoch_ms": 1794881131824
+      },
+      {
+        "operation": "after_buffer_switch_after_gc_rss",
+        "rss_mib": 632.625,
+        "epoch_ms": 1794881131830
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 14.659187316894531,
+        "heap_committed_mib": 64.0,
+        "gc_count": 8,
+        "gc_total_ms": 50,
+        "thread_count": 20,
+        "epoch_ms": 1794881131965
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "rss_mib": 632.65625,
+        "epoch_ms": 1794881131971
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 13.665740966796875,
+        "heap_committed_mib": 64.0,
+        "gc_count": 9,
+        "gc_total_ms": 61,
+        "thread_count": 20,
+        "epoch_ms": 1794881131983
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "rss_mib": 632.65625,
+        "epoch_ms": 1794881131988
+      },
+      {
+        "source_still_open": false,
+        "operation": "semantic_release",
+        "analyses": 0,
+        "collected": true,
+        "epoch_ms": 1794881131989
+      }
+    ]
+  },
+  {
+    "group": "memory-settled-before-control",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "22b07df9a2f9affc74dbb78aad087ce61c9eb4e30e5c51f125d99dc06e143fc5",
+    "profiled": false,
+    "quiescence": "timers-and-jobs",
+    "max_observed_rss_mib": 660.125,
+    "median_semantic_allocation_mib": null,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.90546417236328,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 9,
+        "thread_count": 20,
+        "epoch_ms": 1794881134898
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 36.90546417236328,
+        "heap_committed_mib": 66.0,
+        "gc_count": 6,
+        "gc_total_ms": 9,
+        "thread_count": 20,
+        "epoch_ms": 1794881136063
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "rss_mib": 656.59375,
+        "epoch_ms": 1794881136068
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.83221435546875,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 17,
+        "thread_count": 20,
+        "epoch_ms": 1794881136078
+      },
+      {
+        "operation": "settled_before_semantics_after_gc_rss",
+        "rss_mib": 657.984375,
+        "epoch_ms": 1794881136083
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 41.83221435546875,
+        "heap_committed_mib": 66.0,
+        "gc_count": 7,
+        "gc_total_ms": 17,
+        "thread_count": 20,
+        "epoch_ms": 1794881137302
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 659.171875,
+        "epoch_ms": 1794881137314
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.888633728027344,
+        "heap_committed_mib": 66.0,
+        "gc_count": 8,
+        "gc_total_ms": 31,
+        "thread_count": 20,
+        "epoch_ms": 1794881137329
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "rss_mib": 659.359375,
+        "epoch_ms": 1794881137334
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 39.888633728027344,
+        "heap_committed_mib": 66.0,
+        "gc_count": 8,
+        "gc_total_ms": 31,
+        "thread_count": 20,
+        "epoch_ms": 1794881138639
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "rss_mib": 659.734375,
+        "epoch_ms": 1794881138653
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.912445068359375,
+        "heap_committed_mib": 66.0,
+        "gc_count": 9,
+        "gc_total_ms": 50,
+        "thread_count": 20,
+        "epoch_ms": 1794881138673
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "rss_mib": 659.75,
+        "epoch_ms": 1794881138679
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.912445068359375,
+        "heap_committed_mib": 66.0,
+        "gc_count": 9,
+        "gc_total_ms": 50,
+        "thread_count": 20,
+        "epoch_ms": 1794881138847
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "rss_mib": 659.765625,
+        "epoch_ms": 1794881138856
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.884048461914062,
+        "heap_committed_mib": 66.0,
+        "gc_count": 10,
+        "gc_total_ms": 65,
+        "thread_count": 20,
+        "epoch_ms": 1794881138872
+      },
+      {
+        "operation": "after_buffer_switch_after_gc_rss",
+        "rss_mib": 659.78125,
+        "epoch_ms": 1794881138878
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 24.884048461914062,
+        "heap_committed_mib": 66.0,
+        "gc_count": 10,
+        "gc_total_ms": 65,
+        "thread_count": 20,
+        "epoch_ms": 1794881140086
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "rss_mib": 660.125,
+        "epoch_ms": 1794881140103
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 23.885833740234375,
+        "heap_committed_mib": 66.0,
+        "gc_count": 11,
+        "gc_total_ms": 82,
+        "thread_count": 20,
+        "epoch_ms": 1794881140120
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "rss_mib": 660.125,
+        "epoch_ms": 1794881140125
+      },
+      {
+        "source_still_open": false,
+        "operation": "semantic_release",
+        "analyses": 0,
+        "collected": true,
+        "epoch_ms": 1794881140126
+      }
+    ]
+  },
+  {
+    "group": "memory-settled-profile-after",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "28e7e4bb1d70eb6c195b0986674c2eba1f7679dd524a974605f57ff44b74b5cf",
+    "profiled": true,
+    "quiescence": "timers-and-jobs",
+    "max_observed_rss_mib": 822.734375,
+    "median_semantic_allocation_mib": 60.141685485839844,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 55.707542419433594,
+        "heap_committed_mib": 77.0,
+        "gc_count": 8,
+        "gc_total_ms": 12,
+        "thread_count": 23,
+        "epoch_ms": 1794881201861
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 32.707542419433594,
+        "heap_committed_mib": 77.0,
+        "gc_count": 9,
+        "gc_total_ms": 12,
+        "thread_count": 23,
+        "epoch_ms": 1794881203031
+      },
+      {
+        "rss_mib": 681.109375,
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "epoch_ms": 1794881203047
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 25.573440551757812,
+        "heap_committed_mib": 77.0,
+        "gc_count": 10,
+        "gc_total_ms": 25,
+        "thread_count": 23,
+        "epoch_ms": 1794881203062
+      },
+      {
+        "rss_mib": 682.5625,
+        "operation": "settled_before_semantics_after_gc_rss",
+        "epoch_ms": 1794881203068
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 48.32154846191406,
+        "heap_committed_mib": 77.0,
+        "gc_count": 13,
+        "gc_total_ms": 36,
+        "thread_count": 23,
+        "epoch_ms": 1794881205323
+      },
+      {
+        "rss_mib": 694.390625,
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794881205330
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 28.54303741455078,
+        "heap_committed_mib": 77.0,
+        "gc_count": 15,
+        "gc_total_ms": 51,
+        "thread_count": 23,
+        "epoch_ms": 1794881205345
+      },
+      {
+        "rss_mib": 694.546875,
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794881205350
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 130.91929626464844,
+        "heap_committed_mib": 192.0,
+        "gc_count": 36,
+        "gc_total_ms": 92,
+        "thread_count": 23,
+        "epoch_ms": 1794881209137
+      },
+      {
+        "rss_mib": 820.78125,
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794881209144
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 28.566062927246094,
+        "heap_committed_mib": 104.0,
+        "gc_count": 37,
+        "gc_total_ms": 107,
+        "thread_count": 23,
+        "epoch_ms": 1794881209160
+      },
+      {
+        "rss_mib": 822.734375,
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794881209166
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 29.566062927246094,
+        "heap_committed_mib": 104.0,
+        "gc_count": 37,
+        "gc_total_ms": 107,
+        "thread_count": 23,
+        "epoch_ms": 1794881210365
+      },
+      {
+        "rss_mib": 733.328125,
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "epoch_ms": 1794881210372
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 28.553749084472656,
+        "heap_committed_mib": 100.0,
+        "gc_count": 38,
+        "gc_total_ms": 122,
+        "thread_count": 23,
+        "epoch_ms": 1794881210388
+      },
+      {
+        "rss_mib": 733.40625,
+        "operation": "after_buffer_switch_after_gc_rss",
+        "epoch_ms": 1794881210393
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 30.553749084472656,
+        "heap_committed_mib": 100.0,
+        "gc_count": 38,
+        "gc_total_ms": 122,
+        "thread_count": 23,
+        "epoch_ms": 1794881212640
+      },
+      {
+        "rss_mib": 729.96875,
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "epoch_ms": 1794881212645
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 25.94683837890625,
+        "heap_committed_mib": 90.0,
+        "gc_count": 39,
+        "gc_total_ms": 135,
+        "thread_count": 23,
+        "epoch_ms": 1794881212659
+      },
+      {
+        "rss_mib": 730.0,
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "epoch_ms": 1794881212663
+      },
+      {
+        "collected": true,
+        "source_still_open": false,
+        "operation": "semantic_release",
+        "analyses": 30,
+        "epoch_ms": 1794881213660
+      }
+    ]
+  },
+  {
+    "group": "memory-settled-profile-before",
+    "bytes": 1048576,
+    "state": "OK",
+    "jar_sha256": "22b07df9a2f9affc74dbb78aad087ce61c9eb4e30e5c51f125d99dc06e143fc5",
+    "profiled": true,
+    "quiescence": "timers-and-jobs",
+    "max_observed_rss_mib": 820.109375,
+    "median_semantic_allocation_mib": 60.813148498535156,
+    "phases": [
+      {
+        "operation": "full_ui_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 55.89855194091797,
+        "heap_committed_mib": 77.0,
+        "gc_count": 8,
+        "gc_total_ms": 12,
+        "thread_count": 23,
+        "epoch_ms": 1794881186382
+      },
+      {
+        "operation": "settled_before_semantics_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 38.89855194091797,
+        "heap_committed_mib": 77.0,
+        "gc_count": 9,
+        "gc_total_ms": 12,
+        "thread_count": 23,
+        "epoch_ms": 1794881187557
+      },
+      {
+        "rss_mib": 692.265625,
+        "operation": "settled_before_semantics_no_forced_gc_rss",
+        "epoch_ms": 1794881187566
+      },
+      {
+        "operation": "settled_before_semantics_after_gc",
+        "state": "OK",
+        "heap_used_mib": 25.567031860351562,
+        "heap_committed_mib": 77.0,
+        "gc_count": 10,
+        "gc_total_ms": 24,
+        "thread_count": 23,
+        "epoch_ms": 1794881187580
+      },
+      {
+        "rss_mib": 694.984375,
+        "operation": "settled_before_semantics_after_gc_rss",
+        "epoch_ms": 1794881187585
+      },
+      {
+        "operation": "after_first_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 49.61761474609375,
+        "heap_committed_mib": 77.0,
+        "gc_count": 13,
+        "gc_total_ms": 37,
+        "thread_count": 23,
+        "epoch_ms": 1794881189883
+      },
+      {
+        "rss_mib": 706.125,
+        "operation": "after_first_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794881189892
+      },
+      {
+        "operation": "after_first_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 28.564605712890625,
+        "heap_committed_mib": 79.0,
+        "gc_count": 15,
+        "gc_total_ms": 51,
+        "thread_count": 23,
+        "epoch_ms": 1794881189905
+      },
+      {
+        "rss_mib": 706.3125,
+        "operation": "after_first_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794881189910
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 49.073272705078125,
+        "heap_committed_mib": 134.0,
+        "gc_count": 56,
+        "gc_total_ms": 138,
+        "thread_count": 23,
+        "epoch_ms": 1794881193706
+      },
+      {
+        "rss_mib": 777.28125,
+        "operation": "after_repeated_analysis_or_control_no_forced_gc_rss",
+        "epoch_ms": 1794881193714
+      },
+      {
+        "operation": "after_repeated_analysis_or_control_after_gc",
+        "state": "OK",
+        "heap_used_mib": 28.58342742919922,
+        "heap_committed_mib": 100.0,
+        "gc_count": 58,
+        "gc_total_ms": 154,
+        "thread_count": 23,
+        "epoch_ms": 1794881193728
+      },
+      {
+        "rss_mib": 777.375,
+        "operation": "after_repeated_analysis_or_control_after_gc_rss",
+        "epoch_ms": 1794881193733
+      },
+      {
+        "operation": "after_buffer_switch_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 29.58342742919922,
+        "heap_committed_mib": 100.0,
+        "gc_count": 58,
+        "gc_total_ms": 154,
+        "thread_count": 23,
+        "epoch_ms": 1794881194919
+      },
+      {
+        "rss_mib": 743.046875,
+        "operation": "after_buffer_switch_no_forced_gc_rss",
+        "epoch_ms": 1794881194925
+      },
+      {
+        "operation": "after_buffer_switch_after_gc",
+        "state": "OK",
+        "heap_used_mib": 28.55565643310547,
+        "heap_committed_mib": 100.0,
+        "gc_count": 59,
+        "gc_total_ms": 168,
+        "thread_count": 23,
+        "epoch_ms": 1794881194940
+      },
+      {
+        "rss_mib": 743.0625,
+        "operation": "after_buffer_switch_after_gc_rss",
+        "epoch_ms": 1794881194944
+      },
+      {
+        "operation": "after_outline_and_source_close_no_forced_gc",
+        "state": "OK",
+        "heap_used_mib": 30.55565643310547,
+        "heap_committed_mib": 100.0,
+        "gc_count": 59,
+        "gc_total_ms": 168,
+        "thread_count": 23,
+        "epoch_ms": 1794881197173
+      },
+      {
+        "rss_mib": 744.03125,
+        "operation": "after_outline_and_source_close_no_forced_gc_rss",
+        "epoch_ms": 1794881197178
+      },
+      {
+        "operation": "after_outline_and_source_close_after_gc",
+        "state": "OK",
+        "heap_used_mib": 25.976547241210938,
+        "heap_committed_mib": 90.0,
+        "gc_count": 60,
+        "gc_total_ms": 180,
+        "thread_count": 23,
+        "epoch_ms": 1794881197190
+      },
+      {
+        "rss_mib": 744.09375,
+        "operation": "after_outline_and_source_close_after_gc_rss",
+        "epoch_ms": 1794881197195
+      },
+      {
+        "source_still_open": false,
+        "operation": "semantic_release",
+        "analyses": 30,
+        "collected": true,
+        "epoch_ms": 1794881198215
+      }
+    ]
+  }
+]

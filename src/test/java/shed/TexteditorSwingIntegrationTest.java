@@ -326,6 +326,35 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void semanticMarkerEditPreservesAnInactiveSplitViewportAtAnIndependentCaret() throws Exception {
+        assumeSwingAvailable();
+        String text = "## first\n" + "body\n".repeat(1000);
+        Path file = Files.writeString(tempDir.resolve("edit-viewports.md"), text);
+        Texteditor editor = createEditor(Files.createDirectories(tempDir.resolve("home-edit-viewports")), file);
+        var ready = new java.util.concurrent.atomic.AtomicReference<MarkdownHeadingAnalysis>();
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.setMode(EditorMode.INSERT); editor.splitWindow(true); editor.validate();
+                editor.requestMarkdownHeadings(new Object(), editor.getCurrentBuffer(), () -> true, ready::set); return null;
+            });
+            assertTrue(awaitUiState(() -> ready.get() != null));
+            onEdt(() -> {
+                EditorPane first = editor.editorPanes.getFirst(), second = editor.editorPanes.getLast();
+                first.getTextArea().setCaretPosition(0); editor.activateEditorPane(second); second.getTextArea().setCaretPosition(0);
+                first.surface().scrollTo(new EditorSurface.Viewport(0, 800));
+                var viewport = first.surface().viewport(); assertTrue(viewport.y() > 0);
+                assertEquals("Demoted heading", editor.markdownHeadingShift(true));
+                assertSame(second, editor.getActivePane()); assertEquals(viewport, first.surface().viewport());
+                assertSame(first.getTextArea().getDocument(), second.getTextArea().getDocument());
+                assertEquals("#" + text, editor.getCurrentBuffer().getContent());
+                editor.getCurrentBuffer().getUndoManager().undo(); assertEquals(text, editor.getCurrentBuffer().getContent()); return null;
+            });
+            assertEquals(text, Files.readString(file));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void pendingSemanticEditsCannotSurviveTypingCaretBufferModeOrLifetimeChanges() throws Exception {
         assumeSwingAvailable();
         for (String action : List.of("typing", "caret-return", "buffer-return", "mode-key", "focus", "close", "split", "undo-redo")) {

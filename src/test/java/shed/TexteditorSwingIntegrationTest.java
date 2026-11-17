@@ -149,6 +149,116 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void semanticSymbolPickerKeepsDuplicateTargetsRejectsStaleSelectionAndPreservesJavaSymbols() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-semantic-symbols"));
+        String text = "# duplicate\n```\n# fake\n```\n# duplicate\n";
+        Path markdown = Files.writeString(tempDir.resolve("symbols.md"), text);
+        Path java = Files.writeString(tempDir.resolve("Example.java"), "public class Example {\n    public void run() {}\n}\n");
+        Texteditor editor = createEditor(home, markdown);
+        var available = new java.util.concurrent.CountDownLatch(1);
+        var retained = new java.util.concurrent.atomic.AtomicReference<MarkdownHeadingAnalysis>();
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            FileBuffer buffer = onEdt(editor::getCurrentBuffer);
+            var snapshot = onEdt(buffer::textSnapshot);
+            long revision = onEdt(buffer::documentRevision);
+            onEdt(() -> {
+                editor.requestMarkdownHeadings(new Object(), buffer, () -> true, result -> {
+                    retained.set(result); available.countDown();
+                }); return null;
+            });
+            assertTrue(available.await(15, TimeUnit.SECONDS));
+            onEdt(() -> {
+                String message = drivePicker(editor, "Symbols", dialog -> {
+                    var list = descendants(dialog, javax.swing.JList.class).getFirst();
+                    assertEquals(2, list.getModel().getSize());
+                    list.setSelectedIndex(1);
+                    descendants(dialog, javax.swing.JTextField.class).getFirst().postActionEvent();
+                }, () -> editor.paletteController.showHeuristicSymbols("duplicate"));
+                assertEquals("Line 5", message);
+                assertEquals(text.lastIndexOf("# duplicate"), editor.writingArea.getCaretPosition());
+                assertSame(snapshot, buffer.textSnapshot()); assertEquals(revision, buffer.documentRevision());
+                assertFalse(buffer.isModified()); assertFalse(buffer.getUndoManager().canUndo());
+                assertEquals(text, buffer.getSavedContent());
+                String stale = drivePicker(editor, "Symbols", dialog -> {
+                    try { buffer.getDocument().insertString(0, "edit\n", null); }
+                    catch (javax.swing.text.BadLocationException error) { throw new AssertionError(error); }
+                    int caret = editor.writingArea.getCaretPosition();
+                    descendants(dialog, javax.swing.JTextField.class).getFirst().postActionEvent();
+                    assertEquals(caret, editor.writingArea.getCaretPosition());
+                }, () -> editor.paletteController.showHeuristicSymbols("duplicate"));
+                assertEquals("Markdown headings changed; request again", stale);
+                long submitted = editor.markdownController.headingAnalysis().diagnostics().submitted();
+                FileBuffer javaBuffer = new FileBuffer(java.toFile(), editor.configManager);
+                editor.buffers.add(javaBuffer); editor.loadBufferIntoEditor(javaBuffer);
+                String ordinary = drivePicker(editor, "Symbols", dialog -> {
+                    descendants(dialog, javax.swing.JTextField.class).getFirst().postActionEvent();
+                }, () -> editor.paletteController.showHeuristicSymbols("Example"));
+                assertEquals("Line 1", ordinary);
+                assertEquals(submitted, editor.markdownController.headingAnalysis().diagnostics().submitted());
+                assertFalse(javaBuffer.isModified());
+                return null;
+            });
+            assertNotNull(retained.get());
+            assertEquals(text, Files.readString(markdown));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void pendingHeadingWorkRespectsManualCaretMovementAndBufferClosure() throws Exception {
+        assumeSwingAvailable();
+        Path home = Files.createDirectories(tempDir.resolve("home-semantic-close"));
+        Path first = Files.writeString(tempDir.resolve("close-a.md"), "prose\n# A\n");
+        Path second = Files.writeString(tempDir.resolve("close-b.md"), "other\n# B\n");
+        Texteditor editor = createEditor(home, first, second);
+        var started = new java.util.concurrent.CountDownLatch[]{new java.util.concurrent.CountDownLatch(1), new java.util.concurrent.CountDownLatch(1)};
+        var release = new java.util.concurrent.CountDownLatch[]{new java.util.concurrent.CountDownLatch(1), new java.util.concurrent.CountDownLatch(1)};
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            var service = new MarkdownAnalysisService(editor.asyncJobService, (source, cancelled) -> {
+                int index = calls.getAndIncrement(); started[index].countDown();
+                try { assertTrue(release[index].await(15, TimeUnit.SECONDS)); }
+                catch (InterruptedException ignored) { }
+                return MarkdownHeadingAnalysis.analyze(source, cancelled);
+            });
+            FileBuffer a = onEdt(() -> editor.buffers.stream().filter(b -> b.getFile().equals(first.toFile())).findFirst().orElseThrow());
+            FileBuffer b = onEdt(editor::getCurrentBuffer);
+            onEdt(() -> {
+                var field = MarkdownController.class.getDeclaredField("headingAnalysis"); field.setAccessible(true);
+                assertEquals(null, field.get(editor.markdownController)); field.set(editor.markdownController, service);
+                editor.loadBufferIntoEditor(a); editor.writingArea.setCaretPosition(0); editor.navigateHeading(true); return null;
+            });
+            assertTrue(started[0].await(15, TimeUnit.SECONDS));
+            onEdt(() -> { editor.writingArea.setCaretPosition(3); return null; });
+            release[0].countDown();
+            assertTrue(awaitUiState(() -> service.diagnostics().running() == 0));
+            onEdt(() -> {
+                assertEquals(3, editor.writingArea.getCaretPosition());
+                a.getDocument().insertString(0, "edit\n", null);
+                assertEquals(1, service.diagnostics().submitted(), "ordinary edits must not submit semantic work");
+                editor.writingArea.setCaretPosition(0); editor.navigateHeading(true); editor.showOutline(); return null;
+            });
+            assertTrue(started[1].await(15, TimeUnit.SECONDS));
+            onEdt(() -> {
+                editor.closeActiveBufferWithoutExiting(true);
+                assertFalse(editor.buffers.contains(a)); assertSame(b, editor.getCurrentBuffer());
+                assertTrue(Arrays.stream(editor.getOwnedWindows()).noneMatch(w -> w instanceof MarkdownOutlineDialog && w.isDisplayable()));
+                editor.writingArea.setCaretPosition(2); return null;
+            });
+            release[1].countDown();
+            assertTrue(awaitUiState(() -> service.diagnostics().running() == 0));
+            onEdt(() -> {
+                assertEquals(2, editor.writingArea.getCaretPosition()); assertEquals("other\n# B\n", b.getContent());
+                assertFalse(b.isModified()); assertFalse(b.getUndoManager().canUndo());
+                assertEquals(0, service.diagnostics().subscribers()); return null;
+            });
+            assertEquals("prose\n# A\n", Files.readString(first));
+        } finally { for (var gate : release) gate.countDown(); disposeEditor(editor); }
+    }
+
+    @Test
     void workbenchControlsKeepTheirStyleAndKeyboardBehaviorAcrossThemeAndZoomChanges() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-workbench-style"));

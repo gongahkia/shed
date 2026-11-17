@@ -1,0 +1,92 @@
+{
+  "recorded_utc": "2026-11-17T01:13:36.034321+00:00",
+  "head_before": "9a12c55b41aa7052e4365ffe2d590d70c6ef8166",
+  "head_after": "9a12c55b41aa7052e4365ffe2d590d70c6ef8166",
+  "status_before": "",
+  "status_after": " M docs/MARKDOWN_SEMANTIC_CONSUMERS.md\n M src/benchmark/java/shed/MarkdownConsumerProbe.java\n M src/test/java/shed/MarkdownConsumersTest.java\n M src/test/java/shed/TexteditorSwingIntegrationTest.java\n?? docs/performance/markdown-tranche2b/\n",
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_edited": false,
+  "diff_check": "PASS",
+  "commands": {
+    "focused.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home /tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn -B -Djava.awt.headless=true -DargLine=-Xmx512m -Dtest=MarkdownConsumersTest,MarkdownSemanticParserTest test",
+    "focused-expanded.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home /tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn -B -Djava.awt.headless=true -DargLine=-Xmx512m -Dtest=MarkdownConsumersTest,MarkdownSemanticParserTest test",
+    "navigation.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home /tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn -B -Djava.awt.headless=false -DargLine=-Xmx512m '-Dtest=TexteditorSwingIntegrationTest#semanticMarkdownOutlineNavigationSplitsAndStaleSelectionPreserveSource+pendingSemanticNavigationCannotMoveAnotherBufferOrInstallAnEditedRevision' test",
+    "symbol-picker.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home /tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn -B -Djava.awt.headless=false -DargLine=-Xmx512m '-Dtest=TexteditorSwingIntegrationTest#semanticSymbolPickerKeepsDuplicateTargetsRejectsStaleSelectionAndPreservesJavaSymbols' test",
+    "navigation-close.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home /tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn -B -Djava.awt.headless=false -DargLine=-Xmx512m '-Dtest=TexteditorSwingIntegrationTest#pendingHeadingWorkRespectsManualCaretMovementAndBufferClosure' test",
+    "full-suite.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home /tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn -B -Djava.awt.headless=false -DargLine=-Xmx512m test",
+    "full-suite-final.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home /tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn -B -Djava.awt.headless=false -DargLine=-Xmx512m test",
+    "package.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home /tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn -B -DskipTests package",
+    "tooling.log": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_benchmark*.py'",
+    "packaged-smoke.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-packaged-markdown.py --jar target/shed-2.0.0.jar --output /tmp/shed-tranche2b-run/packaged-smoke.json",
+    "consumers-mixed.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home PYTHONDONTWRITEBYTECODE=1 python3 scripts/benchmark-markdown.py --jar target/shed-2.0.0.jar --mode semantic-consumers --sizes 4096 102400 1048576 2097152 --shapes mixed --samples 10 --warmups 2 --timeout 90 --output /tmp/shed-tranche2b-run/consumers-mixed",
+    "consumers-final.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home PYTHONDONTWRITEBYTECODE=1 python3 scripts/benchmark-markdown.py --jar target/shed-2.0.0.jar --mode semantic-consumers --sizes 4096 102400 1048576 2097152 --shapes mixed --samples 100 --warmups 5 --timeout 90 --output /tmp/shed-tranche2b-run/consumers-final",
+    "consumers-adverse.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home PYTHONDONTWRITEBYTECODE=1 python3 scripts/benchmark-markdown.py --jar target/shed-2.0.0.jar --mode semantic-consumers --sizes 102400 1048576 --shapes markers table fence headings --samples 5 --warmups 1 --timeout 90 --output /tmp/shed-tranche2b-run/consumers-adverse",
+    "consumers-profile.log": "JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home PYTHONDONTWRITEBYTECODE=1 python3 scripts/benchmark-markdown.py --jar target/shed-2.0.0.jar --mode semantic-consumers --sizes 1048576 --shapes mixed --samples 5 --warmups 1 --profile --timeout 90 --output /tmp/shed-tranche2b-run/consumers-profile"
+  },
+  "prerequisite_failure": "Initial Maven invocation could not start: Maven absent, ambient JAVA_HOME missing. No tests executed in that attempt.",
+  "toolchain": {
+    "java_version": "openjdk version \"21.0.13\" 2026-10-20 LTS\nOpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.13+9 (build 21.0.13+9-LTS, mixed mode, sharing)\n",
+    "jdk_archive_sha256": "bf036b35b071bfb2f54f2c0af8ee8d88afa95ee6eb3dce02c0f94cfc2524d04a",
+    "maven_archive_sha256": "4b7195b6a4f5c81af4c0212677a32ee8143643401bc6e1e8412e6b06ea82beac",
+    "jdk_source": "https://api.adoptium.net/v3/binary/latest/21/ga/mac/aarch64/jdk/hotspot/normal/eclipse",
+    "maven_source": "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.11/apache-maven-3.9.11-bin.tar.gz"
+  },
+  "jar": {
+    "path": "target/shed-2.0.0.jar",
+    "sha256": "22b07df9a2f9affc74dbb78aad087ce61c9eb4e30e5c51f125d99dc06e143fc5",
+    "bytes": 50043881
+  },
+  "modified_tracked_files": [
+    "docs/MARKDOWN_SEMANTIC_CONSUMERS.md",
+    "src/benchmark/java/shed/MarkdownConsumerProbe.java",
+    "src/test/java/shed/MarkdownConsumersTest.java",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java"
+  ],
+  "preserved_tracked_files": 1086,
+  "all_production_sources_unchanged_from_continuation_start": true,
+  "prior_performance_evidence_unchanged": true,
+  "dependencies_and_manifests_unchanged": true,
+  "document_model_unchanged": true,
+  "source_files_sha256": {
+    "docs/MARKDOWN_SEMANTIC_CONSUMERS.md": "28c76302539beff877ab92b47d468d23cf50bfae8e1df415ad445e11e656918d",
+    "src/benchmark/java/shed/MarkdownConsumerProbe.java": "67a9d9c86be3f69a17e4f52dfda5d67a0d0dc19693b30fe34068260c85e52195",
+    "src/test/java/shed/MarkdownConsumersTest.java": "1ebd5d16a1fed9de7a35f43dfadf569e47d1533766ef7c321dcdaa056a583c3a",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java": "42e125ebca37ea41f9e90e40ab50dad0c4a2cf0cf801109ab350c74520877010"
+  },
+  "added_evidence_files": [
+    "docs/performance/markdown-tranche2b/INDEX.md",
+    "docs/performance/markdown-tranche2b/baseline-files.json.gz",
+    "docs/performance/markdown-tranche2b/cases.json.gz",
+    "docs/performance/markdown-tranche2b/measurements.json",
+    "docs/performance/markdown-tranche2b/packaged-smoke.json",
+    "docs/performance/markdown-tranche2b/profiles.json",
+    "docs/performance/markdown-tranche2b/regression-suites.json",
+    "docs/performance/markdown-tranche2b/verification-logs.json.gz",
+    "docs/performance/markdown-tranche2b/verification.json",
+    "docs/performance/markdown-tranche2b/manifest.json"
+  ],
+  "maven_final": {
+    "tests": 1364,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5
+  },
+  "maven_passed": 1359,
+  "python_tooling_passed": 10,
+  "packaged_smoke": "PASS",
+  "benchmark_case_count": 17,
+  "all_benchmark_children_completed": true,
+  "limits": [
+    "Full parse cap 1048576 UTF-16 units unchanged",
+    "At most one running/one pending/eight subscribers/one weak result per coordinator",
+    "512 MiB child heap unchanged",
+    "No startup semantic service observed in all benchmark children",
+    "No external Markdown LSP notification traffic measurement",
+    "Whole-process RSS peak 835.23 MiB exceeds historical 768 MiB reference",
+    "No Linux/Windows or native compositor performance qualification"
+  ],
+  "no_commits_or_pushes_issued": true,
+  "no_reset_clean_or_revert_issued": true,
+  "next_tranches_started": false
+}

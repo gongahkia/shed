@@ -1,0 +1,193 @@
+{
+  "group": "consumers-profile",
+  "diagnostic_only": true,
+  "overlapped_final_maven": true,
+  "recording_sha256": "548908a7992ca3d769fa59662f2cb6d3026b4080a98cf65368611fadc6a0dac5",
+  "recording_bytes": 1077275,
+  "binary_retained_outside_checkout": "/tmp/shed-tranche2b-run/consumers-profile/semantic-consumers-mixed-1048576-0/profile.jfr",
+  "summary": {
+    "recording": "/tmp/shed-tranche2b-run/consumers-profile/semantic-consumers-mixed-1048576-0/profile.jfr",
+    "execution_or_native_samples": 185,
+    "overlapping_stack_presence_counts": {
+      "EDT DefaultDocumentEvent.undo": 2,
+      "EDT FontDesignMetrics": 2,
+      "EDT GrammarHighlightService": 1,
+      "EDT PlainView": 4,
+      "EDT SourcePlainView": 1,
+      "EDT UndoManager.undo": 2,
+      "EDT VersionedTextSnapshot": 4,
+      "EDT javax.swing.text.PlainView.calculateLongestLine": 3,
+      "EDT source-width-summary-rebuild": 1,
+      "other VersionedTextSnapshot": 9
+    },
+    "top_stacks": [
+      {
+        "value": 58,
+        "key": "other sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000700122a908.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 40,
+        "key": "other sun.font.CFont.createNativeFont;sun.font.CFont.getNativeFontPtr;sun.font.CFont.getWidth;sun.font.FontFamily.preferredWidth;sun.font.FontFamily.setFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerFont;sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000700122a908.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 15,
+        "key": "other sun.java2d.metal.MTLLayer.blitTexture;sun.java2d.metal.MTLLayer.lambda$drawInMTLContext$4;sun.java2d.metal.MTLLayer$$Lambda.0x000000700126fcd8.run;sun.lwawt.macosx.CFRetainedResource.execute;sun.java2d.metal.MTLLayer.drawInMTLContext"
+      },
+      {
+        "value": 6,
+        "key": "other sun.lwawt.macosx.LWCToolkit.initAppkit;sun.lwawt.macosx.LWCToolkit.lambda$new$0;sun.lwawt.macosx.LWCToolkit$$Lambda.0x00000070010c3d88.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.lwawt.macosx.LWCToolkit.<init>;sun.awt.PlatformGraphicsInfo.createToolkit;java.awt.Toolkit.getDefaultToolkit;java.awt.Toolkit.getEventQueue;java.awt.EventQueue.isDispatchThread;javax.swing.SwingUtilities.isEventDispatchThread;shed.MarkdownPerformanceProbe.edt;shed.MarkdownPerformanceProbe.open;shed.MarkdownPerformanceProbe.main"
+      },
+      {
+        "value": 4,
+        "key": "other java.lang.ProcessHandleImpl.waitForProcessExit0;java.lang.ProcessHandleImpl$1.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run;jdk.internal.misc.InnocuousThread.run"
+      },
+      {
+        "value": 3,
+        "key": "other shed.MarkdownHeadingAnalysis.analyze;shed.MarkdownAnalysisService$$Lambda.0x0000007001385bd8.analyze;shed.MarkdownAnalysisService.lambda$start$1;shed.MarkdownAnalysisService$$Lambda.0x0000007001386440.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000700122bc00.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 3,
+        "key": "other sun.security.provider.SHA2.implCompress0;sun.security.provider.SHA2.implCompress;sun.security.provider.DigestBase.implCompressMultiBlock0;sun.security.provider.DigestBase.implCompressMultiBlock;sun.security.provider.DigestBase.engineUpdate;java.security.MessageDigest$Delegate.engineUpdate;java.security.MessageDigest.update;java.security.MessageDigest.digest;shed.FileBuffer.digest;shed.FileBuffer.load;shed.FileBuffer.<init>;shed.LegacyDocumentStore.load;shed.PaneBufferController.lambda$openFileAsync$11;shed.PaneBufferController$$Lambda.0x0000007001237508.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000700122bc00.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 3,
+        "key": "other java.lang.String.charAt;shed.VersionedTextSnapshot.stats;shed.VersionedTextSnapshot.prefix;shed.VersionedTextSnapshot.prefix;shed.VersionedTextSnapshot.prefix;shed.VersionedTextSnapshot.prefix;shed.VersionedTextSnapshot.prefix;shed.VersionedTextSnapshot.positionAt;shed.MarkdownHeadingAnalysis.from;shed.MarkdownHeadingAnalysis.analyze;shed.MarkdownAnalysisService$$Lambda.0x0000007001385bd8.analyze;shed.MarkdownAnalysisService.lambda$start$1;shed.MarkdownAnalysisService$$Lambda.0x0000007001386440.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000700122bc00.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 2,
+        "key": "other java.lang.ProcessImpl.forkAndExec;java.lang.ProcessImpl.<init>;java.lang.ProcessImpl.start;java.lang.ProcessBuilder.start;java.lang.ProcessBuilder.start;shed.SyntaxUiController.loadGitBlame;shed.SyntaxUiController.lambda$startPendingGitBlame$2;shed.SyntaxUiController$$Lambda.0x00000070012ad378.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000700122bc00.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 2,
+        "key": "other java.lang.String.charAt;org.commonmark.parser.beta.Scanner.peek;org.commonmark.parser.beta.Scanner.next;org.commonmark.internal.LinkReferenceDefinitionParser.startDefinition;org.commonmark.internal.LinkReferenceDefinitionParser.parse;org.commonmark.internal.ParagraphParser.addLine;org.commonmark.internal.DocumentParser.addLine;org.commonmark.internal.DocumentParser.parseLine;org.commonmark.internal.DocumentParser.parse;org.commonmark.parser.Parser.parseReader;shed.MarkdownSemanticParser.parse;shed.MarkdownHeadingAnalysis.analyze;shed.MarkdownAnalysisService$$Lambda.0x0000007001385bd8.analyze;shed.MarkdownAnalysisService.lambda$start$1;shed.MarkdownAnalysisService$$Lambda.0x0000007001386440.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000700122bc00.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 2,
+        "key": "other java.lang.Character.getType;java.lang.Character.isLetterOrDigit;java.lang.Character.isLetterOrDigit;shed.OpenBufferCompletionIndex.isWordCharacter;shed.OpenBufferCompletionIndex.build;shed.InputController.lambda$submitOpenBufferWordIndex$3;shed.InputController$$Lambda.0x000000700128ced0.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000700122bc00.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 2,
+        "key": "other jdk.internal.event.ThreadSleepEvent.commit;java.lang.Thread.afterSleep;java.lang.Thread.sleep;shed.MarkdownPerformanceProbe.await;shed.MarkdownPerformanceProbe.open;shed.MarkdownPerformanceProbe.main"
+      },
+      {
+        "value": 1,
+        "key": "EDT sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateMetrics;javax.swing.text.PlainView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.text.JTextComponent.getPreferredScrollableViewportSize;javax.swing.JTextArea.getPreferredScrollableViewportSize;javax.swing.ViewportLayout.preferredLayoutSize;java.awt.Container.preferredSize;java.awt.Container.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.ScrollPaneLayout.preferredLayoutSize;java.awt.Container.preferredSize;java.awt.Container.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.plaf.basic.BasicSplitPaneUI$BasicHorizontalLayoutManager.getPreferredSizeOfComponent;javax.swing.plaf.basic.BasicSplitPaneUI$BasicHorizontalLayoutManager.getPreferredSizes;javax.swing.plaf.basic.BasicSplitPaneUI$BasicHorizontalLayoutManager.resetToPreferredSizes;javax.swing.plaf.basic.BasicSplitPaneUI$BasicHorizontalLayoutManager.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validate;javax.swing.RepaintManager$3.run;javax.swing.RepaintManager$3.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;javax.swing.RepaintManager.validateInvalidComponents;javax.swing.RepaintManager$ProcessingRunnable.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;shed.MarkdownConsumerProbe$QueueTiming.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run"
+      },
+      {
+        "value": 1,
+        "key": "other java.lang.invoke.MethodHandles$Lookup$ClassDefiner.<init>;java.lang.invoke.MethodHandles$Lookup.makeHiddenClassDefiner;java.lang.invoke.MethodHandles$Lookup.makeHiddenClassDefiner;java.lang.invoke.InnerClassLambdaMetafactory.generateInnerClass;java.lang.invoke.InnerClassLambdaMetafactory.spinInnerClass;java.lang.invoke.InnerClassLambdaMetafactory.buildCallSite;java.lang.invoke.LambdaMetafactory.metafactory;java.lang.invoke.DirectMethodHandle$Holder.invokeStatic;java.lang.invoke.Invokers$Holder.invokeExact_MT;java.lang.invoke.BootstrapMethodInvoker.invoke;java.lang.invoke.CallSite.makeSite;java.lang.invoke.MethodHandleNatives.linkCallSiteImpl;java.lang.invoke.MethodHandleNatives.linkCallSite;java.util.ResourceBundle$ResourceBundleProviderHelper.loadPropertyResourceBundle;java.util.ResourceBundle.loadBundle;java.util.ResourceBundle.findBundle;java.util.ResourceBundle.findBundle;java.util.ResourceBundle.getBundleImpl;java.util.ResourceBundle.getBundleImpl;java.util.ResourceBundle.getBundleImpl;java.util.ResourceBundle.getBundle;java.awt.Toolkit$4.run;java.awt.Toolkit$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.awt.Toolkit.initStatic;java.awt.Toolkit.<clinit>;java.awt.EventQueue.isDispatchThread;javax.swing.SwingUtilities.isEventDispatchThread;shed.MarkdownPerformanceProbe.edt;shed.MarkdownPerformanceProbe.open;shed.MarkdownPerformanceProbe.main"
+      },
+      {
+        "value": 1,
+        "key": "other org.commonmark.internal.util.LinkScanner.scanLinkDestinationWithBalancedParens;org.commonmark.internal.util.LinkScanner.scanLinkDestination;org.commonmark.internal.InlineParserImpl.parseLinkDestination;org.commonmark.internal.InlineParserImpl.parseInlineDestinationTitle;org.commonmark.internal.InlineParserImpl.parseLinkInfo;org.commonmark.internal.InlineParserImpl.parseLinkOrImage;org.commonmark.internal.InlineParserImpl.parseCloseBracket;org.commonmark.internal.InlineParserImpl.parseInline;org.commonmark.internal.InlineParserImpl.parse;org.commonmark.internal.ParagraphParser.parseInlines;org.commonmark.internal.DocumentParser.processInlines;org.commonmark.internal.DocumentParser.finalizeAndProcess;org.commonmark.internal.DocumentParser.parse;org.commonmark.parser.Parser.parseReader;shed.MarkdownSemanticParser.parse;shed.MarkdownHeadingAnalysis.analyze;shed.MarkdownAnalysisService$$Lambda.0x0000007001385bd8.analyze;shed.MarkdownAnalysisService.lambda$start$1;shed.MarkdownAnalysisService$$Lambda.0x0000007001386440.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000700122bc00.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run"
+      },
+      {
+        "value": 1,
+        "key": "other jdk.internal.loader.NativeLibraries.load;jdk.internal.loader.NativeLibraries$NativeLibraryImpl.open;jdk.internal.loader.NativeLibraries.loadLibrary;jdk.internal.loader.NativeLibraries.loadLibrary;jdk.internal.loader.NativeLibraries.findFromPaths;jdk.internal.loader.NativeLibraries.loadLibrary;java.lang.ClassLoader.loadLibrary;java.lang.Runtime.loadLibrary0;java.lang.System.loadLibrary;sun.lwawt.macosx.LWCToolkit$1.run;sun.lwawt.macosx.LWCToolkit$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.lwawt.macosx.LWCToolkit.<clinit>;sun.awt.PlatformGraphicsInfo.createToolkit;java.awt.Toolkit.getDefaultToolkit;java.awt.Toolkit.getEventQueue;java.awt.EventQueue.isDispatchThread;javax.swing.SwingUtilities.isEventDispatchThread;shed.MarkdownPerformanceProbe.edt;shed.MarkdownPerformanceProbe.open;shed.MarkdownPerformanceProbe.main"
+      },
+      {
+        "value": 1,
+        "key": "EDT sun.lwawt.macosx.CPlatformWindow.nativeGetNSWindowInsets;sun.lwawt.macosx.CPlatformWindow.lambda$getInsets$6;sun.lwawt.macosx.CPlatformWindow$$Lambda.0x0000007001264e40.run;sun.lwawt.macosx.CFRetainedResource.execute;sun.lwawt.macosx.CPlatformWindow.getInsets;sun.lwawt.LWWindowPeer.initializeImpl;sun.lwawt.LWComponentPeer.initialize;sun.lwawt.LWToolkit.createDelegatedPeer;sun.lwawt.LWToolkit.createDialog;sun.lwawt.macosx.LWCToolkit.createDialog;java.awt.Dialog.addNotify;java.awt.Window.pack;shed.MarkdownOutlineDialog.<init>;shed.MarkdownOutlineDialog.showFor;shed.MarkdownController.showOutline;shed.Texteditor.showOutline;shed.MarkdownConsumerProbe.lambda$run$6;shed.MarkdownConsumerProbe$$Lambda.0x000000700133fc20.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;shed.MarkdownConsumerProbe$QueueTiming.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run"
+      },
+      {
+        "value": 1,
+        "key": "EDT sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.PlainView.getLineWidth;javax.swing.text.PlainView.calculateLongestLine;javax.swing.text.PlainView.updateMetrics;javax.swing.text.PlainView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.viewToModel;javax.swing.plaf.basic.BasicTextUI.viewToModel2D;javax.swing.text.JTextComponent.viewToModel2D;shed.SyntaxUiController.syntaxViewport;shed.SyntaxUiController.applySyntaxHighlighting;shed.Texteditor.applySyntaxHighlighting;shed.PaneBufferController.loadBufferIntoPane;shed.PaneBufferController.restoreBufferIntoPane;shed.PaneBufferController.deleteBuffer;shed.PaneBufferController.closeActiveBufferWithoutExiting;shed.Texteditor.closeActiveBufferWithoutExiting;shed.MarkdownConsumerProbe.lambda$run$29;shed.MarkdownConsumerProbe$$Lambda.0x00000070013b3400.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;shed.MarkdownConsumerProbe$QueueTiming.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run"
+      }
+    ],
+    "allocation_samples": 916,
+    "top_weighted_allocation_samples_not_retained": [
+      {
+        "value": 258201224,
+        "key": "[B"
+      },
+      {
+        "value": 54596072,
+        "key": "[Ljava.lang.Object;"
+      },
+      {
+        "value": 44098136,
+        "key": "org.commonmark.internal.inline.LinkResultImpl"
+      },
+      {
+        "value": 18235200,
+        "key": "[I"
+      },
+      {
+        "value": 15911240,
+        "key": "java.lang.String"
+      },
+      {
+        "value": 12479440,
+        "key": "java.util.ArrayList"
+      },
+      {
+        "value": 12272136,
+        "key": "org.commonmark.node.Text"
+      },
+      {
+        "value": 9885720,
+        "key": "java.lang.StringBuilder"
+      },
+      {
+        "value": 9636304,
+        "key": "[C"
+      },
+      {
+        "value": 8101608,
+        "key": "java.util.ImmutableCollections$Set12"
+      },
+      {
+        "value": 7616368,
+        "key": "shed.VersionedTextSnapshot$Stats"
+      },
+      {
+        "value": 7310928,
+        "key": "org.commonmark.internal.DocumentParser$OpenBlockParser"
+      },
+      {
+        "value": 5755768,
+        "key": "org.commonmark.internal.inline.EntityInlineParser"
+      },
+      {
+        "value": 5595520,
+        "key": "shed.MarkdownSourceRange"
+      },
+      {
+        "value": 5486632,
+        "key": "org.commonmark.internal.InlineParserImpl$DelimiterData"
+      }
+    ],
+    "gc_pause_ms": [
+      1.290333,
+      0.406375,
+      2.818166,
+      3.567875,
+      5.701667,
+      1.938833,
+      1.438041,
+      0.041875,
+      1.0735,
+      0.067917,
+      2.133417,
+      2.022208,
+      3.495916,
+      3.425042,
+      3.7515,
+      4.269375,
+      17.594541,
+      0.654875,
+      0.44125,
+      1.274667,
+      7.152333,
+      2.142625,
+      2.1685,
+      1.171417,
+      3.875875,
+      11.954458,
+      13.290708
+    ],
+    "gc_pause_total_ms": 99.16328899999999
+  },
+  "nmt": "27320:\n\nNative Memory Tracking:\n\n(Omitting categories weighting less than 1KB)\n\nTotal: reserved=2091697KB, committed=308625KB\n       malloc: 53177KB #83109\n       mmap:   reserved=2038520KB, committed=255448KB\n\n-                 Java Heap (reserved=524288KB, committed=78848KB)\n                            (mmap: reserved=524288KB, committed=78848KB, at peak) \n \n-                     Class (reserved=1049196KB, committed=3564KB)\n                            (classes #5227)\n                            (  instance classes #4849, array classes #378)\n                            (malloc=620KB #15320) (at peak) \n                            (mmap: reserved=1048576KB, committed=2944KB, at peak) \n                            (  Metadata:   )\n                            (    reserved=65536KB, committed=21376KB)\n                            (    used=21043KB)\n                            (    waste=333KB =1.56%)\n                            (  Class space:)\n                            (    reserved=1048576KB, committed=2944KB)\n                            (    used=2664KB)\n                            (    waste=280KB =9.50%)\n \n-                    Thread (reserved=92979KB, committed=92979KB)\n                            (threads #43)\n                            (stack: reserved=92856KB, committed=92856KB, peak=92856KB)\n                            (malloc=74KB #262) (peak=83KB #266) \n                            (arena=48KB #84) (peak=860KB #50)\n \n-                      Code (reserved=248500KB, committed=12836KB)\n                            (malloc=804KB #5904) (peak=805KB #5905) \n                            (mmap: reserved=247696KB, committed=12032KB, at peak) \n                            (arena=0KB #0) (peak=33KB #1)\n \n-                        GC (reserved=60074KB, committed=51386KB)\n                            (malloc=16954KB #2332) (peak=16975KB #2565) \n                            (mmap: reserved=43120KB, committed=34432KB, at peak) \n \n-                 GCCardSet (reserved=22KB, committed=22KB)\n                            (malloc=22KB #251) (at peak) \n \n-                  Compiler (reserved=1739KB, committed=1739KB)\n                            (malloc=42KB #212) (peak=48KB #230) \n                            (arena=1697KB #5) (peak=9478KB #13)\n \n-                  Internal (reserved=1538KB, committed=1538KB)\n                            (malloc=1506KB #4981) (at peak) \n                            (mmap: reserved=32KB, committed=32KB, at peak) \n \n-                     Other (reserved=1236KB, committed=1236KB)\n                            (malloc=1236KB #12) (at peak) \n \n-                    Symbol (reserved=6683KB, committed=6683KB)\n                            (malloc=3414KB #37224) (at peak) \n                            (arena=3268KB #1) (at peak)\n \n-    Native Memory Tracking (reserved=1329KB, committed=1329KB)\n                            (malloc=30KB #511) (at peak) \n                            (tracking overhead=1299KB)\n \n-        Shared class space (reserved=16384KB, committed=12896KB, readonly=0KB)\n                            (mmap: reserved=16384KB, committed=12896KB, peak=13152KB) \n \n-               Arena Chunk (reserved=4304KB, committed=4304KB)\n                            (malloc=4304KB #373) (peak=11450KB #370) \n \n-                   Tracing (reserved=16972KB, committed=16972KB)\n                            (malloc=16972KB #4374) (at peak) \n \n-                   Logging (reserved=0KB, committed=0KB)\n                            (malloc=0KB #2) (peak=6KB #4) \n \n-                Statistics (reserved=0KB, committed=0KB)\n                            (malloc=0KB #2) (peak=2KB #6) \n \n-                    Module (reserved=178KB, committed=178KB)\n                            (malloc=178KB #2117) (at peak) \n \n-                 Safepoint (reserved=32KB, committed=32KB)\n                            (mmap: reserved=32KB, committed=32KB, at peak) \n \n-           Synchronization (reserved=543KB, committed=543KB)\n                            (malloc=543KB #8964) (at peak) \n \n-            Serviceability (reserved=18KB, committed=18KB)\n                            (malloc=18KB #34) (peak=18KB #36) \n \n-                 Metaspace (reserved=65672KB, committed=21512KB)\n                            (malloc=136KB #162) (at peak) \n                            (mmap: reserved=65536KB, committed=21376KB, at peak) \n \n-      String Deduplication (reserved=1KB, committed=1KB)\n                            (malloc=1KB #8) (at peak) \n \n-           Object Monitors (reserved=12KB, committed=12KB)\n                            (malloc=12KB #59) (at peak) \n \n-                   Unknown (reserved=0KB, committed=0KB)\n                            (mmap: reserved=0KB, committed=0KB, peak=32KB) \n \n",
+  "limitation": "Early startup NMT is not a peak-memory census; weighted JFR samples are not retained bytes. No complete native RSS attribution."
+}

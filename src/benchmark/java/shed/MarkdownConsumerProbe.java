@@ -44,6 +44,7 @@ final class MarkdownConsumerProbe {
         if (buffer.isLargeFile()) { out("MD_SAMPLE ", Map.of("operation", "semantic_outline", "state", "UNSUPPORTED", "reason", "Read-only projection retains legacy UI")); return; }
         String original = edt(() -> buffer.textSnapshot().text());
         out("MD_META ", Map.of("operation", "semantic_before_request", "service_initialized", edt(() -> field(editor.markdownController, "headingAnalysis") != null)));
+        System.gc(); memory("semantic_before_first_analysis_gc_observation");
         QueueTiming queue = new QueueTiming();
         java.nio.file.Path switchedFile = null;
         edt(() -> { Toolkit.getDefaultToolkit().getSystemEventQueue().push(queue); return null; });
@@ -62,6 +63,7 @@ final class MarkdownConsumerProbe {
                 row.put("reason", result.semantic().detail()); out("MD_SAMPLE ", row);
             }
             var service = edt(() -> editor.markdownController.headingAnalysis());
+            System.gc(); memory("semantic_with_outline_gc_observation");
             long submitted = edt(() -> service.diagnostics().submitted());
             for (int i = -warmups; i < samples; i++) {
                 var row = edt(() -> {
@@ -77,6 +79,21 @@ final class MarkdownConsumerProbe {
                 uiText(outstanding ? "semantic_typing_outstanding_job" : "semantic_typing_idle", () -> typed('x'), i >= 0);
                 uiText("semantic_typing_undo", () -> editor.getCurrentBuffer().getUndoManager().undo(), i >= 0);
             }
+            // One EDT turn keeps the worker from installing intermediate revisions during the burst.
+            long burstBegan = System.nanoTime();
+            edt(() -> {
+                for (int i = 0; i < 16; i++) {
+                    long began = System.nanoTime(); newRevision(editor);
+                    double editMillis = (System.nanoTime() - began) / 1e6;
+                    began = System.nanoTime(); editor.showOutline();
+                    out("MD_SAMPLE ", Map.of("operation", "semantic_rapid_edit", "state", "OK",
+                        "edit_undo_edt_ms", editMillis, "request_edt_ms", (System.nanoTime() - began) / 1e6));
+                }
+                return null;
+            });
+            await(() -> ready(editor), 30);
+            out("MD_SAMPLE ", Map.of("operation", "semantic_burst_convergence", "state", "OK",
+                "convergence_observed_ms", (System.nanoTime() - burstBegan) / 1e6));
             edt(() -> { buffer.setModified(false); editor.showOutline(); return null; });
             await(() -> ready(editor), 30);
             MarkdownHeadingAnalysis retained = edt(() -> analysis(editor));
@@ -96,7 +113,14 @@ final class MarkdownConsumerProbe {
                 }
             } else out("MD_SAMPLE ", Map.of("operation", "semantic_occurrences_worker", "state", "UNSUPPORTED", "coverage", retained.semantic().coverage().name()));
             retained = null;
-            edt(() -> { editor.splitWindow(true); editor.showOutline(); return null; });
+            edt(() -> {
+                EditorPane first = editor.getActivePane(); int caret = first.getTextArea().getCaretPosition();
+                editor.splitWindow(true); editor.writingArea.setCaretPosition(0);
+                long began = System.nanoTime(); editor.navigateHeading(true);
+                out("MD_SAMPLE ", Map.of("operation", "semantic_split_navigation", "state", "OK", "edt_ms", (System.nanoTime() - began) / 1e6));
+                if (first.getTextArea().getCaretPosition() != caret) throw new AssertionError("Navigation changed other pane caret");
+                editor.showOutline(); return null;
+            });
             await(() -> ready(editor), 30);
             out("MD_META ", Map.of("operation", "semantic_split", "shared_document", edt(() -> editor.editorPanes.stream().allMatch(p -> p.getBuffer() != buffer || p.getTextArea().getDocument() == buffer.getDocument()))));
             switchedFile = java.nio.file.Files.createTempFile(java.nio.file.Path.of(buffer.getFilePath()).getParent(), "consumer-switch-", ".md");
@@ -112,9 +136,11 @@ final class MarkdownConsumerProbe {
             out("MD_META ", Map.of("operation", "semantic_diagnostics", "submitted", edt(() -> service.diagnostics().submitted()),
                 "reused", edt(() -> service.diagnostics().reused()), "stale_rejected", edt(() -> service.diagnostics().staleRejected()),
                 "superseded", edt(() -> service.diagnostics().superseded()), "source_restored", true));
-            System.gc(); memory("semantic_after_document_close_gc_observation");
             edt(() -> { var d = dialog(editor); if (d != null) d.dispose(); return null; });
             System.gc(); memory("semantic_after_outline_dispose_gc_observation");
+            edt(() -> { editor.closeActiveBufferWithoutExiting(true); return null; });
+            if (edt(() -> editor.buffers.contains(buffer))) throw new AssertionError("Source buffer still open");
+            System.gc(); memory("semantic_after_document_close_gc_observation");
         } finally {
             edt(() -> { queue.remove(); return null; });
             if (switchedFile != null) java.nio.file.Files.deleteIfExists(switchedFile);

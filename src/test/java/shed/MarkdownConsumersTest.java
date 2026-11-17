@@ -198,4 +198,94 @@ class MarkdownConsumersTest {
         }
         assertEquals(expected, result.headings());
     }
+
+    @Test void supportedSizesAndIncompleteHeadingPrecisionKeepDistinctPaths() {
+        for (int size : new int[]{100 * 1024, MarkdownSemanticParser.MAX_CHARACTERS}) {
+            String prefix = "# first\n```\n# fenced\n```\n";
+            String line = "ordinary prose ".repeat(6) + "\n";
+            String body = line.repeat(size / line.length() + 1);
+            var input = source((prefix + body).substring(0, size));
+            var result = MarkdownHeadingAnalysis.analyze(input, () -> false);
+            assertEquals(MarkdownHeadingAnalysis.Path.SEMANTIC, result.path());
+            assertEquals(MarkdownSemanticSnapshot.Coverage.COMPLETE, result.semantic().coverage());
+            assertEquals(List.of("first"), result.headings().stream().map(MarkdownHeadingAnalysis.Heading::title).toList());
+        }
+        var input = source("# safe legacy target");
+        var parsed = new MarkdownSemanticParser().parse(input);
+        var incomplete = new MarkdownSemanticSnapshot(input, parsed.status(), parsed.coverage(), parsed.coveredRange(),
+            parsed.blocks(), List.of(new MarkdownSemanticSnapshot.Heading(1, "unknown", "unknown",
+                new MarkdownSemanticSnapshot.Location(List.of()), java.util.Optional.empty())),
+            parsed.codeBlocks(), parsed.inlines(), parsed.links(), parsed.references(), parsed.tasks(),
+            java.util.Set.of(MarkdownSemanticSnapshot.Limitation.MISSING_OR_INVALID_PARSER_SPANS), "injected missing location");
+        var fallback = MarkdownHeadingAnalysis.from(incomplete, () -> false, System.nanoTime());
+        assertEquals(MarkdownHeadingAnalysis.Path.LEGACY_UNVERIFIED, fallback.path());
+        assertEquals(0, fallback.headings().getFirst().offset());
+        assertEquals("safe legacy target", fallback.headings().getFirst().title());
+        var structural = MarkdownHeadingAnalysis.analyze(source("# retained\n" + "x".repeat(65537)), () -> false);
+        assertEquals(MarkdownHeadingAnalysis.Path.LEGACY_UNSUPPORTED, structural.path());
+        assertTrue(structural.semantic().detail().contains("line-length"));
+    }
+
+    @Test void occurrenceExtractionPreservesSourceAndDoesNotInventDeferredRegions() throws Exception {
+        AtomicReference<FileBuffer> buffer = new AtomicReference<>();
+        AtomicReference<MarkdownSemanticSnapshot.Source> captured = new AtomicReference<>();
+        var panes = new javax.swing.JTextArea[2];
+        var events = new AtomicInteger();
+        String text = "[external](https://example.test/a#b) ![image][i] \\[escaped](x) ` [code](x) `\n\n"
+            + "[i]: local.png\n\n```mermaid\n[inside](x)\n$x$";
+        edt(() -> {
+            buffer.set(FileBuffer.createScratch("occurrences.md", text));
+            for (int i = 0; i < panes.length; i++) {
+                panes[i] = new javax.swing.JTextArea(); panes[i].setDocument(buffer.get().getDocument());
+                panes[i].select(i + 1, i + 4);
+            }
+            buffer.get().getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                public void insertUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
+                public void removeUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
+                public void changedUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
+            });
+            captured.set(MarkdownSemanticSnapshot.Source.capture(new DocumentWorkspace.Id(42), buffer.get()));
+        });
+        var input = captured.get();
+        var view = new MarkdownOccurrences(new MarkdownSemanticParser().parse(input));
+        var all = view.stream().toList();
+        assertEquals(4, all.size());
+        assertEquals("b", all.getFirst().fragment().orElseThrow());
+        assertEquals(MarkdownOccurrences.ReferenceStatus.RESOLVED, all.get(1).referenceStatus());
+        var fence = all.getLast();
+        assertEquals(MarkdownOccurrences.Kind.MERMAID, fence.kind());
+        assertTrue(fence.closingMarker().isEmpty());
+        assertFalse(view.mathSupported());
+        assertTrue(view.sourceLocationsComplete());
+        edt(() -> {
+            var b = buffer.get();
+            assertEquals(text, b.getContent()); assertEquals(text, b.getSavedContent());
+            assertSame(input.text(), b.textSnapshot()); assertEquals(input.revision(), b.documentRevision());
+            assertFalse(b.isModified()); assertFalse(b.getUndoManager().canUndo());
+            assertEquals(0, events.get());
+            for (int i = 0; i < panes.length; i++) {
+                assertEquals(i + 1, panes[i].getSelectionStart()); assertEquals(i + 4, panes[i].getSelectionEnd());
+            }
+        });
+    }
+
+    @Test void documentClosureInvalidatesEvenAStronglyHeldCachedResult() throws Exception {
+        var jobs = new AsyncJobService(Executors.newSingleThreadExecutor(), 10, null);
+        var service = new MarkdownAnalysisService(jobs);
+        var input = source("# cached");
+        AtomicReference<MarkdownHeadingAnalysis> first = new AtomicReference<>();
+        CountDownLatch initial = new CountDownLatch(1), repeated = new CountDownLatch(1);
+        try {
+            edt(() -> service.request(new Object(), input, () -> true, r -> { first.set(r); initial.countDown(); }));
+            await(initial);
+            edt(() -> {
+                service.documentClosed(input.documentId());
+                service.request(new Object(), input, () -> true, r -> {
+                    assertNotSame(first.get(), r); repeated.countDown();
+                });
+            });
+            await(repeated);
+            edt(() -> { assertEquals(2, service.diagnostics().submitted()); assertEquals(0, service.diagnostics().subscribers()); });
+        } finally { edt(service::close); jobs.shutdownNow(); }
+    }
 }

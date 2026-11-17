@@ -8,6 +8,8 @@ Analysis is explicit, asynchronous and independent of highlighting. `MarkdownCon
 
 ## B. Files and responsibilities
 
+Continuation began at `9a12c55b41aa7052e4365ffe2d590d70c6ef8166` with a clean working tree. The implementation below was already present in that HEAD, following `a6347e6e3`; no history was rewritten. This continuation reviewed those changes, extended verification and completed the missing evidence directory. The earlier 2A baseline is `d0d6f9f98`.
+
 | File | Change |
 | --- | --- |
 | `MarkdownHeadingAnalysis.java` | New worker projection, source-order/level-aware target lookup, explicit semantic/legacy/cancelled/failed provenance, conservative dense-input admission. |
@@ -23,6 +25,8 @@ Analysis is explicit, asynchronous and independent of highlighting. `MarkdownCon
 | `MarkdownConsumerProbe.java` | New opt-in actual-workbench performance scenarios; isolated EDT dispatch timing and existing completed-paint measurement. |
 | `MarkdownPerformanceProbe.java`, `scripts/benchmark-markdown.py` | Reuse the established runner/fixtures/environment/resource controls through `semantic-consumers`; the optional new probe is compiled only for that mode. Other modes still compile against older distributions. |
 | This report and `performance/markdown-tranche2b/` | Contracts, measurements, commands, failures/corrections and repository verification. |
+
+Files modified **during this continuation** are `MarkdownConsumersTest.java` (three additional tests and shared-selection preservation), `TexteditorSwingIntegrationTest.java` (two additional workbench tests), `MarkdownConsumerProbe.java` (rapid-edit, split and memory observations), and this report. New evidence files are enumerated in the evidence index. No production code needed further changes after review and verification.
 
 The 2A parser/model/range files, `SymbolService`, `MarkdownService`, `MarkdownEdit`, `FileBuffer`, snapshots, 1D lexer/controller, 1B source view, preview renderer/pane/assets and Maven dependencies are unchanged.
 
@@ -52,7 +56,7 @@ The 2A full-parse limit remains **1,048,576 UTF-16 units**, with its existing li
 
 Read-only large-file projections retain their original projection-local legacy routes. No full semantic coverage or full-file source offsets are claimed for them. The legacy path intentionally retains known limitations, including ATX-only interpretation and possible fenced-example headings. Legacy output remains proportional to heading count, as in the previous outline; it is not a new bounded semantic index or a guarantee of efficient outlines for arbitrarily dense giant files.
 
-The initial consumer prototype called `snapshot.line(i)` for every legacy line. The 2 MiB production benchmark measured about 13 seconds per scan; its bounded watchdog stack captured `VersionedTextSnapshot.countNewlines → offsetOfNewline → line → MarkdownHeadingAnalysis.from`. That traversal repeatedly measured chunk/prefix newline positions. The final fallback reads sequential 8 KiB chunks, tracks UTF-16 offsets/line numbers once and materializes only candidate `#` lines before applying the **unchanged** existing heading helpers. A differential test checks chunk boundaries, raw CRLF, Unicode, empty headings and EOF. No snapshot/store implementation is changed. Failed/timeout benchmark reports remain negative evidence, not successful performance results.
+The fallback reads sequential 8 KiB chunks, tracks UTF-16 offsets/line numbers once and materializes only candidate `#` lines before applying the **unchanged** existing heading helpers. A differential test checks chunk boundaries, raw CRLF, Unicode, empty headings and EOF. No snapshot/store implementation is changed. Earlier draft notes referred to slow prototype scans and watchdog traces, but those historical logs were absent at continuation start; I cannot verify those earlier measurements. The archived results below are fresh measurements of the current implementation.
 
 ## E. Occurrence contract
 
@@ -83,7 +87,11 @@ An outline refreshes on explicit reopening, source-stale selection, or return of
 
 Headless tests cover semantic ATX/Setext/empty/duplicate/formatted/Unicode headings; fenced and unclosed examples; strict target selection; complete-empty versus fallback/cancelled results; oversize/dense admission; links/images/references/fragments/fences; escaped table-span omission; weak reuse/in-flight joining; saturation, supersession, cancellation, injected failure, document closure and disposal.
 
-Actual-workbench tests exercise existing heading keys/outline selection, source offsets, duplicates, stale selection after edits, shared splits and independent caret state, pending analysis across buffer switches, and ordered repeated navigation. They assert unchanged source, snapshot/revision/history/dirty/saved baseline and ordinary document-event counts except for the deliberate source edit. The existing fold keyboard test retains its assertions and waits for exact asynchronous navigation targets.
+Actual-workbench tests exercise existing heading keys/outline selection, source offsets, duplicates, stale selection after edits, shared splits and independent caret state, pending analysis across buffer switches, and ordered repeated navigation. Additional continuation tests exercise the real local symbol picker, duplicate-row identity, stale picker acceptance, unchanged Java symbol routing, manual caret movement, closure during a gated parse and disposal of the source's outline. They assert unchanged source, snapshot/revision/history/dirty/saved baseline and ordinary document-event counts except for deliberate source edits. Occurrence tests preserve both shared-document selections. The existing fold keyboard test retains its assertions and waits for exact asynchronous navigation targets.
+
+No new LSP transport fixture was introduced. Zero document-change events are asserted around read-only navigation/extraction; inspection confirms the existing source-change LSP path is entered from document-change handling. The complete suite separately exercises LSP synchronization. Actual external language-server notification traffic during these Markdown tests is not measured.
+
+Benchmark workbenches reported zero connected LSP clients and automatic `.md` launch failures in their existing job diagnostics. Those outcomes remain visible in raw reports; no external Markdown LSP integration or performance qualification is claimed.
 
 No source/highlighting, save/recovery/undo or LSP ownership code was replaced. The 1A service-provider packaging, 1B view metrics, 1C partial fixes and 1D checkpoint pipeline remain in place. Final test totals and packaged verification are recorded in the evidence index.
 
@@ -95,15 +103,40 @@ This is separate from the 2A isolated parser benchmark. Convergence includes the
 
 Heavy benchmarks remain opt-in, bounded by the existing 512 MiB child heap/watchdog/new-output-directory rules. Startup observations test that the service is uninitialized before an explicit request; no true cold-cache claim is made. Measured values, sample counts, host pressure and limitations belong to the final [evidence index](performance/markdown-tranche2b/INDEX.md).
 
+Final unprofiled mixed runs use **100 measured requests after five warmups per size**. Values below are p95 milliseconds, except the last column, which is the largest observed dispatch during measured outline refreshes. Worker time includes eligibility, CommonMark analysis and heading projection; it is not an isolated CommonMark-only timer.
+
+| Source | Request EDT | Worker | Convergence | Cached navigation EDT | Typing to Swing paint | Occurrence extraction | Maximum observed EDT dispatch |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 4 KiB | 0.51 | 1.68 | 19.59 | 0.44 | 0.65 | 0.020 | 9.34 |
+| 100 KiB | 0.31 | 5.11 | 14.80 | 0.32 | 1.20 | 0.165 | 1.67 |
+| 1 MiB | 0.44 | 40.76 | 57.23 | 0.27 | 1.06 | 0.548 | 11.04 |
+| 2 MiB, legacy fallback | 0.28 | 4.62 | 16.81 | 0.35 | 1.06 | Unsupported | 1.47 |
+
+All four runs observed an uninitialized semantic service after workbench startup, exact source restoration, shared split documents and unchanged independent pane caret state. Each recorded 109 reuse events and no additional parse for the repeated unchanged-revision navigation loop. Stale-rejection counts were 103 / 6 / 1 / 3; supersession and cancellation counts depend on scheduling and are not deterministic timing gates. A single 16-edit burst per child measures coalescing/convergence; it is not a sustained-input percentile qualification. Separate gated tests establish rejection deterministically.
+
+At 1 MiB, post-GC used heap with the outline was 28.87 MiB, versus 26.26 MiB after outline disposal: **2.62 MiB observed release**. This includes outline rows and concurrent application state, not an exact semantic-object census. The coordinator has one weak result; it does not retain a strong document cache. Whole-process sampled peak RSS was **677.92 / 747.64 / 835.23 / 720.42 MiB** across the four sizes. The 1 MiB repeated-refresh peak exceeds the historical 768 MiB desktop reference budget; no memory-equivalence or low-memory qualification is claimed. The heap remains bounded at 512 MiB, and only one semantic job is admitted per coordinator. Dense 1 MiB table/marker/heading inputs take the admission fallback before AST construction. A separately labelled profiled diagnostic is retained, not pooled with latency measurements.
+
+The diagnostic recorded JVM-native committed memory of about 301 MiB early in startup, including a 77 MiB committed heap and about 91 MiB of thread stacks. JFR's largest sampled stacks were existing native font initialization and graphics work; semantic analysis appeared on worker stacks. Neither the early NMT sample nor sampled allocation weights explain the whole RSS peak. Native font/graphics retained-byte attribution remains unverified. Profiling overlapped the final Maven run and is diagnostic evidence only.
+
+These results are from an **Apple M3 Mac15,12, eight logical CPUs, 16 GiB RAM, macOS 26.5 arm64, Temurin 21.0.13+9**, with uncontrolled warm filesystem/font caches. They are not comparable speedup measurements against the earlier Intel 2A host. Native keyboard/compositor latency, a second OS and quiet-machine startup equivalence remain unmeasured.
+
 ## I. Verification
 
 Exact commands/results and development failures are archived in the evidence directory. Routine new consumer/parser checks run headless. Display-based checks are reserved for actual windows, focus, outline selection, split behavior and completed painting. No assertions are loosened or existing tests disabled.
 
-## J–L. Compatibility and limitations
+The final evidence index records exact commands, per-suite totals, skips, packaging, tooling and repository checks. The initial restored-toolchain run passed 22 consumer/parser cases; the expanded headless run passed 25. Both original workbench tests and both added picker/closure tests passed independently. A complete pre-final suite passed 1,363 cases with five skips; the final suite includes the additional closure test. The first attempt to start Maven could not run because Maven and the configured JDK were absent; an isolated Java 21/Maven toolchain under `/tmp` supplied verification without dependency changes.
+
+**Final complete Maven result: 1,364 cases, 1,359 passing, five existing skips, zero failures/errors.** This includes 12 consumer tests, 13 2A parser tests and 112 workbench integration cases (one existing skip). Ten Python benchmark-tooling tests passed. The independent packaged-only Mermaid/math/image smoke passed. `git diff --check`, README SHA-256 and preservation of all untouched baseline files passed. No assertions were weakened, and no tests were disabled to obtain these results.
+
+## J. UI/UX compliance
 
 No new visible controls, settings, panels, menus or rendering framework were added. The existing design system, layout, fonts, themes, syntax colors, navigation gestures, keymaps, source surfaces and cross-platform Swing architecture remain unchanged. Only incorrect eligible Markdown heading contents and their current source navigation are corrected. Decoded labels are displayed as text through the standard renderer, without interpreting them as Swing HTML.
 
-README remains protected; before/after SHA-256 and repository preservation are in final verification. No commit/push commands are issued by this task; externally advancing HEAD is recorded and preserved.
+## K. README and repository compliance
+
+README SHA-256 before and after: `48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e`. It was never edited. Starting HEAD and all untouched-file hashes are archived; previous performance evidence, production source, manifests and dependencies remain byte-identical to continuation start. No commit, push, reset, clean or revert command was issued.
+
+## L. Remaining limitations
 
 Known limitations: semantic/admission caps and conservative false negatives; lexical fallback's pre-existing heading inaccuracies; LSP/workspace/breadcrumb consumers still unmigrated; missing table-inline/task-marker/reference precision; unresolved-reference/math/wiki-link extraction; weak-cache misses after GC; full CommonMark transient allocation on admitted input; and the previously deferred Swing HTML preview-layout bottleneck. The occurrence view does not resolve fragments, files or anchors.
 

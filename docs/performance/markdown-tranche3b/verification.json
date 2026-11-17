@@ -1,0 +1,108 @@
+{
+  "initial_head": "fa144c0450eb364c21060584d33f0313c9b7111f",
+  "initial_status": "",
+  "final_head": "e84c674565478d60e6b58100c116aba62fb51c9c",
+  "observed_external_head": "df8a21bde9fe60c06101cd40a3a418a848426ae9",
+  "status": " M docs/MARKDOWN_ASYNC_MEDIA.md\n M src/benchmark/java/shed/MarkdownMediaProbe.java\n?? docs/performance/markdown-tranche3b/\n",
+  "baseline_files": 1143,
+  "changed_from_baseline": [
+    "scripts/benchmark-markdown.py",
+    "scripts/test_benchmark_markdown.py",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java",
+    "src/main/java/shed/MarkdownPreviewAssets.java"
+  ],
+  "added_from_baseline": [
+    "docs/MARKDOWN_ASYNC_MEDIA.md",
+    "docs/performance/markdown-tranche3b/INDEX.md",
+    "docs/performance/markdown-tranche3b/baseline-files.json.gz",
+    "docs/performance/markdown-tranche3b/cases.json.gz",
+    "docs/performance/markdown-tranche3b/manifest.json",
+    "docs/performance/markdown-tranche3b/measurements.json",
+    "docs/performance/markdown-tranche3b/packaged-smoke.json",
+    "docs/performance/markdown-tranche3b/regression-suites.json",
+    "docs/performance/markdown-tranche3b/renderer-inspection.json.gz",
+    "docs/performance/markdown-tranche3b/verification-logs.json.gz",
+    "docs/performance/markdown-tranche3b/verification.json",
+    "src/benchmark/java/shed/MarkdownMediaControlProbe.java",
+    "src/benchmark/java/shed/MarkdownMediaProbe.java",
+    "src/main/java/shed/MarkdownMedia.java",
+    "src/main/java/shed/MarkdownMediaRenderer.java",
+    "src/main/java/shed/MarkdownMediaService.java",
+    "src/test/java/shed/MarkdownMediaServiceTest.java"
+  ],
+  "missing_baseline_files": [],
+  "prior_performance_files_unchanged": 232,
+  "protected_hashes": {
+    "pom.xml": "902b4e0f310a3c9aa7e123d46c26b5c6f38d895239b68f5177c9619dfedd710f",
+    "README.md": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+    "src/main/java/shed/FileBuffer.java": "44210cdcda2780ebd3644de321938cbf356ae72dc66a33bdbce47f78af4775a0",
+    "src/main/java/shed/VersionedTextSnapshot.java": "fac8130861714946528edfb44152d110da041e7bb8bd29e1612e186750605755",
+    "src/main/java/shed/DocumentWorkspace.java": "cc149ea240db745a5371f6cc446f84be767a67f208102c154979c5fa44c117d0",
+    "src/main/java/shed/MarkdownEdit.java": "a3662827e8da030cb894b1328798ac991305bbbe83cf92105de51da3e8d4a862",
+    "src/main/java/shed/BoundedUndoManager.java": "df8a24a4acb21e71a514c3449b1a0ed6eb1a06df240c2ddee8a5834d611e14c8",
+    "src/main/java/shed/MarkdownSemanticParser.java": "ba3dad16ba2b0e89063d02a0d9989d7b12b131f37822477a34bc4d79f0bf948e",
+    "src/main/java/shed/MarkdownSemanticSnapshot.java": "2d2dd1063edd59b54f5d665dad565a4f456951bb74566fd9a46bd1dcfbe1faef",
+    "src/main/java/shed/MarkdownLinkResolver.java": "c0fff99194840bf6b54f05f1bd078dd97d5d8d22a2ce6a84a3a3a584ecbd5719",
+    "src/main/java/shed/MarkdownLinkIndex.java": "d4d69c74cfcb28ab48bee4e5256065ed4888b8256d8136d9ffed9009b8b4ca89",
+    "src/main/java/shed/MarkdownLinkNavigation.java": "a08f3784771d9b0c0a3f8bd3fd47b9e002beba13e1a155bed1232995c75dae61",
+    "src/main/java/shed/MarkdownProjectLinks.java": "f2a69c9e15167bfe7223559a4ef7ee6eeae8f1299ee84291b79aeb70f5d79f99",
+    "src/main/java/shed/MarkdownPreviewPane.java": "29b341a7a7232b90fce4717ac11948084a4137878c214cd9012aecce1fc13b9a",
+    "src/main/java/shed/MarkdownPreviewRenderer.java": "01c0ff19f1bb7c1762c1bbf1b889f1c42f4055fe371f6aca3ec2b61081e5a991",
+    "src/main/java/shed/MarkdownPreviewHtmlKit.java": "7bbe12cf4dbaa941a3dbbcefe5a83ce87035e539538d25553e23d12b4e6ac4ab",
+    "src/main/java/shed/SourcePlainView.java": "d6e5ced94a1884f0dc0917981086c80e7b528ca2b1ee3e8d8b4eb6fb0880a694",
+    "src/main/java/shed/GrammarHighlightService.java": "9f8111002be8082b1458f4092874c31f694ee81315fc98a71e478d4709ee367e",
+    "src/main/java/shed/SyntaxUiController.java": "ff4b346f36987210b263753c534d09a84efd321af30265cf496de4a2997efdea",
+    "src/main/java/shed/InputController.java": "31a039c763ceaf2d3d8d816eb28c3f27aee9efa1e5a7618b744670a46f4570cf"
+  },
+  "final_code_hashes": {
+    "scripts/benchmark-markdown.py": "2bcf2bb88d8c88302b67b15b8aa89dad48fb1b32ab7cfeb5e6930a3244840458",
+    "scripts/test_benchmark_markdown.py": "5afd74650140e6fc19c00ab6b96077ede9e6da0f81547f69d0c5d528e1f31907",
+    "src/benchmark/java/shed/MarkdownMediaControlProbe.java": "5d72bfac45c23ef8830ec1704ef8fcb7528fc8ad41bd93abb10482f1d0bd10b4",
+    "src/benchmark/java/shed/MarkdownMediaProbe.java": "511dc810249ef8d444f7a4b4a2a10739058a13b1cf3de6008a50092703ca8295",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "e6afc67c07d8d70cdae9d0efbdbb4167bdcc279a80ec147a9b52e87ef411b9de",
+    "src/main/java/shed/MarkdownMedia.java": "28c3b24d302b7baf48df59bda65c4de820dc211702daa81181c63e2a6c77f9c3",
+    "src/main/java/shed/MarkdownMediaRenderer.java": "af7db0cb6de5fae7d71fb2953876f63bd598adf0978dd26b293567c5f0a30d51",
+    "src/main/java/shed/MarkdownMediaService.java": "209abacccc2a31e226b13f152d5dea0ac5b37e186592ddbcb70252b24ba0e6db",
+    "src/main/java/shed/MarkdownPreviewAssets.java": "8306b2d8e721ca37a25ea812be7e63e0a463ced957058964a2eb89d736aa117e",
+    "src/test/java/shed/MarkdownMediaServiceTest.java": "8fd8502141475c29575778d7b86ba9abf2d269a9a5ba71389f360fffe4961e68"
+  },
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "before_jar_sha256": "4353f43b4878d2a96f3a5f875136521e316c11967c2ff8ffc0072e04fe1caef6",
+  "final_jar_sha256": "0a3e764180ed4d0ae323ea47d4309a9674fb7a55530896d002f3f6044dc2c349",
+  "diff_checks": [
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "fa144c0450eb364c21060584d33f0313c9b7111f",
+        "--check"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "agent_created_commits_or_pushes": false,
+  "full_suite": {
+    "tests": 1471,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5,
+    "passing": 1466
+  },
+  "new_tests": 31,
+  "python_tooling_tests": 12,
+  "smoke": "PASS",
+  "toolchain": "export JAVA_HOME=/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home\nexport MVN=/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/mvn\n"
+}

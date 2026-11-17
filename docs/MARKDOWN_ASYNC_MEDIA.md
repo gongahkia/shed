@@ -108,13 +108,40 @@ Latch/generation synchronization establishes ordering; arbitrary sleeps do not e
 
 ## H. Performance and memory
 
-PERFORMANCE_TABLE
+| Measurement (ms; p50 / p95) | 4 KiB | 100 KiB | 1 MiB |
+| --- | ---: | ---: | ---: |
+| Before legacy worker typing to paint (n=100) | 0.611 / 1.261 | 0.965 / 1.739 | 1.068 / 1.379 |
+| After legacy worker typing to paint (n=100) | 0.715 / 1.622 | 1.051 / 1.543 | 1.090 / 1.814 |
+| New service typing to paint (n=100) | 0.613 / 1.201 | 0.984 / 1.337 | 0.939 / 1.546 |
+| New service inactive typing to paint (n=100) | 0.612 / 0.919 | 0.965 / 1.247 | 0.943 / 1.193 |
+| Cached Mermaid dispatch EDT (n=100) | 0.017 / 0.032 | 0.016 / 0.033 | 0.015 / 0.035 |
+| Cached Mermaid request/result (n=100) | 0.131 / 0.211 | 0.126 / 0.175 | 0.105 / 0.208 |
+| Cold Mermaid renderer (n=1) | 1845.085 / 1845.085 | 1863.311 / 1863.311 | 1898.755 / 1898.755 |
+| Warm/changed Mermaid renderer (n=11) | 315.468 / 566.639 | 310.602 / 554.279 | 322.144 / 562.914 |
+| Changed Mermaid request/result (n=10) | 316.579 / 567.782 | 311.731 / 555.559 | 323.401 / 564.114 |
+| Queued math wait behind Mermaid (n=8) | 1911.193 / 1911.411 | 1926.803 / 1927.101 | 1958.693 / 1958.953 |
+| Math renderer, includes first use (n=8) | 0.077 / 65.441 | 0.087 / 62.441 | 0.079 / 58.790 |
+| Cached math request/result (n=20) | 0.099 / 0.134 | 0.059 / 0.092 | 0.062 / 0.110 |
+| Local image decode (n=1) | 0.373 / 0.373 | 0.487 / 0.487 | 0.377 / 0.377 |
+| Image capture/validation (n=20) | 0.205 / 0.420 | 0.196 / 0.362 | 0.224 / 0.442 |
+| Cached image request/result (n=19) | 0.336 / 0.548 | 0.295 / 0.564 | 0.317 / 0.598 |
 
 The actual packaged service runs beside Shed's real source editor. All 100 measured typing samples at each size overlap an active cold Mermaid worker, rendering an independently captured media-document revision. One semantic analysis prepares that small media revision; ordinary source keystrokes do not trigger semantic rendering/analysis through this service. Source typing is restored through normal undo, with only the expected 200 revision changes. This is completed Swing paint, not physical keyboard/compositor latency.
 
 The matched `media-control` runs exercise the existing renderer operations in before/after JARs, with the same cold/changed/themed diagrams, math and image. Their diagnostic worker measures renderer/native footprint and typing interference; it does **not** claim that the old preview was asynchronous. Legacy timings include its existing PNG file generation; new service timings include bounded in-memory rasterization. Cache lookup, cold initialization and warm rendering are distinct operations. The evidence index retains every raw sample, queue/worker duration, allocation and control result.
 
-MEMORY_TABLE
+| 1 MiB source phase | Before legacy control heap used / committed (MiB) | After legacy control heap used / committed (MiB) | New service heap used / committed (MiB) |
+| --- | ---: | ---: | ---: |
+| Before media | 22.10 / 66 | 22.01 / 66 | 22.07 / 66 |
+| Retained | 49.50 / 174 | 49.48 / 170 | 66.39 / 230 |
+| Disposed | 49.09 / 174 | 49.07 / 170 | 47.96 / 167 |
+
+| 1 MiB source RSS (MiB) | Before legacy control | After legacy control | New service |
+| --- | ---: | ---: | ---: |
+| Before media | 668.75 | 676.75 | 672.44 |
+| Retained | 914.77 | 906.75 | 957.84 |
+| Disposed | 914.69 | 906.75 | 893.48 |
+| Sampled peak | 1221.70 | 1234.75 | 1226.30 |
 
 All three service cases remove every tracked raster, handle, session and queued job on close, and the disposed service weak reference is collected. There are eight queue-limit rejections, one duplicate coalescing event and one stale-request rejection per case. Recorded resident raster payload is 16,087,236 bytes before disposal and zero afterward. Request/renderer execution remains off the EDT.
 

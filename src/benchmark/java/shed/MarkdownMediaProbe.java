@@ -111,7 +111,10 @@ final class MarkdownMediaProbe {
             uiText("media_active_undo", () -> buffer.getUndoManager().undo(), true);
         }
         idle(service); consume(cold, source, 1, "media_cold_result", State.READY); consume(duplicate, source, 1, "media_duplicate_result", State.READY);
-        queued.forEach(MarkdownMediaService.Handle::close);
+        for (var handle : queued) try (var result = handle.take(source, 1)) {
+            if (result.state() != State.READY) throw new AssertionError("Queued math did not complete");
+            out("MD_SAMPLE ", Map.of("operation", "media_queued_math_result", "state", "OK", "queue_ms", result.queueNanos() / 1e6, "worker_ms", result.workerNanos() / 1e6));
+        }
         out("MD_META ", Map.of("operation", "media_typing_overlap", "samples", samples, "overlap", overlap, "queue_rejections", limited, "metrics", service.metrics().toString()));
         for (int i = 0; i < samples; i++) {
             var hit = submit(session, diagram(semantic, Options.preview(), 1), "media_cached_dispatch"); idle(service); consume(hit, source, 1, "media_cached_result", State.READY);

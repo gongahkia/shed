@@ -23,6 +23,8 @@ final class MarkdownMediaRenderer implements Renderer {
     @Override public Prepared prepare(Request request, BooleanSupplier cancelled) throws Exception {
         worker(); check(cancelled);
         if (request.kind() == Kind.MATH) safeMath(request.content());
+        if (request.kind() == Kind.MERMAID && (request.content().length() > 16384 || request.content().lines().count() > 256))
+            throw new Rejected(State.RESOURCE_LIMIT, "Mermaid service admission: 16 Ki UTF-16 units / 256 lines");
         if (request.kind() != Kind.IMAGE) return new Prepared(request.key(), request, null);
         Context context = request.context().orElseThrow();
         Path source = WorkspaceRootResolver.normalizedIdentity(context.file());
@@ -53,6 +55,10 @@ final class MarkdownMediaRenderer implements Renderer {
             throw new Rejected(State.SUPERSEDED, "Image changed during capture");
         check(cancelled);
         return new Prepared("image|" + file + "|" + after.fileKey() + "|" + after.lastModifiedTime() + "|" + hash(bytes) + "|" + request.options(), request, bytes);
+    }
+    @Override public void validate(Prepared prepared, BooleanSupplier cancelled) throws Exception {
+        if (prepared.request().kind() == Kind.IMAGE && !prepare(prepared.request(), cancelled).key().equals(prepared.key()))
+            throw new Rejected(State.SUPERSEDED, "Image changed during rendering");
     }
     @Override public BufferedImage render(Prepared prepared, BooleanSupplier cancelled) throws Exception {
         worker(); check(cancelled); var request = prepared.request(); var options = request.options();
@@ -145,11 +151,12 @@ final class MarkdownMediaRenderer implements Renderer {
         "langle", "rangle", "lbrace", "rbrace", "vert", "Vert", "lvert", "rvert", "lVert", "rVert",
         "rightarrow", "leftarrow", "leftrightarrow", "Rightarrow", "Leftarrow", "Leftrightarrow");
     private static void safeMath(String source) throws Rejected {
+        if (source.length() > 8192) throw new Rejected(State.RESOURCE_LIMIT, "Math source budget");
         int depth = 0;
         for (int i = 0; i < source.length(); i++) {
             char c = source.charAt(i);
             if (c == '{' && ++depth > 32) throw new Rejected(State.RESOURCE_LIMIT, "Math nesting limit");
-            if (c == '}') depth--;
+            if (c == '}' && --depth < 0) throw new Rejected(State.FAILED, "Unbalanced math expression");
             if (c != '\\') continue;
             int start = ++i;
             while (i < source.length() && Character.isLetter(source.charAt(i))) i++;
@@ -158,6 +165,7 @@ final class MarkdownMediaRenderer implements Renderer {
                 i--;
             }
         }
+        if (depth != 0) throw new Rejected(State.FAILED, "Unbalanced math expression");
     }
     private static void worker() { if (javax.swing.SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Media processing on EDT"); }
     private static void check(BooleanSupplier cancelled) { if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException(); }

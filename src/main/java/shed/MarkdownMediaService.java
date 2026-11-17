@@ -21,8 +21,10 @@ final class MarkdownMediaService implements AutoCloseable {
     interface Renderer {
         Prepared prepare(Request request, BooleanSupplier cancelled) throws Exception;
         BufferedImage render(Prepared prepared, BooleanSupplier cancelled) throws Exception;
+        default void validate(Prepared prepared, BooleanSupplier cancelled) throws Exception { }
     }
     record Prepared(String key, Request request, byte[] imageBytes) { }
+    record AssetInfo(Kind kind, String identity, Options options, int width, int height, long bytes, long pixels) { }
     static final class Rejected extends Exception {
         final State state;
         Rejected(State state, String detail) { super(detail); this.state = state; }
@@ -35,17 +37,25 @@ final class MarkdownMediaService implements AutoCloseable {
     }
     private static final class Entry {
         final BufferedImage image;
+        final AssetInfo info;
         final long bytes, pixels;
         int pins;
         boolean cached;
-        Entry(BufferedImage image) { this.image = image; pixels = (long) image.getWidth() * image.getHeight(); bytes = pixels * 4; }
+        Entry(BufferedImage image, Prepared prepared) {
+            this.image = image; pixels = (long) image.getWidth() * image.getHeight(); bytes = pixels * 4;
+            info = new AssetInfo(prepared.request().kind(), prepared.key(), prepared.request().options(), image.getWidth(), image.getHeight(), bytes, pixels);
+        }
     }
     /** Paint-only access avoids exposing the mutable cached raster. Closing is idempotent. */
     final class Lease implements AutoCloseable {
         private final Session session;
         private final Stamp stamp;
+        private final List<MarkdownSourceRange> ranges;
         private Entry entry;
-        private Lease(Session session, Stamp stamp, Entry entry) { this.session = session; this.stamp = stamp; this.entry = entry; session.leases.add(this); }
+        private Lease(Session session, Stamp stamp, List<MarkdownSourceRange> ranges, Entry entry) { this.session = session; this.stamp = stamp; this.ranges = ranges; this.entry = entry; session.leases.add(this); }
+        Stamp stamp() { return stamp; }
+        List<MarkdownSourceRange> ranges() { return ranges; }
+        AssetInfo info() { synchronized (MarkdownMediaService.this) { return require().info; } }
         boolean isCurrent(Source source, long generation) {
             synchronized (MarkdownMediaService.this) { return entry != null && !closed && !session.closed && session.stamp.same(stamp) && stamp.matches(source, generation); }
         }
@@ -67,23 +77,27 @@ final class MarkdownMediaService implements AutoCloseable {
     final class Handle implements AutoCloseable {
         private final Session session;
         private final Stamp stamp;
+        private final List<MarkdownSourceRange> ranges;
         private State state = State.PENDING;
         private String detail = "Media pending";
         private Job job;
         private Entry entry;
         private long queueNanos, workerNanos;
         private boolean registered;
-        private Handle(Session session, Stamp stamp) { this.session = session; this.stamp = stamp; }
+        private Handle(Session session, Stamp stamp, List<MarkdownSourceRange> ranges) { this.session = session; this.stamp = stamp; this.ranges = ranges; }
         State state() { synchronized (MarkdownMediaService.this) { return state; } }
         Result take(Source current, long generation) {
             synchronized (MarkdownMediaService.this) {
+                if ((state == State.PENDING || state == State.READY) && (!stamp.matches(current, generation) || !session.stamp.same(stamp))) {
+                    finish(this, State.SUPERSEDED, "Media revision or consumer changed"); staleDiscarded++;
+                }
                 if (state == State.PENDING) return new Result(state, Optional.empty(), detail, queueNanos, workerNanos);
                 if (state != State.READY) return new Result(state, Optional.empty(), detail, queueNanos, workerNanos);
                 if (!session.stamp.same(stamp) || !stamp.matches(current, generation) || session.closed || closed) {
                     finish(this, State.SUPERSEDED, "Media revision or consumer changed"); staleDiscarded++;
                     return new Result(state, Optional.empty(), detail, queueNanos, workerNanos);
                 }
-                Lease lease = new Lease(session, stamp, entry); entry = null;
+                Lease lease = new Lease(session, stamp, ranges, entry); entry = null;
                 detach(this); consumers++; // transfer the existing pin and admission slot to the lease
                 state = State.CLOSED; detail = "Media asset transferred";
                 return new Result(State.READY, Optional.of(lease), "Rendered media", queueNanos, workerNanos);
@@ -109,7 +123,7 @@ final class MarkdownMediaService implements AutoCloseable {
         }
         Handle request(Plan plan) {
             synchronized (MarkdownMediaService.this) {
-                Handle handle = new Handle(this, plan.request().map(Request::stamp).orElse(stamp));
+                Handle handle = new Handle(this, plan.request().map(Request::stamp).orElse(stamp), plan.request().map(Request::ranges).orElse(List.of()));
                 if (closed || MarkdownMediaService.this.closed) { handle.state = State.CLOSED; handle.detail = "Media service or session closed"; return handle; }
                 if (plan.request().isEmpty()) { handle.state = plan.state(); handle.detail = plan.detail(); return handle; }
                 Request request = plan.request().orElseThrow();
@@ -150,7 +164,7 @@ final class MarkdownMediaService implements AutoCloseable {
         @Override public void run() {
             long began = System.nanoTime();
             synchronized (MarkdownMediaService.this) {
-                if (cancelled() || closed) { jobs.remove(key, this); return; }
+                if (cancelled() || closed) { jobs.remove(key, this); MarkdownMediaService.this.notifyAll(); return; }
                 started = true; running++;
             }
             BufferedImage output = null; Entry ready = null; State state = State.READY; String detail = "Rendered media";
@@ -164,6 +178,7 @@ final class MarkdownMediaService implements AutoCloseable {
                 }
                 if (ready == null) {
                     output = renderer.render(prepared, this::cancelled);
+                    renderer.validate(prepared, this::cancelled);
                     if (output == null) throw new IllegalStateException("Renderer produced no image");
                     // Own a compact ARGB raster, including when a library returns a view into a larger image.
                     long pixels = (long) output.getWidth() * output.getHeight();
@@ -174,7 +189,7 @@ final class MarkdownMediaService implements AutoCloseable {
                     output.flush(); output = null;
                     synchronized (MarkdownMediaService.this) {
                         if (cancelled() || closed) { owned.flush(); throw new CancellationException(); }
-                        Entry entry = new Entry(owned);
+                        Entry entry = new Entry(owned, prepared);
                         evictFor(entry.bytes, entry.pixels);
                         if (residentBytes + entry.bytes > budget.residentBytes() || residentPixels + entry.pixels > budget.residentPixels()) {
                             owned.flush(); throw new Rejected(State.RESOURCE_LIMIT, "Active media memory budget exhausted");

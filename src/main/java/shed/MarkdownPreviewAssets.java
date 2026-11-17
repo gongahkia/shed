@@ -310,11 +310,16 @@ final class MarkdownPreviewAssets implements AutoCloseable {
     }
 
     private static BufferedImage decodeRasterImage(byte[] content) throws IOException {
-        return decodeRasterImage(content, MAX_IMAGE_DIMENSION, MAX_IMAGE_PIXELS);
+        return decodeRasterImage(content, MAX_IMAGE_DIMENSION, MAX_IMAGE_PIXELS, false);
     }
 
     static BufferedImage decodeRasterImage(byte[] content, int maxDimension, long maxPixels) throws IOException {
-        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(content))) {
+        return decodeRasterImage(content, maxDimension, maxPixels, true);
+    }
+
+    private static BufferedImage decodeRasterImage(byte[] content, int maxDimension, long maxPixels, boolean memoryOnly) throws IOException {
+        try (ImageInputStream input = memoryOnly ? new javax.imageio.stream.MemoryCacheImageInputStream(new ByteArrayInputStream(content))
+                : ImageIO.createImageInputStream(new ByteArrayInputStream(content))) {
             if (input == null) throw new IOException("remote image format is unsupported");
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) throw new IOException("remote image format is unsupported");

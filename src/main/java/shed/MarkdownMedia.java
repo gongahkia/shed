@@ -58,6 +58,10 @@ final class MarkdownMedia {
         String key() { return kind + "|" + digest + "|" + display + "|" + options + "|" + (kind == Kind.IMAGE ? context : ""); }
     }
     record Plan(State state, Optional<Request> request, String detail) {
+        Plan {
+            Objects.requireNonNull(state); Objects.requireNonNull(request); Objects.requireNonNull(detail);
+            if (request.isPresent() != (state == State.PENDING) || state == State.READY) throw new IllegalArgumentException("Inconsistent media plan");
+        }
         static Plan unavailable(State state, String detail) { return new Plan(state, Optional.empty(), detail); }
     }
     private static Plan eligible(MarkdownSemanticSnapshot semantic, Source current) {

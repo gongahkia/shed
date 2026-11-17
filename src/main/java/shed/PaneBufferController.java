@@ -192,6 +192,7 @@ final class PaneBufferController {
                 textChange = buffer.reconcileDocumentText();
             }
             buffer.setModified(true);
+            editor.markdownLinksChanged(buffer, false);
             editor.invalidateGitBlame(buffer);
             scheduleIdleBackup(buffer);
             editor.recordChangePosition();

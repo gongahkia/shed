@@ -132,6 +132,7 @@ public class Texteditor extends JFrame implements KeyListener {
     final WorkspaceRoots workspaceRoots = new WorkspaceRoots();
     final DocumentNavigation documentNavigation = new DocumentNavigation();
     LegacyDocumentStore documentStore;
+    private MarkdownProjectLinks markdownLinks;
     DocumentWorkspace documents;
     OpenEditorsBar openEditorsBar;
     WorkbenchHeader workbenchHeader;
@@ -307,6 +308,7 @@ public class Texteditor extends JFrame implements KeyListener {
             for (FileBuffer buffer : buffers) {
                 boolean bindingChanged = lspController.syncDocumentBinding(buffer, bindings.get(buffer));
                 if (buffer == getCurrentBuffer()) currentBindingChanged = bindingChanged;
+                if (bindingChanged || before.get(buffer) != buffer.textSnapshot()) markdownLinksChanged(buffer, bindingChanged);
                 if (!bindingChanged && before.get(buffer) != buffer.textSnapshot()) syncLspChange(buffer);
             }
             if (getCurrentBuffer() != null && (currentBindingChanged || before.get(getCurrentBuffer()) != getCurrentBuffer().textSnapshot())) {
@@ -1420,8 +1422,33 @@ public class Texteditor extends JFrame implements KeyListener {
         markdownController.detachPreview(pane);
     }
 
+    /** Headless infrastructure only; no startup caller or navigation command is attached. */
+    MarkdownProjectLinks markdownLinks() {
+        if (markdownLinks == null) markdownLinks = new MarkdownProjectLinks(workspaceRoots::all, () -> {
+            var sources = new java.util.ArrayList<MarkdownLinkIndex.Overlay>();
+            for (FileBuffer buffer : buffers) {
+                if (!buffer.isModified() || !buffer.hasFilePath() || buffer.getFileType() != FileType.MARKDOWN) continue;
+                var source = MarkdownSemanticSnapshot.Source.capture(documentStore.id(buffer), buffer);
+                sources.add(new MarkdownLinkIndex.Overlay(java.nio.file.Path.of(buffer.getFilePath()), source, markdownController.availableSemantic(source)));
+                if (sources.size() > 64) break;
+            }
+            return java.util.List.copyOf(sources);
+        });
+        return markdownLinks;
+    }
+
+    void markdownLinksChanged(FileBuffer buffer, boolean diskChanged) {
+        if (markdownLinks != null && buffer != null && buffer.hasFilePath() && buffer.getFileType() == FileType.MARKDOWN)
+            markdownLinks.documentsChanged(java.nio.file.Path.of(buffer.getFilePath()), diskChanged);
+    }
+
+    void markdownLinkRootsChanged() {
+        if (markdownLinks != null) { markdownLinks.reconcileRoots(); markdownLinks.documentsChanged(null, false); }
+    }
+
     void disposeMarkdownPreviews() {
         markdownController.disposePreviews();
+        if (markdownLinks != null) { markdownLinks.close(); markdownLinks = null; }
     }
 
     void requestMarkdownHeadings(Object owner, FileBuffer buffer, java.util.function.BooleanSupplier current,
@@ -1434,6 +1461,7 @@ public class Texteditor extends JFrame implements KeyListener {
     void cancelMarkdownHeadingEdit() { markdownController.cancelHeadingEdit(); }
 
     void markdownSourceClosed(FileBuffer buffer) {
+        if (buffer.isModified()) markdownLinksChanged(buffer, false);
         if (buffer.getFileType() == FileType.MARKDOWN) markdownController.headingSourceClosed(buffer);
     }
 
@@ -2514,6 +2542,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public void notifyBufferSaved(FileBuffer buffer) {
+        markdownLinksChanged(buffer, true);
         if (buffer == getCurrentBuffer()) paneBufferController.refreshDiffGutterForActiveBuffer(buffer);
         lspController.notifyBufferSaved(buffer);
         if (buffer == getCurrentBuffer()) markdownController.refreshPreviewForBuffer(buffer);

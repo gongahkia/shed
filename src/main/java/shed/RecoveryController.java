@@ -73,6 +73,7 @@ final class RecoveryController {
             if (state == FileBuffer.ExternalFileState.UNCHANGED) {
                 continue;
             }
+            editor.markdownLinksChanged(buffer, true);
             if (!buffer.isModified()) {
                 if (state == FileBuffer.ExternalFileState.EXTERNALLY_CHANGED
                     || state == FileBuffer.ExternalFileState.REPLACED) {

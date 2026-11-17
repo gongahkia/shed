@@ -60,6 +60,10 @@ final class MarkdownController {
         return headingAnalysis;
     }
 
+    java.util.Optional<MarkdownSemanticSnapshot> availableSemantic(MarkdownSemanticSnapshot.Source source) {
+        return headingAnalysis == null ? java.util.Optional.empty() : headingAnalysis.available(source);
+    }
+
     void requestHeadings(Object owner, FileBuffer buffer, java.util.function.BooleanSupplier current,
                          java.util.function.Consumer<MarkdownHeadingAnalysis> completion) {
         var source = MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(buffer), buffer);

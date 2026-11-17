@@ -35,6 +35,11 @@ final class MarkdownAnalysisService implements AutoCloseable {
     MarkdownAnalysisService(AsyncJobService jobs) { this(jobs, MarkdownHeadingAnalysis::analyze); }
     MarkdownAnalysisService(AsyncJobService jobs, Analyzer analyzer) { this.jobs = jobs; this.analyzer = analyzer; }
 
+    java.util.Optional<MarkdownSemanticSnapshot> available(MarkdownSemanticSnapshot.Source source) {
+        edt(); var retained = cached.get();
+        return retained != null && retained.source().matches(source) ? java.util.Optional.of(retained.semantic()) : java.util.Optional.empty();
+    }
+
     void request(Object owner, MarkdownSemanticSnapshot.Source source, BooleanSupplier current, Consumer<MarkdownHeadingAnalysis> completion) {
         edt();
         if (closed || !current.getAsBoolean()) return;

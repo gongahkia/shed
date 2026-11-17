@@ -53,6 +53,50 @@ final class ProjectFileScanner {
         return new ScanResult(List.copyOf(files), false, scannedDirectories);
     }
 
+    /** Streaming, non-following discovery for bounded Markdown consumers. Existing explorer scans stay unchanged. */
+    MarkdownScan markdown(Path root, List<Path> nestedRoots, Cancellation cancellation) {
+        var files = new ArrayList<Path>();
+        int[] visited = {0}, failures = {0}; boolean[] limited = {false};
+        try {
+            Files.walkFileTree(root, java.util.Set.of(), 64, new java.nio.file.SimpleFileVisitor<>() {
+                private java.nio.file.FileVisitResult admission() {
+                    if (cancellation.isCancelled()) return java.nio.file.FileVisitResult.TERMINATE;
+                    if (++visited[0] > 32768) { limited[0] = true; return java.nio.file.FileVisitResult.TERMINATE; }
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+                @Override public java.nio.file.FileVisitResult preVisitDirectory(Path dir, java.nio.file.attribute.BasicFileAttributes attrs) {
+                    var decision = admission(); if (decision != java.nio.file.FileVisitResult.CONTINUE) return decision;
+                    if (!dir.equals(root) && (excluded(dir.getFileName().toString(), true) || nestedRoots.contains(dir)))
+                        return java.nio.file.FileVisitResult.SKIP_SUBTREE;
+                    return decision;
+                }
+                @Override public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
+                    var decision = admission(); if (decision != java.nio.file.FileVisitResult.CONTINUE) return decision;
+                    if (attrs.isDirectory()) { limited[0] = true; return decision; } // depth cap
+                    if (attrs.isRegularFile() && !excluded(file.getFileName().toString(), false) && markdown(file)) {
+                        if (files.size() == 1024) { limited[0] = true; return java.nio.file.FileVisitResult.TERMINATE; }
+                        files.add(file);
+                    }
+                    return decision;
+                }
+                @Override public java.nio.file.FileVisitResult visitFileFailed(Path file, IOException error) {
+                    failures[0]++; return admission();
+                }
+            });
+        } catch (IOException | SecurityException error) { failures[0]++; }
+        files.sort(Comparator.comparing(Path::toString));
+        return new MarkdownScan(List.copyOf(files), limited[0], failures[0], cancellation.isCancelled(), visited[0]);
+    }
+
+    static boolean markdown(Path file) {
+        String name = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        return name.endsWith(".md") || name.endsWith(".markdown");
+    }
+
+    record MarkdownScan(List<Path> files, boolean limited, int failures, boolean cancelled, int visited) {
+        boolean complete() { return !limited && failures == 0 && !cancelled; }
+    }
+
     private static List<Path> children(Path directory) {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory)) {
             List<Path> children = new ArrayList<>();

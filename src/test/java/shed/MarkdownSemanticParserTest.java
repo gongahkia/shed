@@ -188,7 +188,7 @@ class MarkdownSemanticParserTest {
         }
         AtomicInteger checks = new AtomicInteger();
         assertEquals(Status.CANCELLED, parser.parse(source(("# heading\nparagraph\n\n").repeat(1000)), () -> checks.incrementAndGet() > 10).status());
-        assertTrue(parse("$math$ [[wiki]]\n").limitations().contains(Limitation.MATH_AND_WIKI_LINKS_DEFERRED));
+        assertTrue(parse("$math$ [[wiki]]\n").limitations().contains(Limitation.MATH_DEFERRED));
         var nested = parser.parse(source("> ".repeat(140) + "text"));
         assertEquals(Status.UNSUPPORTED, nested.status()); assertTrue(nested.headings().isEmpty());
     }

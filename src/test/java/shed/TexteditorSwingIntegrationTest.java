@@ -43,6 +43,55 @@ public class TexteditorSwingIntegrationTest {
     Path tempDir;
 
     @Test
+    void headlessMarkdownLinkServiceUsesExistingEditSaveDiscardAndSplitLifecycle() throws Exception {
+        assumeSwingAvailable();
+        Path project = Files.createDirectories(tempDir.resolve("link-project"));
+        Path a = Files.writeString(project.resolve("a.md"), "# A\n[[b]]\n");
+        Path b = Files.writeString(project.resolve("b.md"), "# B\n");
+        Path c = Files.writeString(project.resolve("c.md"), "# C\n");
+        Texteditor editor = createEditor(tempDir.resolve("link-home"), a);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            FileBuffer buffer = onEdt(editor::getCurrentBuffer);
+            var snapshot = onEdt(buffer::textSnapshot); long revision = onEdt(buffer::documentRevision);
+            var beforeWindows = onEdt(() -> editor.getOwnedWindows().length);
+            onEdt(() -> {
+                var field = Texteditor.class.getDeclaredField("markdownLinks"); field.setAccessible(true);
+                assertEquals(null, field.get(editor));
+                editor.workspaceRoots.add(project); editor.markdownLinks().request(project); return null;
+            });
+            assertTrue(awaitUiState(() -> editor.markdownLinks().backlinks(project, b).state() == MarkdownLink.State.COMPLETE));
+            onEdt(() -> {
+                assertEquals(1, editor.markdownLinks().backlinks(project, b).edges().size());
+                assertSame(snapshot, buffer.textSnapshot()); assertEquals(revision, buffer.documentRevision()); assertFalse(buffer.isModified());
+                assertFalse(buffer.getUndoManager().canUndo()); assertEquals(beforeWindows, editor.getOwnedWindows().length);
+                editor.splitWindow(true); editor.writingArea.replaceRange("c", 6, 7); return null;
+            });
+            assertTrue(awaitUiState(() -> editor.markdownLinks().backlinks(project, c).edges().size() == 1));
+            onEdt(() -> {
+                assertTrue(editor.markdownLinks().backlinks(project, b).edges().isEmpty());
+                for (EditorPane pane : editor.editorPanes) assertSame(buffer.getDocument(), pane.getTextArea().getDocument());
+                return null;
+            });
+            var save = onEdt(() -> buffer.captureSaveSnapshot(null)); buffer.writeSaveSnapshot(save);
+            onEdt(() -> { buffer.completeSaveSnapshot(save); editor.notifyBufferSaved(buffer); return null; });
+            assertTrue(awaitUiState(() -> editor.markdownLinks().backlinks(project, c).state() == MarkdownLink.State.COMPLETE
+                && editor.markdownLinks().backlinks(project, c).edges().getFirst().occurrence().source().document().isEmpty()));
+            onEdt(() -> { editor.writingArea.replaceRange("b", 6, 7); return null; });
+            assertTrue(awaitUiState(() -> editor.markdownLinks().backlinks(project, b).edges().size() == 1));
+            onEdt(() -> {
+                editor.buffers.remove(buffer); editor.markdownSourceClosed(buffer); return null;
+            });
+            assertTrue(awaitUiState(() -> editor.markdownLinks().backlinks(project, c).edges().size() == 1));
+            assertEquals("# A\n[[c]]\n", Files.readString(a));
+            onEdt(() -> {
+                assertTrue(editor.markdownLinks().backlinks(project, b).edges().isEmpty());
+                editor.workspaceRoots.remove(project); editor.markdownLinkRootsChanged(); assertEquals(0, editor.markdownLinks().diagnostics().partitions()); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void semanticMarkdownOutlineNavigationSplitsAndStaleSelectionPreserveSource() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-semantic-headings"));

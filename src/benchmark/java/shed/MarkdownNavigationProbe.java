@@ -69,9 +69,13 @@ final class MarkdownNavigationProbe {
             edt(() -> { editor.writingArea.paintImmediately(editor.writingArea.getVisibleRect()); return null; });
             if (i >= 0) {
                 out("MD_SAMPLE ", Map.of("operation", "follow_plain", "state", "OK", "edt_ms", dispatch, "navigation_to_forced_paint_ms", (System.nanoTime() - began) / 1e6));
-                if (current) out("MD_SAMPLE ", Map.of("operation", "validation_worker", "state", "OK", "worker_ms", edt(() -> metric(editor, "markdown.links.validate")[1]) / 1e6));
+                if (current) {
+                    out("MD_SAMPLE ", Map.of("operation", "validation_worker", "state", "OK", "worker_ms", edt(() -> metric(editor, "markdown.links.validate")[1]) / 1e6));
+                    out("MD_SAMPLE ", Map.of("operation", "source_identity_worker", "state", "OK", "worker_ms", edt(() -> metric(editor, "markdown.links.source")[1]) / 1e6));
+                }
             }
         }
+        settle(editor, "after_follow_navigation");
         for (int i = 0; i < Math.min(samples, 20); i++) {
             edt(() -> { editor.switchToBuffer(editor.buffers.indexOf(source)); editor.writingArea.setCaretPosition(2); return null; });
             picker(editor, current, "Markdown Outgoing Links", "markdown outgoing", false, null, i);
@@ -114,7 +118,7 @@ final class MarkdownNavigationProbe {
     private static void picker(Texteditor editor, boolean integrated, String title, String command, boolean accept,
                                String filter, int iteration) throws Exception {
         var done = new CountDownLatch(1); var failure = new AtomicReference<Throwable>(); 
-        long began = System.nanoTime(); var dispatch = new AtomicReference<Double>(0d);
+        long began = System.nanoTime(); var dispatch = new AtomicReference<Double>(0d); var acceptedAt = new AtomicLong();
         edt(() -> {
             var driver = new javax.swing.Timer(5, event -> {
                 for (Window window : editor.getOwnedWindows()) if (window instanceof JDialog dialog && dialog.isShowing() && dialog.getTitle().startsWith(title)) {
@@ -125,6 +129,7 @@ final class MarkdownNavigationProbe {
                         out("MD_SAMPLE ", Map.of("operation", (integrated ? "" : "control_") + command.replace(' ', '_') + (accept ? "_accept" : "_cancel"),
                             "state", "OK", "observed_to_picker_paint_ms", observed));
                         if (accept) {
+                            acceptedAt.set(System.nanoTime());
                             JTextField field = descendants(dialog, JTextField.class).getFirst();
                             field.postActionEvent();
                         } else dialog.getRootPane().getActionMap().get("dismiss").actionPerformed(new ActionEvent(dialog, 0, "escape"));
@@ -152,7 +157,12 @@ final class MarkdownNavigationProbe {
         if (!done.await(30, TimeUnit.SECONDS)) throw new AssertionError("Picker did not appear: " + title);
         if (failure.get() != null) throw new AssertionError(failure.get());
         if (integrated) await(() -> idle(editor, true), 30);
-        if (integrated && !command.endsWith("follow")) out("MD_SAMPLE ", Map.of("operation", "picker_population_edt", "state", "OK", "edt_ms", edt(() -> metric(editor, "markdown.links.rows")[1]) / 1e6));
+        if (integrated && accept) {
+            edt(() -> { editor.writingArea.paintImmediately(editor.writingArea.getVisibleRect()); return null; });
+            out("MD_SAMPLE ", Map.of("operation", command.replace(' ', '_') + "_selection_navigation", "state", "OK",
+                "selection_to_forced_paint_ms", (System.nanoTime() - acceptedAt.get()) / 1e6));
+        }
+        if (integrated && !command.endsWith("follow")) out("MD_SAMPLE ", Map.of("operation", command.replace(' ', '_') + "_population_edt", "state", "OK", "edt_ms", edt(() -> metric(editor, "markdown.links.rows")[1]) / 1e6));
     }
     private static <T extends Component> List<T> descendants(Container parent, Class<T> type) {
         var result = new ArrayList<T>();

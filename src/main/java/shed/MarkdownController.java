@@ -685,7 +685,7 @@ final class MarkdownController {
         final KeymapProfile profile;
         final java.util.concurrent.atomic.AtomicBoolean stop = new java.util.concurrent.atomic.AtomicBoolean();
         int job = -1;
-        boolean committed, resolving, chosen;
+        boolean committed, resolving;
         java.nio.file.Path file;
         LinkRequest(FileBuffer buffer, EditorPane pane, DocumentWorkspace.Id document, long keyPress,
                     List<java.nio.file.Path> roots, java.nio.file.Path root, KeymapProfile profile, java.util.function.BooleanSupplier picking, Runnable cancel) {
@@ -730,15 +730,14 @@ final class MarkdownController {
         return linkRequest == request && !request.stop.get() && !editor.closingDown && editor.isDisplayable()
             && editor.getActivePane() == request.pane() && editor.editorPanes.contains(request.pane())
             && editor.getCurrentBuffer() == request.buffer() && editor.buffers.contains(request.buffer())
+            && request.buffer().getFileType() == FileType.MARKDOWN && !request.buffer().isLargeFile()
+            && editor.writingArea.getDocument() == request.buffer().getDocument()
+            && !request.pane().isMarkdownPreview() && request.pane().getAlternateComponent() == null && request.pane().getTerminalPane() == null
             && editor.documentStore.id(request.buffer()).equals(request.document) && request.buffer().documentRevision() == request.revision
             && request.text.get() == request.buffer().textSnapshot() && request.pane().getTextArea().getCaret().getDot() == request.dot
             && request.pane().getTextArea().getCaret().getMark() == request.mark
             && editor.inputController.lastKeyPressNanos() == request.keyPress && editor.workspaceRoots.all().equals(request.roots)
-            && editor.configManager.getKeymapProfile() == request.profile && linkFocusCurrent(request);
-    }
-    private boolean linkFocusCurrent(LinkRequest request) {
-        Component focused = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
-        return !request.chosen || focused == null || focused == request.pane().getTextArea() || !SwingUtilities.isDescendingFrom(focused, editor);
+            && editor.configManager.getKeymapProfile() == request.profile;
     }
     private java.nio.file.Path linkRoot(FileBuffer buffer) {
         if (!buffer.hasFilePath()) return null;
@@ -880,10 +879,11 @@ final class MarkdownController {
         try {
             String selected = linkPicker == null ? editor.showPaletteDialog(title, rows) : linkPicker.apply(title, rows);
             if (selected != null && linkRequest != null) {
-                linkRequest.chosen = true;
                 linkRequest.pane().getTextArea().removeFocusListener(linkRequest.focus);
             }
             return selected;
+        } catch (RuntimeException | Error failure) {
+            cancelLinkNavigation(); throw failure;
         } finally { linkPickerOpen = false; }
     }
     private void followEdge(LinkRequest request, long generation, MarkdownLink.Edge edge, java.nio.file.Path selected, boolean backlink) {

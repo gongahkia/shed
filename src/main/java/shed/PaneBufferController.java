@@ -545,6 +545,10 @@ final class PaneBufferController {
                 if (checked) {
                     configuration = applyProjectConfigurationForFile(file);
                     if (!current.getAsBoolean()) { if (completion != null) completion.accept(new IOException("Markdown navigation cancelled")); return; }
+                    FileBuffer latest = findBufferByPath(file);
+                    if (latest != null && !openValid.test(latest)) {
+                        if (completion != null) completion.accept(new IOException("Markdown target changed; request again")); return;
+                    }
                     beforeInstall.run(); editor.recordJumpPosition(); persistCurrentBufferState();
                 }
                 long installStarted = System.nanoTime();

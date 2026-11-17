@@ -43,6 +43,27 @@ public class TexteditorSwingIntegrationTest {
     Path tempDir;
 
     @Test
+    void markdownCheckedOpenRejectsATargetIntroducedBeforeInstallation() throws Exception {
+        assumeSwingAvailable(); Path project = Files.createDirectories(tempDir.resolve("checked-open-project"));
+        Path source = Files.writeString(project.resolve("source.md"), "[[target]]"); Path target = Files.writeString(project.resolve("target.md"), "# Target");
+        Texteditor editor = createEditor(tempDir.resolve("checked-open-home"), source); var completed = new java.util.concurrent.CountDownLatch(1);
+        var error = new java.util.concurrent.atomic.AtomicReference<java.io.IOException>(); var calls = new java.util.concurrent.atomic.AtomicInteger();
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending)); FileBuffer original = onEdt(editor::getCurrentBuffer);
+            var index = MarkdownLinkIndex.build(project, List.of(project), null, List.of(), Set.of(), () -> false);
+            var edge = index.outgoing(source).edges().getFirst();
+            var prepared = MarkdownLinkNavigation.prepare(index, List.of(project), edge, null, false, List.of(), () -> false);
+            onEdt(() -> { editor.openMarkdownTarget(prepared, () -> {
+                if (calls.incrementAndGet() == 3) {
+                    try { editor.buffers.add(new FileBuffer(target.toFile())); } catch (java.io.IOException failure) { throw new RuntimeException(failure); }
+                } return true;
+            }, () -> { throw new AssertionError("Unvalidated concurrent target cannot install"); }, failure -> { error.set(failure); completed.countDown(); }); return null; });
+            assertTrue(completed.await(20, TimeUnit.SECONDS)); assertNotNull(error.get());
+            onEdt(() -> { assertSame(original, editor.getCurrentBuffer()); assertEquals("[[target]]", original.getContent()); assertFalse(original.isModified()); assertFalse(original.getUndoManager().canUndo()); return null; });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void markdownActualOutgoingPickerAcceptsAlreadyOpenTargetAfterModalFocusRestoration() throws Exception {
         assumeSwingAvailable(); Path project = Files.createDirectories(tempDir.resolve("outgoing-accept-project"));
         Path source = Files.writeString(project.resolve("source.md"), "[[target]]"); Path target = Files.writeString(project.resolve("target.md"), "# Target");

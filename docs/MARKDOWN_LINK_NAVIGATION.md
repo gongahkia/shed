@@ -87,13 +87,36 @@ Index generations are monotonic across partition disposal/reopening. A picker se
 
 ## I. Performance and memory
 
-PERFORMANCE_TABLE
+| Measurement (ms; p50 / p95) | 4 KiB / 21 files | 100 KiB / 101 files | 1 MiB / 1,001 files |
+| --- | ---: | ---: | ---: |
+| Legacy follow EDT (n=30) | 0.799 / 1.194 | 0.665 / 1.118 | 1.105 / 2.101 |
+| Semantic follow EDT (n=30) | 0.094 / 0.143 | 0.089 / 0.162 | 0.122 / 0.266 |
+| Legacy follow to paint (n=30) | 12.264 / 14.701 | 12.149 / 13.792 | 14.010 / 15.417 |
+| Semantic follow to paint (n=30) | 14.252 / 14.756 | 14.550 / 15.724 | 30.573 / 42.074 |
+| Outgoing row EDT (n=40) | 0.069 / 0.358 | 0.062 / 0.188 | 0.058 / 0.175 |
+| Backlink row EDT (n=40) | 0.106 / 0.341 | 0.267 / 0.660 | 0.439 / 0.926 |
+| Outgoing picker to paint (n=20) | 15.441 / 28.494 | 17.143 / 45.721 | 27.527 / 93.508 |
+| Backlink picker to paint (n=20) | 16.843 / 53.196 | 37.802 / 64.251 | 28.632 / 74.378 |
+| Ambiguous picker to paint (n=20) | 15.506 / 39.075 | 21.037 / 52.209 | 30.465 / 96.528 |
+| Outgoing selection to paint (n=20) | 20.042 / 35.564 | 19.881 / 36.197 | 19.758 / 35.383 |
+| Backlink selection to paint (n=20) | 17.881 / 21.894 | 18.887 / 40.008 | 26.610 / 45.501 |
+| Validation worker (n=30) | 0.172 / 0.217 | 0.178 / 0.298 | 0.606 / 0.710 |
+| Source identity worker (n=30) | 0.071 / 0.105 | 0.066 / 0.085 | 0.095 / 0.192 |
+| Before typing during refresh to paint (n=100) | 0.490 / 1.042 | 0.972 / 1.348 | 0.945 / 1.339 |
+| After typing during refresh to paint (n=100) | 0.560 / 0.922 | 0.808 / 1.129 | 0.778 / 1.155 |
 
 The new opt-in workload uses actual commands, existing modal pickers, keyboard acceptance/dismissal and completed forced Swing paint. It runs 4 KiB/100 KiB/1 MiB sources in 21/101/1,001-file projects. The before artifact measures legacy ordinary link follow plus the existing generic picker over the same headless index. It does not pretend that 3A.1 already had outgoing/backlink commands. Query/index controls retain the established independent `project-links` workload.
 
 Explicit refresh and validation add end-to-end navigation latency while keeping dispatch short. Tables and raw records separate EDT dispatch, row construction, worker validation and observed completion/paint. Polling/forced paint is not native keyboard/compositor timing. The fixture is warm-cache and host load is uncontrolled. Sample counts accompany percentiles; small observations are not universal limits.
 
-MEMORY_TABLE
+| Phase, 1 MiB / 1,001 files | Before used / committed heap (MiB) | After used / committed heap (MiB) | Before / after RSS (MiB) |
+| --- | ---: | ---: | ---: |
+| before index | 26.50 / 90 | 26.58 / 94 | 683.62 / 681.66 |
+| before navigation | 31.42 / 110 | 31.55 / 110 | 726.69 / 721.30 |
+| after follow navigation | 30.35 / 104 | 29.81 / 100 | 733.00 / 776.50 |
+| after picker cycles | 30.55 / 104 | 31.20 / 106 | 763.03 / 780.39 |
+| after project close | 27.05 / 90 | 26.30 / 94 | 754.09 / 771.00 |
+| Sampled peak RSS | — | — | 845.42 / 844.12 |
 
 Memory observations wait for established timers/jobs, then sample used/committed heap and settled RSS after explicit GC. Picker collection uses weak references; index/UI activity and source revision deltas are checked. Allocations are not equated with retention or RSS. The historical 910.05 MiB qualification remains open; these paired observations do not establish native-memory attribution or prove universal memory equivalence. No JVM/GC, font or renderer optimization was attempted.
 
@@ -109,7 +132,18 @@ A document listener observes zero source events during actual picker acceptance/
 
 ## K. Regression tests
 
-FINAL_COUNTS
+Final full suite: **1,435 passing tests, five existing skips, zero failures/errors** (1,440 total). The new cases add 24 tests to the reported 3A.1 baseline. All 13 headless navigation cases and eleven new workbench cases run in this suite. The five skips are existing DOS-attribute/platform availability, Fish availability, CTest availability and opt-in AI benchmark/native acceptance checks.
+
+Verified serially with Java 21.0.13 / Maven 3.9.11:
+
+```sh
+"$MVN" -B -Djava.awt.headless=false -DargLine=-Xmx512m test
+"$MVN" -B -DskipTests package
+python3 -m unittest discover -s scripts -p test_benchmark_markdown.py
+python3 scripts/test-packaged-markdown.py --jar target/shed-2.0.0.jar
+```
+
+Packaging and packaged Mermaid/math/local-image smoke passed. Benchmark tooling: 11 passing tests. All six final matched navigation runs and both independent index controls passed; fixture hashes were unchanged. `git diff --check` passed.
 
 Exact commands, suite totals, skip reasons, packaged smoke, tooling output and development failures are in the evidence index. Failed development runs are preserved: malformed HTML wiki test input, canonical/logical disk URI mismatch, a benchmark's zero-offset assumption, modal focus restoration and an overlapping packaging failure were corrected. Verification builds were then serialized. No failed run is reported as successful.
 

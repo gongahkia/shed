@@ -117,7 +117,7 @@ final class MarkdownNavigationProbe {
     }
     private static void picker(Texteditor editor, boolean integrated, String title, String command, boolean accept,
                                String filter, int iteration) throws Exception {
-        var done = new CountDownLatch(1); var failure = new AtomicReference<Throwable>(); 
+        var done = new CountDownLatch(1); var failure = new AtomicReference<Throwable>();
         long began = System.nanoTime(); var dispatch = new AtomicReference<Double>(0d); var acceptedAt = new AtomicLong();
         edt(() -> {
             var driver = new javax.swing.Timer(5, event -> {

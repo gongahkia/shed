@@ -45,6 +45,7 @@ final class MarkdownConsumerProbe {
         String original = edt(() -> buffer.textSnapshot().text());
         out("MD_META ", Map.of("operation", "semantic_before_request", "service_initialized", edt(() -> field(editor.markdownController, "headingAnalysis") != null)));
         QueueTiming queue = new QueueTiming();
+        java.nio.file.Path switchedFile = null;
         edt(() -> { Toolkit.getDefaultToolkit().getSystemEventQueue().push(queue); return null; });
         try {
             for (int i = -warmups; i < samples; i++) {
@@ -83,16 +84,25 @@ final class MarkdownConsumerProbe {
                 var threads = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
                 for (int i = -warmups; i < samples; i++) {
                     long bytes = threads.getThreadAllocatedBytes(Thread.currentThread().threadId()), began = System.nanoTime();
-                    long count = new MarkdownOccurrences(retained.semantic()).stream().count();
+                    long[] countAndChecksum = new long[2];
+                    new MarkdownOccurrences(retained.semantic()).stream().forEach(occurrence -> {
+                        countAndChecksum[0]++;
+                        countAndChecksum[1] += occurrence.kind().ordinal() + occurrence.location().segments().getFirst().start()
+                            + occurrence.destination().orElse("").hashCode();
+                    });
                     var row = row("semantic_occurrences_worker"); row.put("state", i < 0 ? "WARMUP" : "OK");
-                    row.put("worker_ms", (System.nanoTime() - began) / 1e6); row.put("occurrences", count);
+                    row.put("worker_ms", (System.nanoTime() - began) / 1e6); row.put("occurrences", countAndChecksum[0]); row.put("checksum", countAndChecksum[1]);
                     row.put("allocated_bytes", threads.getThreadAllocatedBytes(Thread.currentThread().threadId()) - bytes); out("MD_SAMPLE ", row);
                 }
             } else out("MD_SAMPLE ", Map.of("operation", "semantic_occurrences_worker", "state", "UNSUPPORTED", "coverage", retained.semantic().coverage().name()));
+            retained = null;
             edt(() -> { editor.splitWindow(true); editor.showOutline(); return null; });
             await(() -> ready(editor), 30);
             out("MD_META ", Map.of("operation", "semantic_split", "shared_document", edt(() -> editor.editorPanes.stream().allMatch(p -> p.getBuffer() != buffer || p.getTextArea().getDocument() == buffer.getDocument()))));
-            FileBuffer other = FileBuffer.createScratch("consumer-switch.md", "# other\n");
+            switchedFile = java.nio.file.Files.createTempFile(java.nio.file.Path.of(buffer.getFilePath()).getParent(), "consumer-switch-", ".md");
+            java.nio.file.Files.writeString(switchedFile, "# other\n");
+            FileBuffer other = new FileBuffer(switchedFile.toFile(), editor.configManager);
+            if (other.getFileType() != FileType.MARKDOWN) throw new AssertionError("Switch fixture is not Markdown");
             long began = System.nanoTime();
             edt(() -> { editor.buffers.add(other); editor.loadBufferIntoEditor(other); editor.showOutline(); return null; });
             await(() -> ready(editor), 30);
@@ -105,6 +115,9 @@ final class MarkdownConsumerProbe {
             System.gc(); memory("semantic_after_document_close_gc_observation");
             edt(() -> { var d = dialog(editor); if (d != null) d.dispose(); return null; });
             System.gc(); memory("semantic_after_outline_dispose_gc_observation");
-        } finally { edt(() -> { queue.remove(); return null; }); }
+        } finally {
+            edt(() -> { queue.remove(); return null; });
+            if (switchedFile != null) java.nio.file.Files.deleteIfExists(switchedFile);
+        }
     }
 }

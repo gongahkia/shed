@@ -863,6 +863,7 @@ final class SessionConfigController {
         FileBuffer terminalFallback = fallback;
         if (terminalFallback != null && editor.editorPanes.stream().noneMatch(pane -> pane.getBuffer() == terminalFallback)) {
             editor.buffers.remove(terminalFallback);
+            editor.markdownSourceClosed(terminalFallback);
         }
         editor.currentBufferIndex = editor.buffers.indexOf(editor.getActivePane().getBuffer());
         if (editor.getActivePane().getTerminalPane() != null) {

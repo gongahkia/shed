@@ -1436,7 +1436,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     boolean isMarkdownSourceCurrent(FileBuffer buffer, MarkdownSemanticSnapshot.Source source) {
-        return !closingDown && buffers.contains(buffer) && source.matches(
+        return !closingDown && isDisplayable() && buffers.contains(buffer) && buffer.getFileType() == FileType.MARKDOWN && source.matches(
             MarkdownSemanticSnapshot.Source.capture(documentStore.id(buffer), buffer));
     }
 
@@ -1454,8 +1454,8 @@ public class Texteditor extends JFrame implements KeyListener {
 
     String showMarkdownSymbols(String argument) { return markdownController.showSemanticSymbols(argument); }
 
-    void showMarkdownSymbolResults(FileBuffer buffer, EditorPane pane, MarkdownHeadingAnalysis result, String argument) {
-        paletteController.showMarkdownSymbols(buffer, pane, result, argument);
+    String showMarkdownSymbolResults(FileBuffer buffer, EditorPane pane, MarkdownHeadingAnalysis result, String argument) {
+        return paletteController.showMarkdownSymbols(buffer, pane, result, argument);
     }
 
     void refreshMarkdownPreviews() {

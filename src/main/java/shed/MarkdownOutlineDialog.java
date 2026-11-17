@@ -77,7 +77,7 @@ final class MarkdownOutlineDialog extends JDialog {
             @Override public void windowGainedFocus(WindowEvent event) {
                 if (source == null) return;
                 if (!editor.buffers.contains(source)) { dispose(); return; }
-                if (!source.isLargeFile() && requestedSource != null && !editor.isMarkdownSourceCurrent(source, requestedSource))
+                if (!source.isLargeFile() && (requestedSource == null || !editor.isMarkdownSourceCurrent(source, requestedSource)))
                     load(source, null, false);
             }
         });
@@ -107,6 +107,11 @@ final class MarkdownOutlineDialog extends JDialog {
 
     private JScrollPane body() {
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        // Semantic labels can contain decoded "<html>" text; keep the standard renderer's
+        // appearance while preventing JLabel from interpreting heading labels as Swing HTML.
+        var renderer = new javax.swing.DefaultListCellRenderer();
+        renderer.putClientProperty("html.disable", Boolean.TRUE);
+        list.setCellRenderer(renderer);
         list.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent event) {
                 if (event.getClickCount() == 2) goToSelection();
@@ -158,8 +163,10 @@ final class MarkdownOutlineDialog extends JDialog {
         }
         editor.requestMarkdownHeadings(this, buffer, () -> isDisplayable() && generation == request && source == buffer,
             result -> {
-                if (result.path() == MarkdownHeadingAnalysis.Path.CANCELLED) return;
-                if (result.path() == MarkdownHeadingAnalysis.Path.FAILED) { editor.showMessage("Markdown headings unavailable; reopen outline to retry"); return; }
+                if (result.path() == MarkdownHeadingAnalysis.Path.CANCELLED || result.path() == MarkdownHeadingAnalysis.Path.FAILED) {
+                    requestedSource = null;
+                    editor.showMessage("Markdown headings unavailable; reopen outline to retry"); return;
+                }
                 analysis = result;
                 headings.clear();
                 for (var heading : result.headings()) headings.add(new Heading(heading.line(), heading.level(), heading.title(), heading.offset()));

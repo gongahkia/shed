@@ -210,6 +210,8 @@ def main():
     parser.add_argument('--font-size', type=int, default=0, help='0 keeps existing default; otherwise 8..48 pt')
     parser.add_argument('--tab-size', type=int, default=0, help='0 keeps existing default; otherwise 1..16')
     args = parser.parse_args()
+    if args.mode == 'semantic-consumers' and (args.samples > 100 or any(n > 10 * 1024**2 for n in args.sizes)):
+        parser.error('Semantic consumer bounds: at most 100 samples and 10 MiB fixtures')
     if args.mode == 'syntax-lexical' and (args.samples > 25 or any(n > 10 * 1024**2 for n in args.sizes)):
         parser.error('Lexical replay bounds: at most 25 samples and 10 MiB fixtures')
     if args.font_size != 0 and not 8 <= args.font_size <= 48 or args.tab_size != 0 and not 1 <= args.tab_size <= 16:

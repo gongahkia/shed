@@ -80,6 +80,8 @@ class MarkdownConsumersTest {
     @Test void inaccurateTableInlineLocationsAndUnsupportedAnalysisNeverBecomeOccurrences() {
         var table = new MarkdownOccurrences(new MarkdownSemanticParser().parse(source("| a\\|b [l](x) | d |\n|---|---|\n")));
         assertEquals(1, table.unavailableLinkLocations()); assertEquals(0, table.stream().count());
+        assertFalse(table.sourceLocationsComplete());
+        assertTrue(table.limitations().contains(MarkdownSemanticSnapshot.Limitation.TABLE_INLINE_LOCATIONS_UNAVAILABLE));
         var unsupported = new MarkdownOccurrences(MarkdownSemanticSnapshot.unavailable(source("[a](b)"), MarkdownSemanticSnapshot.Status.UNSUPPORTED, "test"));
         assertEquals(0, unsupported.stream().count()); assertEquals(MarkdownSemanticSnapshot.Coverage.NONE, unsupported.coverage());
     }
@@ -179,5 +181,21 @@ class MarkdownConsumersTest {
             edt(service::close);
             assertEquals(0, delivered.get()); assertEquals(1, rejected.get());
         } finally { release.countDown(); edt(service::close); jobs.shutdownNow(); }
+    }
+
+    @Test void streamedLegacyTraversalMatchesExistingRulesAcrossChunksEofAndUnicode() {
+        String text = "prose".repeat(1700) + "\n# first 😀\n\n" + "x".repeat(8190) + "\n## across chunk\n"
+            + "   # indented\n#\n# \n```\n# legacy fenced\n```\n" + "\n## repeated\r\n".repeat(100) + "### EOF e\u0301";
+        var s = source(text);
+        var result = MarkdownHeadingAnalysis.from(MarkdownSemanticSnapshot.unavailable(s,
+            MarkdownSemanticSnapshot.Status.UNSUPPORTED, "force existing legacy rules"), () -> false, System.nanoTime());
+        var expected = new java.util.ArrayList<MarkdownHeadingAnalysis.Heading>();
+        var legacy = new MarkdownService(); int offset = 0, number = 1;
+        for (String line : text.split("\n", -1)) {
+            int level = legacy.headingLevel(line);
+            if (level > 0) expected.add(new MarkdownHeadingAnalysis.Heading(offset, number, level, legacy.headingText(line)));
+            number++; offset += line.length() + 1;
+        }
+        assertEquals(expected, result.headings());
     }
 }

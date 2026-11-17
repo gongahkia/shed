@@ -49,6 +49,7 @@ final class MarkdownAnalysisService implements AutoCloseable {
         if (pending != null && pending.source.matches(source)) {
             reused++; pending.subscribers.put(owner, new Subscriber(current, completion)); return;
         }
+        Request obsolete = pending;
         if (pending != null) { superseded++; pending = null; }
         Request request = new Request(source, ++sequence);
         request.subscribers.put(owner, new Subscriber(current, completion));
@@ -57,6 +58,8 @@ final class MarkdownAnalysisService implements AutoCloseable {
             pending = request;
             if (running.subscribers.isEmpty()) cancelRunning();
         }
+        if (obsolete != null) for (var subscriber : obsolete.subscribers.values())
+            if (!closed && subscriber.current().getAsBoolean()) subscriber.completion().accept(cancelled(obsolete.source, "Heading request superseded"));
     }
 
     private void start(Request request) {
@@ -99,8 +102,9 @@ final class MarkdownAnalysisService implements AutoCloseable {
             if (!next.subscribers.isEmpty()) start(next);
         }
         for (var subscriber : completed.subscribers.values()) {
-            if (!closed && usable && subscriber.current().getAsBoolean()) subscriber.completion().accept(result);
-            else staleRejected++;
+            if (!closed && subscriber.current().getAsBoolean()) {
+                subscriber.completion().accept(usable ? result : cancelled(completed.source, "Heading request cancelled"));
+            } else staleRejected++;
         }
         completed.subscribers.clear();
     }
@@ -133,8 +137,11 @@ final class MarkdownAnalysisService implements AutoCloseable {
     }
     private int subscriberCount() { return (running == null ? 0 : running.subscribers.size()) + (pending == null ? 0 : pending.subscribers.size()); }
     private static MarkdownHeadingAnalysis cancelled(MarkdownSemanticSnapshot.Source source) {
+        return cancelled(source, "Heading subscriber budget reached");
+    }
+    private static MarkdownHeadingAnalysis cancelled(MarkdownSemanticSnapshot.Source source, String detail) {
         return new MarkdownHeadingAnalysis(MarkdownSemanticSnapshot.unavailable(source, MarkdownSemanticSnapshot.Status.CANCELLED,
-            "Heading subscriber budget reached"), MarkdownHeadingAnalysis.Path.CANCELLED, java.util.List.of(), 0);
+            detail), MarkdownHeadingAnalysis.Path.CANCELLED, java.util.List.of(), 0);
     }
     Diagnostics diagnostics() { edt(); return new Diagnostics(submitted, reused, staleRejected, superseded, running == null ? 0 : 1, pending == null ? 0 : 1, subscriberCount()); }
     void clear() {

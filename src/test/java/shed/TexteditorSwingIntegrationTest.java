@@ -113,7 +113,7 @@ public class TexteditorSwingIntegrationTest {
     void pendingSemanticNavigationCannotMoveAnotherBufferOrInstallAnEditedRevision() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-semantic-switch"));
-        Path first = Files.writeString(tempDir.resolve("semantic-a.md"), "prose\n# A");
+        Path first = Files.writeString(tempDir.resolve("semantic-a.md"), "prose\n# A\n## A2");
         Path second = Files.writeString(tempDir.resolve("semantic-b.md"), "other\n# B");
         Texteditor editor = createEditor(home, first, second);
         var started = new java.util.concurrent.CountDownLatch(1);
@@ -140,6 +140,11 @@ public class TexteditorSwingIntegrationTest {
                 assertEquals("other\n# B", editor.writingArea.getText()); assertFalse(b.isModified());
                 assertTrue(service.diagnostics().staleRejected() > 0); return null;
             });
+            onEdt(() -> {
+                editor.loadBufferIntoEditor(a); editor.writingArea.setCaretPosition(0);
+                editor.navigateHeading(true); editor.navigateHeading(true); return null;
+            });
+            assertTrue(awaitUiState(() -> editor.writingArea.getCaretPosition() == a.textSnapshot().text().indexOf("## A2")));
         } finally { release.countDown(); disposeEditor(editor); }
     }
 
@@ -4118,8 +4123,16 @@ public class TexteditorSwingIntegrationTest {
                 assertEquals(text, buffer.getContent());
                 editor.writingArea.setCaretPosition(0);
                 press(editor, ']'); press(editor, ']');
+                return null;
+            });
+            assertTrue(awaitUiState(() -> editor.getCurrentCaretLine() == 2));
+            onEdt(() -> {
                 assertEquals(2, editor.getCurrentCaretLine());
                 press(editor, '['); press(editor, '[');
+                return null;
+            });
+            assertTrue(awaitUiState(() -> editor.getCurrentCaretLine() == 0));
+            onEdt(() -> {
                 assertEquals(0, editor.getCurrentCaretLine());
                 for (String profile : List.of("plain", "emacs")) {
                     editor.configManager.set("keymap.profile", profile);

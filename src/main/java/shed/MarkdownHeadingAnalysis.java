@@ -70,15 +70,32 @@ record MarkdownHeadingAnalysis(MarkdownSemanticSnapshot semantic, Path path, Lis
             headings.clear();
             var legacy = new MarkdownService();
             // Preserve the former line-based navigation, including its documented limitations.
-            for (int line = 0; line < source.text().lineCount(); line++) {
+            int line = 1, lineStart = 0;
+            StringBuilder candidate = null;
+            for (int start = 0; start < source.text().length(); start += 8192) {
                 if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) return cancelled(source, began);
-                String text = source.text().line(line);
-                int level = legacy.headingLevel(text);
-                if (level > 0) headings.add(new Heading(source.text().lineStartOffset(line), line + 1, level, legacy.headingText(text)));
+                String chunk = source.text().substring(start, Math.min(8192, source.text().length() - start));
+                for (int index = 0; index < chunk.length(); index++) {
+                    char c = chunk.charAt(index);
+                    int offset = start + index;
+                    if (c == '\n') {
+                        addLegacy(headings, legacy, candidate, lineStart, line);
+                        candidate = null; line++; lineStart = offset + 1;
+                    } else if (offset == lineStart && c == '#') candidate = new StringBuilder().append(c);
+                    else if (candidate != null) candidate.append(c);
+                }
             }
+            addLegacy(headings, legacy, candidate, lineStart, line);
         }
         headings.sort(Comparator.comparingInt(Heading::offset));
         return new MarkdownHeadingAnalysis(semantic, path, headings, System.nanoTime() - began);
+    }
+
+    private static void addLegacy(List<Heading> headings, MarkdownService legacy, StringBuilder candidate, int offset, int line) {
+        if (candidate == null) return;
+        String text = candidate.toString();
+        int level = legacy.headingLevel(text);
+        if (level > 0) headings.add(new Heading(offset, line, level, legacy.headingText(text)));
     }
 
     private static MarkdownHeadingAnalysis cancelled(MarkdownSemanticSnapshot.Source source, long began) {

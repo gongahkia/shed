@@ -1,6 +1,5 @@
 package shed;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -26,6 +25,13 @@ final class MarkdownOccurrences {
     MarkdownSemanticSnapshot.Source source() { return semantic.source(); }
     MarkdownSemanticSnapshot.Status status() { return semantic.status(); }
     MarkdownSemanticSnapshot.Coverage coverage() { return semantic.coverage(); }
+    java.util.Set<MarkdownSemanticSnapshot.Limitation> limitations() { return semantic.limitations(); }
+    /** Precision of recognized link/reference/fence locations, not support for deferred syntax. */
+    boolean sourceLocationsComplete() {
+        return status() == MarkdownSemanticSnapshot.Status.SUCCEEDED && unavailableLinkLocations() == 0
+            && semantic.references().stream().noneMatch(r -> r.location().segments().isEmpty())
+            && semantic.codeBlocks().stream().noneMatch(c -> c.location().segments().isEmpty());
+    }
     boolean isCurrent(MarkdownSemanticSnapshot.Source source) { return semantic.isCurrent(source); }
     boolean mathSupported() { return false; }
     boolean unresolvedReferenceUsesSupported() { return false; }

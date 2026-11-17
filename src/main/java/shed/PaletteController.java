@@ -293,7 +293,7 @@ final class PaletteController {
         return showLocalSymbols(symbols, argument, () -> true, symbol -> editor.gotoLine(symbol.getLine()));
     }
 
-    void showMarkdownSymbols(FileBuffer buffer, EditorPane pane, MarkdownHeadingAnalysis result, String argument) {
+    String showMarkdownSymbols(FileBuffer buffer, EditorPane pane, MarkdownHeadingAnalysis result, String argument) {
         Map<SymbolService.Symbol, MarkdownHeadingAnalysis.Heading> targets = new java.util.IdentityHashMap<>();
         List<SymbolService.Symbol> symbols = new ArrayList<>();
         for (var heading : result.headings()) {
@@ -301,11 +301,10 @@ final class PaletteController {
             var symbol = new SymbolService.Symbol(heading.title(), "heading", heading.line(), heading.level());
             symbols.add(symbol); targets.put(symbol, heading);
         }
-        String message = showLocalSymbols(symbols, argument,
+        return showLocalSymbols(symbols, argument,
             () -> editor.getActivePane() == pane && pane.getBuffer() == buffer && editor.editorPanes.contains(pane)
                 && editor.isMarkdownSourceCurrent(buffer, result.source()),
             symbol -> editor.gotoMarkdownHeading(buffer, result.source(), targets.get(symbol)));
-        editor.showMessage(message);
     }
 
     private String showLocalSymbols(List<SymbolService.Symbol> symbols, String argument,

@@ -15,6 +15,23 @@ final class MarkdownController {
     private final Texteditor editor;
     private final Map<FileBuffer, PreviewBinding> previews = new IdentityHashMap<>();
     private MarkdownAnalysisService headingAnalysis;
+    private record Motion(boolean forward, int level) { }
+    private static final class PendingNavigation {
+        final FileBuffer buffer;
+        final EditorPane pane;
+        final java.lang.ref.WeakReference<VersionedTextSnapshot> text;
+        final int dot, mark;
+        final List<Motion> motions = new ArrayList<>();
+        PendingNavigation(FileBuffer buffer, EditorPane pane) {
+            this.buffer = buffer; this.pane = pane; text = new java.lang.ref.WeakReference<>(buffer.textSnapshot());
+            dot = pane.getTextArea().getCaret().getDot(); mark = pane.getTextArea().getCaret().getMark();
+        }
+        boolean matches(FileBuffer buffer, EditorPane pane) {
+            return this.buffer == buffer && this.pane == pane && text.get() == buffer.textSnapshot()
+                && dot == pane.getTextArea().getCaret().getDot() && mark == pane.getTextArea().getCaret().getMark();
+        }
+    }
+    private PendingNavigation pendingNavigation;
 
     MarkdownAnalysisService headingAnalysis() {
         if (headingAnalysis == null) headingAnalysis = new MarkdownAnalysisService(editor.asyncJobService);
@@ -30,6 +47,7 @@ final class MarkdownController {
     void cancelHeadings(Object owner) { if (headingAnalysis != null) headingAnalysis.cancel(owner); }
 
     void headingSourceClosed(FileBuffer buffer) {
+        if (pendingNavigation != null && pendingNavigation.buffer == buffer) pendingNavigation = null;
         if (headingAnalysis != null) headingAnalysis.documentClosed(editor.documentStore.id(buffer));
         for (Window window : editor.getOwnedWindows()) if (window instanceof MarkdownOutlineDialog dialog) dialog.sourceClosed(buffer);
     }
@@ -37,13 +55,16 @@ final class MarkdownController {
     String showSemanticSymbols(String argument) {
         FileBuffer buffer = editor.getCurrentBuffer();
         EditorPane pane = editor.getActivePane();
+        pendingNavigation = null;
+        String[] message = {"Loading document symbols"};
         requestHeadings(pane, buffer, () -> pane == editor.getActivePane() && pane.getBuffer() == buffer
             && editor.editorPanes.contains(pane), result -> {
-                if (result.path() == MarkdownHeadingAnalysis.Path.FAILED) { editor.showMessage("Markdown headings unavailable; request again"); return; }
-                if (result.path() != MarkdownHeadingAnalysis.Path.CANCELLED)
-                    editor.showMarkdownSymbolResults(buffer, pane, result, argument);
+                if (result.path() == MarkdownHeadingAnalysis.Path.FAILED || result.path() == MarkdownHeadingAnalysis.Path.CANCELLED)
+                    message[0] = "Markdown headings unavailable; request again";
+                else message[0] = editor.showMarkdownSymbolResults(buffer, pane, result, argument);
+                editor.showMessage(message[0]);
             });
-        return "Loading document symbols";
+        return message[0];
     }
 
     MarkdownController(Texteditor editor) {
@@ -104,6 +125,7 @@ final class MarkdownController {
     }
 
     void detachPreview(EditorPane pane) {
+        if (pendingNavigation != null && pendingNavigation.pane == pane) pendingNavigation = null;
         cancelHeadings(pane);
         Iterator<Map.Entry<FileBuffer, PreviewBinding>> iterator = previews.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -116,6 +138,7 @@ final class MarkdownController {
     }
 
     void disposePreviews() {
+        pendingNavigation = null;
         if (headingAnalysis != null) {
             if (editor.closingDown) { headingAnalysis.close(); headingAnalysis = null; }
             else headingAnalysis.clear();
@@ -282,19 +305,27 @@ final class MarkdownController {
     private String navigateSemanticHeading(boolean forward, int level) {
         FileBuffer buffer = editor.getCurrentBuffer();
         EditorPane pane = editor.getActivePane();
-        int dot = pane.getTextArea().getCaret().getDot(), mark = pane.getTextArea().getCaret().getMark();
-        int line = editor.getCurrentCaretLine() + 1;
+        if (pendingNavigation != null && pendingNavigation.matches(buffer, pane)) {
+            if (pendingNavigation.motions.size() >= 64) return "Heading navigation busy; request again";
+            pendingNavigation.motions.add(new Motion(forward, level));
+            return "Loading headings";
+        }
+        PendingNavigation navigation = new PendingNavigation(buffer, pane);
+        navigation.motions.add(new Motion(forward, level)); pendingNavigation = navigation;
         String[] message = {"Loading headings"};
-        requestHeadings(pane, buffer, () -> pane == editor.getActivePane() && pane.getBuffer() == buffer
-            && editor.editorPanes.contains(pane) && pane.getTextArea().getDocument() == buffer.getDocument()
-            && pane.getTextArea().getCaret().getDot() == dot && pane.getTextArea().getCaret().getMark() == mark, result -> {
+        requestHeadings(pane, buffer, () -> pendingNavigation == navigation && navigation.matches(buffer, pane)
+            && pane == editor.getActivePane() && pane.getBuffer() == buffer
+            && editor.editorPanes.contains(pane) && pane.getTextArea().getDocument() == buffer.getDocument(), result -> {
+                pendingNavigation = null;
                 if (result.path() == MarkdownHeadingAnalysis.Path.CANCELLED || result.path() == MarkdownHeadingAnalysis.Path.FAILED) {
                     message[0] = "Markdown headings unavailable; request again"; editor.showMessage(message[0]); return;
                 }
-                var target = result.target(forward, line, level);
-                message[0] = target.isEmpty() ? "No " + (forward ? "next" : "previous")
-                    + (level == 0 ? " heading" : " h" + level + " heading")
-                    : editor.gotoMarkdownHeading(buffer, result.source(), target.get());
+                for (Motion motion : navigation.motions) {
+                    var target = result.target(motion.forward(), editor.getCurrentCaretLine() + 1, motion.level());
+                    message[0] = target.isEmpty() ? "No " + (motion.forward() ? "next" : "previous")
+                        + (motion.level() == 0 ? " heading" : " h" + motion.level() + " heading")
+                        : editor.gotoMarkdownHeading(buffer, result.source(), target.get());
+                }
                 editor.showMessage(message[0]);
             });
         return message[0];

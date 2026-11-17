@@ -60,7 +60,12 @@ class MarkdownLinkNavigationTest {
         Path note = file("note.md", "# Title"); Path alias = directory.resolve("alias.md"); Files.createSymbolicLink(alias, note);
         Path source = file("source.md", "[x](alias.md#title)"); var index = index(); var edge = index.outgoing(source).edges().getFirst();
         Path outside = Files.createTempFile("shed-nav-outside", ".md");
-        try { Files.delete(note); Files.createSymbolicLink(note, outside); assertThrows(IllegalArgumentException.class, () -> target(index, edge, null, false)); }
+        try {
+            Files.delete(alias); Files.createSymbolicLink(alias, outside);
+            assertThrows(IllegalArgumentException.class, () -> target(index, edge, null, false));
+            Files.delete(alias); Files.createSymbolicLink(alias, note);
+            Files.delete(note); Files.createSymbolicLink(note, outside); assertThrows(IllegalArgumentException.class, () -> target(index, edge, null, false));
+        }
         finally { Files.deleteIfExists(outside); }
     }
     @Test void pendingAndPartialFeedbackCannotClaimCompleteEmptyResults() {

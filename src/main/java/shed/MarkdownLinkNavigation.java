@@ -87,9 +87,12 @@ final class MarkdownLinkNavigation {
         if (!belongs) throw new IllegalArgumentException("Markdown links changed; request again");
         verifyOrigin(index.root(), roots, source, open, stop);
         Resolution resolution = edge.resolution();
-        if (!backlink && candidate != null) {
+        if (!backlink) {
             var nested = roots.stream().map(WorkspaceRootResolver::normalizedIdentity).filter(p -> !p.equals(index.root()) && p.startsWith(index.root())).toList();
-            resolution = new MarkdownLinkResolver(index.root(), nested, index.effective(), index.state() == State.COMPLETE).choose(edge.occurrence(), candidate);
+            // A resolved occurrence already carries uniqueness established by its captured catalog.
+            var resolver = new MarkdownLinkResolver(index.root(), nested, index.effective(), index.state() == State.COMPLETE || resolution.status() == Status.RESOLVED);
+            resolution = candidate == null ? resolver.resolve(edge.occurrence()) : resolver.choose(edge.occurrence(), candidate);
+            if (candidate == null && !resolution.equals(edge.resolution())) throw new IllegalArgumentException("Markdown destination changed; refresh links");
         }
         if (!backlink && resolution.status() != Status.RESOLVED) throw new IllegalArgumentException("Markdown link: " + resolution.status().name().toLowerCase(Locale.ROOT).replace('_', ' '));
         Path target = backlink ? source.file() : resolution.target().orElseThrow();

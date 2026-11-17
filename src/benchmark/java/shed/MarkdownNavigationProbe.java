@@ -84,13 +84,13 @@ final class MarkdownNavigationProbe {
                 await(() -> editor.getCurrentBuffer() != source, 30);
                 edt(() -> { editor.switchToBuffer(editor.buffers.indexOf(source)); editor.writingArea.setCaretPosition(prefix.indexOf("ambiguous") + 3); return null; });
                 picker(editor, true, "Markdown Link Targets", "markdown link follow", false, null, i);
-            }
+            } else picker(editor, false, "Markdown Link Targets", "markdown link follow", false, null, i);
             edt(() -> { if (editor.getCurrentBuffer() == source) editor.openFile(target.toFile()); return null; });
             picker(editor, current, "Markdown Backlinks", "markdown backlinks", false, null, i);
             if (current) {
                 picker(editor, true, "Markdown Backlinks", "markdown backlinks", true, null, i);
                 await(() -> idle(editor, true), 30);
-            }
+            } else picker(editor, false, "Markdown Backlinks", "markdown backlinks", true, null, i);
         }
         edt(() -> { if (editor.getCurrentBuffer() != source) editor.switchToBuffer(editor.buffers.indexOf(source)); editor.writingArea.setCaretPosition(2); return null; });
         settle(editor, "after_picker_cycles");
@@ -149,6 +149,13 @@ final class MarkdownNavigationProbe {
                     labels.add(edge.occurrence().kind().name().toLowerCase(Locale.ROOT) + " · " + edge.occurrence().destination()
                         + " [" + edge.resolution().status().name().toLowerCase(Locale.ROOT) + "] " + edge.occurrence().source().file().getFileName()
                         + " @UTF-16 " + edge.occurrence().offset() + " [#" + (labels.size() + 1) + "]");
+                }
+                if (command.endsWith("follow")) {
+                    labels.clear();
+                    for (var edge : query.edges()) if (edge.resolution().status() == MarkdownLink.Status.AMBIGUOUS) {
+                        for (Path candidate : edge.resolution().candidates()) labels.add("File: " + candidate.getFileName() + " [#" + (labels.size() + 1) + "]");
+                        break;
+                    }
                 }
                 editor.showPaletteDialog(title, labels.isEmpty() ? List.of("No known links (control)") : labels);
             }

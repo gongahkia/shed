@@ -35,7 +35,14 @@ final class MarkdownEditingProbe {
         out("MD_META ", Map.of("operation", phase + "_rss", "rss_mib", Long.parseLong(new String(child.getInputStream().readAllBytes()).trim()) / 1024d));
     }
     private static void settled(Texteditor editor, String phase) throws Exception {
-        await(() -> editor.asyncJobService.list().stream().noneMatch(j -> j.getStatus() == AsyncJobService.Status.RUNNING), 30);
+        await(() -> {
+            for (Object owner : List.of(editor.syntaxUiController, editor.inputController, editor.recoveryController, editor.lspController))
+                for (Field f : owner.getClass().getDeclaredFields()) if (f.getType() == javax.swing.Timer.class) {
+                    f.setAccessible(true); var timer = (javax.swing.Timer) f.get(owner);
+                    if (timer != null && !timer.isRepeats() && timer.isRunning()) return false;
+                }
+            return editor.asyncJobService.list().stream().noneMatch(j -> j.getStatus() == AsyncJobService.Status.RUNNING);
+        }, 30);
         edt(() -> null); observe(phase + "_no_forced_gc");
         System.gc(); edt(() -> null); observe(phase + "_after_gc");
         if (ManagementFactory.getRuntimeMXBean().getInputArguments().contains("-XX:NativeMemoryTracking=summary")) {

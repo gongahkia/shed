@@ -1431,6 +1431,8 @@ public class Texteditor extends JFrame implements KeyListener {
 
     void cancelMarkdownHeadings(Object owner) { markdownController.cancelHeadings(owner); }
 
+    void cancelMarkdownHeadingEdit() { markdownController.cancelHeadingEdit(); }
+
     void markdownSourceClosed(FileBuffer buffer) {
         if (buffer.getFileType() == FileType.MARKDOWN) markdownController.headingSourceClosed(buffer);
     }

@@ -15,6 +15,27 @@ final class MarkdownController {
     private final Texteditor editor;
     private final Map<FileBuffer, PreviewBinding> previews = new IdentityHashMap<>();
     private MarkdownAnalysisService headingAnalysis;
+    private final Object headingEditOwner = new Object();
+    private PendingHeadingEdit pendingHeadingEdit;
+    private record PendingHeadingEdit(FileBuffer buffer, EditorPane pane, MarkdownSemanticSnapshot.Source source,
+                                      int dot, int mark, EditorMode mode, KeymapProfile profile, long keyPress,
+                                      javax.swing.event.CaretListener caretListener) { }
+
+    void cancelHeadingEdit() {
+        if (pendingHeadingEdit != null) {
+            pendingHeadingEdit.pane().getTextArea().removeCaretListener(pendingHeadingEdit.caretListener());
+            pendingHeadingEdit = null;
+            cancelHeadings(headingEditOwner);
+        }
+    }
+
+    private boolean headingEditCurrent(PendingHeadingEdit request) {
+        return pendingHeadingEdit == request && sourceWritable(request.pane(), request.buffer())
+            && editor.isMarkdownSourceCurrent(request.buffer(), request.source())
+            && editor.editorState.mode == request.mode() && editor.configManager.getKeymapProfile() == request.profile()
+            && editor.inputController.lastKeyPressNanos() == request.keyPress()
+            && editor.writingArea.getCaret().getDot() == request.dot() && editor.writingArea.getCaret().getMark() == request.mark();
+    }
     private record Motion(boolean forward, int level) { }
     private static final class PendingNavigation {
         final FileBuffer buffer;
@@ -47,6 +68,7 @@ final class MarkdownController {
     void cancelHeadings(Object owner) { if (headingAnalysis != null) headingAnalysis.cancel(owner); }
 
     void headingSourceClosed(FileBuffer buffer) {
+        if (pendingHeadingEdit != null && pendingHeadingEdit.buffer() == buffer) cancelHeadingEdit();
         if (pendingNavigation != null && pendingNavigation.buffer == buffer) pendingNavigation = null;
         if (headingAnalysis != null) headingAnalysis.documentClosed(editor.documentStore.id(buffer));
         for (Window window : editor.getOwnedWindows()) if (window instanceof MarkdownOutlineDialog dialog) dialog.sourceClosed(buffer);
@@ -125,6 +147,7 @@ final class MarkdownController {
     }
 
     void detachPreview(EditorPane pane) {
+        if (pendingHeadingEdit != null && pendingHeadingEdit.pane() == pane) cancelHeadingEdit();
         if (pendingNavigation != null && pendingNavigation.pane == pane) pendingNavigation = null;
         cancelHeadings(pane);
         Iterator<Map.Entry<FileBuffer, PreviewBinding>> iterator = previews.entrySet().iterator();
@@ -138,6 +161,7 @@ final class MarkdownController {
     }
 
     void disposePreviews() {
+        cancelHeadingEdit();
         pendingNavigation = null;
         if (headingAnalysis != null) {
             if (editor.closingDown) { headingAnalysis.close(); headingAnalysis = null; }
@@ -373,25 +397,51 @@ final class MarkdownController {
     String markdownHeadingShift(boolean demote) {
         String unavailable = mutationUnavailable();
         if (unavailable != null) return unavailable;
+        if (pendingHeadingEdit != null && headingEditCurrent(pendingHeadingEdit)) return "Heading edit pending; request again";
+        cancelHeadingEdit();
         try {
+            FileBuffer buffer = editor.getCurrentBuffer(); EditorPane pane = editor.getActivePane();
+            var source = MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(buffer), buffer);
+            if (source.text().length() > MarkdownSemanticParser.MAX_CHARACTERS)
+                return "Markdown heading edit unavailable: semantic size limit";
             SourceLine line = sourceLine(editor.getCurrentCaretLine());
-            String changed;
-            String success;
-            if (!editor.markdownService.isHeading(line.text())) {
-                if (demote) changed = (editor.effectiveExpandTab() ? " ".repeat(editor.writingArea.getTabSize()) : "\t") + line.text();
-                else {
-                    int count = 0;
-                    while (count < line.text().length() && count < editor.writingArea.getTabSize()
-                        && Character.isWhitespace(line.text().charAt(count))) count++;
-                    changed = line.text().substring(count);
+            int dot = editor.writingArea.getCaret().getDot(), mark = editor.writingArea.getCaret().getMark();
+            javax.swing.event.CaretListener listener = event -> cancelHeadingEdit();
+            var request = new PendingHeadingEdit(buffer, pane, source, dot, mark, editor.editorState.mode,
+                editor.configManager.getKeymapProfile(), editor.inputController.lastKeyPressNanos(), listener);
+            pendingHeadingEdit = request; pane.getTextArea().addCaretListener(listener);
+            String[] message = {"Loading heading edit"};
+            requestHeadings(headingEditOwner, buffer, () -> {
+                if (headingEditCurrent(request)) return true;
+                // Detach only local state here: the coordinator may be pruning its subscriber map.
+                if (pendingHeadingEdit == request) {
+                    pane.getTextArea().removeCaretListener(listener); pendingHeadingEdit = null;
                 }
-                success = "Line updated";
-            } else {
-                changed = demote ? editor.markdownService.demoteHeading(line.text()) : editor.markdownService.promoteHeading(line.text());
-                if (changed.equals(line.text())) return demote ? "Already at h6" : "Already at h1";
-                success = demote ? "Demoted heading" : "Promoted heading";
-            }
-            return replace(line.start(), line.end(), changed, -1, success);
+                return false;
+            }, result -> {
+                pane.getTextArea().removeCaretListener(listener); pendingHeadingEdit = null;
+                var planned = MarkdownHeadingEditPlan.plan(result.semantic(), dot, mark, demote);
+                if (planned.edit().isPresent()) {
+                    String failure = MarkdownEdit.applyPlan(planned.edit().get(),
+                        MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(buffer), buffer), buffer,
+                        pane.getTextArea(), pane.surface(), () -> sourceWritable(pane, buffer));
+                    message[0] = failure.isEmpty() ? planned.message() : failure;
+                } else if (planned.status() == MarkdownHeadingEditPlan.Status.NOT_HEADING && !line.text().contains("#")) {
+                    // Preserve ordinary-line indentation without reinterpreting semantic no-match as a heading.
+                    String changed;
+                    if (demote) changed = (editor.effectiveExpandTab() ? " ".repeat(editor.writingArea.getTabSize()) : "\t") + line.text();
+                    else {
+                        int count = 0;
+                        while (count < line.text().length() && count < editor.writingArea.getTabSize()
+                            && Character.isWhitespace(line.text().charAt(count))) count++;
+                        changed = line.text().substring(count);
+                    }
+                    try { message[0] = replace(line.start(), line.end(), changed, -1, "Line updated"); }
+                    catch (BadLocationException invalid) { message[0] = "Markdown edit unavailable: invalid line"; }
+                } else message[0] = planned.message();
+                editor.showMessage(message[0]);
+            });
+            return message[0];
         } catch (BadLocationException error) { return "Markdown edit unavailable: invalid line"; }
     }
 

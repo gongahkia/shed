@@ -8,6 +8,24 @@ import javax.swing.text.PlainDocument;
 
 /** A short-lived, EDT-owned Markdown range edit. It owns neither source nor history. */
 final class MarkdownEdit {
+    static String applyPlan(MarkdownHeadingEditPlan plan, MarkdownSemanticSnapshot.Source current,
+                            FileBuffer buffer, JTextArea area, EditorSurface surface, BooleanSupplier targetValid) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Markdown edits require the EDT");
+        if (!plan.source().matches(current) || current.revision() != buffer.documentRevision()
+            || current.text() != buffer.textSnapshot() || area.getDocument() != buffer.getDocument()
+            || area.getCaret().getDot() != plan.dot() || area.getCaret().getMark() != plan.mark())
+            return "Markdown edit unavailable: stale semantic plan";
+        try {
+            plan.range().validate(current.text());
+            if (!plan.expected().equals(buffer.getDocument().getText(plan.range().start(), plan.range().length())))
+                return "Markdown edit unavailable: stale marker text";
+            return new MarkdownEdit(buffer, area, surface, targetValid, plan.range().start(), plan.range().end())
+                .apply(plan.replacement(), -1);
+        } catch (BadLocationException | IllegalArgumentException invalid) {
+            return "Markdown edit unavailable: invalid semantic range";
+        }
+    }
+
     private final FileBuffer buffer;
     private final JTextArea area;
     private final EditorSurface surface;

@@ -259,6 +259,134 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void semanticHeadingEditsPreserveKeymapsSplitsRecoveryAndCurrentHighlighting() throws Exception {
+        assumeSwingAvailable();
+        String text = "## *café* 😀\nbody\n```md\n## example\n```\n";
+        Path file = Files.writeString(tempDir.resolve("semantic-edits.md"), text);
+        Texteditor editor = createEditor(Files.createDirectories(tempDir.resolve("home-semantic-edits")), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            for (String profile : List.of("plain", "vim", "emacs")) {
+                onEdt(() -> {
+                    editor.configManager.set("keymap.profile", profile);
+                    editor.getCurrentBuffer().setContent(text, false); editor.setMode(profile.equals("vim") ? EditorMode.NORMAL : EditorMode.INSERT);
+                    editor.writingArea.select(3, 7);
+                    var history = (BoundedUndoManager) editor.getCurrentBuffer().getUndoManager(); history.discardAllEdits();
+                    assertEquals("Loading heading edit", editor.markdownHeadingShift(true));
+                    assertEquals(text, editor.writingArea.getText()); return null;
+                });
+                assertTrue(awaitUiState(() -> editor.writingArea.getText().equals("#" + text)));
+                assertTrue(awaitUiState(() -> markdownSyntaxSettled(editor)));
+                onEdt(() -> {
+                    assertCurrentMarkdownSyntax(editor);
+                    assertEquals(8, editor.writingArea.getCaret().getDot()); assertEquals(4, editor.writingArea.getCaret().getMark());
+                    var history = (BoundedUndoManager) editor.getCurrentBuffer().getUndoManager(); assertEquals(1, history.retainedEditCount());
+                    history.undo(); assertEquals(text, editor.writingArea.getText()); history.redo(); assertEquals("#" + text, editor.writingArea.getText());
+                    assertEquals(text, editor.getCurrentBuffer().getSavedContent()); return null;
+                });
+            }
+            var splitAnalysis = new java.util.concurrent.atomic.AtomicReference<MarkdownHeadingAnalysis>();
+            onEdt(() -> {
+                editor.persistRecoverySnapshots();
+                EditorPane first = editor.getActivePane(); editor.splitWindow(true);
+                assertSame(first.getTextArea().getDocument(), editor.writingArea.getDocument());
+                first.getTextArea().select(17, 19);
+                editor.requestMarkdownHeadings(new Object(), editor.getCurrentBuffer(), () -> true, splitAnalysis::set); return null;
+            });
+            assertTrue(awaitUiState(() -> splitAnalysis.get() != null));
+            onEdt(() -> { editor.writingArea.setCaretPosition(0); editor.markdownHeadingShift(false); return null; });
+            assertTrue(awaitUiState(() -> editor.writingArea.getText().equals(text)));
+            onEdt(() -> {
+                assertEquals(16, editor.editorPanes.getFirst().getTextArea().getSelectionStart());
+                assertEquals(18, editor.editorPanes.getFirst().getTextArea().getSelectionEnd());
+                editor.getCurrentBuffer().getUndoManager().undo(); assertEquals("#" + text, editor.writingArea.getText());
+                editor.persistRecoverySnapshots(); return null;
+            });
+            assertTrue(awaitUiState(() -> {
+                try { var journal = RecoveryJournal.read(editor.recoveryStoreDir.toPath());
+                    return journal != null && journal.entries().stream().anyMatch(e -> e.content().equals("#" + text));
+                } catch (java.io.IOException error) { return false; }
+            }));
+            assertEquals(text, Files.readString(file));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void pendingSemanticEditsCannotSurviveTypingCaretBufferModeOrLifetimeChanges() throws Exception {
+        assumeSwingAvailable();
+        for (String action : List.of("typing", "caret-return", "buffer-return", "mode-key", "close", "split", "undo-redo")) {
+            Path home = Files.createDirectories(tempDir.resolve("home-edit-gate-" + action));
+            Path first = Files.writeString(tempDir.resolve("edit-gate-a-" + action + ".md"), "## A\nbody");
+            Path second = Files.writeString(tempDir.resolve("edit-gate-b-" + action + ".md"), "## B\nother");
+            Texteditor editor = createEditor(home, first, second);
+            var started = new java.util.concurrent.CountDownLatch(1); var release = new java.util.concurrent.CountDownLatch(1);
+            try {
+                assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+                var service = new MarkdownAnalysisService(editor.asyncJobService, (source, stop) -> {
+                    started.countDown();
+                    try { assertTrue(release.await(15, TimeUnit.SECONDS)); } catch (InterruptedException ignored) { }
+                    return MarkdownHeadingAnalysis.analyze(source, stop);
+                });
+                FileBuffer b = onEdt(editor::getCurrentBuffer);
+                FileBuffer a = onEdt(() -> editor.buffers.stream().filter(f -> f.getFile().equals(first.toFile())).findFirst().orElseThrow());
+                onEdt(() -> {
+                    var field = MarkdownController.class.getDeclaredField("headingAnalysis"); field.setAccessible(true); field.set(editor.markdownController, service);
+                    editor.loadBufferIntoEditor(a); editor.setMode(EditorMode.INSERT); editor.writingArea.setCaretPosition(0);
+                    assertEquals("Loading heading edit", editor.markdownHeadingShift(true));
+                    assertEquals("Heading edit pending; request again", editor.markdownHeadingShift(false)); return null;
+                });
+                assertTrue(started.await(15, TimeUnit.SECONDS));
+                onEdt(() -> {
+                    switch (action) {
+                        case "typing" -> a.getDocument().insertString(a.getDocument().getLength(), "typed", null);
+                        case "caret-return" -> { editor.writingArea.setCaretPosition(3); editor.writingArea.setCaretPosition(0); }
+                        case "buffer-return" -> { editor.loadBufferIntoEditor(b); editor.loadBufferIntoEditor(a); }
+                        case "mode-key" -> { editor.setMode(EditorMode.NORMAL); editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ESCAPE, (char) 27)); editor.setMode(EditorMode.INSERT); }
+                        case "close" -> editor.closeActiveBufferWithoutExiting(true);
+                        case "split" -> editor.splitWindow(true);
+                        case "undo-redo" -> { a.getDocument().insertString(a.getDocument().getLength(), "x", null); a.getUndoManager().undo(); a.getUndoManager().redo(); }
+                    }
+                    return null;
+                });
+                record State(String text, VersionedTextSnapshot snapshot, long revision, boolean dirty, int history, long bytes) { }
+                var expected = onEdt(() -> new State(a.getContent(), a.textSnapshot(), a.documentRevision(), a.isModified(),
+                    ((BoundedUndoManager) a.getUndoManager()).retainedEditCount(), ((BoundedUndoManager) a.getUndoManager()).retainedBytes()));
+                release.countDown(); assertTrue(awaitUiState(() -> service.diagnostics().running() == 0));
+                onEdt(() -> {
+                    assertEquals(expected.text(), a.getContent(), action); assertSame(expected.snapshot(), a.textSnapshot());
+                    assertEquals(expected.revision(), a.documentRevision()); assertEquals(expected.dirty(), a.isModified());
+                    assertEquals(expected.history(), ((BoundedUndoManager) a.getUndoManager()).retainedEditCount());
+                    assertEquals(expected.bytes(), ((BoundedUndoManager) a.getUndoManager()).retainedBytes());
+                    assertEquals("## B\nother", b.getContent()); assertFalse(b.isModified());
+                    assertEquals(0, service.diagnostics().subscribers()); return null;
+                });
+            } finally { release.countDown(); disposeEditor(editor); }
+        }
+    }
+
+    @Test
+    void semanticHeadingRejectionDoesNotFallBackToFencedEscapedOrSetextMarkers() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("edit-rejected.md"), "## first");
+        Texteditor editor = createEditor(Files.createDirectories(tempDir.resolve("home-edit-rejected")), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            for (String text : List.of("```\n## fake\n```", "\\## escaped", "Title\n---", "## first\n" + "body\n".repeat(210000))) {
+                onEdt(() -> {
+                    var buffer = editor.getCurrentBuffer(); buffer.setContent(text, false); editor.setMode(EditorMode.INSERT);
+                    int dot = Math.max(0, text.indexOf("##")); editor.writingArea.setCaretPosition(dot);
+                    var history = (BoundedUndoManager) buffer.getUndoManager(); history.discardAllEdits();
+                    var snapshot = buffer.textSnapshot(); long revision = buffer.documentRevision();
+                    editor.markdownHeadingShift(true); awaitPendingMarkdownHeadingEdit(editor);
+                    assertEquals(text, buffer.getContent()); assertSame(snapshot, buffer.textSnapshot()); assertEquals(revision, buffer.documentRevision());
+                    assertFalse(buffer.isModified()); assertFalse(history.canUndo()); assertEquals(text, buffer.getSavedContent());
+                    return null;
+                });
+            }
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void workbenchControlsKeepTheirStyleAndKeyboardBehaviorAcrossThemeAndZoomChanges() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-workbench-style"));
@@ -4357,6 +4485,7 @@ public class TexteditorSwingIntegrationTest {
         history.discardAllEdits();
         String saved = buffer.getSavedContent();
         String message = command.call();
+        awaitPendingMarkdownHeadingEdit(editor);
         assertEquals(after, editor.writingArea.getText(), message);
         assertEquals(after, buffer.textSnapshot().text());
         assertEquals(saved, buffer.getSavedContent());
@@ -4364,6 +4493,21 @@ public class TexteditorSwingIntegrationTest {
         assertEquals(1, history.retainedEditCount(), message);
         history.undo(); assertEquals(before, editor.writingArea.getText()); assertFalse(history.canUndo());
         history.redo(); assertEquals(after, editor.writingArea.getText()); assertFalse(history.canRedo());
+    }
+
+    private static void awaitPendingMarkdownHeadingEdit(Texteditor editor) throws Exception {
+        var field = MarkdownController.class.getDeclaredField("pendingHeadingEdit"); field.setAccessible(true);
+        if (field.get(editor.markdownController) == null) return;
+        var loop = java.awt.Toolkit.getDefaultToolkit().getSystemEventQueue().createSecondaryLoop();
+        boolean[] timedOut = {false};
+        var timeout = new javax.swing.Timer(10000, e -> { timedOut[0] = true; loop.exit(); }); timeout.setRepeats(false);
+        var source = MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(editor.getCurrentBuffer()), editor.getCurrentBuffer());
+        // An observer of this exact in-flight revision exits after the completion dispatch. It
+        // remains current even when the edit's own callback changes the source first.
+        editor.markdownController.headingAnalysis().request(new Object(), source, () -> true, result -> loop.exit());
+        timeout.start();
+        try { loop.enter(); assertFalse(timedOut[0], "Heading edit completion timed out"); }
+        finally { timeout.stop(); }
     }
 
     @Test

@@ -45,6 +45,8 @@ final class InputController {
     private JSplitPane completionSplit;
     private JScrollPane completionDocumentationScroll;
 
+    long lastKeyPressNanos() { return lastKeyPressNanos; }
+
     InputController(Texteditor editor) {
         this.editor = editor;
         this.completionRequestState = new CompletionRequestState();

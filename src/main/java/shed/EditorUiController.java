@@ -757,6 +757,7 @@ final class EditorUiController {
         if (pane == null) {
             return;
         }
+        editor.cancelMarkdownHeadingEdit();
         editor.writingArea = pane.getTextArea();
         editor.lineNumberPanel = pane.getLineNumberPanel();
         editor.editorScrollPane = pane.getScrollPane();

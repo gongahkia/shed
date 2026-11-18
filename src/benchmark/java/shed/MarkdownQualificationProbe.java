@@ -141,7 +141,13 @@ public final class MarkdownQualificationProbe {
         edt(() -> {((OpenBufferCompletionIndex)field(editor.inputController,"openBufferCompletionIndex")).complete(editor.buffers,editor.getCurrentBuffer(),"al",0,20,new FuzzyMatchService());return null;});
         snapshot("after_normal_completion_query",true,false);
         out("MD_META ",edt(() -> Map.of("operation","closed_after_query","alive",refs.stream().filter(r->r.get()!=null).count(),
-            "index_entries",((Map<?,?>)field(field(editor.inputController,"openBufferCompletionIndex"),"snapshots")).size(),"open_buffers",editor.buffers.size())));
+            "index_entries",((Map<?,?>)field(field(editor.inputController,"openBufferCompletionIndex"),"snapshots")).size(),"open_buffers",editor.buffers.size(),
+            "retention_path",retainedPath(refs.getFirst().get()))));
+        // Bounded causal control: exercise existing history eviction; never clear application fields.
+        edt(() -> {for(int i=0;i<201;i++)editor.asyncJobService.submit("qualification history turnover",token -> null,null);return null;});
+        snapshot("after_bounded_history_turnover",true,false);
+        out("MD_META ",edt(() -> Map.of("operation","closed_after_history_turnover","alive",refs.stream().filter(r->r.get()!=null).count(),
+            "retention_path",retainedPath(refs.getFirst().get()))));
     }
 
     private static WeakReference<?> index() throws Exception {

@@ -233,7 +233,7 @@ public class TexteditorSwingIntegrationTest {
                     try {
                         var filter = descendants(dialog, javax.swing.JTextField.class).getFirst(); field.set(filter);
                         var list = descendants(dialog, javax.swing.JList.class).getFirst();
-                        assertEquals(editor.resolveUiFont(), list.getFont()); assertEquals(editor.configManager.getCommandBarBackground(), list.getBackground());
+                        assertEquals(editor.resolveUiFont(), list.getFont()); assertEquals(editor.configManager.getFloatingSurfaceColor(), list.getBackground());
                         assertEquals(2, list.getModel().getSize()); assertTrue(list.getModel().getElementAt(0).toString().contains(":1:1"));
                         filter.setText("b");
                         dialog.getRootPane().getActionMap().get("dismiss").actionPerformed(new ActionEvent(dialog, 0, "escape"));
@@ -2235,7 +2235,7 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(editor.configManager.getNormalColor(), onEdt(() -> shown.getContentPane().getBackground()));
             List<javax.swing.JTextField> fields = onEdt(() -> descendants(shown, javax.swing.JTextField.class));
             assertFalse(fields.isEmpty());
-            assertTrue(fields.stream().allMatch(field -> editor.configManager.getCommandBarBackground().equals(field.getBackground())));
+            assertTrue(fields.stream().allMatch(field -> editor.configManager.getFloatingSurfaceColor().equals(field.getBackground())));
             List<javax.swing.JButton> buttons = onEdt(() -> descendants(shown, javax.swing.JButton.class));
             assertFalse(buttons.isEmpty());
             assertTrue(buttons.stream().allMatch(button -> editor.configManager.getEditorForeground().equals(button.getForeground())));
@@ -2274,7 +2274,7 @@ public class TexteditorSwingIntegrationTest {
 
             assertEquals(editor.configManager.getNormalColor(), onEdt(() -> shown.getContentPane().getBackground()));
             assertTrue(onEdt(() -> descendants(shown, javax.swing.JList.class).stream()
-                .allMatch(list -> editor.configManager.getCommandBarBackground().equals(list.getBackground()))));
+                .allMatch(list -> editor.configManager.getFloatingSurfaceColor().equals(list.getBackground()))));
             assertTrue(onEdt(() -> descendants(shown, javax.swing.JTextArea.class).stream()
                 .allMatch(area -> editor.configManager.getNormalColor().equals(area.getBackground()))));
             assertEquals(editor.configManager.getNormalColor(), onEdt(() -> UIManager.getColor("OptionPane.background")));

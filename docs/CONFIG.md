@@ -535,7 +535,7 @@ schema_version = 1
 - `:config save` persists runtime differences from built-in defaults, not a full expanded template.
 - `.shed.toml` is applied per project root and is cleared automatically when switching out of that project scope. Permitted DAP declarations are separately resolved from the target workspace root, so a Tests action does not depend on whichever file is active in another root.
 
-Shed Dark is the default for new configurations. Shed Light provides the same neutral workbench treatment in light mode. These palettes keep the editor background stable across editing modes; the status bar reports the current mode. Existing explicit theme choices and color overrides are preserved.
+Shed Light is the default for new configurations. Shed Dark provides the matching neutral workbench treatment in dark mode. These palettes keep the editor background stable across editing modes; the status bar reports the current mode. Existing explicit theme choices and color overrides are preserved.
 
 Agent prompts accept `@path/to/file`, `@"path with spaces"` and `#skill-name`. Typing `@` or `#` shows fuzzy suggestions; arrows select, Tab/Enter insert, Escape dismisses, and Control Space refreshes. File suggestions respect workspace ignores and access policy. References use complete unsaved text where available. Missing/ambiguous references fail before prompting. Each selected source is limited to 102,400 characters and all explicit/instruction context to 1 Mi characters. OpenCode reads short-lived full snapshots; source paths are listed in Activity. Skill names must be unique across configured directories.
 

@@ -1,0 +1,20 @@
+{
+  "version": "15.1.0",
+  "sources": [
+    {
+      "url": "https://www.unicode.org/Public/15.1.0/ucd/DerivedCoreProperties.txt",
+      "downloaded_sha256": "f55d0db69123431a7317868725b1fcbf1eab6b265d756d1bd7f0f6d9f9ee108b",
+      "vendored_extract": "src/test/resources/unicode/15.1.0/IndicConjunctBreak.txt",
+      "extract_sha256": "1a616998a80d2249b8e5136e563dca58b6cd67122f1d731428923cb7d67e8899"
+    },
+    {
+      "url": "https://www.unicode.org/Public/15.1.0/ucd/auxiliary/GraphemeBreakTest.txt",
+      "sha256": "ed9c5e92fd0911ccbeeb63c97cb19c519ea272ff1112ce843abd991582dd848f",
+      "verbatim": true
+    },
+    {
+      "url": "https://www.unicode.org/license.txt",
+      "downloaded_sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96"
+    }
+  ]
+}

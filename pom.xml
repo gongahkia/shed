@@ -44,6 +44,7 @@
         <targetPath>META-INF/licenses</targetPath>
         <includes>
           <include>NIB_THEME_LICENSE.txt</include>
+          <include>UNICODE_LICENSE.txt</include>
         </includes>
       </resource>
     </resources>

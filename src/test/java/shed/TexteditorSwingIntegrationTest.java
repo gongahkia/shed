@@ -1152,6 +1152,63 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void indicEditsUseExistingVimEmacsAndPlainMultiSelectionRoutes() throws Exception {
+        assumeSwingAvailable();
+        String source = "क्ष|क्ष";
+        Texteditor editor = createEditor(tempDir.resolve("indic-routes-home"), Files.writeString(tempDir.resolve("indic-routes.md"), source));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                var buffer = editor.getCurrentBuffer();
+                for (String profile : List.of("vim", "emacs", "plain")) {
+                    editor.configManager.set("keymap.profile", profile); editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                    buffer.getUndoManager().discardAllEdits();
+                    if (profile.equals("vim")) {
+                        editor.setMode(EditorMode.INSERT); editor.writingArea.setCaretPosition(3);
+                        editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_BACK_SPACE, '\b'));
+                    } else if (profile.equals("emacs")) {
+                        editor.writingArea.setCaretPosition(0);
+                        editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, KeyEvent.CTRL_DOWN_MASK, KeyEvent.VK_F, 'f'));
+                        assertEquals(3, editor.writingArea.getCaretPosition()); editor.writingArea.setCaretPosition(0);
+                        editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, KeyEvent.CTRL_DOWN_MASK, KeyEvent.VK_D, 'd'));
+                    } else {
+                        editor.writingArea.setCaretPosition(3); editor.extraSelections.add(MultiSelection.caret(7));
+                        editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_BACK_SPACE, '\b'));
+                    }
+                    String expected = profile.equals("plain") ? "|" : "|क्ष";
+                    assertEquals(expected, buffer.getContent(), profile); assertEquals(0, editor.writingArea.getCaretPosition());
+                    editor.clearExtraCursors(); buffer.getUndoManager().undo(); assertEquals(source, buffer.getContent(), profile);
+                    assertFalse(buffer.getUndoManager().canUndo());
+                    buffer.getUndoManager().redo(); assertEquals(expected, buffer.getContent());
+                    buffer.getUndoManager().undo(); assertEquals(source, buffer.getContent());
+                }
+                editor.configManager.set("keymap.profile", "vim"); editor.setMode(EditorMode.NORMAL);
+                buffer.getUndoManager().discardAllEdits(); editor.writingArea.setCaretPosition(0);
+                editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_X, 'x'));
+                assertEquals("|क्ष", buffer.getContent());
+                buffer.getUndoManager().undo(); assertEquals(source, buffer.getContent());
+                assertFalse(buffer.getUndoManager().canUndo());
+                buffer.getUndoManager().redo(); assertEquals("|क्ष", buffer.getContent());
+                editor.persistRecoverySnapshots();
+                editor.splitWindow(true);
+                var first = editor.editorPanes.getFirst().getTextArea(); var second = editor.editorPanes.getLast().getTextArea();
+                assertSame(buffer.getDocument(), first.getDocument()); assertSame(first.getDocument(), second.getDocument());
+                first.setCaretPosition(0); second.setCaretPosition(1);
+                assertEquals(0, first.getCaretPosition()); assertEquals(1, second.getCaretPosition());
+                assertEquals("shed-light", editor.configManager.getThemeId());
+                assertEquals("JetBrains Mono", editor.writingArea.getFont().getFamily());
+                return null;
+            });
+            assertTrue(awaitUiState(() -> {
+                try {
+                    var journal = RecoveryJournal.read(editor.recoveryStoreDir.toPath());
+                    return journal != null && journal.entries().stream().anyMatch(entry -> entry.content().equals("|क्ष"));
+                } catch (java.io.IOException failure) { throw new RuntimeException(failure); }
+            }));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void customActionsWorkInEachProfileWithoutInterceptingOtherFieldsOrComposition() throws Exception {
         assumeSwingAvailable();
         Path home = Files.createDirectories(tempDir.resolve("home-keymap-actions"));

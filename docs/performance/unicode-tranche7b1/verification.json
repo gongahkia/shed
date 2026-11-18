@@ -1,0 +1,23 @@
+{
+  "start_head": "a7633bd7a5ac6a4b68544a4c1854412e8ac68c68",
+  "end_head": "fab95b08663f87ea29d3de951093c0c2759df8e6",
+  "agent_commits_or_pushes": false,
+  "external_commits_preserved": true,
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "missing_baseline_files": [],
+  "previous_evidence_unchanged": true,
+  "defaults_unchanged": true,
+  "jar_before_sha256": "8d9a08e892d10536c769fd83dc72ed948620c65d2fd57def69e87e2664d772ed",
+  "jar_after_sha256": "d0c9b93fd62d8de88f878a1ee282cf785cf16f797a5ede0824a129229ef334b0",
+  "git_diff_check": 0,
+  "maven": {
+    "tests": 1548,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5
+  },
+  "tooling_passed": 19,
+  "packaged_smoke": "PASS",
+  "full_corpus_mismatches_remaining": 51
+}

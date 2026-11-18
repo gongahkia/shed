@@ -1,0 +1,35 @@
+{
+  "changed_baseline_files": [
+    "src/main/java/shed/GraphemeBoundary.java",
+    "src/main/java/shed/ClipboardManager.java",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java",
+    "src/test/java/shed/UnicodeEditingRegressionTest.java",
+    "src/test/java/shed/GraphemeBoundaryTest.java",
+    "pom.xml",
+    "docs/GRAPHEME_EDITING.md"
+  ],
+  "added_since_task_baseline": [
+    "docs/UNICODE_CORRECTNESS_REMEDIATION.md",
+    "docs/UNICODE_LICENSE.txt",
+    "docs/performance/unicode-tranche7b1/INDEX.md",
+    "docs/performance/unicode-tranche7b1/after-ui.json.gz",
+    "docs/performance/unicode-tranche7b1/baseline-files.json.gz",
+    "docs/performance/unicode-tranche7b1/before-ui.json.gz",
+    "docs/performance/unicode-tranche7b1/commands.json",
+    "docs/performance/unicode-tranche7b1/conformance-after.json",
+    "docs/performance/unicode-tranche7b1/conformance-before-final.json",
+    "docs/performance/unicode-tranche7b1/conformance-comparison.json",
+    "docs/performance/unicode-tranche7b1/inventory.json",
+    "docs/performance/unicode-tranche7b1/measurements.json",
+    "docs/performance/unicode-tranche7b1/packaged-smoke.json",
+    "docs/performance/unicode-tranche7b1/regression-suites.json",
+    "docs/performance/unicode-tranche7b1/unicode-provenance.json",
+    "docs/performance/unicode-tranche7b1/verification-logs.json.gz",
+    "docs/performance/unicode-tranche7b1/verification.json",
+    "src/benchmark/java/shed/GraphemeQualificationProbe.java",
+    "src/main/java/shed/IndicConjunctBreak.java",
+    "src/test/java/shed/IndicConjunctBoundaryTest.java",
+    "src/test/resources/unicode/15.1.0/GraphemeBreakTest.txt",
+    "src/test/resources/unicode/15.1.0/IndicConjunctBreak.txt"
+  ]
+}

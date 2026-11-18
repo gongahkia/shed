@@ -103,8 +103,7 @@ public class ClipboardManager {
                 this.clipboardBuffer = deleted;
                 this.lastYankWasLine = false;
                 systemClipboard.setContents(new StringSelection(deleted), null);
-                String newText = text.substring(0, range.start()) + text.substring(range.end());
-                textArea.setText(newText);
+                textArea.replaceRange("", range.start(), range.end());
                 textArea.setCaretPosition(range.start());
                 return deleted;
             }

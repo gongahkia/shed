@@ -104,10 +104,19 @@ final class GraphemeBoundary {
         cursor += width(previous);
         int regionalIndicators = isRegionalIndicator(previous) ? 1 : 0;
         boolean emojiBeforeZwj = isEmoji(previous);
+        int conjunctState = IndicConjunctBreak.isConsonant(previous) ? 1 : 0;
         while (cursor < text.length()) {
             int current = codePointAt(text, cursor);
-            if (!continues(previous, current, regionalIndicators, emojiBeforeZwj)) {
+            boolean consonant = IndicConjunctBreak.isConsonant(current);
+            // GB9c: a consonant followed by InCB Extend/Linker, including a linker.
+            if (!(conjunctState == 2 && consonant)
+                && !continues(previous, current, regionalIndicators, emojiBeforeZwj)) {
                 return cursor;
+            }
+            if (consonant) conjunctState = 1;
+            else if (conjunctState != 0) {
+                if (IndicConjunctBreak.isLinker(current)) conjunctState = 2;
+                else if (!IndicConjunctBreak.isExtend(current)) conjunctState = 0;
             }
             if (isRegionalIndicator(current)) {
                 regionalIndicators++;

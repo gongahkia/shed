@@ -13,11 +13,33 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 public class UnicodeEditingRegressionTest {
-    private static final List<String> CLUSTERS = List.of("e\u0301", "|", "👩🏽", "|", "👩‍💻", "|", "🇸🇬", "|", "🇺🇸", "|", "α", "|", "日", "|", "م");
+    private static final List<String> CLUSTERS = List.of("e\u0301", "|", "👩🏽", "|", "👩‍💻", "|", "🇸🇬", "|", "🇺🇸", "|", "α", "|", "日", "|", "م",
+        "|", "क्ष", "|", "क्‍ष", "|", "ক্ষ", "|", "ક્ષ", "|", "କ୍ଷ", "|", "క్ష", "|", "ക്ഷ", "|", "✈️", "|", "𝄞");
     private static final String FIXTURE = String.join("", CLUSTERS);
 
     @TempDir
     Path tempDir;
+
+    @Test
+    void conjunctDeletionPreservesBomCrLfSourceSnapshotAndSavedBytes() throws Exception {
+        String disk = "\uFEFF**क्ष**\r\n";
+        Path source = tempDir.resolve("conjunct.md"); Files.writeString(source, disk, StandardCharsets.UTF_8);
+        FileBuffer buffer = new FileBuffer(source.toFile());
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            JTextArea area = new JTextArea(buffer.getDocument());
+            assertEquals("**क्ष**\n", buffer.getContent());
+            var range = GraphemeEditRange.next(buffer.getContent(), 2);
+            area.replaceRange("", range.start(), range.end());
+            assertEquals("****\n", buffer.getContent());
+            buffer.reconcileDocumentText();
+            assertEquals(buffer.getContent(), buffer.textSnapshot().text());
+            buffer.getUndoManager().undo(); assertEquals("**क्ष**\n", buffer.getContent());
+            buffer.getUndoManager().redo(); assertEquals("****\n", buffer.getContent());
+        });
+        buffer.save();
+        assertEquals("\uFEFF****\r\n", Files.readString(source, StandardCharsets.UTF_8));
+        assertEquals(buffer.getContent(), new FileBuffer(source.toFile()).getContent());
+    }
 
     @Test
     void singleCaretUnicodeFixtureSurvivesNavigationSelectionDeleteUndoSaveAndReload() throws Exception {

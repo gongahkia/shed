@@ -1,0 +1,753 @@
+{
+  "failures": [
+    {
+      "line": "\u00f7 0600 \u00d7 0020 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] SPACE (Other) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 0020 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] SPACE (Other) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 000D \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [5.0] <CARRIAGE RETURN (CR)> (CR) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 000A \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [5.0] <LINE FEED (LF)> (LF) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 0001 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [5.0] <START OF HEADING> (Control) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 034F \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING GRAPHEME JOINER (Extend) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00d7 034F \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00d7 [9.0] COMBINING GRAPHEME JOINER (Extend) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 1F1E6 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] REGIONAL INDICATOR SYMBOL LETTER A (RI) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 1F1E6 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] REGIONAL INDICATOR SYMBOL LETTER A (RI) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        4
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        4
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0600 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] ARABIC NUMBER SIGN (Prepend) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 0600 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] ARABIC NUMBER SIGN (Prepend) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0A03 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.1] GURMUKHI SIGN VISARGA (SpacingMark) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00d7 0A03 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00d7 [9.1] GURMUKHI SIGN VISARGA (SpacingMark) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 1100 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] HANGUL CHOSEONG KIYEOK (L) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 1100 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] HANGUL CHOSEONG KIYEOK (L) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 1160 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] HANGUL JUNGSEONG FILLER (V) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 1160 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] HANGUL JUNGSEONG FILLER (V) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 11A8 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] HANGUL JONGSEONG KIYEOK (T) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 11A8 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] HANGUL JONGSEONG KIYEOK (T) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 AC00 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] HANGUL SYLLABLE GA (LV) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 AC00 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] HANGUL SYLLABLE GA (LV) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 AC01 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] HANGUL SYLLABLE GAG (LVT) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 AC01 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] HANGUL SYLLABLE GAG (LVT) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0900 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] DEVANAGARI SIGN INVERTED CANDRABINDU (Extend_ConjunctLinkingScripts) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00d7 0900 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00d7 [9.0] DEVANAGARI SIGN INVERTED CANDRABINDU (Extend_ConjunctLinkingScripts) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0903 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.1] DEVANAGARI SIGN VISARGA (SpacingMark_ConjunctLinkingScripts) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00d7 0903 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00d7 [9.1] DEVANAGARI SIGN VISARGA (SpacingMark_ConjunctLinkingScripts) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0904 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] DEVANAGARI LETTER SHORT A (ConjunctLinkingScripts) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 0904 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] DEVANAGARI LETTER SHORT A (ConjunctLinkingScripts) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0D4E \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] MALAYALAM LETTER DOT REPH (Prepend_ConjunctLinkingScripts) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 0D4E \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] MALAYALAM LETTER DOT REPH (Prepend_ConjunctLinkingScripts) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0915 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] DEVANAGARI LETTER KA (ConjunctLinkingScripts_LinkingConsonant) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 0915 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] DEVANAGARI LETTER KA (ConjunctLinkingScripts_LinkingConsonant) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 231A \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] WATCH (ExtPict) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 231A \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] WATCH (ExtPict) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0300 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING GRAVE ACCENT (Extend_ExtCccZwj) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00d7 0300 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00d7 [9.0] COMBINING GRAVE ACCENT (Extend_ExtCccZwj) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 093C \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] DEVANAGARI SIGN NUKTA (Extend_ConjunctLinkingScripts_ExtCccZwj) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00d7 093C \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00d7 [9.0] DEVANAGARI SIGN NUKTA (Extend_ConjunctLinkingScripts_ExtCccZwj) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 094D \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] DEVANAGARI SIGN VIRAMA (Extend_ConjunctLinkingScripts_ConjunctLinker_ExtCccZwj) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00d7 094D \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00d7 [9.0] DEVANAGARI SIGN VIRAMA (Extend_ConjunctLinkingScripts_ConjunctLinker_ExtCccZwj) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 200D \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] ZERO WIDTH JOINER (ZWJ_ExtCccZwj) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00d7 200D \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00d7 [9.0] ZERO WIDTH JOINER (ZWJ_ExtCccZwj) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0378 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] <reserved-0378> (Other) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0600 \u00d7 0308 \u00f7 0378 \u00f7\t#  \u00f7 [0.2] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.0] COMBINING DIAERESIS (Extend_ExtCccZwj) \u00f7 [999.0] <reserved-0378> (Other) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0D4E \u00d7 0600 \u00f7\t#  \u00f7 [0.2] MALAYALAM LETTER DOT REPH (Prepend_ConjunctLinkingScripts) \u00d7 [9.2] ARABIC NUMBER SIGN (Prepend) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2
+      ],
+      "expected_utf16": [
+        0,
+        2
+      ]
+    },
+    {
+      "line": "\u00f7 0061 \u00f7 1F1E6 \u00d7 1F1E7 \u00d7 200D \u00f7 1F1E8 \u00f7 0062 \u00f7\t#  \u00f7 [0.2] LATIN SMALL LETTER A (Other) \u00f7 [999.0] REGIONAL INDICATOR SYMBOL LETTER A (RI) \u00d7 [13.0] REGIONAL INDICATOR SYMBOL LETTER B (RI) \u00d7 [9.0] ZERO WIDTH JOINER (ZWJ_ExtCccZwj) \u00f7 [999.0] REGIONAL INDICATOR SYMBOL LETTER C (RI) \u00f7 [999.0] LATIN SMALL LETTER B (Other) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        8,
+        9
+      ],
+      "expected_utf16": [
+        0,
+        1,
+        6,
+        8,
+        9
+      ]
+    },
+    {
+      "line": "\u00f7 0061 \u00f7 1F1E6 \u00d7 200D \u00f7 1F1E7 \u00d7 1F1E8 \u00f7 0062 \u00f7\t#  \u00f7 [0.2] LATIN SMALL LETTER A (Other) \u00f7 [999.0] REGIONAL INDICATOR SYMBOL LETTER A (RI) \u00d7 [9.0] ZERO WIDTH JOINER (ZWJ_ExtCccZwj) \u00f7 [999.0] REGIONAL INDICATOR SYMBOL LETTER B (RI) \u00d7 [13.0] REGIONAL INDICATOR SYMBOL LETTER C (RI) \u00f7 [999.0] LATIN SMALL LETTER B (Other) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        8,
+        9
+      ],
+      "expected_utf16": [
+        0,
+        1,
+        4,
+        8,
+        9
+      ]
+    },
+    {
+      "line": "\u00f7 0061 \u00f7 0600 \u00d7 0062 \u00f7\t#  \u00f7 [0.2] LATIN SMALL LETTER A (Other) \u00f7 [999.0] ARABIC NUMBER SIGN (Prepend) \u00d7 [9.2] LATIN SMALL LETTER B (Other) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expected_utf16": [
+        0,
+        1,
+        3
+      ]
+    },
+    {
+      "line": "\u00f7 0061 \u00d7 1F3FF \u00f7 1F476 \u00f7\t#  \u00f7 [0.2] LATIN SMALL LETTER A (Other) \u00d7 [9.0] EMOJI MODIFIER FITZPATRICK TYPE-6 (Extend) \u00f7 [999.0] BABY (ExtPict) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        3,
+        5
+      ],
+      "expected_utf16": [
+        0,
+        3,
+        5
+      ]
+    },
+    {
+      "line": "\u00f7 0061 \u00d7 1F3FF \u00f7 1F476 \u00d7 200D \u00d7 1F6D1 \u00f7\t#  \u00f7 [0.2] LATIN SMALL LETTER A (Other) \u00d7 [9.0] EMOJI MODIFIER FITZPATRICK TYPE-6 (Extend) \u00f7 [999.0] BABY (ExtPict) \u00d7 [9.0] ZERO WIDTH JOINER (ZWJ_ExtCccZwj) \u00d7 [11.0] OCTAGONAL SIGN (ExtPict) \u00f7 [0.3]",
+      "actual_utf16": [
+        0,
+        1,
+        3,
+        8
+      ],
+      "expected_utf16": [
+        0,
+        3,
+        8
+      ]
+    }
+  ],
+  "passed": 1136,
+  "timing": [
+    {
+      "iterations_per_sample": 1000,
+      "samples": 100,
+      "allocated_bytes_per_call": 0.0,
+      "p50_ns": 16.958,
+      "size": 1024,
+      "p95_ns": 17.5,
+      "operation": "ascii_previous"
+    },
+    {
+      "iterations_per_sample": 1000,
+      "samples": 100,
+      "allocated_bytes_per_call": 0.0,
+      "p50_ns": 109.875,
+      "size": 1024,
+      "p95_ns": 120.083,
+      "operation": "conjunct_next"
+    },
+    {
+      "iterations_per_sample": 1,
+      "samples": 100,
+      "allocated_bytes_per_call": 0.0,
+      "p50_ns": 22209.0,
+      "size": 1024,
+      "p95_ns": 37250.0,
+      "operation": "conjunct_previous_at_eof"
+    },
+    {
+      "iterations_per_sample": 1000,
+      "samples": 100,
+      "allocated_bytes_per_call": 0.0,
+      "p50_ns": 17.542,
+      "size": 102400,
+      "p95_ns": 17.708,
+      "operation": "ascii_previous"
+    },
+    {
+      "iterations_per_sample": 1000,
+      "samples": 100,
+      "allocated_bytes_per_call": 0.0,
+      "p50_ns": 53.292,
+      "size": 102400,
+      "p95_ns": 54.458,
+      "operation": "conjunct_next"
+    },
+    {
+      "iterations_per_sample": 1,
+      "samples": 100,
+      "allocated_bytes_per_call": 0.0,
+      "p50_ns": 1983084.0,
+      "size": 102400,
+      "p95_ns": 2054666.0,
+      "operation": "conjunct_previous_at_eof"
+    },
+    {
+      "iterations_per_sample": 1000,
+      "samples": 100,
+      "allocated_bytes_per_call": 0.0,
+      "p50_ns": 17.0,
+      "size": 1048576,
+      "p95_ns": 17.334,
+      "operation": "ascii_previous"
+    },
+    {
+      "iterations_per_sample": 1000,
+      "samples": 100,
+      "allocated_bytes_per_call": 0.0,
+      "p50_ns": 54.708,
+      "size": 1048576,
+      "p95_ns": 55.125,
+      "operation": "conjunct_next"
+    },
+    {
+      "iterations_per_sample": 1,
+      "samples": 100,
+      "allocated_bytes_per_call": 0.0,
+      "p50_ns": 19043209.0,
+      "size": 1048576,
+      "p95_ns": 20461458.0,
+      "operation": "conjunct_previous_at_eof"
+    }
+  ],
+  "unicode_version": "15.1.0",
+  "jdk_regex_X_first_end": 2,
+  "failed": 51,
+  "jdk_character_iterator_first_end": 2,
+  "gb9c_failed": 0,
+  "gb9c_cases": 7,
+  "cases": 1187
+}

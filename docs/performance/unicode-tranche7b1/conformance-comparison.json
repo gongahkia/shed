@@ -1,0 +1,11 @@
+{
+  "corpus_version": "15.1.0",
+  "cases": 1187,
+  "before_failed": 58,
+  "after_failed": 51,
+  "gb9c_cases_corrected": 7,
+  "new_failure_records": 0,
+  "remaining_failure_records_identical": true,
+  "fully_conformant": false,
+  "diagnostic_is_report_only_not_a_passing_conformance_test": true
+}

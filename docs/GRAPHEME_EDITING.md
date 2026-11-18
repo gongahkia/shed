@@ -4,6 +4,8 @@
 
 This is the contract for the grapheme-aware cursor, deletion, and regression work in #72 through #77. #72 applies boundary-safe single-caret left/right and relevant word/line motions. #73 applies boundary-safe single-caret backspace/delete and visual-selection expansion. #74 provides deterministic single-caret Unicode fixtures; multi-selection coverage remains pending #77. Large-file mode remains read-only and is outside this contract.
 
+Implementation qualification: [Tranche 7B.1](UNICODE_CORRECTNESS_REMEDIATION.md) pins the Indic GB9c properties to Unicode 15.1.0 and verifies the affected editing paths. The current implementation is not fully conformant: the complete 15.1 corpus still reports 51 existing mismatches outside that correction. The contract below remains the target, not a claim that all native input paths have been qualified.
+
 ## Terms and coordinate systems
 
 Shed stores Java text and Swing document positions as zero-based UTF-16 code-unit offsets. They are valid from `0` through `text.length()` inclusive. This preserves interoperability with `JTextArea`, `Document`, sessions, and existing Java APIs; it does not make one UTF-16 code unit a user-visible character.

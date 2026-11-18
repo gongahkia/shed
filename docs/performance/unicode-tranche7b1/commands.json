@@ -1,0 +1,47 @@
+[
+  {
+    "name": "after-ui",
+    "command": [
+      "python3",
+      "scripts/benchmark-markdown.py",
+      "--mode",
+      "ui",
+      "--shapes",
+      "mixed",
+      "--sizes",
+      "102400",
+      "1048576",
+      "--samples",
+      "100",
+      "--warmups",
+      "10",
+      "--output",
+      "/tmp/shed-tranche7b1-after"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "smoke",
+    "command": [
+      "python3",
+      "scripts/test-packaged-markdown.py",
+      "--output",
+      "/tmp/shed-tranche7b1-run/packaged-smoke.json"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "tooling",
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "scripts",
+      "-p",
+      "test_benchmark*.py"
+    ],
+    "exit": 0
+  }
+]

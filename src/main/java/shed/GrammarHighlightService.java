@@ -163,7 +163,7 @@ final class GrammarHighlightService {
                     // Strictly beyond the removed range: the preceding newline still exists.
                     if (point.getValue().offset() > offset + removed) {
                         suffix.put(point.getKey() + lines,
-                            new Checkpoint(point.getValue().offset() + characters, point.getValue().state()));
+                            new Checkpoint(point.getValue().offset() + characters, point.getValue().state(), point.getValue().context()));
                     }
                 }
                 // State at the start of the changed line depends only on its unchanged prefix.
@@ -186,16 +186,25 @@ final class GrammarHighlightService {
             }
         }
 
+        MarkdownKeyboardContext.State keyboardContext(VersionedTextSnapshot text, int line, int offset) {
+            Checkpoint point;
+            synchronized (this) {
+                if (snapshot.get() != text) return MarkdownKeyboardContext.UNKNOWN;
+                point = checkpoints.floorEntry(line).getValue();
+            }
+            return MarkdownKeyboardContext.before(text, point.offset(), point.context(), offset);
+        }
+
         synchronized int checkpointCount() { return checkpoints.size() + suffix.size(); }
 
         private static TreeMap<Integer, Checkpoint> initialCheckpoints() {
             TreeMap<Integer, Checkpoint> points = new TreeMap<>();
-            points.put(0, new Checkpoint(0, State.normal()));
+            points.put(0, new Checkpoint(0, State.normal(), MarkdownKeyboardContext.TEXT));
             return points;
         }
     }
 
-    private record Checkpoint(int offset, State state) { }
+    private record Checkpoint(int offset, State state, MarkdownKeyboardContext.State context) { }
     private record MarkdownPlan(TreeMap<Integer, Checkpoint> points, TreeMap<Integer, Checkpoint> suffix) { }
 
     /** Worker-owned scan; the shared keyword tables are read-only after construction. */
@@ -212,6 +221,7 @@ final class GrammarHighlightService {
         int offset = restart.getValue().offset();
         int scanStart = offset;
         State state = restart.getValue().state();
+        MarkdownKeyboardContext.State context = restart.getValue().context();
         int stride = Math.max(128, (text.lineCount() + 511) / 512);
         List<Token> tokens = new ArrayList<>();
         List<Token> local = new ArrayList<>(8);
@@ -223,26 +233,27 @@ final class GrammarHighlightService {
             while (line <= lastLine) {
                 if (obsolete.getAsBoolean()) return null;
                 Checkpoint candidate = plan.suffix().remove(line);
-                if (candidate != null && candidate.offset() == offset && candidate.state().equals(state)) {
+                if (candidate != null && candidate.offset() == offset && candidate.state().equals(state) && candidate.context().equals(context)) {
                     // Same lexical state at an unchanged line boundary proves the remaining
                     // unchanged suffix has identical states. No source/token cache is needed.
                     points.put(line, candidate);
                     points.putAll(plan.suffix()); plan.suffix().clear();
                     var jump = points.floorEntry(firstLine);
                     if (line < firstLine && jump.getKey() > line) {
-                        line = jump.getKey(); offset = jump.getValue().offset(); state = jump.getValue().state();
+                        line = jump.getKey(); offset = jump.getValue().offset(); state = jump.getValue().state(); context = jump.getValue().context();
                         previousReads += source.readCharacters;
                         source = new SnapshotLines(text, offset, obsolete);
                     }
                     compact(points, firstLine);
                 }
                 if (line == firstLine || line % stride == 0) {
-                    points.put(line, new Checkpoint(offset, state));
+                    points.put(line, new Checkpoint(offset, state, context));
                     compact(points, firstLine);
                 }
                 String value = source.next();
                 local.clear();
                 state = markdown(value, state, line < firstLine ? null : local);
+                context = MarkdownKeyboardContext.advance(context, value);
                 for (Token token : local) tokens.add(new Token(offset + token.start(), offset + token.end(), token.scope()));
                 int consumed = value.length() + (offset + value.length() < text.length() ? 1 : 0);
                 characters += consumed;

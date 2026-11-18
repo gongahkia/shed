@@ -5033,6 +5033,130 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void markdownReferenceCommandsPreserveEmptyBehaviorAndHandleDirectedSelectionsInEveryProfile() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("reference-selection.md"), "label");
+        Texteditor editor = createEditor(tempDir.resolve("reference-selection-home"), file);
+        try {
+            onEdt(() -> {
+                FileBuffer buffer = editor.getCurrentBuffer();
+                for (String profile : List.of("plain", "vim", "emacs")) for (boolean image : List.of(false, true)) {
+                    editor.configManager.set("keymap.profile", profile); editor.setMode(EditorMode.INSERT);
+                    String command = image ? "image" : "link", template = image ? "![alt](path)" : "[text](url)", destination = image ? "path" : "url";
+                    buffer.setContent("body", false); editor.writingArea.setCaretPosition(2);
+                    editor.commandHandler.execute(command);
+                    assertEquals("bo" + template + "dy", buffer.getContent()); assertEquals(2 + template.length(), editor.writingArea.getCaretPosition());
+                    assertEquals(null, editor.writingArea.getSelectedText());
+                    for (boolean reverse : List.of(false, true)) for (String before : List.of("label", "before label after", "[old](x)label**tail**")) {
+                        buffer.setContent(before, false); int start = before.indexOf("label"), end = start + 5;
+                        editor.writingArea.setCaretPosition(reverse ? end : start); editor.writingArea.moveCaretPosition(reverse ? start : end);
+                        int dot = editor.writingArea.getCaret().getDot(), mark = editor.writingArea.getCaret().getMark();
+                        var history = (BoundedUndoManager) buffer.getUndoManager(); history.discardAllEdits();
+                        String inserted = (image ? "![label](path)" : "[label](url)"), after = before.substring(0, start) + inserted + before.substring(end);
+                        editor.commandHandler.execute(PaletteController.surfaceActionCommand(image ? "Insert Image" : "Insert Link"));
+                        assertEquals(after, buffer.getContent(), profile); assertEquals(destination, editor.writingArea.getSelectedText());
+                        assertEquals(1, history.retainedEditCount());
+                        history.undo(); assertEquals(before, buffer.getContent()); assertEquals(dot, editor.writingArea.getCaret().getDot()); assertEquals(mark, editor.writingArea.getCaret().getMark());
+                        history.redo(); assertEquals(after, buffer.getContent()); assertEquals(destination, editor.writingArea.getSelectedText());
+                    }
+                    KeyEvent typed = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_N, 'n'); editor.keyPressed(typed);
+                    if (!typed.isConsumed()) editor.writingArea.getActionMap().get(javax.swing.text.DefaultEditorKit.defaultKeyTypedAction)
+                        .actionPerformed(new ActionEvent(editor.writingArea, ActionEvent.ACTION_PERFORMED, "n"));
+                    assertEquals("[old](x)" + (image ? "![label](n)" : "[label](n)") + "**tail**", buffer.getContent(), profile);
+                }
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownSelectedReferenceRejectionsPreserveAllDocumentAndHistoryState() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("reference-reject.md"), "label");
+        Texteditor editor = createEditor(tempDir.resolve("reference-reject-home"), file);
+        try {
+            onEdt(() -> {
+                for (String[] example : new String[][]{{"line one\nline two", "0", "17"}, {"a\tb", "0", "3"}, {"   ", "0", "3"},
+                        {"[label]", "1", "6"}, {"\\label", "1", "6"}, {"😀", "1", "2"}, {"a".repeat(4097), "0", "4097"}}) {
+                    editor.getCurrentBuffer().setContent(example[0], false); editor.writingArea.select(Integer.parseInt(example[1]), Integer.parseInt(example[2]));
+                    assertMarkdownRejectedUnchanged(editor, () -> List.of(editor.insertLink(), editor.insertImage()));
+                }
+                editor.getCurrentBuffer().setContent("label", false); editor.writingArea.select(0, 5); editor.writingArea.setEditable(false);
+                editor.configManager.set("keymap.profile", "plain");
+                assertMarkdownRejectedUnchanged(editor, () -> List.of(editor.insertLink(), editor.insertImage()));
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void selectedImageUsesActualPaletteAcceptanceAndCancellationWithoutNewUi() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("image-palette.md"), "Architecture diagram");
+        Texteditor editor = createEditor(tempDir.resolve("image-palette-home"), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            for (boolean accept : List.of(true, false)) {
+                var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+                onEdt(() -> {
+                    editor.configManager.set("keymap.profile", "plain"); editor.setMode(EditorMode.INSERT);
+                    var buffer = editor.getCurrentBuffer(); buffer.setContent("Architecture diagram", false); editor.writingArea.select(0, 20);
+                    buffer.getUndoManager().discardAllEdits(); var snapshot = buffer.textSnapshot();
+                    var driver = new javax.swing.Timer(10, null);
+                    var watchdog = new javax.swing.Timer(15000, event -> {
+                        failure.set(new AssertionError("Command palette did not complete"));
+                        for (Window w : editor.getOwnedWindows()) if (w instanceof javax.swing.JDialog dialog) dialog.dispose();
+                    }); watchdog.setRepeats(false);
+                    driver.addActionListener(event -> {
+                        var dialog = Arrays.stream(editor.getOwnedWindows()).filter(w -> w instanceof javax.swing.JDialog d && d.isShowing()
+                            && d.getTitle().equals("Command Palette")).map(w -> (javax.swing.JDialog) w).findFirst().orElse(null);
+                        if (dialog == null) return; driver.stop();
+                        try {
+                            var list = descendants(dialog, javax.swing.JList.class).getFirst();
+                            assertEquals(editor.resolveUiFont(), list.getFont());
+                            if (accept) {
+                                var filter = descendants(dialog, javax.swing.JTextField.class).getFirst(); filter.setText("Insert Image"); filter.postActionEvent();
+                            } else dialog.getRootPane().getActionMap().get("dismiss").actionPerformed(new ActionEvent(dialog, 0, "escape"));
+                        } catch (Throwable error) { failure.set(error); dialog.dispose(); }
+                    }); driver.start(); watchdog.start();
+                    try { editor.showCommandPalette(); } finally { driver.stop(); watchdog.stop(); }
+                    if (failure.get() != null) throw new AssertionError(failure.get());
+                    if (accept) { assertEquals("![Architecture diagram](path)", buffer.getContent()); assertEquals("path", editor.writingArea.getSelectedText()); }
+                    else { assertSame(snapshot, buffer.textSnapshot()); assertEquals("Architecture diagram", editor.writingArea.getSelectedText()); assertFalse(buffer.getUndoManager().canUndo()); }
+                    return null;
+                });
+            }
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void selectedReferenceSharesSourceHistoryAndKeepsPaneViewportAndRecoveryOwnership() throws Exception {
+        assumeSwingAvailable(); String text = "label\n" + "body\n".repeat(1000), after = "[label](url)\n" + "body\n".repeat(1000);
+        Path file = Files.writeString(tempDir.resolve("insert-split.md"), text);
+        Texteditor editor = createEditor(tempDir.resolve("insert-split-home"), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> { editor.configManager.set("keymap.profile", "plain"); editor.setMode(EditorMode.INSERT); editor.splitWindow(true); editor.validate(); return null; });
+            flushEdt();
+            onEdt(() -> {
+                var first = editor.editorPanes.getFirst(); var second = editor.editorPanes.getLast();
+                first.getTextArea().setCaretPosition(100); editor.activateEditorPane(second); second.getTextArea().select(0, 5);
+                first.surface().scrollTo(new EditorSurface.Viewport(0, 800)); var viewport = first.surface().viewport();
+                assertEquals("Link inserted", editor.insertLink()); assertSame(second, editor.getActivePane());
+                assertEquals(viewport, first.surface().viewport()); assertEquals("url", second.getTextArea().getSelectedText());
+                assertSame(first.getTextArea().getDocument(), second.getTextArea().getDocument()); assertEquals(after, first.getTextArea().getText());
+                var history = editor.getCurrentBuffer().getUndoManager(); history.undo(); assertEquals(text, first.getTextArea().getText());
+                assertEquals("label", second.getTextArea().getSelectedText()); history.redo(); assertEquals("url", second.getTextArea().getSelectedText()); return null;
+            });
+            assertTrue(awaitUiState(() -> {
+                try { var journal = RecoveryJournal.read(editor.recoveryStoreDir.toPath()); return journal != null && journal.entries().stream().anyMatch(e -> e.content().equals(after)); }
+                catch (java.io.IOException pending) { return false; }
+            }));
+            assertEquals(text, Files.readString(file));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void markdownRangeCommandsPreserveEofAndAtomicUndoRedo() throws Exception {
         assumeSwingAvailable();
         Path file = Files.writeString(tempDir.resolve("markdown-edits.md"), "# start");
@@ -5071,7 +5195,7 @@ public class TexteditorSwingIntegrationTest {
                     indent + "body" + eof,
                     () -> editor.markdownHeadingShift(true));
                 assertMarkdownCommandUndo(editor, "préface" + eof,
-                    "pré" + editor.markdownService.insertLinkTemplate() + "face" + eof, () -> {
+                    "p[ré](url)face" + eof, () -> {
                         editor.writingArea.select(1, 3);
                         return editor.insertLink();
                     });
@@ -5118,6 +5242,178 @@ public class TexteditorSwingIntegrationTest {
         timeout.start();
         try { loop.enter(); assertFalse(timedOut[0], "Heading edit completion timed out"); }
         finally { timeout.stop(); }
+    }
+
+    private static void warmMarkdownKeyboardContext(Texteditor editor) throws Exception {
+        // Test-only synchronous preparation of the existing metadata; production uses its normal worker.
+        @SuppressWarnings("unchecked") var caches = (java.util.Map<FileBuffer, GrammarHighlightService.MarkdownCache>) syntaxField(editor, "markdownCaches");
+        var buffer = editor.getCurrentBuffer(); var source = buffer.textSnapshot();
+        var cache = caches.computeIfAbsent(buffer, ignored -> new GrammarHighlightService.MarkdownCache());
+        new GrammarHighlightService().highlightMarkdown(source, 0, source.length(), cache, cache.bind(source), () -> false);
+    }
+
+    private static void markdownEnterWithDefault(Texteditor editor) {
+        KeyEvent event = new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ENTER, '\n');
+        editor.keyPressed(event);
+        if (!event.isConsumed()) editor.writingArea.getActionMap().get(javax.swing.text.DefaultEditorKit.insertBreakAction)
+            .actionPerformed(new java.awt.event.ActionEvent(editor.writingArea, 0, "\n"));
+    }
+
+    @Test
+    void markdownNestedQuotesUseAtomicEnterAcrossProfilesAndDirectedSelections() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("nested-quotes.md"), "> > nested");
+        Texteditor editor = createEditor(tempDir.resolve("nested-quotes-home"), file);
+        try {
+            onEdt(() -> {
+                for (String profile : List.of("plain", "vim", "emacs")) {
+                    editor.configManager.set("keymap.profile", profile);
+                    for (String[] row : new String[][] {{"> quote", "> "}, {"> > nested", "> > "}, {"> > > 深😀é", "> > > "},
+                        {"  > > nested", "  > > "}, {">   > text", ">   > "}, {"> - item", "> - "},
+                        {"> > - [x] task", "> > - [ ] "}, {"> > 3. item", "> > 4. "}})
+                        for (String eof : List.of("", "\n")) assertMarkdownCommandUndo(editor, row[0] + eof,
+                            row[0] + "\n" + row[1] + eof, () -> {
+                                editor.writingArea.setCaretPosition(row[0].length()); markdownEnterWithDefault(editor);
+                                assertEquals(row[0].length() + 1 + row[1].length(), editor.writingArea.getCaretPosition()); return profile;
+                            });
+                    for (String empty : List.of("> ", "> > ", ">>>"))
+                        assertMarkdownCommandUndo(editor, empty, "\n", () -> {
+                            editor.writingArea.setCaretPosition(empty.length()); markdownEnterWithDefault(editor); return profile;
+                        });
+                    for (boolean reversed : List.of(false, true))
+                        assertMarkdownCommandUndo(editor, "> > abcd tail", "> > ab\n> >  tail", () -> {
+                            editor.writingArea.setCaretPosition(reversed ? 8 : 6); editor.writingArea.moveCaretPosition(reversed ? 6 : 8);
+                            markdownEnterWithDefault(editor); assertEquals(11, editor.writingArea.getCaretPosition()); return profile;
+                        });
+                }
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownFenceCompletionVerifiesOpeningsAndTheExistingVimShortcut() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("fence-context.md"), "```py");
+        Texteditor editor = createEditor(tempDir.resolve("fence-context-home"), file);
+        try {
+            onEdt(() -> {
+                for (String opening : List.of("```py", "  ```py", "`````py", "``` py"))
+                    for (int caret : new int[]{0, opening.length()}) assertMarkdownCommandUndo(editor, opening,
+                        opening.replace("py", "python"), () -> { editor.writingArea.setCaretPosition(caret); return editor.completeCodeFenceLanguage(); });
+                String multiple = "```java\nbody\n```\n```py";
+                assertMarkdownCommandUndo(editor, multiple, multiple.substring(0, multiple.length() - 2) + "python", () -> {
+                    editor.writingArea.setCaretPosition(multiple.length()); warmMarkdownKeyboardContext(editor); return editor.completeCodeFenceLanguage();
+                });
+                for (String source : List.of("```java\nbody\n```", "````java\n```py", "~~~java\n```py", "> ```py", "- ```py",
+                    "    ```py", "\t```py", "\\```py", "~~~py", "<pre>\n```py", "- item\n  ```py")) {
+                    editor.getCurrentBuffer().setContent(source, false); editor.writingArea.setCaretPosition(source.length());
+                    warmMarkdownKeyboardContext(editor);
+                    assertMarkdownRejectedUnchanged(editor, () -> List.of(editor.completeCodeFenceLanguage()));
+                }
+                editor.configManager.set("keymap.profile", "vim");
+                assertMarkdownCommandUndo(editor, "```py", "```python", () -> {
+                    editor.writingArea.setCaretPosition(5);
+                    editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, KeyEvent.CTRL_DOWN_MASK, KeyEvent.VK_J, 'j'));
+                    return "existing Vim Ctrl+J";
+                });
+                editor.getCurrentBuffer().setContent("```java\n```", false); editor.writingArea.setCaretPosition(11); warmMarkdownKeyboardContext(editor);
+                assertMarkdownRejectedUnchanged(editor, () -> {
+                    editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, KeyEvent.CTRL_DOWN_MASK, KeyEvent.VK_J, 'j'));
+                    return List.of("closing fence shortcut");
+                });
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownKeyboardContextRejectsCodeStaleAndReadOnlyTargetsAndSharesSplits() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("keyboard-context.md"), "````markdown\n```\n> > example\n````\n> > body");
+        Texteditor editor = createEditor(tempDir.resolve("keyboard-context-home"), file);
+        try {
+            onEdt(() -> { editor.applySyntaxHighlighting(); return null; });
+            assertTrue(awaitUiState(() -> markdownSyntaxSettled(editor)));
+            onEdt(() -> {
+                for (String profile : List.of("plain", "vim", "emacs")) {
+                    editor.configManager.set("keymap.profile", profile);
+                    for (String prefix : List.of("```markdown\n", "~~~~markdown\n", "> ```markdown\n", "<pre>\n")) {
+                        String source = prefix + "> > example";
+                        assertMarkdownCommandUndo(editor, source, source + "\n", () -> {
+                            warmMarkdownKeyboardContext(editor); editor.writingArea.setCaretPosition(source.length()); markdownEnterWithDefault(editor); return profile;
+                        });
+                    }
+                    assertMarkdownCommandUndo(editor, "body\n> > text", "body\n> > text\n> > ", () -> {
+                        warmMarkdownKeyboardContext(editor); editor.writingArea.setCaretPosition(13); markdownEnterWithDefault(editor); return profile;
+                    });
+                }
+                var buffer = editor.getCurrentBuffer(); buffer.setContent("> > shared", false); editor.writingArea.setCaretPosition(10);
+                editor.splitWindow(true); var owner = editor.getActivePane();
+                markdownEnterWithDefault(editor); assertEquals("> > shared\n> > ", buffer.getContent());
+                for (var pane : editor.editorPanes) assertSame(buffer.getDocument(), pane.getTextArea().getDocument());
+                buffer.getUndoManager().undo(); assertEquals("> > shared", buffer.getContent()); buffer.getUndoManager().redo();
+                editor.activateEditorPane(owner); editor.writingArea.setEditable(false); editor.configManager.set("keymap.profile", "plain");
+                assertMarkdownRejectedUnchanged(editor, () -> List.of(editor.handleMarkdownEnter(), editor.completeCodeFenceLanguage()));
+                editor.writingArea.setEditable(true);
+                buffer.setContent("> > 😀", false); editor.writingArea.select(5, 6);
+                assertMarkdownRejectedUnchanged(editor, () -> List.of(editor.handleMarkdownEnter()));
+                buffer.setContent("```java\n> > source", false); warmMarkdownKeyboardContext(editor);
+                buffer.getDocument().remove(0, 8); editor.writingArea.setCaretPosition(buffer.getDocument().getLength());
+                markdownEnterWithDefault(editor); assertEquals("> > source\n> > ", buffer.getContent());
+                var other = FileBuffer.createScratch("other.md", "untouched"); editor.buffers.add(other); editor.loadBufferIntoEditor(other);
+                return null;
+            });
+            flushEdt(); assertEquals("untouched", onEdt(() -> editor.buffers.stream().filter(b -> "other.md".equals(b.getDisplayName())).findFirst().orElseThrow().getContent()));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownKeyboardEditsPreserveBomNewlinesSavingAndRecovery() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("keyboard-persistence-home"));
+        try {
+            for (String separator : List.of("\n", "\r\n")) for (String eof : List.of("", separator)) {
+                String original = "\ufeffintro" + separator + "> > é😀é" + eof;
+                Path file = Files.write(tempDir.resolve("quote-" + separator.length() + "-" + eof.length() + ".md"), original.getBytes(StandardCharsets.UTF_8));
+                FileBuffer buffer = new FileBuffer(file.toFile());
+                onEdt(() -> {
+                    editor.buffers.add(buffer); editor.loadBufferIntoEditor(buffer); editor.configManager.set("keymap.profile", "plain");
+                    warmMarkdownKeyboardContext(editor); editor.writingArea.setCaretPosition("intro\n> > é😀é".length()); markdownEnterWithDefault(editor);
+                    String expected = "intro\n> > é😀é\n> > " + (eof.isEmpty() ? "" : "\n");
+                    assertEquals(expected, buffer.getContent()); assertTrue(buffer.isModified());
+                    buffer.getUndoManager().undo(); assertEquals("intro\n> > é😀é" + (eof.isEmpty() ? "" : "\n"), buffer.getContent());
+                    buffer.getUndoManager().redo(); assertEquals(expected, buffer.getContent()); return null;
+                });
+                var save = onEdt(() -> buffer.captureSaveSnapshot(null)); buffer.writeSaveSnapshot(save);
+                onEdt(() -> { buffer.completeSaveSnapshot(save); return null; });
+                org.junit.jupiter.api.Assertions.assertArrayEquals(("\ufeffintro" + separator + "> > é😀é" + separator + "> > " + eof).getBytes(StandardCharsets.UTF_8), Files.readAllBytes(file));
+                assertEquals(onEdt(buffer::getContent), new FileBuffer(file.toFile()).getContent());
+            }
+            String recovery = onEdt(() -> {
+                editor.writingArea.setCaretPosition(editor.writingArea.getDocument().getLength()); markdownEnterWithDefault(editor);
+                editor.persistRecoverySnapshots(); return editor.getCurrentBuffer().getContent();
+            });
+            assertTrue(awaitUiState(() -> {
+                try { var journal = RecoveryJournal.read(editor.recoveryStoreDir.toPath());
+                    return journal != null && journal.entries().stream().anyMatch(entry -> entry.content().equals(recovery));
+                } catch (java.io.IOException error) { return false; }
+            }));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownClosingFenceCompletionDoesNotInsertALanguage() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("closing-fence.md"), "```java\nbody\n```");
+        Texteditor editor = createEditor(tempDir.resolve("closing-fence-home"), file);
+        try {
+            onEdt(() -> {
+                editor.writingArea.setCaretPosition(editor.writingArea.getDocument().getLength());
+                assertMarkdownRejectedUnchanged(editor, () -> List.of(editor.completeCodeFenceLanguage()));
+                return null;
+            });
+        } finally { disposeEditor(editor); }
     }
 
     @Test

@@ -442,8 +442,8 @@ Portable-manifest format, safety boundary, and its distinction from private sess
 | `:table sort N desc` | Sort table by column `N` descending |
 | `:table insert-col` / `insertcol` / `addcol` | Insert table column after current column |
 | `:table delete-col` / `deletecol` / `delcol` | Delete current (or specified) table column |
-| `:markdown link insert`, `:link` | Insert markdown link template |
-| `:markdown image insert`, `:img`, `:image` | Insert markdown image template |
+| `:markdown link insert`, `:link` | Wrap selected text as a literal link label and select `url`; otherwise insert the existing link template |
+| `:markdown image insert`, `:img`, `:image` | Wrap selected text as literal image alt text and select `path`; otherwise insert the existing image template |
 | `:conceal 0|1|2`, `:conceallevel 0|1|2` | Set markdown conceal level |
 | `:snippets`, `:snippet` | Show user and built-in snippets for the current language |
 | `:snippet edit`, `:snippets open`, `:snippets edit` | Create if needed and open global user snippets |

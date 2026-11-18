@@ -1,0 +1,33 @@
+{
+  "implementation": {
+    "src/main/java/shed/MarkdownController.java": "1dcd784e1f0d1903574a55dc0caff3f0f8103214d29dae8e7439c1e162c5b0d6",
+    "src/main/java/shed/SyntaxUiController.java": "746310c81f173a8723cb5ade7f832994373a89b6bd1c048fdb5369906ce3fbd5",
+    "src/main/java/shed/GrammarHighlightService.java": "eff8290f8cfe6e78fc5161a2eab60934fde63390b566760fb4f390ac00b90bb5",
+    "src/main/java/shed/MarkdownService.java": "566a0ca336825f97a8dc8bd7671b34e35bb6e4966cca27ca72dcae3e08f47e3b",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java": "ab2ea83a65a5d63cf8ff1507d0e240fbbdd74cb466d46d60c3e995878d85f39a",
+    "src/test/java/shed/MarkdownServiceTest.java": "0e23d40a855e6a2ccc47c0cc29a0ba18817a8f2c05ece6115ab7007ca3d6dc7b",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "06be4bc34de31c2fc79a67dfaefe97f60c4b9a3ad65aeaa8049bda6d3dacb3ad",
+    "scripts/test_benchmark_markdown.py": "ba3cd821bb73c9685fcab0ce8e461bd1a5e7dbef648563cad702d43680d40955",
+    "scripts/benchmark-markdown.py": "c472555f78b1d1f4353df444b6499c24fd469277ceca804c1ce8a5448bd553d9",
+    "src/main/java/shed/MarkdownKeyboardContext.java": "88f1a0b206c43eb62cb17f9c6e748195189fdf45fa9db94f5192959ae39cc111",
+    "src/test/java/shed/MarkdownKeyboardContextTest.java": "025271ba5d13a139a786e5179ddeb6c02b2add57623d22655dd2b9b865da868d",
+    "src/benchmark/java/shed/MarkdownKeyboardProbe.java": "b0bb327af127f976d16cb03614717e5e938856e1c82d3aad5f12b3ea86b52f70",
+    "docs/MARKDOWN_KEYBOARD_CONTEXT.md": "380c5e4e5222aaa6a9a27004980717ca7cdbcaeeef2076ee6235188fcce116fc"
+  },
+  "evidence": {
+    "docs/performance/markdown-tranche5c1/INDEX.md": "a3cd86324aab7937bf39f8def684ff8cd09b0fa59ef2fdcbabffb6acce522f94",
+    "docs/performance/markdown-tranche5c1/after.json.gz": "0a6a79f0c19649fdd90dea7b95f0ac95b071ea73414bad6425aa9bda10f5f619",
+    "docs/performance/markdown-tranche5c1/baseline-files.json.gz": "d65ea9da252b206038c88bdcd2fd64507a022838d960f927591221df141e36da",
+    "docs/performance/markdown-tranche5c1/before.json.gz": "b79cfbdd0b4ad4d9dae13789489d1c0862559b6eac8b7398e0fa95b7a2f32446",
+    "docs/performance/markdown-tranche5c1/lexical-after.json.gz": "fd4b5ded90ec74b824cf5c7b4a4ad84a2acacffd59ed58835a115792a59ce767",
+    "docs/performance/markdown-tranche5c1/lexical-before.json.gz": "196295235cdbe1acca16d7a6ae5a2ee997fe209437ac1a06afca451c46e18d23",
+    "docs/performance/markdown-tranche5c1/measurements.json": "68943871eb9d250293c3f12fed8cc89910df8fbbe6701a8c8dae150339f59f6b",
+    "docs/performance/markdown-tranche5c1/packaged-smoke.json": "a03a7aa54b50dbe611dc514ad1189f411c431ccedc478c7aaa7e1302ed1fd08f",
+    "docs/performance/markdown-tranche5c1/probe-logs.json.gz": "06c3808d13b69a9be926868005d62fcad98493460915e048b41c109ebca3e3c6",
+    "docs/performance/markdown-tranche5c1/regression-suites.json": "2acfc3587181c68726610cdb01402b0aafdeba150b552519d0a77962492355b4",
+    "docs/performance/markdown-tranche5c1/typing-after.json.gz": "4b4ca9cfc3a8fe29eb55e767c4322fca9bde2df2d552c20c0f630a1eb56c8ff2",
+    "docs/performance/markdown-tranche5c1/typing-before.json.gz": "c2d5818077ca63fddba22102e087dd2cf817ecf686b6e014c00347192bdb046c",
+    "docs/performance/markdown-tranche5c1/verification-logs.json.gz": "07f453e0c92eacd723f6d701e9207b442c40f9ad7359de4a44f1156f3f968edd",
+    "docs/performance/markdown-tranche5c1/verification.json": "992ae69d7d70c8e77bcf62fc82a84fd16bf39c5eb02b996dec759dd826d0d1f5"
+  }
+}

@@ -609,6 +609,14 @@ public class MarkdownService {
     public String listContinuation(String currentLine) {
         if (currentLine == null) return null;
 
+        Quote quote = quote(currentLine);
+        if (quote != null) {
+            String body = currentLine.substring(quote.body());
+            if (emptyQuoteBody(body)) return null;
+            String nested = listContinuation(body);
+            return quote.prefix() + (nested == null ? "" : nested);
+        }
+
         Matcher checkbox = CHECKBOX_UNCHECKED.matcher(currentLine);
         if (checkbox.matches()) {
             String prefix = checkbox.group(1);
@@ -641,11 +649,6 @@ public class MarkdownService {
             return unordered.group(1) + unordered.group(2) + " ";
         }
 
-        if (currentLine.matches("^\\s*>\\s+.*$") && !currentLine.matches("^\\s*>\\s*$")) {
-            int idx = currentLine.indexOf('>');
-            return currentLine.substring(0, idx + 1) + " ";
-        }
-
         return null;
     }
 
@@ -659,7 +662,31 @@ public class MarkdownService {
         if (cb.matches() && cb.group(2).trim().isEmpty()) return true;
         Matcher checked = CHECKBOX_CHECKED.matcher(line);
         if (checked.matches() && checked.group(2).trim().isEmpty()) return true;
-        return line.matches("^\\s*>\\s*$");
+        Quote quote = quote(line);
+        return quote != null && emptyQuoteBody(line.substring(quote.body()));
+    }
+
+    private boolean emptyQuoteBody(String body) {
+        for (int i = 0; i < body.length(); i++) if (body.charAt(i) != ' ' && body.charAt(i) != '\t') return false;
+        return true;
+    }
+
+    private record Quote(String prefix, int body) { }
+
+    private Quote quote(String line) {
+        int index = 0;
+        while (index < line.length() && line.charAt(index) == ' ') index++;
+        if (index > 3 || index == line.length() || line.charAt(index) != '>') return null;
+        int depth = 0;
+        while (index < line.length() && line.charAt(index) == '>') {
+            if (++depth > 32) return null;
+            int markerEnd = ++index;
+            while (index < line.length() && line.charAt(index) == ' ') index++;
+            if (index - markerEnd > 4 || index < line.length() && line.charAt(index) == '\t') return null;
+            if (index == line.length() || line.charAt(index) != '>')
+                return new Quote(line.substring(0, markerEnd) + " ", markerEnd < line.length() && line.charAt(markerEnd) == ' ' ? markerEnd + 1 : markerEnd);
+        }
+        return null;
     }
 
     // --- Link helpers ---
@@ -680,6 +707,35 @@ public class MarkdownService {
 
     public String insertImageTemplate() {
         return "![alt](path)";
+    }
+
+    static final int MAX_INSERTION_LABEL = 4096;
+    record Insertion(String source, int destinationStart, int destinationEnd) { }
+
+    /** Selected source is a literal label, not inline Markdown to reinterpret. */
+    Insertion insertion(String selected, boolean image) {
+        if (selected == null || selected.isBlank() || selected.length() > MAX_INSERTION_LABEL)
+            throw new IllegalArgumentException("select 1–4096 nonblank source units");
+        StringBuilder escaped = new StringBuilder(selected.length());
+        for (int i = 0; i < selected.length(); i++) {
+            char c = selected.charAt(i);
+            if (Character.isISOControl(c) || c == '\u2028' || c == '\u2029')
+                throw new IllegalArgumentException("multiline, tab or control-character selection");
+            if (c == '\\' && i + 1 < selected.length() && (selected.charAt(i + 1) == '(' || selected.charAt(i + 1) == ')'))
+                throw new IllegalArgumentException("ambiguous math-delimiter selection");
+            if (Character.isSurrogate(c)) {
+                if (!Character.isHighSurrogate(c) || i + 1 == selected.length() || !Character.isLowSurrogate(selected.charAt(i + 1)))
+                    throw new IllegalArgumentException("invalid Unicode selection");
+                escaped.append(c).append(selected.charAt(++i)); continue;
+            }
+            // CommonMark backslash escapes preserve literal punctuation, including entities and nested markup.
+            // Parentheses are literal in labels; escaping them would invoke the existing preview's math syntax.
+            if (c != '(' && c != ')' && (c >= '!' && c <= '/' || c >= ':' && c <= '@' || c >= '[' && c <= '`' || c >= '{' && c <= '~')) escaped.append('\\');
+            escaped.append(c);
+        }
+        String prefix = image ? "![" : "[", destination = image ? "path" : "url";
+        int start = prefix.length() + escaped.length() + 2;
+        return new Insertion(prefix + escaped + "](" + destination + ")", start, start + destination.length());
     }
 
     // --- Horizontal rule detection ---

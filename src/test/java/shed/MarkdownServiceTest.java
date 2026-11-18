@@ -15,6 +15,12 @@ class MarkdownServiceTest {
         service = new MarkdownService();
     }
 
+    @Test
+    void nestedBlockquotesPreserveTheirFullPrefix() {
+        assertEquals("> > ", service.listContinuation("> > nested"));
+        assertEquals("> > > ", service.listContinuation("> > > nested"));
+    }
+
     // --- Heading detection ---
 
     @Test

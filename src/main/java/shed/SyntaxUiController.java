@@ -590,6 +590,12 @@ final class SyntaxUiController {
         return cache;
     }
 
+    MarkdownKeyboardContext.State markdownKeyboardContext(FileBuffer buffer, int line, int offset) {
+        var cache = markdownCaches.get(buffer);
+        if (offset == 0) return MarkdownKeyboardContext.TEXT;
+        return cache == null ? MarkdownKeyboardContext.UNKNOWN : cache.keyboardContext(buffer.textSnapshot(), line, offset);
+    }
+
     void markdownDocumentChanged(FileBuffer buffer, FileBuffer.DocumentTextChange change) {
         GrammarHighlightService.MarkdownCache cache = markdownCaches.get(buffer);
         if (cache == null || change == null) return;

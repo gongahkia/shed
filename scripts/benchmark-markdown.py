@@ -204,7 +204,7 @@ def main():
     parser.add_argument('--jar', type=Path, default=ROOT / 'target/shed-2.0.0.jar')
     parser.add_argument('--classpath-file', type=Path, help='Optional existing dependency classpath for a separately labeled packaged-vs-classpath control')
     parser.add_argument('--generate-only', action='store_true')
-    parser.add_argument('--mode', choices=['startup', 'startup-empty', 'ui', 'model', 'preview', 'preview-install', 'assets', 'assets-ready', 'search', 'syntax', 'syntax-lexical', 'semantic-consumers', 'semantic-edits', 'semantic-memory', 'semantic-memory-control', 'project-links', 'link-navigation', 'media-service', 'media-control', 'subtree-edits', 'presentation-control', 'presentation-prototype', 'presentation-styled'], default='model')
+    parser.add_argument('--mode', choices=['startup', 'startup-empty', 'ui', 'model', 'preview', 'preview-install', 'assets', 'assets-ready', 'search', 'syntax', 'syntax-lexical', 'semantic-consumers', 'semantic-edits', 'semantic-memory', 'semantic-memory-control', 'project-links', 'link-navigation', 'media-service', 'media-control', 'subtree-edits', 'insertion-edits', 'keyboard-edits', 'presentation-control', 'presentation-prototype', 'presentation-styled'], default='model')
     parser.add_argument('--shapes', nargs='+', choices=SHAPES, default=['mixed'])
     parser.add_argument('--sizes', nargs='+', type=int, default=list(SIZES), help='Exact bytes, <=100 MiB each')
     parser.add_argument('--samples', type=int, default=100)
@@ -219,6 +219,10 @@ def main():
     parser.add_argument('--font-size', type=int, default=0, help='0 keeps existing default; otherwise 8..48 pt')
     parser.add_argument('--tab-size', type=int, default=0, help='0 keeps existing default; otherwise 1..16')
     args = parser.parse_args()
+    if args.mode == 'keyboard-edits' and (args.samples > 100 or any(n > 1024**2 for n in args.sizes)):
+        parser.error('Keyboard bounds: at most 100 samples and 1 MiB fixtures')
+    if args.mode == 'insertion-edits' and (args.samples > 100 or any(n > 1024**2 for n in args.sizes)):
+        parser.error('Insertion bounds: at most 100 samples and 1 MiB fixtures')
     if args.mode == 'subtree-edits' and (args.samples > 100 or any(n > 1024**2 for n in args.sizes)):
         parser.error('Subtree edit bounds: at most 100 samples and 1 MiB fixtures')
     if args.mode.startswith('presentation-') and (args.samples > 100 or any(n > 2 * 1024**2 for n in args.sizes)):
@@ -262,6 +266,10 @@ def main():
     if args.mode.startswith('presentation-'):
         sources.append(ROOT / 'src/benchmark/java/shed/MarkdownPresentationProbe.java')
         sources.extend(ROOT / f'src/test/java/shed/{name}.java' for name in ('MarkdownPresentationFrame', 'MarkdownPresentationPrototype'))
+    if args.mode == 'keyboard-edits':
+        sources.append(ROOT / 'src/benchmark/java/shed/MarkdownKeyboardProbe.java')
+    if args.mode == 'insertion-edits':
+        sources.append(ROOT / 'src/benchmark/java/shed/MarkdownInsertionProbe.java')
     if args.mode == 'subtree-edits':
         sources.append(ROOT / 'src/benchmark/java/shed/MarkdownSubtreeProbe.java')
     if args.mode == 'semantic-consumers':

@@ -1,0 +1,59 @@
+{
+  "initial_head": "b90187e50a2b4843af872c8c982e3916c6f82e39",
+  "final_head": "c2143e36b5190f4c04f2acfe73cac3e1d2254c5b",
+  "external_head_advance_preserved": true,
+  "initial_status": " M docs/COMMANDS.md\n M scripts/benchmark-markdown.py\n M scripts/test_benchmark_markdown.py\n M src/benchmark/java/shed/MarkdownPerformanceProbe.java\n M src/main/java/shed/CommandHandler.java\n M src/main/java/shed/MarkdownController.java\n M src/main/java/shed/MarkdownEdit.java\n M src/main/java/shed/PaletteController.java\n M src/test/java/shed/TexteditorSwingIntegrationTest.java\n?? docs/MARKDOWN_LIVE_PRESENTATION_FEASIBILITY.md\n?? docs/MARKDOWN_SUBTREE_EDITING.md\n?? docs/performance/markdown-tranche4a/\n?? docs/performance/markdown-tranche5a/\n?? src/benchmark/java/shed/MarkdownPresentationProbe.java\n?? src/benchmark/java/shed/MarkdownSubtreeProbe.java\n?? src/main/java/shed/MarkdownSubtreeEditPlan.java\n?? src/test/java/shed/MarkdownMarkerProjection.java\n?? src/test/java/shed/MarkdownPresentationFrame.java\n?? src/test/java/shed/MarkdownPresentationPrototype.java\n?? src/test/java/shed/MarkdownPresentationPrototypeTest.java\n?? src/test/java/shed/MarkdownSubtreeEditPlanTest.java\n",
+  "final_status": " M docs/COMMANDS.md\n M scripts/benchmark-markdown.py\n M scripts/test_benchmark_markdown.py\n M src/benchmark/java/shed/MarkdownPerformanceProbe.java\n M src/main/java/shed/MarkdownController.java\n M src/main/java/shed/MarkdownEdit.java\n M src/main/java/shed/MarkdownService.java\n M src/main/java/shed/PaletteController.java\n M src/test/java/shed/TexteditorSwingIntegrationTest.java\n?? docs/MARKDOWN_SELECTION_INSERTION.md\n?? docs/performance/markdown-tranche5b/\n?? scripts/__pycache__/benchmark-editor.cpython-315.pyc\n?? scripts/__pycache__/benchmark-html-reader.cpython-315.pyc\n?? scripts/__pycache__/test_benchmark_html_reader.cpython-315.pyc\n?? src/benchmark/java/shed/MarkdownInsertionProbe.java\n?? src/test/java/shed/MarkdownInsertionTest.java\n",
+  "baseline_files": 1227,
+  "changed_existing_files": [
+    "scripts/test_benchmark_markdown.py",
+    "scripts/benchmark-markdown.py",
+    "src/main/java/shed/PaletteController.java",
+    "src/main/java/shed/MarkdownService.java",
+    "src/main/java/shed/MarkdownController.java",
+    "docs/COMMANDS.md",
+    "src/main/java/shed/MarkdownEdit.java",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java"
+  ],
+  "unchanged_baseline_files": 1218,
+  "unexpected_baseline_changes": [],
+  "readme_before_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "diff_check": "PASS",
+  "new_text_whitespace": "PASS",
+  "application_class_changes": [
+    "shed/MarkdownController$LinkDiagnostics.class",
+    "shed/MarkdownController$LinkRequest$1.class",
+    "shed/MarkdownController$LinkRequest.class",
+    "shed/MarkdownController.class",
+    "shed/MarkdownEdit$SelectionBoundary.class",
+    "shed/MarkdownEdit$SelectionHistory.class",
+    "shed/MarkdownEdit.class",
+    "shed/MarkdownService$ConcealRange.class",
+    "shed/MarkdownService$Insertion.class",
+    "shed/MarkdownService.class",
+    "shed/PaletteController.class"
+  ],
+  "packaged_prototype_or_probe_classes": false,
+  "before_jar_sha256": "3b50b60ae6b36a26e24c60915e4e7eaee4a9418128b18dbddf76dbde05e545d2",
+  "after_jar_sha256": "146114632297db9461b19782bec54456d159cd280f53832ebeac8c8d33f57a67",
+  "paired_probe_identity": "MATCH",
+  "production_families_changed": [
+    "MarkdownController",
+    "MarkdownEdit",
+    "MarkdownService",
+    "PaletteController"
+  ],
+  "task_created_commits_or_pushes": false,
+  "native_memory_attribution": "UNRESOLVED",
+  "full_suite": {
+    "tests": 1526,
+    "passed": 1521,
+    "skipped": 5,
+    "failures": 0,
+    "errors": 0
+  },
+  "tooling_passed": 15,
+  "protected_prior_performance_files": 299
+}

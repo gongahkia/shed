@@ -10,6 +10,28 @@ spec.loader.exec_module(bench)
 
 
 class MarkdownBenchmarkTest(unittest.TestCase):
+    def test_keyboard_admission_before_output_creation(self):
+        import subprocess, sys
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'not-created'
+            for bounds in [['--samples', '101'], ['--sizes', str(1024**2 + 1)]]:
+                result = subprocess.run([sys.executable, str(bench.ROOT / 'scripts/benchmark-markdown.py'),
+                    '--mode', 'keyboard-edits', '--output', str(output), '--generate-only'] + bounds, capture_output=True, text=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn('Keyboard bounds', result.stderr)
+                self.assertFalse(output.exists())
+
+    def test_insertion_admission_before_output_creation(self):
+        import subprocess, sys
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'not-created'
+            for bounds in [['--samples', '101'], ['--sizes', str(1024**2 + 1)]]:
+                result = subprocess.run([sys.executable, str(bench.ROOT / 'scripts/benchmark-markdown.py'),
+                    '--mode', 'insertion-edits', '--output', str(output), '--generate-only'] + bounds, capture_output=True, text=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn('Insertion bounds', result.stderr)
+                self.assertFalse(output.exists())
+
     def test_subtree_admission_and_bounded_fixtures(self):
         import subprocess, sys
         with tempfile.TemporaryDirectory() as directory:

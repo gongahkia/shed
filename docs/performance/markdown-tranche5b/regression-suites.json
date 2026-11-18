@@ -1,0 +1,2335 @@
+{
+  "totals": {
+    "tests": 1526,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5
+  },
+  "suites": [
+    {
+      "name": "shed.AccessibilitySupportTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.AcpConnectionTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "2.666",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentActionReplyTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "1.216",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentAnswerTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.004",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentCommandPlanTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "1.476",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentContextFilesTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.026",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentInteractionHistoryTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.019",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentModelOptionsTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentPolicyTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentPromptContextTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.038",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentQuestionSchemaTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "1.008",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentQuestionsTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.006",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentReplyFormatExceptionTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentReviewPanelTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "3.685",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentSelectionTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.055",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentSessionPanelTest",
+      "tests": "21",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "12.204",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentSessionRegistryTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.008",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentSessionServiceTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "6.778",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentSessionWriteTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "2.071",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentTaskPlanTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.189",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentWorkbenchPanelTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "2.015",
+      "skips": []
+    },
+    {
+      "name": "shed.AgentWriteReviewTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "1.614",
+      "skips": []
+    },
+    {
+      "name": "shed.AnimatedBlockCaretTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.41",
+      "skips": []
+    },
+    {
+      "name": "shed.AnimatedTerminalPanelTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.013",
+      "skips": []
+    },
+    {
+      "name": "shed.ApplicationBoundaryTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.018",
+      "skips": []
+    },
+    {
+      "name": "shed.ApplicationErrorReporterTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.007",
+      "skips": []
+    },
+    {
+      "name": "shed.ArchitectureBoundaryTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.075",
+      "skips": []
+    },
+    {
+      "name": "shed.AsyncJobServiceTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.013",
+      "skips": []
+    },
+    {
+      "name": "shed.BackgroundTaskProcessTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.227",
+      "skips": []
+    },
+    {
+      "name": "shed.BackupSchedulerTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.011",
+      "skips": []
+    },
+    {
+      "name": "shed.BlockCaretTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.005",
+      "skips": []
+    },
+    {
+      "name": "shed.BoundedUndoManagerTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.BracketColorServiceTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.BreakpointStoreTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.084",
+      "skips": []
+    },
+    {
+      "name": "shed.BufferViewStateTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.BuildInfoTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.BuiltInDebugAdapterSupportTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.01",
+      "skips": []
+    },
+    {
+      "name": "shed.BuiltInRemoteWorkspaceProvidersTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.006",
+      "skips": []
+    },
+    {
+      "name": "shed.BuiltInTerminalProfilesTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.CaretMotionTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.CommandParsingTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.008",
+      "skips": []
+    },
+    {
+      "name": "shed.CommandPathCompletionTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.003",
+      "skips": []
+    },
+    {
+      "name": "shed.CompletionRankerTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.CompletionRequestStateTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.ComposeControllerTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.ConfigManagerTest",
+      "tests": "56",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "3.052",
+      "skips": []
+    },
+    {
+      "name": "shed.CoverageServiceTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.01",
+      "skips": []
+    },
+    {
+      "name": "shed.DataBreakpointStoreTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.03",
+      "skips": []
+    },
+    {
+      "name": "shed.DataLossRegressionTest",
+      "tests": "17",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "1",
+      "time": "0.059",
+      "skips": [
+        {
+          "test": "atomicSavePreservesDosHiddenAttributeWhenSupported",
+          "reason": "",
+          "detail": "org.opentest4j.TestAbortedException: Assumption failed: DOS file attributes unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.DataLossRegressionTest.atomicSavePreservesDosHiddenAttributeWhenSupported(DataLossRegressionTest.java:196)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+        }
+      ]
+    },
+    {
+      "name": "shed.DatabaseControllerTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.DebugAdapterDetectorTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.004",
+      "skips": []
+    },
+    {
+      "name": "shed.DebugAdapterIntegrationTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.133",
+      "skips": []
+    },
+    {
+      "name": "shed.DebugAdapterRegistryTest",
+      "tests": "15",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.007",
+      "skips": []
+    },
+    {
+      "name": "shed.DebugAdapterTransportTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.277",
+      "skips": []
+    },
+    {
+      "name": "shed.DebugConsoleTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.DebugFrameLocationTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.DebugInspectionTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.DebugSessionServiceTest",
+      "tests": "51",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.245",
+      "skips": []
+    },
+    {
+      "name": "shed.DebugStoppedFrameSelectionTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.DevContainerControllerTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.004",
+      "skips": []
+    },
+    {
+      "name": "shed.DevContainerSessionServiceTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.009",
+      "skips": []
+    },
+    {
+      "name": "shed.DevContainerTaskCommandTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.DevContainerTestExecutionTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.004",
+      "skips": []
+    },
+    {
+      "name": "shed.DiagnosticLogTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.004",
+      "skips": []
+    },
+    {
+      "name": "shed.DockerWorkbenchDialogTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.005",
+      "skips": []
+    },
+    {
+      "name": "shed.DocumentFormatPreservationTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.152",
+      "skips": []
+    },
+    {
+      "name": "shed.DocumentLabelsTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.DocumentLifecycleTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.DocumentRequestsTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.DocumentWorkbenchTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.011",
+      "skips": []
+    },
+    {
+      "name": "shed.DotnetDebugPresetDetectorTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.005",
+      "skips": []
+    },
+    {
+      "name": "shed.EditorLocationTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.EditorSurfaceTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.003",
+      "skips": []
+    },
+    {
+      "name": "shed.EditorUiControllerDropPlacementTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.EditorWorkspaceDocumentsTest",
+      "tests": "15",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.072",
+      "skips": []
+    },
+    {
+      "name": "shed.EmacsKeymapTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.ExceptionBreakpointStoreTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.014",
+      "skips": []
+    },
+    {
+      "name": "shed.FileBufferTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.071",
+      "skips": []
+    },
+    {
+      "name": "shed.FileFinderIconsTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.FileTreeModelTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.FileWatcherServiceTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "2.004",
+      "skips": []
+    },
+    {
+      "name": "shed.FocusedAiNativeAcceptanceTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "1",
+      "time": "0.0",
+      "skips": [
+        {
+          "test": "actualEditorAcceptsAcpSuggestionsAndRendersWrappedMultilinePreviews",
+          "reason": "System property [shed.ai.native] does not exist",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "name": "shed.FocusedAiPerformanceTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "1",
+      "time": "0.0",
+      "skips": [
+        {
+          "test": "measurePreviewPreparationPaintingAndDismissalAcrossBufferSizes",
+          "reason": "System property [shed.ai.benchmark] does not exist",
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "name": "shed.FontFamilyCatalogTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.FormatterPolicyTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.FunctionBreakpointStoreTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.047",
+      "skips": []
+    },
+    {
+      "name": "shed.FuzzyMatchServiceTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.024",
+      "skips": []
+    },
+    {
+      "name": "shed.GitChangesWorkbenchModelTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.003",
+      "skips": []
+    },
+    {
+      "name": "shed.GitConflictResolutionModelTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.GitGraphCanvasTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.012",
+      "skips": []
+    },
+    {
+      "name": "shed.GitGraphModelTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.GitHistoryModelTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.GitHubCapabilityModelTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.003",
+      "skips": []
+    },
+    {
+      "name": "shed.GitHubPullRequestDetailModelTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.GitHubPullRequestModelTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.GitHubReviewConsentTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.GitHubReviewDraftStoreTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.042",
+      "skips": []
+    },
+    {
+      "name": "shed.GitHubReviewFailureModelTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.GitHubReviewSubmissionModelTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.GitHunkNavigationTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.GitPermalinkTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.005",
+      "skips": []
+    },
+    {
+      "name": "shed.GitProjectFileListingTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.04",
+      "skips": []
+    },
+    {
+      "name": "shed.GitRepositoryModelTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.GrammarHighlightServiceTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.011",
+      "skips": []
+    },
+    {
+      "name": "shed.GraphemeBoundaryTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.GraphemeEditRangeTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.ImportedDebugProfileStoreTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.013",
+      "skips": []
+    },
+    {
+      "name": "shed.IncrementalDiffGutterTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.InlineCompletionDisplayTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.072",
+      "skips": []
+    },
+    {
+      "name": "shed.InlineCompletionKeymapTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.InlineCompletionSessionTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "1.31",
+      "skips": []
+    },
+    {
+      "name": "shed.InstructionBreakpointStoreTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.027",
+      "skips": []
+    },
+    {
+      "name": "shed.InteractiveGitBufferTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.JavaStructuralServiceTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.028",
+      "skips": []
+    },
+    {
+      "name": "shed.JobQuickfixControllerTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.894",
+      "skips": []
+    },
+    {
+      "name": "shed.KeyboardFocusSupportTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.KeymapOverlayTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.006",
+      "skips": []
+    },
+    {
+      "name": "shed.LanguageServerDetectorTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.LargeFileBenchmarkTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.134",
+      "skips": []
+    },
+    {
+      "name": "shed.LargeFileFixtureGeneratorTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.041",
+      "skips": []
+    },
+    {
+      "name": "shed.LargeFileProjectionTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.048",
+      "skips": []
+    },
+    {
+      "name": "shed.LargeFileStoreTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.012",
+      "skips": []
+    },
+    {
+      "name": "shed.LineNumberPanelTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.004",
+      "skips": []
+    },
+    {
+      "name": "shed.LocalPerformanceDiagnosticsTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.LspCompletionApplicationTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.003",
+      "skips": []
+    },
+    {
+      "name": "shed.LspServiceTest",
+      "tests": "44",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.356",
+      "skips": []
+    },
+    {
+      "name": "shed.LspWorkspaceFormatTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.027",
+      "skips": []
+    },
+    {
+      "name": "shed.ManagedLanguageArtifactStoreTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.052",
+      "skips": []
+    },
+    {
+      "name": "shed.ManagedLanguageCatalogTest",
+      "tests": "15",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.ManagedLanguageInstallerTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.013",
+      "skips": []
+    },
+    {
+      "name": "shed.ManagedLanguageSupportServiceTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.015",
+      "skips": []
+    },
+    {
+      "name": "shed.ManagedLanguageSupportTrustTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownConsumersTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.128",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownEditTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.06",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownFoldingTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownHeadingEditPlanTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.097",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownHighlightTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.23",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownInsertionTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.157",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownLinkInfrastructureTest",
+      "tests": "38",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.604",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownLinkNavigationTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.026",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownMediaServiceTest",
+      "tests": "31",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "3.288",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownPresentationPrototypeTest",
+      "tests": "19",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.659",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownPreviewHtmlKitTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.55",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownPreviewPaneTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.008",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownPreviewRendererTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "2.209",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownRemoteImageTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.017",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownSemanticParserTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.091",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownServiceTest",
+      "tests": "41",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.011",
+      "skips": []
+    },
+    {
+      "name": "shed.MarkdownSubtreeEditPlanTest",
+      "tests": "14",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.124",
+      "skips": []
+    },
+    {
+      "name": "shed.MiniJsonStrictTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.MotionServiceTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.MultiSelectionEditServiceTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.02",
+      "skips": []
+    },
+    {
+      "name": "shed.MultiSelectionMotionServiceTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.NativeDebugPresetDetectorTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.005",
+      "skips": []
+    },
+    {
+      "name": "shed.NavigationHistoryTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.NetworkConsentAuditTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.115",
+      "skips": []
+    },
+    {
+      "name": "shed.NotebookDocumentTest",
+      "tests": "14",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.008",
+      "skips": []
+    },
+    {
+      "name": "shed.NotebookPanelTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.239",
+      "skips": []
+    },
+    {
+      "name": "shed.NpmManagedLanguageInstallerTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.004",
+      "skips": []
+    },
+    {
+      "name": "shed.OpenBufferCompletionIndexTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.OpenCodeCompletionClientTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "5.991",
+      "skips": []
+    },
+    {
+      "name": "shed.OpenCodePresetTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.008",
+      "skips": []
+    },
+    {
+      "name": "shed.PaletteFilterSessionTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.135",
+      "skips": []
+    },
+    {
+      "name": "shed.PlainKeymapTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.PrivateWorkspaceFilesTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.016",
+      "skips": []
+    },
+    {
+      "name": "shed.ProblemsServiceTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.004",
+      "skips": []
+    },
+    {
+      "name": "shed.ProjectFileScanBenchmarkTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.009",
+      "skips": []
+    },
+    {
+      "name": "shed.ProjectFileScannerTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.004",
+      "skips": []
+    },
+    {
+      "name": "shed.PtyTerminalConnectorTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.045",
+      "skips": []
+    },
+    {
+      "name": "shed.PtyTerminalPaneSettingsTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.011",
+      "skips": []
+    },
+    {
+      "name": "shed.QuickOpenQueryTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.QuickfixServiceTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.RecoveryJournalSchedulerTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.167",
+      "skips": []
+    },
+    {
+      "name": "shed.RecoveryJournalTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.032",
+      "skips": []
+    },
+    {
+      "name": "shed.RecoveryWorkspaceDialogTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.ReleaseDocumentationTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.RemoteCommandRequestTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.RemoteDebugEndpointTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.003",
+      "skips": []
+    },
+    {
+      "name": "shed.RemoteLspEndpointTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.RemoteTerminalRequestTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.RemoteTestExecutionTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.004",
+      "skips": []
+    },
+    {
+      "name": "shed.RemoteWorkspaceSessionServiceTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.003",
+      "skips": []
+    },
+    {
+      "name": "shed.RemoteWorkspaceTaskTargetsTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.ResourcePackagingTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.004",
+      "skips": []
+    },
+    {
+      "name": "shed.ScmContributionServiceTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.004",
+      "skips": []
+    },
+    {
+      "name": "shed.SearchManagerTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.SearchPatternTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.01",
+      "skips": []
+    },
+    {
+      "name": "shed.ShedInformationDialogTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.ShellCommandTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.003",
+      "skips": []
+    },
+    {
+      "name": "shed.SnippetExpansionTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.SnippetServiceTest",
+      "tests": "15",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.005",
+      "skips": []
+    },
+    {
+      "name": "shed.SnippetSessionTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.SourcePlainViewTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.319",
+      "skips": []
+    },
+    {
+      "name": "shed.SshPortForwardServiceTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.StructuralIndentationServiceTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.SubstituteServiceTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.SymbolServiceTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.029",
+      "skips": []
+    },
+    {
+      "name": "shed.SyntaxHighlightServiceTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.TarGzExtractorTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.005",
+      "skips": []
+    },
+    {
+      "name": "shed.TaskProblemParserTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.005",
+      "skips": []
+    },
+    {
+      "name": "shed.TaskServiceTest",
+      "tests": "20",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.027",
+      "skips": []
+    },
+    {
+      "name": "shed.TerminalConformanceFixtureTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.TerminalControllerTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.TerminalLinkResolverTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.003",
+      "skips": []
+    },
+    {
+      "name": "shed.TerminalSessionStateTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.TerminalShellIntegrationTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "1",
+      "time": "0.074",
+      "skips": [
+        {
+          "test": "preparesAnIsolatedFishStartup",
+          "reason": "",
+          "detail": "org.opentest4j.TestAbortedException: Assumption failed: Fish is unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.TerminalShellIntegrationTest.preparesAnIsolatedFishStartup(TerminalShellIntegrationTest.java:48)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+        }
+      ]
+    },
+    {
+      "name": "shed.TestServiceTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.028",
+      "skips": []
+    },
+    {
+      "name": "shed.TestWatchServiceTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "2.319",
+      "skips": []
+    },
+    {
+      "name": "shed.TextFileCodecTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.TexteditorSwingIntegrationTest",
+      "tests": "139",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "1",
+      "time": "41.202",
+      "skips": [
+        {
+          "test": "testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree",
+          "reason": "",
+          "detail": "org.opentest4j.TestAbortedException: Assumption failed: CMake, CTest, and CPack are unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.TexteditorSwingIntegrationTest.testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree(TexteditorSwingIntegrationTest.java:3932)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+        }
+      ]
+    },
+    {
+      "name": "shed.ThemePreviewTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    },
+    {
+      "name": "shed.ToolOutputTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.ToolchainServiceTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.045",
+      "skips": []
+    },
+    {
+      "name": "shed.TreeServiceTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.003",
+      "skips": []
+    },
+    {
+      "name": "shed.UiPerformanceGuardTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.UnicodeEditingRegressionTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.016",
+      "skips": []
+    },
+    {
+      "name": "shed.UpdateConsentTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.UpdateMetadataVerifierTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.021",
+      "skips": []
+    },
+    {
+      "name": "shed.VersionedTextSnapshotTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.013",
+      "skips": []
+    },
+    {
+      "name": "shed.VsCodeLaunchConfigurationImporterTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.012",
+      "skips": []
+    },
+    {
+      "name": "shed.VsCodeTaskImporterTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.013",
+      "skips": []
+    },
+    {
+      "name": "shed.WindowLayoutNodeResponsiveTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.006",
+      "skips": []
+    },
+    {
+      "name": "shed.WindowPlacementStoreTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.008",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkbenchCaretTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.015",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkbenchLayoutTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkbenchPlacementStateTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceBridgeTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.663",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceChangeJournalTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.058",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceCliTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.467",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceCreationProposalTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.932",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceDeletionProposalTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.819",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceEditTransactionTest",
+      "tests": "20",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.232",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceEditorSettingsTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.006",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceIndexBenchmarkTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.008",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceIndexComparisonTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.009",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceIndexServiceTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "5.164",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceManifestTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.01",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceProposalRecoveryTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.192",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceProposalRestoreTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.639",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceProposalRpcTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.383",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceProposalServiceTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.412",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceQueryServiceTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.007",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceRenameProposalTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "2.239",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceReplaceServiceTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.042",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceRootResolverTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceRootsTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.0",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceRpcTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.002",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceSearchQueryServiceTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.083",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceStatePersistenceServiceTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.009",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceStateRestoreServiceTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.006",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceStateTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.003",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceSymbolServiceTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.047",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceTextEditsTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.006",
+      "skips": []
+    },
+    {
+      "name": "shed.WorkspaceTextSearchServiceTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.022",
+      "skips": []
+    },
+    {
+      "name": "shed.WrappingFlowLayoutTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.001",
+      "skips": []
+    }
+  ]
+}

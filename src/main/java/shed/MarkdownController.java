@@ -405,6 +405,12 @@ final class MarkdownController {
         return new SourceLine(start, end, editor.writingArea.getText(start, end - start));
     }
 
+    private SourceLine keyboardLine(int line) throws BadLocationException {
+        int start = editor.writingArea.getLineStartOffset(line);
+        int end = Math.min(editor.writingArea.getLineEndOffset(line), editor.writingArea.getDocument().getLength());
+        return end - start > MarkdownKeyboardContext.MAX_LINE ? null : sourceLine(line);
+    }
+
     String markdownHeadingShift(boolean demote) {
         return headingShift(demote, false);
     }
@@ -618,17 +624,26 @@ final class MarkdownController {
         if (unavailable != null) return unavailable;
         try {
             int start = editor.writingArea.getSelectionStart(), end = editor.writingArea.getSelectionEnd();
+            new MarkdownSourceRange(start, end).validate(editor.getCurrentBuffer().textSnapshot());
             int lineIndex = editor.writingArea.getLineOfOffset(start);
-            SourceLine line = sourceLine(lineIndex);
+            SourceLine line = keyboardLine(lineIndex);
+            if (line == null) {
+                if (editor.configManager.getKeymapProfile() != KeymapProfile.VIM) return null;
+                String result = replace(start, end, "\n", start + 1, "");
+                if (result.isEmpty()) recordContinuation("\n");
+                return result;
+            }
+            var context = editor.syntaxUiController.markdownKeyboardContext(editor.getCurrentBuffer(), lineIndex, line.start());
+            boolean supported = context.text() && MarkdownKeyboardContext.advance(context, line.text()) != MarkdownKeyboardContext.UNKNOWN;
             // Continue the prefix before the selection/caret, never a different active editor later.
             String before = editor.writingArea.getText(line.start(), start - line.start());
-            if (editor.markdownService.isEmptyListItem(before) && before.equals(line.text()) && start == end) {
+            if (supported && editor.markdownService.isEmptyListItem(before) && before.equals(line.text()) && start == end) {
                 int rangeEnd = line.end() < editor.writingArea.getDocument().getLength() ? line.end() + 1 : line.end();
                 String result = replace(line.start(), rangeEnd, "\n", line.start() + 1, "");
                 if (result.isEmpty()) recordContinuation("\n");
                 return result;
             }
-            String continuation = editor.markdownService.listContinuation(before);
+            String continuation = supported ? editor.markdownService.listContinuation(before) : null;
             if (continuation == null) {
                 if (editor.configManager.getKeymapProfile() != KeymapProfile.VIM) return null;
                 int indent = 0;
@@ -655,13 +670,55 @@ final class MarkdownController {
     }
 
     public String insertLink() {
-        String unavailable = mutationUnavailable();
-        return unavailable != null ? unavailable : insertTemplate(editor.markdownService.insertLinkTemplate(), "Link template inserted");
+        return insertReference(false);
     }
 
     public String insertImage() {
+        return insertReference(true);
+    }
+
+    private String insertReference(boolean image) {
         String unavailable = mutationUnavailable();
-        return unavailable != null ? unavailable : insertTemplate(editor.markdownService.insertImageTemplate(), "Image template inserted");
+        if (unavailable != null) return unavailable;
+        if (editor.writingArea.getSelectionStart() == editor.writingArea.getSelectionEnd())
+            return insertTemplate(image ? editor.markdownService.insertImageTemplate() : editor.markdownService.insertLinkTemplate(),
+                image ? "Image template inserted" : "Link template inserted");
+        EditorPane pane = editor.getActivePane(); FileBuffer buffer = editor.getCurrentBuffer();
+        int start = pane.getTextArea().getSelectionStart(), end = pane.getTextArea().getSelectionEnd();
+        if (end - start > MarkdownService.MAX_INSERTION_LABEL) return "Markdown insertion unavailable: selection exceeds 4096 source units";
+        var source = MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(buffer), buffer);
+        try {
+            new MarkdownSourceRange(start, end).validate(source.text());
+            char previous = start == 0 ? 0 : source.text().charAt(start - 1);
+            if (previous == '\\' || previous == '[' || !image && previous == '!'
+                || end < source.text().length() && source.text().charAt(end) == ']')
+                return "Markdown insertion unavailable: ambiguous adjacent delimiter";
+            var insertion = editor.markdownService.insertion(pane.getTextArea().getText(start, end - start), image);
+            MarkdownEdit edit = new MarkdownEdit(buffer, pane.getTextArea(), pane.surface(),
+                () -> sourceWritable(pane, buffer) && editor.isMarkdownSourceCurrent(buffer, source), start, end);
+            var host = new java.lang.ref.WeakReference<>(editor);
+            var owner = new java.lang.ref.WeakReference<>(pane);
+            // History may outlive a pane; its selection guard captures only weak UI references.
+            java.util.function.BooleanSupplier restore = () -> {
+                var current = host.get(); var target = owner.get();
+                return current != null && target != null && !current.closingDown
+                    && current.editorPanes.contains(target) && current.getActivePane() == target
+                    && !target.isMarkdownPreview() && target.getAlternateComponent() == null && target.getTerminalPane() == null;
+            };
+            Map<EditorPane, EditorSurface.Viewport> otherViews = new IdentityHashMap<>();
+            for (EditorPane other : editor.editorPanes) if (other != pane && other.getBuffer() == buffer
+                && !other.isMarkdownPreview() && other.getAlternateComponent() == null && other.getTerminalPane() == null)
+                otherViews.put(other, other.surface().viewport());
+            String failure = edit.applySelection(insertion.source(), new EditorSurface.Selection(
+                start + insertion.destinationEnd(), start + insertion.destinationStart()), restore);
+            if (failure.isEmpty()) {
+                editor.activateEditorPane(pane);
+                otherViews.forEach((other, viewport) -> other.surface().scrollTo(viewport));
+            }
+            return failure.isEmpty() ? (image ? "Image inserted" : "Link inserted") : failure;
+        } catch (BadLocationException | IllegalArgumentException invalid) {
+            return "Markdown insertion unavailable: " + invalid.getMessage();
+        }
     }
 
 
@@ -1001,27 +1058,30 @@ final class MarkdownController {
     boolean isOnCodeFenceLine() {
         try {
             int line = editor.getCurrentCaretLine();
-            int lineStart = editor.writingArea.getLineStartOffset(line);
-            int lineEnd = editor.writingArea.getLineEndOffset(line);
-            String lineText = editor.writingArea.getText(lineStart, lineEnd - lineStart).trim();
-            return lineText.startsWith("```");
-        } catch (BadLocationException e) {
-            return false;
-        }
+            int start = editor.writingArea.getLineStartOffset(line);
+            int length = Math.min(16, Math.min(editor.writingArea.getLineEndOffset(line), editor.writingArea.getDocument().getLength()) - start);
+            return editor.writingArea.getText(start, length).stripLeading().startsWith("```");
+        } catch (BadLocationException error) { return false; }
     }
-
 
     String completeCodeFenceLanguage() {
         String unavailable = mutationUnavailable();
         if (unavailable != null) return unavailable;
         try {
-            SourceLine line = sourceLine(editor.getCurrentCaretLine());
-            String text = line.text().trim();
-            if (!text.startsWith("```")) return "Not a code fence line";
-            String[] matches = editor.markdownService.filterCodeFenceLanguages(text.substring(3).trim());
+            int index = editor.getCurrentCaretLine();
+            SourceLine line = keyboardLine(index);
+            if (line == null || editor.writingArea.getSelectionStart() != editor.writingArea.getSelectionEnd())
+                return "Fence completion unavailable: unsupported line or selection";
+            var context = editor.syntaxUiController.markdownKeyboardContext(editor.getCurrentBuffer(), index, line.start());
+            var fence = MarkdownKeyboardContext.fence(line.text());
+            if (!context.text() || fence == null || fence.marker() != '`' || fence.info().indexOf('`') >= 0
+                || MarkdownKeyboardContext.advance(context, line.text()) == MarkdownKeyboardContext.UNKNOWN)
+                return "Fence completion unavailable: not a verified opening backtick fence";
+            String[] matches = editor.markdownService.filterCodeFenceLanguages(fence.info().trim());
             if (matches.length == 0) return "No matching language";
-            int languageStart = line.start() + line.text().indexOf("```") + 3;
-            return replace(languageStart, line.end(), matches[0], -1, "Language: " + matches[0]);
+            int languageStart = fence.markerEnd();
+            while (languageStart < line.text().length() && (line.text().charAt(languageStart) == ' ' || line.text().charAt(languageStart) == '\t')) languageStart++;
+            return replace(line.start() + languageStart, line.end(), matches[0], -1, "Language: " + matches[0]);
         } catch (BadLocationException error) { return "Markdown edit unavailable: invalid line"; }
     }
 

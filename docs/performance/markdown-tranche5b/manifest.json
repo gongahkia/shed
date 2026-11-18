@@ -1,0 +1,28 @@
+{
+  "implementation": {
+    "docs/COMMANDS.md": "1cde81218ddecaa44a266aa51f7ac55e1ad1301c9d7ecf542a805fd96672597a",
+    "scripts/benchmark-markdown.py": "fa21e82c92159f5ffb8b0ea771d6cffd0406eefb41c84c9f6523fdee75041555",
+    "scripts/test_benchmark_markdown.py": "eb52b793c54bd5421f2e2b0871552e783fd84e67f0dfffe7a301f1801733aacb",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "18bd71eed0678eb97405a076155e9d62830e264fe5940b0905be348c544224d2",
+    "src/main/java/shed/MarkdownController.java": "73ab3515df0fdeacdb21fbef0daeaef0ef952efb558f1b1824f351738c9fcf76",
+    "src/main/java/shed/MarkdownEdit.java": "c5e15fb62d2caeac49bec09bf05a7d5d6f8835d8658ff16ece8667848a1cc158",
+    "src/main/java/shed/MarkdownService.java": "8938bdf31c2b4606fa6033b2cf799853cc03c46231999c0eb987494bacafccf5",
+    "src/main/java/shed/PaletteController.java": "f223b747341bdbd51bcf69dc029108010617b0702be1a959099365851e353404",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java": "0e0e4d9712226808db961e0cb5e338b3244603278ff0d0505173ddb3f57a2763",
+    "src/test/java/shed/MarkdownInsertionTest.java": "2d3a80ddafa6014ab28d43e87241019573013c3b26c9e673b7eaf3cabd236d74",
+    "src/benchmark/java/shed/MarkdownInsertionProbe.java": "4e32c6c3fa03caacd08e7b83315bd38447b86e7a193575992665758b3e65613c",
+    "docs/MARKDOWN_SELECTION_INSERTION.md": "de1454f15020e8e8e2320c663b7a568d1f7d7c16b9e6c90a5ff52401caea5f4d"
+  },
+  "evidence": {
+    "docs/performance/markdown-tranche5b/INDEX.md": "0c327d0b7cf684e50605cbd0794a2baae60fc5e92effb2bdf49f99f5f2d9a90d",
+    "docs/performance/markdown-tranche5b/after.json.gz": "46d6f6818e1856b3b1016671b369c3ee30cb1135049bb51e05377908486e44ad",
+    "docs/performance/markdown-tranche5b/baseline-files.json.gz": "3813996d50edd2959c7fdcdc5768aeff3af366aa67f56516f19f0ae635759516",
+    "docs/performance/markdown-tranche5b/before.json.gz": "26936f6c5c7c5e9d646bae46ff9d7a7d6c9f93d2ec990bbc6a7fab9f3b4a69aa",
+    "docs/performance/markdown-tranche5b/measurements.json": "80358f8050f92881d579de65d2ae4b499f308fcfdc0df452776ceff38b98a361",
+    "docs/performance/markdown-tranche5b/packaged-smoke.json": "804d69c7b9a2171495987c35b45cf2b779e97220d960334d422cfa7e64ef622f",
+    "docs/performance/markdown-tranche5b/probe-logs.json.gz": "f5056b6fb4cc7b75a7c7ce4780757c40e73466d3fd7c5bd3f5f06d65ea1bb837",
+    "docs/performance/markdown-tranche5b/regression-suites.json": "21a23f22f2d52e0974d0fc469b547efc8c6284485b2a8c77881ff63ff3173409",
+    "docs/performance/markdown-tranche5b/verification-logs.json.gz": "afe74943b1cc949fc5d11bd1896cf3c53db3dac0007b41487944f6526a640b3a",
+    "docs/performance/markdown-tranche5b/verification.json": "0e70ba1e7c81293ad307a284e795d819738637dfbf1de7ddb0d0aa8524e44dc3"
+  }
+}

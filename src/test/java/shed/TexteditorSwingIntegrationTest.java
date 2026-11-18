@@ -43,6 +43,39 @@ public class TexteditorSwingIntegrationTest {
     Path tempDir;
 
     @Test
+    void isolatedPresentationViewRetainsExistingPlainVimAndEmacsInputRoutes() throws Exception {
+        assumeSwingAvailable(); Path file = Files.writeString(tempDir.resolve("presentation.md"), "# Heading\n\nbody\n");
+        Texteditor editor = createEditor(tempDir.resolve("presentation-home"), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            for (String profile : List.of("plain", "vim", "emacs")) {
+                boolean dirtyBefore = onEdt(() -> editor.getCurrentBuffer().isModified());
+                var prototype = onEdt(() -> {
+                    editor.configManager.set("keymap.profile", profile); editor.setMode(EditorMode.INSERT);
+                    return new MarkdownPresentationPrototype(editor.writingArea, () -> {
+                        var buffer = editor.getCurrentBuffer();
+                        return new MarkdownPresentationPrototype.Binding(MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(buffer), buffer), buffer.getDocument());
+                    });
+                });
+                try {
+                    var ticket = onEdt(prototype::capture);
+                    var semantic = MarkdownHeadingAnalysis.analyze(ticket.source(), () -> false).semantic();
+                    var frame = MarkdownPresentationFrame.prepare(semantic, ticket.settings(), ticket.generation(), () -> false);
+                    onEdt(() -> {
+                        assertTrue(prototype.install(frame)); var buffer = editor.getCurrentBuffer(); var text = buffer.textSnapshot(); long revision = buffer.documentRevision();
+                        editor.writingArea.setCaretPosition(0); assertSame(text, buffer.textSnapshot()); assertEquals(revision, buffer.documentRevision()); assertEquals(dirtyBefore, buffer.isModified());
+                        var typed = new KeyEvent(editor.writingArea, KeyEvent.KEY_TYPED, 0, 0, KeyEvent.VK_UNDEFINED, 'x'); editor.keyTyped(typed);
+                        if (!typed.isConsumed()) editor.writingArea.getActionMap().get(javax.swing.text.DefaultEditorKit.defaultKeyTypedAction)
+                            .actionPerformed(new ActionEvent(editor.writingArea, ActionEvent.ACTION_PERFORMED, "x"));
+                        assertEquals("x# Heading\n\nbody\n", buffer.getContent(), profile); assertFalse(prototype.styled());
+                        buffer.getUndoManager().undo(); assertEquals("# Heading\n\nbody\n", buffer.getContent()); return null;
+                    });
+                } finally { onEdt(() -> { prototype.close(); return null; }); }
+            }
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void markdownCheckedOpenRejectsATargetIntroducedBeforeInstallation() throws Exception {
         assumeSwingAvailable(); Path project = Files.createDirectories(tempDir.resolve("checked-open-project"));
         Path source = Files.writeString(project.resolve("source.md"), "[[target]]"); Path target = Files.writeString(project.resolve("target.md"), "# Target");
@@ -720,7 +753,8 @@ public class TexteditorSwingIntegrationTest {
     @Test
     void pendingSemanticEditsCannotSurviveTypingCaretBufferModeOrLifetimeChanges() throws Exception {
         assumeSwingAvailable();
-        for (String action : List.of("typing", "caret-return", "buffer-return", "mode-key", "focus", "close", "split", "undo-redo")) {
+        for (String action : List.of("typing", "caret-return", "buffer-return", "mode-key", "focus", "close", "split", "undo-redo",
+                "subtree-typing", "subtree-caret-return", "subtree-buffer-return", "subtree-mode-key", "subtree-focus", "subtree-close", "subtree-split", "subtree-undo-redo")) {
             Path home = Files.createDirectories(tempDir.resolve("home-edit-gate-" + action));
             Path first = Files.writeString(tempDir.resolve("edit-gate-a-" + action + ".md"), "## A\nbody");
             Path second = Files.writeString(tempDir.resolve("edit-gate-b-" + action + ".md"), "## B\nother");
@@ -738,12 +772,12 @@ public class TexteditorSwingIntegrationTest {
                 onEdt(() -> {
                     var field = MarkdownController.class.getDeclaredField("headingAnalysis"); field.setAccessible(true); field.set(editor.markdownController, service);
                     editor.loadBufferIntoEditor(a); editor.setMode(EditorMode.INSERT); editor.writingArea.setCaretPosition(0);
-                    assertEquals("Loading heading edit", editor.markdownHeadingShift(true));
+                    assertEquals("Loading heading edit", action.startsWith("subtree-") ? editor.markdownSubtreeShift(true) : editor.markdownHeadingShift(true));
                     assertEquals("Heading edit pending; request again", editor.markdownHeadingShift(false)); return null;
                 });
                 assertTrue(started.await(15, TimeUnit.SECONDS));
                 onEdt(() -> {
-                    switch (action) {
+                    switch (action.replace("subtree-", "")) {
                         case "typing" -> a.getDocument().insertString(a.getDocument().getLength(), "typed", null);
                         case "caret-return" -> { editor.writingArea.setCaretPosition(3); editor.writingArea.setCaretPosition(0); }
                         case "buffer-return" -> { editor.loadBufferIntoEditor(b); editor.loadBufferIntoEditor(a); }
@@ -4832,6 +4866,170 @@ public class TexteditorSwingIntegrationTest {
             assertEquals(undo, history.canUndo()); assertEquals(redo, history.canRedo());
             assertEquals(dot, editor.writingArea.getCaretPosition()); assertEquals(mark, editor.writingArea.getCaret().getMark());
         } finally { buffer.getDocument().removeDocumentListener(listener); }
+    }
+
+    @Test
+    void markdownSubtreePreservesFencedHeadingExamples() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("subtree-fence.md"), "## Implementation");
+        Texteditor editor = createEditor(tempDir.resolve("subtree-fence-home"), file);
+        try {
+            String before = "# Architecture\n\n## Implementation\n\n```markdown\n### Example heading\n```\n\n### Actual subsection\n\n## Next\n";
+            String after = before.replace("## Implementation", "# Implementation")
+                .replace("### Actual subsection", "## Actual subsection");
+            assertMarkdownCommandUndo(editor, before, after, () -> {
+                editor.writingArea.setCaretPosition(before.indexOf("## Implementation"));
+                return editor.markdownSubtreeShift(false);
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownHeadingCommandsAndPaletteActionsWorkAcrossProfilesAndVimRoutes() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("heading-commands.md"), "## Parent\n### child");
+        Texteditor editor = createEditor(tempDir.resolve("heading-commands-home"), file);
+        try {
+            for (String profile : List.of("plain", "vim", "emacs")) {
+                onEdt(() -> { editor.configManager.set("keymap.profile", profile); return null; });
+                for (String[] action : new String[][]{{"Promote Markdown Heading", "# Parent\n### child"},
+                        {"Demote Markdown Heading", "### Parent\n### child"}, {"Promote Markdown Subtree", "# Parent\n## child"},
+                        {"Demote Markdown Subtree", "### Parent\n#### child"}}) {
+                    assertMarkdownCommandUndo(editor, "## Parent\n### child", action[1],
+                        () -> editor.commandHandler.execute(PaletteController.surfaceActionCommand(action[0])));
+                }
+            }
+            onEdt(() -> {
+                for (char direction : new char[]{'<', '>'}) {
+                    String after = direction == '<' ? "# Parent\n## child" : "### Parent\n#### child";
+                    assertMarkdownCommandUndo(editor, "## Parent\n### child", after, () -> {
+                        enableVim(editor); press(editor, direction); press(editor, 'r'); return "Vim subtree route";
+                    });
+                }
+                assertMarkdownRejectedUnchanged(editor, () -> List.of(editor.commandHandler.execute("md heading unknown"),
+                    editor.commandHandler.execute("markdown heading promote extra")));
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void coldVimSubtreeCommandSurvivesOnlyItsNormalPromptExit() throws Exception {
+        assumeSwingAvailable();
+        String before = "## Parent\n### child";
+        Path file = Files.writeString(tempDir.resolve("subtree-prompt.md"), before);
+        Texteditor editor = createEditor(tempDir.resolve("subtree-prompt-home"), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            for (String transition : List.of("normal", "input", "mode", "focus")) for (boolean prompt : List.of(false, true)) {
+                var started = new java.util.concurrent.CountDownLatch(1); var release = new java.util.concurrent.CountDownLatch(1);
+                var service = new MarkdownAnalysisService(editor.asyncJobService, (source, cancelled) -> {
+                    started.countDown();
+                    try { assertTrue(release.await(15, TimeUnit.SECONDS)); } catch (InterruptedException ignored) { }
+                    return MarkdownHeadingAnalysis.analyze(source, cancelled);
+                });
+                try {
+                    onEdt(() -> {
+                        editor.getCurrentBuffer().setContent(before, false); enableVim(editor); editor.writingArea.setCaretPosition(0);
+                        editor.markdownController.headingAnalysis().close();
+                        var field = MarkdownController.class.getDeclaredField("headingAnalysis"); field.setAccessible(true); field.set(editor.markdownController, service);
+                        editor.setMode(EditorMode.COMMAND); editor.editorUiController.setCommandPromptText("markdown heading demote-subtree");
+                        KeyEvent enter = new KeyEvent(prompt ? editor.commandBar : editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ENTER, '\n');
+                        if (prompt) assertTrue(editor.inputController.handleCommandPromptKeyPressed(enter)); else editor.handleCommandMode(enter);
+                        assertEquals(EditorMode.NORMAL, editor.editorState.mode);
+                        assertTrue(editor.commandHistory.contains("markdown heading demote-subtree"));
+                        if (transition.equals("input")) editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_ESCAPE, (char) 27));
+                        if (transition.equals("mode")) editor.setMode(EditorMode.INSERT);
+                        if (transition.equals("focus")) {
+                            var event = new FocusEvent(editor.writingArea, FocusEvent.FOCUS_LOST);
+                            for (var listener : editor.writingArea.getFocusListeners()) listener.focusLost(event);
+                        }
+                        return null;
+                    });
+                    assertTrue(started.await(15, TimeUnit.SECONDS)); release.countDown();
+                    assertTrue(awaitUiState(() -> service.diagnostics().running() == 0));
+                    assertEquals(transition.equals("normal") ? "### Parent\n#### child" : before,
+                        onEdt(() -> editor.getCurrentBuffer().getContent()));
+                } finally { release.countDown(); onEdt(() -> { service.close(); return null; }); }
+            }
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownSubtreeRejectsUnsupportedAndLevelBoundariesWithoutEventsOrHistory() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("subtree-reject.md"), "## Root");
+        Texteditor editor = createEditor(tempDir.resolve("subtree-reject-home"), file);
+        try {
+            onEdt(() -> {
+                for (String text : List.of("## Root\n### child\n###### too deep", "# Root", "## Root\n> ### quote", "# Root\nSetext\n---",
+                        "```md\n## fake\n```", "Title\n===", "    ## code")) {
+                    editor.getCurrentBuffer().setContent(text, false); editor.setMode(EditorMode.INSERT);
+                    editor.writingArea.setCaretPosition(text.startsWith("```") ? text.indexOf("## fake") : 0);
+                    assertMarkdownRejectedUnchanged(editor, () -> {
+                        String message = editor.markdownSubtreeShift(!text.equals("# Root"));
+                        awaitPendingMarkdownHeadingEdit(editor); return List.of(message);
+                    });
+                }
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void semanticSubtreeEditKeepsInitiatingSplitAndInactiveViewport() throws Exception {
+        assumeSwingAvailable();
+        String text = "## Parent\n" + "body\n".repeat(1000) + "### child\n";
+        Path file = Files.writeString(tempDir.resolve("subtree-splits.md"), text);
+        Texteditor editor = createEditor(tempDir.resolve("subtree-splits-home"), file);
+        var retained = new java.util.concurrent.atomic.AtomicReference<MarkdownHeadingAnalysis>();
+        String after = text.replace("## Parent", "### Parent").replace("### child", "#### child");
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.setMode(EditorMode.INSERT); editor.splitWindow(true); editor.validate();
+                editor.requestMarkdownHeadings(new Object(), editor.getCurrentBuffer(), () -> true, retained::set); return null;
+            });
+            assertTrue(awaitUiState(() -> retained.get() != null));
+            onEdt(() -> {
+                EditorPane first = editor.editorPanes.getFirst(), second = editor.editorPanes.getLast();
+                first.getTextArea().setCaretPosition(0); editor.activateEditorPane(second); second.getTextArea().setCaretPosition(5);
+                first.surface().scrollTo(new EditorSurface.Viewport(0, 800)); var viewport = first.surface().viewport();
+                assertEquals("Demoted subtree", editor.markdownSubtreeShift(true));
+                assertSame(second, editor.getActivePane()); assertEquals(6, second.getTextArea().getCaretPosition());
+                assertEquals(viewport, first.surface().viewport());
+                assertSame(first.getTextArea().getDocument(), second.getTextArea().getDocument());
+                assertEquals(after, editor.getCurrentBuffer().getContent());
+                editor.getCurrentBuffer().getUndoManager().undo(); assertEquals(text, editor.getCurrentBuffer().getContent());
+                editor.getCurrentBuffer().getUndoManager().redo(); assertEquals(after, editor.getCurrentBuffer().getContent()); return null;
+            });
+            assertTrue(awaitUiState(() -> {
+                try { assertCurrentMarkdownSyntax(editor); return true; }
+                catch (AssertionError pending) { return false; }
+            }));
+            assertTrue(awaitUiState(() -> {
+                try { var journal = RecoveryJournal.read(editor.recoveryStoreDir.toPath());
+                    return journal != null && journal.entries().stream().anyMatch(entry -> entry.content().equals(after));
+                } catch (java.io.IOException pending) { return false; }
+            }));
+            assertEquals(text, Files.readString(file));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void markdownSelectedLinkUsesLabelAndSelectsItsDestination() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("selected-link.md"), "Important documentation");
+        Texteditor editor = createEditor(tempDir.resolve("selected-link-home"), file);
+        try {
+            onEdt(() -> {
+                editor.configManager.set("keymap.profile", "plain");
+                editor.writingArea.select(0, editor.writingArea.getDocument().getLength());
+                editor.commandHandler.execute("markdown link insert");
+                assertEquals("[Important documentation](url)", editor.getCurrentBuffer().getContent());
+                assertEquals("url", editor.writingArea.getSelectedText()); return null;
+            });
+        } finally { disposeEditor(editor); }
     }
 
     @Test

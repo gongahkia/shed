@@ -441,6 +441,13 @@ public class CommandHandler {
                 ? editor.showTableOfContents() : "Usage: :markdown toc";
             case "outline" -> command.argument().isEmpty()
                 ? editor.showOutline() : "Usage: :markdown outline";
+            case "heading" -> switch (command.argument().toLowerCase(java.util.Locale.ROOT)) {
+                case "promote" -> editor.markdownHeadingShift(false);
+                case "demote" -> editor.markdownHeadingShift(true);
+                case "promote-subtree" -> editor.markdownSubtreeShift(false);
+                case "demote-subtree" -> editor.markdownSubtreeShift(true);
+                default -> "Usage: :markdown heading promote|demote|promote-subtree|demote-subtree";
+            };
             case "checkbox" -> "toggle".equalsIgnoreCase(command.argument())
                 ? editor.toggleCheckbox() : "Usage: :markdown checkbox toggle";
             case "table" -> "insert".equalsIgnoreCase(command.argument())
@@ -453,7 +460,7 @@ public class CommandHandler {
                 ? editor.showMarkdownLinks(command.name().equals("backlinks")) : "Usage: :markdown outgoing|backlinks";
             case "image" -> "insert".equalsIgnoreCase(command.argument())
                 ? editor.insertImage() : "Usage: :markdown image insert";
-            default -> "Usage: :markdown preview|close|refresh|toc|outline|outgoing|backlinks|checkbox toggle|table insert|link insert|link follow|image insert";
+            default -> "Usage: :markdown preview|close|refresh|toc|outline|heading promote|heading demote|heading promote-subtree|heading demote-subtree|outgoing|backlinks|checkbox toggle|table insert|link insert|link follow|image insert";
         };
     }
 

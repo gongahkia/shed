@@ -33,7 +33,10 @@ final class MarkdownController {
     private boolean headingEditCurrent(PendingHeadingEdit request) {
         return pendingHeadingEdit == request && sourceWritable(request.pane(), request.buffer())
             && editor.isMarkdownSourceCurrent(request.buffer(), request.source())
-            && editor.editorState.mode == request.mode() && editor.configManager.getKeymapProfile() == request.profile()
+            // A submitted Vim Ex command normally leaves its prompt before an asynchronous result arrives.
+            && (editor.editorState.mode == request.mode()
+                || request.mode() == EditorMode.COMMAND && editor.editorState.mode == EditorMode.NORMAL)
+            && editor.configManager.getKeymapProfile() == request.profile()
             && editor.inputController.lastKeyPressNanos() == request.keyPress()
             && editor.writingArea.getCaret().getDot() == request.dot() && editor.writingArea.getCaret().getMark() == request.mark();
     }
@@ -403,6 +406,14 @@ final class MarkdownController {
     }
 
     String markdownHeadingShift(boolean demote) {
+        return headingShift(demote, false);
+    }
+
+    String markdownSubtreeShift(boolean demote) {
+        return headingShift(demote, true);
+    }
+
+    private String headingShift(boolean demote, boolean subtree) {
         String unavailable = mutationUnavailable();
         if (unavailable != null) return unavailable;
         if (pendingHeadingEdit != null && headingEditCurrent(pendingHeadingEdit)) return "Heading edit pending; request again";
@@ -412,7 +423,7 @@ final class MarkdownController {
             var source = MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(buffer), buffer);
             if (source.text().length() > MarkdownSemanticParser.MAX_CHARACTERS)
                 return "Markdown heading edit unavailable: semantic size limit";
-            SourceLine line = sourceLine(editor.getCurrentCaretLine());
+            SourceLine line = subtree ? null : sourceLine(editor.getCurrentCaretLine());
             int dot = editor.writingArea.getCaret().getDot(), mark = editor.writingArea.getCaret().getMark();
             javax.swing.event.CaretListener listener = event -> cancelHeadingEdit();
             var focusListener = new java.awt.event.FocusAdapter() {
@@ -431,22 +442,29 @@ final class MarkdownController {
                 }
                 return false;
             }, result -> {
+                if (!headingEditCurrent(request)) return;
                 pane.getTextArea().removeCaretListener(listener); pane.getTextArea().removeFocusListener(focusListener); pendingHeadingEdit = null;
-                var planned = MarkdownHeadingEditPlan.plan(result.semantic(), dot, mark, demote);
-                if (planned.edit().isPresent()) {
+                var planned = subtree ? null : MarkdownHeadingEditPlan.plan(result.semantic(), dot, mark, demote);
+                var tree = subtree ? MarkdownSubtreeEditPlan.plan(result.semantic(), dot, mark, demote) : null;
+                if (subtree ? tree.edit().isPresent() : planned.edit().isPresent()) {
                     Map<EditorPane, EditorSurface.Viewport> otherViews = new IdentityHashMap<>();
                     for (EditorPane other : editor.editorPanes) if (other != pane && other.getBuffer() == buffer
                         && !other.isMarkdownPreview() && other.getAlternateComponent() == null && other.getTerminalPane() == null)
                         otherViews.put(other, other.surface().viewport());
-                    String failure = MarkdownEdit.applyPlan(planned.edit().get(),
-                        MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(buffer), buffer), buffer,
-                        pane.getTextArea(), pane.surface(), () -> sourceWritable(pane, buffer));
+                    var current = MarkdownSemanticSnapshot.Source.capture(editor.documentStore.id(buffer), buffer);
+                    String failure = subtree
+                        ? MarkdownEdit.applyPlan(tree.edit().orElseThrow(), current, buffer, pane.getTextArea(), pane.surface(), () -> sourceWritable(pane, buffer))
+                        : MarkdownEdit.applyPlan(planned.edit().orElseThrow(), current, buffer, pane.getTextArea(), pane.surface(), () -> sourceWritable(pane, buffer));
                     if (failure.isEmpty()) {
-                        otherViews.forEach((other, viewport) -> other.surface().scrollTo(viewport));
                         editor.activateEditorPane(pane);
+                        otherViews.forEach((other, viewport) -> {
+                            // A bounded splice can temporarily remove lines; refresh the restored extent before clamping.
+                            if (subtree) other.getScrollPane().getViewport().doLayout();
+                            other.surface().scrollTo(viewport);
+                        });
                     }
-                    message[0] = failure.isEmpty() ? planned.message() : failure;
-                } else if (planned.status() == MarkdownHeadingEditPlan.Status.NOT_HEADING && !line.text().contains("#")) {
+                    message[0] = failure.isEmpty() ? (subtree ? tree.message() : planned.message()) : failure;
+                } else if (!subtree && planned.status() == MarkdownHeadingEditPlan.Status.NOT_HEADING && !line.text().contains("#")) {
                     // Preserve ordinary-line indentation without reinterpreting semantic no-match as a heading.
                     String changed;
                     if (demote) changed = (editor.effectiveExpandTab() ? " ".repeat(editor.writingArea.getTabSize()) : "\t") + line.text();
@@ -458,33 +476,10 @@ final class MarkdownController {
                     }
                     try { message[0] = replace(line.start(), line.end(), changed, -1, "Line updated"); }
                     catch (BadLocationException invalid) { message[0] = "Markdown edit unavailable: invalid line"; }
-                } else message[0] = planned.message();
+                } else message[0] = subtree ? tree.message() : planned.message();
                 editor.showMessage(message[0]);
             });
             return message[0];
-        } catch (BadLocationException error) { return "Markdown edit unavailable: invalid line"; }
-    }
-
-    String markdownSubtreeShift(boolean demote) {
-        String unavailable = mutationUnavailable();
-        if (unavailable != null) return unavailable;
-        try {
-            int lineIndex = editor.getCurrentCaretLine();
-            SourceLine first = sourceLine(lineIndex), last = first;
-            int level = editor.markdownService.headingLevel(first.text());
-            if (level == 0) return "Not on a heading line";
-            StringBuilder changed = new StringBuilder(demote ? editor.markdownService.demoteHeading(first.text())
-                : editor.markdownService.promoteHeading(first.text()));
-            for (int i = lineIndex + 1; i < editor.writingArea.getLineCount(); i++) {
-                SourceLine line = sourceLine(i);
-                int nextLevel = editor.markdownService.headingLevel(line.text());
-                if (nextLevel > 0 && nextLevel <= level) break;
-                if (line.end() - first.start() > MarkdownService.MAX_TABLE_CHARS) return "Markdown subtree too large to edit safely";
-                changed.append('\n').append(demote ? editor.markdownService.demoteHeading(line.text())
-                    : editor.markdownService.promoteHeading(line.text()));
-                last = line;
-            }
-            return replace(first.start(), last.end(), changed.toString(), -1, demote ? "Demoted subtree" : "Promoted subtree");
         } catch (BadLocationException error) { return "Markdown edit unavailable: invalid line"; }
     }
 

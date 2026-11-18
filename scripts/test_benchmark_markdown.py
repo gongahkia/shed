@@ -10,6 +10,43 @@ spec.loader.exec_module(bench)
 
 
 class MarkdownBenchmarkTest(unittest.TestCase):
+    def test_subtree_admission_and_bounded_fixtures(self):
+        import subprocess, sys
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'not-created'
+            for bounds in [['--samples', '101'], ['--sizes', str(1024**2 + 1)]]:
+                result = subprocess.run([sys.executable, str(bench.ROOT / 'scripts/benchmark-markdown.py'),
+                    '--mode', 'subtree-edits', '--output', str(output), '--generate-only'] + bounds, capture_output=True, text=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn('Subtree edit bounds', result.stderr)
+                self.assertFalse(output.exists())
+            for shape in ['subtree-small', 'subtree-wide', 'subtree-capped']:
+                file = Path(directory) / (shape + '.md')
+                manifest = bench.fixture(file, 100 * 1024, shape)
+                self.assertEqual(100 * 1024, file.stat().st_size)
+                self.assertGreater(manifest['complete_blocks'], 0)
+                self.assertTrue(file.read_text().startswith('## '))
+                self.assertIn('## Sibling', file.read_text())
+
+    def test_presentation_limits_and_unicode_fixture(self):
+        import subprocess, sys
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'never-created'
+            for mode, bounds in [('presentation-control', ['--samples', '101']),
+                                 ('presentation-prototype', ['--sizes', str(2 * 1024**2 + 1)]),
+                                 ('presentation-styled', ['--sizes', str(1024**2)])]:
+                result = subprocess.run([sys.executable, str(bench.ROOT / 'scripts/benchmark-markdown.py'),
+                    '--mode', mode, '--output', str(output), '--generate-only'] + bounds, capture_output=True, text=True)
+                self.assertEqual(2, result.returncode)
+                self.assertIn('bounds', result.stderr)
+                self.assertFalse(output.exists())
+            file = Path(directory) / 'unicode.md'
+            manifest = bench.fixture(file, 4096, 'unicode')
+            self.assertEqual(4096, file.stat().st_size)
+            self.assertIn('😀', file.read_text())
+            self.assertIn('中文', file.read_text())
+            self.assertEqual('UTF-8', manifest['encoding'])
+
     def test_media_service_admission_is_checked_before_output_creation(self):
         import subprocess, sys
         with tempfile.TemporaryDirectory() as directory:

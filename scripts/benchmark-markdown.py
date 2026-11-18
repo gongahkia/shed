@@ -16,7 +16,7 @@ import zlib
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-SHAPES = ('mixed', 'plain', 'long-line', 'nested', 'table', 'fence', 'headings', 'markers', 'tabs', 'widths')
+SHAPES = ('mixed', 'plain', 'long-line', 'nested', 'table', 'fence', 'headings', 'markers', 'tabs', 'widths', 'unicode', 'subtree-small', 'subtree-wide', 'subtree-capped')
 SIZES = (100 * 1024, 1024**2, 10 * 1024**2, 50 * 1024**2, 100 * 1024**2)
 # Reuse the established nearest-rank statistics definition; do not replace its budgets.
 spec = importlib.util.spec_from_file_location('editor_benchmark', ROOT / 'scripts/benchmark-editor.py')
@@ -58,8 +58,17 @@ def fixture(path, size, shape):
         'markers': ('**b** *i* ~~s~~ `c` [l](x) ![i](swatch.png)\n' * 128 + '\n'),
         'tabs': '# Tabs\n\n' + ('\titem\tvalue\tmore\n' * 64) + prose,
         'widths': '# Width changes\n\n' + prose,
+        'unicode': '# Héading 😀\n\n' + ('中文 e\u0301 and emoji 😀 **bold** *italic* `code` [link](note.md).\n\n' * 8),
     }
-    data = blocks[shape].encode('ascii')
+    if shape == 'subtree-small':
+        blocks[shape] = '## Section\nbody\n### Child\n#### Deep\n' + prose + '\n## Sibling\n\n'
+    elif shape == 'subtree-wide':
+        count = min(500, max(2, size // 256))
+        repeats = max(1, (min(size // 2, 60 * 1024) // count - 16) // 11)
+        blocks[shape] = '## Section\n' + ''.join(f'### Child {i}\n' + 'plain text ' * repeats + '\n' for i in range(count)) + '## Sibling\n\n'
+    elif shape == 'subtree-capped':
+        blocks[shape] = '## capped subtree\n' + ('plain text ' * 10 + '\n') * 600 + '### Child\n## Sibling\n'
+    data = blocks[shape].encode('utf-8')
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('xb') as out:
         remaining = size
@@ -75,7 +84,7 @@ def fixture(path, size, shape):
             out.write(b'p' * (remaining - 1) + b'\n')
     return {'path': str(path), 'bytes': size, 'sha256': digest(path), 'shape': shape,
             'generator': 1, 'complete_blocks': (size - (min(32768, size // 2) + 1 if shape == 'widths' else 0)) // len(data),
-            'padding_bytes': remaining, 'encoding': 'ASCII/UTF-8', 'eof_newline': True}
+            'padding_bytes': remaining, 'encoding': 'UTF-8' if shape == 'unicode' else 'ASCII/UTF-8', 'eof_newline': True}
 
 
 def command_output(command):
@@ -195,7 +204,7 @@ def main():
     parser.add_argument('--jar', type=Path, default=ROOT / 'target/shed-2.0.0.jar')
     parser.add_argument('--classpath-file', type=Path, help='Optional existing dependency classpath for a separately labeled packaged-vs-classpath control')
     parser.add_argument('--generate-only', action='store_true')
-    parser.add_argument('--mode', choices=['startup', 'startup-empty', 'ui', 'model', 'preview', 'preview-install', 'assets', 'assets-ready', 'search', 'syntax', 'syntax-lexical', 'semantic-consumers', 'semantic-edits', 'semantic-memory', 'semantic-memory-control', 'project-links', 'link-navigation', 'media-service', 'media-control'], default='model')
+    parser.add_argument('--mode', choices=['startup', 'startup-empty', 'ui', 'model', 'preview', 'preview-install', 'assets', 'assets-ready', 'search', 'syntax', 'syntax-lexical', 'semantic-consumers', 'semantic-edits', 'semantic-memory', 'semantic-memory-control', 'project-links', 'link-navigation', 'media-service', 'media-control', 'subtree-edits', 'presentation-control', 'presentation-prototype', 'presentation-styled'], default='model')
     parser.add_argument('--shapes', nargs='+', choices=SHAPES, default=['mixed'])
     parser.add_argument('--sizes', nargs='+', type=int, default=list(SIZES), help='Exact bytes, <=100 MiB each')
     parser.add_argument('--samples', type=int, default=100)
@@ -210,6 +219,12 @@ def main():
     parser.add_argument('--font-size', type=int, default=0, help='0 keeps existing default; otherwise 8..48 pt')
     parser.add_argument('--tab-size', type=int, default=0, help='0 keeps existing default; otherwise 1..16')
     args = parser.parse_args()
+    if args.mode == 'subtree-edits' and (args.samples > 100 or any(n > 1024**2 for n in args.sizes)):
+        parser.error('Subtree edit bounds: at most 100 samples and 1 MiB fixtures')
+    if args.mode.startswith('presentation-') and (args.samples > 100 or any(n > 2 * 1024**2 for n in args.sizes)):
+        parser.error('Presentation bounds: at most 100 samples and 2 MiB fixtures')
+    if args.mode == 'presentation-styled' and any(n > 100 * 1024 for n in args.sizes):
+        parser.error('Styled candidate bounds: at most 100 KiB; canonical document sharing is unsupported')
     if args.mode == 'semantic-consumers' and (args.samples > 100 or any(n > 10 * 1024**2 for n in args.sizes)):
         parser.error('Semantic consumer bounds: at most 100 samples and 10 MiB fixtures')
     if args.mode.startswith(('semantic-edits', 'semantic-memory')) and (args.samples > 100 or any(n > 2 * 1024**2 for n in args.sizes)):
@@ -244,6 +259,11 @@ def main():
     java = Path(subprocess.check_output([str(ROOT / 'scripts/resolve-toolchain.sh'), 'home'], text=True).strip())
     classes = output / 'classes'; classes.mkdir()
     sources = [ROOT / f'src/benchmark/java/shed/{name}.java' for name in ('EditorWorkflowProbe', 'MarkdownPerformanceProbe', 'MarkdownLexicalProbe')]
+    if args.mode.startswith('presentation-'):
+        sources.append(ROOT / 'src/benchmark/java/shed/MarkdownPresentationProbe.java')
+        sources.extend(ROOT / f'src/test/java/shed/{name}.java' for name in ('MarkdownPresentationFrame', 'MarkdownPresentationPrototype'))
+    if args.mode == 'subtree-edits':
+        sources.append(ROOT / 'src/benchmark/java/shed/MarkdownSubtreeProbe.java')
     if args.mode == 'semantic-consumers':
         sources.append(ROOT / 'src/benchmark/java/shed/MarkdownConsumerProbe.java')
     if args.mode.startswith(('semantic-edits', 'semantic-memory')):

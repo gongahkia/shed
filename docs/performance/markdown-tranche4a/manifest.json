@@ -1,0 +1,138 @@
+{
+  "artifacts": {
+    "INDEX.md": {
+      "sha256": "a422941e26e42a36edf7cadd09a602f8f48b62ba7bff923bef7c9536e87cedc3",
+      "bytes": 8646
+    },
+    "baseline-files.json.gz": {
+      "sha256": "6717e2a500eb05685ad53c4f7587c4172840965983a966fd335ad061d3005a3a",
+      "bytes": 57188
+    },
+    "control.json.gz": {
+      "sha256": "c3457547a890d32809908e810ff7d8f8b40a83a72b2fa1ca75644882a481d176",
+      "bytes": 25631
+    },
+    "images.json": {
+      "sha256": "f28d10bef72c7c5683b0cf66f0e7decaac50c4b67a3249cd349a43a3f51ab4e3",
+      "bytes": 877
+    },
+    "large-fence.json.gz": {
+      "sha256": "d77cb6d1ff9ffcabf28c0cf01b36af761894748fcf516b29790a8dd5b6c13b25",
+      "bytes": 6727
+    },
+    "long-prose.json.gz": {
+      "sha256": "a98e2c463a4de7d96df7511561faa69f33673a592b096318399f64bd7a28e5e4",
+      "bytes": 6217
+    },
+    "measurements.json": {
+      "sha256": "61cb7c7dd98fa84165c22ccd562bb9b711736f2cb453e4ab255d7082cb7f5f8e",
+      "bytes": 134333
+    },
+    "packaged-smoke.json": {
+      "sha256": "a3688b591bd7c2800df8e1bd90d8c937092af74d14b851622f1ac42508d91463",
+      "bytes": 7322
+    },
+    "pilot.json.gz": {
+      "sha256": "1778a58a424fefd9961b7308a115da3bd8939d0201c89db77776637e674e7898",
+      "bytes": 6813
+    },
+    "probe-logs.json.gz": {
+      "sha256": "d8955ba07543885a2f4b460a50933e6700691e0c8336546678b6701a344c7f75",
+      "bytes": 362244
+    },
+    "prototype.json.gz": {
+      "sha256": "e7090507a677a65bca6d520b0c742913693a3a651ad3215ba6704be5f7c4318a",
+      "bytes": 33574
+    },
+    "regression-suites.json": {
+      "sha256": "d87f9be68bf4a14f94c3f64dde3c8e64330c2f92ef0f1e303e398b27c57643ad",
+      "bytes": 40200
+    },
+    "shapes.json.gz": {
+      "sha256": "5c9f04d9b4d15969588e9f4cc3dc3b991803eb47b3671992b8a433c32ab51903",
+      "bytes": 23788
+    },
+    "styled.json.gz": {
+      "sha256": "a8455fd785d26f0d911450d6dcf3797eaf5ddfd9cd3f59e7afce565cf8459102",
+      "bytes": 6719
+    },
+    "unicode-control.json.gz": {
+      "sha256": "9e7d564319b299dd71d9e276b1adc5cb41b21097f695751f72020fe45d84220a",
+      "bytes": 8867
+    },
+    "unsupported.json.gz": {
+      "sha256": "6ced66bdbdb78cbca18fa542fbd1f84eb391993a4d9f9fb6eba85b4077b518e4",
+      "bytes": 9212
+    },
+    "unwrapped-initial.png": {
+      "sha256": "b242ab568387fa410e95435d5e723fe4ac06dbbe005e612c865a6c3c92635184",
+      "bytes": 40423
+    },
+    "verification-logs.json.gz": {
+      "sha256": "af1f92faa6fb85060c977f87adeb349faf8a4531d864987416b869b58cd4d77a",
+      "bytes": 17216
+    },
+    "verification.json": {
+      "sha256": "a845f45501ad962628a620e3fff1bd2fc12d6b422f77dd5093acda172586f132",
+      "bytes": 2832
+    },
+    "wrap-control.json.gz": {
+      "sha256": "d7b8ff4dd0bd32d3db1671acb417aef2b4ff10354690b46dfd37b05dee41819e",
+      "bytes": 25865
+    },
+    "wrap-prototype.json.gz": {
+      "sha256": "3e94458afbff52d714190aa10fd8ac1c999a4231c7807030583db5b586fa6e48",
+      "bytes": 34741
+    },
+    "wrapped-initial.png": {
+      "sha256": "6f684e8e03a291ae3e480e8435eb56045b20972d556d4a8448c5d27ac5c54e33",
+      "bytes": 60461
+    },
+    "wrapped-selection.png": {
+      "sha256": "11cc1652d5ff8f7acab88cc3a6fbf31fffd77fae12090880f6d1306601c2c6ab",
+      "bytes": 61262
+    }
+  },
+  "implementation": {
+    "scripts/benchmark-markdown.py": {
+      "sha256": "7fc245603e2faf18063b613a77e9bc4fa6d47d4e166b0a8d3e77499447ff570f",
+      "bytes": 18977
+    },
+    "scripts/test_benchmark_markdown.py": {
+      "sha256": "bf361284840c78b63e86f87f8d80b83cbb8299fdd19a1efdb66b2c629e1feac2",
+      "bytes": 7133
+    },
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java": {
+      "sha256": "fa90c8a1f2b61aa9aecf28b89a4e121daa0cae8beb7fdb8824d197316d393c65",
+      "bytes": 40763
+    },
+    "src/benchmark/java/shed/MarkdownPresentationProbe.java": {
+      "sha256": "61f9994a4d7c749c19bd05c1cd2675a9009a5245297b048660a4b26286c92968",
+      "bytes": 14182
+    },
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java": {
+      "sha256": "71f1b7d24921dda5fad73922dfd5caf9fe90c3c74d85aec7ae294ad0e772a771",
+      "bytes": 331334
+    },
+    "src/test/java/shed/MarkdownPresentationFrame.java": {
+      "sha256": "864bceb958d4f64904490d3f359341c71f853aefecf4766947dac01287edfb31",
+      "bytes": 12269
+    },
+    "src/test/java/shed/MarkdownPresentationPrototype.java": {
+      "sha256": "c3340231d1ea0f5e2929a4ab32377dd1b4dcdfca2e11d50ec920382841452663",
+      "bytes": 16924
+    },
+    "src/test/java/shed/MarkdownMarkerProjection.java": {
+      "sha256": "d7728a284a09dfca0b2a2a969c85882e4c887fa7bd4947ea85a3d6f5a0507367",
+      "bytes": 1895
+    },
+    "src/test/java/shed/MarkdownPresentationPrototypeTest.java": {
+      "sha256": "03498fc1856bc6aaefaaf8e292078030cb158016adf220bf53b05f9b9988d912",
+      "bytes": 22893
+    },
+    "docs/MARKDOWN_LIVE_PRESENTATION_FEASIBILITY.md": {
+      "sha256": "cf17b087b5724dd0e3ce6318b828d70424f2e0ccd99316106409b5a22a4856c2",
+      "bytes": 30616
+    }
+  }
+}

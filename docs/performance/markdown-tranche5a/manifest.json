@@ -1,0 +1,186 @@
+{
+  "artifacts": {
+    "INDEX.md": {
+      "sha256": "92956149cfcb7a186e1330088f4a1f670ac96c1a35a8b4701879d99cc3ad37c0",
+      "bytes": 7247
+    },
+    "after.json.gz": {
+      "sha256": "1ec273b5e708dcebc3cb8045f30e80c69698753cb559e2b80d03d90e9d1ca595",
+      "bytes": 171897
+    },
+    "baseline-files.json.gz": {
+      "sha256": "077e0739da07e659ce699eb991fefdeaa6f9b070e16aecb56982ac1d9918ca93",
+      "bytes": 58847
+    },
+    "before.json.gz": {
+      "sha256": "6bb24d8cb563384a58439929f3bb4b3e1e39f53fd593368dfeeda81891656903",
+      "bytes": 152531
+    },
+    "final.json.gz": {
+      "sha256": "e460c6ab7dfecea00b0beab491b11fdfa9694ed868347627f171051e93741e58",
+      "bytes": 184159
+    },
+    "limit-after.json.gz": {
+      "sha256": "c8d7a7c32c8c77495faa4c4797a30b8ed7ba3ad2e494da3a5855e2c69da236e1",
+      "bytes": 9048
+    },
+    "limit-before.json.gz": {
+      "sha256": "110f5e8345fd50c9b8f3587fc0e80ad7af263405cb41471d10de2d81d0b2a521",
+      "bytes": 13081
+    },
+    "limit-final.json.gz": {
+      "sha256": "34c21c4e555dba3e442bc185cf05f2cbdcdfc7efacd6fa82bf82e86030570094",
+      "bytes": 9191
+    },
+    "measurements.json": {
+      "sha256": "0e6d9fc0dabcdeff81086bf1c7c10bc09430a87780d346558172ddc6fe5898cb",
+      "bytes": 503638
+    },
+    "mixed-after.json.gz": {
+      "sha256": "3268ff9c37c3174ac37685f8ababaa328d92576fb2cb8c2dabeb90b777e55772",
+      "bytes": 54578
+    },
+    "mixed-before.json.gz": {
+      "sha256": "6eebbb69132909f21001cc1220893e70581e929766e6811b82e0d8c482fd7cc1",
+      "bytes": 49788
+    },
+    "packaged-smoke.json": {
+      "sha256": "e5735f2e20e159da8537ba59c381584e41278aa7090607bdeee6ee98bba7312c",
+      "bytes": 7322
+    },
+    "pilot-after.json.gz": {
+      "sha256": "089fec8967dc882efc9181d3072531e55bbbe4be93acbd7e6fa30507b9860643",
+      "bytes": 7299
+    },
+    "pilot-before.json.gz": {
+      "sha256": "4cb7bab8c81777b6b9d303511cbef0e8c2b525a9557ea0825844f2739fe43786",
+      "bytes": 7169
+    },
+    "pilot2-after.json.gz": {
+      "sha256": "59ccd3ea7d7e6bba36685261788c4c9dccd17c409a184ab13a7775e0f5b694ed",
+      "bytes": 6863
+    },
+    "pilot2-before.json.gz": {
+      "sha256": "fb1d16ff1f9c1e85b2d3732203e74f9aa1b2be519e5e49046259fdfbd5afe326",
+      "bytes": 6646
+    },
+    "prefix-check.json.gz": {
+      "sha256": "f2b20e3ff25bd579003de70f30ae84b170c34d38ecc425d09c366b601f673fc8",
+      "bytes": 15259
+    },
+    "probe-logs.json.gz": {
+      "sha256": "e0a958adbf2868c01e8a52f44b604534ec8b9195dff2611f37e1afbeb775e9f9",
+      "bytes": 1758752
+    },
+    "regression-suites.json": {
+      "sha256": "6a8a6839a40882d74986b2c533e60ea3300dc290eb170fdef6d3e9e0e4b88848",
+      "bytes": 40360
+    },
+    "release-after.json.gz": {
+      "sha256": "aa21a9af507082cb45c3764f8940d78898e64c821bedadfa0328f9c42adbd0f3",
+      "bytes": 182268
+    },
+    "release-before.json.gz": {
+      "sha256": "29c8cb75c70abbfd2938d4bba2f4f273a0a9fdb4c0fd30da09c9cbaad40c481b",
+      "bytes": 154752
+    },
+    "release-limit.json.gz": {
+      "sha256": "8635e713335f1dde8d2c96cb2cb32ab354389e573f564f9af0b8fba207782999",
+      "bytes": 9043
+    },
+    "release-wrap.json.gz": {
+      "sha256": "3c0096bb429f03e9139b1c5a0e38490e9509cf1664cf0e68302b0ba900cb9f16",
+      "bytes": 15806
+    },
+    "reverse-before.json.gz": {
+      "sha256": "e8bde3b507b150e06069b6f48356703e350da5e7855fe7de5feff23e31f46cc6",
+      "bytes": 14881
+    },
+    "typing-after.json.gz": {
+      "sha256": "e09485f24b22285e7fd04687d8a17c7d6da6a7d8cf99dcd317ffca7bf0baa3e5",
+      "bytes": 54919
+    },
+    "typing-before.json.gz": {
+      "sha256": "412886ca90fdacf9d7ec5936616a35ec5cecd3d849d1de64b39ba66063c913bf",
+      "bytes": 60001
+    },
+    "verification-logs.json.gz": {
+      "sha256": "d3b631977225c08c4f169883205d1902e2afd77878e03a984e0077bfcb1c5e3c",
+      "bytes": 51048
+    },
+    "verification.json": {
+      "sha256": "020a7587084c857644006f09eb3170a53fb04ad3d2bc91104b2ee125aca09649",
+      "bytes": 7221
+    },
+    "wrap-after.json.gz": {
+      "sha256": "d89710a89fa2d4350a1b8c1618bce5eafd5cdc38c9de8967931f4f61c36c9bfd",
+      "bytes": 15830
+    },
+    "wrap-before.json.gz": {
+      "sha256": "fe856143c025b9b47d60d186f454ee07c0f23ba384a35ee6abe1e6bf9346e45a",
+      "bytes": 14487
+    },
+    "wrap-final.json.gz": {
+      "sha256": "2cce3697f49ff01efc790f642dc1a43112bba64ab70ecd1b9d101892b4d48dee",
+      "bytes": 16386
+    },
+    "wrapped-control.json.gz": {
+      "sha256": "007a24a1580fc928953056ff503bad275763e2c8d65e6484e05cc734dd60f913",
+      "bytes": 14449
+    }
+  },
+  "implementation": {
+    "src/main/java/shed/MarkdownController.java": {
+      "sha256": "68e4b57c24547975a4089675cb9ffcc3881d86df6908274343c94375a3be1735",
+      "bytes": 65798
+    },
+    "src/main/java/shed/MarkdownEdit.java": {
+      "sha256": "87c52cef985a490cd31c5cc5423d72da187cb9d9f5049466d521f9a1e9461dd1",
+      "bytes": 7778
+    },
+    "src/main/java/shed/CommandHandler.java": {
+      "sha256": "7ec351b5f8d14d495cbadb03acb8afad7dee463e6b049b270ab168ba9dfc13b8",
+      "bytes": 45006
+    },
+    "src/main/java/shed/PaletteController.java": {
+      "sha256": "7bdc0758d49040b2e63ae8046f2032e612fe1e480d288afa3fb5e33a7e6161f7",
+      "bytes": 57452
+    },
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java": {
+      "sha256": "46ca4f9bf24a6c78788603738dd9c6b70c1c74a831dae129770b6fe5f0a389e5",
+      "bytes": 341560
+    },
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java": {
+      "sha256": "9966abaed0ca44e0a943e513495b5ebffbffaa6b81e86335882a03f89db1850d",
+      "bytes": 40935
+    },
+    "scripts/benchmark-markdown.py": {
+      "sha256": "9681de57314ec9bf7dcb54c9e25449e52437c8bb20b01a09ad6defe9fddd994d",
+      "bytes": 19923
+    },
+    "scripts/test_benchmark_markdown.py": {
+      "sha256": "49a5d8b543ce6716ed8d5779c1dd5a41d17a221acb46234587508b5ed31c28c5",
+      "bytes": 8293
+    },
+    "docs/COMMANDS.md": {
+      "sha256": "2da48a06424c5542fc2173bb83a93cf9b280b556ad8b60c7a7ea05b9d1dda059",
+      "bytes": 41930
+    },
+    "src/main/java/shed/MarkdownSubtreeEditPlan.java": {
+      "sha256": "376c9bd86d61bb0479658ecc12df91553c8a0d5eecb9ddf8ef02d8e8723384ee",
+      "bytes": 9870
+    },
+    "src/test/java/shed/MarkdownSubtreeEditPlanTest.java": {
+      "sha256": "5805a0b34ecaec7dd9b7903936a33f9ec0e1ec21c7e7e969fd7d16199186d7fd",
+      "bytes": 16964
+    },
+    "src/benchmark/java/shed/MarkdownSubtreeProbe.java": {
+      "sha256": "7233674ddab716233b0d1e2b885d2418f42d28f51498af79ddb32d4faf126c87",
+      "bytes": 11969
+    },
+    "docs/MARKDOWN_SUBTREE_EDITING.md": {
+      "sha256": "ffd931e8fbc0dbc1568b5e839061999bdab2e43a3c6fba9f9c80c22c6937e0ba",
+      "bytes": 24021
+    }
+  }
+}

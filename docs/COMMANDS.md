@@ -432,6 +432,8 @@ Portable-manifest format, safety boundary, and its distinction from private sess
 | `:markdown preview`, `:mdpreview` | Open a live native Markdown preview beside the source buffer |
 | `:markdown refresh` | Re-render the open Markdown preview |
 | `:markdown close` | Close the open Markdown preview |
+| `:markdown heading promote`, `:markdown heading demote` | Shift the current verified ATX heading by one level, retaining existing single-line shift behavior outside headings |
+| `:markdown heading promote-subtree`, `:markdown heading demote-subtree` | Atomically shift a supported standalone ATX subtree; code examples remain source text |
 | `:markdown checkbox toggle`, `:toggle`, `:checkbox` | Toggle markdown checkbox under cursor |
 | `:markdown table insert`, `:table` | Insert default `3x2` markdown table |
 | `:table NxM` | Insert `NxM` table |

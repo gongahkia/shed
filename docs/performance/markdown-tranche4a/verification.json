@@ -1,0 +1,63 @@
+{
+  "starting_head": "e84c674565478d60e6b58100c116aba62fb51c9c",
+  "starting_status": " M docs/MARKDOWN_ASYNC_MEDIA.md\n M src/benchmark/java/shed/MarkdownMediaProbe.java\n?? docs/performance/markdown-tranche3b/\n",
+  "final_head": "b90187e50a2b4843af872c8c982e3916c6f82e39",
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "baseline_files_checked": 1160,
+  "changed_baseline_files": [
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java",
+    "scripts/benchmark-markdown.py",
+    "scripts/test_benchmark_markdown.py"
+  ],
+  "unchanged_production_files": 401,
+  "unchanged_prior_performance_files": 242,
+  "application_classes_before": 1406,
+  "application_classes_after": 1406,
+  "application_class_changes": [],
+  "application_class_additions": [],
+  "application_class_removals": [],
+  "jar_sha256": "21b3d25763c29a4536ecf2bb0f2ad78c830f6f237142bbaed65e2743fc71481f",
+  "agent_commits_or_pushes": false,
+  "prototype_classes_in_application": [],
+  "evidence_case_counts": {
+    "control": 3,
+    "prototype": 3,
+    "wrap-control": 3,
+    "wrap-prototype": 3,
+    "shapes": 3,
+    "unsupported": 2,
+    "styled": 2,
+    "unicode-control": 1,
+    "large-fence": 1,
+    "long-prose": 1,
+    "pilot": 1
+  },
+  "final_checks": {
+    "current_diff": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "initial_head_diff": {
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  "untracked_text_whitespace_checked": true,
+  "implementation_inventory": [
+    "scripts/benchmark-markdown.py",
+    "scripts/test_benchmark_markdown.py",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java",
+    "src/benchmark/java/shed/MarkdownPresentationProbe.java",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java",
+    "src/test/java/shed/MarkdownPresentationFrame.java",
+    "src/test/java/shed/MarkdownPresentationPrototype.java",
+    "src/test/java/shed/MarkdownMarkerProjection.java",
+    "src/test/java/shed/MarkdownPresentationPrototypeTest.java",
+    "docs/MARKDOWN_LIVE_PRESENTATION_FEASIBILITY.md"
+  ],
+  "final_status": " M scripts/benchmark-markdown.py\n M scripts/test_benchmark_markdown.py\n M src/benchmark/java/shed/MarkdownPerformanceProbe.java\n M src/test/java/shed/TexteditorSwingIntegrationTest.java\n?? docs/MARKDOWN_LIVE_PRESENTATION_FEASIBILITY.md\n?? docs/performance/markdown-tranche4a/\n?? src/benchmark/java/shed/MarkdownPresentationProbe.java\n?? src/test/java/shed/MarkdownMarkerProjection.java\n?? src/test/java/shed/MarkdownPresentationFrame.java\n?? src/test/java/shed/MarkdownPresentationPrototype.java\n?? src/test/java/shed/MarkdownPresentationPrototypeTest.java\n"
+}

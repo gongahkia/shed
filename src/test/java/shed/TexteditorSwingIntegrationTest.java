@@ -1524,7 +1524,7 @@ public class TexteditorSwingIntegrationTest {
             assertSame(area, onEdt(() -> editor.writingArea));
             assertSame(buffer, onEdt(editor::getCurrentBuffer));
             assertEquals("typed during startup", onEdt(area::getText));
-            assertEquals("Monospaced", onEdt(() -> area.getFont().getName()));
+            assertEquals("JetBrains Mono", onEdt(() -> area.getFont().getFamily()));
             assertNotNull(onEdt(editor::getJMenuBar));
             assertSame(editor.getContentPane(), onEdt(() -> editor.footerPanel.getParent()));
             assertNotNull(onEdt(() -> editor.toolWindowHost));

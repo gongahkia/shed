@@ -124,6 +124,26 @@ public final class MarkdownQualificationProbe {
         if (!original.text().equals(edt(buffer::getContent))) throw new AssertionError("Undo mismatch");
         out("MD_META ",Map.of("operation","constrained_persistence","save_reopen",true,"recovery",true,"undo",true));
     }
+    private static java.util.List<WeakReference<FileBuffer>> retainClosedCopies() throws Exception {
+        var refs=new ArrayList<WeakReference<FileBuffer>>();Path original=Path.of(edt(() -> editor.getCurrentBuffer().getFilePath()));
+        for(int i=0;i<8;i++) {
+            Path copy=output.resolve("closed-"+i+".md");Files.copy(original,copy);var buffer=new FileBuffer(copy.toFile());
+            edt(() -> {editor.buffers.add(buffer);editor.loadBufferIntoEditor(buffer);return null;});
+            await(() -> ((OpenBufferCompletionIndex)field(editor.inputController,"openBufferCompletionIndex")).hasSnapshot(buffer,buffer.textSnapshot()),20);
+            refs.add(new WeakReference<>(buffer));edt(() -> {editor.closeActiveBufferWithoutExiting(true);return null;});
+        }
+        return refs;
+    }
+    private static void retention() throws Exception {
+        var refs=retainClosedCopies();snapshot("eight_closed_buffers",true,false);
+        out("MD_META ",edt(() -> Map.of("operation","closed_before_query","alive",refs.stream().filter(r->r.get()!=null).count(),
+            "index_entries",((Map<?,?>)field(field(editor.inputController,"openBufferCompletionIndex"),"snapshots")).size(),"open_buffers",editor.buffers.size())));
+        edt(() -> {((OpenBufferCompletionIndex)field(editor.inputController,"openBufferCompletionIndex")).complete(editor.buffers,editor.getCurrentBuffer(),"al",0,20,new FuzzyMatchService());return null;});
+        snapshot("after_normal_completion_query",true,false);
+        out("MD_META ",edt(() -> Map.of("operation","closed_after_query","alive",refs.stream().filter(r->r.get()!=null).count(),
+            "index_entries",((Map<?,?>)field(field(editor.inputController,"openBufferCompletionIndex"),"snapshots")).size(),"open_buffers",editor.buffers.size())));
+    }
+
     private static WeakReference<?> index() throws Exception {
         Path notes=Files.createDirectories(output.resolve("notes"));
         for(int i=0;i<1000;i++)Files.writeString(notes.resolve("note-"+i+".md"),"# Note "+i+"\n[source](../input.md)\n[[note-"+((i+1)%1000)+"]]\n");
@@ -172,7 +192,9 @@ public final class MarkdownQualificationProbe {
             edt(() -> {editor.writingArea.paintImmediately(editor.writingArea.getVisibleRect());return null;});
             snapshot("initial_idle",true,true);
         }
-        if(mode.equals("index")) {var ref=index();snapshot("after_index_disposal",true,true);out("MD_META ",Map.of("operation","index_release","collected",ref.get()==null));}
+        out("MD_META ",edt(() -> Map.of("operation","qualification_appearance","theme",editor.configManager.getThemeId(),"configured_font",editor.configManager.getFontFamily(),"actual_editor_family",editor.writingArea.getFont().getFamily())));
+        if(mode.equals("retention"))retention();
+        else if(mode.equals("index")) {var ref=index();snapshot("after_index_disposal",true,true);out("MD_META ",Map.of("operation","index_release","collected",ref.get()==null));}
         else if(mode.equals("media") || mode.equals("media-control")) {
             var helper=Class.forName(mode.equals("media")?"shed.MarkdownMediaProbe":"shed.MarkdownMediaControlProbe");
             var run=helper.getDeclaredMethod("run",Texteditor.class,int.class,int.class);run.setAccessible(true);run.invoke(null,editor,50,5);

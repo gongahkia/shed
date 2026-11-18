@@ -50,8 +50,9 @@ public class ConfigManagerTest {
         System.setProperty("user.home", home.toString());
         ConfigManager config = new ConfigManager();
 
+        assertEquals("shed-light", config.getThemeId());
         assertEquals(4, config.getTabSize());
-        assertEquals("Monospaced", config.getFontFamily());
+        assertEquals("JetBrains Mono", config.getFontFamily());
         assertEquals(16, config.getFontSize());
         assertEquals("", config.getUiFontFamily());
         assertEquals(0, config.getUiFontSize());
@@ -157,7 +158,7 @@ public class ConfigManagerTest {
 
         assertFalse(config.hasConfigLoadFailure());
         assertEquals(4, config.getTabSize());
-        assertEquals("shed-dark", config.getThemeId());
+        assertEquals("shed-light", config.getThemeId());
     }
 
     @Test
@@ -234,7 +235,7 @@ public class ConfigManagerTest {
 
         assertTrue(config.hasConfigLoadFailure());
         assertTrue(config.getConfigLoadReport().contains("font.family names no installed font family: Missing Shed Test Font"));
-        assertEquals("Monospaced", config.getFontFamily());
+        assertEquals("JetBrains Mono", config.getFontFamily());
         assertTrue(config.validateSettingValue("font.family", "Missing Shed Test Font")
             .startsWith("font.family names no installed font family: Missing Shed Test Font"));
         assertThrows(IOException.class, () -> config.setAndPersist("font.family", "Missing Shed Test Font"));
@@ -1108,7 +1109,7 @@ public class ConfigManagerTest {
 
         String cleared = config.applyProjectConfigForFile(fileB);
         assertTrue(cleared.contains("Project config cleared"));
-        assertEquals("shed-dark", config.getThemeId());
+        assertEquals("shed-light", config.getThemeId());
         assertNull(config.getActiveProjectConfigPath());
     }
 
@@ -1253,6 +1254,6 @@ public class ConfigManagerTest {
 
         config.set("project.config.enabled", "false");
         assertTrue(config.applyProjectConfigForFile(file).contains("Project config disabled"));
-        assertEquals("shed-dark", config.getThemeId());
+        assertEquals("shed-light", config.getThemeId());
     }
 }

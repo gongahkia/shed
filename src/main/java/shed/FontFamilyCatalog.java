@@ -17,6 +17,7 @@ final class FontFamilyCatalog {
             return null;
         }
         String requested = requestedFamily.trim();
+        if (BundledEditorFont.matches(requested) && BundledEditorFont.available()) return BundledEditorFont.FAMILY;
         for (String installed : GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()) {
             if (installed.equalsIgnoreCase(requested)) {
                 return installed;
@@ -31,6 +32,8 @@ final class FontFamilyCatalog {
      * match, because a visually similar font may change editor metrics.
      */
     static Resolution resolveRepair(String requestedFamily) {
+        if (BundledEditorFont.matches(requestedFamily) && BundledEditorFont.available())
+            return new Resolution(BundledEditorFont.FAMILY, !BundledEditorFont.FAMILY.equals(requestedFamily.trim()));
         return resolveRepair(requestedFamily,
             List.of(GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()));
     }

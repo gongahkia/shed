@@ -16,6 +16,9 @@ final class StagedStartupFont {
     }
 
     static Font forConfiguration(ConfigManager config) {
+        if (!GraphicsEnvironment.isHeadless() && System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")
+            && BundledEditorFont.matches(config.getFontFamily()) && config.getUiFontFamily().isBlank() && config.getUiFontSize() == 0)
+            return BundledEditorFont.atSize(config.getFontSize());
         if (GraphicsEnvironment.isHeadless()
             || !System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("mac")
             || !"Monospaced".equalsIgnoreCase(config.getFontFamily())

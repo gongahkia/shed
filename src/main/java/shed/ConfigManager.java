@@ -48,13 +48,13 @@ public class ConfigManager {
     private DebugAdapterRegistry.Validation debugConfiguration;
 
     // Default configuration values
-    private static final String DEFAULT_THEME = "shed-dark";
+    private static final String DEFAULT_THEME = "shed-light";
     private static final String DEFAULT_COLOR_NORMAL = "#282C34";
     private static final String DEFAULT_COLOR_INSERT = "#2C323C";
     private static final String DEFAULT_COLOR_COMMAND = "#3A3F4B";
     private static final String DEFAULT_COLOR_VISUAL = "#313A46";
     private static final String DEFAULT_COLOR_REPLACE = "#4B2F3A";
-    private static final String DEFAULT_FONT_FAMILY = "Monospaced";
+    private static final String DEFAULT_FONT_FAMILY = BundledEditorFont.FAMILY;
     private static final int DEFAULT_FONT_SIZE = 16;
     private static final String DEFAULT_UI_FONT_FAMILY = "";
     private static final int DEFAULT_UI_FONT_SIZE = 0;
@@ -955,7 +955,7 @@ public class ConfigManager {
 
     public String getThemeDisplayName() {
         ThemePalette theme = activeTheme();
-        return theme == null ? "Shed Dark" : theme.displayName;
+        return theme == null ? "Shed Light" : theme.displayName;
     }
 
     public String setTheme(String requestedTheme) {

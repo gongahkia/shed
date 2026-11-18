@@ -59,8 +59,8 @@ The inspector and generated reference derive each typed setting's identifier, de
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `theme` | `shed-dark` | string | Built-in theme id; `shed-light` is the matching light palette |
-| `font.family` | `Monospaced` | string | Buffer font family; must resolve uniquely to a Java-installed family |
+| `theme` | `shed-light` | string | Built-in theme id; `shed-dark` is the matching dark palette |
+| `font.family` | `JetBrains Mono` | string | Editor font family; JetBrains Mono is bundled, with other Java-installed families supported |
 | `font.size` | `16` | int | Buffer font size |
 | `ui.font.family` | empty | string | UI font family; empty uses the shared sans-serif interface font, otherwise must resolve uniquely to a Java-installed family |
 | `ui.font.size` | `0` | int | UI font size; `0` uses the shared 13-point interface size |
@@ -476,7 +476,7 @@ schema_version = 1
 
 # Editor
 "theme" = "nightfox"
-"font.family" = "Monospaced"
+"font.family" = "JetBrains Mono"
 "font.size" = 16
 "ui.font.family" = ""
 "ui.font.size" = 0

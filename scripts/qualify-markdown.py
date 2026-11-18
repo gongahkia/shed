@@ -25,7 +25,7 @@ def sha(path):
 def execute(jdk, jar, classes, output, label, fixture, small, mode, nmt=False, plain=False, heap=512, jfr=False):
     folder = output / label
     (folder / 'home/.shed').mkdir(parents=True)
-    (folder / 'home/.shed/config.toml').write_text('schema_version = 1\n"keymap.profile" = "plain"\n"session.restore.on.start" = false\n"markdown.preview.remote.images" = false\n' + ('"font.family" = "Dialog"\n' if label.startswith('custom') else ''))
+    (folder / 'home/.shed/config.toml').write_text('schema_version = 1\n"keymap.profile" = "plain"\n"session.restore.on.start" = false\n"markdown.preview.remote.images" = false\n"theme" = "shed-light"\n' + ('"font.family" = "Dialog"\n' if label.startswith('custom') else ''))
     source = None
     if fixture:
         source = folder / ('input' + fixture.suffix)
@@ -93,7 +93,7 @@ def execute(jdk, jar, classes, output, label, fixture, small, mode, nmt=False, p
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--jar', type=Path, default=ROOT / 'target/shed-2.0.0.jar')
-    parser.add_argument('--group', choices=['memory', 'lifecycle', 'constrained', 'default-launch', 'startup', 'fonts', 'unicode', 'index', 'rich', 'preview'], default='memory')
+    parser.add_argument('--group', choices=['memory', 'lifecycle', 'constrained', 'default-launch', 'startup', 'fonts', 'unicode', 'index', 'rich', 'preview', 'retention'], default='memory')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--generate-only', action='store_true')
     args = parser.parse_args()
@@ -133,6 +133,8 @@ def main():
         for label in ['empty', '1m']:
             cases.append((label + '-nmt', fixtures.get(label), 'baseline', True, False, 512, False))
         cases.append(('1m-jfr-nmt', fixtures['1m'], 'baseline', True, False, 512, True))
+    elif args.group == 'retention':
+        cases = [('retention-eight-files', fixtures['1m'], 'retention', False, False, 512, False)]
     elif args.group == 'index':
         cases = [('index-nmt', fixtures['1m'], 'index', True, False, 512, False)]
     elif args.group == 'rich':

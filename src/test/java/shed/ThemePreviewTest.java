@@ -36,7 +36,7 @@ class ThemePreviewTest {
     @Test
     void nibThemesUseTheirOfficialEditorAndSyntaxRoles() {
         ConfigManager config = new ConfigManager();
-        assertTrue(config.defaultConfigTemplate().contains("shed-dark"));
+        assertTrue(config.defaultConfigTemplate().contains("\"theme\" = \"shed-light\""));
         assertEquals("nib-dark", config.setTheme("Nib Dark"));
         assertEquals("#C9BE83", hex(config.getCaretColor()));
         assertEquals("#3A5550", hex(config.getSelectionColor()));

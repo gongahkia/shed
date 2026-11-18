@@ -1464,6 +1464,7 @@ final class EditorUiController {
 
 
     Font resolveInstalledFont(String family, int fontSize) {
+        if (BundledEditorFont.matches(family)) return BundledEditorFont.atSize(fontSize);
         String installedFamily = FontFamilyCatalog.resolve(family);
         return installedFamily == null ? null : new Font(installedFamily, Font.PLAIN, fontSize);
     }

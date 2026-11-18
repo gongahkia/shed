@@ -1,0 +1,953 @@
+{
+  "jfr-unicode.json": {
+    "recording": "/tmp/shed-tranche7a-unicode/unicode100k-profile/profile.jfr",
+    "execution_or_native_samples": 317,
+    "overlapping_stack_presence_counts": {
+      "EDT FlowView": 103,
+      "EDT FontDesignMetrics": 32,
+      "EDT ParagraphView": 110,
+      "EDT SunLayoutEngine": 65,
+      "other highlightSnapshot": 1
+    },
+    "top_stacks": [
+      {
+        "key": "other sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000e80122e340.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 78
+      },
+      {
+        "key": "other sun.font.CFont.createNativeFont;sun.font.CFont.getNativeFontPtr;sun.font.CFont.getWidth;sun.font.FontFamily.preferredWidth;sun.font.FontFamily.setFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerFont;sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000e80122e340.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 40
+      },
+      {
+        "key": "other sun.lwawt.macosx.LWCToolkit.initAppkit;sun.lwawt.macosx.LWCToolkit.lambda$new$0;sun.lwawt.macosx.LWCToolkit$$Lambda.0x000000e8010c7350.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.lwawt.macosx.LWCToolkit.<init>;sun.awt.PlatformGraphicsInfo.createToolkit;java.awt.Toolkit.getDefaultToolkit;java.awt.Toolkit.getEventQueue;java.awt.EventQueue.isDispatchThread;javax.swing.SwingUtilities.isEventDispatchThread;shed.MarkdownPerformanceProbe.edt;shed.MarkdownPerformanceProbe.open;java.lang.invoke.DirectMethodHandle$Holder.invokeStatic;java.lang.invoke.LambdaForm$MH.0x000000e80100e400.invoke;java.lang.invoke.Invokers$Holder.invokeExact_MT;jdk.internal.reflect.DirectMethodHandleAccessor.invokeImpl;jdk.internal.reflect.DirectMethodHandleAccessor.invoke;java.lang.reflect.Method.invoke;shed.MarkdownQualificationProbe.main",
+        "value": 8
+      },
+      {
+        "key": "EDT sun.font.CStrike.getNativeGlyphOutline;sun.font.CStrike.getGlyphOutline;sun.font.CompositeStrike.getGlyphOutline;sun.font.StandardGlyphVector$GlyphStrike.getGlyphOutlineBounds;sun.font.StandardGlyphVector.getGlyphOutlineBounds;sun.font.StandardGlyphVector.getGlyphVisualBounds;sun.font.StandardGlyphVector.getGlyphInfo;sun.font.ExtendedTextSourceLabel.createCharinfo;sun.font.ExtendedTextSourceLabel.getCharinfo;sun.font.ExtendedTextSourceLabel.getLineBreakIndex;java.awt.font.TextMeasurer.calcLineBreak;java.awt.font.TextMeasurer.getLineBreakIndex;java.awt.font.LineBreakMeasurer.nextOffset;java.awt.font.LineBreakMeasurer.nextLayout;javax.swing.text.TextLayoutStrategy.sync;javax.swing.text.TextLayoutStrategy.insertUpdate;javax.swing.text.FlowView.loadChildren;javax.swing.text.CompositeView.setParent;javax.swing.text.FlowView.setParent;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.setParent;javax.swing.text.CompositeView.replace;javax.swing.text.BoxView.replace;javax.swing.text.CompositeView.loadChildren;javax.swing.text.CompositeView.setParent;javax.swing.plaf.basic.BasicTextUI$RootView.setView;javax.swing.plaf.basic.BasicTextUI.setView;javax.swing.plaf.basic.BasicTextUI.modelChanged;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.propertyChange;java.beans.PropertyChangeSupport.fire;java.beans.PropertyChangeSupport.firePropertyChange;java.beans.PropertyChangeSupport.firePropertyChange;java.awt.Component.firePropertyChange;java.awt.Component.setFont;java.awt.Container.setFont;javax.swing.JComponent.setFont;javax.swing.JTextArea.setFont;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x000000e8012bc000.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 7
+      },
+      {
+        "key": "EDT sun.font.CCharToGlyphMapper.nativeCharsToGlyphs;sun.font.CCharToGlyphMapper.charToGlyph;sun.font.CCharToGlyphMapper.charToGlyph;sun.font.CCompositeGlyphMapper.convertToGlyph;sun.font.CCompositeGlyphMapper.charToGlyph;sun.font.FontRunIterator.next;sun.font.GlyphLayout.layout;sun.font.ExtendedTextSourceLabel.createGV;sun.font.ExtendedTextSourceLabel.getGV;sun.font.ExtendedTextSourceLabel.createLogicalBounds;sun.font.ExtendedTextSourceLabel.getAdvance;java.awt.font.TextLine.init;java.awt.font.TextLine.<init>;java.awt.font.TextLine.fastCreateTextLine;java.awt.font.TextLayout.fastInit;java.awt.font.TextLayout.<init>;java.awt.Font.getStringBounds;sun.swing.SwingUtilities2.getFontCharsWidth;sun.swing.SwingUtilities2.getFontCharWidth;javax.swing.text.Utilities.getTabbedTextOffset;javax.swing.text.GlyphPainter1.getBoundedPosition;javax.swing.text.GlyphView.getBreakWeight;javax.swing.text.ParagraphView.findEdgeSpan;javax.swing.text.ParagraphView.calculateMinorAxisRequirements;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.FlowView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.setSize;javax.swing.text.BoxView.updateChildSizes;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.ScrollPaneLayout.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validate;java.awt.Component.revalidateSynchronously;java.awt.Component.revalidate;shed.EditorUiController.applyUiTheme;shed.EditorUiController.applyUiTheme;shed.SyntaxUiController.applyThemeColors;shed.Texteditor.applyThemeColors;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x000000e8012bc000.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run",
+        "value": 7
+      },
+      {
+        "key": "EDT sun.font.CStrike.getNativeGlyphOutline;sun.font.CStrike.getGlyphOutline;sun.font.CompositeStrike.getGlyphOutline;sun.font.StandardGlyphVector$GlyphStrike.getGlyphOutlineBounds;sun.font.StandardGlyphVector.getGlyphOutlineBounds;sun.font.StandardGlyphVector.getGlyphVisualBounds;sun.font.StandardGlyphVector.getGlyphInfo;sun.font.ExtendedTextSourceLabel.createCharinfo;sun.font.ExtendedTextSourceLabel.getCharinfo;sun.font.ExtendedTextSourceLabel.getLineBreakIndex;java.awt.font.TextMeasurer.calcLineBreak;java.awt.font.TextMeasurer.getLineBreakIndex;java.awt.font.LineBreakMeasurer.nextOffset;java.awt.font.LineBreakMeasurer.nextLayout;javax.swing.text.TextLayoutStrategy.sync;javax.swing.text.TextLayoutStrategy.insertUpdate;javax.swing.text.FlowView.loadChildren;javax.swing.text.CompositeView.setParent;javax.swing.text.FlowView.setParent;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.setParent;javax.swing.text.CompositeView.replace;javax.swing.text.BoxView.replace;javax.swing.text.CompositeView.loadChildren;javax.swing.text.CompositeView.setParent;javax.swing.plaf.basic.BasicTextUI$RootView.setView;javax.swing.plaf.basic.BasicTextUI.setView;javax.swing.plaf.basic.BasicTextUI.modelChanged;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.insertUpdate;javax.swing.text.AbstractDocument.fireInsertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;javax.swing.text.AbstractDocument.replace;javax.swing.text.JTextComponent.replaceSelection;javax.swing.text.DefaultEditorKit$DefaultKeyTypedAction.actionPerformed;shed.MarkdownPerformanceProbe.typed;shed.MarkdownQualificationProbe.lambda$main$38;shed.MarkdownQualificationProbe$$Lambda.0x000000e80133f308.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$23;shed.MarkdownPerformanceProbe$$Lambda.0x000000e8012a7310.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 6
+      },
+      {
+        "key": "other sun.java2d.metal.MTLLayer.blitTexture;sun.java2d.metal.MTLLayer.lambda$drawInMTLContext$4;sun.java2d.metal.MTLLayer$$Lambda.0x000000e801273878.run;sun.lwawt.macosx.CFRetainedResource.execute;sun.java2d.metal.MTLLayer.drawInMTLContext",
+        "value": 6
+      },
+      {
+        "key": "EDT sun.font.CStrike.getNativeGlyphOutline;sun.font.CStrike.getGlyphOutline;sun.font.CompositeStrike.getGlyphOutline;sun.font.StandardGlyphVector$GlyphStrike.getGlyphOutlineBounds;sun.font.StandardGlyphVector.getGlyphOutlineBounds;sun.font.StandardGlyphVector.getGlyphVisualBounds;sun.font.StandardGlyphVector.getGlyphInfo;sun.font.ExtendedTextSourceLabel.createCharinfo;sun.font.ExtendedTextSourceLabel.getCharinfo;sun.font.ExtendedTextSourceLabel.getCharX;java.awt.font.TextLine$3.computeFunction;java.awt.font.TextLine.applyFunctionAtIndex;java.awt.font.TextLine.getCharXPosition;java.awt.font.TextLine.getCharLinePosition;java.awt.font.TextLayout.getCaretInfo;java.awt.font.TextLayout.getCaretInfoTestInternal;java.awt.font.TextLayout.getCaretInfo;java.awt.font.TextLayout.getCaretInfo;javax.swing.text.GlyphPainter2.getSpan;javax.swing.text.GlyphView.getPartialSpan;javax.swing.text.GlyphView.getMinimumSpan;javax.swing.text.ParagraphView.calculateMinorAxisRequirements;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.getMinimumSpan;javax.swing.text.BoxView.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.ScrollPaneLayout.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validate;javax.swing.SwingUtilities.updateComponentTreeUI;shed.EditorUiController.applyUiFontWithProfile;shed.EditorUiController.applyUiFont;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x000000e8012bc000.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents",
+        "value": 5
+      },
+      {
+        "key": "EDT sun.font.CStrike.getNativeGlyphOutline;sun.font.CStrike.getGlyphOutline;sun.font.CompositeStrike.getGlyphOutline;sun.font.StandardGlyphVector$GlyphStrike.getGlyphOutlineBounds;sun.font.StandardGlyphVector.getGlyphOutlineBounds;sun.font.StandardGlyphVector.getGlyphVisualBounds;sun.font.StandardGlyphVector.getGlyphInfo;sun.font.ExtendedTextSourceLabel.createCharinfo;sun.font.ExtendedTextSourceLabel.getCharinfo;sun.font.ExtendedTextSourceLabel.getCharX;java.awt.font.TextLine$3.computeFunction;java.awt.font.TextLine.applyFunctionAtIndex;java.awt.font.TextLine.getCharXPosition;java.awt.font.TextLine.getCharLinePosition;java.awt.font.TextLayout.getCaretInfo;java.awt.font.TextLayout.getCaretInfoTestInternal;java.awt.font.TextLayout.getCaretInfo;java.awt.font.TextLayout.getCaretInfo;javax.swing.text.GlyphPainter2.getSpan;javax.swing.text.GlyphView.getPartialSpan;javax.swing.text.GlyphView.getMinimumSpan;javax.swing.text.ParagraphView.calculateMinorAxisRequirements;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.getMinimumSpan;javax.swing.text.BoxView.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.modelToView;javax.swing.plaf.basic.BasicTextUI.modelToView2D;javax.swing.text.JTextComponent.modelToView2D;shed.LineNumberPanel.repaintLines;shed.PaneBufferController.handleDocumentChange;shed.Texteditor.handleDocumentChange;shed.EditorUiController$2.insertUpdate;javax.swing.text.AbstractDocument.fireInsertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;javax.swing.text.AbstractDocument.replace;javax.swing.text.JTextComponent.replaceSelection;javax.swing.text.DefaultEditorKit$DefaultKeyTypedAction.actionPerformed;shed.MarkdownPerformanceProbe.typed;shed.MarkdownQualificationProbe.lambda$main$38;shed.MarkdownQualificationProbe$$Lambda.0x000000e80133f308.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$23;shed.MarkdownPerformanceProbe$$Lambda.0x000000e8012a7310.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents",
+        "value": 5
+      },
+      {
+        "key": "EDT sun.font.CCharToGlyphMapper.nativeCharsToGlyphs;sun.font.CCharToGlyphMapper.charToGlyph;sun.font.CCharToGlyphMapper.charToGlyph;sun.font.CCompositeGlyphMapper.convertToGlyph;sun.font.CCompositeGlyphMapper.charToGlyph;sun.font.FontRunIterator.next;sun.font.GlyphLayout.layout;sun.font.ExtendedTextSourceLabel.createGV;sun.font.ExtendedTextSourceLabel.getGV;sun.font.ExtendedTextSourceLabel.createLogicalBounds;sun.font.ExtendedTextSourceLabel.getAdvance;java.awt.font.TextLine.init;java.awt.font.TextLine.<init>;java.awt.font.TextLine.fastCreateTextLine;java.awt.font.TextLayout.fastInit;java.awt.font.TextLayout.<init>;java.awt.Font.getStringBounds;sun.swing.SwingUtilities2.getFontCharsWidth;sun.swing.SwingUtilities2.getFontCharWidth;javax.swing.text.Utilities.getTabbedTextOffset;javax.swing.text.GlyphPainter1.getBoundedPosition;javax.swing.text.GlyphView.getBreakWeight;javax.swing.text.ParagraphView.findEdgeSpan;javax.swing.text.ParagraphView.calculateMinorAxisRequirements;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.getMinimumSpan;javax.swing.text.BoxView.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.ScrollPaneLayout.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validate;javax.swing.SwingUtilities.updateComponentTreeUI;shed.EditorUiController.applyUiTheme;shed.EditorUiController.applyUiTheme;shed.SyntaxUiController.applyThemeColors;shed.Texteditor.applyThemeColors;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x000000e8012bc000.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent",
+        "value": 5
+      },
+      {
+        "key": "EDT sun.font.CCharToGlyphMapper.nativeCharsToGlyphs;sun.font.CCharToGlyphMapper.charToGlyph;sun.font.CCharToGlyphMapper.charToGlyph;sun.font.CCompositeGlyphMapper.convertToGlyph;sun.font.CCompositeGlyphMapper.charToGlyph;sun.font.FontRunIterator.next;sun.font.GlyphLayout.layout;sun.font.ExtendedTextSourceLabel.createGV;sun.font.ExtendedTextSourceLabel.getGV;sun.font.ExtendedTextSourceLabel.createLogicalBounds;sun.font.ExtendedTextSourceLabel.getAdvance;java.awt.font.TextLine.init;java.awt.font.TextLine.<init>;java.awt.font.TextLine.fastCreateTextLine;java.awt.font.TextLayout.fastInit;java.awt.font.TextLayout.<init>;java.awt.Font.getStringBounds;sun.swing.SwingUtilities2.getFontCharsWidth;sun.swing.SwingUtilities2.getFontCharWidth;javax.swing.text.Utilities.getTabbedTextOffset;javax.swing.text.GlyphPainter1.getBoundedPosition;javax.swing.text.GlyphView.getBreakWeight;javax.swing.text.ParagraphView.findEdgeSpan;javax.swing.text.ParagraphView.calculateMinorAxisRequirements;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.getMinimumSpan;javax.swing.text.BoxView.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.modelToView;javax.swing.plaf.basic.BasicTextUI.modelToView2D;javax.swing.text.JTextComponent.modelToView2D;shed.LineNumberPanel.repaintLines;shed.PaneBufferController.handleDocumentChange;shed.Texteditor.handleDocumentChange;shed.EditorUiController$2.insertUpdate;javax.swing.text.AbstractDocument.fireInsertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;javax.swing.text.AbstractDocument.replace;javax.swing.text.JTextComponent.replaceSelection;javax.swing.text.DefaultEditorKit$DefaultKeyTypedAction.actionPerformed;shed.MarkdownPerformanceProbe.typed;shed.MarkdownQualificationProbe.lambda$main$38;shed.MarkdownQualificationProbe$$Lambda.0x000000e80133f308.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$23;shed.MarkdownPerformanceProbe$$Lambda.0x000000e8012a7310.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter",
+        "value": 5
+      },
+      {
+        "key": "EDT sun.font.CCharToGlyphMapper.nativeCharsToGlyphs;sun.font.CCharToGlyphMapper.charToGlyph;sun.font.CCharToGlyphMapper.charToGlyph;sun.font.CCompositeGlyphMapper.convertToGlyph;sun.font.CCompositeGlyphMapper.charToGlyph;sun.font.FontRunIterator.next;sun.font.GlyphLayout.layout;sun.font.ExtendedTextSourceLabel.createGV;sun.font.ExtendedTextSourceLabel.getGV;sun.font.ExtendedTextSourceLabel.createLogicalBounds;sun.font.ExtendedTextSourceLabel.getAdvance;java.awt.font.TextLine.init;java.awt.font.TextLine.<init>;java.awt.font.TextLine.fastCreateTextLine;java.awt.font.TextLayout.fastInit;java.awt.font.TextLayout.<init>;java.awt.Font.getStringBounds;sun.swing.SwingUtilities2.getFontCharsWidth;sun.swing.SwingUtilities2.getFontCharWidth;javax.swing.text.Utilities.getTabbedTextOffset;javax.swing.text.GlyphPainter1.getBoundedPosition;javax.swing.text.GlyphView.getBreakWeight;javax.swing.text.ParagraphView.findEdgeSpan;javax.swing.text.ParagraphView.calculateMinorAxisRequirements;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.FlowView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.setSize;javax.swing.text.BoxView.updateChildSizes;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.modelToView;javax.swing.plaf.basic.BasicTextUI.modelToView2D;javax.swing.text.JTextComponent.modelToView2D;shed.LineNumberPanel.repaintLines;shed.PaneBufferController.handleDocumentChange;shed.Texteditor.handleDocumentChange;shed.EditorUiController$2.insertUpdate;javax.swing.text.AbstractDocument.fireInsertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;javax.swing.text.AbstractDocument.replace;javax.swing.text.JTextComponent.replaceSelection;javax.swing.text.DefaultEditorKit$DefaultKeyTypedAction.actionPerformed;shed.MarkdownPerformanceProbe.typed;shed.MarkdownQualificationProbe.lambda$main$38;shed.MarkdownQualificationProbe$$Lambda.0x000000e80133f308.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$23;shed.MarkdownPerformanceProbe$$Lambda.0x000000e8012a7310.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege",
+        "value": 4
+      },
+      {
+        "key": "EDT sun.font.CCharToGlyphMapper.nativeCharsToGlyphs;sun.font.CCharToGlyphMapper.charToGlyph;sun.font.CCharToGlyphMapper.charToGlyph;sun.font.CCompositeGlyphMapper.convertToGlyph;sun.font.CCompositeGlyphMapper.charToGlyph;sun.font.FontRunIterator.next;sun.font.GlyphLayout.layout;sun.font.ExtendedTextSourceLabel.createGV;sun.font.ExtendedTextSourceLabel.getGV;sun.font.ExtendedTextSourceLabel.createLogicalBounds;sun.font.ExtendedTextSourceLabel.getAdvance;java.awt.font.TextLine.init;java.awt.font.TextLine.<init>;java.awt.font.TextLine.fastCreateTextLine;java.awt.font.TextLayout.fastInit;java.awt.font.TextLayout.<init>;java.awt.Font.getStringBounds;sun.swing.SwingUtilities2.getFontCharsWidth;sun.swing.SwingUtilities2.getFontCharWidth;javax.swing.text.Utilities.getTabbedTextOffset;javax.swing.text.GlyphPainter1.getBoundedPosition;javax.swing.text.GlyphView.getBreakWeight;javax.swing.text.ParagraphView.findEdgeSpan;javax.swing.text.ParagraphView.calculateMinorAxisRequirements;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.FlowView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.setSize;javax.swing.text.BoxView.updateChildSizes;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.ScrollPaneLayout.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validate;javax.swing.SwingUtilities.updateComponentTreeUI;shed.EditorUiController.applyUiFontWithProfile;shed.EditorUiController.applyUiFont;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x000000e8012bc000.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege",
+        "value": 4
+      },
+      {
+        "key": "EDT sun.font.CStrike.getNativeGlyphOutline;sun.font.CStrike.getGlyphOutline;sun.font.CompositeStrike.getGlyphOutline;sun.font.StandardGlyphVector$GlyphStrike.getGlyphOutlineBounds;sun.font.StandardGlyphVector.getGlyphOutlineBounds;sun.font.StandardGlyphVector.getGlyphVisualBounds;sun.font.StandardGlyphVector.getGlyphInfo;sun.font.ExtendedTextSourceLabel.createCharinfo;sun.font.ExtendedTextSourceLabel.getCharinfo;sun.font.ExtendedTextSourceLabel.getLineBreakIndex;java.awt.font.TextMeasurer.calcLineBreak;java.awt.font.TextMeasurer.getLineBreakIndex;java.awt.font.LineBreakMeasurer.nextOffset;java.awt.font.LineBreakMeasurer.nextLayout;javax.swing.text.TextLayoutStrategy.sync;javax.swing.text.TextLayoutStrategy.insertUpdate;javax.swing.text.FlowView.loadChildren;javax.swing.text.CompositeView.setParent;javax.swing.text.FlowView.setParent;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.setParent;javax.swing.text.CompositeView.replace;javax.swing.text.BoxView.replace;javax.swing.text.CompositeView.loadChildren;javax.swing.text.CompositeView.setParent;javax.swing.plaf.basic.BasicTextUI$RootView.setView;javax.swing.plaf.basic.BasicTextUI.setView;javax.swing.plaf.basic.BasicTextUI.modelChanged;javax.swing.plaf.basic.BasicTextUI.installUI;javax.swing.JComponent.setUI;javax.swing.text.JTextComponent.setUI;javax.swing.text.JTextComponent.updateUI;javax.swing.SwingUtilities.updateComponentTreeUI0;javax.swing.SwingUtilities.updateComponentTreeUI0;javax.swing.SwingUtilities.updateComponentTreeUI0;javax.swing.SwingUtilities.updateComponentTreeUI0;javax.swing.SwingUtilities.updateComponentTreeUI0;javax.swing.SwingUtilities.updateComponentTreeUI0;javax.swing.SwingUtilities.updateComponentTreeUI0;javax.swing.SwingUtilities.updateComponentTreeUI0;javax.swing.SwingUtilities.updateComponentTreeUI0;javax.swing.SwingUtilities.updateComponentTreeUI;shed.EditorUiController.applyUiFontWithProfile;shed.EditorUiController.applyUiFont;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x000000e8012bc000.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 4
+      },
+      {
+        "key": "EDT sun.font.CStrike.getNativeGlyphOutline;sun.font.CStrike.getGlyphOutline;sun.font.CompositeStrike.getGlyphOutline;sun.font.StandardGlyphVector$GlyphStrike.getGlyphOutlineBounds;sun.font.StandardGlyphVector.getGlyphOutlineBounds;sun.font.StandardGlyphVector.getGlyphVisualBounds;sun.font.StandardGlyphVector.getGlyphInfo;sun.font.ExtendedTextSourceLabel.createCharinfo;sun.font.ExtendedTextSourceLabel.getCharinfo;sun.font.ExtendedTextSourceLabel.getCharX;java.awt.font.TextLine$3.computeFunction;java.awt.font.TextLine.applyFunctionAtIndex;java.awt.font.TextLine.getCharXPosition;java.awt.font.TextLine.getCharLinePosition;java.awt.font.TextLayout.getCaretInfo;java.awt.font.TextLayout.getCaretInfoTestInternal;java.awt.font.TextLayout.getCaretInfo;java.awt.font.TextLayout.getCaretInfo;javax.swing.text.GlyphPainter2.getSpan;javax.swing.text.GlyphView.getPartialSpan;javax.swing.text.GlyphView.getMinimumSpan;javax.swing.text.ParagraphView.calculateMinorAxisRequirements;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.getMinimumSpan;javax.swing.text.BoxView.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.ScrollPaneLayout.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validate;javax.swing.SwingUtilities.updateComponentTreeUI;shed.EditorUiController.applyUiTheme;shed.EditorUiController.applyUiTheme;shed.SyntaxUiController.applyThemeColors;shed.Texteditor.applyThemeColors;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x000000e8012bc000.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter",
+        "value": 4
+      },
+      {
+        "key": "EDT sun.font.CCharToGlyphMapper.nativeCharsToGlyphs;sun.font.CCharToGlyphMapper.charToGlyph;sun.font.CCharToGlyphMapper.charToGlyph;sun.font.CCompositeGlyphMapper.convertToGlyph;sun.font.CCompositeGlyphMapper.charToGlyph;sun.font.FontRunIterator.next;sun.font.GlyphLayout.layout;sun.font.ExtendedTextSourceLabel.createGV;sun.font.ExtendedTextSourceLabel.getGV;sun.font.ExtendedTextSourceLabel.createLogicalBounds;sun.font.ExtendedTextSourceLabel.getAdvance;java.awt.font.TextLine.init;java.awt.font.TextLine.<init>;java.awt.font.TextLine.fastCreateTextLine;java.awt.font.TextLayout.fastInit;java.awt.font.TextLayout.<init>;java.awt.Font.getStringBounds;sun.swing.SwingUtilities2.getFontCharsWidth;sun.swing.SwingUtilities2.getFontCharWidth;javax.swing.text.Utilities.getTabbedTextOffset;javax.swing.text.GlyphPainter1.getBoundedPosition;javax.swing.text.GlyphView.getBreakWeight;javax.swing.text.ParagraphView.findEdgeSpan;javax.swing.text.ParagraphView.calculateMinorAxisRequirements;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.calculateMinorAxisRequirements;javax.swing.text.BoxView.checkRequests;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.FlowView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.setSize;javax.swing.text.BoxView.updateChildSizes;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.ScrollPaneLayout.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validate;javax.swing.SwingUtilities.updateComponentTreeUI;shed.EditorUiController.applyUiTheme;shed.EditorUiController.applyUiTheme;shed.SyntaxUiController.applyThemeColors;shed.Texteditor.applyThemeColors;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x000000e8012bc000.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged",
+        "value": 4
+      },
+      {
+        "key": "EDT sun.font.SunLayoutEngine.shape;sun.font.SunLayoutEngine.layout;sun.font.GlyphLayout$EngineRecord.layout;sun.font.GlyphLayout.layout;sun.font.ExtendedTextSourceLabel.createGV;sun.font.ExtendedTextSourceLabel.getGV;sun.font.ExtendedTextSourceLabel.createLogicalBounds;sun.font.ExtendedTextSourceLabel.getAdvance;java.awt.font.TextLine.init;java.awt.font.TextLine.<init>;java.awt.font.TextMeasurer.makeTextLineOnRange;java.awt.font.TextMeasurer.getLayout;java.awt.font.LineBreakMeasurer.nextLayout;javax.swing.text.TextLayoutStrategy.sync;javax.swing.text.TextLayoutStrategy.insertUpdate;javax.swing.text.FlowView.loadChildren;javax.swing.text.CompositeView.setParent;javax.swing.text.FlowView.setParent;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.setParent;javax.swing.text.CompositeView.replace;javax.swing.text.BoxView.replace;javax.swing.text.CompositeView.loadChildren;javax.swing.text.CompositeView.setParent;javax.swing.plaf.basic.BasicTextUI$RootView.setView;javax.swing.plaf.basic.BasicTextUI.setView;javax.swing.plaf.basic.BasicTextUI.modelChanged;javax.swing.plaf.basic.BasicTextUI$UpdateHandler.insertUpdate;javax.swing.text.AbstractDocument.fireInsertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;javax.swing.text.AbstractDocument.replace;javax.swing.text.JTextComponent.replaceSelection;javax.swing.text.DefaultEditorKit$DefaultKeyTypedAction.actionPerformed;shed.MarkdownPerformanceProbe.typed;shed.MarkdownQualificationProbe.lambda$main$38;shed.MarkdownQualificationProbe$$Lambda.0x000000e80133f308.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$23;shed.MarkdownPerformanceProbe$$Lambda.0x000000e8012a7310.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 3
+      },
+      {
+        "key": "EDT sun.font.SunLayoutEngine.shape;sun.font.SunLayoutEngine.layout;sun.font.GlyphLayout$EngineRecord.layout;sun.font.GlyphLayout.layout;sun.font.ExtendedTextSourceLabel.createGV;sun.font.ExtendedTextSourceLabel.getGV;sun.font.ExtendedTextSourceLabel.createLogicalBounds;sun.font.ExtendedTextSourceLabel.getAdvance;java.awt.font.TextLine.init;java.awt.font.TextLine.<init>;java.awt.font.TextMeasurer.makeTextLineOnRange;java.awt.font.TextMeasurer.getLayout;java.awt.font.LineBreakMeasurer.nextLayout;javax.swing.text.TextLayoutStrategy.createView;javax.swing.text.FlowView$FlowStrategy.layoutRow;javax.swing.text.TextLayoutStrategy.layoutRow;javax.swing.text.FlowView$FlowStrategy.layout;javax.swing.text.TextLayoutStrategy.layout;javax.swing.text.FlowView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextAreaUI$PlainParagraph.setSize;javax.swing.text.BoxView.updateChildSizes;javax.swing.text.BoxView.setSpanOnAxis;javax.swing.text.BoxView.layout;javax.swing.text.BoxView.setSize;javax.swing.plaf.basic.BasicTextUI$RootView.setSize;javax.swing.plaf.basic.BasicTextUI.viewToModel;javax.swing.plaf.basic.BasicTextUI.viewToModel2D;javax.swing.text.JTextComponent.viewToModel2D;shed.LineNumberPanel.paintComponent;javax.swing.JComponent.paint;javax.swing.JComponent.paintChildren;javax.swing.JComponent.paint;javax.swing.JViewport.paint;javax.swing.JComponent.paintChildren;javax.swing.JComponent.paint;javax.swing.JComponent.paintChildren;javax.swing.JComponent.paint;javax.swing.JComponent.paintToOffscreen;javax.swing.RepaintManager$PaintManager.paintDoubleBufferedImpl;javax.swing.RepaintManager$PaintManager.paintDoubleBuffered;javax.swing.RepaintManager$PaintManager.paint;javax.swing.RepaintManager.paint;javax.swing.JComponent._paintImmediately;javax.swing.JComponent.paintImmediately;javax.swing.RepaintManager$4.run;javax.swing.RepaintManager$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;javax.swing.RepaintManager.paintDirtyRegions;javax.swing.RepaintManager.paintDirtyRegions;javax.swing.RepaintManager.prePaintDirtyRegions;javax.swing.RepaintManager$ProcessingRunnable.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter",
+        "value": 3
+      }
+    ],
+    "allocation_samples": 2180,
+    "top_weighted_allocation_samples_not_retained": [
+      {
+        "key": "[C",
+        "value": 991504560
+      },
+      {
+        "key": "[I",
+        "value": 874105472
+      },
+      {
+        "key": "java.lang.Integer",
+        "value": 362210664
+      },
+      {
+        "key": "java.awt.geom.AffineTransform",
+        "value": 356959848
+      },
+      {
+        "key": "[F",
+        "value": 348981816
+      },
+      {
+        "key": "java.awt.geom.Point2D$Float",
+        "value": 111298328
+      },
+      {
+        "key": "[B",
+        "value": 91326320
+      },
+      {
+        "key": "[D",
+        "value": 78301032
+      },
+      {
+        "key": "java.awt.geom.Rectangle2D$Float",
+        "value": 73620912
+      },
+      {
+        "key": "java.awt.geom.Rectangle2D$Double",
+        "value": 48227056
+      },
+      {
+        "key": "java.awt.geom.Path2D$Float$CopyIterator",
+        "value": 44057640
+      },
+      {
+        "key": "java.lang.Object",
+        "value": 24141448
+      },
+      {
+        "key": "java.awt.geom.GeneralPath",
+        "value": 21442872
+      },
+      {
+        "key": "sun.text.RuleBasedBreakIterator",
+        "value": 21238128
+      },
+      {
+        "key": "java.awt.font.TextLine",
+        "value": 18837424
+      }
+    ],
+    "gc_pause_ms": [
+      1.265584,
+      0.036834,
+      1.997583,
+      3.935417,
+      7.318959,
+      0.531292,
+      5.706083,
+      4.192584,
+      3.786792,
+      13.153542,
+      2.11825,
+      1.98425,
+      1.703375,
+      1.750417,
+      3.207209,
+      1.718042,
+      3.980125,
+      3.536625,
+      2.501458,
+      2.8755,
+      3.418,
+      9.373625,
+      5.125625,
+      6.323084,
+      2.685459,
+      1.194917,
+      2.281333,
+      2.54225,
+      2.890125,
+      2.470125,
+      4.989,
+      4.136125,
+      5.993583,
+      1.473583,
+      0.0525,
+      4.950708,
+      5.12825,
+      5.83375,
+      1.952709,
+      0.056917,
+      6.912208,
+      3.970541,
+      3.451625,
+      1.371209,
+      0.838708,
+      2.209834,
+      6.345833,
+      3.590125,
+      1.3745,
+      1.995209,
+      1.472375,
+      0.049084,
+      2.369792,
+      2.472958,
+      2.806875
+    ],
+    "gc_pause_total_ms": 181.402465
+  },
+  "jfr-media-service.json": {
+    "recording": "/tmp/shed-tranche7a-rich/media-nmt/profile.jfr",
+    "execution_or_native_samples": 359,
+    "overlapping_stack_presence_counts": {
+      "EDT FontDesignMetrics": 2,
+      "EDT PlainView": 5,
+      "EDT SourcePlainView": 1,
+      "EDT VersionedTextSnapshot": 2,
+      "EDT javax.swing.text.PlainView.calculateLongestLine": 1,
+      "EDT source-width-summary-rebuild": 1,
+      "other GrammarHighlightService": 1,
+      "other MarkdownPreviewAssets": 1,
+      "other VersionedTextSnapshot": 1,
+      "other highlightSnapshot": 1
+    },
+    "top_stacks": [
+      {
+        "key": "other java.lang.ProcessHandleImpl.waitForProcessExit0;java.lang.ProcessHandleImpl$1.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run;jdk.internal.misc.InnocuousThread.run",
+        "value": 126
+      },
+      {
+        "key": "other sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000700122a908.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 27
+      },
+      {
+        "key": "other sun.font.CFont.createNativeFont;sun.font.CFont.getNativeFontPtr;sun.font.CFont.getWidth;sun.font.FontFamily.preferredWidth;sun.font.FontFamily.setFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerFont;sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000700122a908.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 23
+      },
+      {
+        "key": "other sun.java2d.metal.MTLRenderQueue.flushBuffer;sun.java2d.metal.MTLRenderQueue.flushBuffer;sun.java2d.metal.MTLRenderQueue$QueueFlusher.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 13
+      },
+      {
+        "key": "other sun.java2d.metal.MTLLayer.blitTexture;sun.java2d.metal.MTLLayer.lambda$drawInMTLContext$4;sun.java2d.metal.MTLLayer$$Lambda.0x000000700126fcd8.run;sun.lwawt.macosx.CFRetainedResource.execute;sun.java2d.metal.MTLLayer.drawInMTLContext",
+        "value": 6
+      },
+      {
+        "key": "other sun.lwawt.macosx.LWCToolkit.initAppkit;sun.lwawt.macosx.LWCToolkit.lambda$new$0;sun.lwawt.macosx.LWCToolkit$$Lambda.0x00000070010c3b80.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.lwawt.macosx.LWCToolkit.<init>;sun.awt.PlatformGraphicsInfo.createToolkit;java.awt.Toolkit.getDefaultToolkit;java.awt.Toolkit.getEventQueue;java.awt.EventQueue.isDispatchThread;javax.swing.SwingUtilities.isEventDispatchThread;shed.MarkdownPerformanceProbe.edt;shed.MarkdownQualificationProbe.main",
+        "value": 5
+      },
+      {
+        "key": "other java.lang.ProcessImpl.forkAndExec;java.lang.ProcessImpl.<init>;java.lang.ProcessImpl.start;java.lang.ProcessBuilder.start;java.lang.ProcessBuilder.start;shed.SyntaxUiController.loadGitBlame;shed.SyntaxUiController.lambda$startPendingGitBlame$2;shed.SyntaxUiController$$Lambda.0x000000700129caf0.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x000000700122bc00.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 4
+      },
+      {
+        "key": "other jdk.internal.util.ArraysSupport.utf16hashCode;jdk.internal.util.ArraysSupport.vectorizedHashCode;java.lang.StringUTF16.hashCode;java.lang.String.hashCode;com.oracle.truffle.api.source.SourceImpl$Key.hashCodeImpl;com.oracle.truffle.api.source.SourceImpl$Key.hashCode;java.util.concurrent.ConcurrentHashMap.get;com.oracle.truffle.api.source.InternedSources.intern;com.oracle.truffle.api.source.Source.buildSource;com.oracle.truffle.api.source.Source$SourceBuilder.build;com.oracle.truffle.api.source.Source$LiteralBuilder.build;com.oracle.truffle.polyglot.PolyglotSourceDispatch.build;org.graalvm.polyglot.Source$Builder.build;org.graalvm.polyglot.Source$Builder.buildLiteral;org.graalvm.polyglot.Source.create;org.graalvm.polyglot.Context.eval;com.aresstack.mermaid.GraalJsExecutor$1.call;com.aresstack.mermaid.GraalJsExecutor$1.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 3
+      },
+      {
+        "key": "other sun.awt.AWTAutoShutdown.setToolkitBusy;sun.awt.AWTAutoShutdown.notifyToolkitThreadBusy",
+        "value": 2
+      },
+      {
+        "key": "other java.lang.ProcessImpl.forkAndExec;java.lang.ProcessImpl.<init>;java.lang.ProcessImpl.start;java.lang.ProcessBuilder.start;java.lang.ProcessBuilder.start;shed.MarkdownQualificationProbe.command;shed.MarkdownQualificationProbe.snapshot;shed.MarkdownQualificationProbe.main",
+        "value": 2
+      },
+      {
+        "key": "other com.oracle.truffle.js.parser.GraalJSTranslator.markTerminalReturnNodes;com.oracle.truffle.js.parser.GraalJSTranslator.markTerminalReturnNodes;com.oracle.truffle.js.parser.GraalJSTranslator.functionEnvInit;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterFunctionNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.js.parser.ir.FunctionNode.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.LexicalContextExpression.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.createVarAssignNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterVarNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterVarNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterVarNode;com.oracle.js.parser.ir.VarNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.translateFunctionBody;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterFunctionNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.js.parser.ir.FunctionNode.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.LexicalContextExpression.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterCallNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterCallNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterCallNode;com.oracle.js.parser.ir.CallNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.createVarAssignNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterVarNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterVarNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterVarNode;com.oracle.js.parser.ir.VarNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.translateFunctionBody;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterFunctionNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.js.parser.ir.FunctionNode.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.LexicalContextExpression.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformFunction;com.oracle.truffle.js.parser.GraalJSTranslator.translateScript;com.oracle.truffle.js.parser.JavaScriptTranslator.translateScript",
+        "value": 1
+      },
+      {
+        "key": "other com.oracle.truffle.regex.tregex.parser.CaseFoldTable$CaseFoldTableImpl.getLo;com.oracle.truffle.regex.charset.SortedListOfRanges.binarySearch;com.oracle.truffle.regex.tregex.parser.CaseFoldTable$CaseFoldTableImpl.applyCaseFold;com.oracle.truffle.regex.tregex.parser.CaseFoldTable.applyCaseFold;com.oracle.truffle.regex.tregex.parser.RegexLexer.charClass;com.oracle.truffle.regex.tregex.parser.RegexLexer.charClass;com.oracle.truffle.regex.tregex.parser.RegexLexer.getNext;com.oracle.truffle.regex.tregex.parser.RegexLexer.next;com.oracle.truffle.regex.tregex.parser.RegexParser.parse;com.oracle.truffle.regex.tregex.parser.RegexParser.parse;com.oracle.truffle.regex.tregex.TRegexCompilationRequest.compileInternal;com.oracle.truffle.regex.tregex.TRegexCompilationRequest.compile;com.oracle.truffle.regex.tregex.TRegexCompiler.doCompile;com.oracle.truffle.regex.tregex.TRegexCompiler.compile;com.oracle.truffle.regex.RegexLanguage.createRegexObject;com.oracle.truffle.regex.RegexLanguage.parse;com.oracle.truffle.api.TruffleLanguage$ParsingRequest.parse;com.oracle.truffle.api.TruffleLanguage.parse;com.oracle.truffle.api.LanguageAccessor$LanguageImpl.parse;com.oracle.truffle.polyglot.PolyglotSourceCache.parseImpl;com.oracle.truffle.polyglot.PolyglotSourceCache.access$300;com.oracle.truffle.polyglot.PolyglotSourceCache$WeakCache.lookup;com.oracle.truffle.polyglot.PolyglotSourceCache.parseCached;com.oracle.truffle.polyglot.PolyglotLanguageContext.parseCached;com.oracle.truffle.polyglot.EngineAccessor$EngineImpl.parseForLanguage;com.oracle.truffle.api.TruffleLanguage$Env.parseInternal;com.oracle.truffle.js.runtime.RegexCompilerInterface.compile;com.oracle.truffle.js.nodes.access.RegExpLiteralNode.execute;com.oracle.truffle.js.nodes.function.JSFunctionCallNode$Call1Node.createArguments;com.oracle.truffle.js.nodes.function.JSFunctionCallNode$CallNode.execute;com.oracle.truffle.js.nodes.access.JSWriteScopeFrameSlotNodeGen.execute_generic4;com.oracle.truffle.js.nodes.access.JSWriteScopeFrameSlotNodeGen.execute;com.oracle.truffle.js.nodes.access.JSWriteScopeFrameSlotNodeGen.executeVoid;com.oracle.truffle.js.nodes.binary.DualNode.executeVoid;com.oracle.truffle.js.nodes.binary.DualNode.executeVoid;com.oracle.truffle.js.nodes.binary.DualNode.executeVoid;com.oracle.truffle.js.nodes.binary.DualNode.executeVoid;com.oracle.truffle.js.nodes.binary.DualNode.executeVoid;com.oracle.truffle.js.nodes.binary.DualNode.executeVoid;com.oracle.truffle.js.nodes.binary.DualNode.executeVoid;com.oracle.truffle.js.nodes.binary.DualNode.executeVoid;com.oracle.truffle.js.nodes.binary.DualNode.executeVoid;com.oracle.truffle.js.nodes.binary.DualNode.executeVoid;com.oracle.truffle.js.nodes.control.AbstractBlockNode.executeVoid;com.oracle.truffle.js.nodes.control.AbstractBlockNode.executeVoid;com.oracle.truffle.api.impl.DefaultBlockNode.executeVoid;com.oracle.truffle.js.nodes.control.AbstractBlockNode.executeVoid;com.oracle.truffle.js.nodes.control.VoidBlockNode.execute;com.oracle.truffle.js.nodes.function.FunctionBodyNode.execute;com.oracle.truffle.js.nodes.function.FunctionRootNode.executeInRealm;com.oracle.truffle.js.runtime.JavaScriptRealmBoundaryRootNode.execute;com.oracle.truffle.api.impl.DefaultCallTarget.callDirectOrIndirect;com.oracle.truffle.api.impl.DefaultIndirectCallNode.call;com.oracle.truffle.js.nodes.function.JSFunctionCallNode$GenericJSFunctionCacheNode.executeCall;com.oracle.truffle.js.nodes.function.JSFunctionCallNode.executeCall;com.oracle.truffle.js.nodes.function.JSFunctionCallNode$CallNode.execute;com.oracle.truffle.js.nodes.access.JSWriteScopeFrameSlotNodeGen.execute_generic4;com.oracle.truffle.js.nodes.access.JSWriteScopeFrameSlotNodeGen.execute;com.oracle.truffle.js.nodes.binary.JSLogicalNode.execute;com.oracle.truffle.js.nodes.JavaScriptNode.executeVoid;com.oracle.truffle.js.nodes.binary.DualNode.execute;com.oracle.truffle.js.nodes.control.ReturnNode$TerminalPositionReturnNode.execute;com.oracle.truffle.js.nodes.function.FunctionBodyNode.execute;com.oracle.truffle.js.nodes.function.FunctionRootNode.executeInRealm",
+        "value": 1
+      },
+      {
+        "key": "other com.oracle.truffle.js.parser.env.Environment.isMappedArgumentsParameter;com.oracle.truffle.js.parser.env.Environment.newFrameSlotVarRef;com.oracle.truffle.js.parser.env.Environment.findVar;com.oracle.truffle.js.parser.env.Environment.findVar;com.oracle.truffle.js.parser.GraalJSTranslator.findScopeVar;com.oracle.truffle.js.parser.GraalJSTranslator.findScopeVarCheckTDZ;com.oracle.truffle.js.parser.GraalJSTranslator.enterIdentNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterIdentNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterIdentNode;com.oracle.js.parser.ir.IdentNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformArgs;com.oracle.truffle.js.parser.GraalJSTranslator.enterCallNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterCallNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterCallNode;com.oracle.js.parser.ir.CallNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.createVarAssignNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterVarNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterVarNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterVarNode;com.oracle.js.parser.ir.VarNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterIfNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterIfNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterIfNode;com.oracle.js.parser.ir.IfNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterIfNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterIfNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterIfNode;com.oracle.js.parser.ir.IfNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.translateFunctionBody;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterFunctionNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode",
+        "value": 1
+      },
+      {
+        "key": "other com.oracle.js.parser.AbstractParser.nextOrEOL;com.oracle.js.parser.AbstractParser.next;com.oracle.js.parser.Parser.endOfLine;com.oracle.js.parser.Parser.variableDeclarationList;com.oracle.js.parser.Parser.variableStatement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.sourceElements;com.oracle.js.parser.Parser.functionBody;com.oracle.js.parser.Parser.arrowFunction;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.argumentList;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.expressionStatement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.sourceElements;com.oracle.js.parser.Parser.functionBody;com.oracle.js.parser.Parser.arrowFunction;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.argumentList;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.variableDeclarationList;com.oracle.js.parser.Parser.variableStatement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.sourceElements;com.oracle.js.parser.Parser.functionBody;com.oracle.js.parser.Parser.arrowFunction;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.parenthesizedExpressionAndArrowParameterList;com.oracle.js.parser.Parser.primaryExpression;com.oracle.js.parser.Parser.memberExpression;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.variableDeclarationList;com.oracle.js.parser.Parser.variableStatement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.sourceElements;com.oracle.js.parser.Parser.program;com.oracle.js.parser.Parser.parse;com.oracle.js.parser.Parser.parse;com.oracle.truffle.js.parser.GraalJSParserHelper.parseSource;com.oracle.truffle.js.parser.GraalJSParserHelper.parseScript;com.oracle.truffle.js.parser.JavaScriptTranslator.translateScript",
+        "value": 1
+      },
+      {
+        "key": "other com.oracle.truffle.js.parser.GraalJSTranslator.defaultSwitchNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterSwitchNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterSwitchNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterSwitchNode;com.oracle.js.parser.ir.SwitchNode.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.LexicalContextStatement.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlockStatement;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlockStatement;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlockStatement;com.oracle.js.parser.ir.BlockStatement.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlockStatement;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlockStatement;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlockStatement;com.oracle.js.parser.ir.BlockStatement.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.translateFunctionBody;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterFunctionNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.js.parser.ir.FunctionNode.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.LexicalContextExpression.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformArgs;com.oracle.truffle.js.parser.GraalJSTranslator.enterCallNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterCallNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterCallNode;com.oracle.js.parser.ir.CallNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformPropertyValue;com.oracle.truffle.js.parser.GraalJSTranslator.enterObjectPropertyNode;com.oracle.truffle.js.parser.GraalJSTranslator.transformPropertyDefinitionList;com.oracle.truffle.js.parser.GraalJSTranslator.enterObjectNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterObjectNode",
+        "value": 1
+      },
+      {
+        "key": "EDT java.io.UnixFileSystem.getBooleanAttributes0;java.io.UnixFileSystem.hasBooleanAttributes;java.io.File.isDirectory;shed.LspController.workspaceRootPath;shed.LspController.remoteLspEndpointFor;shed.LspController.bufferUri;shed.LspController.syncLspChange;shed.Texteditor.syncLspChange;shed.PaneBufferController.syncLspChange;shed.PaneBufferController.markModified;shed.PaneBufferController.handleDocumentChange;shed.Texteditor.handleDocumentChange;shed.EditorUiController$2.insertUpdate;javax.swing.text.AbstractDocument.fireInsertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;javax.swing.text.AbstractDocument.replace;javax.swing.text.JTextComponent.replaceSelection;javax.swing.text.DefaultEditorKit$DefaultKeyTypedAction.actionPerformed;shed.MarkdownPerformanceProbe.typed;shed.MarkdownMediaProbe.lambda$run$2;shed.MarkdownMediaProbe$$Lambda.0x0000007001335320.run;shed.MarkdownPerformanceProbe.timed;shed.MarkdownPerformanceProbe.lambda$uiText$23;shed.MarkdownPerformanceProbe$$Lambda.0x0000007001335760.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 1
+      },
+      {
+        "key": "other java.util.zip.Inflater.inflateBytesBytes;java.util.zip.Inflater.inflate;java.util.zip.InflaterInputStream.read;jdk.internal.loader.Resource.getBytes;jdk.internal.loader.URLClassPath$JarLoader$2.getBytes;jdk.internal.loader.BuiltinClassLoader.defineClass;jdk.internal.loader.BuiltinClassLoader.findClassOnClassPathOrNull;jdk.internal.loader.BuiltinClassLoader.loadClassOrNull;jdk.internal.loader.BuiltinClassLoader.loadClass;jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass;java.lang.ClassLoader.loadClass;com.oracle.truffle.js.nodes.NodeFactory.createReadElementNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterIndexNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterIndexNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterIndexNode;com.oracle.js.parser.ir.IndexNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterUnaryDefaultNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterUnaryNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterUnaryNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterUnaryNode;com.oracle.js.parser.ir.UnaryNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterIfNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterIfNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterIfNode;com.oracle.js.parser.ir.IfNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.translateFunctionBody;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterFunctionNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.js.parser.ir.FunctionNode.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.LexicalContextExpression.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterBinaryAssignNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterBinaryNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBinaryNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterBinaryNode;com.oracle.js.parser.ir.BinaryNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterExpressionStatement;com.oracle.truffle.js.parser.JavaScriptTranslator.enterExpressionStatement;com.oracle.truffle.js.parser.GraalJSTranslator.enterExpressionStatement;com.oracle.js.parser.ir.ExpressionStatement.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept",
+        "value": 1
+      },
+      {
+        "key": "other com.oracle.truffle.js.parser.GraalJSTranslator.tagExpression;com.oracle.truffle.js.parser.GraalJSTranslator.enterIdentNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterIdentNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterIdentNode;com.oracle.js.parser.ir.IdentNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterAccessNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterAccessNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterAccessNode;com.oracle.js.parser.ir.AccessNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterBinaryExpressionNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterBinaryNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBinaryNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterBinaryNode;com.oracle.js.parser.ir.BinaryNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterIfNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterIfNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterIfNode;com.oracle.js.parser.ir.IfNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.translateFunctionBody;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterFunctionNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.js.parser.ir.FunctionNode.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.LexicalContextExpression.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformPropertyValue;com.oracle.truffle.js.parser.GraalJSTranslator.enterObjectPropertyNode;com.oracle.truffle.js.parser.GraalJSTranslator.transformPropertyDefinitionList;com.oracle.truffle.js.parser.GraalJSTranslator.enterObjectNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterObjectNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterObjectNode;com.oracle.js.parser.ir.ObjectNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterReturnNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterReturnNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterReturnNode;com.oracle.js.parser.ir.ReturnNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.translateFunctionBody;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterFunctionNode",
+        "value": 1
+      }
+    ],
+    "allocation_samples": 3149,
+    "top_weighted_allocation_samples_not_retained": [
+      {
+        "key": "[B",
+        "value": 826084368
+      },
+      {
+        "key": "[Ljava.lang.Object;",
+        "value": 678668824
+      },
+      {
+        "key": "com.oracle.js.parser.ir.IdentNode",
+        "value": 263154104
+      },
+      {
+        "key": "[I",
+        "value": 207044976
+      },
+      {
+        "key": "com.oracle.truffle.js.nodes.access.FrequencyBasedPolymorphicAccessNode$HitsCount",
+        "value": 179124744
+      },
+      {
+        "key": "com.oracle.truffle.js.nodes.access.JSWriteScopeFrameSlotNodeGen",
+        "value": 153570168
+      },
+      {
+        "key": "com.oracle.truffle.js.nodes.binary.JSSubtractNodeGen",
+        "value": 124686024
+      },
+      {
+        "key": "java.lang.String",
+        "value": 123247856
+      },
+      {
+        "key": "com.oracle.truffle.api.impl.DefaultTruffleRuntime$DefaultFrameInstance",
+        "value": 102869464
+      },
+      {
+        "key": "com.oracle.truffle.js.nodes.control.ExprBlockNode",
+        "value": 96908240
+      },
+      {
+        "key": "java.util.HashMap$KeySet",
+        "value": 85087000
+      },
+      {
+        "key": "java.lang.StringBuilder",
+        "value": 76144824
+      },
+      {
+        "key": "com.oracle.truffle.api.impl.DefaultVirtualFrame",
+        "value": 66141120
+      },
+      {
+        "key": "[C",
+        "value": 62474032
+      },
+      {
+        "key": "com.oracle.truffle.js.runtime.objects.JSOrdinaryObject$DefaultLayout",
+        "value": 54747808
+      }
+    ],
+    "gc_pause_ms": [
+      0.865084,
+      0.022166,
+      1.753292,
+      2.425708,
+      3.141291,
+      1.541458,
+      0.031208,
+      0.930208,
+      1.335625,
+      8.416375,
+      8.896833,
+      9.677125,
+      1.36275,
+      0.0345,
+      1.030583,
+      0.030875,
+      0.747833,
+      0.783042,
+      0.630583,
+      1.235125,
+      1.181417,
+      9.156125,
+      8.59125,
+      9.706208,
+      12.389917,
+      1.258792,
+      0.043375,
+      1.48275,
+      0.033375,
+      2.114375,
+      0.056791,
+      2.08375,
+      1.6875,
+      2.656166,
+      4.072459,
+      3.0575,
+      2.686875,
+      4.9655,
+      3.9395,
+      5.553083,
+      2.514958,
+      2.507458,
+      2.600167,
+      2.337084,
+      0.058458,
+      3.394417,
+      0.062125,
+      2.722375,
+      0.076417,
+      2.96525,
+      5.612584,
+      3.784583,
+      2.950709,
+      8.262459,
+      6.168041,
+      2.733875,
+      3.256083,
+      0.067042,
+      2.600042,
+      0.068,
+      2.4925,
+      0.077125,
+      9.194083,
+      10.506,
+      7.527459,
+      3.743,
+      3.320875,
+      8.925833,
+      2.271208,
+      5.14075,
+      5.385875,
+      3.270042,
+      4.7495,
+      22.030875,
+      6.679959,
+      2.478625,
+      0.0935,
+      12.279875,
+      0.103791,
+      2.64025,
+      0.09525,
+      9.192292,
+      7.916167,
+      7.679375,
+      6.679625,
+      9.164,
+      14.743458,
+      7.0975,
+      4.477792,
+      7.26725,
+      6.635458,
+      7.059542,
+      7.103625,
+      2.606458,
+      0.082042,
+      2.793041,
+      0.087875,
+      3.202833,
+      0.083916,
+      6.949458,
+      4.8225,
+      5.914,
+      10.161458,
+      8.645834,
+      4.370875,
+      11.207833,
+      19.192708,
+      5.12175,
+      9.559208,
+      12.81525,
+      3.494625,
+      0.114708,
+      10.948459,
+      9.199667,
+      6.804291,
+      9.0685,
+      4.721417,
+      10.197791,
+      22.392458,
+      36.900417,
+      26.714292,
+      0.588291,
+      22.147,
+      23.528958,
+      23.680458,
+      26.114792,
+      27.489375,
+      26.512333,
+      24.79675
+    ],
+    "gc_pause_total_ms": 807.404579
+  },
+  "jfr-baseline-memory.json": {
+    "recording": "/tmp/shed-tranche7a-memory/1m-jfr-nmt/profile.jfr",
+    "execution_or_native_samples": 155,
+    "overlapping_stack_presence_counts": {
+      "EDT FontDesignMetrics": 1,
+      "EDT PlainView": 2,
+      "EDT SourcePlainView": 1,
+      "EDT source-width-summary-rebuild": 1,
+      "other VersionedTextSnapshot": 1
+    },
+    "top_stacks": [
+      {
+        "key": "other java.lang.ProcessHandleImpl.waitForProcessExit0;java.lang.ProcessHandleImpl$1.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run;jdk.internal.misc.InnocuousThread.run",
+        "value": 66
+      },
+      {
+        "key": "other sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000700122ab30.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 30
+      },
+      {
+        "key": "other sun.font.CFont.createNativeFont;sun.font.CFont.getNativeFontPtr;sun.font.CFont.getWidth;sun.font.FontFamily.preferredWidth;sun.font.FontFamily.setFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerFont;sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000700122ab30.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 26
+      },
+      {
+        "key": "other sun.lwawt.macosx.LWCToolkit.initAppkit;sun.lwawt.macosx.LWCToolkit.lambda$new$0;sun.lwawt.macosx.LWCToolkit$$Lambda.0x00000070010c3b80.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.lwawt.macosx.LWCToolkit.<init>;sun.awt.PlatformGraphicsInfo.createToolkit;java.awt.Toolkit.getDefaultToolkit;java.awt.Toolkit.getEventQueue;java.awt.EventQueue.isDispatchThread;javax.swing.SwingUtilities.isEventDispatchThread;shed.MarkdownPerformanceProbe.edt;shed.MarkdownQualificationProbe.main",
+        "value": 6
+      },
+      {
+        "key": "other java.lang.ProcessImpl.forkAndExec;java.lang.ProcessImpl.<init>;java.lang.ProcessImpl.start;java.lang.ProcessBuilder.start;java.lang.ProcessBuilder.start;shed.SyntaxUiController.loadGitBlame;shed.SyntaxUiController.lambda$startPendingGitBlame$2;shed.SyntaxUiController$$Lambda.0x00000070012dcd00.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x0000007001236000.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 5
+      },
+      {
+        "key": "other sun.java2d.metal.MTLRenderQueue.flushBuffer;sun.java2d.metal.MTLRenderQueue.flushBuffer;sun.java2d.metal.MTLRenderQueue$QueueFlusher.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 4
+      },
+      {
+        "key": "other javax.swing.text.AbstractDocument.insertUpdate;javax.swing.text.PlainDocument.insertUpdate;javax.swing.text.AbstractDocument.handleInsertString;javax.swing.text.AbstractDocument.insertString;javax.swing.text.PlainDocument.insertString;shed.FileBuffer.setDocumentText;shed.FileBuffer.load;shed.FileBuffer.<init>;shed.LegacyDocumentStore.load;shed.PaneBufferController.lambda$openFileAsync$15;shed.PaneBufferController$$Lambda.0x000000700123c000.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x0000007001236000.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 1
+      },
+      {
+        "key": "EDT jdk.internal.loader.NativeLibrary.findEntry0;jdk.internal.loader.NativeLibraries$NativeLibraryImpl.find;jdk.internal.loader.NativeLibraries.find;java.lang.ClassLoader.findNative;sun.java2d.metal.MTLSurfaceData.clearWindow;sun.java2d.metal.MTLSurfaceData$MTLLayerSurfaceData.invalidate;sun.lwawt.LWWindowPeer.disposeImpl;sun.lwawt.LWComponentPeer.dispose;java.awt.Component.removeNotify;java.awt.Container.removeNotify;java.awt.Window.removeNotify;java.awt.Frame.removeNotify;java.awt.Window$1DisposeAction.run;java.awt.Window.doDispose;java.awt.Window.dispose;shed.MarkdownQualificationProbe.lambda$main$25;shed.MarkdownQualificationProbe$$Lambda.0x000000700132f7c0.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 1
+      },
+      {
+        "key": "other sun.awt.AWTAutoShutdown.isReadyToShutdown;sun.awt.AWTAutoShutdown.setToolkitBusy;sun.awt.AWTAutoShutdown.notifyToolkitThreadBusy",
+        "value": 1
+      },
+      {
+        "key": "EDT java.util.zip.Inflater.inflateBytesBytes;java.util.zip.Inflater.inflate;java.util.zip.InflaterInputStream.read;jdk.internal.loader.Resource.getBytes;jdk.internal.loader.URLClassPath$JarLoader$2.getBytes;jdk.internal.loader.BuiltinClassLoader.defineClass;jdk.internal.loader.BuiltinClassLoader.findClassOnClassPathOrNull;jdk.internal.loader.BuiltinClassLoader.loadClassOrNull;jdk.internal.loader.BuiltinClassLoader.loadClass;jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass;java.lang.ClassLoader.loadClass;shed.Texteditor.<init>;shed.Texteditor.<init>;shed.MarkdownQualificationProbe.lambda$main$21;shed.MarkdownQualificationProbe$$Lambda.0x0000007001006a08.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 1
+      },
+      {
+        "key": "other java.lang.String.charAt;shed.VersionedTextSnapshot.stats;shed.VersionedTextSnapshot$Node.<init>;shed.VersionedTextSnapshot.merge;shed.VersionedTextSnapshot.merge;shed.VersionedTextSnapshot.of;shed.FileBuffer.setDocumentText;shed.FileBuffer.load;shed.FileBuffer.<init>;shed.LegacyDocumentStore.load;shed.PaneBufferController.lambda$openFileAsync$15;shed.PaneBufferController$$Lambda.0x000000700123c000.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x0000007001236000.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 1
+      },
+      {
+        "key": "EDT sun.awt.CGraphicsDevice.nativeGetScreenInsets;sun.awt.CGraphicsDevice.getScreenInsets;sun.lwawt.LWWindowPeer.getDefaultMaximizedBounds;sun.lwawt.LWWindowPeer.setMaximizedBounds;sun.lwawt.LWWindowPeer.initializeImpl;sun.lwawt.LWComponentPeer.initialize;sun.lwawt.LWToolkit.createDelegatedPeer;sun.lwawt.LWToolkit.createFrame;java.awt.Frame.addNotify;java.awt.Window.show;java.awt.Component.show;java.awt.Component.setVisible;java.awt.Window.setVisible;shed.Texteditor.<init>;shed.Texteditor.<init>;shed.MarkdownQualificationProbe.lambda$main$21;shed.MarkdownQualificationProbe$$Lambda.0x0000007001006a08.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 1
+      },
+      {
+        "key": "EDT sun.java2d.marlin.Renderer._endRendering;sun.java2d.marlin.Renderer.endRendering;sun.java2d.marlin.Renderer.endRendering;sun.java2d.marlin.DMarlinRenderingEngine.getAATileGenerator;sun.java2d.pipe.AAShapePipe.renderPath;sun.java2d.pipe.AAShapePipe.draw;sun.java2d.pipe.PixelToParallelogramConverter.draw;sun.java2d.pipe.PixelToShapeConverter.drawLine;sun.java2d.pipe.PixelToParallelogramConverter.drawLine;sun.java2d.SunGraphics2D.drawLine;shed.WorkbenchIcons.paintIcon;javax.swing.plaf.basic.BasicButtonUI.paintIcon;javax.swing.plaf.basic.BasicButtonUI.paint;shed.WorkbenchStyle$ButtonUI.update;javax.swing.JComponent.paintComponent;javax.swing.JComponent.paint;javax.swing.JComponent.paintChildren;javax.swing.JComponent.paint;javax.swing.JComponent.paintChildren;javax.swing.JComponent.paint;javax.swing.JComponent.paintChildren;javax.swing.JComponent.paint;javax.swing.JComponent.paintChildren;javax.swing.JComponent.paint;javax.swing.JComponent.paintChildren;javax.swing.JComponent.paint;javax.swing.JComponent.paintToOffscreen;javax.swing.RepaintManager$PaintManager.paintDoubleBufferedImpl;javax.swing.RepaintManager$PaintManager.paintDoubleBuffered;javax.swing.RepaintManager$PaintManager.paint;javax.swing.RepaintManager.paint;javax.swing.JComponent._paintImmediately;javax.swing.JComponent.paintImmediately;javax.swing.RepaintManager$4.run;javax.swing.RepaintManager$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;javax.swing.RepaintManager.paintDirtyRegions;javax.swing.RepaintManager.paintDirtyRegions;javax.swing.RepaintManager.prePaintDirtyRegions;javax.swing.RepaintManager$ProcessingRunnable.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 1
+      },
+      {
+        "key": "other java.lang.Character.getType;java.lang.Character.isLetter;java.lang.Character.isLetter;shed.OpenBufferCompletionIndex.isIdentifierStart;shed.OpenBufferCompletionIndex.build;shed.InputController.lambda$submitOpenBufferWordIndex$3;shed.InputController$$Lambda.0x00000070012dd378.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x0000007001236000.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 1
+      },
+      {
+        "key": "other sun.security.provider.SHA2.implCompress0;sun.security.provider.SHA2.implCompress;sun.security.provider.DigestBase.implCompressMultiBlock0;sun.security.provider.DigestBase.implCompressMultiBlock;sun.security.provider.DigestBase.engineUpdate;java.security.MessageDigest$Delegate.engineUpdate;java.security.MessageDigest.update;java.security.MessageDigest.digest;shed.FileBuffer.digest;shed.FileBuffer.load;shed.FileBuffer.<init>;shed.LegacyDocumentStore.load;shed.PaneBufferController.lambda$openFileAsync$15;shed.PaneBufferController$$Lambda.0x000000700123c000.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x0000007001236000.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 1
+      },
+      {
+        "key": "EDT sun.font.FontDesignMetrics.getLatinCharWidth;sun.font.FontDesignMetrics.charsWidth;sun.swing.SwingUtilities2.getFontCharsWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;javax.swing.text.Utilities.getTabbedTextWidth;shed.SourcePlainView.width;shed.SourcePlainView.put;shed.SourcePlainView.rebuild;shed.SourcePlainView.ensureSummary;shed.SourcePlainView.getPreferredSpan;javax.swing.plaf.basic.BasicTextUI$RootView.getPreferredSpan;javax.swing.plaf.basic.BasicTextUI.getPreferredSize;javax.swing.plaf.basic.BasicTextAreaUI.getPreferredSize;javax.swing.JComponent.getPreferredSize;javax.swing.JTextArea.getPreferredSize;javax.swing.ScrollPaneLayout.layoutContainer;java.awt.Container.layout;java.awt.Container.doLayout;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validateTree;java.awt.Container.validate;javax.swing.SwingUtilities.updateComponentTreeUI;shed.EditorUiController.applyUiFontWithProfile;shed.EditorUiController.applyUiFont;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x00000070012ddbe0.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 1
+      },
+      {
+        "key": "EDT java.lang.invoke.LambdaProxyClassArchive.findFromArchive;java.lang.invoke.LambdaProxyClassArchive.find;java.lang.invoke.InnerClassLambdaMetafactory.spinInnerClass;java.lang.invoke.InnerClassLambdaMetafactory.buildCallSite;java.lang.invoke.LambdaMetafactory.metafactory;java.lang.invoke.LambdaForm$DMH.0x0000007001090000.invokeStatic;java.lang.invoke.Invokers$Holder.invokeExact_MT;java.lang.invoke.BootstrapMethodInvoker.invoke;java.lang.invoke.CallSite.makeSite;java.lang.invoke.MethodHandleNatives.linkCallSiteImpl;java.lang.invoke.MethodHandleNatives.linkCallSite;shed.InlineFindBar.<init>;shed.Texteditor.<init>;shed.Texteditor.<init>;shed.MarkdownQualificationProbe.lambda$main$21;shed.MarkdownQualificationProbe$$Lambda.0x0000007001006a08.call;java.util.concurrent.FutureTask.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 1
+      },
+      {
+        "key": "EDT java.util.zip.Inflater.inflateBytesBytes;java.util.zip.Inflater.inflate;java.util.zip.InflaterInputStream.read;jdk.internal.loader.Resource.getBytes;jdk.internal.loader.URLClassPath$JarLoader$2.getBytes;jdk.internal.loader.BuiltinClassLoader.defineClass;jdk.internal.loader.BuiltinClassLoader.findClassOnClassPathOrNull;jdk.internal.loader.BuiltinClassLoader.loadClassOrNull;jdk.internal.loader.BuiltinClassLoader.loadClass;jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass;java.lang.ClassLoader.loadClass;java.lang.Class.getDeclaredMethods0;java.lang.Class.privateGetDeclaredMethods;java.lang.Class.getDeclaredMethod;java.awt.Component.isCoalesceEventsOverriden;java.awt.Component$3.run;java.awt.Component$3.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.awt.Component.checkCoalescing;java.awt.Component.<init>;java.awt.Container.<init>;javax.swing.JComponent.<init>;javax.swing.JPanel.<init>;javax.swing.JPanel.<init>;shed.ToolWindowHost.<init>;shed.EditorUiController.finishStagedStartup;shed.Texteditor.lambda$new$1;shed.Texteditor$$Lambda.0x00000070012ddbe0.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 1
+      }
+    ],
+    "allocation_samples": 728,
+    "top_weighted_allocation_samples_not_retained": [
+      {
+        "key": "[B",
+        "value": 67736600
+      },
+      {
+        "key": "[C",
+        "value": 9437256
+      },
+      {
+        "key": "java.io.File",
+        "value": 6529784
+      },
+      {
+        "key": "java.lang.String",
+        "value": 6306720
+      },
+      {
+        "key": "[I",
+        "value": 5795328
+      },
+      {
+        "key": "java.awt.geom.AffineTransform",
+        "value": 3453704
+      },
+      {
+        "key": "[Z",
+        "value": 2171384
+      },
+      {
+        "key": "shed.OpenBufferCompletionIndex$WordStats",
+        "value": 2168976
+      },
+      {
+        "key": "jdk.internal.org.objectweb.asm.Frame",
+        "value": 2077392
+      },
+      {
+        "key": "jdk.internal.org.objectweb.asm.SymbolTable$Entry",
+        "value": 1984920
+      },
+      {
+        "key": "[Ljava.lang.Object;",
+        "value": 1610720
+      },
+      {
+        "key": "[Ljdk.internal.org.objectweb.asm.SymbolTable$Entry;",
+        "value": 1432448
+      },
+      {
+        "key": "java.awt.EventQueue$4",
+        "value": 1293664
+      },
+      {
+        "key": "java.awt.Rectangle",
+        "value": 1160400
+      },
+      {
+        "key": "java.util.regex.Pattern",
+        "value": 1152736
+      }
+    ],
+    "gc_pause_ms": [
+      0.781166,
+      0.029292,
+      1.926333,
+      2.249166,
+      2.0675,
+      0.703083,
+      1.739208,
+      0.032959,
+      1.738583,
+      8.729333,
+      7.963,
+      10.243417,
+      10.62175
+    ],
+    "gc_pause_total_ms": 48.82479
+  },
+  "jfr-renderer-control.json": {
+    "recording": "/tmp/shed-tranche7a-rich/renderer-control-nmt/profile.jfr",
+    "execution_or_native_samples": 845,
+    "overlapping_stack_presence_counts": {
+      "EDT DefaultDocumentEvent.undo": 2,
+      "EDT FontDesignMetrics": 1,
+      "EDT PlainView": 8,
+      "EDT SourcePlainView": 1,
+      "EDT UndoManager.undo": 2,
+      "EDT VersionedTextSnapshot": 4,
+      "EDT javax.swing.text.PlainView.calculateLongestLine": 1,
+      "other GapContent": 1,
+      "other GrammarHighlightService": 1,
+      "other MarkdownPreviewAssets": 17,
+      "other highlightSnapshot": 1
+    },
+    "top_stacks": [
+      {
+        "key": "other sun.nio.ch.KQueue.poll;sun.nio.ch.KQueueSelectorImpl.doSelect;sun.nio.ch.SelectorImpl.lockAndDoSelect;sun.nio.ch.SelectorImpl.select;jdk.internal.net.http.HttpClientImpl$SelectorManager.run",
+        "value": 386
+      },
+      {
+        "key": "other java.lang.ProcessHandleImpl.waitForProcessExit0;java.lang.ProcessHandleImpl$1.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run;jdk.internal.misc.InnocuousThread.run",
+        "value": 129
+      },
+      {
+        "key": "other sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000040122ab30.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 29
+      },
+      {
+        "key": "other sun.font.CFont.createNativeFont;sun.font.CFont.getNativeFontPtr;sun.font.CFont.getWidth;sun.font.FontFamily.preferredWidth;sun.font.FontFamily.setFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerGenericFont;sun.font.CFontManager.registerFont;sun.font.CFontManager.loadNativeFonts;sun.font.CFontManager$1.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.font.CFontManager.loadFonts;sun.font.SunFontManager.loadFontFiles;sun.font.SunFontManager.getInstalledFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;sun.java2d.SunGraphicsEnvironment.getAvailableFontFamilyNames;shed.StagedStartupFont.loadSystemFonts;shed.Texteditor.lambda$new$2;shed.Texteditor$$Lambda.0x000000040122ab30.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 24
+      },
+      {
+        "key": "other sun.java2d.metal.MTLRenderQueue.flushBuffer;sun.java2d.metal.MTLRenderQueue.flushBuffer;sun.java2d.metal.MTLRenderQueue$QueueFlusher.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 9
+      },
+      {
+        "key": "other sun.java2d.metal.MTLLayer.blitTexture;sun.java2d.metal.MTLLayer.lambda$drawInMTLContext$4;sun.java2d.metal.MTLLayer$$Lambda.0x00000004012736d0.run;sun.lwawt.macosx.CFRetainedResource.execute;sun.java2d.metal.MTLLayer.drawInMTLContext",
+        "value": 7
+      },
+      {
+        "key": "other sun.lwawt.macosx.LWCToolkit.initAppkit;sun.lwawt.macosx.LWCToolkit.lambda$new$0;sun.lwawt.macosx.LWCToolkit$$Lambda.0x00000004010c3b80.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;sun.lwawt.macosx.LWCToolkit.<init>;sun.awt.PlatformGraphicsInfo.createToolkit;java.awt.Toolkit.getDefaultToolkit;java.awt.Toolkit.getEventQueue;java.awt.EventQueue.isDispatchThread;javax.swing.SwingUtilities.isEventDispatchThread;shed.MarkdownPerformanceProbe.edt;shed.MarkdownQualificationProbe.main",
+        "value": 5
+      },
+      {
+        "key": "other java.lang.ProcessImpl.forkAndExec;java.lang.ProcessImpl.<init>;java.lang.ProcessImpl.start;java.lang.ProcessBuilder.start;java.lang.ProcessBuilder.start;shed.SyntaxUiController.loadGitBlame;shed.SyntaxUiController.lambda$startPendingGitBlame$2;shed.SyntaxUiController$$Lambda.0x00000004012dd338.run;shed.AsyncJobService.lambda$submit$6;shed.AsyncJobService$$Lambda.0x0000000401236000.run;java.util.concurrent.Executors$RunnableAdapter.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 5
+      },
+      {
+        "key": "other jdk.internal.util.ArraysSupport.utf16hashCode;jdk.internal.util.ArraysSupport.vectorizedHashCode;java.lang.StringUTF16.hashCode;java.lang.String.hashCode;com.oracle.truffle.api.source.SourceImpl$Key.hashCodeImpl;com.oracle.truffle.api.source.SourceImpl$Key.hashCode;java.util.concurrent.ConcurrentHashMap.get;com.oracle.truffle.api.source.InternedSources.intern;com.oracle.truffle.api.source.Source.buildSource;com.oracle.truffle.api.source.Source$SourceBuilder.build;com.oracle.truffle.api.source.Source$LiteralBuilder.build;com.oracle.truffle.polyglot.PolyglotSourceDispatch.build;org.graalvm.polyglot.Source$Builder.build;org.graalvm.polyglot.Source$Builder.buildLiteral;org.graalvm.polyglot.Source.create;org.graalvm.polyglot.Context.eval;com.aresstack.mermaid.GraalJsExecutor$1.call;com.aresstack.mermaid.GraalJsExecutor$1.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 5
+      },
+      {
+        "key": "other java.util.zip.Deflater.deflateBytesBytes;java.util.zip.Deflater.deflate;java.util.zip.Deflater.deflate;com.sun.imageio.plugins.png.IDATOutputStream.deflate;com.sun.imageio.plugins.png.IDATOutputStream.write;com.sun.imageio.plugins.png.PNGImageWriter.encodePass;com.sun.imageio.plugins.png.PNGImageWriter.write_IDAT;com.sun.imageio.plugins.png.PNGImageWriter.write;javax.imageio.ImageWriter.write;javax.imageio.ImageIO.doWrite;javax.imageio.ImageIO.write;shed.MarkdownPreviewAssets.writePng;shed.MarkdownPreviewAssets.renderMermaid;shed.MarkdownMediaControlProbe.lambda$run$14;shed.MarkdownMediaControlProbe$$Lambda.0x000000040180a858.call;shed.MarkdownMediaControlProbe.timed;shed.MarkdownMediaControlProbe.lambda$run$15;shed.MarkdownMediaControlProbe$$Lambda.0x000000040180a630.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 4
+      },
+      {
+        "key": "EDT sun.font.CStrike$GlyphInfoCache.get;sun.font.CStrike.getGlyphImagePtrs;sun.font.GlyphList.mapChars;sun.font.GlyphList.setFromString;sun.java2d.pipe.GlyphListPipe.drawString;sun.java2d.pipe.ValidatePipe.drawString;sun.java2d.SunGraphics2D.drawString;sun.swing.SwingUtilities2.drawChars;javax.swing.text.Utilities.drawTabbedText;javax.swing.text.PlainView.drawUnselectedTextImpl;javax.swing.text.PlainView.drawUnselectedText;javax.swing.text.PlainView.callDrawUnselectedText;javax.swing.text.PlainView.drawElement;javax.swing.text.PlainView.drawLineImpl;javax.swing.text.PlainView.drawLine;javax.swing.text.PlainView.paint;javax.swing.plaf.basic.BasicTextUI$RootView.paint;javax.swing.plaf.basic.BasicTextUI.paintSafely;javax.swing.plaf.basic.BasicTextUI.paint;javax.swing.plaf.basic.BasicTextUI.update;javax.swing.JComponent.paintComponent;shed.EditorUiController$7.paintComponent;javax.swing.JComponent.paint;javax.swing.JComponent.paintToOffscreen;javax.swing.RepaintManager$PaintManager.paintDoubleBufferedImpl;javax.swing.RepaintManager$PaintManager.paintDoubleBuffered;javax.swing.RepaintManager$PaintManager.paint;javax.swing.RepaintManager.paint;javax.swing.JComponent._paintImmediately;javax.swing.JComponent.paintImmediately;javax.swing.RepaintManager$4.run;javax.swing.RepaintManager$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;javax.swing.RepaintManager.paintDirtyRegions;javax.swing.RepaintManager.paintDirtyRegions;javax.swing.RepaintManager.prePaintDirtyRegions;javax.swing.RepaintManager$ProcessingRunnable.run;java.awt.event.InvocationEvent.dispatch;java.awt.EventQueue.dispatchEventImpl;java.awt.EventQueue$4.run;java.awt.EventQueue$4.run;java.security.AccessController.executePrivileged;java.security.AccessController.doPrivileged;java.security.ProtectionDomain$JavaSecurityAccessImpl.doIntersectionPrivilege;java.awt.EventQueue.dispatchEvent;java.awt.EventDispatchThread.pumpOneEventForFilters;java.awt.EventDispatchThread.pumpEventsForFilter;java.awt.EventDispatchThread.pumpEventsForHierarchy;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.pumpEvents;java.awt.EventDispatchThread.run",
+        "value": 3
+      },
+      {
+        "key": "other com.oracle.truffle.js.nodes.array.JSArrayNextElementIndexNodeGen.executeLong;com.oracle.truffle.js.nodes.array.JSArrayNextElementIndexNode.executeLong;com.oracle.truffle.js.nodes.access.ForEachIndexCallNode$ForwardForEachIndexCallNode.nextElementIndex;com.oracle.truffle.js.nodes.access.ForEachIndexCallNode$ForwardForEachIndexCallNode.executeForEachIndexFast;com.oracle.truffle.js.nodes.access.ForEachIndexCallNode.executeForEachIndex;com.oracle.truffle.js.builtins.ArrayPrototypeBuiltins$ArrayForEachIndexCallOperation.forEachIndexCall;com.oracle.truffle.js.builtins.ArrayPrototypeBuiltins$JSArrayForEachNode.forEach;com.oracle.truffle.js.builtins.ArrayPrototypeBuiltinsFactory$JSArrayForEachNodeGen.execute;com.oracle.truffle.js.nodes.function.FunctionRootNode.executeInRealm;com.oracle.truffle.js.runtime.JavaScriptRealmBoundaryRootNode.execute;com.oracle.truffle.api.impl.DefaultCallTarget.callDirectOrIndirect;com.oracle.truffle.api.impl.DefaultDirectCallNode.call;com.oracle.truffle.js.nodes.function.JSFunctionCallNode$UnboundJSFunctionCacheNode.executeCall;com.oracle.truffle.js.nodes.function.JSFunctionCallNode.executeCall;com.oracle.truffle.js.nodes.function.JSFunctionCallNode$InvokeNode.execute;com.oracle.truffle.js.nodes.binary.JSLogicalNode.execute;com.oracle.truffle.js.nodes.JavaScriptNode.executeVoid;com.oracle.truffle.js.nodes.binary.DualNode.execute;com.oracle.truffle.js.nodes.control.IfNode.execute;com.oracle.truffle.js.nodes.control.IfNode.execute;com.oracle.truffle.js.nodes.control.IfNode.execute;com.oracle.truffle.js.nodes.control.ReturnNode$TerminalPositionReturnNode.execute;com.oracle.truffle.js.nodes.control.AbstractBlockNode.executeGeneric;com.oracle.truffle.js.nodes.control.AbstractBlockNode.executeGeneric;com.oracle.truffle.api.impl.DefaultBlockNode.executeGeneric;com.oracle.truffle.js.nodes.control.AbstractBlockNode.execute;com.oracle.truffle.js.nodes.function.BlockScopeNode$FrameBlockScopeNode.execute;com.oracle.truffle.js.nodes.control.AbstractBlockNode.executeGeneric;com.oracle.truffle.js.nodes.control.AbstractBlockNode.executeGeneric;com.oracle.truffle.api.impl.DefaultBlockNode.executeGeneric;com.oracle.truffle.js.nodes.control.AbstractBlockNode.execute;com.oracle.truffle.js.nodes.function.FunctionBodyNode.execute;com.oracle.truffle.js.nodes.function.FunctionRootNode.executeInRealm;com.oracle.truffle.js.runtime.JavaScriptRealmBoundaryRootNode.execute;com.oracle.truffle.api.impl.DefaultCallTarget.callDirectOrIndirect;com.oracle.truffle.api.impl.DefaultDirectCallNode.call;com.oracle.truffle.js.nodes.function.JSFunctionCallNode$UnboundJSFunctionCacheNode.executeCall;com.oracle.truffle.js.nodes.function.JSFunctionCallNode.executeCall;com.oracle.truffle.js.nodes.function.JSFunctionCallNode$CallNode.execute;com.oracle.truffle.js.nodes.access.WriteElementNode.executeWithTargetAndIndex;com.oracle.truffle.js.nodes.access.WriteElementNode.executeWithTarget;com.oracle.truffle.js.nodes.access.WriteElementNode.execute;com.oracle.truffle.js.nodes.binary.DualNode.execute;com.oracle.truffle.js.nodes.control.IfNode.execute;com.oracle.truffle.js.nodes.control.DiscardResultNode.execute;com.oracle.truffle.js.nodes.binary.DualNode.execute;com.oracle.truffle.js.nodes.function.FunctionBodyNode.execute;com.oracle.truffle.js.nodes.function.FunctionRootNode.executeInRealm;com.oracle.truffle.js.runtime.JavaScriptRealmBoundaryRootNode.execute;com.oracle.truffle.api.impl.DefaultCallTarget.callDirectOrIndirect;com.oracle.truffle.api.impl.DefaultIndirectCallNode.call;com.oracle.truffle.js.nodes.function.JSFunctionCallNode$GenericJSFunctionCacheNode.executeCall;com.oracle.truffle.js.nodes.function.JSFunctionCallNode.executeCall;com.oracle.truffle.js.builtins.ArrayPrototypeBuiltins$ArrayForEachIndexCallOperation$DefaultCallbackNode.apply;com.oracle.truffle.js.nodes.access.ForEachIndexCallNode.callback;com.oracle.truffle.js.nodes.access.ForEachIndexCallNode$ForwardForEachIndexCallNode.executeForEachIndexFast;com.oracle.truffle.js.nodes.access.ForEachIndexCallNode.executeForEachIndex;com.oracle.truffle.js.builtins.ArrayPrototypeBuiltins$ArrayForEachIndexCallOperation.forEachIndexCall;com.oracle.truffle.js.builtins.ArrayPrototypeBuiltins$JSArrayForEachNode.forEach;com.oracle.truffle.js.builtins.ArrayPrototypeBuiltinsFactory$JSArrayForEachNodeGen.execute;com.oracle.truffle.js.nodes.function.FunctionRootNode.executeInRealm;com.oracle.truffle.js.runtime.JavaScriptRealmBoundaryRootNode.execute;com.oracle.truffle.api.impl.DefaultCallTarget.callDirectOrIndirect;com.oracle.truffle.api.impl.DefaultDirectCallNode.call",
+        "value": 2
+      },
+      {
+        "key": "other java.util.zip.Deflater.deflateBytesBytes;java.util.zip.Deflater.deflate;java.util.zip.Deflater.deflate;com.sun.imageio.plugins.png.IDATOutputStream.deflate;com.sun.imageio.plugins.png.IDATOutputStream.write;com.sun.imageio.plugins.png.PNGImageWriter.encodePass;com.sun.imageio.plugins.png.PNGImageWriter.write_IDAT;com.sun.imageio.plugins.png.PNGImageWriter.write;javax.imageio.ImageWriter.write;javax.imageio.ImageIO.doWrite;javax.imageio.ImageIO.write;shed.MarkdownPreviewAssets.writePng;shed.MarkdownPreviewAssets.renderMermaid;shed.MarkdownMediaControlProbe.lambda$run$4;shed.MarkdownMediaControlProbe$$Lambda.0x00000004013379e8.call;shed.MarkdownMediaControlProbe.timed;shed.MarkdownMediaControlProbe.lambda$run$5;shed.MarkdownMediaControlProbe$$Lambda.0x00000004013377c0.call;java.util.concurrent.FutureTask.run;java.util.concurrent.ThreadPoolExecutor.runWorker;java.util.concurrent.ThreadPoolExecutor$Worker.run;java.lang.Thread.runWith;java.lang.Thread.run",
+        "value": 2
+      },
+      {
+        "key": "other sun.awt.AWTAutoShutdown.isReadyToShutdown;sun.awt.AWTAutoShutdown.setToolkitBusy;sun.awt.AWTAutoShutdown.notifyToolkitThreadBusy",
+        "value": 2
+      },
+      {
+        "key": "other com.oracle.truffle.js.parser.GraalJSTranslator.tagExpression;com.oracle.truffle.js.parser.GraalJSTranslator.enterLiteralNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterLiteralNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterLiteralNode;com.oracle.js.parser.ir.LiteralNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.createArrayLiteral;com.oracle.truffle.js.parser.GraalJSTranslator.enterLiteralNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterLiteralNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterLiteralNode;com.oracle.js.parser.ir.LiteralNode$ArrayLiteralNode.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.LiteralNode$ArrayLiteralNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformArgs;com.oracle.truffle.js.parser.GraalJSTranslator.enterCallNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterCallNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterCallNode;com.oracle.js.parser.ir.CallNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.createArrayLiteral;com.oracle.truffle.js.parser.GraalJSTranslator.enterLiteralNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterLiteralNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterLiteralNode;com.oracle.js.parser.ir.LiteralNode$ArrayLiteralNode.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.LiteralNode$ArrayLiteralNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformPropertyValue;com.oracle.truffle.js.parser.GraalJSTranslator.enterObjectPropertyNode;com.oracle.truffle.js.parser.GraalJSTranslator.transformPropertyDefinitionList;com.oracle.truffle.js.parser.GraalJSTranslator.enterObjectNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterObjectNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterObjectNode;com.oracle.js.parser.ir.ObjectNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.createVarAssignNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterVarNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterVarNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterVarNode;com.oracle.js.parser.ir.VarNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatementInBlock;com.oracle.truffle.js.parser.GraalJSTranslator.transformStatements;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.truffle.js.parser.JavaScriptTranslator.enterBlock;com.oracle.truffle.js.parser.GraalJSTranslator.enterBlock;com.oracle.js.parser.ir.Block.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.Block.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.translateFunctionBody;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterFunctionNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterFunctionNode;com.oracle.js.parser.ir.FunctionNode.accept;com.oracle.js.parser.ir.LexicalContextNode.accept;com.oracle.js.parser.ir.LexicalContextExpression.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform;com.oracle.truffle.js.parser.GraalJSTranslator.enterCallNode;com.oracle.truffle.js.parser.JavaScriptTranslator.enterCallNode;com.oracle.truffle.js.parser.GraalJSTranslator.enterCallNode;com.oracle.js.parser.ir.CallNode.accept;com.oracle.truffle.js.parser.GraalJSTranslator.transform",
+        "value": 1
+      },
+      {
+        "key": "other org.graalvm.collections.EconomicMapImpl.find;org.graalvm.collections.EconomicMapImpl.get;com.oracle.js.parser.ir.Scope.getExistingSymbol;com.oracle.js.parser.ir.Scope.isLexicallyDeclaredName;com.oracle.js.parser.Parser.detectVarNameConflict;com.oracle.js.parser.Parser.declareVar;com.oracle.js.parser.Parser.variableDeclarationList;com.oracle.js.parser.Parser.forStatement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.sourceElements;com.oracle.js.parser.Parser.functionBody;com.oracle.js.parser.Parser.functionExpression;com.oracle.js.parser.Parser.functionExpression;com.oracle.js.parser.Parser.memberExpression;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.argumentList;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.propertyDefinition;com.oracle.js.parser.Parser.objectLiteral;com.oracle.js.parser.Parser.primaryExpression;com.oracle.js.parser.Parser.memberExpression;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.variableDeclarationList;com.oracle.js.parser.Parser.variableStatement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.sourceElements;com.oracle.js.parser.Parser.functionBody;com.oracle.js.parser.Parser.functionExpression;com.oracle.js.parser.Parser.functionExpression;com.oracle.js.parser.Parser.memberExpression;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.parenthesizedExpressionAndArrowParameterList;com.oracle.js.parser.Parser.primaryExpression;com.oracle.js.parser.Parser.memberExpression;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.expression",
+        "value": 1
+      },
+      {
+        "key": "other com.oracle.js.parser.AbstractParser.nextOrEOL;com.oracle.js.parser.AbstractParser.next;com.oracle.js.parser.AbstractParser.expect;com.oracle.js.parser.Parser.argumentList;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.variableDeclarationList;com.oracle.js.parser.Parser.variableStatement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statementList;com.oracle.js.parser.Parser.getBlock;com.oracle.js.parser.Parser.getStatement;com.oracle.js.parser.Parser.ifStatement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.sourceElements;com.oracle.js.parser.Parser.functionBody;com.oracle.js.parser.Parser.functionExpression;com.oracle.js.parser.Parser.functionExpression;com.oracle.js.parser.Parser.memberExpression;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.expressionStatement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.sourceElements;com.oracle.js.parser.Parser.functionBody;com.oracle.js.parser.Parser.arrowFunction;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.argumentList;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.variableDeclarationList;com.oracle.js.parser.Parser.variableStatement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.sourceElements;com.oracle.js.parser.Parser.functionBody;com.oracle.js.parser.Parser.arrowFunction;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.parenthesizedExpressionAndArrowParameterList;com.oracle.js.parser.Parser.primaryExpression;com.oracle.js.parser.Parser.memberExpression;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression",
+        "value": 1
+      },
+      {
+        "key": "other java.lang.String.hashCode;com.oracle.js.parser.Parser.isValidStrictIdent;com.oracle.js.parser.Parser.verifyStrictIdent;com.oracle.js.parser.Parser.identifier;com.oracle.js.parser.Parser.bindingIdentifier;com.oracle.js.parser.Parser.formalParameter;com.oracle.js.parser.Parser.formalParameterList;com.oracle.js.parser.Parser.formalParameterList;com.oracle.js.parser.Parser.propertyMethodFunction;com.oracle.js.parser.Parser.methodDefinition;com.oracle.js.parser.Parser.classTail;com.oracle.js.parser.Parser.classExpression;com.oracle.js.parser.Parser.memberExpression;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.parenthesizedExpressionAndArrowParameterList;com.oracle.js.parser.Parser.primaryExpression;com.oracle.js.parser.Parser.memberExpression;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.expressionStatement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.sourceElements;com.oracle.js.parser.Parser.functionBody;com.oracle.js.parser.Parser.arrowFunction;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.argumentList;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.variableDeclarationList;com.oracle.js.parser.Parser.variableStatement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.statement;com.oracle.js.parser.Parser.sourceElements;com.oracle.js.parser.Parser.functionBody;com.oracle.js.parser.Parser.arrowFunction;com.oracle.js.parser.Parser.assignmentExpression;com.oracle.js.parser.Parser.parenthesizedExpressionAndArrowParameterList;com.oracle.js.parser.Parser.primaryExpression;com.oracle.js.parser.Parser.memberExpression;com.oracle.js.parser.Parser.leftHandSideExpression;com.oracle.js.parser.Parser.unaryExpression;com.oracle.js.parser.Parser.expression;com.oracle.js.parser.Parser.conditionalExpression;com.oracle.js.parser.Parser.assignmentExpression",
+        "value": 1
+      }
+    ],
+    "allocation_samples": 3499,
+    "top_weighted_allocation_samples_not_retained": [
+      {
+        "key": "[B",
+        "value": 728662208
+      },
+      {
+        "key": "[Ljava.lang.Object;",
+        "value": 303821456
+      },
+      {
+        "key": "com.oracle.truffle.js.parser.env.Environment$FrameSlotVarRef",
+        "value": 263365776
+      },
+      {
+        "key": "com.oracle.js.parser.ir.IdentNode",
+        "value": 262662048
+      },
+      {
+        "key": "[I",
+        "value": 198398456
+      },
+      {
+        "key": "com.oracle.truffle.api.impl.DefaultTruffleRuntime$DefaultFrameInstance",
+        "value": 162894560
+      },
+      {
+        "key": "com.oracle.truffle.js.nodes.access.RegExpLiteralNode",
+        "value": 147408800
+      },
+      {
+        "key": "com.oracle.truffle.js.nodes.access.JSConstantNode$JSConstantIntegerNode",
+        "value": 141404296
+      },
+      {
+        "key": "com.oracle.truffle.api.impl.DefaultAssumption",
+        "value": 134695432
+      },
+      {
+        "key": "com.oracle.truffle.api.impl.DefaultVirtualFrame",
+        "value": 131479720
+      },
+      {
+        "key": "java.util.ArrayList",
+        "value": 130907840
+      },
+      {
+        "key": "com.oracle.truffle.api.nodes.NodeIterator",
+        "value": 129674912
+      },
+      {
+        "key": "com.oracle.truffle.object.CoreLocations$ObjectArrayLocation",
+        "value": 105653488
+      },
+      {
+        "key": "[C",
+        "value": 86466952
+      },
+      {
+        "key": "java.util.HashMap$KeySet",
+        "value": 82087088
+      }
+    ],
+    "gc_pause_ms": [
+      1.626333,
+      0.037041,
+      2.011709,
+      2.759208,
+      2.413541,
+      1.910667,
+      0.030625,
+      0.723125,
+      1.928458,
+      9.266459,
+      8.427166,
+      9.69025,
+      1.917625,
+      0.036583,
+      1.3565,
+      11.861542,
+      10.399208,
+      9.438666,
+      9.570375,
+      1.035916,
+      0.046041,
+      1.718291,
+      0.059791,
+      2.132208,
+      0.095417,
+      2.446,
+      1.95575,
+      1.451542,
+      0.811625,
+      0.934416,
+      0.824209,
+      5.540458,
+      5.478041,
+      3.360542,
+      2.91075,
+      2.298709,
+      0.095542,
+      5.788625,
+      4.555875,
+      2.280167,
+      1.694708,
+      5.7535,
+      6.198375,
+      3.726542,
+      0.065125,
+      4.654666,
+      0.125667,
+      6.486417,
+      8.900375,
+      6.409333,
+      5.544709,
+      3.843875,
+      2.781417,
+      0.086167,
+      8.745,
+      4.672417,
+      5.617958,
+      5.896375,
+      5.895166,
+      4.80875,
+      6.584458,
+      12.938125,
+      3.211875,
+      0.071917,
+      15.36825,
+      4.074208,
+      0.102708,
+      3.729917,
+      0.097125,
+      4.171583,
+      5.532292,
+      10.402666,
+      9.388625,
+      11.151417,
+      5.702209,
+      8.222792,
+      9.576625,
+      11.618875,
+      5.03375,
+      3.245958,
+      0.169792,
+      3.3985,
+      0.089166,
+      10.57825,
+      6.854209,
+      12.09625,
+      12.148375,
+      11.0385,
+      7.364875,
+      8.575875,
+      8.820583,
+      4.078042,
+      0.1245,
+      3.762291,
+      0.11375,
+      6.65025,
+      5.290667,
+      9.248417,
+      11.943375,
+      12.220667,
+      10.444792,
+      7.3565,
+      10.085083,
+      10.405417,
+      7.454583,
+      3.852791,
+      0.183833,
+      4.466292,
+      0.152125,
+      2.988,
+      0.117875,
+      8.662792,
+      10.251292,
+      9.266375,
+      9.246708,
+      5.887834,
+      4.141584,
+      7.655417,
+      8.656416,
+      5.472458,
+      4.8685,
+      2.716042,
+      0.167542,
+      13.889042,
+      15.917292,
+      11.624334,
+      27.730083,
+      22.664083,
+      24.92475,
+      24.977792,
+      3.378541,
+      0.063083,
+      26.657708,
+      29.235041,
+      0.897542,
+      39.900083,
+      33.832542,
+      23.958125,
+      19.482875
+    ],
+    "gc_pause_total_ms": 941.556414
+  }
+}

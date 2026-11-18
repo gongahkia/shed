@@ -1,0 +1,74 @@
+[
+  {
+    "group": "fonts",
+    "command": [
+      "python3",
+      "scripts/qualify-markdown.py",
+      "--group",
+      "fonts",
+      "--output",
+      "/tmp/shed-tranche7a-fonts"
+    ],
+    "exit": 0
+  },
+  {
+    "group": "index",
+    "command": [
+      "python3",
+      "scripts/qualify-markdown.py",
+      "--group",
+      "index",
+      "--output",
+      "/tmp/shed-tranche7a-index"
+    ],
+    "exit": 2
+  },
+  {
+    "group": "rich",
+    "command": [
+      "python3",
+      "scripts/qualify-markdown.py",
+      "--group",
+      "rich",
+      "--output",
+      "/tmp/shed-tranche7a-rich"
+    ],
+    "exit": 0
+  },
+  {
+    "group": "preview",
+    "command": [
+      "python3",
+      "scripts/qualify-markdown.py",
+      "--group",
+      "preview",
+      "--output",
+      "/tmp/shed-tranche7a-preview"
+    ],
+    "exit": 0
+  },
+  {
+    "group": "unicode",
+    "command": [
+      "python3",
+      "scripts/qualify-markdown.py",
+      "--group",
+      "unicode",
+      "--output",
+      "/tmp/shed-tranche7a-unicode"
+    ],
+    "exit": 0
+  },
+  {
+    "group": "lifecycle-qualified",
+    "command": [
+      "python3",
+      "scripts/qualify-markdown.py",
+      "--group",
+      "lifecycle",
+      "--output",
+      "/tmp/shed-tranche7a-lifecycle-qualified"
+    ],
+    "exit": 0
+  }
+]

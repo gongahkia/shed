@@ -1,0 +1,85 @@
+[
+  {
+    "name": "retention-final",
+    "command": [
+      "python3",
+      "scripts/qualify-markdown.py",
+      "--jar",
+      "/tmp/shed-tranche7a-run/audit.jar",
+      "--group",
+      "retention",
+      "--output",
+      "/tmp/shed-tranche7a-retention-qualified"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "defaults-startup",
+    "command": [
+      "python3",
+      "scripts/qualify-markdown.py",
+      "--group",
+      "startup",
+      "--output",
+      "/tmp/shed-tranche7a-defaults-startup"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "defaults-ui",
+    "command": [
+      "python3",
+      "scripts/benchmark-markdown.py",
+      "--mode",
+      "ui",
+      "--shapes",
+      "mixed",
+      "--sizes",
+      "102400",
+      "1048576",
+      "--samples",
+      "100",
+      "--warmups",
+      "10",
+      "--output",
+      "/tmp/shed-tranche7a-defaults-ui"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "defaults-memory",
+    "command": [
+      "python3",
+      "scripts/qualify-markdown.py",
+      "--group",
+      "default-launch",
+      "--output",
+      "/tmp/shed-tranche7a-defaults-memory"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "packaged-smoke",
+    "command": [
+      "python3",
+      "scripts/test-packaged-markdown.py",
+      "--output",
+      "/tmp/shed-tranche7a-run/packaged-smoke.json"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "tooling-final",
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "scripts",
+      "-p",
+      "test_benchmark*.py"
+    ],
+    "exit": 0
+  }
+]

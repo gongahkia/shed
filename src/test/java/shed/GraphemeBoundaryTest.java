@@ -8,6 +8,15 @@ import org.junit.jupiter.api.Test;
 
 public class GraphemeBoundaryTest {
     @Test
+    void indicConjunctIsOneNavigationAndDeletionUnit() {
+        String conjunct = "\u0915\u094D\u0937"; // Devanagari KA + VIRAMA + SSA
+        assertEquals(3, GraphemeBoundary.next(conjunct, 0));
+        assertEquals(0, GraphemeBoundary.previous(conjunct, 3));
+        assertFalse(GraphemeBoundary.isBoundary(conjunct, 2));
+        assertEquals(new GraphemeEditRange.Range(0, 3), GraphemeEditRange.previous(conjunct, 3));
+    }
+
+    @Test
     void keepsCombiningEmojiAndFlagClustersIntact() {
         String combining = "e\u0301";
         String emoji = "👩🏽";

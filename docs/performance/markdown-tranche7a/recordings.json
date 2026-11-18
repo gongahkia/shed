@@ -1,0 +1,37 @@
+[
+  {
+    "path": "/tmp/shed-tranche7a-unicode/unicode100k-profile/profile.jfr",
+    "bytes": 1819502,
+    "sha256": "f27a101f01e3629c82883dc7120fdadf723ba4137a5660e21bbaf55e75dfbf47"
+  },
+  {
+    "path": "/tmp/shed-tranche7a-preview-rich/preview-mixed-4096-0/profile.jfr",
+    "bytes": 2637807,
+    "sha256": "0d046a7aab9a1b919e1f85331339ebcf06d3231f8bff1338a66a23068d6b7296"
+  },
+  {
+    "path": "/tmp/shed-tranche7a-memory/1m-jfr-nmt/profile.jfr",
+    "bytes": 847595,
+    "sha256": "69ca3d9fe21de3c8dd3e7fd81d99c948dae588e3c1b511d21cedcaf0ba68f999"
+  },
+  {
+    "path": "/tmp/shed-tranche7a-semantic-memory/semantic-memory-mixed-1048576-0/profile.jfr",
+    "bytes": 1285951,
+    "sha256": "bc2fd8cb9998f3d2cca4122ec2dc39c1c23b589b0229e25c6aa6f8d09c2835b1"
+  },
+  {
+    "path": "/tmp/shed-tranche7a-rich/renderer-control-nmt/profile.jfr",
+    "bytes": 3653636,
+    "sha256": "264eccf58a1d20ef170d8050a6a0f440c1d67bc262343d3d716778ef3cbf213c"
+  },
+  {
+    "path": "/tmp/shed-tranche7a-rich/media-nmt/profile.jfr",
+    "bytes": 3294964,
+    "sha256": "449b5ec5f56f752d3aa5b2cf535d02221f52673eb8948a48b47f32e50dfd1a33"
+  },
+  {
+    "path": "/tmp/shed-tranche7a-defaults-unicode/unicode100k-profile/profile.jfr",
+    "bytes": 1259708,
+    "sha256": "c7e6725828567dfaca445e5288b596324ffd77fe23050ca7c909f889b2e814df"
+  }
+]

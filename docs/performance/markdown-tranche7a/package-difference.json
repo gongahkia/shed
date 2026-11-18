@@ -1,0 +1,18 @@
+{
+  "changed_application_entries": [
+    "shed/ConfigManager.class",
+    "shed/EditorUiController$17.class",
+    "shed/EditorUiController.class",
+    "shed/FontFamilyCatalog.class",
+    "shed/StagedStartupFont.class"
+  ],
+  "added_application_entries": [
+    "assets/fonts/",
+    "assets/fonts/JetBrainsMono-OFL.txt",
+    "assets/fonts/JetBrainsMono-Regular.ttf",
+    "shed/BundledEditorFont$Holder.class",
+    "shed/BundledEditorFont.class"
+  ],
+  "bundled_font_matches_source": true,
+  "bundled_license_matches_source": true
+}

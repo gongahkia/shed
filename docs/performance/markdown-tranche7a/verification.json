@@ -1,0 +1,37 @@
+{
+  "start_head": "c2143e36b5190f4c04f2acfe73cac3e1d2254c5b",
+  "end_head": "a7633bd7a5ac6a4b68544a4c1854412e8ac68c68",
+  "external_commits_preserved": true,
+  "agent_commits_or_pushes": false,
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "original_jar_sha256": "f51440f1e8aee98e48c71f611c0f48983a296c55540f1230f0f2dae2c9ed4acf",
+  "original_jar_matches_baseline": true,
+  "new_default_jar_sha256": "8d9a08e892d10536c769fd83dc72ed948620c65d2fd57def69e87e2664d772ed",
+  "changed_baseline_files": [
+    "src/main/java/shed/StagedStartupFont.java",
+    "src/main/java/shed/FontFamilyCatalog.java",
+    "src/main/java/shed/ConfigManager.java",
+    "src/main/java/shed/EditorUiController.java",
+    "src/test/java/shed/ConfigManagerTest.java",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java",
+    "src/test/java/shed/ThemePreviewTest.java",
+    "pom.xml",
+    "docs/CONFIG.md"
+  ],
+  "missing_baseline_files": [],
+  "suite_totals": {
+    "tests": 1542,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5
+  },
+  "git_diff_check": 0,
+  "tooling": {
+    "passed": 19,
+    "failed": 0
+  },
+  "packaged_smoke": "PASS",
+  "final_full_passed": 1537,
+  "previous_performance_evidence_unchanged": true
+}

@@ -1,0 +1,8 @@
+{
+  "saved_sha256": "b0be25a8aac2f2ef25d3ecba2187109edf084c74c0330ecc6e128435b2898171",
+  "expected_sha256": "b0be25a8aac2f2ef25d3ecba2187109edf084c74c0330ecc6e128435b2898171",
+  "saved_bytes": 10485761,
+  "expected_bytes": 10485761,
+  "exact_expected_edit": true,
+  "note": "Independent disk verification after the confounded second-buffer reopen OOM; does not establish the rest of that child persistence/undo sequence completed."
+}

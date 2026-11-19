@@ -93,7 +93,7 @@ def execute(jdk, jar, classes, output, label, fixture, small, mode, nmt=False, p
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--jar', type=Path, default=ROOT / 'target/shed-2.0.0.jar')
-    parser.add_argument('--group', choices=['memory', 'lifecycle', 'constrained', 'default-launch', 'startup', 'fonts', 'unicode', 'index', 'rich', 'preview', 'retention'], default='memory')
+    parser.add_argument('--group', choices=['memory', 'lifecycle', 'constrained', 'default-launch', 'startup', 'fonts', 'unicode', 'index', 'rich', 'preview', 'retention', 'retention-cycles', 'watched-cycles'], default='memory')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--generate-only', action='store_true')
     args = parser.parse_args()
@@ -133,6 +133,16 @@ def main():
         for label in ['empty', '1m']:
             cases.append((label + '-nmt', fixtures.get(label), 'baseline', True, False, 512, False))
         cases.append(('1m-jfr-nmt', fixtures['1m'], 'baseline', True, False, 512, True))
+    elif args.group == 'watched-cycles':
+        cases = [('watched-small', fixtures['small'], 'watched-cycles', False, False, 512, False),
+                 ('watched-1m', fixtures['1m'], 'watched-cycles', False, False, 512, False)]
+    elif args.group == 'retention-cycles':
+        control = corpus / 'control.java'
+        header, comment = 'class Control {}\n', '// alpha beta gamma delta\n'
+        control.write_text(header + (comment * (1048576 // len(comment)))[:1048576 - len(header)])
+        cases = [('cycles-small', fixtures['small'], 'retention-cycles', False, False, 512, False),
+                 ('cycles-1m', fixtures['1m'], 'retention-cycles', False, False, 512, False),
+                 ('cycles-java', control, 'retention-cycles', False, False, 512, False)]
     elif args.group == 'retention':
         cases = [('retention-eight-files', fixtures['1m'], 'retention', False, False, 512, False)]
     elif args.group == 'index':

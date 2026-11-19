@@ -1591,6 +1591,7 @@ final class JobQuickfixController {
         }
         pruneSpecialBufferReturns(editor.quickfixBuffer);
         editor.buffers.remove(editor.quickfixBuffer);
+        editor.releaseClosedBufferResources(editor.quickfixBuffer);
         editor.quickfixBuffer = null;
         return "Quickfix closed";
     }

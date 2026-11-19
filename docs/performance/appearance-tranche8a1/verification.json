@@ -1,0 +1,172 @@
+{
+  "maven": {
+    "command": "source /tmp/shed-tranche2c-run/toolchain.env; \"$MVN\" test",
+    "exit": 0,
+    "tests": 1565,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5,
+    "passed": 1560,
+    "skips": [
+      {
+        "class": "shed.DataLossRegressionTest",
+        "test": "atomicSavePreservesDosHiddenAttributeWhenSupported",
+        "message": "",
+        "details": "org.opentest4j.TestAbortedException: Assumption failed: DOS file attributes unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.DataLossRegressionTest.atomicSavePreservesDosHiddenAttributeWhenSupported(DataLossRegressionTest.java:196)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+      },
+      {
+        "class": "shed.FocusedAiPerformanceTest",
+        "test": "measurePreviewPreparationPaintingAndDismissalAcrossBufferSizes",
+        "message": "System property [shed.ai.benchmark] does not exist",
+        "details": ""
+      },
+      {
+        "class": "shed.TerminalShellIntegrationTest",
+        "test": "preparesAnIsolatedFishStartup",
+        "message": "",
+        "details": "org.opentest4j.TestAbortedException: Assumption failed: Fish is unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.TerminalShellIntegrationTest.preparesAnIsolatedFishStartup(TerminalShellIntegrationTest.java:48)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+      },
+      {
+        "class": "shed.TexteditorSwingIntegrationTest",
+        "test": "testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree",
+        "message": "",
+        "details": "org.opentest4j.TestAbortedException: Assumption failed: CMake, CTest, and CPack are unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.TexteditorSwingIntegrationTest.testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree(TexteditorSwingIntegrationTest.java:4115)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+      },
+      {
+        "class": "shed.FocusedAiNativeAcceptanceTest",
+        "test": "actualEditorAcceptsAcpSuggestionsAndRendersWrappedMultilinePreviews",
+        "message": "System property [shed.ai.native] does not exist",
+        "details": ""
+      }
+    ]
+  },
+  "tooling": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_*.py'",
+    "exit": 0,
+    "passed": 31,
+    "new_focused_tests": 3
+  },
+  "packaged_smoke": {
+    "jar_sha256": "6ee56710a5c6961860d8533bd916f9deef4ca445df71dadf5a9fa550c12bf3ee",
+    "jar_bytes": 50367236,
+    "probe_sha256": "7aff36cad7d2112bd6cb0d7d3153063e58c7f5f32bde905560f2036f8cf0152c",
+    "command": [
+      "/private/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home/bin/java",
+      "-Xms64m",
+      "-Xmx512m",
+      "-Djava.awt.headless=true",
+      "-Duser.home=/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/shed-packaged-markdown-wi3co_kc/home",
+      "-cp",
+      "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/shed-packaged-markdown-wi3co_kc/classes:/private/tmp/shed-tranche8a1-run/production.jar",
+      "shed.PackagedMarkdownSmoke",
+      "/private/tmp/shed-tranche8a1-run/production.jar",
+      "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/shed-packaged-markdown-wi3co_kc"
+    ],
+    "state": "PASS",
+    "exit": 0,
+    "stdout": "SMOKE {\"classpath\":\"/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/shed-packaged-markdown-wi3co_kc/classes:/private/tmp/shed-tranche8a1-run/production.jar\",\"application_origin\":\"/private/tmp/shed-tranche8a1-run/production.jar\",\"providers\":[\"com.oracle.truffle.js.lang.JavaScriptLanguageProvider\",\"com.oracle.truffle.regex.RegexLanguageProvider\"],\"provider_descriptors\":1,\"operation\":\"runtime\"}\nSMOKE {\"heap_committed_bytes\":69206016,\"heap_used_bytes\":6324744,\"threads\":7,\"operation\":\"before_assets\"}\nSMOKE {\"heap_committed_bytes\":69206016,\"heap_used_bytes\":24150536,\"threads\":9,\"operation\":\"plain_before_first_mermaid\"}\nSMOKE {\"render_ms\":136.822083,\"operation\":\"math_first\"}\nSMOKE {\"render_ms\":3366.764916,\"operation\":\"mermaid_first_after_plain_and_math\"}\nSMOKE {\"render_ms\":0.005083,\"operation\":\"mermaid_identical_cached\"}\nSMOKE {\"render_ms\":0.002708,\"operation\":\"mermaid_identical_cached\"}\nSMOKE {\"render_ms\":0.0015,\"operation\":\"mermaid_identical_cached\"}\nSMOKE {\"render_ms\":1431.837292,\"operation\":\"mermaid_multiple_nodes\"}\nSMOKE {\"render_ms\":742.766625,\"operation\":\"mermaid_changed\"}\nSMOKE {\"render_ms\":0.002792,\"operation\":\"mermaid_valid_after_invalid\"}\nSMOKE {\"render_ms\":505.252667,\"operation\":\"mermaid_changed_after_invalid\"}\nSMOKE {\"heap_committed_bytes\":466616320,\"heap_used_bytes\":317194240,\"threads\":14,\"operation\":\"after_renders_no_forced_gc\"}\nSMOKE {\"heap_committed_bytes\":466616320,\"heap_used_bytes\":337641472,\"threads\":13,\"operation\":\"after_assets_close_no_forced_gc\"}\nSMOKE_PASS\n",
+    "stderr": "[GraalJS] Creating context...\n[GraalJS] Context created in 86 ms\n[GraalJS] Bindings set in 204 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 2636 ms\n[GraalJS] Result read in 0 ms\n[GraalJS] Creating context...\n[GraalJS] Context created in 1 ms\n[GraalJS] Bindings set in 4 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 1173 ms\n[GraalJS] Result read in 0 ms\n[GraalJS] Creating context...\n[GraalJS] Context created in 0 ms\n[GraalJS] Bindings set in 2 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 679 ms\n[GraalJS] Result read in 0 ms\n[GraalJS] Creating context...\n[GraalJS] Context created in 1 ms\n[GraalJS] Bindings set in 3 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 514 ms\n[GraalJS] Result read in 0 ms\n[MermaidRenderer] Render failed: ERROR:UnknownDiagramError: No diagram type detected matching given configuration for text: this is not a Mermaid diagram\nSTACK: UnknownDiagramError: No diagram type detected matching given configuration for text: this is not a Mermaid diagram\n    at detectType (Unnamed:3301:74)\n    at Function.fromText (Unnamed:6014:6680)\n    at Object.render (Unnamed:6022:1191)\n    at Unnamed:6022:5541\n    at new Promise (native)\n    at performCall (Unnamed:6022:5518)\n    at executeQueue (Unnamed:6022:5178)\n    at Unnamed:6022:5665\n    at new Promise (native)\n    at Object.render (Unnamed:6022:5486)\n[GraalJS] Creating context...\n[GraalJS] Context created in 0 ms\n[GraalJS] Bindings set in 2 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 477 ms\n[GraalJS] Result read in 0 ms\n[MermaidRenderer] Render failed: ERROR:UnknownDiagramError: No diagram type detected matching given configuration for text: this is not a Mermaid diagram\nSTACK: UnknownDiagramError: No diagram type detected matching given configuration for text: this is not a Mermaid diagram\n    at detectType (Unnamed:3301:74)\n    at Function.fromText (Unnamed:6014:6680)\n    at Object.render (Unnamed:6022:1191)\n    at Unnamed:6022:5541\n    at new Promise (native)\n    at performCall (Unnamed:6022:5518)\n    at executeQueue (Unnamed:6022:5178)\n    at Unnamed:6022:5665\n    at new Promise (native)\n    at Object.render (Unnamed:6022:5486)\n[GraalJS] Creating context...\n[GraalJS] Context created in 0 ms\n[GraalJS] Bindings set in 2 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 447 ms\n[GraalJS] Result read in 0 ms\n[GraalJS] Creating context...\n[GraalJS] Context created in 1 ms\n[GraalJS] Bindings set in 2 ms\n[GraalJS] Evaluating setup script (2908 KB)...\n[GraalJS] Setup script evaluated in 457 ms\n[GraalJS] Result read in 0 ms\n",
+    "events": [
+      {
+        "classpath": "/var/folders/55/fw1sdntj20v8650vsmkn7s8c0000gn/T/shed-packaged-markdown-wi3co_kc/classes:/private/tmp/shed-tranche8a1-run/production.jar",
+        "application_origin": "/private/tmp/shed-tranche8a1-run/production.jar",
+        "providers": [
+          "com.oracle.truffle.js.lang.JavaScriptLanguageProvider",
+          "com.oracle.truffle.regex.RegexLanguageProvider"
+        ],
+        "provider_descriptors": 1,
+        "operation": "runtime"
+      },
+      {
+        "heap_committed_bytes": 69206016,
+        "heap_used_bytes": 6324744,
+        "threads": 7,
+        "operation": "before_assets"
+      },
+      {
+        "heap_committed_bytes": 69206016,
+        "heap_used_bytes": 24150536,
+        "threads": 9,
+        "operation": "plain_before_first_mermaid"
+      },
+      {
+        "render_ms": 136.822083,
+        "operation": "math_first"
+      },
+      {
+        "render_ms": 3366.764916,
+        "operation": "mermaid_first_after_plain_and_math"
+      },
+      {
+        "render_ms": 0.005083,
+        "operation": "mermaid_identical_cached"
+      },
+      {
+        "render_ms": 0.002708,
+        "operation": "mermaid_identical_cached"
+      },
+      {
+        "render_ms": 0.0015,
+        "operation": "mermaid_identical_cached"
+      },
+      {
+        "render_ms": 1431.837292,
+        "operation": "mermaid_multiple_nodes"
+      },
+      {
+        "render_ms": 742.766625,
+        "operation": "mermaid_changed"
+      },
+      {
+        "render_ms": 0.002792,
+        "operation": "mermaid_valid_after_invalid"
+      },
+      {
+        "render_ms": 505.252667,
+        "operation": "mermaid_changed_after_invalid"
+      },
+      {
+        "heap_committed_bytes": 466616320,
+        "heap_used_bytes": 317194240,
+        "threads": 14,
+        "operation": "after_renders_no_forced_gc"
+      },
+      {
+        "heap_committed_bytes": 466616320,
+        "heap_used_bytes": 337641472,
+        "threads": 13,
+        "operation": "after_assets_close_no_forced_gc"
+      }
+    ]
+  },
+  "feasibility": {
+    "command": "python3 scripts/qualify-decorated-transparency.py --jar /tmp/shed-tranche8a1-run/production.jar --output /tmp/shed-tranche8a1-gate",
+    "exit": 3,
+    "verdict": "NO_GO",
+    "children": 2,
+    "completed_child_protocols": 2,
+    "alpha_or_opacity_rejections": 6,
+    "transparent_cases": 0
+  },
+  "head_before": "2e3cfd8e7b5618d0cc330a77e1967d47a699651b",
+  "head_after": "2e3cfd8e7b5618d0cc330a77e1967d47a699651b",
+  "preexisting_file_count": 1451,
+  "preexisting_changed": [],
+  "readme_sha256_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_sha256_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "jar_sha256_before": "6ee56710a5c6961860d8533bd916f9deef4ca445df71dadf5a9fa550c12bf3ee",
+  "jar_sha256_after": "6ee56710a5c6961860d8533bd916f9deef4ca445df71dadf5a9fa550c12bf3ee",
+  "git_diff_check_exit": 0,
+  "git_diff_check_output": "",
+  "unavailable_after_failed_gate": [
+    "transparent decorated compositor/readability",
+    "transparent resize/scroll/selection",
+    "native controls/IME/physical input qualification",
+    "successful repeated transparency enable/disable and disposal",
+    "paired native graphics allocation",
+    "multi-monitor and other platform headful verification"
+  ],
+  "new_file_whitespace_check": "PASS",
+  "documentation_link_check": "PASS",
+  "prototype_absent_from_packaged_jar": true
+}

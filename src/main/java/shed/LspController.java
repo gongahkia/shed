@@ -1730,6 +1730,7 @@ final class LspController {
         }
         boolean wasCurrent = buffer == editor.getCurrentBuffer();
         editor.buffers.remove(buffer);
+        editor.releaseClosedBufferResources(buffer);
         if (wasCurrent && !editor.buffers.isEmpty()) {
             editor.switchToBuffer(Math.min(editor.currentBufferIndex, editor.buffers.size() - 1));
         } else if (editor.buffers.isEmpty()) {

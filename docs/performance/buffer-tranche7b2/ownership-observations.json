@@ -1,0 +1,699 @@
+{
+  "after-index": [
+    {
+      "operation": "index_release",
+      "collected": true,
+      "epoch_ms": 1794988709670
+    }
+  ],
+  "after-lifecycle": [
+    {
+      "next_still_open": false,
+      "initial_path": "editor.fileWatcherService.listeners.value[1][1].arg$2",
+      "next_collected": true,
+      "next_path": "COLLECTED",
+      "operation": "closed_source_references",
+      "initial_still_open": false,
+      "initial_collected": false,
+      "epoch_ms": 1794988770908
+    },
+    {
+      "initial_still_open": false,
+      "initial_collected": false,
+      "next_still_open": false,
+      "initial_path": "editor.fileWatcherService.listeners.value[1][1].arg$2",
+      "next_collected": true,
+      "next_path": "COLLECTED",
+      "operation": "closed_source_references",
+      "epoch_ms": 1794988783831
+    }
+  ],
+  "after-retention": [
+    {
+      "index_entries": 1,
+      "alive": 0,
+      "open_buffers": 1,
+      "operation": "closed_before_query",
+      "epoch_ms": 1794988045342
+    },
+    {
+      "alive": 0,
+      "open_buffers": 1,
+      "operation": "closed_after_query",
+      "retention_path": "COLLECTED",
+      "index_entries": 1,
+      "epoch_ms": 1794988046141
+    },
+    {
+      "operation": "closed_after_history_turnover",
+      "retention_path": "COLLECTED",
+      "alive": 0,
+      "epoch_ms": 1794988046941
+    }
+  ],
+  "after-retention-cycles": [
+    {
+      "closed": 8,
+      "snapshots_alive": 0,
+      "first_retaining_path": "COLLECTED",
+      "open_buffers": 1,
+      "index_entries": 1,
+      "buffers_alive": 0,
+      "operation": "cycle_ownership",
+      "histories_alive": 0,
+      "round": 0,
+      "epoch_ms": 1794988661267
+    },
+    {
+      "closed": 16,
+      "snapshots_alive": 0,
+      "first_retaining_path": "COLLECTED",
+      "open_buffers": 1,
+      "index_entries": 1,
+      "buffers_alive": 0,
+      "operation": "cycle_ownership",
+      "histories_alive": 0,
+      "round": 1,
+      "epoch_ms": 1794988663337
+    },
+    {
+      "closed": 24,
+      "snapshots_alive": 0,
+      "first_retaining_path": "COLLECTED",
+      "open_buffers": 1,
+      "index_entries": 1,
+      "buffers_alive": 0,
+      "operation": "cycle_ownership",
+      "histories_alive": 0,
+      "round": 2,
+      "epoch_ms": 1794988665372
+    },
+    {
+      "open_buffers": 1,
+      "first_retaining_path": "COLLECTED",
+      "snapshots_alive": 0,
+      "closed": 8,
+      "round": 0,
+      "histories_alive": 0,
+      "operation": "cycle_ownership",
+      "buffers_alive": 0,
+      "index_entries": 1,
+      "epoch_ms": 1794988671837
+    },
+    {
+      "open_buffers": 1,
+      "first_retaining_path": "COLLECTED",
+      "snapshots_alive": 0,
+      "closed": 16,
+      "round": 1,
+      "histories_alive": 0,
+      "operation": "cycle_ownership",
+      "buffers_alive": 0,
+      "index_entries": 1,
+      "epoch_ms": 1794988674121
+    },
+    {
+      "open_buffers": 1,
+      "first_retaining_path": "COLLECTED",
+      "snapshots_alive": 0,
+      "closed": 24,
+      "round": 2,
+      "histories_alive": 0,
+      "operation": "cycle_ownership",
+      "buffers_alive": 0,
+      "index_entries": 1,
+      "epoch_ms": 1794988676651
+    },
+    {
+      "open_buffers": 1,
+      "index_entries": 1,
+      "buffers_alive": 0,
+      "operation": "cycle_ownership",
+      "histories_alive": 0,
+      "round": 0,
+      "closed": 8,
+      "snapshots_alive": 0,
+      "first_retaining_path": "COLLECTED",
+      "epoch_ms": 1794988685667
+    },
+    {
+      "open_buffers": 1,
+      "index_entries": 1,
+      "buffers_alive": 0,
+      "operation": "cycle_ownership",
+      "histories_alive": 0,
+      "round": 1,
+      "closed": 16,
+      "snapshots_alive": 0,
+      "first_retaining_path": "COLLECTED",
+      "epoch_ms": 1794988688451
+    },
+    {
+      "open_buffers": 1,
+      "index_entries": 1,
+      "buffers_alive": 0,
+      "operation": "cycle_ownership",
+      "histories_alive": 0,
+      "round": 2,
+      "closed": 24,
+      "snapshots_alive": 0,
+      "first_retaining_path": "COLLECTED",
+      "epoch_ms": 1794988691215
+    }
+  ],
+  "after-rich": [
+    {
+      "metrics": "Metrics[queued=0, running=0, consumers=0, sessions=0, cached=0, resident=0, residentBytes=0, residentPixels=0, cacheBytes=0, peakQueued=8, rendered=21, hits=89, coalesced=1, staleDiscarded=1, failures=0, rejected=8]",
+      "operation": "media_closed",
+      "epoch_ms": 1794988726215
+    },
+    {
+      "operation": "media_service_collected",
+      "media_workers_alive": 0,
+      "collected": true,
+      "epoch_ms": 1794988726550
+    }
+  ],
+  "after-ui": [],
+  "before-index": [
+    {
+      "operation": "index_release",
+      "collected": true,
+      "epoch_ms": 1794988593296
+    }
+  ],
+  "before-lifecycle": [
+    {
+      "next_still_open": false,
+      "initial_collected": false,
+      "initial_still_open": false,
+      "operation": "closed_source_references",
+      "next_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[2]",
+      "next_collected": false,
+      "initial_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[1]",
+      "epoch_ms": 1794987637594
+    },
+    {
+      "initial_collected": false,
+      "initial_still_open": false,
+      "operation": "closed_source_references",
+      "next_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[2]",
+      "next_collected": false,
+      "initial_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[3]",
+      "next_still_open": false,
+      "epoch_ms": 1794987654883
+    }
+  ],
+  "before-retention": [
+    {
+      "operation": "closed_before_query",
+      "open_buffers": 1,
+      "alive": 8,
+      "index_entries": 9,
+      "epoch_ms": 1794987624428
+    },
+    {
+      "operation": "closed_after_query",
+      "open_buffers": 1,
+      "alive": 8,
+      "index_entries": 1,
+      "retention_path": "editor.asyncJobService.jobs.value[25].cancelledBeforeStart.arg$2.arg$4",
+      "epoch_ms": 1794987625239
+    },
+    {
+      "retention_path": "COLLECTED",
+      "operation": "closed_after_history_turnover",
+      "alive": 0,
+      "epoch_ms": 1794987626053
+    }
+  ],
+  "before-retention-cycles": [
+    {
+      "buffers_alive": 8,
+      "operation": "cycle_ownership",
+      "histories_alive": 8,
+      "round": 0,
+      "closed": 8,
+      "snapshots_alive": 8,
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[2]",
+      "open_buffers": 1,
+      "index_entries": 9,
+      "epoch_ms": 1794988553762
+    },
+    {
+      "buffers_alive": 16,
+      "operation": "cycle_ownership",
+      "histories_alive": 16,
+      "round": 1,
+      "closed": 16,
+      "snapshots_alive": 16,
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[2]",
+      "open_buffers": 1,
+      "index_entries": 17,
+      "epoch_ms": 1794988555870
+    },
+    {
+      "buffers_alive": 24,
+      "operation": "cycle_ownership",
+      "histories_alive": 24,
+      "round": 2,
+      "closed": 24,
+      "snapshots_alive": 24,
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[18]",
+      "open_buffers": 1,
+      "index_entries": 25,
+      "epoch_ms": 1794988557871
+    },
+    {
+      "round": 0,
+      "closed": 8,
+      "snapshots_alive": 8,
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[7]",
+      "open_buffers": 1,
+      "index_entries": 9,
+      "buffers_alive": 8,
+      "operation": "cycle_ownership",
+      "histories_alive": 8,
+      "epoch_ms": 1794988564399
+    },
+    {
+      "round": 1,
+      "closed": 16,
+      "snapshots_alive": 16,
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[6]",
+      "open_buffers": 1,
+      "index_entries": 17,
+      "buffers_alive": 16,
+      "operation": "cycle_ownership",
+      "histories_alive": 16,
+      "epoch_ms": 1794988566667
+    },
+    {
+      "round": 2,
+      "closed": 24,
+      "snapshots_alive": 24,
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[14]",
+      "open_buffers": 1,
+      "index_entries": 25,
+      "buffers_alive": 24,
+      "operation": "cycle_ownership",
+      "histories_alive": 24,
+      "epoch_ms": 1794988568907
+    },
+    {
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[2]",
+      "open_buffers": 1,
+      "index_entries": 9,
+      "buffers_alive": 8,
+      "operation": "cycle_ownership",
+      "histories_alive": 8,
+      "round": 0,
+      "closed": 8,
+      "snapshots_alive": 8,
+      "epoch_ms": 1794988575976
+    },
+    {
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[9]",
+      "open_buffers": 1,
+      "index_entries": 17,
+      "buffers_alive": 16,
+      "operation": "cycle_ownership",
+      "histories_alive": 16,
+      "round": 1,
+      "closed": 16,
+      "snapshots_alive": 16,
+      "epoch_ms": 1794988578319
+    },
+    {
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[19]",
+      "open_buffers": 1,
+      "index_entries": 25,
+      "buffers_alive": 24,
+      "operation": "cycle_ownership",
+      "histories_alive": 24,
+      "round": 2,
+      "closed": 24,
+      "snapshots_alive": 24,
+      "epoch_ms": 1794988580707
+    }
+  ],
+  "before-rich": [
+    {
+      "operation": "media_closed",
+      "metrics": "Metrics[queued=0, running=0, consumers=0, sessions=0, cached=0, resident=0, residentBytes=0, residentPixels=0, cacheBytes=0, peakQueued=8, rendered=21, hits=89, coalesced=1, staleDiscarded=1, failures=0, rejected=8]",
+      "epoch_ms": 1794988613583
+    },
+    {
+      "collected": true,
+      "media_workers_alive": 0,
+      "operation": "media_service_collected",
+      "epoch_ms": 1794988613909
+    }
+  ],
+  "before-ui": [],
+  "before-watched-cycles": [
+    {
+      "histories_alive": 8,
+      "watch_listener_files": 9,
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[9]",
+      "operation": "cycle_ownership",
+      "open_buffers": 1,
+      "snapshots_alive": 8,
+      "closed": 8,
+      "index_entries": 9,
+      "round": 0,
+      "buffers_alive": 8,
+      "epoch_ms": 1794989520462
+    },
+    {
+      "histories_alive": 16,
+      "watch_listener_files": 17,
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[7]",
+      "operation": "cycle_ownership",
+      "open_buffers": 1,
+      "snapshots_alive": 16,
+      "closed": 16,
+      "index_entries": 17,
+      "round": 1,
+      "buffers_alive": 16,
+      "epoch_ms": 1794989522499
+    },
+    {
+      "histories_alive": 24,
+      "watch_listener_files": 25,
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[6]",
+      "operation": "cycle_ownership",
+      "open_buffers": 1,
+      "snapshots_alive": 24,
+      "closed": 24,
+      "index_entries": 25,
+      "round": 2,
+      "buffers_alive": 24,
+      "epoch_ms": 1794989524568
+    },
+    {
+      "round": 0,
+      "index_entries": 9,
+      "closed": 8,
+      "snapshots_alive": 8,
+      "open_buffers": 1,
+      "operation": "cycle_ownership",
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[7]",
+      "watch_listener_files": 9,
+      "histories_alive": 8,
+      "buffers_alive": 8,
+      "epoch_ms": 1794989531686
+    },
+    {
+      "round": 1,
+      "index_entries": 17,
+      "closed": 16,
+      "snapshots_alive": 16,
+      "open_buffers": 1,
+      "operation": "cycle_ownership",
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[8]",
+      "watch_listener_files": 17,
+      "histories_alive": 16,
+      "buffers_alive": 16,
+      "epoch_ms": 1794989533973
+    },
+    {
+      "round": 2,
+      "index_entries": 25,
+      "closed": 24,
+      "snapshots_alive": 24,
+      "open_buffers": 1,
+      "operation": "cycle_ownership",
+      "first_retaining_path": "editor.inputController.openBufferCompletionIndex.snapshots.key[6]",
+      "watch_listener_files": 25,
+      "histories_alive": 24,
+      "buffers_alive": 24,
+      "epoch_ms": 1794989536270
+    }
+  ],
+  "final-index": [
+    {
+      "operation": "index_release",
+      "collected": true,
+      "epoch_ms": 1794989638819
+    }
+  ],
+  "final-lifecycle": [
+    {
+      "operation": "closed_source_references",
+      "next_path": "COLLECTED",
+      "next_collected": true,
+      "initial_path": "COLLECTED",
+      "next_still_open": false,
+      "initial_collected": true,
+      "initial_still_open": false,
+      "epoch_ms": 1794989615224
+    },
+    {
+      "initial_collected": true,
+      "initial_still_open": false,
+      "operation": "closed_source_references",
+      "next_path": "COLLECTED",
+      "next_collected": true,
+      "initial_path": "COLLECTED",
+      "next_still_open": false,
+      "epoch_ms": 1794989628299
+    }
+  ],
+  "final-retention": [
+    {
+      "operation": "closed_before_query",
+      "open_buffers": 1,
+      "alive": 0,
+      "index_entries": 1,
+      "epoch_ms": 1794989545156
+    },
+    {
+      "open_buffers": 1,
+      "alive": 0,
+      "index_entries": 1,
+      "retention_path": "COLLECTED",
+      "operation": "closed_after_query",
+      "epoch_ms": 1794989545956
+    },
+    {
+      "retention_path": "COLLECTED",
+      "operation": "closed_after_history_turnover",
+      "alive": 0,
+      "epoch_ms": 1794989546777
+    }
+  ],
+  "final-retention-cycles": [
+    {
+      "closed": 8,
+      "snapshots_alive": 0,
+      "open_buffers": 1,
+      "operation": "cycle_ownership",
+      "first_retaining_path": "COLLECTED",
+      "watch_listener_files": 1,
+      "histories_alive": 0,
+      "buffers_alive": 0,
+      "round": 0,
+      "index_entries": 1,
+      "epoch_ms": 1794989555061
+    },
+    {
+      "closed": 16,
+      "snapshots_alive": 0,
+      "open_buffers": 1,
+      "operation": "cycle_ownership",
+      "first_retaining_path": "COLLECTED",
+      "watch_listener_files": 1,
+      "histories_alive": 0,
+      "buffers_alive": 0,
+      "round": 1,
+      "index_entries": 1,
+      "epoch_ms": 1794989557102
+    },
+    {
+      "closed": 24,
+      "snapshots_alive": 0,
+      "open_buffers": 1,
+      "operation": "cycle_ownership",
+      "first_retaining_path": "COLLECTED",
+      "watch_listener_files": 1,
+      "histories_alive": 0,
+      "buffers_alive": 0,
+      "round": 2,
+      "index_entries": 1,
+      "epoch_ms": 1794989559162
+    },
+    {
+      "index_entries": 1,
+      "round": 0,
+      "buffers_alive": 0,
+      "histories_alive": 0,
+      "watch_listener_files": 1,
+      "first_retaining_path": "COLLECTED",
+      "operation": "cycle_ownership",
+      "open_buffers": 1,
+      "snapshots_alive": 0,
+      "closed": 8,
+      "epoch_ms": 1794989567103
+    },
+    {
+      "index_entries": 1,
+      "round": 1,
+      "buffers_alive": 0,
+      "histories_alive": 0,
+      "watch_listener_files": 1,
+      "first_retaining_path": "COLLECTED",
+      "operation": "cycle_ownership",
+      "open_buffers": 1,
+      "snapshots_alive": 0,
+      "closed": 16,
+      "epoch_ms": 1794989569364
+    },
+    {
+      "index_entries": 1,
+      "round": 2,
+      "buffers_alive": 0,
+      "histories_alive": 0,
+      "watch_listener_files": 1,
+      "first_retaining_path": "COLLECTED",
+      "operation": "cycle_ownership",
+      "open_buffers": 1,
+      "snapshots_alive": 0,
+      "closed": 24,
+      "epoch_ms": 1794989571620
+    },
+    {
+      "closed": 8,
+      "snapshots_alive": 0,
+      "open_buffers": 1,
+      "operation": "cycle_ownership",
+      "first_retaining_path": "COLLECTED",
+      "watch_listener_files": 1,
+      "histories_alive": 0,
+      "buffers_alive": 0,
+      "round": 0,
+      "index_entries": 1,
+      "epoch_ms": 1794989578776
+    },
+    {
+      "closed": 16,
+      "snapshots_alive": 0,
+      "open_buffers": 1,
+      "operation": "cycle_ownership",
+      "first_retaining_path": "COLLECTED",
+      "watch_listener_files": 1,
+      "histories_alive": 0,
+      "buffers_alive": 0,
+      "round": 1,
+      "index_entries": 1,
+      "epoch_ms": 1794989581093
+    },
+    {
+      "closed": 24,
+      "snapshots_alive": 0,
+      "open_buffers": 1,
+      "operation": "cycle_ownership",
+      "first_retaining_path": "COLLECTED",
+      "watch_listener_files": 1,
+      "histories_alive": 0,
+      "buffers_alive": 0,
+      "round": 2,
+      "index_entries": 1,
+      "epoch_ms": 1794989583431
+    }
+  ],
+  "final-rich": [
+    {
+      "metrics": "Metrics[queued=0, running=0, consumers=0, sessions=0, cached=0, resident=0, residentBytes=0, residentPixels=0, cacheBytes=0, peakQueued=8, rendered=21, hits=89, coalesced=1, staleDiscarded=1, failures=0, rejected=8]",
+      "operation": "media_closed",
+      "epoch_ms": 1794989652807
+    },
+    {
+      "media_workers_alive": 0,
+      "collected": true,
+      "operation": "media_service_collected",
+      "epoch_ms": 1794989653146
+    }
+  ],
+  "final-ui": [],
+  "final-watched-cycles": [
+    {
+      "operation": "cycle_ownership",
+      "open_buffers": 1,
+      "snapshots_alive": 0,
+      "closed": 8,
+      "index_entries": 1,
+      "round": 0,
+      "buffers_alive": 0,
+      "histories_alive": 0,
+      "watch_listener_files": 1,
+      "first_retaining_path": "COLLECTED",
+      "epoch_ms": 1794989591498
+    },
+    {
+      "operation": "cycle_ownership",
+      "open_buffers": 1,
+      "snapshots_alive": 0,
+      "closed": 16,
+      "index_entries": 1,
+      "round": 1,
+      "buffers_alive": 0,
+      "histories_alive": 0,
+      "watch_listener_files": 1,
+      "first_retaining_path": "COLLECTED",
+      "epoch_ms": 1794989593521
+    },
+    {
+      "operation": "cycle_ownership",
+      "open_buffers": 1,
+      "snapshots_alive": 0,
+      "closed": 24,
+      "index_entries": 1,
+      "round": 2,
+      "buffers_alive": 0,
+      "histories_alive": 0,
+      "watch_listener_files": 1,
+      "first_retaining_path": "COLLECTED",
+      "epoch_ms": 1794989595562
+    },
+    {
+      "index_entries": 1,
+      "round": 0,
+      "buffers_alive": 0,
+      "histories_alive": 0,
+      "watch_listener_files": 1,
+      "first_retaining_path": "COLLECTED",
+      "operation": "cycle_ownership",
+      "open_buffers": 1,
+      "snapshots_alive": 0,
+      "closed": 8,
+      "epoch_ms": 1794989602079
+    },
+    {
+      "index_entries": 1,
+      "round": 1,
+      "buffers_alive": 0,
+      "histories_alive": 0,
+      "watch_listener_files": 1,
+      "first_retaining_path": "COLLECTED",
+      "operation": "cycle_ownership",
+      "open_buffers": 1,
+      "snapshots_alive": 0,
+      "closed": 16,
+      "epoch_ms": 1794989604314
+    },
+    {
+      "index_entries": 1,
+      "round": 2,
+      "buffers_alive": 0,
+      "histories_alive": 0,
+      "watch_listener_files": 1,
+      "first_retaining_path": "COLLECTED",
+      "operation": "cycle_ownership",
+      "open_buffers": 1,
+      "snapshots_alive": 0,
+      "closed": 24,
+      "epoch_ms": 1794989606609
+    }
+  ]
+}

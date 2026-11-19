@@ -33,6 +33,7 @@ public class AsyncJobService {
 
     public static final class JobToken {
         private volatile boolean cancelled;
+        private boolean finished;
         private final List<Runnable> cancelHooks;
 
         private JobToken() {
@@ -48,29 +49,32 @@ public class AsyncJobService {
             if (hook == null) {
                 return;
             }
-            if (cancelled) {
-                hook.run();
-                return;
+            boolean runNow;
+            synchronized (cancelHooks) {
+                if (finished) return;
+                runNow = cancelled;
+                if (!runNow) cancelHooks.add(hook);
             }
-            cancelHooks.add(hook);
-            if (cancelled) {
-                runCancelHooks();
-            }
+            if (runNow) hook.run();
         }
 
         private void cancel() {
-            cancelled = true;
-            runCancelHooks();
+            List<Runnable> hooks;
+            synchronized (cancelHooks) {
+                if (finished || cancelled) return;
+                cancelled = true;
+                if (cancelHooks.isEmpty()) return;
+                hooks = new ArrayList<>(cancelHooks);
+                cancelHooks.clear();
+            }
+            for (Runnable hook : hooks) {
+                try { hook.run(); } catch (Exception ignored) { }
+            }
         }
 
-        private void runCancelHooks() {
+        private void finish() {
             synchronized (cancelHooks) {
-                for (Runnable hook : cancelHooks) {
-                    try {
-                        hook.run();
-                    } catch (Exception ignored) {
-                    }
-                }
+                finished = true;
                 cancelHooks.clear();
             }
         }
@@ -243,6 +247,8 @@ public class AsyncJobService {
                 error = new Exception("Unexpected background job failure", failure);
                 reportUnexpected(failure, "running async job " + record.description);
             } finally {
+                record.cancelledBeforeStart = null;
+                record.token.finish();
                 record.finishedAtMillis = System.currentTimeMillis();
                 trimHistoryIfNeeded();
                 JobSnapshot snapshot = record.snapshot();
@@ -261,6 +267,8 @@ public class AsyncJobService {
             }
             });
         } catch (RejectedExecutionException error) {
+            record.cancelledBeforeStart = null;
+            record.token.finish();
             record.status = Status.CANCELLED;
             record.errorMessage = "executor is shut down";
             record.finishedAtMillis = System.currentTimeMillis();
@@ -275,6 +283,8 @@ public class AsyncJobService {
         }
 
         record.future = future;
+        // Cancellation or shutdown may have raced with the executor's submit return.
+        if (record.token.isCancelled() || targetExecutor.isShutdown()) cancel(id);
         return id;
     }
 
@@ -294,6 +304,8 @@ public class AsyncJobService {
             record.finishedAtMillis = System.currentTimeMillis();
             trimHistoryIfNeeded();
             Runnable completion = record.cancelledBeforeStart;
+            record.cancelledBeforeStart = null;
+            record.token.finish();
             if (completion != null) completion.run();
         }
         return true;
@@ -316,11 +328,15 @@ public class AsyncJobService {
     public void shutdownNow() {
         for (JobRecord record : jobs.values()) {
             if (record.status == Status.RUNNING) {
-                record.token.cancel();
+                cancel(record.id);
             }
         }
         executor.shutdownNow();
         longRunningExecutor.shutdownNow();
+        // Include submissions accepted between the first cancellation pass and shutdown.
+        for (JobRecord record : jobs.values()) {
+            if (record.status == Status.RUNNING) cancel(record.id);
+        }
     }
 
     private void trimHistoryIfNeeded() {

@@ -74,6 +74,17 @@ public class WindowLayoutNode {
         return ratio;
     }
 
+    void rememberDividerLocations() {
+        if (isLeaf()) return;
+        if (renderedSplit != null && renderedSplit.isShowing()) {
+            int extent = orientation == Orientation.HORIZONTAL ? renderedSplit.getWidth() : renderedSplit.getHeight();
+            int available = extent - renderedSplit.getDividerSize();
+            if (available > 0) ratio = Math.max(.05, Math.min(.95, renderedSplit.getDividerLocation() / (double) available));
+        }
+        if (first != null) first.rememberDividerLocations();
+        if (second != null) second.rememberDividerLocations();
+    }
+
     public Component render() {
         return render(null, Integer.MAX_VALUE, Integer.MAX_VALUE);
     }

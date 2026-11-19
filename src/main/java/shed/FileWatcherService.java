@@ -61,6 +61,8 @@ public class FileWatcherService {
         if (watchThread != null) {
             watchThread.interrupt();
         }
+        listeners.clear();
+        watchedDirs.clear();
     }
 
     public WatchRegistration watch(File file, FileChangeListener listener) {

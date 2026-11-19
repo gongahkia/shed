@@ -1,0 +1,15 @@
+{
+  "scripts/investigate-unicode-layout.py": "3988437cd8707ffce31ce14e1a963f17c889f3a9c3e5a2e2cd811064c46d61e3",
+  "scripts/test_unicode_layout_tooling.py": "af4a9365d4c3802bc6b11c4e7bac673190ea58c2589f5b7ce5b92d60c74b09f7",
+  "src/benchmark/java/shed/UnicodeLayoutProbe.java": "7ff732ba0d43450cecae3ecdaf67d726e6b6191c196c0775ccbb682a88791a75",
+  "docs/UNICODE_LAYOUT_INVESTIGATION.md": "bd07fc2a2913bf54b5382ae4d67d0ae6b36461d1b6b7d676c8dfcf3a0dd95e0c",
+  "docs/performance/unicode-layout-tranche7b3/INDEX.md": "9c6f133ac5aa62ce37c575f0b0ad5d675aa7924624898a8f304cded24c901ed4",
+  "docs/performance/unicode-layout-tranche7b3/baseline.json.gz": "6a3471b07c9a1c1288df7665f82f9371e5f46bc96ecd52f1aedcc89178d185f5",
+  "docs/performance/unicode-layout-tranche7b3/diagnostics.json.gz": "94ffca0093d3715363fb116ca7ca2704c9e11a85b700df4c6cfd17e5ce13fedb",
+  "docs/performance/unicode-layout-tranche7b3/measurements.json": "d88a6dfea21e8d8fcf8af8987693d3be7efca17d684f8b756d840d218f4b7a93",
+  "docs/performance/unicode-layout-tranche7b3/packaged-smoke.json": "3e65452d0bb3ab96744ecca70a41b593880c56dda9713d8d22859fce010d6003",
+  "docs/performance/unicode-layout-tranche7b3/profiling.json": "58fccf363296a1d3dcc25d1d4f419654c8e1a1eee2120db452d201963153d528",
+  "docs/performance/unicode-layout-tranche7b3/reports.json.gz": "7480b95325015903965a9092f99cade53692d4eacdcba298b83e865e0d0192c3",
+  "docs/performance/unicode-layout-tranche7b3/verification.json": "1e21dd1dd3a405ca3444246c62ceeb67b6dc9e5235e110cc46135ca5f559a15c",
+  "docs/performance/unicode-layout-tranche7b3/inventory.json": "ff158d3f373385e4b69a768552b6df055e871b67ad6551e6883ba4293cdbfc38"
+}

@@ -1,0 +1,13 @@
+{
+  "docs/MARKDOWN_PRODUCT_READINESS.md": "d505f21f9b18ed160dd1854fc68067e359ce70d8d2599c9d610b824ca4c2dfca",
+  "docs/performance/markdown-tranche7c/INDEX.md": "b636e2a056e00a99cf7c7ad46f4f2278a621c4f304250fce7e1a2128cf950d80",
+  "docs/performance/markdown-tranche7c/baseline.json.gz": "e3e007488a7b3444664415f7f0aebeaf7fd7d4127cedbdbcc5c8fade7683489b",
+  "docs/performance/markdown-tranche7c/corpus.json.gz": "22ed39b6f365a9ab4c218f65e57372d2a32481712c95e5b988bc8ae254feae2e",
+  "docs/performance/markdown-tranche7c/current-controls.json.gz": "d0cb619f6c7467749de5fcdbd7106dceaa1815b1a85018fd7dcb6394f37e8a2b",
+  "docs/performance/markdown-tranche7c/diagnostics.json.gz": "c94af676a9f76865190d647f7e1f5285f8bddef3a10b0def834d18f4330f68a7",
+  "docs/performance/markdown-tranche7c/evidence-review.json": "c8e29618f3f5f471e92beb4b91c8f947a22d17607c5cc3ce7598b7d68748c90a",
+  "docs/performance/markdown-tranche7c/measurements.json": "134c38d5c19be99419d93bda306dec44b647bd135041d433ce5c5aaa6ad11d4c",
+  "docs/performance/markdown-tranche7c/packaged-smoke.json": "6c8e898f77678dc7ed7329adc05ed87b48b57252011c3ffe585301993e38d2b7",
+  "docs/performance/markdown-tranche7c/verification.json": "486fae42b2b276dd9472427a55efb0df36738d85512734108236ba8990785e7b",
+  "docs/performance/markdown-tranche7c/inventory.json": "8c1b22f123d40a41fe06014d85d383bcbe82d9ad550a3dd96706c1a845167ec7"
+}

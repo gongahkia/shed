@@ -508,7 +508,7 @@ final class TreeGitController {
         if (editor.treeBuffer != null) {
             int index = editor.buffers.indexOf(editor.treeBuffer);
             if (index >= 0) {
-                editor.buffers.set(index, replacement);
+                editor.releaseClosedBufferResources(editor.buffers.set(index, replacement));
             } else {
                 editor.buffers.add(replacement);
             }
@@ -617,7 +617,7 @@ final class TreeGitController {
             FileBuffer targetBuffer = existing != null ? existing : new FileBuffer(file, editor.configManager);
             if (existing == null) {
                 if (editor.shouldReplaceSingleUntitledBuffer()) {
-                    editor.buffers.set(0, targetBuffer);
+                    editor.releaseClosedBufferResources(editor.buffers.set(0, targetBuffer));
                 } else {
                     editor.buffers.add(targetBuffer);
                 }

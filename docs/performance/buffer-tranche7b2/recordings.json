@@ -1,0 +1,32 @@
+[
+  {
+    "path": "/tmp/shed-tranche7b2-final-rich/renderer-control-nmt/profile.jfr",
+    "bytes": 3471165,
+    "sha256": "f1f606ed0cfbd32b8a867c2095dc18247c0326bdfbb8b5b2332d156e0f37e493"
+  },
+  {
+    "path": "/tmp/shed-tranche7b2-final-rich/media-nmt/profile.jfr",
+    "bytes": 3562711,
+    "sha256": "4a9d3c79a9b1f1d820c9eb3d0a3bf55f7c9503108ba7f03ff88575926dac8dd9"
+  },
+  {
+    "path": "/tmp/shed-tranche7b2-before-rich/renderer-control-nmt/profile.jfr",
+    "bytes": 5268888,
+    "sha256": "5ba08052d7d42104368decee3f54ff64cc91d622e191d2fbbba6b49e7f443754"
+  },
+  {
+    "path": "/tmp/shed-tranche7b2-before-rich/media-nmt/profile.jfr",
+    "bytes": 4046404,
+    "sha256": "a26f3b60741508efc627334466c7069ef18514e0d8e34da4ceb33390e5ccc7cb"
+  },
+  {
+    "path": "/tmp/shed-tranche7b2-after-rich/renderer-control-nmt/profile.jfr",
+    "bytes": 5196003,
+    "sha256": "0c34ac394f4b85d6221d282841480231431eb416dc604bf71c9d8d735115b552"
+  },
+  {
+    "path": "/tmp/shed-tranche7b2-after-rich/media-nmt/profile.jfr",
+    "bytes": 3842287,
+    "sha256": "25d9b3ff937092b3c5aff038e8f09eedefef050cc0b6b8ac24910c917c559575"
+  }
+]

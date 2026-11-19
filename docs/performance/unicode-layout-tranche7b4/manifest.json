@@ -1,0 +1,18 @@
+{
+  "src/test/java/shed/ParagraphRangePrototype.java": "11940abf7fb0e016c4e940f74edf24e3add961fe806c076b7e683bc6eb74f9a5",
+  "src/test/java/shed/ParagraphRangePrototypeTest.java": "83ac2a270bccb8bbb5bbf9ec2e4f6c6f1b2fd27ea14b61614a457506d681375c",
+  "src/benchmark/java/shed/UnicodeCandidateProbe.java": "55652412902ef6ac062531b2a989027bed856f1d7184844cd1a394d4d9d1124f",
+  "src/benchmark/java/shed/UnicodeCandidateJfrSummary.java": "9a256056f274235d58ef0ae22c75c67dbc377873d619409113e459d1cc0f9f6c",
+  "scripts/benchmark-unicode-candidate.py": "f92de51f60b3c53ec59d991a996860cd4f3be36a0feddf8814e475673b77a095",
+  "scripts/test_unicode_candidate_tooling.py": "1c7596533cb56af4a89cf0c98ca237c5ca76e1ea7b2414b8e0db639ca068230c",
+  "docs/UNICODE_LAYOUT_FEASIBILITY.md": "016bf34d67e81820ceb6949aa8a621fa4d035a1c2c515a0e4407209a2e7d69ee",
+  "docs/performance/unicode-layout-tranche7b4/INDEX.md": "e034bb5c4dda6a23243700c70d0e906b7c34bf1efce279f220e37f3500ac5b1e",
+  "docs/performance/unicode-layout-tranche7b4/baseline.json.gz": "b2faceedb59c7a0828d8ce805c45e42f2e6821bf75145c34ef880378b3dbadca",
+  "docs/performance/unicode-layout-tranche7b4/diagnostics.json.gz": "abdd38bddb598132b9caa4bfb6fb87a90def2cf7d3572e38dc2bd377d8d7b321",
+  "docs/performance/unicode-layout-tranche7b4/measurements.json": "1d1b1fb4f8d3145e3983fbd43093d962d090c22a647cf9764611c09785d1bc51",
+  "docs/performance/unicode-layout-tranche7b4/packaged-smoke.json": "7848a69d45306596a11f8f10da751f7eeee3ff79aa0cd2425bd29e0de2d089e9",
+  "docs/performance/unicode-layout-tranche7b4/profiling.json": "6f4dae38e0e8668e8153e2699ba82908009b578e89b8add41f48b32dd28b5e3f",
+  "docs/performance/unicode-layout-tranche7b4/reports.json.gz": "698826f0b745caf9d9a68177e7795cc75486ed62ad693c266717ef7420806323",
+  "docs/performance/unicode-layout-tranche7b4/verification.json": "a843e6f30e8c3f39f3628d6ce334bcca26d88fbfd63c14d368317b0ffd732217",
+  "docs/performance/unicode-layout-tranche7b4/inventory.json": "24aee6e28459ec672a663720d3680ebfbc264b44c019d961c947631e2b390992"
+}

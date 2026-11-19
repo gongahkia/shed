@@ -1,0 +1,76 @@
+{
+  "production_changes": [],
+  "modified_preexisting_files": [],
+  "new_files": [
+    {
+      "path": "src/test/java/shed/ParagraphRangePrototype.java",
+      "purpose": "Isolated public-API source-range prototype"
+    },
+    {
+      "path": "src/test/java/shed/ParagraphRangePrototypeTest.java",
+      "purpose": "Four deterministic differential/source/read/lifecycle tests"
+    },
+    {
+      "path": "src/benchmark/java/shed/UnicodeCandidateProbe.java",
+      "purpose": "Opt-in matched workbench/model/read observations"
+    },
+    {
+      "path": "src/benchmark/java/shed/UnicodeCandidateJfrSummary.java",
+      "purpose": "Bounded streaming first-edit profile attribution"
+    },
+    {
+      "path": "scripts/benchmark-unicode-candidate.py",
+      "purpose": "Bounded paired opt-in child runner"
+    },
+    {
+      "path": "scripts/test_unicode_candidate_tooling.py",
+      "purpose": "Three non-GUI admission and fixture tests"
+    },
+    {
+      "path": "docs/UNICODE_LAYOUT_FEASIBILITY.md",
+      "purpose": "Engineering report A\u2013L"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b4/INDEX.md",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b4/baseline.json.gz",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b4/diagnostics.json.gz",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b4/measurements.json",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b4/packaged-smoke.json",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b4/profiling.json",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b4/reports.json.gz",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b4/verification.json",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b4/inventory.json",
+      "purpose": "Every added file and purpose"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b4/manifest.json",
+      "purpose": "Deliverable checksums"
+    }
+  ],
+  "baseline_files_preserved": 1393,
+  "production_decision": "NO-GO"
+}

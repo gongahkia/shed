@@ -1,0 +1,101 @@
+{
+  "scope": "all new 8A.1 files",
+  "self_exclusions": [
+    "docs/performance/appearance-tranche8a1/inventory.json",
+    "docs/performance/appearance-tranche8a1/checksums.sha256"
+  ],
+  "files": {
+    "src/benchmark/java/shed/DecoratedTransparencyProbe.java": {
+      "bytes": 12347,
+      "sha256": "5c98abdabd95c06bd8210c686d4fc94831e6af57c1b52078bf0aaa245bf085e7"
+    },
+    "scripts/qualify-decorated-transparency.py": {
+      "bytes": 4302,
+      "sha256": "30ed833038c5a93ad102091f98a92634a3d8f6dc0d419c5b6935fc1bcd2392b5"
+    },
+    "scripts/test_decorated_transparency.py": {
+      "bytes": 1866,
+      "sha256": "07d6cbe3d236a6db6469982e76bb8ab793ec105653e7473ad28ebfd7fd3e80fd"
+    },
+    "docs/DECORATED_WINDOW_TRANSPARENCY.md": {
+      "bytes": 24242,
+      "sha256": "0ab9a8ccaee280c2510c28c3ff249246f8880cd3fabee2d7d0cdd086cc9c5a15"
+    },
+    "docs/performance/appearance-tranche8a1/INDEX.md": {
+      "bytes": 2129,
+      "sha256": "dda32149c0cdaf79e4e1e40342ef4cf48e147ef370b4c854d14456927d832691"
+    },
+    "docs/performance/appearance-tranche8a1/accessibility-read.json": {
+      "bytes": 54,
+      "sha256": "69843666e0a3decace14298957d1cebf009d306ee283da4db749ce126ea6bde1"
+    },
+    "docs/performance/appearance-tranche8a1/attempt-opaque-components.png": {
+      "bytes": 33782,
+      "sha256": "8321d6f6c438857e10870be16d794b1c4d89e338958541245ea4a52b24c6535a"
+    },
+    "docs/performance/appearance-tranche8a1/attempt-stdout.log": {
+      "bytes": 9884,
+      "sha256": "dfe8e0927d0af49b7a232ffd90b199d013189d0841a22700d7ab83e560db8fb9"
+    },
+    "docs/performance/appearance-tranche8a1/baseline.json.gz": {
+      "bytes": 71848,
+      "sha256": "a02229a6ce70b0820fcdb4edaca6b35f1e937213f61bc2d4819620039e47a357"
+    },
+    "docs/performance/appearance-tranche8a1/gate.log": {
+      "bytes": 36,
+      "sha256": "8f19d85c8289b8d31ebce49a16f56ad448ae54562e66452a40fa59189b92f8d5"
+    },
+    "docs/performance/appearance-tranche8a1/git-status-after.txt": {
+      "bytes": 1974,
+      "sha256": "378bd27368f45675079f18fac39c435c555c8b8a32aa8b1bd91ad98c473212ab"
+    },
+    "docs/performance/appearance-tranche8a1/java-version.txt": {
+      "bytes": 195,
+      "sha256": "477d64a6b08c9a9dd143deae108edf7929a93b40434d87285d41addc8fba509f"
+    },
+    "docs/performance/appearance-tranche8a1/jdk-audit.json": {
+      "bytes": 1296,
+      "sha256": "6c4c8721702fde81241ba27824590820673fc4136b08ddf9126f4ae6b6fabd9a"
+    },
+    "docs/performance/appearance-tranche8a1/jna-awt.txt": {
+      "bytes": 2909,
+      "sha256": "e0b612ac598f2dca200fece01acbfe2e634e55cd0384d27e3a90efa57120dba9"
+    },
+    "docs/performance/appearance-tranche8a1/jna-mac-window.txt": {
+      "bytes": 13615,
+      "sha256": "a0baad2aab3251f4176a5199290eb1ac510c171495a39f78203ff47a1307d206"
+    },
+    "docs/performance/appearance-tranche8a1/maven.log.gz": {
+      "bytes": 5735,
+      "sha256": "83a2762572a0f6d2a02bcce25682248e8fcce07a86322e65925ebc586655609f"
+    },
+    "docs/performance/appearance-tranche8a1/measurements.json": {
+      "bytes": 14427,
+      "sha256": "21cc9c51e339b7e41bdb3178714ec903bb3c7cbbe669c03a5eadebcd1d9a736e"
+    },
+    "docs/performance/appearance-tranche8a1/opaque-opaque-components.png": {
+      "bytes": 33782,
+      "sha256": "8321d6f6c438857e10870be16d794b1c4d89e338958541245ea4a52b24c6535a"
+    },
+    "docs/performance/appearance-tranche8a1/opaque-stdout.log": {
+      "bytes": 8306,
+      "sha256": "3deeb2e413468c7547ea83b0e62fb9667bcce3789f0d7218b025eb1084a4431d"
+    },
+    "docs/performance/appearance-tranche8a1/packaged-smoke.log.gz": {
+      "bytes": 1533,
+      "sha256": "c869f9cde5f54fe73dc5def00acb04d1e28ee4b61a99dea56a3fe5735a0d47e4"
+    },
+    "docs/performance/appearance-tranche8a1/report.json.gz": {
+      "bytes": 5132,
+      "sha256": "04060c56312b691bad4fca3935b2e27a5cfdd02a55114b0428ef498bc5982d87"
+    },
+    "docs/performance/appearance-tranche8a1/tooling.log.gz": {
+      "bytes": 66,
+      "sha256": "543d0977eacb6964b40f7e84ab7efa629f8887bc00a0f1fd5c78975166a5fc99"
+    },
+    "docs/performance/appearance-tranche8a1/verification.json": {
+      "bytes": 11981,
+      "sha256": "6113debcce1484ee395c53870900ac9e236874a5dbf453c5ba2519a043db0a89"
+    }
+  }
+}

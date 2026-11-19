@@ -300,6 +300,8 @@ final class WorkspaceController implements WorkspaceFoldersApplication {
     }
 
     private void syncTreeRoot(Path root, boolean showTree) {
+        if (editor.focusModeController != null && !java.util.Objects.equals(editor.treeRoot, root == null ? null : root.toFile()))
+            editor.focusModeController.endForLayoutReplacement();
         editor.markdownLinkRootsChanged();
         editor.treeGitController.setWorkspaceTreeRoot(root == null ? null : root.toFile(), showTree);
     }

@@ -1,0 +1,43 @@
+ M scripts/qualify-markdown.py
+ M src/benchmark/java/shed/MarkdownQualificationProbe.java
+ M src/main/java/shed/AsyncJobService.java
+ M src/main/java/shed/FileWatcherService.java
+ M src/main/java/shed/InputController.java
+ M src/main/java/shed/JobQuickfixController.java
+ M src/main/java/shed/LspController.java
+ M src/main/java/shed/PaneBufferController.java
+ M src/main/java/shed/RecoveryController.java
+ M src/main/java/shed/SessionConfigController.java
+ M src/main/java/shed/TerminalController.java
+ M src/main/java/shed/Texteditor.java
+ M src/main/java/shed/TreeGitController.java
+ M src/test/java/shed/FileWatcherServiceTest.java
+ M src/test/java/shed/TexteditorSwingIntegrationTest.java
+?? docs/APPEARANCE_FEASIBILITY.md
+?? docs/BUFFER_LIFECYCLE_REMEDIATION.md
+?? docs/DECORATED_WINDOW_TRANSPARENCY.md
+?? docs/MARKDOWN_PRODUCT_READINESS.md
+?? docs/UNICODE_LAYOUT_FEASIBILITY.md
+?? docs/UNICODE_LAYOUT_INVESTIGATION.md
+?? docs/performance/appearance-tranche8a/
+?? docs/performance/appearance-tranche8a1/
+?? docs/performance/buffer-tranche7b2/
+?? docs/performance/markdown-tranche7c/
+?? docs/performance/unicode-layout-tranche7b3/
+?? docs/performance/unicode-layout-tranche7b4/
+?? scripts/benchmark-appearance-feasibility.py
+?? scripts/benchmark-unicode-candidate.py
+?? scripts/investigate-unicode-layout.py
+?? scripts/qualify-decorated-transparency.py
+?? scripts/test_appearance_feasibility.py
+?? scripts/test_decorated_transparency.py
+?? scripts/test_unicode_candidate_tooling.py
+?? scripts/test_unicode_layout_tooling.py
+?? src/benchmark/java/shed/AppearanceTransparencyProbe.java
+?? src/benchmark/java/shed/DecoratedTransparencyProbe.java
+?? src/benchmark/java/shed/UnicodeCandidateJfrSummary.java
+?? src/benchmark/java/shed/UnicodeCandidateProbe.java
+?? src/benchmark/java/shed/UnicodeLayoutProbe.java
+?? src/test/java/shed/AsyncJobPayloadLifecycleTest.java
+?? src/test/java/shed/ParagraphRangePrototype.java
+?? src/test/java/shed/ParagraphRangePrototypeTest.java

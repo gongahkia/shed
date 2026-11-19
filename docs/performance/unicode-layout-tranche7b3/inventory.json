@@ -1,0 +1,63 @@
+{
+  "production_changes": [],
+  "modified_preexisting_files": [],
+  "new_files": [
+    {
+      "path": "scripts/investigate-unicode-layout.py",
+      "purpose": "Opt-in bounded diagnostic runner"
+    },
+    {
+      "path": "scripts/test_unicode_layout_tooling.py",
+      "purpose": "Three fast tooling admission/fixture tests"
+    },
+    {
+      "path": "src/benchmark/java/shed/UnicodeLayoutProbe.java",
+      "purpose": "Opt-in production observation and stock causal control"
+    },
+    {
+      "path": "docs/UNICODE_LAYOUT_INVESTIGATION.md",
+      "purpose": "Engineering report A\u2013L"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b3/INDEX.md",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b3/baseline.json.gz",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b3/diagnostics.json.gz",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b3/measurements.json",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b3/packaged-smoke.json",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b3/profiling.json",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b3/reports.json.gz",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b3/verification.json",
+      "purpose": "Evidence and provenance"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b3/inventory.json",
+      "purpose": "Complete new-file inventory"
+    },
+    {
+      "path": "docs/performance/unicode-layout-tranche7b3/manifest.json",
+      "purpose": "New-deliverable checksums"
+    }
+  ],
+  "preexisting_work": "All 1372 baseline file hashes matched; prior uncommitted 7B.2 production/test/tooling/evidence preserved."
+}

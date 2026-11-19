@@ -382,6 +382,7 @@ public class Texteditor extends JFrame implements KeyListener {
         inlineCompletionController = new InlineCompletionController(this);
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override public void windowClosed(java.awt.event.WindowEvent event) {
+                if (focusModeController != null) focusModeController.close();
                 if (workbenchHeader != null) workbenchHeader.close();
                 if (toolWindowHost != null) toolWindowHost.close();
                 workspaceDocumentSource.close(); agentWorkspaceController.close(); inlineCompletionController.close();
@@ -1466,6 +1467,11 @@ public class Texteditor extends JFrame implements KeyListener {
     void markdownSourceClosed(FileBuffer buffer) {
         if (buffer.isModified()) markdownLinksChanged(buffer, false);
         if (buffer.getFileType() == FileType.MARKDOWN) markdownController.headingSourceClosed(buffer);
+    }
+
+    void releaseClosedBufferResources(FileBuffer buffer) {
+        inputController.removeOpenBufferWordIndex(buffer);
+        recoveryController.unregisterFileWatch(buffer);
     }
 
     boolean isMarkdownSourceCurrent(FileBuffer buffer, MarkdownSemanticSnapshot.Source source) {

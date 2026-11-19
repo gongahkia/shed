@@ -204,6 +204,8 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleTheme("list"), "themes");
         registerCommand((args, range, force) -> handleToggle(args, "zen", editor::toggleZenMode), "zen");
         registerCommand((args, range, force) -> handleToggle(args, "goyo", editor::toggleGoyoMode), "goyo");
+        registerCommand((args, range, force) -> editor.focusModeController.handleFocusCommand(args), "focus");
+        registerCommand((args, range, force) -> editor.focusModeController.handleCenterCommand(args), "center");
         registerCommand((args, range, force) -> handleToggle(args, "limelight", editor::toggleLimelight), "limelight");
         registerCommand((args, range, force) -> handleToggle(args, "minimap", editor::toggleMinimap), "minimap");
         registerCommand((args, range, force) -> handleNormal(args, range), "normal", "norm");

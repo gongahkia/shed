@@ -1,0 +1,49 @@
+{
+  "Frame.java": {
+    "sha256": "2e9460a08c858ebbd0089fa4641bd954424a21d27b091b04719f473eef5a51fe",
+    "relevant_methods": [
+      {
+        "line": 927,
+        "declaration": "public void setUndecorated(boolean undecorated) {"
+      },
+      {
+        "line": 965,
+        "declaration": "public void setOpacity(float opacity) {"
+      },
+      {
+        "line": 991,
+        "declaration": "public void setBackground(Color bgColor) {"
+      }
+    ]
+  },
+  "Window.java": {
+    "sha256": "c4d2e607aa033256dd331eadf3e9c250266162d62ad359b8952d5de93c9105e7",
+    "relevant_methods": [
+      {
+        "line": 3664,
+        "declaration": "public void setOpacity(float opacity) {"
+      },
+      {
+        "line": 3879,
+        "declaration": "public void setBackground(Color bgColor) {"
+      }
+    ]
+  },
+  "JFrame.java": {
+    "sha256": "c4b0acf472ca741161eca42f965da3e09dcd7f78648f5f68db4e19d8d138bc0d",
+    "relevant_methods": []
+  },
+  "CPlatformWindow.java": {
+    "sha256": "234105718b9d66de6018ede381378889d5322a5290b0db0388341a9e1e791530",
+    "relevant_methods": [
+      {
+        "line": 927,
+        "declaration": "public void setOpacity(float opacity) {"
+      },
+      {
+        "line": 932,
+        "declaration": "public void setOpaque(boolean isOpaque) {"
+      }
+    ]
+  }
+}

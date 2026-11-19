@@ -1,0 +1,224 @@
+{
+  "reports": {
+    "docs/MARKDOWN_FINAL_QUALIFICATION.md": "09a10135ebadd39ddb1768971aaebf95178cda44e3099be3b8842be0002a4d80",
+    "docs/UNICODE_LAYOUT_INVESTIGATION.md": "bd07fc2a2913bf54b5382ae4d67d0ae6b36461d1b6b7d676c8dfcf3a0dd95e0c",
+    "docs/UNICODE_LAYOUT_FEASIBILITY.md": "016bf34d67e81820ceb6949aa8a621fa4d035a1c2c515a0e4407209a2e7d69ee",
+    "docs/BUFFER_LIFECYCLE_REMEDIATION.md": "c7a4a2b8f2bf20fe398755d5b2a5bbddd2002d4a5da9ea7055ac8d60e062a59c",
+    "docs/UNICODE_CORRECTNESS_REMEDIATION.md": "7e67eadf89a161a3374d3580f79c305997474a88932123c56d59281793c155b5",
+    "docs/MARKDOWN_LIVE_PRESENTATION_FEASIBILITY.md": "cf17b087b5724dd0e3ce6318b828d70424f2e0ccd99316106409b5a22a4856c2",
+    "docs/MARKDOWN_PREVIEW_RESPONSIVENESS.md": "0ad1ceba3111940aa77df49f7f22cf84d79688a01a0c55ad43b1b8fbc98c16f6",
+    "docs/MARKDOWN_PERFORMANCE_BASELINE.md": "b28b68ef1e77dc9a70574356af0ab9a18eae0491a56cdd95ff08208a5d7eae73",
+    "docs/SOURCE_VIEW_PERFORMANCE.md": "a98911bb6db211e0dc585f63eedde9d11fa87aed0703021d619d21c55c03239a",
+    "docs/MARKDOWN_HIGHLIGHTING_PERFORMANCE.md": "7fc739a3710ae602002ffa55d5674c52f1b044c51eb68074e697991567a04b68",
+    "docs/MARKDOWN_SEMANTIC_FOUNDATION.md": "8af7ed1ac794f8cde59261b64e09e9c44ccca712e24bd5608973790f2f7f493a",
+    "docs/MARKDOWN_SEMANTIC_CONSUMERS.md": "28c76302539beff877ab92b47d468d23cf50bfae8e1df415ad445e11e656918d",
+    "docs/MARKDOWN_SEMANTIC_EDIT_PLANS.md": "d4a85ed84eacebf09e4dbcb045423836f95e59e6f89e84dd161dab8fea7e05f6",
+    "docs/MARKDOWN_LINK_INFRASTRUCTURE.md": "c96de84ec3d3dc12151e2e69a0234286f76179c68bd96165647622c546196cb2",
+    "docs/MARKDOWN_LINK_NAVIGATION.md": "08dc25961a1e665a38b2d3d074698a75a9958c3374787d5d54d24cd5d35c728e",
+    "docs/MARKDOWN_ASYNC_MEDIA.md": "b4b3c8ca7fa77a5ef2be3d4e22d2f98737ee8b5076e68a959279a6173f8bdcb9",
+    "docs/MARKDOWN_SUBTREE_EDITING.md": "ffd931e8fbc0dbc1568b5e839061999bdab2e43a3c6fba9f9c80c22c6937e0ba",
+    "docs/MARKDOWN_SELECTION_INSERTION.md": "de1454f15020e8e8e2320c663b7a568d1f7d7c16b9e6c90a5ff52401caea5f4d",
+    "docs/MARKDOWN_KEYBOARD_CONTEXT.md": "380c5e4e5222aaa6a9a27004980717ca7cdbcaeeef2076ee6235188fcce116fc",
+    "docs/GRAPHEME_EDITING.md": "6ee375f1f9983610ed774d1eb21d75031559c7366745a3ee57cae28b691c8437",
+    "docs/EDITING_PERFORMANCE.md": "4b7820ac8f5c6d5d782189cd080badec3413093d615509490b1154fa720830d8",
+    "docs/ARCHITECTURE.md": "ef027afa1d32074fe161442d91ad5850a8dbdf6c0f61fe56f183233372a418ac",
+    "docs/PACKAGED_MARKDOWN_TEST.md": "acec12c9267bcbe3b91e01238d4b8a72a95d2254eb4b3d9abce0b3dbbf8c0094"
+  },
+  "capability_review": {
+    "source_atomic_edits": {
+      "production_sources": {
+        "src/main/java/shed/FileBuffer.java": "44210cdcda2780ebd3644de321938cbf356ae72dc66a33bdbce47f78af4775a0",
+        "src/main/java/shed/MarkdownEdit.java": "c5e15fb62d2caeac49bec09bf05a7d5d6f8835d8658ff16ece8667848a1cc158",
+        "src/main/java/shed/BoundedUndoManager.java": "df8a24a4acb21e71a514c3449b1a0ed6eb1a06df240c2ddee8a5834d611e14c8"
+      },
+      "regression_classes": [
+        "MarkdownEditTest",
+        "DataLossRegressionTest",
+        "BoundedUndoManagerTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    },
+    "headings_subtrees": {
+      "production_sources": {
+        "src/main/java/shed/MarkdownController.java": "1dcd784e1f0d1903574a55dc0caff3f0f8103214d29dae8e7439c1e162c5b0d6",
+        "src/main/java/shed/MarkdownHeadingEditPlan.java": "f3bb0d1fa33e02cf224fde8ebfb07a95a71595133267cb4d6f59af17a575c0eb",
+        "src/main/java/shed/MarkdownSubtreeEditPlan.java": "376c9bd86d61bb0479658ecc12df91553c8a0d5eecb9ddf8ef02d8e8723384ee"
+      },
+      "regression_classes": [
+        "MarkdownHeadingEditPlanTest",
+        "MarkdownSubtreeEditPlanTest",
+        "TexteditorSwingIntegrationTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    },
+    "tables_lists_checkboxes": {
+      "production_sources": {
+        "src/main/java/shed/MarkdownController.java": "1dcd784e1f0d1903574a55dc0caff3f0f8103214d29dae8e7439c1e162c5b0d6",
+        "src/main/java/shed/MarkdownService.java": "566a0ca336825f97a8dc8bd7671b34e35bb6e4966cca27ca72dcae3e08f47e3b",
+        "src/main/java/shed/InputController.java": "d9d8f03269237343135dcbde62ad906c2bba197708781e6b2c926990f1689522"
+      },
+      "regression_classes": [
+        "MarkdownServiceTest",
+        "MarkdownKeyboardContextTest",
+        "TexteditorSwingIntegrationTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    },
+    "quote_fence_keyboard_context": {
+      "production_sources": {
+        "src/main/java/shed/MarkdownKeyboardContext.java": "88f1a0b206c43eb62cb17f9c6e748195189fdf45fa9db94f5192959ae39cc111",
+        "src/main/java/shed/GrammarHighlightService.java": "eff8290f8cfe6e78fc5161a2eab60934fde63390b566760fb4f390ac00b90bb5",
+        "src/main/java/shed/InputController.java": "d9d8f03269237343135dcbde62ad906c2bba197708781e6b2c926990f1689522"
+      },
+      "regression_classes": [
+        "MarkdownKeyboardContextTest",
+        "TexteditorSwingIntegrationTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    },
+    "link_image_insertion": {
+      "production_sources": {
+        "src/main/java/shed/MarkdownController.java": "1dcd784e1f0d1903574a55dc0caff3f0f8103214d29dae8e7439c1e162c5b0d6",
+        "src/main/java/shed/MarkdownService.java": "566a0ca336825f97a8dc8bd7671b34e35bb6e4966cca27ca72dcae3e08f47e3b",
+        "src/main/java/shed/CommandHandler.java": "7ec351b5f8d14d495cbadb03acb8afad7dee463e6b049b270ab168ba9dfc13b8",
+        "src/main/java/shed/PaletteController.java": "f223b747341bdbd51bcf69dc029108010617b0702be1a959099365851e353404"
+      },
+      "regression_classes": [
+        "MarkdownInsertionTest",
+        "TexteditorSwingIntegrationTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    },
+    "semantics_outline": {
+      "production_sources": {
+        "src/main/java/shed/MarkdownHeadingAnalysis.java": "0e616074085bfebdeefb27d38c67aa979e1137f467f6fd307061931c1bda5a67",
+        "src/main/java/shed/MarkdownSemanticParser.java": "ba3dad16ba2b0e89063d02a0d9989d7b12b131f37822477a34bc4d79f0bf948e",
+        "src/main/java/shed/MarkdownSemanticSnapshot.java": "2d2dd1063edd59b54f5d665dad565a4f456951bb74566fd9a46bd1dcfbe1faef",
+        "src/main/java/shed/MarkdownOutlineDialog.java": "ad5c70e809f2c110e843bc8c683b9415b42f5251aee4e0f1943376642bb144a8"
+      },
+      "regression_classes": [
+        "MarkdownSemanticParserTest",
+        "MarkdownConsumersTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    },
+    "links_backlinks": {
+      "production_sources": {
+        "src/main/java/shed/MarkdownLinkNavigation.java": "a08f3784771d9b0c0a3f8bd3fd47b9e002beba13e1a155bed1232995c75dae61",
+        "src/main/java/shed/MarkdownLinkResolver.java": "c0fff99194840bf6b54f05f1bd078dd97d5d8d22a2ce6a84a3a3a584ecbd5719",
+        "src/main/java/shed/MarkdownProjectLinks.java": "f2a69c9e15167bfe7223559a4ef7ee6eeae8f1299ee84291b79aeb70f5d79f99",
+        "src/main/java/shed/MarkdownController.java": "1dcd784e1f0d1903574a55dc0caff3f0f8103214d29dae8e7439c1e162c5b0d6"
+      },
+      "regression_classes": [
+        "MarkdownLinkInfrastructureTest",
+        "MarkdownLinkNavigationTest",
+        "TexteditorSwingIntegrationTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    },
+    "source_highlighting": {
+      "production_sources": {
+        "src/main/java/shed/SourcePlainView.java": "d6e5ced94a1884f0dc0917981086c80e7b528ca2b1ee3e8d8b4eb6fb0880a694",
+        "src/main/java/shed/GrammarHighlightService.java": "eff8290f8cfe6e78fc5161a2eab60934fde63390b566760fb4f390ac00b90bb5",
+        "src/main/java/shed/SyntaxUiController.java": "746310c81f173a8723cb5ade7f832994373a89b6bd1c048fdb5369906ce3fbd5"
+      },
+      "regression_classes": [
+        "SourcePlainViewTest",
+        "MarkdownHighlightTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    },
+    "preview": {
+      "production_sources": {
+        "src/main/java/shed/MarkdownPreviewPane.java": "29b341a7a7232b90fce4717ac11948084a4137878c214cd9012aecce1fc13b9a",
+        "src/main/java/shed/MarkdownPreviewRenderer.java": "01c0ff19f1bb7c1762c1bbf1b889f1c42f4055fe371f6aca3ec2b61081e5a991",
+        "src/main/java/shed/MarkdownPreviewAssets.java": "8306b2d8e721ca37a25ea812be7e63e0a463ced957058964a2eb89d736aa117e"
+      },
+      "regression_classes": [
+        "MarkdownPreviewPaneTest",
+        "MarkdownPreviewRendererTest",
+        "MarkdownRemoteImageTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    },
+    "async_media_infrastructure_not_installed_preview": {
+      "production_sources": {
+        "src/main/java/shed/MarkdownMediaService.java": "209abacccc2a31e226b13f152d5dea0ac5b37e186592ddbcb70252b24ba0e6db",
+        "src/main/java/shed/MarkdownMediaRenderer.java": "af7db0cb6de5fae7d71fb2953876f63bd598adf0978dd26b293567c5f0a30d51",
+        "src/main/java/shed/MarkdownMedia.java": "28c3b24d302b7baf48df59bda65c4de820dc211702daa81181c63e2a6c77f9c3"
+      },
+      "regression_classes": [
+        "MarkdownMediaServiceTest"
+      ],
+      "status": "Infrastructure only, no production preview/editor installation"
+    },
+    "lifecycle_recovery": {
+      "production_sources": {
+        "src/main/java/shed/PaneBufferController.java": "c0cdf356337159031e54ac1cee055854d0bbcf3c9bd0112c21c758e4ceac2dff",
+        "src/main/java/shed/RecoveryController.java": "6bfe8fc2ee7892705d2b2b29eb924335cbe3c9902e4094294949bcf0f5ba1d44",
+        "src/main/java/shed/AsyncJobService.java": "dc6bee77ec34a07e78ac2bb335578234adde0843677a9cfadbbe05ee61f39017",
+        "src/main/java/shed/FileWatcherService.java": "baed6fe7f80bbcdd71b6a4b3d8016bee04ba2b7d7448a0b974b1c100ef0bfaa6"
+      },
+      "regression_classes": [
+        "DocumentLifecycleTest",
+        "AsyncJobPayloadLifecycleTest",
+        "FileWatcherServiceTest",
+        "TexteditorSwingIntegrationTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    },
+    "unicode": {
+      "production_sources": {
+        "src/main/java/shed/GraphemeBoundary.java": "56180189486b26a24639f8f5eba86e26742b83fa0e740acb669c641799149149",
+        "src/main/java/shed/IndicConjunctBreak.java": "53cf261386c48b7364b6528db876f416e2c7fa1eee800b2c9d5e9dfc71b19dbd",
+        "src/main/java/shed/ClipboardManager.java": "d0e07603938573e7df713fc2f00b6660895a0a1869ad85a8393c3ffded859ef4"
+      },
+      "regression_classes": [
+        "GraphemeBoundaryTest",
+        "IndicConjunctBoundaryTest",
+        "GraphemeEditRangeTest",
+        "UnicodeEditingRegressionTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    },
+    "keymaps": {
+      "production_sources": {
+        "src/main/java/shed/InputController.java": "d9d8f03269237343135dcbde62ad906c2bba197708781e6b2c926990f1689522",
+        "src/main/java/shed/EditorSurface.java": "1692b54731af870b94d90a065a98cebd67201f01558999173e8b04f7a520c4e3",
+        "src/main/java/shed/SwingEditorSurface.java": "4f1c7428a006b60be5073e73a9ee66eaea795af77a7e22277826560f3233eb5a"
+      },
+      "regression_classes": [
+        "PlainKeymapTest",
+        "EmacsKeymapTest",
+        "TexteditorSwingIntegrationTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    },
+    "read_only_protection": {
+      "production_sources": {
+        "src/main/java/shed/FileBuffer.java": "44210cdcda2780ebd3644de321938cbf356ae72dc66a33bdbce47f78af4775a0",
+        "src/main/java/shed/LargeFileStore.java": "5fde1a98ab7492fa8783bbe8bb50a6950f73de0969a09ee2cc22dabbe2bad93d",
+        "src/main/java/shed/LargeFileProjection.java": "c746f1e81b40e944048472d67f452188b1e74c21eb5e7548c8a34a4edcd4806d"
+      },
+      "regression_classes": [
+        "DocumentLifecycleTest",
+        "MarkdownEditTest",
+        "TexteditorSwingIntegrationTest"
+      ],
+      "status": "Production route reviewed; supported-scope regressions exercised in full suite"
+    }
+  },
+  "prior_evidence_indexes": {
+    "docs/performance/markdown-tranche7a/INDEX.md": "e094f0d70d496b0a56a6edd060e0cfa0489e7a5566ad377acb67c98c1f39cd77",
+    "docs/performance/buffer-tranche7b2/INDEX.md": "4f5b230c4966b03c26fd345badb31091d8b2bef107d60f5729d5995ba3f19a71",
+    "docs/performance/unicode-layout-tranche7b3/INDEX.md": "9c6f133ac5aa62ce37c575f0b0ad5d675aa7924624898a8f304cded24c901ed4",
+    "docs/performance/unicode-layout-tranche7b4/INDEX.md": "e034bb5c4dda6a23243700c70d0e906b7c34bf1efce279f220e37f3500ac5b1e"
+  },
+  "readiness": {
+    "personal_development": "CONDITIONAL GO",
+    "general_public_release": "NO-GO",
+    "performance_first_ambition": "NO-GO",
+    "8a_isolated_research": "CONDITIONAL GO only under separate authorization and research gates; no shipping approval"
+  },
+  "architectural_decision": "Retain current code; explicitly limit claims. Screen a maintained compatible JDK before deciding whether to fund a separate layout project. No implementation in 7C."
+}

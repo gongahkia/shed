@@ -1151,6 +1151,132 @@ public class TexteditorSwingIntegrationTest {
         return false;
     }
 
+    private static OpenBufferCompletionIndex completionIndex(Texteditor editor) throws Exception {
+        var field = InputController.class.getDeclaredField("openBufferCompletionIndex"); field.setAccessible(true);
+        return (OpenBufferCompletionIndex) field.get(editor.inputController);
+    }
+
+    @Test
+    void fileWatchRegistrationEndsWithItsBufferAndPreservesIndependentListeners() throws Exception {
+        assumeSwingAvailable();
+        Path path = Files.writeString(tempDir.resolve("watch-owner.md"), "watched original");
+        Texteditor editor = createEditor(tempDir.resolve("watch-owner-home"), path);
+        FileWatcherService.WatchRegistration independent = null;
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            FileBuffer buffer = onEdt(editor::getCurrentBuffer);
+            independent = onEdt(() -> editor.fileWatcherService.watch(path.toFile(), file -> { }));
+            onEdt(() -> {
+                for (int i=0;i<3;i++) editor.registerFileWatch(buffer);
+                var field=FileWatcherService.class.getDeclaredField("listeners"); field.setAccessible(true);
+                var listeners=(java.util.Map<?,?>)field.get(editor.fileWatcherService);
+                assertEquals(2, ((java.util.List<?>)listeners.get(path.toFile().getAbsolutePath())).size());
+                editor.splitWindow(true); editor.closeActiveWindow();
+                assertTrue(editor.fileWatcherService.isWatching(path.toFile()));
+                editor.closeActiveBufferWithoutExiting(true);
+                assertEquals(1, ((java.util.List<?>)listeners.get(path.toFile().getAbsolutePath())).size());
+                assertEquals("watched original", buffer.getContent()); return null;
+            });
+            independent.close(); independent=null;
+            assertFalse(onEdt(() -> editor.fileWatcherService.isWatching(path.toFile())));
+        } finally { if(independent!=null)independent.close(); disposeEditor(editor); }
+    }
+
+    @Test
+    void closingCancelsPendingWordIndexesAndReopeningCannotReceiveTheOldResult() throws Exception {
+        assumeSwingAvailable();
+        Path path = Files.writeString(tempDir.resolve("completion-reopen.md"), "alpha beta original");
+        Texteditor editor = createEditor(tempDir.resolve("completion-reopen-home"), path);
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var blockerEntered = new java.util.concurrent.CountDownLatch(1); var release = new java.util.concurrent.CountDownLatch(1);
+        AsyncJobService original = editor.asyncJobService; var controlled = new AsyncJobService(executor, 20, null);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending)); FileBuffer closed = onEdt(editor::getCurrentBuffer);
+            assertTrue(awaitUiState(() -> completionIndex(editor).hasSnapshot(closed, closed.textSnapshot())));
+            executor.submit(() -> { blockerEntered.countDown(); try { release.await(); } catch (InterruptedException ignored) { } });
+            assertTrue(blockerEntered.await(5, TimeUnit.SECONDS));
+            onEdt(() -> {
+                editor.asyncJobService = controlled;
+                var submit = InputController.class.getDeclaredMethod("submitOpenBufferWordIndex", FileBuffer.class, VersionedTextSnapshot.class);
+                submit.setAccessible(true); submit.invoke(editor.inputController, closed, closed.textSnapshot());
+                int job = controlled.list().getFirst().getId();
+                editor.closeActiveBufferWithoutExiting(true);
+                assertEquals(AsyncJobService.Status.CANCELLED, controlled.get(job).getStatus());
+                assertFalse(completionIndex(editor).hasSnapshot(closed));
+                var pending = InputController.class.getDeclaredField("pendingWordIndexBuffer"); pending.setAccessible(true);
+                assertFalse(pending.get(editor.inputController) == closed);
+                return null;
+            });
+            release.countDown();
+            onEdt(() -> { editor.documents.open(path, 1, 1, "reopen"); return null; });
+            assertTrue(awaitCurrentFile(editor, path));
+            FileBuffer reopened = onEdt(editor::getCurrentBuffer); assertFalse(reopened == closed);
+            assertTrue(awaitUiState(() -> completionIndex(editor).hasSnapshot(reopened, reopened.textSnapshot())));
+            onEdt(() -> {
+                assertEquals("alpha beta original", reopened.getContent()); assertFalse(reopened.isModified());
+                assertFalse(completionIndex(editor).hasSnapshot(closed));
+                assertTrue(completionIndex(editor).hasSnapshot(reopened)); return null;
+            });
+        } finally {
+            release.countDown(); controlled.shutdownNow(); onEdt(() -> { editor.asyncJobService = original; return null; }); disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void replacingASessionDropsOnlyTheRetiredBufferCompletionSnapshot() throws Exception {
+        assumeSwingAvailable();
+        Path path = Files.writeString(tempDir.resolve("completion-session.md"), "session alpha original");
+        Texteditor editor = createEditor(tempDir.resolve("completion-session-home"), path);
+        Path session = tempDir.resolve("completion-session.json");
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending)); FileBuffer retired = onEdt(editor::getCurrentBuffer);
+            assertTrue(awaitUiState(() -> completionIndex(editor).hasSnapshot(retired, retired.textSnapshot())));
+            onEdt(() -> {
+                assertTrue(editor.sessionConfigController.saveSession(session.toString()).startsWith("Session saved:"));
+                assertTrue(editor.sessionConfigController.loadSession(session.toString(), true).startsWith("Restored session:"));
+                assertFalse(editor.buffers.contains(retired)); assertFalse(completionIndex(editor).hasSnapshot(retired)); return null;
+            });
+            FileBuffer active = onEdt(editor::getCurrentBuffer);
+            assertEquals("session alpha original", onEdt(active::getContent));
+            assertTrue(awaitUiState(() -> completionIndex(editor).hasSnapshot(active, active.textSnapshot())));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void completionIndexEndsWithBufferOwnershipRatherThanSplitVisibility() throws Exception {
+        assumeSwingAvailable();
+        Path firstPath = Files.writeString(tempDir.resolve("completion-first.md"), "alpha original");
+        Path nextPath = Files.writeString(tempDir.resolve("completion-next.java"), "class Next { int beta; }");
+        Texteditor editor = createEditor(tempDir.resolve("completion-close-home"), firstPath);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            FileBuffer first = onEdt(editor::getCurrentBuffer);
+            assertTrue(awaitUiState(() -> completionIndex(editor).hasSnapshot(first, first.textSnapshot())));
+            onEdt(() -> {
+                editor.splitWindow(true); editor.closeActiveWindow();
+                assertTrue(editor.buffers.contains(first)); assertTrue(completionIndex(editor).hasSnapshot(first));
+                editor.writingArea.insert("unsaved ", 0);
+                assertTrue(first.isModified());
+                FileBuffer next = new FileBuffer(nextPath.toFile()); editor.buffers.add(next); editor.loadBufferIntoEditor(next);
+                editor.loadBufferIntoEditor(first);
+                assertTrue(editor.deleteBuffer(false).contains("No write"));
+                assertTrue(completionIndex(editor).hasSnapshot(first)); assertTrue(first.getUndoManager().canUndo());
+                assertEquals("unsaved alpha original", first.getContent());
+                editor.deleteBuffer(true);
+                assertFalse(editor.buffers.contains(first));
+                assertFalse(completionIndex(editor).hasSnapshot(first), "closed buffer remains in completion index");
+                assertEquals("unsaved alpha original", first.getContent()); assertTrue(first.getUndoManager().canUndo());
+                return null;
+            });
+            FileBuffer next = onEdt(editor::getCurrentBuffer);
+            assertTrue(awaitUiState(() -> completionIndex(editor).hasSnapshot(next, next.textSnapshot())));
+            onEdt(() -> {
+                editor.closeActiveBufferWithoutExiting(true);
+                assertFalse(completionIndex(editor).hasSnapshot(next)); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
     @Test
     void indicEditsUseExistingVimEmacsAndPlainMultiSelectionRoutes() throws Exception {
         assumeSwingAvailable();
@@ -4269,6 +4395,234 @@ public class TexteditorSwingIntegrationTest {
     private static void enableVim(Texteditor editor) {
         editor.configManager.set("keymap.profile", "vim");
         editor.setMode(EditorMode.NORMAL);
+    }
+
+    @Test
+    void focusModeRestoresPrehiddenChromeAndPreservesSource() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("focus-restore.md"), "# Heading\nUnicode e\u0301 😀\n");
+        Texteditor editor = createEditor(tempDir.resolve("focus-restore-home"), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.workbenchHeader.setVisible(false); editor.openEditorsBar.setVisible(false);
+                editor.footerPanel.setVisible(false); editor.statusBar.setVisible(false);
+                var buffer = editor.getCurrentBuffer(); long revision = buffer.documentRevision();
+                var document = editor.writingArea.getDocument(); editor.writingArea.select(2, 8);
+                editor.toggleGoyoMode(); editor.toggleGoyoMode();
+                assertFalse(editor.workbenchHeader.isVisible()); assertFalse(editor.openEditorsBar.isVisible());
+                assertFalse(editor.footerPanel.isVisible()); assertFalse(editor.statusBar.isVisible());
+                assertSame(document, editor.writingArea.getDocument()); assertEquals(revision, buffer.documentRevision());
+                assertEquals(2, editor.writingArea.getSelectionStart()); assertEquals(8, editor.writingArea.getSelectionEnd());
+                assertFalse(buffer.isModified()); assertFalse(buffer.getUndoManager().canUndo());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void focusCommandsAreIdempotentAndKeepCommandExitAvailableAcrossKeymaps() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("focus-commands-home"), Files.writeString(tempDir.resolve("focus-commands.md"), "# Heading\nbody\n"));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                assertEquals("focus toggle", PaletteController.surfaceActionCommand("Toggle Focus Mode"));
+                assertEquals("focus off", PaletteController.surfaceActionCommand("Exit Focus Mode"));
+                assertEquals("center toggle", PaletteController.surfaceActionCommand("Toggle Centered Writing"));
+                for (String profile : new String[]{"plain", "vim", "emacs"}) {
+                    editor.configManager.set("keymap.profile", profile);
+                    assertEquals("Focus mode enabled", editor.commandHandler.execute("focus on"));
+                    assertEquals("Focus mode enabled", editor.commandHandler.execute("focus on"));
+                    assertFalse(editor.workbenchHeader.isVisible()); assertFalse(editor.footerPanel.isVisible());
+                    editor.setMode(EditorMode.COMMAND);
+                    assertTrue(editor.footerPanel.isVisible()); assertTrue(editor.commandBar.isVisible());
+                    assertFalse(editor.statusBar.isVisible());
+                    assertEquals("Focus mode disabled", editor.commandHandler.execute("focus off"));
+                    editor.setMode(EditorMode.NORMAL);
+                    assertTrue(editor.workbenchHeader.isVisible()); assertTrue(editor.footerPanel.isVisible());
+                    assertEquals("Focus mode disabled", editor.commandHandler.execute("focus off"));
+                    assertFalse(editor.focusModeController.isCenteredWriting());
+                }
+                assertTrue(editor.commandHandler.execute("focus invalid").startsWith("Usage:"));
+                assertTrue(editor.commandHandler.execute("center invalid").startsWith("Usage:"));
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void focusKeepsMinimapIdentityAndListenerCountAcrossRepeatedCycles() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("focus-minimap-home"), Files.writeString(tempDir.resolve("focus-minimap.md"), "body\n".repeat(100)));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.toggleMinimap(); var minimap = editor.activeMinimapPanel;
+                var viewport = editor.getActivePane().getScrollPane().getViewport(); int listeners = viewport.getChangeListeners().length;
+                for (int i = 0; i < 12; i++) {
+                    editor.focusModeController.setGoyoEnabled(true);
+                    assertSame(minimap, editor.activeMinimapPanel); assertFalse(minimap.isVisible());
+                    editor.focusModeController.setGoyoEnabled(false);
+                    assertSame(minimap, editor.activeMinimapPanel); assertTrue(minimap.isVisible());
+                }
+                assertEquals(listeners, viewport.getChangeListeners().length);
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void focusBoundsEachSplitAndKeepsSharedDocumentAndNavigation() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("focus-splits-home"), Files.writeString(tempDir.resolve("focus-splits.md"), "body text\n".repeat(100)));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            FileBuffer buffer = onEdt(editor::getCurrentBuffer);
+            onEdt(() -> {
+                editor.setSize(1600, 900); editor.configManager.set("zen.mode.width", "40");
+                editor.splitWindow(true); editor.commandHandler.execute("focus on"); editor.validate(); return null;
+            });
+            assertTrue(awaitUiState(() -> editor.editorPanes.stream().allMatch(pane -> {
+                int desired = 40 * pane.getTextArea().getFontMetrics(pane.getTextArea().getFont()).charWidth('M');
+                int width = pane.getScrollPane().getViewport().getExtentSize().width;
+                return width > 100 && width <= desired + 2;
+            })));
+            onEdt(() -> {
+                for (EditorPane pane : editor.editorPanes) assertSame(buffer.getDocument(), pane.getTextArea().getDocument());
+                editor.activateEditorPane(editor.editorPanes.getFirst()); editor.writingArea.setCaretPosition(10);
+                editor.splitWindow(false); EditorPane added = editor.getActivePane();
+                editor.closeActiveWindow(); assertFalse(editor.editorPanes.contains(added));
+                EditorPane active = editor.getActivePane(); editor.writingArea.select(2, 12);
+                editor.commandHandler.execute("focus off");
+                assertSame(active, editor.getActivePane()); assertEquals(2, editor.writingArea.getSelectionStart());
+                assertEquals(12, editor.writingArea.getSelectionEnd()); assertEquals(2, editor.editorPanes.size());
+                assertFalse(buffer.getUndoManager().canUndo()); assertFalse(buffer.isModified()); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void centeredWritingPreservesBordersWrapAndUnicodeHitTestingAcrossResizes() throws Exception {
+        assumeSwingAvailable();
+        String content = "# Héading 😀\ne\u0301 emoji 😀\t中文\n" + "long prose ".repeat(80) + "\n";
+        Texteditor editor = createEditor(tempDir.resolve("center-geometry-home"), Files.writeString(tempDir.resolve("center-geometry.md"), content));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            FileBuffer buffer = onEdt(editor::getCurrentBuffer);
+            var original = onEdt(() -> editor.getActivePane().getScrollPane().getBorder());
+            onEdt(() -> { editor.setSize(1400, 800); editor.configManager.set("zen.mode.width", "40");
+                editor.commandHandler.execute("center on"); editor.validate(); return null; });
+            assertTrue(awaitUiState(() -> editor.getActivePane().getScrollPane().getInsets().left > 0));
+            for (boolean wrap : new boolean[]{false, true}) {
+                onEdt(() -> {
+                    editor.writingArea.setLineWrap(wrap); editor.writingArea.setWrapStyleWord(wrap);
+                    editor.writingArea.setFont(editor.writingArea.getFont().deriveFont(18f)); editor.updateZenModeLayout();
+                    editor.validate();
+                    for (int offset : new int[]{0, 2, content.indexOf("emoji"), content.indexOf("中文")}) {
+                        var box = editor.writingArea.modelToView2D(offset);
+                        assertNotNull(box);
+                        assertEquals(offset, editor.writingArea.viewToModel2D(new java.awt.geom.Point2D.Double(box.getX() + .1, box.getY() + box.getHeight() / 2)));
+                    }
+                    editor.writingArea.select(2, 12); return null;
+                });
+            }
+            onEdt(() -> { editor.setSize(420, 700); editor.validate(); editor.updateZenModeLayout(); return null; });
+            assertTrue(awaitUiState(() -> editor.getActivePane().getScrollPane().getInsets().left == 0),
+                onEdt(() -> "frame=" + editor.getSize() + " host=" + editor.editorHostPanel.getSize() + " pane=" + editor.getActivePane().getScrollPane().getSize() + " insets=" + editor.getActivePane().getScrollPane().getInsets()));
+            onEdt(() -> {
+                editor.commandHandler.execute("center off"); assertSame(original, editor.getActivePane().getScrollPane().getBorder());
+                assertTrue(editor.writingArea.getLineWrap()); assertEquals(content, buffer.getContent());
+                assertEquals(2, editor.writingArea.getSelectionStart()); assertEquals(12, editor.writingArea.getSelectionEnd());
+                assertFalse(buffer.isModified()); assertFalse(buffer.getUndoManager().canUndo()); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void focusRestoresIndependentCenterAndRespectsChangedTabPreference() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("focus-center-home"), Files.writeString(tempDir.resolve("focus-center.md"), "body\n"));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.commandHandler.execute("center on"); editor.commandHandler.execute("focus on");
+                editor.commandHandler.execute("center off"); editor.configManager.set("ui.open_editors.visible", "false");
+                editor.commandHandler.execute("focus off");
+                assertTrue(editor.focusModeController.isCenteredWriting());
+                assertFalse(editor.openEditorsBar.isVisible());
+                editor.commandHandler.execute("center off");
+                assertTrue(editor.workbenchHeader.isVisible()); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void focusRestoresHiddenTreeAndDoesNotResurrectClosedPanes() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("focus-tree-home"), Files.writeString(tempDir.resolve("focus-tree.md"), "body\n"));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                EditorPane source = editor.getActivePane(); editor.splitWindow(true);
+                EditorPane sidebar = editor.getActivePane(); editor.treePane = sidebar;
+                sidebar.setHiddenByFocusMode(true); editor.activateEditorPane(source); editor.renderWindowLayout();
+                editor.commandHandler.execute("focus on"); editor.commandHandler.execute("focus off");
+                assertTrue(sidebar.isHiddenByFocusMode());
+                sidebar.setHiddenByFocusMode(false); editor.renderWindowLayout(); editor.commandHandler.execute("focus on");
+                editor.paneBufferController.closePane(sidebar);
+                editor.commandHandler.execute("focus off"); assertEquals(1, editor.editorPanes.size());
+                assertFalse(editor.editorPanes.contains(sidebar)); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void focusPreservesDockSizeAndSessionVisibilityWhileTemporaryToolsCanOpen() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("focus-dock-home"), Files.writeString(tempDir.resolve("focus-dock.md"), "body\n"));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> { editor.showToolWindow(); editor.validate(); editor.editorToolSplit.setDividerLocation(350); editor.validate(); return null; });
+            int height = onEdt(() -> editor.toolWindowHost.getHeight());
+            onEdt(() -> {
+                editor.commandHandler.execute("focus on"); assertFalse(editor.toolWindowHost.isVisible());
+                assertEquals(true, editor.focusModeController.dockStateForSession().get("visible"));
+                editor.commandHandler.execute("focus off"); editor.validate(); return null;
+            });
+            assertTrue(awaitUiState(() -> Math.abs(editor.toolWindowHost.getHeight() - height) <= 2));
+            onEdt(() -> {
+                editor.hideToolWindow(); editor.commandHandler.execute("focus on"); editor.showToolWindow();
+                assertTrue(editor.toolWindowHost.isVisible()); editor.commandHandler.execute("focus off");
+                assertFalse(editor.toolWindowHost.isVisible()); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void workspaceChangeAndDisposalEndFocusWithoutRetainingOldPresentation() throws Exception {
+        assumeSwingAvailable();
+        Path first = Files.createDirectories(tempDir.resolve("focus-project-a"));
+        Path next = Files.createDirectories(tempDir.resolve("focus-project-b"));
+        Texteditor editor = createEditor(tempDir.resolve("focus-workspace-home"), Files.writeString(tempDir.resolve("focus-workspace.md"), "body\n"));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.workspaceController.addDirectory(first.toFile(), true);
+                editor.activateEditorPane(editor.editorPanes.stream().filter(pane -> pane != editor.treePane).findFirst().orElseThrow());
+                editor.commandHandler.execute("focus on"); assertTrue(editor.goyoModeEnabled);
+                editor.workspaceController.addDirectory(next.toFile(), true);
+                assertFalse(editor.goyoModeEnabled); assertFalse(editor.focusModeController.isCenteredWriting());
+                assertEquals(next.toRealPath().toFile(), editor.treeRoot);
+                editor.activateEditorPane(editor.editorPanes.stream().filter(pane -> pane != editor.treePane).findFirst().orElseThrow());
+                editor.commandHandler.execute("focus on"); return null;
+            });
+        } finally { disposeEditor(editor); }
+        assertTrue(awaitUiState(() -> {
+            var state = FocusModeController.class.getDeclaredField("focusState"); state.setAccessible(true);
+            var borders = FocusModeController.class.getDeclaredField("centeredBorders"); borders.setAccessible(true);
+            return state.get(editor.focusModeController) == null && ((java.util.Map<?, ?>) borders.get(editor.focusModeController)).isEmpty();
+        }));
     }
 
     private static Texteditor createEditor(Path home, Path... targets) throws Exception {

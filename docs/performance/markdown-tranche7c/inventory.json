@@ -1,0 +1,58 @@
+{
+  "production_changes": [],
+  "test_changes": [],
+  "benchmark_changes": [],
+  "modified_preexisting_files": [],
+  "new_files": [
+    {
+      "path": "docs/MARKDOWN_PRODUCT_READINESS.md",
+      "purpose": "Final A\u2013N qualification and readiness/architecture decisions"
+    },
+    {
+      "path": "docs/performance/markdown-tranche7c/INDEX.md",
+      "purpose": "Qualification evidence and provenance"
+    },
+    {
+      "path": "docs/performance/markdown-tranche7c/baseline.json.gz",
+      "purpose": "Qualification evidence and provenance"
+    },
+    {
+      "path": "docs/performance/markdown-tranche7c/corpus.json.gz",
+      "purpose": "Qualification evidence and provenance"
+    },
+    {
+      "path": "docs/performance/markdown-tranche7c/current-controls.json.gz",
+      "purpose": "Qualification evidence and provenance"
+    },
+    {
+      "path": "docs/performance/markdown-tranche7c/diagnostics.json.gz",
+      "purpose": "Qualification evidence and provenance"
+    },
+    {
+      "path": "docs/performance/markdown-tranche7c/evidence-review.json",
+      "purpose": "Qualification evidence and provenance"
+    },
+    {
+      "path": "docs/performance/markdown-tranche7c/measurements.json",
+      "purpose": "Qualification evidence and provenance"
+    },
+    {
+      "path": "docs/performance/markdown-tranche7c/packaged-smoke.json",
+      "purpose": "Qualification evidence and provenance"
+    },
+    {
+      "path": "docs/performance/markdown-tranche7c/verification.json",
+      "purpose": "Qualification evidence and provenance"
+    },
+    {
+      "path": "docs/performance/markdown-tranche7c/inventory.json",
+      "purpose": "Complete new-file inventory"
+    },
+    {
+      "path": "docs/performance/markdown-tranche7c/manifest.json",
+      "purpose": "Deliverable checksums"
+    }
+  ],
+  "baseline_files_preserved": 1410,
+  "scope": "Documentation/evidence only; no automatic follow-up implementation."
+}

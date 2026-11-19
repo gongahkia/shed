@@ -1,0 +1,1 @@
+Pilot desktop rectangle capture could include an occluding application. Both derived rectangle captures were deleted and are excluded from evidence. Component-rendered fixtures remain. Final runs use existing process-owned window capture only; native window-surface capture is not a desktop-compositing or blur measurement. Performance samples preceded capture.

@@ -1,0 +1,44 @@
+{
+  "Window.java": {
+    "sha256": "c4d2e607aa033256dd331eadf3e9c250266162d62ad359b8952d5de93c9105e7",
+    "matches": []
+  },
+  "CPlatformWindow.java": {
+    "sha256": "234105718b9d66de6018ede381378889d5322a5290b0db0388341a9e1e791530",
+    "matches": [
+      {
+        "line": 128,
+        "text": "public static final String WINDOW_FULL_CONTENT = \"apple.awt.fullWindowContent\";"
+      },
+      {
+        "line": 129,
+        "text": "public static final String WINDOW_TRANSPARENT_TITLE_BAR = \"apple.awt.transparentTitleBar\";"
+      },
+      {
+        "line": 130,
+        "text": "public static final String WINDOW_TITLE_VISIBLE = \"apple.awt.windowTitleVisible\";"
+      },
+      {
+        "line": 932,
+        "text": "public void setOpaque(boolean isOpaque) {"
+      },
+      {
+        "line": 933,
+        "text": "contentView.setWindowLayerOpaque(isOpaque);"
+      }
+    ]
+  },
+  "AquaLookAndFeel.java": {
+    "sha256": "507031fdb2850c99373dd99fdf4a8a86707b2b6f15c810971870475728d95c9d",
+    "matches": []
+  },
+  "sdk_visual_effect_header": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSVisualEffectView.h",
+  "sources": [
+    "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/Window.html",
+    "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/Frame.html",
+    "https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/java/awt/GraphicsDevice.html",
+    "https://docs.oracle.com/en/java/javase/21/docs/specs/AWT_Native_Interface.html",
+    "https://developer.apple.com/documentation/AppKit/NSVisualEffectView?language=objc",
+    "https://developer.apple.com/documentation/appkit/nsworkspace/accessibilitydisplayshouldreducetransparency?language=objc"
+  ]
+}

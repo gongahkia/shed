@@ -17,6 +17,7 @@ final class RecoveryController {
     private boolean recoveryJournalLoading;
     private int lastWarnedDroppedEntries = -1;
     private Timer snapshotCaptureTimer;
+    private final Map<FileBuffer, FileWatcherService.WatchRegistration> fileWatches = new IdentityHashMap<>();
 
     RecoveryController(Texteditor editor) {
         this.editor = editor;
@@ -228,12 +229,8 @@ final class RecoveryController {
         if (buffer == null || target == null) {
             throw new IOException("Conflict buffer and save target are required");
         }
-        File previousFile = buffer.getFile();
         int caret = buffer == editor.getCurrentBuffer() ? editor.writingArea.getCaretPosition() : 0;
         buffer.saveAs(target);
-        if (previousFile != null && !previousFile.getAbsoluteFile().equals(target.getAbsoluteFile())) {
-            editor.fileWatcherService.unwatch(previousFile);
-        }
         editor.registerFileWatch(buffer);
         editor.addToRecentFiles(target.getAbsolutePath());
         editor.notifyCurrentBufferSaved();
@@ -509,7 +506,7 @@ final class RecoveryController {
                     FileBuffer buffer = file.exists() ? new FileBuffer(file, editor.configManager)
                         : new FileBuffer(file.getAbsolutePath(), editor.configManager);
                     if (editor.shouldReplaceSingleUntitledBuffer()) {
-                        editor.buffers.set(0, buffer);
+                        editor.releaseClosedBufferResources(editor.buffers.set(0, buffer));
                     } else {
                         editor.buffers.add(buffer);
                     }
@@ -525,7 +522,7 @@ final class RecoveryController {
             FileBuffer scratch = FileBuffer.createScratch(scratchName, restoredContent);
             scratch.setModified(true);
             if (editor.shouldReplaceSingleUntitledBuffer()) {
-                editor.buffers.set(0, scratch);
+                editor.releaseClosedBufferResources(editor.buffers.set(0, scratch));
             } else {
                 editor.buffers.add(scratch);
             }
@@ -537,15 +534,23 @@ final class RecoveryController {
 
 
     public void registerFileWatch(FileBuffer buffer) {
-        if (buffer == null || buffer.getFile() == null || buffer.isScratch()) return;
-        editor.fileWatcherService.watch(buffer.getFile(), file -> {
+        unregisterFileWatch(buffer);
+        if (buffer == null || buffer.getFile() == null || buffer.isScratch() || !editor.buffers.contains(buffer)) return;
+        var registration = editor.fileWatcherService.watch(buffer.getFile(), file -> {
             SwingUtilities.invokeLater(() -> {
-                if (!editor.reloadPromptActive && buffer.getFile() != null
+                if (!editor.closingDown && editor.isDisplayable() && editor.buffers.contains(buffer)
+                    && !editor.reloadPromptActive && buffer.getFile() != null
                     && buffer.getFile().getAbsoluteFile().equals(file.getAbsoluteFile())) {
                     checkForExternalChanges();
                 }
             });
         });
+        fileWatches.put(buffer, registration);
+    }
+
+    void unregisterFileWatch(FileBuffer buffer) {
+        var registration = fileWatches.remove(buffer);
+        if (registration != null) registration.close();
     }
 
 }

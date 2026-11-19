@@ -732,7 +732,7 @@ final class SessionConfigController {
         }
         payload.put("layout", serializeWindowLayout(editor.windowLayoutRoot));
         payload.put("toolPlacements", editor.workbenchPlacementState.toList());
-        if (editor.toolWindowHost != null) payload.put("toolDock", editor.toolWindowHost.captureDockState());
+        if (editor.toolWindowHost != null) payload.put("toolDock", editor.focusModeController.dockStateForSession());
         payload.put("activePaneIndex", editor.activePaneIndex);
         FileBuffer current = editor.getCurrentBuffer();
         if (current != null) {
@@ -814,6 +814,7 @@ final class SessionConfigController {
         editor.treeBuffer = null;
         editor.treePane = null;
         editor.quickfixBuffer = null;
+        for (FileBuffer closingBuffer : editor.buffers) editor.releaseClosedBufferResources(closingBuffer);
         editor.buffers.clear();
         editor.buffers.addAll(restoredBuffers);
 
@@ -863,6 +864,7 @@ final class SessionConfigController {
         FileBuffer terminalFallback = fallback;
         if (terminalFallback != null && editor.editorPanes.stream().noneMatch(pane -> pane.getBuffer() == terminalFallback)) {
             editor.buffers.remove(terminalFallback);
+            editor.releaseClosedBufferResources(terminalFallback);
             editor.markdownSourceClosed(terminalFallback);
         }
         editor.currentBufferIndex = editor.buffers.indexOf(editor.getActivePane().getBuffer());
@@ -900,6 +902,7 @@ final class SessionConfigController {
         editor.treePane = null;
         editor.quickfixBuffer = null;
         editor.workbenchPlacementState = new WorkbenchPlacementState();
+        for (FileBuffer closingBuffer : editor.buffers) editor.releaseClosedBufferResources(closingBuffer);
         editor.buffers.clear();
 
         for (String filePath : filePaths) {
@@ -1142,6 +1145,7 @@ final class SessionConfigController {
 
 
     void resetEditorPanesForSession(int paneCount, Map<String, Object> layoutObject) {
+        editor.focusModeController.endForLayoutReplacement();
         editor.detachActiveDocumentListener();
         editor.disposeMarkdownPreviews();
         editor.editorPanes.clear();
@@ -1602,6 +1606,7 @@ final class SessionConfigController {
 
         editor.specialBufferReturns.pop();
         editor.buffers.remove(current);
+        editor.releaseClosedBufferResources(current);
         editor.markdownSourceClosed(current);
         if (current == editor.quickfixBuffer) {
             editor.quickfixBuffer = null;

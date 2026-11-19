@@ -16,6 +16,19 @@ class FileWatcherServiceTest {
     Path tempDir;
 
     @Test
+    void stopReleasesRegistrationsAndDirectoryMetadata() throws Exception {
+        Path path=Files.writeString(tempDir.resolve("stopped.md"), "content");
+        FileWatcherService watcher=new FileWatcherService();
+        try {
+            watcher.start(); watcher.watch(path.toFile(), file -> { }); watcher.stop();
+            for(String name:java.util.List.of("listeners", "watchedDirs")) {
+                var field=FileWatcherService.class.getDeclaredField(name); field.setAccessible(true);
+                assertTrue(((java.util.Map<?,?>)field.get(watcher)).isEmpty(), name);
+            }
+        } finally { watcher.stop(); }
+    }
+
+    @Test
     void notifiesIndependentRegistrationsForTheSameFile() throws Exception {
         Path file = tempDir.resolve("watched.txt");
         Files.writeString(file, "before");

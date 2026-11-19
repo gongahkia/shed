@@ -224,8 +224,12 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         }
     }
 
-    boolean hideForFocusMode() {
+    record FocusState(boolean visible, int height, boolean automatic, Tab selected, Map<String, Object> dockState) { }
+
+    FocusState hideForFocusMode() {
         boolean dockedVisible = isVisible();
+        Map<String, Object> dock = captureDockState();
+        FocusState state = new FocusState(dockedVisible, rememberedHeight, rememberedAutomatic, Tab.valueOf((String) dock.get("selected")), dock);
         hiddenDetachedForFocusMode.clear();
         for (Map.Entry<Tab, JDialog> entry : detached.entrySet()) {
             JDialog dialog = entry.getValue();
@@ -235,13 +239,18 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
             }
         }
         editor.hideToolWindow();
-        return dockedVisible;
+        return state;
     }
 
-    void restoreAfterFocusMode(boolean restoreDocked) {
-        if (restoreDocked) {
+    void restoreAfterFocusMode(FocusState state) {
+        if (closed) return;
+        if (!detached.containsKey(state.selected())) tabs.setSelectedComponent(presentations.get(state.selected()));
+        rememberedHeight = state.height();
+        rememberedAutomatic = state.automatic();
+        if (state.visible()) {
             editor.showToolWindow();
-        }
+            restoreDockSize();
+        } else editor.hideToolWindow();
         for (Tab tab : EnumSet.copyOf(hiddenDetachedForFocusMode)) {
             JDialog dialog = detached.get(tab);
             if (dialog != null && dialog.isDisplayable()) {
@@ -326,7 +335,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
         java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().removePropertyChangeListener("permanentFocusOwner", toolFocus);
         for (ToolSurface surface : surfaces.values()) surface.close();
         for (JDialog dialog : java.util.List.copyOf(detached.values())) dialog.dispose();
-        detached.clear(); dockTransitions.clear();
+        detached.clear(); dockTransitions.clear(); hiddenDetachedForFocusMode.clear();
     }
 
     void reattachAll() {

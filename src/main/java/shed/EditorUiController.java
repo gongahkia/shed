@@ -456,6 +456,12 @@ final class EditorUiController {
         paneLineNumberPanel.setHighlightCurrentLine(editor.configManager.getShowCurrentLine());
 
         JScrollPane paneScrollPane = new JScrollPane(textArea);
+        paneScrollPane.setBorder(null);
+        paneScrollPane.addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentResized(java.awt.event.ComponentEvent event) {
+                if (editor.focusModeController != null && editor.focusModeController.isCenteredWriting()) editor.updateZenModeLayout();
+            }
+        });
         paneScrollPane.setWheelScrollingEnabled(true);
         applyEditorScrollBarVisibility(paneScrollPane);
         paneScrollPane.getVerticalScrollBar().setUnitIncrement(Math.max(16, textArea.getFontMetrics(textArea.getFont()).getHeight()));
@@ -829,8 +835,9 @@ final class EditorUiController {
 
 
     void renderWindowLayout() {
-        int width = Math.max(editor.editorHostPanel.getWidth(), editor.getWidth());
-        int height = Math.max(editor.editorHostPanel.getHeight(), editor.getHeight());
+        if (editor.focusModeController != null) editor.focusModeController.syncChrome();
+        int width = editor.editorHostPanel.getWidth() > 0 ? editor.editorHostPanel.getWidth() : editor.getWidth();
+        int height = editor.editorHostPanel.getHeight() > 0 ? editor.editorHostPanel.getHeight() : editor.getHeight();
         Component next = editor.windowLayoutRoot == null ? new JPanel()
             : editor.windowLayoutRoot.render(getActivePane(), width, height);
         if (next == null) next = new JPanel();

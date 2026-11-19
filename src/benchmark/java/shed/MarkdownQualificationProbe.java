@@ -13,6 +13,7 @@ public final class MarkdownQualificationProbe {
     private static Texteditor editor;
     private static Path output;
     private static boolean diagnostic;
+    private static boolean watchedCycles;
     private static WeakReference<FileBuffer> closedInitial, closedNext;
     private static Object field(Object owner, String name) throws Exception {
         var f = owner.getClass().getDeclaredField(name); f.setAccessible(true); return f.get(owner);
@@ -150,6 +151,47 @@ public final class MarkdownQualificationProbe {
             "retention_path",retainedPath(refs.getFirst().get()))));
     }
 
+    private record Retired(WeakReference<FileBuffer> buffer, WeakReference<VersionedTextSnapshot> text,
+                           WeakReference<javax.swing.undo.UndoManager> undo) { }
+    private static void timedEdt(String operation, Runnable action) throws Exception {
+        long posted = System.nanoTime();
+        edt(() -> {
+            var bean = (com.sun.management.ThreadMXBean)ManagementFactory.getThreadMXBean();
+            long id = Thread.currentThread().threadId(), allocation = bean.getThreadAllocatedBytes(id), start = System.nanoTime();
+            action.run();
+            out("MD_SAMPLE ", Map.of("operation",operation,"state","OK","edt_ms",(System.nanoTime()-start)/1e6,
+                "queue_ms",(start-posted)/1e6,"allocated_bytes",bean.getThreadAllocatedBytes(id)-allocation)); return null;
+        });
+    }
+    private static List<Retired> closedCycle(int round) throws Exception {
+        var retired = new ArrayList<Retired>(); Path original = Path.of(edt(() -> editor.getCurrentBuffer().getFilePath()));
+        for (int i=0;i<8;i++) {
+            Path copy=output.resolve("cycle-"+round+"-"+i+original.getFileName()); Files.copy(original,copy);
+            long read=System.nanoTime(); var buffer=new FileBuffer(copy.toFile());
+            out("MD_SAMPLE ",Map.of("operation","cycle_file_read","state","OK","worker_ms",(System.nanoTime()-read)/1e6));
+            timedEdt("cycle_attach",() -> {editor.buffers.add(buffer);editor.loadBufferIntoEditor(buffer);});
+            if(watchedCycles)timedEdt("cycle_watch_register",() -> editor.registerFileWatch(buffer));
+            await(() -> ((OpenBufferCompletionIndex)field(editor.inputController,"openBufferCompletionIndex")).hasSnapshot(buffer,buffer.textSnapshot()),20);
+            retired.add(new Retired(new WeakReference<>(buffer),new WeakReference<>(edt(buffer::textSnapshot)),new WeakReference<>(buffer.getUndoManager())));
+            timedEdt("cycle_close",() -> editor.closeActiveBufferWithoutExiting(true));
+        }
+        return retired;
+    }
+    private static void retentionCycles() throws Exception {
+        var retired=new ArrayList<Retired>();
+        for(int round=0;round<3;round++) {
+            retired.addAll(closedCycle(round)); snapshot("closed_cycle_"+round,true,false);
+            int count=round;
+            out("MD_META ",edt(() -> Map.of("operation","cycle_ownership","round",count,"closed",retired.size(),
+                "buffers_alive",retired.stream().filter(r->r.buffer().get()!=null).count(),
+                "snapshots_alive",retired.stream().filter(r->r.text().get()!=null).count(),
+                "histories_alive",retired.stream().filter(r->r.undo().get()!=null).count(),
+                "index_entries",((Map<?,?>)field(field(editor.inputController,"openBufferCompletionIndex"),"snapshots")).size(),
+                "open_buffers",editor.buffers.size(),"first_retaining_path",retainedPath(retired.getFirst().buffer().get()),
+                "watch_listener_files",((Map<?,?>)field(editor.fileWatcherService,"listeners")).size())));
+        }
+    }
+
     private static WeakReference<?> index() throws Exception {
         Path notes=Files.createDirectories(output.resolve("notes"));
         for(int i=0;i<1000;i++)Files.writeString(notes.resolve("note-"+i+".md"),"# Note "+i+"\n[source](../input.md)\n[[note-"+((i+1)%1000)+"]]\n");
@@ -200,6 +242,8 @@ public final class MarkdownQualificationProbe {
         }
         out("MD_META ",edt(() -> Map.of("operation","qualification_appearance","theme",editor.configManager.getThemeId(),"configured_font",editor.configManager.getFontFamily(),"actual_editor_family",editor.writingArea.getFont().getFamily())));
         if(mode.equals("retention"))retention();
+        else if(mode.equals("retention-cycles"))retentionCycles();
+        else if(mode.equals("watched-cycles")) {watchedCycles=true;retentionCycles();}
         else if(mode.equals("index")) {var ref=index();snapshot("after_index_disposal",true,true);out("MD_META ",Map.of("operation","index_release","collected",ref.get()==null));}
         else if(mode.equals("media") || mode.equals("media-control")) {
             var helper=Class.forName(mode.equals("media")?"shed.MarkdownMediaProbe":"shed.MarkdownMediaControlProbe");

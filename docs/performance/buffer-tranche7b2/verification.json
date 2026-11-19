@@ -1,0 +1,36 @@
+{
+  "start_head": "2e3cfd8e7b5618d0cc330a77e1967d47a699651b",
+  "end_head": "2e3cfd8e7b5618d0cc330a77e1967d47a699651b",
+  "agent_commits_or_pushes": false,
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "missing_baseline_files": [],
+  "protected_files_unchanged": {
+    "README.md": true,
+    "pom.xml": true,
+    "src/main/java/shed/FileBuffer.java": true,
+    "src/main/java/shed/VersionedTextSnapshot.java": true,
+    "src/main/java/shed/ConfigManager.java": true,
+    "src/main/java/shed/BundledEditorFont.java": true,
+    "src/main/java/shed/EditorUiController.java": true,
+    "src/main/java/shed/StagedStartupFont.java": true,
+    "src/main/java/shed/GraphemeBoundary.java": true,
+    "src/main/java/shed/ClipboardManager.java": true,
+    "src/main/java/shed/MarkdownMediaService.java": true,
+    "src/main/java/shed/MarkdownProjectLinks.java": true,
+    "src/main/java/shed/MarkdownPreviewPane.java": true,
+    "src/main/java/shed/GrammarHighlightService.java": true
+  },
+  "previous_performance_evidence_unchanged": true,
+  "jar_before_sha256": "d0c9b93fd62d8de88f878a1ee282cf785cf16f797a5ede0824a129229ef334b0",
+  "jar_final_sha256": "6ee56710a5c6961860d8533bd916f9deef4ca445df71dadf5a9fa550c12bf3ee",
+  "maven": {
+    "tests": 1561,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5
+  },
+  "tooling_passed": 19,
+  "packaged_smoke": "PASS",
+  "git_diff_check": 0
+}

@@ -1,0 +1,526 @@
+[
+  {
+    "mode": "opaque",
+    "peak_sampled_rss_mib": 577.484375,
+    "operations": {
+      "first_opaque_insert": {
+        "n": 1,
+        "paint_p50_ms": 0.930208,
+        "paint_p95_ms": 0.930208,
+        "paint_max_ms": 0.930208,
+        "edt_p95_ms": 0.238292
+      },
+      "initial_paint": {
+        "n": 1,
+        "paint_p50_ms": 18.686292,
+        "paint_p95_ms": 18.686292,
+        "paint_max_ms": 18.686292,
+        "edt_p95_ms": 0.012667
+      },
+      "opaque_resize": {
+        "n": 4,
+        "paint_p50_ms": 0.382125,
+        "paint_p95_ms": 3.675833,
+        "paint_max_ms": 3.675833,
+        "edt_p95_ms": 0.079042
+      },
+      "opaque_scroll": {
+        "n": 4,
+        "paint_p50_ms": 0.3585,
+        "paint_p95_ms": 0.517333,
+        "paint_max_ms": 0.517333,
+        "edt_p95_ms": 1.1765
+      },
+      "opaque_undo": {
+        "n": 21,
+        "paint_p50_ms": 0.3485,
+        "paint_p95_ms": 0.4645,
+        "paint_max_ms": 0.620417,
+        "edt_p95_ms": 0.069208
+      },
+      "warm_opaque_insert": {
+        "n": 20,
+        "paint_p50_ms": 0.392334,
+        "paint_p95_ms": 0.522459,
+        "paint_max_ms": 0.523667,
+        "edt_p95_ms": 0.085709
+      }
+    },
+    "metadata": [
+      {
+        "scale": "AffineTransform[[2.0, 0.0, 0.0], [0.0, 2.0, 0.0]]",
+        "per_pixel": true,
+        "uniform": true,
+        "operation": "capabilities",
+        "epoch_ms": 1795054634091
+      },
+      {
+        "operation": "window_ready",
+        "creation_to_paint_ms": 3285.628125,
+        "native_decorations": true,
+        "root_decoration_style": 0,
+        "font": "java.awt.Font[family=JetBrains Mono,name=JetBrains Mono Regular,style=plain,size=16]",
+        "theme": "shed-light",
+        "epoch_ms": 1795054637316
+      },
+      {
+        "heap_used_mib": 20.03174591064453,
+        "heap_committed_mib": 66.0,
+        "operation": "settled_no_gc",
+        "epoch_ms": 1795054637829
+      },
+      {
+        "operation": "restoration",
+        "window_opacity": 1,
+        "source_revision_unchanged": true,
+        "window_alpha": 255,
+        "selection_unchanged": true,
+        "epoch_ms": 1795054637830
+      },
+      {
+        "background_alpha": 255,
+        "operation": "opaque_pixels",
+        "foreground_alpha": 255,
+        "epoch_ms": 1795054637878
+      },
+      {
+        "theme": "shed-light",
+        "rows": [
+          {
+            "muted": 5.1541735569673195,
+            "text": 11.490240954459834,
+            "backdrop": "white",
+            "comment": 4.269749315599378
+          },
+          {
+            "muted": 5.1541735569673195,
+            "text": 11.490240954459834,
+            "backdrop": "black",
+            "comment": 4.269749315599378
+          }
+        ],
+        "alpha": 255,
+        "operation": "contrast_calculation_only",
+        "epoch_ms": 1795054637907
+      },
+      {
+        "theme": "shed-light",
+        "rows": [
+          {
+            "muted": 5.1541735569673195,
+            "text": 11.490240954459834,
+            "backdrop": "white",
+            "comment": 4.269749315599378
+          },
+          {
+            "muted": 3.665975181913426,
+            "text": 8.172588235084547,
+            "backdrop": "black",
+            "comment": 3.036916559167859
+          }
+        ],
+        "alpha": 218,
+        "operation": "contrast_calculation_only",
+        "epoch_ms": 1795054637907
+      },
+      {
+        "theme": "shed-light",
+        "rows": [
+          {
+            "muted": 5.240378136058869,
+            "text": 11.682417522476394,
+            "backdrop": "white",
+            "comment": 4.341161723138531
+          },
+          {
+            "muted": 1.306591209590315,
+            "text": 2.912794391038206,
+            "backdrop": "black",
+            "comment": 1.0823882551209525
+          }
+        ],
+        "alpha": 128,
+        "operation": "contrast_calculation_only",
+        "epoch_ms": 1795054637907
+      },
+      {
+        "theme": "shed-dark",
+        "rows": [
+          {
+            "muted": 6.256196571779474,
+            "text": 10.573685449191354,
+            "backdrop": "white",
+            "comment": 5.469193623354142
+          },
+          {
+            "muted": 6.256196571779474,
+            "text": 10.573685449191354,
+            "backdrop": "black",
+            "comment": 5.469193623354142
+          }
+        ],
+        "alpha": 255,
+        "operation": "contrast_calculation_only",
+        "epoch_ms": 1795054637907
+      },
+      {
+        "theme": "shed-dark",
+        "rows": [
+          {
+            "muted": 3.960153743749601,
+            "text": 6.693111307552092,
+            "backdrop": "white",
+            "comment": 3.461983228039276
+          },
+          {
+            "muted": 6.74932149657575,
+            "text": 11.407122791213505,
+            "backdrop": "black",
+            "comment": 5.900285527719556
+          }
+        ],
+        "alpha": 218,
+        "operation": "contrast_calculation_only",
+        "epoch_ms": 1795054637908
+      },
+      {
+        "theme": "shed-dark",
+        "rows": [
+          {
+            "muted": 1.3007745299570321,
+            "text": 2.1984572515075715,
+            "backdrop": "white",
+            "comment": 1.1371426206064632
+          },
+          {
+            "muted": 7.768378271895752,
+            "text": 13.129444919917997,
+            "backdrop": "black",
+            "comment": 6.791149290306019
+          }
+        ],
+        "alpha": 128,
+        "operation": "contrast_calculation_only",
+        "epoch_ms": 1795054637908
+      },
+      {
+        "heap_used_mib": 9.219802856445312,
+        "heap_committed_mib": 64.0,
+        "operation": "disposed_requested_gc",
+        "epoch_ms": 1795054638181
+      },
+      {
+        "source_listeners": 1,
+        "source_exact": true,
+        "operation": "disposal",
+        "displayable_windows": 0,
+        "epoch_ms": 1795054638183
+      }
+    ],
+    "nearest_rss": {
+      "settled_no_gc": {
+        "epoch_ms": 1795054637708.699,
+        "mib": 562.171875
+      },
+      "disposed_requested_gc": {
+        "epoch_ms": 1795054638220.0862,
+        "mib": 577.40625
+      }
+    }
+  },
+  {
+    "mode": "attempt",
+    "peak_sampled_rss_mib": 579.484375,
+    "operations": {
+      "first_opaque_insert": {
+        "n": 1,
+        "paint_p50_ms": 4.14875,
+        "paint_p95_ms": 4.14875,
+        "paint_max_ms": 4.14875,
+        "edt_p95_ms": 0.259
+      },
+      "initial_paint": {
+        "n": 1,
+        "paint_p50_ms": 19.018541,
+        "paint_p95_ms": 19.018541,
+        "paint_max_ms": 19.018541,
+        "edt_p95_ms": 0.025416
+      },
+      "opaque_resize": {
+        "n": 4,
+        "paint_p50_ms": 0.309041,
+        "paint_p95_ms": 4.372041,
+        "paint_max_ms": 4.372041,
+        "edt_p95_ms": 0.055959
+      },
+      "opaque_scroll": {
+        "n": 4,
+        "paint_p50_ms": 0.343167,
+        "paint_p95_ms": 0.512833,
+        "paint_max_ms": 0.512833,
+        "edt_p95_ms": 0.91175
+      },
+      "opaque_undo": {
+        "n": 21,
+        "paint_p50_ms": 0.354958,
+        "paint_p95_ms": 0.614042,
+        "paint_max_ms": 0.724708,
+        "edt_p95_ms": 0.123333
+      },
+      "warm_opaque_insert": {
+        "n": 20,
+        "paint_p50_ms": 0.377667,
+        "paint_p95_ms": 0.646583,
+        "paint_max_ms": 0.748209,
+        "edt_p95_ms": 0.095917
+      }
+    },
+    "metadata": [
+      {
+        "uniform": true,
+        "per_pixel": true,
+        "scale": "AffineTransform[[2.0, 0.0, 0.0], [0.0, 2.0, 0.0]]",
+        "operation": "capabilities",
+        "epoch_ms": 1795054638786
+      },
+      {
+        "exception": "java.awt.IllegalComponentStateException",
+        "kind": "background_218",
+        "operation": "attempt",
+        "accepted": false,
+        "message": "The frame is decorated",
+        "state_unchanged": true,
+        "phase": "before_peer",
+        "epoch_ms": 1795054638786
+      },
+      {
+        "exception": "java.awt.IllegalComponentStateException",
+        "kind": "background_0",
+        "operation": "attempt",
+        "accepted": false,
+        "message": "The frame is decorated",
+        "state_unchanged": true,
+        "phase": "before_peer",
+        "epoch_ms": 1795054638786
+      },
+      {
+        "exception": "java.awt.IllegalComponentStateException",
+        "kind": "whole_window_opacity",
+        "operation": "attempt",
+        "accepted": false,
+        "message": "The frame is decorated",
+        "state_unchanged": true,
+        "phase": "before_peer",
+        "epoch_ms": 1795054638786
+      },
+      {
+        "root_decoration_style": 0,
+        "native_decorations": true,
+        "creation_to_paint_ms": 1400.439,
+        "operation": "window_ready",
+        "theme": "shed-light",
+        "font": "java.awt.Font[family=JetBrains Mono,name=JetBrains Mono Regular,style=plain,size=16]",
+        "epoch_ms": 1795054640140
+      },
+      {
+        "operation": "settled_no_gc",
+        "heap_committed_mib": 66.0,
+        "heap_used_mib": 20.03174591064453,
+        "epoch_ms": 1795054640650
+      },
+      {
+        "exception": "java.awt.IllegalComponentStateException",
+        "kind": "background_218",
+        "operation": "attempt",
+        "accepted": false,
+        "message": "The frame is decorated",
+        "state_unchanged": true,
+        "phase": "displayable_peer",
+        "epoch_ms": 1795054640650
+      },
+      {
+        "exception": "java.awt.IllegalComponentStateException",
+        "kind": "background_0",
+        "operation": "attempt",
+        "accepted": false,
+        "message": "The frame is decorated",
+        "state_unchanged": true,
+        "phase": "displayable_peer",
+        "epoch_ms": 1795054640651
+      },
+      {
+        "exception": "java.awt.IllegalComponentStateException",
+        "kind": "whole_window_opacity",
+        "operation": "attempt",
+        "accepted": false,
+        "message": "The frame is decorated",
+        "state_unchanged": true,
+        "phase": "displayable_peer",
+        "epoch_ms": 1795054640651
+      },
+      {
+        "operation": "verdict",
+        "reason": "Public JFrame translucency does not accept native decorations",
+        "value": "NO_GO",
+        "epoch_ms": 1795054640651
+      },
+      {
+        "window_alpha": 255,
+        "source_revision_unchanged": true,
+        "window_opacity": 1,
+        "operation": "restoration",
+        "selection_unchanged": true,
+        "epoch_ms": 1795054640651
+      },
+      {
+        "operation": "opaque_pixels",
+        "background_alpha": 255,
+        "foreground_alpha": 255,
+        "epoch_ms": 1795054640708
+      },
+      {
+        "rows": [
+          {
+            "text": 11.490240954459834,
+            "muted": 5.1541735569673195,
+            "comment": 4.269749315599378,
+            "backdrop": "white"
+          },
+          {
+            "text": 11.490240954459834,
+            "muted": 5.1541735569673195,
+            "comment": 4.269749315599378,
+            "backdrop": "black"
+          }
+        ],
+        "theme": "shed-light",
+        "operation": "contrast_calculation_only",
+        "alpha": 255,
+        "epoch_ms": 1795054640736
+      },
+      {
+        "rows": [
+          {
+            "text": 11.490240954459834,
+            "muted": 5.1541735569673195,
+            "comment": 4.269749315599378,
+            "backdrop": "white"
+          },
+          {
+            "text": 8.172588235084547,
+            "muted": 3.665975181913426,
+            "comment": 3.036916559167859,
+            "backdrop": "black"
+          }
+        ],
+        "theme": "shed-light",
+        "operation": "contrast_calculation_only",
+        "alpha": 218,
+        "epoch_ms": 1795054640736
+      },
+      {
+        "rows": [
+          {
+            "text": 11.682417522476394,
+            "muted": 5.240378136058869,
+            "comment": 4.341161723138531,
+            "backdrop": "white"
+          },
+          {
+            "text": 2.912794391038206,
+            "muted": 1.306591209590315,
+            "comment": 1.0823882551209525,
+            "backdrop": "black"
+          }
+        ],
+        "theme": "shed-light",
+        "operation": "contrast_calculation_only",
+        "alpha": 128,
+        "epoch_ms": 1795054640736
+      },
+      {
+        "rows": [
+          {
+            "text": 10.573685449191354,
+            "muted": 6.256196571779474,
+            "comment": 5.469193623354142,
+            "backdrop": "white"
+          },
+          {
+            "text": 10.573685449191354,
+            "muted": 6.256196571779474,
+            "comment": 5.469193623354142,
+            "backdrop": "black"
+          }
+        ],
+        "theme": "shed-dark",
+        "operation": "contrast_calculation_only",
+        "alpha": 255,
+        "epoch_ms": 1795054640736
+      },
+      {
+        "rows": [
+          {
+            "text": 6.693111307552092,
+            "muted": 3.960153743749601,
+            "comment": 3.461983228039276,
+            "backdrop": "white"
+          },
+          {
+            "text": 11.407122791213505,
+            "muted": 6.74932149657575,
+            "comment": 5.900285527719556,
+            "backdrop": "black"
+          }
+        ],
+        "theme": "shed-dark",
+        "operation": "contrast_calculation_only",
+        "alpha": 218,
+        "epoch_ms": 1795054640736
+      },
+      {
+        "rows": [
+          {
+            "text": 2.1984572515075715,
+            "muted": 1.3007745299570321,
+            "comment": 1.1371426206064632,
+            "backdrop": "white"
+          },
+          {
+            "text": 13.129444919917997,
+            "muted": 7.768378271895752,
+            "comment": 6.791149290306019,
+            "backdrop": "black"
+          }
+        ],
+        "theme": "shed-dark",
+        "operation": "contrast_calculation_only",
+        "alpha": 128,
+        "epoch_ms": 1795054640736
+      },
+      {
+        "operation": "disposed_requested_gc",
+        "heap_committed_mib": 64.0,
+        "heap_used_mib": 9.227851867675781,
+        "epoch_ms": 1795054641008
+      },
+      {
+        "source_exact": true,
+        "source_listeners": 1,
+        "displayable_windows": 0,
+        "operation": "disposal",
+        "epoch_ms": 1795054641009
+      }
+    ],
+    "nearest_rss": {
+      "settled_no_gc": {
+        "epoch_ms": 1795054640533.364,
+        "mib": 561.890625
+      },
+      "disposed_requested_gc": {
+        "epoch_ms": 1795054641045.428,
+        "mib": 579.484375
+      }
+    }
+  }
+]

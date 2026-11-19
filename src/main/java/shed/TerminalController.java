@@ -408,6 +408,7 @@ final class TerminalController {
         if (panes.isEmpty()) {
             closeTerminalSession(buffer);
             editor.buffers.remove(buffer);
+            editor.releaseClosedBufferResources(buffer);
             return;
         }
         for (EditorPane pane : panes) {
@@ -420,6 +421,7 @@ final class TerminalController {
             }
             closeTerminalSession(buffer);
             editor.buffers.remove(buffer);
+            editor.releaseClosedBufferResources(buffer);
             FileBuffer replacement = editor.buffers.isEmpty() ? null : editor.buffers.get(0);
             if (replacement == null) {
                 editor.openEmptyBuffer();
@@ -428,6 +430,7 @@ final class TerminalController {
             }
         }
         editor.buffers.remove(buffer);
+        editor.releaseClosedBufferResources(buffer);
         editor.currentBufferIndex = editor.buffers.isEmpty() ? -1 : Math.min(Math.max(0, editor.currentBufferIndex), editor.buffers.size() - 1);
         editor.showMessage("Terminal exited");
     }

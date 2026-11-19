@@ -28,6 +28,7 @@ final class InputController {
     private Character pendingQuickSuggestionCharacter;
     private javax.swing.Timer wordIndexTimer;
     private FileBuffer pendingWordIndexBuffer;
+    private FileBuffer wordIndexJobBuffer;
     private int wordIndexGeneration;
     private int wordIndexJobId;
     private int wordIndexJobSerial;
@@ -177,7 +178,22 @@ final class InputController {
         wordIndexTimer.restart();
     }
 
-    void removeOpenBufferWordIndex(FileBuffer buffer) { openBufferCompletionIndex.remove(buffer); }
+    void removeOpenBufferWordIndex(FileBuffer buffer) {
+        if (buffer == null) return;
+        openBufferCompletionIndex.remove(buffer);
+        if (pendingWordIndexBuffer == buffer) {
+            pendingWordIndexBuffer = null;
+            if (wordIndexTimer != null) wordIndexTimer.stop();
+        }
+        if (wordIndexJobBuffer == buffer) {
+            wordIndexGeneration++;
+            wordIndexJobSerial++;
+            int job = wordIndexJobId;
+            wordIndexJobId = -1;
+            wordIndexJobBuffer = null;
+            if (job >= 0) editor.asyncJobService.cancel(job);
+        }
+    }
 
     private void rebuildOpenBufferWordIndex() {
         FileBuffer buffer = pendingWordIndexBuffer;
@@ -192,10 +208,12 @@ final class InputController {
         int generation = ++wordIndexGeneration;
         int serial = ++wordIndexJobSerial;
         if (wordIndexJobId >= 0) editor.asyncJobService.cancel(wordIndexJobId);
+        wordIndexJobBuffer = buffer;
         wordIndexJobId = editor.asyncJobService.submit("completion word index", token -> openBufferCompletionIndex.build(text.text()),
             (snapshot, words, error) -> {
                 if (serial != wordIndexJobSerial) return;
                 wordIndexJobId = -1;
+                wordIndexJobBuffer = null;
                 if (snapshot == null || snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED || error != null
                     || generation != wordIndexGeneration || words == null || !editor.buffers.contains(buffer)
                     || buffer.textSnapshot() != text) return;

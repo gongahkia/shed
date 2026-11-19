@@ -563,7 +563,7 @@ final class PaneBufferController {
         FileBuffer alreadyOpen = findBufferByPath(file);
         if (alreadyOpen != null) buffer = alreadyOpen;
         if (alreadyOpen == null && shouldReplaceSingleUntitledBuffer()) {
-            editor.buffers.set(0, buffer);
+            editor.releaseClosedBufferResources(editor.buffers.set(0, buffer));
         } else if (alreadyOpen == null) {
             editor.buffers.add(buffer);
         }
@@ -619,7 +619,7 @@ final class PaneBufferController {
             return "Unable to split the target window";
         }
         if (existing == null) {
-            if (shouldReplaceSingleUntitledBuffer()) editor.buffers.set(0, targetBuffer);
+            if (shouldReplaceSingleUntitledBuffer()) editor.releaseClosedBufferResources(editor.buffers.set(0, targetBuffer));
             else editor.buffers.add(targetBuffer);
         }
         loadBufferIntoPane(newPane, targetBuffer, 0);
@@ -731,6 +731,7 @@ final class PaneBufferController {
         }
         editor.closeTerminalSession(buffer);
         editor.buffers.remove(buffer);
+        editor.releaseClosedBufferResources(buffer);
         editor.markdownSourceClosed(buffer);
         editor.syntaxUiController.forgetMarkdownState(buffer);
         editor.persistRecoverySnapshotsSafely();
@@ -827,6 +828,7 @@ final class PaneBufferController {
         }
         editor.closeTerminalSession(buffer);
         editor.buffers.remove(buffer);
+        editor.releaseClosedBufferResources(buffer);
         editor.markdownSourceClosed(buffer);
         editor.syntaxUiController.forgetMarkdownState(buffer);
         editor.currentBufferIndex = 0;
@@ -865,6 +867,7 @@ final class PaneBufferController {
         if (editor.isTreeBuffer(closingBuffer)) {
             editor.treeLineTargets.remove(closingBuffer);
             editor.buffers.remove(closingBuffer);
+            editor.releaseClosedBufferResources(closingBuffer);
             editor.markdownSourceClosed(closingBuffer);
             editor.syntaxUiController.forgetMarkdownState(closingBuffer);
             if (closingBuffer == editor.treeBuffer) {

@@ -1,0 +1,514 @@
+--- a/src/main/java/shed/ConfigManager.java
++++ b/src/main/java/shed/ConfigManager.java
+@@ -31,6 +31,7 @@
+     }
+ 
+     private final Map<String, String> config;
++    private ThemePreviewLease themePreview;
+     private final Map<String, String> defaultConfig;
+     private final Map<String, String> persistedConfig;
+     private final Map<String, String> projectConfig;
+@@ -958,6 +959,53 @@
+         return theme == null ? "Shed Light" : theme.displayName;
+     }
+ 
++    String getAuthoritativeThemeId() {
++        return resolveTheme(getString("theme", DEFAULT_THEME)).id;
++    }
++
++    ThemePreviewLease previewTheme(String requestedTheme) {
++        String alias = THEME_ALIASES.get(normalizeThemeName(requestedTheme == null ? "" : requestedTheme));
++        if (themePreview != null || alias == null || !THEMES.containsKey(alias)) return null;
++        themePreview = new ThemePreviewLease(alias);
++        return themePreview;
++    }
++
++    // A preview changes palette resolution only, never the serializable settings layers.
++    final class ThemePreviewLease implements AutoCloseable {
++        private String theme;
++
++        private ThemePreviewLease(String theme) { this.theme = theme; }
++
++        boolean select(String requestedTheme) {
++            String alias = THEME_ALIASES.get(normalizeThemeName(requestedTheme == null ? "" : requestedTheme));
++            if (themePreview != this || alias == null || !THEMES.containsKey(alias)) return false;
++            theme = alias;
++            return true;
++        }
++
++        int acceptAndPersist() throws IOException {
++            if (themePreview != this) throw new IOException("Theme preview is no longer active");
++            String previous = config.get("theme");
++            Map<String, String> persistedBefore = new HashMap<>(persistedConfig);
++            setTheme(theme);
++            try {
++                int count = persistCurrentConfig();
++                close();
++                return count;
++            } catch (IOException error) {
++                config.put("theme", previous);
++                settings.applyRuntime("theme", previous);
++                persistedConfig.clear();
++                persistedConfig.putAll(persistedBefore);
++                throw error;
++            }
++        }
++
++        @Override public void close() {
++            if (themePreview == this) themePreview = null;
++        }
++    }
++
+     public String setTheme(String requestedTheme) {
+         if (requestedTheme == null || requestedTheme.trim().isEmpty()) {
+             return null;
+@@ -2364,7 +2412,10 @@
+     }
+ 
+     private ThemePalette activeTheme() {
+-        String raw = getString("theme", DEFAULT_THEME);
++        return resolveTheme(themePreview == null ? getString("theme", DEFAULT_THEME) : themePreview.theme);
++    }
++
++    private ThemePalette resolveTheme(String raw) {
+         String alias = THEME_ALIASES.get(normalizeThemeName(raw));
+         if (alias == null) {
+             alias = DEFAULT_THEME;
+--- a/src/main/java/shed/SessionConfigController.java
++++ b/src/main/java/shed/SessionConfigController.java
+@@ -349,7 +349,7 @@
+         }
+         boolean canDetectThemeChange = previousContent != null && updatedContent != null;
+         boolean themeChangedInFile = canDetectThemeChange && didConfigKeyChange(previousContent, updatedContent, "theme");
+-        String activeThemeBeforeReload = editor.configManager.getThemeId();
++        String activeThemeBeforeReload = editor.configManager.getAuthoritativeThemeId();
+         editor.configManager.reload();
+         if (!editor.configManager.hasConfigLoadFailure() && canDetectThemeChange && !themeChangedInFile) {
+             editor.configManager.setTheme(activeThemeBeforeReload);
+--- a/src/main/java/shed/Texteditor.java
++++ b/src/main/java/shed/Texteditor.java
+@@ -327,6 +327,7 @@
+     }
+ 
+     Texteditor(String[] args, ApplicationErrorReporter errorReporter) {
++        ThemeGalleryDialog.cancelLivePreview();
+         long startupStartedAt = System.nanoTime();
+         StartupProfile startupProfile = new StartupProfile();
+         this.errorReporter = errorReporter == null ? new ApplicationErrorReporter() : errorReporter;
+--- a/src/main/java/shed/ThemeGalleryDialog.java
++++ b/src/main/java/shed/ThemeGalleryDialog.java
+@@ -9,6 +9,9 @@
+ import java.awt.Graphics;
+ import java.awt.Graphics2D;
+ import java.awt.RenderingHints;
++import java.awt.Window;
++import java.io.IOException;
++import java.lang.ref.WeakReference;
+ import java.util.List;
+ import javax.swing.BorderFactory;
+ import javax.swing.DefaultListCellRenderer;
+@@ -24,6 +27,7 @@
+ 
+ /** Visual selector for the bundled theme palettes. */
+ final class ThemeGalleryDialog extends JDialog {
++    private static WeakReference<ThemeGalleryDialog> livePreview = new WeakReference<>(null);
+     private static final List<Swatch> SWATCHES = List.of(
+         new Swatch("Editor", ThemePreview::normal),
+         new Swatch("Insert", ThemePreview::insert),
+@@ -43,10 +47,24 @@
+     private final JLabel title = new JLabel();
+     private final JLabel status = new JLabel();
+     private final JButton applyAndSave = new JButton("Apply and Save");
++    private final JButton previewInApp = new JButton("Preview in App");
++    private ConfigManager.ThemePreviewLease previewLease;
+ 
+     static void showFor(Texteditor editor) {
+         if (editor == null) return;
++        for (Window window : editor.getOwnedWindows()) {
++            if (window instanceof ThemeGalleryDialog gallery && gallery.isDisplayable()) {
++                gallery.setVisible(true);
++                gallery.toFront();
++                return;
++            }
++        }
+         new ThemeGalleryDialog(editor).setVisible(true);
++    }
++
++    static void cancelLivePreview() {
++        ThemeGalleryDialog gallery = livePreview.get();
++        if (gallery != null) gallery.cancelPreview();
+     }
+ 
+     private ThemeGalleryDialog(Texteditor editor) {
+@@ -106,11 +124,17 @@
+     }
+ 
+     private JPanel actions() {
++        previewInApp.addActionListener(event -> {
++            if (previewLease == null) previewSelectedTheme();
++            else cancelPreview();
++        });
++        previewInApp.setToolTipText("Temporarily preview in this workbench without saving. Close or cancel to restore.");
+         applyAndSave.addActionListener(event -> applyAndSaveSelection());
+         applyAndSave.setToolTipText("Use this theme now and save it to ~/.shed/config.toml.");
+         JButton close = new JButton("Close");
+         close.addActionListener(event -> dispose());
+         JPanel panel = new JPanel();
++        panel.add(previewInApp);
+         panel.add(applyAndSave);
+         panel.add(close);
+         return panel;
+@@ -139,6 +163,44 @@
+         applyAndSave.setEnabled(true);
+         codePreview.setTheme(preview);
+         swatchGrid.setTheme(preview);
++        if (previewLease != null) previewSelectedTheme();
++    }
++
++    void previewSelectedTheme() {
++        ThemePreview selected = themes.getSelectedValue();
++        if (selected == null) return;
++        // Swing UI defaults are process-wide; independent multi-window previews need separate qualification.
++        for (Window window : Window.getWindows()) {
++            if (window instanceof Texteditor && window != editor && window.isDisplayable()) {
++                status.setText("Workbench preview requires one Shed window; palette preview remains available.");
++                return;
++            }
++        }
++        String before = editor.configManager.getThemeId();
++        if (previewLease == null) previewLease = editor.configManager.previewTheme(selected.id());
++        else previewLease.select(selected.id());
++        if (previewLease == null) return;
++        livePreview = new WeakReference<>(this);
++        previewInApp.setText("Cancel Preview");
++        status.setText("Previewing " + selected.displayName() + " — not saved");
++        if (!before.equals(editor.configManager.getThemeId())) editor.applyThemeColors();
++        themes.repaint();
++    }
++
++    void cancelPreview() {
++        if (previewLease == null) return;
++        String before = editor.configManager.getThemeId();
++        previewLease.close();
++        previewLease = null;
++        if (livePreview.get() == this) livePreview.clear();
++        previewInApp.setText("Preview in App");
++        if (editor.isDisplayable() && !before.equals(editor.configManager.getThemeId())) editor.applyThemeColors();
++        updateSelection();
++    }
++
++    @Override public void dispose() {
++        cancelPreview();
++        super.dispose();
+     }
+ 
+     private void applyAndSaveSelection() {
+@@ -148,13 +210,24 @@
+     private void applySelectedTheme() {
+         ThemePreview preview = themes.getSelectedValue();
+         if (preview == null) return;
+-        String result = editor.setThemeFromCommand(preview.id());
+-        if (!result.startsWith("Theme set to ")) {
+-            status.setText(result);
++        ConfigManager.ThemePreviewLease lease = previewLease;
++        if (lease == null) lease = editor.configManager.previewTheme(preview.id());
++        if (lease == null) {
++            status.setText("Theme preview is no longer available");
+             return;
+         }
+-        editor.editorUiController.applyUiTheme(this);
+-        status.setText(result + "    " + editor.saveConfigToDisk());
++        try {
++            int count = lease.acceptAndPersist();
++            previewLease = null;
++            if (livePreview.get() == this) livePreview.clear();
++            previewInApp.setText("Preview in App");
++            editor.applyThemeColors();
++            status.setText("Theme set to " + preview.id() + "    Saved config (" + count + " keys)");
++        } catch (IOException error) {
++            if (previewLease == null) lease.close();
++            status.setText("Error saving config: " + error.getMessage());
++            return;
++        }
+         title.setText(preview.displayName() + " — active");
+         applyAndSave.setEnabled(true);
+         themes.repaint();
+--- a/src/test/java/shed/ConfigManagerTest.java
++++ b/src/test/java/shed/ConfigManagerTest.java
+@@ -42,6 +42,90 @@
+         } else {
+             System.setProperty("prefers.reduced.motion", originalReducedMotionProperty);
+         }
++    }
++
++    @Test
++    void themePreviewNeverEntersSavedOrRuntimeSettings() throws Exception {
++        System.setProperty("user.home", tempDir.resolve("preview-save").toString());
++        ConfigManager config = new ConfigManager();
++        config.setAndPersist("theme", "shed-light");
++        var lease = config.previewTheme("dracula");
++        assertNotNull(lease);
++        assertEquals("dracula", config.getThemeId());
++        assertEquals("shed-light", config.get("theme"));
++        assertEquals("shed-light", config.getAuthoritativeThemeId());
++        config.set("font.size", "18");
++        config.persistCurrentConfig();
++        assertEquals("shed-light", new ConfigManager().getThemeId());
++        assertEquals(18, new ConfigManager().getFontSize());
++        lease.close();
++        assertEquals("shed-light", config.getThemeId());
++    }
++
++    @Test
++    void previewRollbackResolvesCurrentAuthorityInsteadOfEntrySnapshot() throws Exception {
++        System.setProperty("user.home", tempDir.resolve("preview-authority").toString());
++        ConfigManager config = new ConfigManager();
++        var lease = config.previewTheme("dracula");
++        assertTrue(lease.select("gruvbox-dark"));
++        config.setTheme("catppuccin-latte");
++        assertEquals("gruvbox-dark", config.getThemeId());
++        config.persistCurrentConfig();
++        config.reload();
++        assertEquals("gruvbox-dark", config.getThemeId());
++        lease.close();
++        assertEquals("catppuccin-latte", config.getThemeId());
++    }
++
++    @Test
++    void previewRejectsUnknownAndStaleOwnersWithoutChangingAuthority() throws Exception {
++        System.setProperty("user.home", tempDir.resolve("preview-stale").toString());
++        ConfigManager config = new ConfigManager();
++        assertNull(config.previewTheme("missing"));
++        var old = config.previewTheme("dracula");
++        assertNull(config.previewTheme("gruvbox-dark"));
++        assertFalse(old.select("missing"));
++        old.close();
++        var current = config.previewTheme("gruvbox-dark");
++        old.close();
++        assertFalse(old.select("dracula"));
++        assertThrows(IOException.class, old::acceptAndPersist);
++        assertEquals("gruvbox-dark", config.getThemeId());
++        current.close();
++        assertEquals("shed-light", config.getThemeId());
++    }
++
++    @Test
++    void acceptingPreviewCommitsThroughExistingPreferences() throws Exception {
++        System.setProperty("user.home", tempDir.resolve("preview-accept").toString());
++        ConfigManager config = new ConfigManager();
++        var lease = config.previewTheme("dracula");
++        assertTrue(lease.acceptAndPersist() > 0);
++        assertEquals("dracula", config.getThemeId());
++        assertEquals("dracula", config.getAuthoritativeThemeId());
++        assertEquals("dracula", new ConfigManager().getThemeId());
++        lease.close();
++        assertEquals("dracula", config.getThemeId());
++    }
++
++    @Test
++    void failedPreviewSaveRetainsPreviewButRestoresAuthoritativePreferences() throws Exception {
++        Path home = tempDir.resolve("preview-failed-save");
++        System.setProperty("user.home", home.toString());
++        ConfigManager config = new ConfigManager();
++        config.setAndPersist("theme", "shed-light");
++        Path file = home.resolve(".shed/config.toml");
++        Files.delete(file);
++        Files.createDirectory(file);
++        var lease = config.previewTheme("dracula");
++        assertThrows(IOException.class, lease::acceptAndPersist);
++        assertEquals("dracula", config.getThemeId());
++        assertEquals("shed-light", config.getAuthoritativeThemeId());
++        lease.close();
++        assertEquals("shed-light", config.getThemeId());
++        Files.delete(file);
++        config.persistCurrentConfig();
++        assertEquals("shed-light", new ConfigManager().getThemeId());
+     }
+ 
+     @Test
+--- a/src/test/java/shed/TexteditorSwingIntegrationTest.java
++++ b/src/test/java/shed/TexteditorSwingIntegrationTest.java
+@@ -2501,6 +2501,183 @@
+     }
+ 
+     @Test
++    void liveThemePreviewCancelsWithoutSourceOrPreferenceChangesAcrossKeymapsAndSplits() throws Exception {
++        assumeSwingAvailable();
++        Path home = tempDir.resolve("preview-sources-home");
++        Path file = Files.writeString(tempDir.resolve("preview-sources.md"), "# Heading\nUnicode क्ष 😀 é\n");
++        Texteditor editor = createEditor(home, file);
++        try {
++            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
++            onEdt(() -> {
++                editor.splitWindow(true);
++                editor.commandHandler.execute("focus on");
++                FileBuffer buffer = editor.getCurrentBuffer();
++                var events = new java.util.concurrent.atomic.AtomicInteger();
++                buffer.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
++                    public void insertUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
++                    public void removeUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
++                    public void changedUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
++                });
++                var snapshot = buffer.textSnapshot(); long revision = buffer.documentRevision();
++                boolean dirty = buffer.isModified(), undo = buffer.getUndoManager().canUndo();
++                for (String profile : List.of("plain", "vim", "emacs")) {
++                    editor.configManager.set("keymap.profile", profile);
++                    editor.writingArea.setCaretPosition(20); editor.writingArea.moveCaretPosition(10);
++                    var font = editor.writingArea.getFont();
++                    ThemeGalleryDialog gallery = themeGallery(editor);
++                    assertSame(gallery, themeGallery(editor), "only one gallery per owner");
++                    selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme();
++                    assertEquals("dracula", editor.configManager.getThemeId());
++                    assertEquals("shed-light", editor.configManager.get("theme"));
++                    for (EditorPane pane : editor.editorPanes) assertEquals(editor.configManager.getEditorForeground(), pane.getTextArea().getForeground());
++                    selectGalleryTheme(gallery, "gruvbox-dark");
++                    assertEquals("gruvbox-dark", editor.configManager.getThemeId());
++                    gallery.dispose();
++                    assertEquals("shed-light", editor.configManager.getThemeId());
++                    assertEquals(10, editor.writingArea.getCaret().getDot());
++                    assertEquals(20, editor.writingArea.getCaret().getMark());
++                    assertEquals(font, editor.writingArea.getFont());
++                    assertSame(snapshot, buffer.textSnapshot()); assertEquals(revision, buffer.documentRevision());
++                    assertEquals(dirty, buffer.isModified()); assertEquals(undo, buffer.getUndoManager().canUndo());
++                }
++                assertEquals(0, events.get()); assertTrue(editor.goyoModeEnabled);
++                editor.commandHandler.execute("focus off"); return null;
++            });
++            assertEquals("# Heading\nUnicode क्ष 😀 é\n", Files.readString(file));
++            assertFalse(Files.exists(home.resolve(".shed/config.toml")));
++        } finally { disposeEditor(editor); }
++    }
++
++    @Test
++    void livePreviewCancellationUsesCurrentManualAuthorityAndKeepsFontChanges() throws Exception {
++        assumeSwingAvailable();
++        Texteditor editor = createEditor(tempDir.resolve("preview-authority-home"), Files.writeString(tempDir.resolve("preview-authority.md"), "body\n"));
++        try {
++            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
++            onEdt(() -> {
++                ThemeGalleryDialog gallery = themeGallery(editor);
++                selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme();
++                editor.setThemeFromCommand("catppuccin-latte");
++                editor.configManager.set("font.size", "18");
++                editor.sessionConfigController.applyRuntimeConfigFromSettings();
++                assertEquals("dracula", editor.configManager.getThemeId());
++                gallery.cancelPreview();
++                assertEquals("catppuccin-latte", editor.configManager.getThemeId());
++                assertEquals(18, editor.configManager.getFontSize());
++                assertEquals(18, editor.writingArea.getFont().getSize());
++                gallery.dispose(); return null;
++            });
++        } finally { disposeEditor(editor); }
++    }
++
++    @Test
++    void galleryAcceptancePersistsWhileRepeatedDisposalReleasesPreviewOwnership() throws Exception {
++        assumeSwingAvailable(); Path home = tempDir.resolve("preview-commit-home");
++        Texteditor editor = createEditor(home, Files.writeString(tempDir.resolve("preview-commit.md"), "body\n"));
++        try {
++            onEdt(() -> {
++                ThemeGalleryDialog gallery = themeGallery(editor);
++                selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme();
++                descendants(gallery, javax.swing.JButton.class).stream().filter(b -> b.getText().equals("Apply and Save")).findFirst().orElseThrow().doClick();
++                assertEquals("dracula", editor.configManager.getAuthoritativeThemeId());
++                gallery.dispose(); assertEquals("dracula", editor.configManager.getThemeId());
++                for (int i = 0; i < 6; i++) {
++                    ThemeGalleryDialog next = themeGallery(editor);
++                    selectGalleryTheme(next, "shed-light"); next.previewSelectedTheme(); next.dispose(); next.dispose();
++                    assertEquals("dracula", editor.configManager.getThemeId());
++                }
++                return null;
++            });
++            assertTrue(Files.readString(home.resolve(".shed/config.toml")).contains("dracula"));
++            onEdt(() -> {
++                ThemeGalleryDialog gallery = themeGallery(editor);
++                selectGalleryTheme(gallery, "shed-light"); gallery.previewSelectedTheme();
++                editor.dispose();
++                assertEquals("dracula", editor.configManager.getThemeId()); return null;
++            });
++        } finally { disposeEditor(editor); }
++    }
++
++    @Test
++    void openingAnotherWorkbenchCancelsLivePreviewAndMultipleWindowsRejectIt() throws Exception {
++        assumeSwingAvailable();
++        Texteditor first = createEditor(tempDir.resolve("preview-first-home"), Files.writeString(tempDir.resolve("preview-first.md"), "first"));
++        Texteditor second = null;
++        try {
++            ThemeGalleryDialog gallery = onEdt(() -> {
++                var shown = themeGallery(first); selectGalleryTheme(shown, "dracula"); shown.previewSelectedTheme();
++                assertEquals("dracula", first.configManager.getThemeId()); return shown;
++            });
++            second = createEditor(tempDir.resolve("preview-second-home"), Files.writeString(tempDir.resolve("preview-second.md"), "second"));
++            onEdt(() -> {
++                assertEquals("shed-light", first.configManager.getThemeId());
++                gallery.previewSelectedTheme();
++                assertEquals("shed-light", first.configManager.getThemeId());
++                assertTrue(descendants(gallery, javax.swing.JLabel.class).stream().anyMatch(label -> label.getText() != null && label.getText().contains("requires one Shed window")));
++                gallery.dispose(); return null;
++            });
++        } finally { disposeEditor(second); disposeEditor(first); }
++    }
++
++    @Test
++    void savingSettingsDuringPreviewDoesNotPromoteTemporaryThemeToAuthority() throws Exception {
++        assumeSwingAvailable(); Path home = tempDir.resolve("preview-settings-home");
++        Texteditor editor = createEditor(home, Files.writeString(tempDir.resolve("preview-settings.md"), "body"));
++        try {
++            onEdt(() -> {
++                editor.configManager.setAndPersist("theme", "shed-light");
++                Path settings = home.resolve(".shed/config.toml"); String before = Files.readString(settings);
++                String after = before + "\n\"font.size\" = 18\n"; Files.writeString(settings, after);
++                ThemeGalleryDialog gallery = themeGallery(editor);
++                selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme();
++                FileBuffer buffer = new FileBuffer(settings.toFile());
++                editor.sessionConfigController.reloadConfigIfSettingsBuffer(buffer, before, after);
++                assertEquals("dracula", editor.configManager.getThemeId());
++                gallery.cancelPreview();
++                assertEquals("shed-light", editor.configManager.getThemeId());
++                assertEquals(18, editor.configManager.getFontSize());
++                gallery.dispose(); return null;
++            });
++        } finally { disposeEditor(editor); }
++    }
++
++    @Test
++    void gallerySaveFailureLeavesPreviewCancellableAndDoesNotCommitItsTheme() throws Exception {
++        assumeSwingAvailable(); Path home = tempDir.resolve("gallery-save-failure-home");
++        Texteditor editor = createEditor(home, Files.writeString(tempDir.resolve("gallery-save-failure.md"), "body"));
++        try {
++            onEdt(() -> {
++                Path settings = home.resolve(".shed/config.toml"); Files.createDirectory(settings);
++                ThemeGalleryDialog gallery = themeGallery(editor);
++                selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme();
++                descendants(gallery, javax.swing.JButton.class).stream().filter(b -> b.getText().equals("Apply and Save")).findFirst().orElseThrow().doClick();
++                assertEquals("shed-light", editor.configManager.getAuthoritativeThemeId());
++                assertEquals("dracula", editor.configManager.getThemeId());
++                assertTrue(descendants(gallery, javax.swing.JLabel.class).stream().anyMatch(label -> label.getText() != null && label.getText().startsWith("Error saving config:")));
++                gallery.dispose(); assertEquals("shed-light", editor.configManager.getThemeId());
++                Files.delete(settings); return null;
++            });
++        } finally { disposeEditor(editor); }
++    }
++
++    private static ThemeGalleryDialog themeGallery(Texteditor editor) {
++        ThemeGalleryDialog.showFor(editor);
++        return Arrays.stream(editor.getOwnedWindows()).filter(ThemeGalleryDialog.class::isInstance)
++            .map(ThemeGalleryDialog.class::cast).filter(Window::isDisplayable).findFirst().orElseThrow();
++    }
++
++    private static void selectGalleryTheme(ThemeGalleryDialog gallery, String id) {
++        for (var list : descendants(gallery, javax.swing.JList.class)) {
++            for (int i = 0; i < list.getModel().getSize(); i++) {
++                if (list.getModel().getElementAt(i) instanceof ThemePreview theme && theme.id().equals(id)) {
++                    list.setSelectedIndex(i); return;
++                }
++            }
++        }
++        throw new AssertionError("Missing gallery theme: " + id);
++    }
++
++    @Test
+     void themeGallerySavesAndRefreshesForLightThemes() throws Exception {
+         assumeSwingAvailable();
+         Path home = tempDir.resolve("home-themed-gallery");

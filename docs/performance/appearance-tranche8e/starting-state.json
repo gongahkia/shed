@@ -1,0 +1,5 @@
+{
+  "head": "b1aacc16fe3cc364e1d1fcc7bb76e41fd6d94fb9",
+  "status": " M docs/FOCUS_MODE_CENTERED_WRITING.md\n M docs/performance/appearance-tranche8d/git-status-after.txt\n M docs/performance/appearance-tranche8d/verification.json\n?? docs/performance/appearance-tranche8d/ContextGuardProbe.java.txt\n?? docs/performance/appearance-tranche8d/INDEX.md\n?? docs/performance/appearance-tranche8d/checksums.sha256\n?? docs/performance/appearance-tranche8d/context-guard.log\n?? docs/performance/appearance-tranche8d/inventory.json\n",
+  "jar_sha256": "d448ccae866a592c5e1aee6cbea352c7289cb0fb1780ef8ae65896bec3578dbc"
+}

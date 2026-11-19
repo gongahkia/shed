@@ -1,0 +1,39 @@
+{
+  "tests": 1592,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 5,
+  "passed": 1587,
+  "skips": [
+    {
+      "class": "shed.DataLossRegressionTest",
+      "test": "atomicSavePreservesDosHiddenAttributeWhenSupported",
+      "reason": "",
+      "details": "org.opentest4j.TestAbortedException: Assumption failed: DOS file attributes unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.DataLossRegressionTest.atomicSavePreservesDosHiddenAttributeWhenSupported(DataLossRegressionTest.java:196)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+    },
+    {
+      "class": "shed.FocusedAiPerformanceTest",
+      "test": "measurePreviewPreparationPaintingAndDismissalAcrossBufferSizes",
+      "reason": "System property [shed.ai.benchmark] does not exist",
+      "details": ""
+    },
+    {
+      "class": "shed.TerminalShellIntegrationTest",
+      "test": "preparesAnIsolatedFishStartup",
+      "reason": "",
+      "details": "org.opentest4j.TestAbortedException: Assumption failed: Fish is unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.TerminalShellIntegrationTest.preparesAnIsolatedFishStartup(TerminalShellIntegrationTest.java:48)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+    },
+    {
+      "class": "shed.TexteditorSwingIntegrationTest",
+      "test": "testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree",
+      "reason": "",
+      "details": "org.opentest4j.TestAbortedException: Assumption failed: CMake, CTest, and CPack are unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.TexteditorSwingIntegrationTest.testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree(TexteditorSwingIntegrationTest.java:4292)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+    },
+    {
+      "class": "shed.FocusedAiNativeAcceptanceTest",
+      "test": "actualEditorAcceptsAcpSuggestionsAndRendersWrappedMultilinePreviews",
+      "reason": "System property [shed.ai.native] does not exist",
+      "details": ""
+    }
+  ]
+}

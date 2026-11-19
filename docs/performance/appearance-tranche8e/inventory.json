@@ -1,0 +1,140 @@
+{
+  "scope": "Tranche 8E modified/created files, excluding inventory/checksum self hashes. Existing 8D work is excluded.",
+  "files": [
+    {
+      "file": "src/main/java/shed/ConfigManager.java",
+      "bytes": 122968,
+      "sha256": "882e7688504ea93419aa9912c14e19532b44a52b8009c170294765f52f47b9ac"
+    },
+    {
+      "file": "src/main/java/shed/ThemeGalleryDialog.java",
+      "bytes": 19906,
+      "sha256": "4124f02cebef38342c9327a9e98048492f47813f483343570c0609483b5dba16"
+    },
+    {
+      "file": "src/main/java/shed/SessionConfigController.java",
+      "bytes": 71361,
+      "sha256": "73e210d1fd78635f4cfcdff8d24834973eeee9f1b43e7301fa0e73631d96efc2"
+    },
+    {
+      "file": "src/main/java/shed/Texteditor.java",
+      "bytes": 125412,
+      "sha256": "fdec25df7c2b3b0f3b0b92a476ad8f57018068f9a5db2cbbb29fedb3ff7e96b8"
+    },
+    {
+      "file": "src/test/java/shed/ConfigManagerTest.java",
+      "bytes": 67885,
+      "sha256": "54be2feeabb12992f17a286b1d697a2f27ab8b35aca3d45c9ef70738969d3a6e"
+    },
+    {
+      "file": "src/test/java/shed/TexteditorSwingIntegrationTest.java",
+      "bytes": 410813,
+      "sha256": "a9461db379e9cc521a1a04d408eecaa4638a603a0da915c298099a5fd2110abe"
+    },
+    {
+      "file": "src/benchmark/java/shed/ThemePreviewPerformanceProbe.java",
+      "bytes": 10696,
+      "sha256": "bb6499e2dc26ad22f42e860125a5f63d7c593495b15d7d57e7a63e3b61b3891b"
+    },
+    {
+      "file": "scripts/benchmark-theme-preview.py",
+      "bytes": 5225,
+      "sha256": "bd75917540e37c1810c4c555512b91d2b54e3b33047ec73cf3d4f18a8428ff36"
+    },
+    {
+      "file": "scripts/test_theme_preview_tooling.py",
+      "bytes": 2004,
+      "sha256": "7541b26e8fb6b1c85ca736acdced9d86a2172100944751b05939bbb825a2dff5"
+    },
+    {
+      "file": "docs/THEME_PREVIEW_AND_SYSTEM_APPEARANCE.md",
+      "bytes": 26447,
+      "sha256": "12bf998143f706e2106f5e134684a5de94584b13f4d32d8d18fe1d39a4c27d14"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/INDEX.md",
+      "bytes": 4318,
+      "sha256": "86e6e8e03c5854ec65676c9dcac6c9023747f20e71b646295a1072992209056b"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/benchmark-final.log.gz",
+      "bytes": 110,
+      "sha256": "ae51307b784acee3d30865b15c467d9262e996e54faf8f960c2d3bf25993a92e"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/config-tests.log.gz",
+      "bytes": 970,
+      "sha256": "1733fe9e275fc3a6b5e5e429d812bbaf0381c3af76aa0e9f32dd4456bb61a5b4"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/exploratory-report.json.gz",
+      "bytes": 33881,
+      "sha256": "577ccebee374222d6cd6544cfd45544ed4ccf5f4367963c1fa4396a0e2365d7d"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/focused-final.log.gz",
+      "bytes": 38,
+      "sha256": "60986f9baffd177f6bfbb8506d443c1fb3a05663d14fa8a68b628eeb56c3e264"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/full-tests.log.gz",
+      "bytes": 5918,
+      "sha256": "15307a7b6366144d5bfa76638552246c0dd4f28ffc1537307e08606184f7df17"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/gallery-tests.log.gz",
+      "bytes": 1010,
+      "sha256": "4c05de6ff1480eee7db5b37f42091adce376a0aec39e61b48a0aae3c2182b88d"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/implementation.patch",
+      "bytes": 25896,
+      "sha256": "4e2313c17c073e5ccae0b9ac8043ea2aadefbb99ab6c0d0883eec6f0959fb1d7"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/maven-full-results.json",
+      "bytes": 2770,
+      "sha256": "4d21826d7c265b644fbef7c0c789b8454352b47d02796a987436adaa1102d2c8"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/packaged-smoke.json",
+      "bytes": 7192,
+      "sha256": "b5c86da1daae3f29030cb7776aeffc08757e63361c49e6546d6803420d940133"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/paired-report.json.gz",
+      "bytes": 36561,
+      "sha256": "e403ad1f8e554c3ad85af18d904130b3bf4ae3340c6d0f97fad81a6ae7f637e2"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/preservation-check.json",
+      "bytes": 3098,
+      "sha256": "b57d7a64d26384ae35897b82fb5e7df5d42d05fef401bfc2ab0d03299918d674"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/starting-state.json",
+      "bytes": 616,
+      "sha256": "cd237682712852fb5d776e7fbd0bce6e7a8de6b63b4466a6362f9aaab31b84e3"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/summary.json",
+      "bytes": 93226,
+      "sha256": "2d9d011b94c1e26d8f4d8be20f3a90f3c9abfe35c7f915e81e9066a4b7931d4f"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/system-appearance-audit.json",
+      "bytes": 437,
+      "sha256": "8e39b7b10cf63824b5a52e4933fb7c5cb296d11c1367656a456383e44973a743"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/tooling-final.log.gz",
+      "bytes": 72,
+      "sha256": "978a3328cd2782999908e534d70232439dba7d7d3f3223ab2e6aebc85575e3bb"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e/verification.json",
+      "bytes": 4373,
+      "sha256": "1f0dc818687d0ad88ae0e44335b48b4743ec21404de7cc2d852624427b2a26bf"
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "maven": {
+    "command": "\"$MVN\" test",
+    "exit": 0,
+    "tests": 1592,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5,
+    "passed": 1587,
+    "skips": [
+      {
+        "class": "shed.DataLossRegressionTest",
+        "test": "atomicSavePreservesDosHiddenAttributeWhenSupported",
+        "reason": "",
+        "details": "org.opentest4j.TestAbortedException: Assumption failed: DOS file attributes unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.DataLossRegressionTest.atomicSavePreservesDosHiddenAttributeWhenSupported(DataLossRegressionTest.java:196)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+      },
+      {
+        "class": "shed.FocusedAiPerformanceTest",
+        "test": "measurePreviewPreparationPaintingAndDismissalAcrossBufferSizes",
+        "reason": "System property [shed.ai.benchmark] does not exist",
+        "details": ""
+      },
+      {
+        "class": "shed.TerminalShellIntegrationTest",
+        "test": "preparesAnIsolatedFishStartup",
+        "reason": "",
+        "details": "org.opentest4j.TestAbortedException: Assumption failed: Fish is unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.TerminalShellIntegrationTest.preparesAnIsolatedFishStartup(TerminalShellIntegrationTest.java:48)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+      },
+      {
+        "class": "shed.TexteditorSwingIntegrationTest",
+        "test": "testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree",
+        "reason": "",
+        "details": "org.opentest4j.TestAbortedException: Assumption failed: CMake, CTest, and CPack are unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.TexteditorSwingIntegrationTest.testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree(TexteditorSwingIntegrationTest.java:4292)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+      },
+      {
+        "class": "shed.FocusedAiNativeAcceptanceTest",
+        "test": "actualEditorAcceptsAcpSuggestionsAndRendersWrappedMultilinePreviews",
+        "reason": "System property [shed.ai.native] does not exist",
+        "details": ""
+      }
+    ]
+  },
+  "focused": {
+    "command": "\"$MVN\" -q \"-Dtest=ConfigManagerTest,ThemePreviewTest,TexteditorSwingIntegrationTest#liveThemePreview*+livePreviewCancellation*+galleryAcceptance*+openingAnotherWorkbench*+savingSettingsDuringPreview*+gallerySaveFailure*+themeGallerySaves*\" test",
+    "passed": 70,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "exit": 0
+  },
+  "tooling": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_*.py'",
+    "passed": 37,
+    "exit": 0
+  },
+  "package": {
+    "command": "\"$MVN\" -q -DskipTests package",
+    "exit": 0,
+    "sha256": "64c07ac73d9663d39d79450fdce800253134d518e0896fe4283cd1bcb554fc80"
+  },
+  "packaged_smoke": {
+    "command": "python3 scripts/test-packaged-markdown.py --jar /tmp/shed-tranche8e-run/candidate.jar --output /tmp/shed-tranche8e-run/packaged-smoke.json",
+    "state": "PASS",
+    "exit": 0
+  },
+  "benchmark": {
+    "command": "python3 scripts/benchmark-theme-preview.py --jar /tmp/shed-tranche8e-run/candidate.jar --baseline-jar /tmp/shed-tranche8e-run/baseline.jar --output /tmp/shed-tranche8e-run/paired-final",
+    "processes": 8,
+    "completed": 8,
+    "exit": 0
+  },
+  "early_failures": "Two ConfigManager assertions and one Swing assertion used the nonexistent ID gruvbox. The new fixtures were corrected to registered gruvbox-dark. No production correction or assertion weakening was used to resolve these failures. Original logs retained."
+}

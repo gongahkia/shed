@@ -39,7 +39,7 @@ def main():
     classes = output / 'classes'
     classes.mkdir()
     subprocess.run([str(jdk / 'bin/javac'), '-cp', str(jar), '-d', str(classes), *map(str, sources)], check=True, timeout=40)
-    report = {'environment_before': base.environment(), 'fixtures': fixtures, 'jars': {label: hashlib.sha256(path.read_bytes()).hexdigest() for label, path in [('baseline', baseline), ('candidate', jar)]}, 'cases': []}
+    report = {'environment_before': base.environment(), 'jdk': base.command_output([str(jdk / 'bin/java'), '-version']), 'probe_sha256': {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in sources}, 'fixtures': fixtures, 'jars': {label: hashlib.sha256(path.read_bytes()).hexdigest() for label, path in [('baseline', baseline), ('candidate', jar)]}, 'cases': []}
     for index, (size, split, html) in enumerate(CASES):
         pair = [('baseline', baseline, False), ('candidate', jar, True)]
         if index % 2:

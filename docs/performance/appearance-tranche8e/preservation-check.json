@@ -1,0 +1,81 @@
+{
+  "head_before": "b1aacc16fe3cc364e1d1fcc7bb76e41fd6d94fb9",
+  "head_after": "5487625cf7f27fd0fa2048e1aaf5b38c71f67ccf",
+  "starting_status": " M docs/FOCUS_MODE_CENTERED_WRITING.md\n M docs/performance/appearance-tranche8d/git-status-after.txt\n M docs/performance/appearance-tranche8d/verification.json\n?? docs/performance/appearance-tranche8d/ContextGuardProbe.java.txt\n?? docs/performance/appearance-tranche8d/INDEX.md\n?? docs/performance/appearance-tranche8d/checksums.sha256\n?? docs/performance/appearance-tranche8d/context-guard.log\n?? docs/performance/appearance-tranche8d/inventory.json\n",
+  "status_after": " M scripts/benchmark-theme-preview.py\n?? docs/THEME_PREVIEW_AND_SYSTEM_APPEARANCE.md\n?? docs/performance/appearance-tranche8e/\n",
+  "changed_from_start": [
+    "src/main/java/shed/ConfigManager.java",
+    "src/main/java/shed/SessionConfigController.java",
+    "src/main/java/shed/Texteditor.java",
+    "src/main/java/shed/ThemeGalleryDialog.java",
+    "src/test/java/shed/ConfigManagerTest.java",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java"
+  ],
+  "missing_from_start": [],
+  "other_preexisting_files_unchanged": 1510,
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "compiled_class_checks": [
+    {
+      "class": "shed/ConfigManager$ConfigRepair.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/ConfigManager$ThemePalette.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/ConfigManager$ThemePreviewLease.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/ConfigManager.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/SessionConfigController.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/Texteditor$1.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/Texteditor.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/ThemeGalleryDialog$1.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/ThemeGalleryDialog$2.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/ThemeGalleryDialog$PaletteIcon.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/ThemeGalleryDialog$Swatch.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/ThemeGalleryDialog$ThemeCellRenderer.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/ThemeGalleryDialog$ThemeCodePreview.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/ThemeGalleryDialog$ThemeSwatchGrid.class",
+      "matches_current_compiled": true
+    },
+    {
+      "class": "shed/ThemeGalleryDialog.class",
+      "matches_current_compiled": true
+    }
+  ],
+  "note": "External commit 5487625cf captured the then-current work. No commit or push was made by the agent; external work preserved."
+}

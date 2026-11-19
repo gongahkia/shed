@@ -1,0 +1,12 @@
+{
+  "jdk_source_archive": "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home/lib/src.zip",
+  "java_sources_inspected": 217,
+  "needles": [
+    "effectiveAppearance",
+    "AppleInterfaceTheme",
+    "application.appearance",
+    "DarkMode"
+  ],
+  "matches": [],
+  "limitation": "This Java source archive excludes native sources and does not prove that no platform interop approach is possible. No OS appearance setting was changed."
+}

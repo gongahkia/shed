@@ -1,0 +1,16 @@
+package shed;
+import javax.swing.*;
+import java.nio.file.*;
+import static shed.MarkdownPerformanceProbe.*;
+public class CenterDiagnostic {
+ static Texteditor e;
+ static void dump(String p)throws Exception { edt(()->{var s=e.getActivePane().getScrollPane();var a=e.writingArea;System.out.println(p+" window="+e.getSize()+" pane="+s.getSize()+" inset="+s.getInsets()+" cols="+e.configManager.getZenModeWidth()+" font="+a.getFont()+" M="+a.getFontMetrics(a.getFont()).charWidth('M')+" centered="+e.focusModeController.isCenteredWriting()+" listeners="+s.getComponentListeners().length);return null;}); }
+ public static void main(String[]a)throws Exception {
+ try {
+  e=edt(()->new Texteditor(new String[]{a[0]})); await(()->!e.stagedStartupPending&&e.getCurrentBuffer().hasFilePath(),20);
+  edt(()->{e.setSize(1400,800);e.configManager.set("zen.mode.width","40");e.commandHandler.execute("center on"); e.writingArea.setLineWrap(true);e.writingArea.setFont(e.writingArea.getFont().deriveFont(18f));e.validate();e.updateZenModeLayout();return null;});Thread.sleep(300);dump("wide");
+  edt(()->{e.setSize(320,700);e.validate();e.updateZenModeLayout();return null;});Thread.sleep(300);dump("narrow");
+  edt(()->{e.updateZenModeLayout();return null;});dump("manual");
+ }finally{System.exit(0);}
+ }
+}

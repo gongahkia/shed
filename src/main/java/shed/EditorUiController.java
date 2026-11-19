@@ -459,8 +459,19 @@ final class EditorUiController {
         paneScrollPane.setBorder(null);
         paneScrollPane.addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override public void componentResized(java.awt.event.ComponentEvent event) {
-                if (editor.focusModeController != null && editor.focusModeController.isCenteredWriting()) editor.updateZenModeLayout();
+                if (editor.focusModeController != null) editor.focusModeController.requestLayoutUpdate();
             }
+        });
+        paneScrollPane.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentResized(java.awt.event.ComponentEvent event) {
+                if (editor.focusModeController != null) editor.focusModeController.requestLayoutUpdate();
+            }
+        });
+        textArea.addPropertyChangeListener("font", event -> {
+            if (editor.focusModeController != null) editor.focusModeController.requestLayoutUpdate();
+        });
+        textArea.addPropertyChangeListener("lineWrap", event -> {
+            if (editor.focusModeController != null) editor.focusModeController.requestLayoutUpdate();
         });
         paneScrollPane.setWheelScrollingEnabled(true);
         applyEditorScrollBarVisibility(paneScrollPane);

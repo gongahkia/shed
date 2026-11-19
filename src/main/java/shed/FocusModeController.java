@@ -9,11 +9,14 @@ import java.util.WeakHashMap;
 import javax.swing.border.Border;
 
 final class FocusModeController {
+    static final int MAX_CENTERED_WRAPPED_CHARS = 100 * 1024;
     private final Texteditor editor;
     private boolean limelightBeforeZen;
     private boolean zenEnabled;
     private boolean centeredWriting;
     private boolean closed;
+    private boolean layoutPending;
+    private boolean tabsPreference;
     private FocusState focusState;
     private final Map<EditorPane, CenteredBorder> centeredBorders = new WeakHashMap<>();
     private int focusStart;
@@ -46,6 +49,7 @@ final class FocusModeController {
 
     FocusModeController(Texteditor editor) {
         this.editor = editor;
+        tabsPreference = editor.configManager.getOpenEditorsVisible();
         focusStart = -1;
         focusEnd = -1;
     }
@@ -65,6 +69,7 @@ final class FocusModeController {
 
     String toggleGoyoMode() {
         setGoyoEnabled(!editor.goyoModeEnabled);
+        if (!editor.goyoModeEnabled && hasLargeWrappedSource()) return "Goyo mode unavailable for large wrapped panes";
         return editor.goyoModeEnabled ? "Goyo mode enabled" : "Goyo mode disabled";
     }
 
@@ -85,6 +90,7 @@ final class FocusModeController {
             case "off" -> setGoyoEnabled(false);
             default -> { return "Usage: :focus [on|off|toggle]"; }
         }
+        if (!editor.goyoModeEnabled && !operation.equals("off") && hasLargeWrappedSource()) return "Focus mode unavailable for large wrapped panes";
         return editor.goyoModeEnabled ? "Focus mode enabled" : "Focus mode disabled";
     }
 
@@ -96,13 +102,30 @@ final class FocusModeController {
             case "off" -> setCenteredWriting(false);
             default -> { return "Usage: :center [on|off|toggle]"; }
         }
+        if (!centeredWriting && !operation.equals("off") && hasLargeWrappedSource()) return "Centered writing unavailable for large wrapped panes";
         return centeredWriting ? "Centered writing enabled" : "Centered writing disabled";
+    }
+
+    private boolean hasLargeWrappedSource() {
+        return editor.editorPanes.stream().anyMatch(pane -> !pane.isHiddenByFocusMode() && !pane.isMarkdownPreview()
+            && pane.getTerminalPane() == null && pane.getAlternateComponent() == null && pane.getTextArea().getLineWrap()
+            && pane.getTextArea().getDocument().getLength() > MAX_CENTERED_WRAPPED_CHARS);
     }
 
     boolean isCenteredWriting() { return centeredWriting; }
 
+    void requestLayoutUpdate() {
+        if (closed || !centeredWriting || layoutPending) return;
+        layoutPending = true;
+        SwingUtilities.invokeLater(() -> {
+            layoutPending = false;
+            if (!closed && centeredWriting) updateZenModeLayout();
+        });
+    }
+
     void setCenteredWriting(boolean enabled) {
         if (closed || centeredWriting == enabled) return;
+        if (enabled && hasLargeWrappedSource()) return;
         centeredWriting = enabled;
         updateZenModeLayout();
     }
@@ -114,6 +137,7 @@ final class FocusModeController {
             return;
         }
         if (enabled) {
+            if (hasLargeWrappedSource()) return;
             if (editor.getActivePane() == editor.treePane && firstVisiblePaneExcept(editor.treePane) == null) return;
             if (editor.windowLayoutRoot != null) editor.windowLayoutRoot.rememberDividerLocations();
             focusState = new FocusState(centeredWriting, editor.configManager.getOpenEditorsVisible());
@@ -179,7 +203,13 @@ final class FocusModeController {
     }
 
     void syncChrome() {
-        if (closed || !editor.goyoModeEnabled || focusState == null) return;
+        if (closed) return;
+        if (!editor.goyoModeEnabled || focusState == null) {
+            boolean current = editor.configManager.getOpenEditorsVisible();
+            if (tabsPreference != current && editor.openEditorsBar != null) editor.openEditorsBar.setVisible(current);
+            tabsPreference = current;
+            return;
+        }
         hideTree();
         for (JComponent component : new JComponent[]{editor.workbenchHeader, editor.openEditorsBar, editor.activeMinimapPanel}) {
             if (component != null) { focusState.remember(component); component.setVisible(false); }
@@ -187,19 +217,22 @@ final class FocusModeController {
         if (editor.footerPanel == null) {
             return;
         }
-        {
-            boolean commandActive = editor.editorState != null
-                && (editor.editorState.mode == EditorMode.COMMAND || editor.editorState.mode == EditorMode.SEARCH);
-            editor.footerPanel.setVisible(commandActive);
-            if (editor.statusBar != null) editor.statusBar.setVisible(false);
-            if (editor.commandBar != null) editor.commandBar.setVisible(commandActive);
-        }
+        boolean commandActive = editor.editorState != null
+            && (editor.editorState.mode == EditorMode.COMMAND || editor.editorState.mode == EditorMode.SEARCH);
+        editor.footerPanel.setVisible(commandActive);
+        if (editor.statusBar != null) editor.statusBar.setVisible(false);
+        if (editor.commandBar != null) editor.commandBar.setVisible(commandActive);
         editor.getContentPane().revalidate();
         editor.getContentPane().repaint();
     }
 
     void updateZenModeLayout() {
         if (closed || editor.editorHostPanel == null) {
+            return;
+        }
+        if ((editor.goyoModeEnabled || centeredWriting) && hasLargeWrappedSource()) {
+            setGoyoEnabled(false);
+            setCenteredWriting(false);
             return;
         }
         Color background = editor.getModeBackground(editor.editorState.mode == null ? EditorMode.NORMAL : editor.editorState.mode);
@@ -217,7 +250,8 @@ final class FocusModeController {
             scrollPane.setBackground(background);
             scrollPane.getViewport().setBackground(background);
             if (!centeredWriting || pane.isHiddenByFocusMode() || pane.isMarkdownPreview()
-                    || pane.getTerminalPane() != null || pane.getAlternateComponent() != null) {
+                    || pane.getTerminalPane() != null || pane.getAlternateComponent() != null
+                    || area.getLineWrap() && area.getDocument().getLength() > MAX_CENTERED_WRAPPED_CHARS) {
                 CenteredBorder saved = centeredBorders.remove(pane);
                 if (saved != null && scrollPane.getBorder() == saved.applied()) scrollPane.setBorder(saved.original());
                 continue;
@@ -258,6 +292,8 @@ final class FocusModeController {
 
     void close() {
         closed = true;
+        editor.goyoModeEnabled = false;
+        centeredWriting = false;
         focusState = null;
         centeredBorders.clear();
     }

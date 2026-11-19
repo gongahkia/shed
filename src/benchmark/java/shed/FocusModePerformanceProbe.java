@@ -30,7 +30,10 @@ public final class FocusModePerformanceProbe {
     }
     private static void toggle(String name) throws Exception {
         var values = edt(() -> {
-            long began = System.nanoTime(); editor.toggleGoyoMode(); long dispatch = System.nanoTime();
+            boolean before = editor.goyoModeEnabled;
+            long began = System.nanoTime(); String result = editor.toggleGoyoMode(); long dispatch = System.nanoTime();
+            if (before == editor.goyoModeEnabled) return Map.<String, Object>of("operation", name, "state", "UNSUPPORTED_NO_CHANGE", "result", result,
+                "enabled", editor.goyoModeEnabled, "dispatch_ms", (dispatch - began) / 1e6);
             editor.validate(); long layout = System.nanoTime();
             editor.getRootPane().paintImmediately(editor.getRootPane().getVisibleRect());
             return Map.<String, Object>of("operation", name, "dispatch_ms", (dispatch - began) / 1e6,
@@ -80,6 +83,7 @@ public final class FocusModePerformanceProbe {
             Thread.sleep(500); String digest = documentDigest(); memory("ready_no_gc");
             for (String phase : new String[]{"normal", "focus"}) {
                 if (phase.equals("focus")) { toggle("focus_first_enable"); Thread.sleep(150); }
+                out("FOCUS ", Map.of("operation", "phase_state", "phase", phase, "enabled", edt(() -> editor.goyoModeEnabled)));
                 var buffer = edt(editor::getCurrentBuffer);
                 for (int i = 0; i < 51; i++) {
                     edt(() -> { editor.writingArea.setCaretPosition(16); return null; });
@@ -126,6 +130,8 @@ public final class FocusModePerformanceProbe {
             for (int i = 0; i < 3; i++) { System.gc(); Thread.sleep(80); }
             memory("disposed_requested_gc"); System.out.println("FOCUS_DONE");
             exit = 0;
+        } catch (Throwable failure) {
+            failure.printStackTrace();
         } finally { edt(() -> { for (Window window : Window.getWindows()) window.dispose(); return null; }); System.exit(exit); }
     }
 }

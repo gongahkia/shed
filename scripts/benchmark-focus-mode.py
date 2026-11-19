@@ -16,12 +16,13 @@ spec = importlib.util.spec_from_file_location('markdown_baseline', ROOT / 'scrip
 base = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(base)
 CASES = [(4096, False, False), (102400, False, False), (1048576, False, False),
-         (10485760, False, False), (1048576, True, False), (1048576, False, True), (1048576, True, True)]
+         (10485760, False, False), (1048576, True, False), (1048576, False, True), (1048576, True, True), (102400, True, False)]
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--jar', type=Path, required=True)
+    parser.add_argument('--baseline-jar', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--generate-only', action='store_true')
     args = parser.parse_args()
@@ -37,14 +38,18 @@ def main():
     sources = [ROOT / f'src/benchmark/java/shed/{name}.java' for name in ['FocusModePerformanceProbe', 'MarkdownPerformanceProbe', 'MarkdownLexicalProbe']]
     classes = output / 'classes'; classes.mkdir()
     subprocess.run([str(jdk / 'bin/javac'), '-cp', str(jar), '-d', str(classes), *map(str, sources)], check=True)
-    report = {'jar_sha256': hashlib.sha256(jar.read_bytes()).hexdigest(), 'source_hashes': {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
+    artifacts = [('current', jar)]
+    if args.baseline_jar: artifacts.insert(0, ('baseline', args.baseline_jar.resolve(strict=True)))
+    report = {'jar_sha256': hashlib.sha256(jar.read_bytes()).hexdigest(), 'artifacts': {label: hashlib.sha256(path.read_bytes()).hexdigest() for label, path in artifacts}, 'source_hashes': {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
               'environment_before': base.environment(), 'cases': []}
-    for size, wrap, split in CASES:
-        folder = output / f'{size}-wrap{int(wrap)}-split{int(split)}'; (folder / 'home/.shed').mkdir(parents=True)
+    plan = [(label, artifact, size, wrap, split) for index, (size, wrap, split) in enumerate(CASES)
+            for label, artifact in (artifacts if index % 2 == 0 else list(reversed(artifacts)))]
+    for label, artifact, size, wrap, split in plan:
+        folder = output / f'{label}-{size}-wrap{int(wrap)}-split{int(split)}'; (folder / 'home/.shed').mkdir(parents=True)
         (folder / 'home/.shed/config.toml').write_text('schema_version = 1\n"theme" = "shed-light"\n"keymap.profile" = "plain"\n"session.restore.on.start" = false\n')
         command = [str(jdk / 'bin/java'), '-Xms64m', '-Xmx512m', '-Djava.awt.headless=false', f'-Duser.home={folder / "home"}',
-                   '-cp', os.pathsep.join([str(classes), str(jar)]), 'shed.FocusModePerformanceProbe', fixtures[size]['path'], str(wrap).lower(), str(split).lower()]
-        case = {'bytes': size, 'wrap': wrap, 'split': split, 'command': command, 'rss': []}
+                   '-cp', os.pathsep.join([str(classes), str(artifact)]), 'shed.FocusModePerformanceProbe', fixtures[size]['path'], str(wrap).lower(), str(split).lower()]
+        case = {'artifact': label, 'bytes': size, 'wrap': wrap, 'split': split, 'command': command, 'rss': [], 'load': os.getloadavg()}
         env = os.environ.copy()
         for key in ['JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'CLASSPATH']: env.pop(key, None)
         start = time.monotonic()
@@ -64,7 +69,7 @@ def main():
         case.update(exit=child.returncode, complete='FOCUS_DONE' in log, events=[json.loads(line[6:]) for line in log.splitlines() if line.startswith('FOCUS ')])
         report['cases'].append(case)
         (output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
-        print(size, wrap, split, case['exit'], case['complete'], flush=True)
+        print(label, size, wrap, split, case['exit'], case['complete'], flush=True)
     report['environment_after'] = base.environment(); (output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     return 0 if all(case['exit'] == 0 and case['complete'] for case in report['cases']) else 1
 

@@ -186,17 +186,21 @@ final class FileTreePanel extends JPanel {
         Color foreground = editor.configManager.getEditorForeground();
         Font textFont = editor.resolveUiFont();
         iconFont = FileFinderIcons.availableNerdFont(textFont);
-        int rowHeight = Math.max(UiZoom.scale(22, editor.configManager.getUiZoom()),
-            textFont.getSize() + UiZoom.scale(8, editor.configManager.getUiZoom()));
         setBackground(surface);
         tree.setBackground(surface);
         tree.setForeground(foreground);
         tree.setFont(textFont);
-        tree.setRowHeight(rowHeight);
         scrollPane.setBackground(surface);
         scrollPane.getViewport().setBackground(surface);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
-        scrollPane.getVerticalScrollBar().setUnitIncrement(rowHeight);
+        refreshDensity();
+    }
+
+    void refreshDensity() {
+        int height = editor.configManager.getUiDensity().treeHeight(tree.getFontMetrics(tree.getFont()), editor.configManager.getUiZoom());
+        tree.setRowHeight(height);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(height);
+        revalidate(); repaint();
     }
 
     private final class ExplorerRenderer extends JPanel implements TreeCellRenderer {

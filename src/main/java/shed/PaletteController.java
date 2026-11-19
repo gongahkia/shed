@@ -72,6 +72,9 @@ final class PaletteController {
         action("Reload Configuration", "config reload", "Reload configuration from disk."),
         action("Keymap Inspector", "keymap inspector", "Inspect and edit validated keymap overlays."),
         action("Themes", "theme list", "Browse and apply built-in themes with palette previews."),
+        action("Compact UI Density", "density compact", "Reduce workbench spacing without changing fonts."),
+        action("Default UI Density", "density default", "Restore the standard workbench spacing."),
+        action("Comfortable UI Density", "density comfortable", "Increase workbench spacing without changing fonts."),
         action("Toggle Zen Mode", "zen toggle", "Toggle the distraction-free Zen layout."),
         action("Toggle Goyo Mode", "goyo toggle", "Toggle the Goyo layout."),
         action("Toggle Focus Mode", "focus toggle", "Hide workbench chrome and center the current editors."),
@@ -913,14 +916,15 @@ final class PaletteController {
         filterField.setBorder(javax.swing.BorderFactory.createCompoundBorder(
             javax.swing.BorderFactory.createMatteBorder(0, 0, 1, 0, editor.configManager.getCaretColor()),
             javax.swing.BorderFactory.createEmptyBorder(6, 8, 6, 8)));
-        int rowHeight = Math.max(UiZoom.scale(40, editor.configManager.getUiZoom()),
-            filterField.getFontMetrics(uiFont).getHeight() + UiZoom.scale(12, editor.configManager.getUiZoom()));
+        int rowHeight = editor.configManager.getUiDensity().pickerHeight(filterField, editor.configManager.getUiZoom());
+        filterField.putClientProperty(UiDensity.PICKER_FILTER, Boolean.TRUE);
         filterField.setPreferredSize(new Dimension(1, rowHeight));
         DefaultListModel<String> model = new DefaultListModel<>();
         for (int index = 0; index < Math.min(PALETTE_RESULT_LIMIT, candidates.size()); index++) {
             model.addElement(candidates.get(index));
         }
         JList<String> list = new JList<>(model);
+        list.putClientProperty(UiDensity.PICKER_LIST, Boolean.TRUE);
         AccessibilitySupport.describe(list, title + " results", "Matching " + title.toLowerCase(Locale.ROOT) + " entries. Use Up and Down to select, Enter to open, or Escape to dismiss.");
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setFont(uiFont);

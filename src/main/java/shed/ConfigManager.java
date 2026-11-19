@@ -306,6 +306,7 @@ public class ConfigManager {
         defineDefault("ui.font.family", DEFAULT_UI_FONT_FAMILY);
         defineDefault("ui.font.size", DEFAULT_UI_FONT_SIZE);
         defineDefault("ui.zoom", DEFAULT_UI_ZOOM);
+        defineDefault("ui.density", "default");
         defineDefault("terminal.font.family", DEFAULT_TERMINAL_FONT_FAMILY);
         defineDefault("terminal.font.size", DEFAULT_TERMINAL_FONT_SIZE);
         defineDefault("terminal.default.profile", DEFAULT_TERMINAL_DEFAULT_PROFILE);
@@ -454,6 +455,7 @@ public class ConfigManager {
             case "ui.font.family" -> "Application UI font family; empty uses the shared sans-serif interface font";
             case "ui.font.size" -> "Application UI font size; zero uses the shared 13-point interface size";
             case "ui.zoom" -> "Application interface scale; Ctrl/Cmd + and Ctrl/Cmd - adjust it live; Ctrl/Cmd 0 resets it";
+            case "ui.density" -> "Workbench spacing preset; independent of editor fonts and interface zoom";
             case "terminal.font.family" -> "Terminal font family";
             case "terminal.font.size" -> "Terminal font size";
             case "terminal.default.profile" -> "Default profile for newly opened terminals";
@@ -637,6 +639,11 @@ public class ConfigManager {
             }
             String key = String.join(".", entry.getKey());
             Object value = entry.getValue();
+            if (key.equals("ui.density") && (!(value instanceof String density) || UiDensity.parse(density) == null)) {
+                if (repairs != null) repairs.add(new ConfigRepair(key,
+                    value instanceof String || value instanceof Number || value instanceof Boolean ? String.valueOf(value) : "unsupported value", "default"));
+                value = "default";
+            }
             if (!(value instanceof String || value instanceof Long || value instanceof Double || value instanceof Boolean)) {
                 errors.add(tomlLocation(result.inputPositionOf(entry.getKey()))
                     + "unsupported TOML value for " + key + fallbackDescription(key));
@@ -1067,6 +1074,31 @@ public class ConfigManager {
         return UiZoom.clamp(getDouble("ui.zoom", DEFAULT_UI_ZOOM));
     }
 
+    UiDensity getUiDensity() {
+        UiDensity density = UiDensity.parse(getString("ui.density", "default"));
+        return density == null ? UiDensity.DEFAULT : density;
+    }
+
+    void applyUiDensityFrom(ConfigManager source) {
+        if (!shedDirectoryPath.equals(source.shedDirectoryPath)) return;
+        String density = source.getUiDensity().id;
+        set("ui.density", density);
+        if (!density.equals(source.persistedConfig.getOrDefault("ui.density", "default"))) return;
+        // Acknowledge only an already-applied density-only write, preserving local unsaved settings.
+        int ours = persistedConfig.size() - (persistedConfig.containsKey("ui.density") ? 1 : 0);
+        int theirs = source.persistedConfig.size() - (source.persistedConfig.containsKey("ui.density") ? 1 : 0);
+        if (ours != theirs) return;
+        for (Map.Entry<String, String> entry : source.persistedConfig.entrySet()) {
+            if (!entry.getKey().equals("ui.density") && !java.util.Objects.equals(entry.getValue(), persistedConfig.get(entry.getKey()))) return;
+        }
+        String fingerprint = source.configFileFingerprint();
+        if (!source.isOwnConfigFileWrite(fingerprint)) return;
+        if (source.persistedConfig.containsKey("ui.density")) persistedConfig.put("ui.density", source.persistedConfig.get("ui.density"));
+        else persistedConfig.remove("ui.density");
+        lastWrittenConfigFingerprint = fingerprint;
+        lastWrittenConfigText = source.lastWrittenConfigText;
+    }
+
     public String getTerminalFontFamily() {
         return getString("terminal.font.family", DEFAULT_TERMINAL_FONT_FAMILY);
     }
@@ -1485,6 +1517,7 @@ public class ConfigManager {
         if (key == null || key.isBlank()) {
             return false;
         }
+        if ("ui.density".equalsIgnoreCase(key.trim())) return false;
         if (getProjectConfigAllowUnsafe()) {
             return true;
         }
@@ -1535,6 +1568,10 @@ public class ConfigManager {
         if (validationError != null) {
             throw new IOException(validationError);
         }
+        if ("ui.density".equals(normalizedKey)) {
+            persistDensity(normalizedValue, false);
+            return;
+        }
         config.put(normalizedKey, normalizedValue);
         settings.applyRuntime(normalizedKey, normalizedValue);
         persistedConfig.put(normalizedKey, normalizedValue);
@@ -1550,10 +1587,29 @@ public class ConfigManager {
         if (defaultValue == null) {
             throw new IOException("no canonical default for " + normalizedKey);
         }
+        if ("ui.density".equals(normalizedKey)) {
+            persistDensity(defaultValue, true);
+            return;
+        }
         config.put(normalizedKey, defaultValue);
         settings.applyRuntime(normalizedKey, defaultValue);
         persistedConfig.remove(normalizedKey);
         writeConfigFile();
+    }
+
+    private void persistDensity(String value, boolean reset) throws IOException {
+        String previous = persistedConfig.get("ui.density");
+        if (reset) persistedConfig.remove("ui.density");
+        else persistedConfig.put("ui.density", value);
+        try {
+            writeConfigFile();
+        } catch (IOException error) {
+            if (previous == null) persistedConfig.remove("ui.density");
+            else persistedConfig.put("ui.density", previous);
+            throw error;
+        }
+        config.put("ui.density", value);
+        settings.applyRuntime("ui.density", value);
     }
 
     public void resetKeybindingAndPersist(String scope, String lhs) throws IOException {

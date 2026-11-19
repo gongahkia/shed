@@ -375,11 +375,18 @@ public final class WorkbenchStyle {
     public static class TabsUI extends BasicTabbedPaneUI {
         public static ComponentUI createUI(JComponent c) { return new TabsUI(); }
         @Override protected void installDefaults() {
-            super.installDefaults(); tabInsets = new Insets(px(8), px(14), px(8), px(14));
+            super.installDefaults(); refreshDensity();
             tabAreaInsets = new Insets(0, 0, 0, 0); contentBorderInsets = new Insets(1, 0, 0, 0);
             selectedTabPadInsets = new Insets(0, 0, 0, 0);
         }
-        @Override protected int calculateTabHeight(int placement, int index, int height) { return Math.max(px(40), super.calculateTabHeight(placement, index, height)); }
+        void refreshDensity() {
+            UiDensity density = UiDensity.forComponent(tabPane);
+            tabInsets = new Insets(px(density.tabVertical), px(density.tabHorizontal), px(density.tabVertical), px(density.tabHorizontal));
+            tabPane.revalidate(); tabPane.repaint();
+        }
+        @Override protected int calculateTabHeight(int placement, int index, int height) {
+            return Math.max(px(UiDensity.forComponent(tabPane).controlMinimum), super.calculateTabHeight(placement, index, height));
+        }
         @Override protected int getTabLabelShiftX(int placement, int index, boolean selected) { return 0; }
         @Override protected int getTabLabelShiftY(int placement, int index, boolean selected) { return 0; }
         @Override protected void paintTabBackground(Graphics g, int placement, int index, int x, int y, int w, int h, boolean selected) {

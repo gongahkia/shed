@@ -202,6 +202,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleMark("list"), "marks");
         registerCommand((args, range, force) -> handleTheme(args), "theme");
         registerCommand((args, range, force) -> handleTheme("list"), "themes");
+        registerCommand((args, range, force) -> editor.sessionConfigController.handleDensityCommand(args), "density");
         registerCommand((args, range, force) -> handleToggle(args, "zen", editor::toggleZenMode), "zen");
         registerCommand((args, range, force) -> handleToggle(args, "goyo", editor::toggleGoyoMode), "goyo");
         registerCommand((args, range, force) -> editor.focusModeController.handleFocusCommand(args), "focus");

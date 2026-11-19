@@ -1057,6 +1057,37 @@ final class EditorUiController {
         }
     }
 
+    void applyDensity() {
+        // Keep source TextUI/View instances, colors, fonts and layout ownership intact.
+        if (editor.workbenchHeader != null) editor.workbenchHeader.refreshDensity();
+        if (editor.openEditorsBar != null) editor.openEditorsBar.refreshDensity();
+        if (editor.toolWindowHost != null) editor.toolWindowHost.refreshDensity();
+        for (EditorPane pane : editor.editorPanes) {
+            if (pane.getAlternateComponent() instanceof FileTreePanel tree) tree.refreshDensity();
+        }
+        applyFooterUiMetrics();
+        for (Window window : Window.getWindows()) {
+            if (window.isDisplayable() && UiDensity.owner(window) == editor) applyDensityRecursively(window);
+        }
+        editor.revalidate(); editor.repaint();
+    }
+
+    private void applyDensityRecursively(Component component) {
+        UiDensity density = editor.configManager.getUiDensity();
+        double zoom = editor.configManager.getUiZoom();
+        if (component instanceof JList<?> list && Boolean.TRUE.equals(list.getClientProperty(UiDensity.PICKER_LIST))) {
+            list.setFixedCellHeight(density.pickerHeight(list, zoom));
+            if (list.getSelectedIndex() >= 0) list.ensureIndexIsVisible(list.getSelectedIndex());
+        } else if (component instanceof JTextField field && Boolean.TRUE.equals(field.getClientProperty(UiDensity.PICKER_FILTER))) {
+            field.setPreferredSize(new Dimension(1, density.pickerHeight(field, zoom)));
+        } else if (component instanceof JTabbedPane tabs && tabs.getUI() instanceof WorkbenchStyle.TabsUI ui) {
+            ui.refreshDensity();
+        }
+        if (component instanceof Container container && !(component instanceof javax.swing.text.JTextComponent)) {
+            for (Component child : container.getComponents()) applyDensityRecursively(child);
+        }
+    }
+
     private void installUiThemeDefaults() {
         UiThemeColors colors = uiThemeColors();
         putUiColor(colors.surface(),
@@ -1140,6 +1171,10 @@ final class EditorUiController {
             text.setSelectionColor(colors.selection());
             text.setSelectedTextColor(colors.selectionText());
         }
+        if (component instanceof JTextField field && Boolean.TRUE.equals(field.getClientProperty(UiDensity.PICKER_FILTER))
+            && editor.configManager.getUiDensity() != UiDensity.DEFAULT) {
+            field.setPreferredSize(new Dimension(1, editor.configManager.getUiDensity().pickerHeight(field, editor.configManager.getUiZoom())));
+        }
         if (component instanceof JComboBox<?> combo) {
             combo.setBackground(colors.field());
             combo.setForeground(colors.foreground());
@@ -1149,8 +1184,10 @@ final class EditorUiController {
             list.setForeground(colors.foreground());
             list.setSelectionBackground(colors.selection());
             list.setSelectionForeground(colors.selectionText());
-            if (!editor.stagedStartupPending) list.setFixedCellHeight(Math.max(UiZoom.scale(40, editor.configManager.getUiZoom()),
-                list.getFontMetrics(list.getFont()).getHeight() + UiZoom.scale(12, editor.configManager.getUiZoom())));
+            if (!editor.stagedStartupPending) list.setFixedCellHeight(Boolean.TRUE.equals(list.getClientProperty(UiDensity.PICKER_LIST))
+                ? editor.configManager.getUiDensity().pickerHeight(list, editor.configManager.getUiZoom())
+                : Math.max(UiZoom.scale(40, editor.configManager.getUiZoom()),
+                    list.getFontMetrics(list.getFont()).getHeight() + UiZoom.scale(12, editor.configManager.getUiZoom())));
         }
         if (component instanceof JTree tree) {
             tree.setBackground(colors.field());
@@ -1369,8 +1406,8 @@ final class EditorUiController {
     private void applyFooterUiMetrics() {
         if (editor.statusBar == null || editor.commandBar == null) return;
         double zoom = editor.configManager.getUiZoom();
-        int statusVerticalPadding = UiZoom.scale(5, zoom);
-        int commandVerticalPadding = UiZoom.scale(4, zoom);
+        int statusVerticalPadding = UiZoom.scale(editor.configManager.getUiDensity().statusPadding, zoom);
+        int commandVerticalPadding = UiZoom.scale(editor.configManager.getUiDensity().commandPadding, zoom);
         Font font = resolveUiFont();
         editor.statusBar.setFont(font);
         if (editor.positionCue != null) {

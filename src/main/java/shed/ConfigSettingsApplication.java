@@ -3,13 +3,20 @@ package shed;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /** Canonical validation/persistence use case; presentation is supplied by the composition root. */
 final class ConfigSettingsApplication implements SettingsApplication {
     private final ConfigManager config;
-    private final Runnable applied;
+    private final Consumer<String> applied;
 
     ConfigSettingsApplication(ConfigManager config, Runnable applied) {
+        this.config = Objects.requireNonNull(config);
+        Objects.requireNonNull(applied);
+        this.applied = key -> applied.run();
+    }
+
+    ConfigSettingsApplication(ConfigManager config, Consumer<String> applied) {
         this.config = Objects.requireNonNull(config);
         this.applied = Objects.requireNonNull(applied);
     }
@@ -31,7 +38,7 @@ final class ConfigSettingsApplication implements SettingsApplication {
         } catch (IOException failure) {
             return "Error saving config: " + failure.getMessage();
         }
-        applied.run();
+        applied.accept(key);
         return "Set and saved " + key + (Objects.equals(requested, repaired) ? ""
             : " (self-healed \"" + requested + "\" -> \"" + repaired + "\")");
     }

@@ -110,7 +110,7 @@ final class WorkbenchHeader extends JPanel implements AutoCloseable {
 
     void refreshAppearance() {
         Font font = editor.stagedStartupPending ? editor.stagedStartupFont : editor.resolveUiFont();
-        int height = Math.max(UiZoom.scale(40, editor.configManager.getUiZoom()), getFontMetrics(font).getHeight() + UiZoom.scale(16, editor.configManager.getUiZoom()));
+        int height = editor.configManager.getUiDensity().controlHeight(getFontMetrics(font), editor.configManager.getUiZoom());
         rowHeight = height;
         for (Component button : actions.getComponents()) { button.setFont(font); button.setPreferredSize(new Dimension(height, height)); }
         workspace.setFont(font); workspace.setPreferredSize(new Dimension(UiZoom.scale(160, editor.configManager.getUiZoom()), height));
@@ -121,6 +121,15 @@ final class WorkbenchHeader extends JPanel implements AutoCloseable {
         setBackground(editor.configManager.getRaisedSurfaceColor()); actions.setOpaque(false);
         location.setForeground(editor.configManager.getMutedForegroundColor());
         refresh();
+    }
+
+    void refreshDensity() {
+        int height = editor.configManager.getUiDensity().controlHeight(getFontMetrics(workspace.getFont()), editor.configManager.getUiZoom());
+        rowHeight = height;
+        for (Component button : actions.getComponents()) button.setPreferredSize(new Dimension(height, height));
+        workspace.setPreferredSize(new Dimension(workspace.getPreferredSize().width, height));
+        focus.setPreferredSize(new Dimension(focus.getPreferredSize().width, height));
+        revalidate(); repaint();
     }
 
     void refresh() {

@@ -205,7 +205,7 @@ final class SessionConfigController {
             return "Error: " + validationError;
         }
         editor.configManager.set(key, appliedValue);
-        applyRuntimeConfigFromSettings();
+        applySetting(key);
         if (isThemeRelatedConfigKey(key)) {
             }
         return configSetResult("Set", key, requestedValue, appliedValue);
@@ -229,7 +229,7 @@ final class SessionConfigController {
         }
         try {
             editor.configManager.resetAndPersist(key);
-            applyRuntimeConfigFromSettings();
+            applySetting(key);
             if (isThemeRelatedConfigKey(key)) {
                     }
             return "Reset and saved " + key;
@@ -415,6 +415,29 @@ final class SessionConfigController {
         return null;
     }
 
+
+    void applySetting(String key) {
+        if (!"ui.density".equals(key)) {
+            applyRuntimeConfigFromSettings();
+            return;
+        }
+        editor.editorUiController.applyDensity();
+        for (java.awt.Window window : java.awt.Window.getWindows()) {
+            if (window instanceof Texteditor other && other != editor && other.isDisplayable()
+                && other.configManager.getShedDirectoryPath().equals(editor.configManager.getShedDirectoryPath())) {
+                other.configManager.applyUiDensityFrom(editor.configManager);
+                other.editorUiController.applyDensity();
+            }
+        }
+    }
+
+    String handleDensityCommand(String argument) {
+        String value = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
+        if (value.isEmpty()) return "Density: " + editor.configManager.getUiDensity().id;
+        if (UiDensity.parse(value) == null) return "Usage: density compact|default|comfortable";
+        String result = setConfigOptionPersistent("ui.density", value);
+        return result.startsWith("Error") ? result : "Density: " + value;
+    }
 
     void applyRuntimeConfigFromSettings() {
         if (!editor.stagedStartupPending) editor.setJMenuBar(ShedMenuBar.create(editor));
@@ -968,7 +991,7 @@ final class SessionConfigController {
         }
         for (Map.Entry<String, Object> entry : settings.entrySet()) {
             String key = entry.getKey();
-            if (key == null || key.isBlank()) {
+            if (key == null || key.isBlank() || key.equals("ui.density")) {
                 continue;
             }
             Object value = entry.getValue();

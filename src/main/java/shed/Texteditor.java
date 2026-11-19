@@ -467,7 +467,7 @@ public class Texteditor extends JFrame implements KeyListener {
         markdownController = new MarkdownController(this);
         paneBufferController = new PaneBufferController(this);
         sessionConfigController = new SessionConfigController(this);
-        settingsApplication = new ConfigSettingsApplication(configManager, sessionConfigController::applyRuntimeConfigFromSettings);
+        settingsApplication = new ConfigSettingsApplication(configManager, sessionConfigController::applySetting);
         symbolService = new SymbolService();
         taskService = new TaskService();
         fileWatcherService = new FileWatcherService();

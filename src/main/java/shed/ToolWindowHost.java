@@ -56,7 +56,7 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
                 tabs.setBounds(0, 0, getWidth(), getHeight());
                 Dimension actions = headerPanel.getPreferredSize();
                 headerPanel.setBounds(Math.max(0, getWidth() - actions.width), 0, actions.width,
-                    UiZoom.scale(40, editor.configManager.getUiZoom()));
+                    headerHeight());
             }
         };
         body.add(tabs, javax.swing.JLayeredPane.DEFAULT_LAYER);
@@ -201,17 +201,30 @@ final class ToolWindowHost extends JPanel implements AutoCloseable {
     }
 
     void refreshAppearance() {
-        int size = UiZoom.scale(40, editor.configManager.getUiZoom());
-        for (var action : headerPanel.getComponents()) action.setPreferredSize(new Dimension(size, size));
         headerPanel.setBackground(editor.configManager.getStatusBarBackground());
         tabs.setFont(editor.resolveUiFont());
+        int size = headerHeight();
+        for (var action : headerPanel.getComponents()) action.setPreferredSize(new Dimension(size, size));
         tabs.setUI(new WorkbenchStyle.TabsUI() {
             @Override protected java.awt.Insets getTabAreaInsets(int placement) {
-                return new java.awt.Insets(0, 0, 0, size * 2);
+                return new java.awt.Insets(0, 0, 0, headerHeight() * 2);
             }
         });
         for (ToolSurface surface : surfaces.values()) surface.refreshAppearance();
         for (ToolViewport view : presentations.values()) view.revalidate();
+    }
+
+    private int headerHeight() {
+        UiDensity density = editor.configManager.getUiDensity();
+        return density == UiDensity.DEFAULT ? UiZoom.scale(40, editor.configManager.getUiZoom())
+            : density.controlHeight(tabs.getFontMetrics(tabs.getFont()), editor.configManager.getUiZoom());
+    }
+
+    void refreshDensity() {
+        int size = headerHeight();
+        for (var action : headerPanel.getComponents()) action.setPreferredSize(new Dimension(size, size));
+        if (tabs.getUI() instanceof WorkbenchStyle.TabsUI ui) ui.refreshDensity();
+        revalidate(); repaint();
     }
 
     void refreshActive() {

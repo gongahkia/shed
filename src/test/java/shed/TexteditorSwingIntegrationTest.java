@@ -2501,6 +2501,220 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void densitySwitchesChromeWithoutReplacingSourceViewsOrChangingSelection() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("density-source-home"), Files.writeString(tempDir.resolve("density-source.md"), "# Heading\nक्ष é 😀 中文\nbody\n"));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.splitWindow(true);
+                FileBuffer buffer = editor.getCurrentBuffer();
+                buffer.getDocument().insertString(buffer.getDocument().getLength(), "x", null);
+                buffer.getUndoManager().undo(); assertTrue(buffer.getUndoManager().canRedo());
+                var snapshot = buffer.textSnapshot(); long revision = buffer.documentRevision();
+                var ui = editor.writingArea.getUI(); var view = ui.getRootView(editor.writingArea);
+                var font = editor.writingArea.getFont(); var background = editor.writingArea.getBackground();
+                boolean dirty = buffer.isModified(), undo = buffer.getUndoManager().canUndo();
+                editor.writingArea.setCaretPosition(20); editor.writingArea.moveCaretPosition(10);
+                var events = new java.util.concurrent.atomic.AtomicInteger();
+                buffer.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                    public void insertUpdate(javax.swing.event.DocumentEvent e) { events.incrementAndGet(); }
+                    public void removeUpdate(javax.swing.event.DocumentEvent e) { events.incrementAndGet(); }
+                    public void changedUpdate(javax.swing.event.DocumentEvent e) { events.incrementAndGet(); }
+                });
+                int defaultTabs = editor.openEditorsBar.getPreferredSize().height;
+                int defaultFooter = editor.statusBar.getPreferredSize().height;
+                for (String profile : List.of("plain", "vim", "emacs")) {
+                    editor.configManager.set("keymap.profile", profile);
+                    for (String value : List.of("compact", "comfortable", "default", "compact", "default")) {
+                        assertEquals("Density: " + value, editor.commandHandler.execute("density " + value));
+                        editor.validate();
+                        assertSame(ui, editor.writingArea.getUI()); assertSame(view, ui.getRootView(editor.writingArea));
+                        assertSame(snapshot, buffer.textSnapshot()); assertEquals(revision, buffer.documentRevision());
+                        assertEquals(dirty, buffer.isModified()); assertEquals(undo, buffer.getUndoManager().canUndo());
+                        assertEquals(10, editor.writingArea.getCaret().getDot()); assertEquals(20, editor.writingArea.getCaret().getMark());
+                        assertEquals(font, editor.writingArea.getFont()); assertEquals(background, editor.writingArea.getBackground());
+                        if (value.equals("compact")) { assertTrue(editor.openEditorsBar.getPreferredSize().height < defaultTabs); assertTrue(editor.statusBar.getPreferredSize().height < defaultFooter); }
+                        if (value.equals("comfortable")) { assertTrue(editor.openEditorsBar.getPreferredSize().height > defaultTabs); assertTrue(editor.statusBar.getPreferredSize().height > defaultFooter); }
+                        if (value.equals("default")) { assertEquals(defaultTabs, editor.openEditorsBar.getPreferredSize().height); assertEquals(defaultFooter, editor.statusBar.getPreferredSize().height); }
+                        var point = editor.writingArea.modelToView2D(10);
+                        assertEquals(10, editor.writingArea.viewToModel2D(new java.awt.geom.Point2D.Double(point.getX(), point.getCenterY())));
+                    }
+                }
+                assertEquals(0, events.get()); assertTrue(buffer.getUndoManager().canRedo());
+                buffer.getUndoManager().redo(); assertTrue(buffer.getContent().endsWith("x"));
+                buffer.getUndoManager().undo(); assertEquals("# Heading\nक्ष é 😀 中文\nbody\n", buffer.getContent());
+                assertTrue(editor.commandHandler.execute("density tiny").startsWith("Usage:"));
+                assertEquals(UiDensity.DEFAULT, editor.configManager.getUiDensity());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void densitySurvivesFocusAndThemePreviewWithoutChangingDensityOnRollback() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("density-modes-home"), Files.writeString(tempDir.resolve("density-modes.md"), "# Title\nbody\n"));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.commandHandler.execute("center on"); editor.commandHandler.execute("focus on");
+                boolean headerVisible = editor.workbenchHeader.isVisible();
+                ThemeGalleryDialog gallery = themeGallery(editor); selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme();
+                assertEquals("dracula", editor.configManager.getThemeId());
+                editor.commandHandler.execute("density comfortable");
+                assertEquals("dracula", editor.configManager.getThemeId());
+                assertEquals(headerVisible, editor.workbenchHeader.isVisible()); assertTrue(editor.goyoModeEnabled);
+                assertTrue(editor.focusModeController.isCenteredWriting());
+                gallery.cancelPreview(); assertEquals(UiDensity.COMFORTABLE, editor.configManager.getUiDensity());
+                assertEquals("shed-light", editor.configManager.getThemeId());
+                editor.commandHandler.execute("focus off"); assertEquals(UiDensity.COMFORTABLE, editor.configManager.getUiDensity());
+                assertTrue(editor.focusModeController.isCenteredWriting());
+                selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme();
+                descendants(gallery, javax.swing.JButton.class).stream().filter(b -> b.getText().equals("Apply and Save")).findFirst().orElseThrow().doClick();
+                assertEquals("dracula", editor.configManager.getThemeId()); assertEquals(UiDensity.COMFORTABLE, editor.configManager.getUiDensity());
+                gallery.dispose(); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void densitySynchronizesSharedPreferenceWindowsWithoutReplayingConfigOverLocalFonts() throws Exception {
+        assumeSwingAvailable(); Path home = tempDir.resolve("density-windows-home");
+        Texteditor first = createEditor(home, Files.writeString(tempDir.resolve("density-first.md"), "first"));
+        Texteditor second = null;
+        try {
+            second = createEditor(home, Files.writeString(tempDir.resolve("density-second.md"), "second"));
+            Texteditor other = second;
+            assertTrue(awaitUiState(() -> !first.stagedStartupPending && !other.stagedStartupPending));
+            onEdt(() -> {
+                other.configManager.set("font.size", "19"); other.sessionConfigController.applyRuntimeConfigFromSettings();
+                var ui = other.writingArea.getUI(); var root = ui.getRootView(other.writingArea);
+                first.commandHandler.execute("density compact");
+                assertEquals(UiDensity.COMPACT, first.configManager.getUiDensity());
+                assertEquals(UiDensity.COMPACT, other.configManager.getUiDensity());
+                other.sessionConfigController.reloadConfigIfChanged();
+                assertEquals(19, other.configManager.getFontSize());
+                assertSame(ui, other.writingArea.getUI()); assertSame(root, ui.getRootView(other.writingArea));
+                assertEquals("second", other.getCurrentBuffer().getContent());
+                return null;
+            });
+        } finally { disposeEditor(second); disposeEditor(first); }
+    }
+
+    @Test
+    void densityUpdatesTreeToolHeadersAndLivePickerRowsWithoutClippingLargeFonts() throws Exception {
+        assumeSwingAvailable(); Path root = Files.createDirectories(tempDir.resolve("density-tree"));
+        Path file = Files.writeString(root.resolve("source.md"), "# Body\ntext\n");
+        Texteditor editor = createEditor(tempDir.resolve("density-tree-home"), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                FileTreePanel tree = new FileTreePanel(editor, root.toFile(), f -> f.listFiles(), f -> { }, () -> { });
+                editor.getActivePane().setAlternateComponent(tree);
+                editor.toolWindowHost.showTab(ToolWindowHost.Tab.SEARCH); editor.validate();
+                var rows = descendants(tree, javax.swing.JTree.class).getFirst(); int original = rows.getRowHeight();
+                var tabs = descendants(editor.toolWindowHost, javax.swing.JTabbedPane.class).getFirst();
+                java.awt.Rectangle originalTab = tabs.getBoundsAt(0);
+                for (String density : List.of("compact", "comfortable", "default")) {
+                    editor.commandHandler.execute("density " + density); editor.validate();
+                    if (density.equals("compact")) assertTrue(rows.getRowHeight() < original);
+                    if (density.equals("comfortable")) assertTrue(rows.getRowHeight() > original);
+                    if (density.equals("default")) { assertEquals(original, rows.getRowHeight()); assertEquals(originalTab.height, tabs.getBoundsAt(0).height); }
+                }
+                editor.getActivePane().clearAlternateComponent();
+                var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+                var driver = new javax.swing.Timer(10, null);
+                var watchdog = new javax.swing.Timer(15000, event -> {
+                    failure.set(new AssertionError("Density picker did not complete"));
+                    for (Window window : editor.getOwnedWindows()) if (window instanceof javax.swing.JDialog dialog) dialog.dispose();
+                }); watchdog.setRepeats(false);
+                driver.addActionListener(event -> {
+                    var dialog = Arrays.stream(editor.getOwnedWindows()).filter(w -> w instanceof javax.swing.JDialog d && d.isShowing()
+                        && d.getTitle().equals("Command Palette")).map(w -> (javax.swing.JDialog) w).findFirst().orElse(null);
+                    if (dialog == null) return; driver.stop();
+                    try {
+                        var list = descendants(dialog, javax.swing.JList.class).getFirst();
+                        int defaultHeight = list.getFixedCellHeight(); var font = list.getFont();
+                        editor.commandHandler.execute("density compact"); assertTrue(list.getFixedCellHeight() < defaultHeight);
+                        assertEquals(font, list.getFont());
+                        editor.commandHandler.execute("density comfortable"); assertTrue(list.getFixedCellHeight() > defaultHeight);
+                        editor.commandHandler.execute("density default"); assertEquals(defaultHeight, list.getFixedCellHeight());
+                        list.setSelectedIndex(2); java.awt.Rectangle cell = list.getCellBounds(2, 2);
+                        assertEquals(2, list.locationToIndex(new java.awt.Point(cell.x + 5, cell.y + cell.height / 2)));
+                    } catch (Throwable error) { failure.set(error); }
+                    finally { dialog.dispose(); }
+                }); driver.start(); watchdog.start();
+                try { editor.showCommandPalette(); } finally { driver.stop(); watchdog.stop(); }
+                if (failure.get() != null) throw new AssertionError(failure.get());
+                for (double zoom : List.of(0.5, 1.0, 2.0)) {
+                    editor.configManager.set("ui.font.size", "24"); editor.configManager.set("ui.zoom", String.valueOf(zoom));
+                    editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                    var font = editor.writingArea.getFont();
+                    editor.commandHandler.execute("density compact");
+                    assertEquals(font, editor.writingArea.getFont());
+                    assertTrue(editor.openEditorsBar.getPreferredSize().height >= editor.resolveUiFont().getSize());
+                }
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void densityRestartAndSettingsUseTheSameSingleApplicationPreference() throws Exception {
+        assumeSwingAvailable(); Path home = tempDir.resolve("density-restart-home");
+        Path file = Files.writeString(tempDir.resolve("density-restart.md"), "body");
+        Texteditor first = createEditor(home, file);
+        try {
+            onEdt(() -> {
+                assertEquals("Density: compact", first.commandHandler.execute("density compact"));
+                first.sessionConfigController.applySessionUiSettings(java.util.Map.of("ui.density", "comfortable"));
+                assertEquals(UiDensity.COMPACT, first.configManager.getUiDensity()); return null;
+            });
+        } finally { disposeEditor(first); }
+        Texteditor reopened = createEditor(home, file);
+        try {
+            assertTrue(awaitUiState(() -> !reopened.stagedStartupPending));
+            onEdt(() -> {
+                assertEquals(UiDensity.COMPACT, reopened.configManager.getUiDensity());
+                SettingsEditorDialog.showFor(reopened);
+                var dialog = Arrays.stream(reopened.getOwnedWindows()).filter(w -> w instanceof SettingsEditorDialog && w.isDisplayable()).findFirst().orElseThrow();
+                var combo = descendants(dialog, javax.swing.JComboBox.class).stream()
+                    .filter(c -> "ui.density".equals(c.getClientProperty("shed.setting.key"))).findFirst().orElseThrow();
+                assertEquals(3, combo.getItemCount()); assertEquals("compact", combo.getSelectedItem());
+                combo.setSelectedItem("comfortable"); assertEquals(UiDensity.COMFORTABLE, reopened.configManager.getUiDensity());
+                dialog.dispose(); return null;
+            });
+        } finally { disposeEditor(reopened); }
+    }
+
+    @Test
+    void densityPreservesWrappedUnicodeHitTestingAndSourceViewAcrossResize() throws Exception {
+        assumeSwingAvailable(); String source = "क्ष é 😀 中文\t" + "word ".repeat(800) + "\nEOF";
+        Texteditor editor = createEditor(tempDir.resolve("density-wrap-home"), Files.writeString(tempDir.resolve("density-wrap.md"), source));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                var buffer = editor.getCurrentBuffer(); var snapshot = buffer.textSnapshot();
+                for (boolean wrap : List.of(false, true)) {
+                    editor.writingArea.setLineWrap(wrap); editor.writingArea.setWrapStyleWord(wrap);
+                    var ui = editor.writingArea.getUI(); var rootView = ui.getRootView(editor.writingArea);
+                    for (int width : List.of(720, 1200)) for (String density : List.of("compact", "comfortable", "default")) {
+                        editor.setSize(width, 760); editor.commandHandler.execute("density " + density); editor.validate();
+                        assertSame(ui, editor.writingArea.getUI()); assertSame(rootView, ui.getRootView(editor.writingArea));
+                        for (int offset : new int[]{0, 3, 4, 7, 10, source.indexOf("word")}) {
+                            var rectangle = editor.writingArea.modelToView2D(offset);
+                            assertEquals(offset, editor.writingArea.viewToModel2D(new java.awt.geom.Point2D.Double(rectangle.getX(), rectangle.getCenterY())), density + " offset " + offset);
+                        }
+                        assertSame(snapshot, buffer.textSnapshot()); assertEquals(source, buffer.getContent());
+                    }
+                }
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void liveThemePreviewCancelsWithoutSourceOrPreferenceChangesAcrossKeymapsAndSplits() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("preview-sources-home");

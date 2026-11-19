@@ -66,6 +66,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `ui.font.size` | `0` | int | UI font size; `0` uses the shared 13-point interface size |
 | `ui.open_editors.visible` | `true` | boolean | Show the open document strip with unsaved indicators and close controls. |
 | `ui.zoom` | `1.0` | number | Interface scale from `0.5` to `4.0`; `Ctrl/Cmd` + `+` or `-` adjusts it live and `Ctrl/Cmd` + `0` resets it |
+| `ui.density` | `default` | string | Application spacing preset: `compact`, `default`, or `comfortable`; independent of font zoom. `:density <preset>` saves it. Project/session overrides do not own this preference. |
 | `terminal.font.family` | `Monospaced` | string | Terminal font family; must resolve uniquely to a Java-installed family |
 | `terminal.font.size` | `14` | int | Terminal font size |
 | `terminal.default.profile` | `system` | string | Default terminal: `system` or a detected `builtin:<id>` profile |
@@ -481,6 +482,7 @@ schema_version = 1
 "ui.font.family" = ""
 "ui.font.size" = 0
 "ui.zoom" = 1.0
+"ui.density" = "default"
 "terminal.font.family" = "Monospaced"
 "terminal.font.size" = 14
 "terminal.default.profile" = "system"

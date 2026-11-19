@@ -43,7 +43,8 @@ final class OpenEditorsBar extends JPanel {
                 setBorder(BorderFactory.createCompoundBorder(
                     focused ? BorderFactory.createLineBorder(config.getFocusColor(), zoomLine)
                         : BorderFactory.createMatteBorder(0, 0, zoomLine, 0, selected ? config.getFocusColor() : getBackground()),
-                    BorderFactory.createEmptyBorder(0, UiZoom.scale(14, config.getUiZoom()), 0, UiZoom.scale(14, config.getUiZoom()))));
+                    BorderFactory.createEmptyBorder(0, UiZoom.scale(config.getUiDensity().tabHorizontal, config.getUiZoom()),
+                        0, UiZoom.scale(config.getUiDensity().tabHorizontal, config.getUiZoom()))));
                 return this;
             }
         });
@@ -91,10 +92,7 @@ final class OpenEditorsBar extends JPanel {
         } else {
             list.setFont(editor.resolveUiFont()); close.setFont(editor.resolveUiFont());
         }
-        int height = controlHeight();
-        list.setFixedCellHeight(height);
-        list.setFixedCellWidth(UiZoom.scale(220, editor.configManager.getUiZoom()));
-        close.setPreferredSize(new Dimension(height, height));
+        refreshDensity();
         setBackground(editor.configManager.getStatusBarBackground());
         list.setBackground(editor.configManager.getStatusBarBackground());
         list.setForeground(editor.configManager.getStatusBarForeground());
@@ -136,8 +134,15 @@ final class OpenEditorsBar extends JPanel {
     void focusEditors() { setVisible(true); refresh(); list.requestFocusInWindow(); }
 
     private int controlHeight() {
-        return Math.max(UiZoom.scale(40, editor.configManager.getUiZoom()),
-            list == null ? 0 : list.getFontMetrics(list.getFont()).getHeight() + UiZoom.scale(16, editor.configManager.getUiZoom()));
+        return editor.configManager.getUiDensity().controlHeight(list.getFontMetrics(list.getFont()), editor.configManager.getUiZoom());
+    }
+
+    void refreshDensity() {
+        int height = controlHeight();
+        list.setFixedCellHeight(height);
+        list.setFixedCellWidth(UiZoom.scale(editor.configManager.getUiDensity().editorTabWidth, editor.configManager.getUiZoom()));
+        close.setPreferredSize(new Dimension(height, height));
+        revalidate(); repaint();
     }
 
     void closeSelected() {

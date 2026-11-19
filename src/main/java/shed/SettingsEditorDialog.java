@@ -380,6 +380,7 @@ final class SettingsEditorDialog extends JDialog {
             case "ui.font.family" -> "Interface font";
             case "ui.font.size" -> "Interface font size";
             case "ui.zoom" -> "Interface scale";
+            case "ui.density" -> "Interface density";
             case "keymap.profile" -> "Keyboard profile";
             default -> {
                 String words = key.replace('.', ' ').replace('_', ' ');

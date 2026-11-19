@@ -1,0 +1,145 @@
+{
+  "scope": "Only new 8E.1 opt-in diagnostics, admission tests, report and evidence. No production changes. Inventory/checksum self hashes excluded.",
+  "files": [
+    {
+      "file": "src/benchmark/native/SystemAppearanceObserver.m",
+      "bytes": 3789,
+      "sha256": "cd077235f9ea36f8b703c9475feb7ceb8f18f307ddbb37cd62595e34fd4d18c5"
+    },
+    {
+      "file": "src/benchmark/java/shed/SystemAppearanceAwtProbe.java",
+      "bytes": 7067,
+      "sha256": "2fe1ef5efa094b9c9a0110c84a53fa0a339981e713bc12705e82c1bf82407e04"
+    },
+    {
+      "file": "scripts/qualify-system-appearance.py",
+      "bytes": 13806,
+      "sha256": "6bebf173ac00133802226c9835f76e8127318d1c5e7d05fb1887abfea6b895fa"
+    },
+    {
+      "file": "scripts/test_system_appearance_tooling.py",
+      "bytes": 2969,
+      "sha256": "fd60f4ed93b80c5528e654653098cf4b2fd632204751eb600422dfa4b5c9c35d"
+    },
+    {
+      "file": "docs/SYSTEM_APPEARANCE_FEASIBILITY.md",
+      "bytes": 20631,
+      "sha256": "7623eeadc4ffceab9d159b0400e877cf5eb17dae31bffcc139ebc28b0c81a41f"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/INDEX.md",
+      "bytes": 4177,
+      "sha256": "7968107907ace3f1c557e2527e807c5f680ac5c3f6cbc3b364020d07d53cbc02"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/baseline.json.gz",
+      "bytes": 75699,
+      "sha256": "4c45db16c1f820701831a35f7a7d6809dd43fde20a4c96d2163b7b93a110b22b"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/environment.json",
+      "bytes": 6096,
+      "sha256": "645e2b5ccbcdba518e9ff3cc30b570752a1b1376e38172f072ce78695532a9aa"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/focused.log.gz",
+      "bytes": 32,
+      "sha256": "6490c31e67ddd5eab4ecef2d023535ca3df72e1f9f82bed9754f9c59fffcbb4c"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/full-results.json",
+      "bytes": 2770,
+      "sha256": "4d21826d7c265b644fbef7c0c789b8454352b47d02796a987436adaa1102d2c8"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/full-tests.log.gz",
+      "bytes": 5724,
+      "sha256": "944055bd93e724060d98553820a20006da5ec138cfb94715f685bbb0817be43f"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/java-build-final.log.gz",
+      "bytes": 41,
+      "sha256": "5fe56a8936a62bb229d0a732e710e90f3efb441c02e3057a838c236798995ce9"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/java-build.log.gz",
+      "bytes": 261,
+      "sha256": "e23cd89c495bd55393185be9dadc9e0fcd7a0ed1d8bc94e9546b65d31a3d5f0e"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/java-default-dark.log.gz",
+      "bytes": 430,
+      "sha256": "7f88a13745faec1f7f87353d9881d0c5922438c4be9561dec2cf916841c2c52c"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/java-default-light.log.gz",
+      "bytes": 603,
+      "sha256": "4228cdcf3ac1dc843ef621e38021716cc7d865c33a33e04f1e9a922aa5b3844e"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/java-initial-final.log.gz",
+      "bytes": 390,
+      "sha256": "bbdd4b57c1ca86bac338e3c4e6c5bd6fa6f433e0bca15c99c84009de4d6e0372"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/java-system-dark.log.gz",
+      "bytes": 431,
+      "sha256": "a894c5d0dafc6126209982d73c9456255c6237dd5445309a9470d5a070b1104c"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/java-system-light.log.gz",
+      "bytes": 577,
+      "sha256": "ea8c85cd375da8c68e03e75727de409e84a7e353926b1883c4217c99c591e17b"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/jdk-source-audit.json",
+      "bytes": 4249,
+      "sha256": "f840ea2b84ba1b224bde77d4b4fb444c758ed9db0299c980554b47e8ad22d843"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/native-build.log.gz",
+      "bytes": 37,
+      "sha256": "859bd377e26152f9c510931a05ca71ef3ef2a0190a07f8f564a7b2ee7a1a34a3"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/native.log.gz",
+      "bytes": 547,
+      "sha256": "d6edae6fbc0a2d8fe5de26343f1aec809de911972aeff16a67ba7895a5234da4"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/packaged-smoke.json",
+      "bytes": 7327,
+      "sha256": "482744c5a851d5ac488d05a0e81067722ced0fbb679a6e62b9759c0958f72278"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/preservation.json",
+      "bytes": 795,
+      "sha256": "e57e1a383f3b2eb30ea08e7315c0f3562bddb5202624c97cd7e1fdf06fc5b7e0"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/runtime-report.json.gz",
+      "bytes": 5662,
+      "sha256": "d211046e9ab92eefff54bcb7b5ed25dfd208e80585731b87df48b68a6cb178d3"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/runtime.log.gz",
+      "bytes": 99,
+      "sha256": "065199ed8f33202c61177cc57e20bddc263a93c3ce1234c0685d9e80f4b333e7"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/summary.json",
+      "bytes": 18554,
+      "sha256": "e51dbcfb6fcaee8bde74e6794fa69b1c48c91508abc771744bbbf682a6d471be"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/tooling-final.log.gz",
+      "bytes": 74,
+      "sha256": "fe03f9e34077be4361dfd2502829d4ac1bb0a0a9dcb823c5fa3bf7e0d14a7400"
+    },
+    {
+      "file": "docs/performance/appearance-tranche8e1/verification.json",
+      "bytes": 4742,
+      "sha256": "6966f47b36643632e03e330a26f848732e11661d06db979ff61a03d9d780421a"
+    }
+  ]
+}

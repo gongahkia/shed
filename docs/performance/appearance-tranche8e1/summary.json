@@ -1,0 +1,645 @@
+{
+  "verdict": "NO-GO for automatic following within the existing native appearance constraints; verified 8E previews preserved",
+  "actual_os_transitions": 8,
+  "positive_unpinned_native_os_events": 6,
+  "request_to_native_kvo_ms": [
+    214.74609375,
+    208.083251953125,
+    151.586669921875,
+    198.596923828125,
+    140.205078125,
+    118.18115234375
+  ],
+  "original_dark": false,
+  "restored_dark": false,
+  "original_auto": null,
+  "restored_auto": null,
+  "restored": true,
+  "children": [
+    {
+      "label": "java-system-dark",
+      "exit": 0,
+      "native_statuses": [
+        {
+          "request": "initial",
+          "effective": "NSAppearanceNameDarkAqua",
+          "explicit": "nil",
+          "system_property": "system",
+          "desktop_property": "null",
+          "native_read_ms": 188.097333,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "return-to-light",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "nil",
+          "system_property": "system",
+          "desktop_property": "null",
+          "native_read_ms": 0.44075,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        }
+      ],
+      "java_property_events": [
+        {
+          "event": "java_property",
+          "epoch_ms": 1795070880249,
+          "edt": true,
+          "value": "java.awt.Font[family=Lucida Grande,name=Lucida Grande,style=plain,size=13]",
+          "name": "font"
+        },
+        {
+          "event": "java_property",
+          "epoch_ms": 1795070880251,
+          "edt": true,
+          "value": "java.awt.SystemColor[i=9]",
+          "name": "foreground"
+        }
+      ],
+      "sampled_rss_mib_range": [
+        551.421875,
+        561.875
+      ],
+      "rss_sample_count": 2
+    },
+    {
+      "label": "java-default-dark",
+      "exit": 0,
+      "native_statuses": [
+        {
+          "request": "initial",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "NSAppearanceNameAqua",
+          "system_property": "unset",
+          "desktop_property": "null",
+          "native_read_ms": 190.724333,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "return-to-light",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "NSAppearanceNameAqua",
+          "system_property": "unset",
+          "desktop_property": "null",
+          "native_read_ms": 0.548583,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        }
+      ],
+      "java_property_events": [
+        {
+          "event": "java_property",
+          "epoch_ms": 1795070878595,
+          "edt": true,
+          "name": "font",
+          "value": "java.awt.Font[family=Lucida Grande,name=Lucida Grande,style=plain,size=13]"
+        },
+        {
+          "event": "java_property",
+          "epoch_ms": 1795070878597,
+          "edt": true,
+          "name": "foreground",
+          "value": "java.awt.SystemColor[i=9]"
+        }
+      ],
+      "sampled_rss_mib_range": [
+        552.578125,
+        560.625
+      ],
+      "rss_sample_count": 2
+    },
+    {
+      "label": "java-system-light",
+      "exit": 0,
+      "native_statuses": [
+        {
+          "request": "initial",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "nil",
+          "system_property": "system",
+          "desktop_property": "null",
+          "native_read_ms": 190.985417,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "follow-0",
+          "effective": "NSAppearanceNameDarkAqua",
+          "explicit": "nil",
+          "system_property": "system",
+          "desktop_property": "null",
+          "native_read_ms": 0.509209,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "follow-1",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "nil",
+          "system_property": "system",
+          "desktop_property": "null",
+          "native_read_ms": 0.437084,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "follow-2",
+          "effective": "NSAppearanceNameDarkAqua",
+          "explicit": "nil",
+          "system_property": "system",
+          "desktop_property": "null",
+          "native_read_ms": 0.360084,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "follow-3",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "nil",
+          "system_property": "system",
+          "desktop_property": "null",
+          "native_read_ms": 0.36875,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "pinned-native-during-dark",
+          "effective": "NSAppearanceNameDarkAqua",
+          "explicit": "nil",
+          "system_property": "system",
+          "desktop_property": "null",
+          "native_read_ms": 0.417875,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "unregistered-during-light",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "nil",
+          "system_property": "system",
+          "desktop_property": "null",
+          "native_read_ms": 0.366334,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "reopen",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "nil",
+          "system_property": "system",
+          "desktop_property": "null",
+          "native_read_ms": 9.631708,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        }
+      ],
+      "java_property_events": [
+        {
+          "event": "java_property",
+          "epoch_ms": 1795070873328,
+          "edt": true,
+          "value": "java.awt.Font[family=Lucida Grande,name=Lucida Grande,style=plain,size=13]",
+          "name": "font"
+        },
+        {
+          "event": "java_property",
+          "epoch_ms": 1795070873330,
+          "edt": true,
+          "value": "java.awt.SystemColor[i=9]",
+          "name": "foreground"
+        },
+        {
+          "event": "java_property",
+          "epoch_ms": 1795070876268,
+          "edt": true,
+          "value": "java.awt.Font[family=Lucida Grande,name=Lucida Grande,style=plain,size=13]",
+          "name": "font"
+        },
+        {
+          "event": "java_property",
+          "epoch_ms": 1795070876268,
+          "edt": true,
+          "value": "java.awt.SystemColor[i=9]",
+          "name": "foreground"
+        }
+      ],
+      "sampled_rss_mib_range": [
+        551.453125,
+        562.453125
+      ],
+      "rss_sample_count": 7
+    },
+    {
+      "label": "java-default-light",
+      "exit": 0,
+      "native_statuses": [
+        {
+          "request": "initial",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "NSAppearanceNameAqua",
+          "system_property": "unset",
+          "desktop_property": "null",
+          "native_read_ms": 206.890583,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "follow-0",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "NSAppearanceNameAqua",
+          "system_property": "unset",
+          "desktop_property": "null",
+          "native_read_ms": 0.769209,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "follow-1",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "NSAppearanceNameAqua",
+          "system_property": "unset",
+          "desktop_property": "null",
+          "native_read_ms": 0.601667,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "follow-2",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "NSAppearanceNameAqua",
+          "system_property": "unset",
+          "desktop_property": "null",
+          "native_read_ms": 0.430667,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "follow-3",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "NSAppearanceNameAqua",
+          "system_property": "unset",
+          "desktop_property": "null",
+          "native_read_ms": 0.405541,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "pinned-native-during-dark",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "NSAppearanceNameAqua",
+          "system_property": "unset",
+          "desktop_property": "null",
+          "native_read_ms": 63.131167,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "unregistered-during-light",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "NSAppearanceNameAqua",
+          "system_property": "unset",
+          "desktop_property": "null",
+          "native_read_ms": 0.433791,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "property-system",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "NSAppearanceNameAqua",
+          "system_property": "system",
+          "desktop_property": "null",
+          "native_read_ms": 0.533083,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        },
+        {
+          "request": "reopen",
+          "effective": "NSAppearanceNameAqua",
+          "explicit": "NSAppearanceNameAqua",
+          "system_property": "system",
+          "desktop_property": "null",
+          "native_read_ms": 7.598625,
+          "used_mib": 15.031745910644531,
+          "committed_mib": 66.0,
+          "appkit_main_thread": true
+        }
+      ],
+      "java_property_events": [
+        {
+          "event": "java_property",
+          "epoch_ms": 1795070871639,
+          "edt": true,
+          "name": "font",
+          "value": "java.awt.Font[family=Lucida Grande,name=Lucida Grande,style=plain,size=13]"
+        },
+        {
+          "event": "java_property",
+          "epoch_ms": 1795070871640,
+          "edt": true,
+          "name": "foreground",
+          "value": "java.awt.SystemColor[i=9]"
+        },
+        {
+          "event": "java_property",
+          "epoch_ms": 1795070876198,
+          "edt": true,
+          "name": "font",
+          "value": "java.awt.Font[family=Lucida Grande,name=Lucida Grande,style=plain,size=13]"
+        },
+        {
+          "event": "java_property",
+          "epoch_ms": 1795070876198,
+          "edt": true,
+          "name": "foreground",
+          "value": "java.awt.SystemColor[i=9]"
+        }
+      ],
+      "sampled_rss_mib_range": [
+        551.015625,
+        559.546875
+      ],
+      "rss_sample_count": 7
+    },
+    {
+      "label": "native",
+      "exit": 0,
+      "native_statuses": [],
+      "java_property_events": [],
+      "sampled_rss_mib_range": [
+        29.96875,
+        31.484375
+      ],
+      "rss_sample_count": 10
+    }
+  ],
+  "native_events": [
+    {
+      "event": "appearance",
+      "effective": "NSAppearanceNameAqua",
+      "request": "startup",
+      "epoch_ms": 1795070869820.586,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 1
+    },
+    {
+      "event": "registered",
+      "effective": "NSAppearanceNameAqua",
+      "request": "startup",
+      "epoch_ms": 1795070869820.683,
+      "explicit": "nil",
+      "registration_ms": 0.151291664224118,
+      "main_thread": true,
+      "callbacks": 1
+    },
+    {
+      "event": "ready",
+      "effective": "NSAppearanceNameAqua",
+      "request": "startup",
+      "epoch_ms": 1795070869820.693,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 1
+    },
+    {
+      "event": "appearance",
+      "effective": "NSAppearanceNameDarkAqua",
+      "request": "startup",
+      "epoch_ms": 1795070873806.265,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 2
+    },
+    {
+      "event": "appearance",
+      "effective": "NSAppearanceNameAqua",
+      "request": "startup",
+      "epoch_ms": 1795070874401.3992,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 3
+    },
+    {
+      "event": "appearance",
+      "effective": "NSAppearanceNameDarkAqua",
+      "request": "startup",
+      "epoch_ms": 1795070874748.9429,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 4
+    },
+    {
+      "event": "appearance",
+      "effective": "NSAppearanceNameAqua",
+      "request": "startup",
+      "epoch_ms": 1795070875157.051,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 5
+    },
+    {
+      "event": "appearance",
+      "effective": "NSAppearanceNameAqua",
+      "request": "pin-light",
+      "epoch_ms": 1795070875323.9941,
+      "explicit": "NSAppearanceNameAqua",
+      "main_thread": true,
+      "callbacks": 6
+    },
+    {
+      "observing": true,
+      "event": "ack",
+      "effective": "NSAppearanceNameAqua",
+      "request": "pin-light",
+      "epoch_ms": 1795070875324.017,
+      "explicit": "NSAppearanceNameAqua",
+      "main_thread": true,
+      "callbacks": 6
+    },
+    {
+      "event": "appearance",
+      "effective": "NSAppearanceNameAqua",
+      "request": "pin-light",
+      "epoch_ms": 1795070875469.419,
+      "explicit": "NSAppearanceNameAqua",
+      "main_thread": true,
+      "callbacks": 7
+    },
+    {
+      "observing": true,
+      "event": "ack",
+      "effective": "NSAppearanceNameAqua",
+      "request": "pinned-status",
+      "epoch_ms": 1795070875758.622,
+      "explicit": "NSAppearanceNameAqua",
+      "main_thread": true,
+      "callbacks": 7
+    },
+    {
+      "event": "unregistered",
+      "effective": "NSAppearanceNameAqua",
+      "request": "unregister",
+      "epoch_ms": 1795070875758.786,
+      "explicit": "NSAppearanceNameAqua",
+      "main_thread": true,
+      "callbacks": 7
+    },
+    {
+      "observing": false,
+      "event": "ack",
+      "effective": "NSAppearanceNameAqua",
+      "request": "unregister",
+      "epoch_ms": 1795070875758.798,
+      "explicit": "NSAppearanceNameAqua",
+      "main_thread": true,
+      "callbacks": 7
+    },
+    {
+      "observing": false,
+      "event": "ack",
+      "effective": "NSAppearanceNameAqua",
+      "request": "unregistered-status",
+      "epoch_ms": 1795070876177.386,
+      "explicit": "NSAppearanceNameAqua",
+      "main_thread": true,
+      "callbacks": 7
+    },
+    {
+      "observing": false,
+      "event": "ack",
+      "effective": "NSAppearanceNameAqua",
+      "request": "follow",
+      "epoch_ms": 1795070876177.5432,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 7
+    },
+    {
+      "event": "appearance",
+      "effective": "NSAppearanceNameAqua",
+      "request": "register",
+      "epoch_ms": 1795070876177.6072,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 8
+    },
+    {
+      "event": "registered",
+      "effective": "NSAppearanceNameAqua",
+      "request": "register",
+      "epoch_ms": 1795070876177.6199,
+      "explicit": "nil",
+      "registration_ms": 0.017791666323319077,
+      "main_thread": true,
+      "callbacks": 8
+    },
+    {
+      "observing": true,
+      "event": "ack",
+      "effective": "NSAppearanceNameAqua",
+      "request": "register",
+      "epoch_ms": 1795070876177.625,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 8
+    },
+    {
+      "event": "already_registered",
+      "effective": "NSAppearanceNameAqua",
+      "request": "register",
+      "epoch_ms": 1795070876177.682,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 8
+    },
+    {
+      "observing": true,
+      "event": "ack",
+      "effective": "NSAppearanceNameAqua",
+      "request": "register",
+      "epoch_ms": 1795070876177.6873,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 8
+    },
+    {
+      "event": "appearance",
+      "effective": "NSAppearanceNameDarkAqua",
+      "request": "register",
+      "epoch_ms": 1795070876947.27,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 9
+    },
+    {
+      "event": "appearance",
+      "effective": "NSAppearanceNameAqua",
+      "request": "register",
+      "epoch_ms": 1795070880625.705,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 10
+    },
+    {
+      "event": "unregistered",
+      "effective": "NSAppearanceNameAqua",
+      "request": "unregister",
+      "epoch_ms": 1795070880908.835,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 10
+    },
+    {
+      "observing": false,
+      "event": "ack",
+      "effective": "NSAppearanceNameAqua",
+      "request": "unregister",
+      "epoch_ms": 1795070880908.858,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 10
+    },
+    {
+      "event": "unregistered",
+      "effective": "NSAppearanceNameAqua",
+      "request": "exit",
+      "epoch_ms": 1795070881631.804,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 10
+    },
+    {
+      "event": "exit",
+      "effective": "NSAppearanceNameAqua",
+      "request": "exit",
+      "epoch_ms": 1795070881631.86,
+      "explicit": "nil",
+      "main_thread": true,
+      "callbacks": 10
+    }
+  ],
+  "limitations": "RSS samples are checkpoint observations, not settled/peak qualification. Java native reads are commanded diagnostics, not OS-event delivery. No production adapter was installed."
+}

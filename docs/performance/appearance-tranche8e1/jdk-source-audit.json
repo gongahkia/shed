@@ -1,0 +1,204 @@
+[
+  {
+    "url": "https://raw.githubusercontent.com/openjdk/jdk21u/jdk-21.0.13-ga/src/java.desktop/macosx/native/libosxapp/NSApplicationAWT.m",
+    "sha256": "bb73de8609ddb45efa00a6311cb7071c5bd786af57a1d6a9889787448984a130",
+    "matches": [
+      {
+        "line": 92,
+        "matching_tokens": [
+          "appearance"
+        ]
+      },
+      {
+        "line": 93,
+        "matching_tokens": [
+          "appearance"
+        ]
+      },
+      {
+        "line": 94,
+        "matching_tokens": [
+          "appearance"
+        ]
+      },
+      {
+        "line": 95,
+        "matching_tokens": [
+          "appearance"
+        ]
+      },
+      {
+        "line": 97,
+        "matching_tokens": [
+          "appearance"
+        ]
+      },
+      {
+        "line": 99,
+        "matching_tokens": [
+          "appearance"
+        ]
+      },
+      {
+        "line": 100,
+        "matching_tokens": [
+          "appearance"
+        ]
+      },
+      {
+        "line": 101,
+        "matching_tokens": [
+          "appearance"
+        ]
+      },
+      {
+        "line": 103,
+        "matching_tokens": [
+          "appearance"
+        ]
+      },
+      {
+        "line": 106,
+        "matching_tokens": [
+          "appearance"
+        ]
+      },
+      {
+        "line": 107,
+        "matching_tokens": [
+          "appearance"
+        ]
+      }
+    ]
+  },
+  {
+    "url": "https://raw.githubusercontent.com/openjdk/jdk21u/jdk-21.0.13-ga/src/java.desktop/macosx/native/libawt_lwawt/awt/LWCToolkit.m",
+    "sha256": "fe8df7b8b1bbf1bd02affb3d4f6bf9ca798d6a4fa3f94ff9e90733748bf417f2",
+    "matches": []
+  },
+  {
+    "url": "https://raw.githubusercontent.com/openjdk/jdk21u/jdk-21.0.13-ga/src/java.desktop/macosx/native/libawt_lwawt/awt/ApplicationDelegate.m",
+    "sha256": "b778c015b54e8f781a64fb2ba1b6f3d2ac1662909f179c002a74ad2597f19c51",
+    "matches": []
+  },
+  {
+    "url": "https://raw.githubusercontent.com/openjdk/jdk21u/jdk-21.0.13-ga/src/java.desktop/macosx/native/libawt_lwawt/awt/CSystemColors.m",
+    "sha256": "f5e5f7a3b6ed8e282de244ef5024f5ea2706c4ad5b8001ddbe32daca236e3d17",
+    "matches": [
+      {
+        "line": 59,
+        "matching_tokens": [
+          "systemcolorschanged"
+        ]
+      },
+      {
+        "line": 60,
+        "matching_tokens": [
+          "systemcolorschanged"
+        ]
+      }
+    ]
+  },
+  {
+    "url": "https://raw.githubusercontent.com/openjdk/jdk21u/jdk-21.0.13-ga/src/java.desktop/macosx/classes/sun/lwawt/macosx/LWCToolkit.java",
+    "sha256": "523b7530c4f8283d61515ecb944a6c5ea2a6d7aa2d91a1e14705d8d59721df81",
+    "matches": [
+      {
+        "line": 258,
+        "matching_tokens": [
+          "systemcolorschanged"
+        ]
+      },
+      {
+        "line": 450,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 451,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 454,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 455,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 456,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 460,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 461,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 462,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 464,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 467,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 468,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 469,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 470,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 471,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      },
+      {
+        "line": 472,
+        "matching_tokens": [
+          "desktoppropert"
+        ]
+      }
+    ]
+  }
+]

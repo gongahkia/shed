@@ -1,0 +1,73 @@
+{
+  "full_maven": {
+    "command": "\"$MVN\" test",
+    "exit": 0,
+    "tests": 1592,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 5,
+    "passed": 1587,
+    "skips": [
+      {
+        "class": "shed.DataLossRegressionTest",
+        "test": "atomicSavePreservesDosHiddenAttributeWhenSupported",
+        "reason": "",
+        "details": "org.opentest4j.TestAbortedException: Assumption failed: DOS file attributes unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.DataLossRegressionTest.atomicSavePreservesDosHiddenAttributeWhenSupported(DataLossRegressionTest.java:196)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+      },
+      {
+        "class": "shed.FocusedAiPerformanceTest",
+        "test": "measurePreviewPreparationPaintingAndDismissalAcrossBufferSizes",
+        "reason": "System property [shed.ai.benchmark] does not exist",
+        "details": ""
+      },
+      {
+        "class": "shed.TerminalShellIntegrationTest",
+        "test": "preparesAnIsolatedFishStartup",
+        "reason": "",
+        "details": "org.opentest4j.TestAbortedException: Assumption failed: Fish is unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.TerminalShellIntegrationTest.preparesAnIsolatedFishStartup(TerminalShellIntegrationTest.java:48)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+      },
+      {
+        "class": "shed.TexteditorSwingIntegrationTest",
+        "test": "testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree",
+        "reason": "",
+        "details": "org.opentest4j.TestAbortedException: Assumption failed: CMake, CTest, and CPack are unavailable\n\tat org.junit.jupiter.api.Assumptions.throwAssumptionFailed(Assumptions.java:316)\n\tat org.junit.jupiter.api.Assumptions.assumeTrue(Assumptions.java:115)\n\tat shed.TexteditorSwingIntegrationTest.testExplorerUsesAnExplicitCtestPresetWithoutGuessingABuildTree(TexteditorSwingIntegrationTest.java:4292)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n\tat java.base/java.util.ArrayList.forEach(ArrayList.java:1596)\n"
+      },
+      {
+        "class": "shed.FocusedAiNativeAcceptanceTest",
+        "test": "actualEditorAcceptsAcpSuggestionsAndRendersWrappedMultilinePreviews",
+        "reason": "System property [shed.ai.native] does not exist",
+        "details": ""
+      }
+    ]
+  },
+  "focused": {
+    "command": "\"$MVN\" -q \"-Dtest=ConfigManagerTest,ThemePreviewTest,TexteditorSwingIntegrationTest#liveThemePreview*+livePreviewCancellation*+galleryAcceptance*+openingAnotherWorkbench*+savingSettingsDuringPreview*+gallerySaveFailure*+themeGallerySaves*\" test",
+    "exit": 0,
+    "tests": 70,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "tooling": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_*.py'",
+    "passed": 41,
+    "exit": 0
+  },
+  "runtime": {
+    "command": "python3 scripts/qualify-system-appearance.py --execute-transitions --output /tmp/shed-tranche8e1-run/runtime",
+    "exit": 0,
+    "state": "MEASUREMENTS_COMPLETE",
+    "restored": true,
+    "child_processes": 5
+  },
+  "smoke": {
+    "command": "python3 scripts/test-packaged-markdown.py --jar target/shed-2.0.0.jar --output /tmp/shed-tranche8e1-run/packaged-smoke.json",
+    "exit": 0,
+    "state": "PASS"
+  },
+  "diagnostic_setup_failures": [
+    "Initial JDK source path for NSApplicationAWT.m returned 404; corrected from libawt_lwawt to libosxapp. JBS page access returned 403; pinned OpenJDK native sources and actual runtime were used instead.",
+    "Initial Java diagnostic compilation used nonexistent JNA Function.invokeByte. Corrected to Function.invoke(byte.class, ...); successful real-transition run compiled the corrected probe. No production change or assertion weakening."
+  ],
+  "post_runtime_tooling_changes": "Added failed-readiness child cleanup, scrubbed ambient JVM override variables (none were present in measured run), and checked child exit statuses. Native and Java probe source hashes still match the measured compiled sources. Owned-child startup failure cleanup is covered by a disposable Python child test; no OS appearance event was mocked."
+}

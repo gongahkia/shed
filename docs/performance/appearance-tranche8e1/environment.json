@@ -1,0 +1,66 @@
+{
+  "before": {
+    "utc": "2026-11-19T06:47:48Z",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "load": [
+      4.51611328125,
+      5.90673828125,
+      5.23095703125
+    ],
+    "cpu_count": 8,
+    "hardware": {
+      "exit": 0,
+      "text": "hw.model: Mac15,12\nhw.memsize: 17179869184\nhw.ncpu: 8\nmachdep.cpu.brand_string: Apple M3"
+    },
+    "pressure": {
+      "exit": 0,
+      "text": "The system has 17179869184 (1048576 pages with a page size of 16384).\nSystem-wide memory free percentage: 57%"
+    },
+    "swap": {
+      "exit": 0,
+      "text": "vm.swapusage: total = 2048.00M  used = 1087.50M  free = 960.50M  (encrypted)"
+    },
+    "vm_stat": {
+      "exit": 0,
+      "text": "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                    69604.\nPages active:                                 253179.\nPages inactive:                               222315.\nPages speculative:                             32489.\nPages throttled:                                   0.\nPages wired down:                             134285.\nPages purgeable:                                6418.\n\"Translation faults\":                     1798335193.\nPages copy-on-write:                        74755263.\nPages zero filled:                        1162620723.\nPages reactivated:                          64489563.\nPages purged:                                6652589.\nFile-backed pages:                            220370.\nAnonymous pages:                              287613.\nPages stored in compressor:                   677484.\nPages occupied by compressor:                 299191.\nDecompressions:                             38961769.\nCompressions:                               53122818.\nPageins:                                    37294406.\nPageouts:                                     276577.\nSwapins:                                      197309.\nSwapouts:                                     324791."
+    },
+    "display": {
+      "exit": 0,
+      "text": "Graphics/Displays:\n\n    Apple M3:\n\n      Chipset Model: Apple M3\n      Type: GPU\n      Bus: Built-In\n      Total Number of Cores: 10\n      Vendor: Apple (0x106b)\n      Metal Support: Metal 4\n      Displays:\n        Color LCD:\n          Display Type: Built-in Liquid Retina Display\n          Resolution: 2560 x 1664 Retina\n          Main Display: Yes\n          Mirror: Off\n          Online: Yes\n          Automatically Adjust Brightness: Yes\n          Connection Type: Internal\n        DELL P2425HE:\n          Resolution: 1920 x 1080 (1080p FHD - Full High Definition)\n          UI Looks like: 1920 x 1080 @ 100.00Hz\n          Mirror: Off\n          Online: Yes\n          Rotation: Supported"
+    }
+  },
+  "after": {
+    "utc": "2026-11-19T06:48:01Z",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "load": [
+      4.5546875,
+      5.845703125,
+      5.220703125
+    ],
+    "cpu_count": 8,
+    "hardware": {
+      "exit": 0,
+      "text": "hw.model: Mac15,12\nhw.memsize: 17179869184\nhw.ncpu: 8\nmachdep.cpu.brand_string: Apple M3"
+    },
+    "pressure": {
+      "exit": 0,
+      "text": "The system has 17179869184 (1048576 pages with a page size of 16384).\nSystem-wide memory free percentage: 51%"
+    },
+    "swap": {
+      "exit": 0,
+      "text": "vm.swapusage: total = 2048.00M  used = 1063.50M  free = 984.50M  (encrypted)"
+    },
+    "vm_stat": {
+      "exit": 0,
+      "text": "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                    44805.\nPages active:                                 238503.\nPages inactive:                               235467.\nPages speculative:                              3200.\nPages throttled:                                   0.\nPages wired down:                             185307.\nPages purgeable:                                8833.\n\"Translation faults\":                     1798881541.\nPages copy-on-write:                        74774599.\nPages zero filled:                        1162935012.\nPages reactivated:                          64547948.\nPages purged:                                6652656.\nFile-backed pages:                            176755.\nAnonymous pages:                              300415.\nPages stored in compressor:                   675802.\nPages occupied by compressor:                 303943.\nDecompressions:                             38990556.\nCompressions:                               53166107.\nPageins:                                    37319486.\nPageouts:                                     276746.\nSwapins:                                      198339.\nSwapouts:                                     324791."
+    },
+    "display": {
+      "exit": 0,
+      "text": "Graphics/Displays:\n\n    Apple M3:\n\n      Chipset Model: Apple M3\n      Type: GPU\n      Bus: Built-In\n      Total Number of Cores: 10\n      Vendor: Apple (0x106b)\n      Metal Support: Metal 4\n      Displays:\n        Color LCD:\n          Display Type: Built-in Liquid Retina Display\n          Resolution: 2560 x 1664 Retina\n          Main Display: Yes\n          Mirror: Off\n          Online: Yes\n          Automatically Adjust Brightness: Yes\n          Connection Type: Internal\n        DELL P2425HE:\n          Resolution: 1920 x 1080 (1080p FHD - Full High Definition)\n          UI Looks like: 1920 x 1080 @ 100.00Hz\n          Mirror: Off\n          Online: Yes\n          Rotation: Supported"
+    }
+  },
+  "java_version": "openjdk version \"21.0.13\" 2026-10-20 LTS\nOpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.13+9 (build 21.0.13+9-LTS, mixed mode, sharing)\n",
+  "jdk_upstream_source_tag": "jdk-21.0.13-ga",
+  "jar_sha256": "64c07ac73d9663d39d79450fdce800253134d518e0896fe4283cd1bcb554fc80",
+  "clang_version": "Apple clang version 21.0.0 (clang-2100.1.1.101)\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n"
+}

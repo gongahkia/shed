@@ -1,0 +1,14 @@
+{
+  "head_before": "bc2438d4b5881a451f64b28c23846eb99b160190",
+  "head_after": "bc2438d4b5881a451f64b28c23846eb99b160190",
+  "status_before": "",
+  "status_after": "?? docs/SYSTEM_APPEARANCE_FEASIBILITY.md\n?? docs/performance/appearance-tranche8e1/\n?? scripts/qualify-system-appearance.py\n?? scripts/test_system_appearance_tooling.py\n?? src/benchmark/java/shed/SystemAppearanceAwtProbe.java\n?? src/benchmark/native/\n",
+  "existing_files_verified_unchanged": 1539,
+  "changed_existing_files": [],
+  "missing_existing_files": [],
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "diagnostic_helpers_in_packaged_jar": [],
+  "agent_commits": 0,
+  "agent_pushes": 0
+}

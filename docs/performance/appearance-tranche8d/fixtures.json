@@ -1,0 +1,46 @@
+{
+  "4096": {
+    "path": "/private/tmp/shed-tranche8d-final/source-4096.md",
+    "bytes": 4096,
+    "sha256": "ed43be0a5b6eefcabd8681bd142f7ef8f3931e13d6f963870c45f8160c57c4fa",
+    "shape": "mixed",
+    "generator": 1,
+    "complete_blocks": 2,
+    "padding_bytes": 290,
+    "encoding": "ASCII/UTF-8",
+    "eof_newline": true
+  },
+  "102400": {
+    "path": "/private/tmp/shed-tranche8d-final/source-102400.md",
+    "bytes": 102400,
+    "sha256": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
+    "shape": "mixed",
+    "generator": 1,
+    "complete_blocks": 53,
+    "padding_bytes": 1541,
+    "encoding": "ASCII/UTF-8",
+    "eof_newline": true
+  },
+  "1048576": {
+    "path": "/private/tmp/shed-tranche8d-final/source-1048576.md",
+    "bytes": 1048576,
+    "sha256": "5667107ee3efa1b2ec59aa1f5b43624e105d04bb6f5003c8eee6101f43343798",
+    "shape": "mixed",
+    "generator": 1,
+    "complete_blocks": 551,
+    "padding_bytes": 23,
+    "encoding": "ASCII/UTF-8",
+    "eof_newline": true
+  },
+  "10485760": {
+    "path": "/private/tmp/shed-tranche8d-final/source-10485760.md",
+    "bytes": 10485760,
+    "sha256": "736bc2651797a3e72c84b938ebabe4f626267b1bd2255f94cd2c43f9c0df4ac5",
+    "shape": "mixed",
+    "generator": 1,
+    "complete_blocks": 5510,
+    "padding_bytes": 230,
+    "encoding": "ASCII/UTF-8",
+    "eof_newline": true
+  }
+}

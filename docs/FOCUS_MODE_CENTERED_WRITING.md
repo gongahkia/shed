@@ -114,11 +114,49 @@ Final measurements and their limitations are recorded in the evidence directory.
 
 The matrix includes small, 100 KiB, 1 MiB and supported 10 MiB sources; 1 MiB wrapped/unwrapped and single/split controls; source typing, toggle dispatch, validation, forced root paint, scrolling, twelve repeated toggle cycles, resizing, heap and process RSS. Both artifact hashes, source hashes, host load and raw measurements are retained. Unsupported or missing paint observations remain explicit; they do not become zero-latency samples.
 
+Final paired run: **16 fresh child JVMs**, alternating artifact order per fixture. Apple M3/Mac15,12 (eight CPU cores), 16 GiB, macOS 26.5.2 arm64, Temurin Java 21.0.13+9, `-Xms64m -Xmx512m`, default 2× display. Initial host load 4.14/3.97/4.91, reported memory free 55%, pre-existing used swap 1,111.50 MiB. No system settings or unrelated applications were changed. These are fresh processes, not cold filesystem-cache launches. One process per artifact/fixture and 50 warm inserts per phase provide observations, not statistical equivalence or cross-platform qualification.
+
+Baseline JAR: `6ee56710a5c6961860d8533bd916f9deef4ca445df71dadf5a9fa550c12bf3ee`. Final JAR: `d448ccae866a592c5e1aee6cbea352c7289cb0fb1780ef8ae65896bec3578dbc`. Source/runner commands and environment accompany [raw paired evidence](performance/appearance-tranche8d/paired-final.json.gz); [measurements](performance/appearance-tranche8d/measurements.json) retain first-edit, warm, toggle, resize, heap and RSS boundaries separately.
+
+| Fixture / presentation | Baseline normal typing p95 | Final normal typing p95 | Baseline focused typing p95 | Final focused typing p95 |
+|---|---:|---:|---:|---:|
+| 4 KiB, unwrapped, single | 3.47 ms | 4.35 ms | 1.13 ms | 1.70 ms |
+| 100 KiB, unwrapped, single | 1.53 ms | 2.45 ms | 0.74 ms | 1.21 ms |
+| 1 MiB, unwrapped, single | 1.79 ms | 2.25 ms | 1.02 ms | 1.40 ms |
+| 10 MiB, unwrapped, single | 1.95 ms | 1.98 ms | 1.09 ms | 1.17 ms |
+| 1 MiB, unwrapped, split | 5.57 ms | 4.80 ms | Unavailable: clipped old source | 4.13 ms |
+| 100 KiB, wrapped, single | 2.09 ms | 1.89 ms | 0.85 ms | 0.71 ms |
+| 1 MiB, wrapped, single/split | Existing editor controls retained | Existing editor controls retained | Old single paints; old split clipped | **Unsupported; no focus/center entry** |
+
+All supported final normal/focused warm typing observations meet the representative **p95 ≤16 ms** target in this run. The source metric ends at the existing attributed source-component paint callback; it is not whole-workbench scanout. First edits are not hidden in warmup: final supported first focused inserts were 1.20–2.42 ms and are retained separately. Larger wrapped rejected phases are marked `enabled=false`, even though the raw loop keeps its historical `focus_*` operation names; their normal editing samples must not be represented as successful focus samples.
+
+For 1 MiB single unwrapped, first enable dispatch/validate/forced-root completion totaled **2.92 ms**; repeated enable/disable totals p95 **2.42/3.13 ms**, six scroll forced-paint observations p95 **1.45 ms**, and four focus resize forced-root observations max **1.13 ms**. For 100 KiB wrapped, first enable total **13.87 ms**, repeated enable/disable p95 **12.78/15.14 ms**, resize max **11.50 ms**. The small-file repeated-disable p95 was **25.92 ms**, an explicit-toggle outlier retained rather than discarded. These forced-root observations are separate from scheduled typing paint and do not time every deferred layout callback; geometry convergence is tested independently.
+
+Large wrapped entry is a **no-change rejection**, so the final probe does not force a root paint and pretend it is a successful transition. Ordinary window resizing on those unsupported sources still observed **181.93 ms single / 349.58 ms split**, versus the existing baseline's expensive wrapped controls. That is an outstanding stock-editor qualification issue, not solved by the guard. No source-view optimization was attempted.
+
+### Memory and lifetime observations
+
+| Unwrapped fixture | Baseline / final used heap after cycles + requested GC | Final committed heap then | Baseline / final sampled peak RSS |
+|---|---:|---:|---:|
+| 4 KiB | 13.06 / 13.09 MiB | 64 MiB | 649.48 / 665.36 MiB |
+| 100 KiB | 13.88 / 13.96 MiB | 64 MiB | 670.69 / 672.33 MiB |
+| 1 MiB | 23.97 / 24.07 MiB | 84 MiB | 685.39 / 698.69 MiB |
+| 10 MiB | 88.38 / 88.49 MiB | 270 MiB | 903.48 / 894.98 MiB |
+| 1 MiB split | 24.19 / 24.08 MiB | 66 MiB | 698.23 / 695.98 MiB |
+
+Final 1 MiB ready used/committed heap was **58.53/90 MiB**, versus baseline **32.09/66 MiB**; after the matched cycle/GC boundary it was **24.07/84** versus **23.97/66 MiB**. This illustrates allocation/GC/commitment differences, not a retained-document-size estimate. Final nearest ready RSS / sampled peak was **669.30/698.69 MiB** at 1 MiB and **870.39/894.98 MiB** at 10 MiB. Fixed-settle samples are short observations, not certified idle memory or exhaustive RSS peaks.
+
+There is no observed growth in the owned minimap listeners across twelve cycles, and disposal tests verify the focus capture and centering map are cleared. Matched post-cycle used heap is close for supported fixtures. **Whole-process/closed-editor reclamation is not fully qualified:** the short post-disposal 1 MiB split sample was 40.11 MiB final versus 28.20 MiB baseline, despite nearly equal pre-disposal heaps. Three isolated GC requests and a short wait do not establish its retaining path or permanence. No heap graph/native attribution or sustained many-window leak claim is made. This observation remains a future qualification item, not justification for production GC or broad memory changes.
+
+Earlier exploratory runs remain separate: the initial benchmark omitted a lexical-probe compile dependency, then expected keyboard paint attribution from direct Undo; those were corrected. An unpaired exploratory run had timing variability and some overlap with compilation, so it is excluded from the final matched comparison. The provisional large-wrapped and width-only-fallback results are preserved as failed qualification evidence. No passing result is substituted for them silently.
+
 Production changes add no semantic parse, full-document copy, source model, background worker, persistent cache or eager renderer/font initialization. Geometry metadata is proportional to live panes/components. Existing source-width and lexical-highlighting implementations are unchanged. The pre-existing Unicode first-edit and stock HTML-preview layout failures remain open.
 
 ## J. Regression verification
 
 Exact commands, final counts, five existing skips, packaged-smoke output and any failed exploratory runs are retained in the verification record. The initial restoration test failed before implementation and subsequently passed. Early diagnostic tests and benchmark admission/paint-attribution corrections are not discarded or presented as passing qualification data.
+
+Final full suite: **1,581 total; 1,576 passed; five existing skips; zero failures/errors**. This adds sixteen tests: thirteen integration cases and three pure layout tests. The dedicated pre-bound focused run passed 33 tests; the final full suite also includes the later unsupported-context regression. All **34 tooling tests passed**, including three new checks. Packaged Mermaid/math/image smoke **PASS** against the final JAR. Existing skips are DOS-hidden attributes, opt-in AI performance, isolated fish startup, explicit CTest preset and opt-in native AI acceptance; exact names/conditions are retained in verification evidence.
 
 ```sh
 source /tmp/shed-tranche2c-run/toolchain.env
@@ -127,7 +165,8 @@ export PYTHONDONTWRITEBYTECODE=1
 "$MVN" test
 "$MVN" -q -DskipTests package
 python3 -m unittest discover -s scripts -p 'test_*.py'
-python3 scripts/test-packaged-markdown.py --jar /tmp/shed-tranche8d-run/production.jar --output /tmp/shed-tranche8d-run/packaged-smoke.json
+python3 scripts/test-packaged-markdown.py --jar /tmp/shed-tranche8d-run/production-qualified.jar --output /tmp/shed-tranche8d-run/packaged-smoke-qualified.json
+python3 scripts/benchmark-focus-mode.py --jar /tmp/shed-tranche8d-run/production-qualified.jar --baseline-jar /tmp/shed-tranche8d-run/baseline.jar --output /tmp/shed-tranche8d-final
 git diff --check
 shasum -a 256 README.md
 ```

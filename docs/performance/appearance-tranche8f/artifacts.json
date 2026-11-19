@@ -1,0 +1,17 @@
+{
+  "jars": {
+    "baseline": "64c07ac73d9663d39d79450fdce800253134d518e0896fe4283cd1bcb554fc80",
+    "candidate": "97669d8d2d41ea4bbae41f0a7e04a249228e35cb1ea57c5ee1bbe9068f8f88d8"
+  },
+  "probe_hashes": {
+    "src/benchmark/java/shed/DensityPerformanceProbe.java": "b5c25a6eeb6e909dd5aa3e3260693d99118fceb9b31ab40d3620aa6b525c08b4",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "06be4bc34de31c2fc79a67dfaefe97f60c4b9a3ad65aeaa8049bda6d3dacb3ad",
+    "src/benchmark/java/shed/MarkdownLexicalProbe.java": "a14105c3f99749a46bf546b5eec28a6d60c27bba30354f162ed01a2e3289952e"
+  },
+  "first_sample_policy": "First of 51 source inputs per phase is reported separately; remaining 50 are warm samples. First Compact request is not warmed up by a prior density request. Baseline preset labels perform no density command.",
+  "matrix_processes": 12,
+  "repeat_processes": 4,
+  "histogram_processes": 2,
+  "default_comparisons": 12,
+  "default_png_comparisons": 36
+}

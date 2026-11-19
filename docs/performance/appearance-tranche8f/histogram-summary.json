@@ -1,0 +1,148 @@
+{
+  "baseline": {
+    "immediate": {
+      "object_bytes_total": 22703344,
+      "selected": {
+        "[B": {
+          "count": 40452,
+          "bytes": 8871024
+        },
+        "[C": {
+          "count": 286,
+          "bytes": 3212376
+        },
+        "javax.swing.text.AbstractDocument$LeafElement": {
+          "count": 18799,
+          "bytes": 751960
+        },
+        "javax.swing.text.GapContent$MarkData": {
+          "count": 18913,
+          "bytes": 756520
+        },
+        "shed.FileBuffer": {
+          "count": 2,
+          "bytes": 256
+        },
+        "shed.VersionedTextSnapshot": {
+          "count": 3,
+          "bytes": 72
+        },
+        "shed.Texteditor": {
+          "count": 1,
+          "bytes": 1120
+        },
+        "shed.UiDensity": null
+      }
+    },
+    "settled": {
+      "object_bytes_total": 22769144,
+      "selected": {
+        "[B": {
+          "count": 41055,
+          "bytes": 8886824
+        },
+        "[C": {
+          "count": 286,
+          "bytes": 3212376
+        },
+        "javax.swing.text.AbstractDocument$LeafElement": {
+          "count": 18799,
+          "bytes": 751960
+        },
+        "javax.swing.text.GapContent$MarkData": {
+          "count": 18913,
+          "bytes": 756520
+        },
+        "shed.FileBuffer": {
+          "count": 2,
+          "bytes": 256
+        },
+        "shed.VersionedTextSnapshot": {
+          "count": 3,
+          "bytes": 72
+        },
+        "shed.Texteditor": {
+          "count": 1,
+          "bytes": 1120
+        },
+        "shed.UiDensity": null
+      }
+    }
+  },
+  "candidate": {
+    "immediate": {
+      "object_bytes_total": 22676008,
+      "selected": {
+        "[B": {
+          "count": 40676,
+          "bytes": 8881264
+        },
+        "[C": {
+          "count": 286,
+          "bytes": 3212376
+        },
+        "javax.swing.text.AbstractDocument$LeafElement": {
+          "count": 18799,
+          "bytes": 751960
+        },
+        "javax.swing.text.GapContent$MarkData": {
+          "count": 18913,
+          "bytes": 756520
+        },
+        "shed.FileBuffer": {
+          "count": 2,
+          "bytes": 256
+        },
+        "shed.VersionedTextSnapshot": {
+          "count": 3,
+          "bytes": 72
+        },
+        "shed.Texteditor": {
+          "count": 1,
+          "bytes": 1120
+        },
+        "shed.UiDensity": {
+          "count": 3,
+          "bytes": 216
+        }
+      }
+    },
+    "settled": {
+      "object_bytes_total": 22740112,
+      "selected": {
+        "[B": {
+          "count": 41278,
+          "bytes": 8897008
+        },
+        "[C": {
+          "count": 286,
+          "bytes": 3212376
+        },
+        "javax.swing.text.AbstractDocument$LeafElement": {
+          "count": 18799,
+          "bytes": 751960
+        },
+        "javax.swing.text.GapContent$MarkData": {
+          "count": 18913,
+          "bytes": 756520
+        },
+        "shed.FileBuffer": {
+          "count": 2,
+          "bytes": 256
+        },
+        "shed.VersionedTextSnapshot": {
+          "count": 3,
+          "bytes": 72
+        },
+        "shed.Texteditor": {
+          "count": 1,
+          "bytes": 1120
+        },
+        "shed.UiDensity": {
+          "count": 3,
+          "bytes": 216
+        }
+      }
+    }
+  }
+}

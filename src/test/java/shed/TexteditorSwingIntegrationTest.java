@@ -2512,7 +2512,7 @@ public class TexteditorSwingIntegrationTest {
                 buffer.getDocument().insertString(buffer.getDocument().getLength(), "x", null);
                 buffer.getUndoManager().undo(); assertTrue(buffer.getUndoManager().canRedo());
                 var snapshot = buffer.textSnapshot(); long revision = buffer.documentRevision();
-                var ui = editor.writingArea.getUI(); var view = ui.getRootView(editor.writingArea);
+                var ui = editor.writingArea.getUI(); var view = ui.getRootView(editor.writingArea).getView(0);
                 var font = editor.writingArea.getFont(); var background = editor.writingArea.getBackground();
                 boolean dirty = buffer.isModified(), undo = buffer.getUndoManager().canUndo();
                 editor.writingArea.setCaretPosition(20); editor.writingArea.moveCaretPosition(10);
@@ -2529,7 +2529,7 @@ public class TexteditorSwingIntegrationTest {
                     for (String value : List.of("compact", "comfortable", "default", "compact", "default")) {
                         assertEquals("Density: " + value, editor.commandHandler.execute("density " + value));
                         editor.validate();
-                        assertSame(ui, editor.writingArea.getUI()); assertSame(view, ui.getRootView(editor.writingArea));
+                        assertSame(ui, editor.writingArea.getUI()); assertSame(view, ui.getRootView(editor.writingArea).getView(0));
                         assertSame(snapshot, buffer.textSnapshot()); assertEquals(revision, buffer.documentRevision());
                         assertEquals(dirty, buffer.isModified()); assertEquals(undo, buffer.getUndoManager().canUndo());
                         assertEquals(10, editor.writingArea.getCaret().getDot()); assertEquals(20, editor.writingArea.getCaret().getMark());
@@ -2710,6 +2710,29 @@ public class TexteditorSwingIntegrationTest {
                     }
                 }
                 return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void densityDefaultRestoresHeaderGeometryAfterDocumentNavigation() throws Exception {
+        assumeSwingAvailable(); Path file = Files.writeString(tempDir.resolve("density-header.md"), "body");
+        Path otherFile = Files.writeString(tempDir.resolve("density-header-other.md"), "other");
+        Texteditor editor = createEditor(tempDir.resolve("density-header-home"), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            int original = onEdt(() -> editor.workbenchHeader.getPreferredSize().height);
+            onEdt(() -> {
+                var source = editor.getCurrentBuffer();
+                editor.commandHandler.execute("density comfortable"); editor.validate();
+                FileBuffer other = new FileBuffer(otherFile.toFile()); editor.buffers.add(other);
+                editor.loadBufferIntoEditor(other); editor.loadBufferIntoEditor(source); editor.validate();
+                assertTrue(editor.workbenchHeader.getPreferredSize().height > original); return null;
+            });
+            onEdt(() -> {
+                editor.commandHandler.execute("density default"); editor.validate();
+                assertEquals(original, editor.workbenchHeader.getPreferredSize().height);
+                assertEquals("body", editor.getCurrentBuffer().getContent()); return null;
             });
         } finally { disposeEditor(editor); }
     }

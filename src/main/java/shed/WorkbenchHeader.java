@@ -129,6 +129,8 @@ final class WorkbenchHeader extends JPanel implements AutoCloseable {
         for (Component button : actions.getComponents()) button.setPreferredSize(new Dimension(height, height));
         workspace.setPreferredSize(new Dimension(workspace.getPreferredSize().width, height));
         focus.setPreferredSize(new Dimension(focus.getPreferredSize().width, height));
+        // Nested containers can cache the former preferred size after navigation/layout.
+        actions.invalidate(); focus.getParent().invalidate();
         revalidate(); repaint();
     }
 

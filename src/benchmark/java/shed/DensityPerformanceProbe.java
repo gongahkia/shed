@@ -18,6 +18,7 @@ import static shed.MarkdownPerformanceProbe.*;
 public final class DensityPerformanceProbe {
     private static Texteditor editor;
     private static boolean supported;
+    private static FileBuffer tabControl;
     private static Path output;
     private static final com.sun.management.ThreadMXBean THREADS =
         (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
@@ -52,7 +53,10 @@ public final class DensityPerformanceProbe {
     }
     private static void capture(String phase) throws Exception {
         edt(() -> {
-            editor.statusBar.setText("Density geometry control"); editor.validate();
+            editor.statusBar.setText("Density geometry control");
+            for (AbstractButton button : descendants(editor.workbenchHeader, AbstractButton.class)) button.getModel().setRollover(false);
+            for (var label : descendants(editor.workbenchHeader, JLabel.class)) if ("workbench.focus".equals(label.getName())) label.setText("Editor");
+            editor.validate();
             Map<String, Object> geometry = new LinkedHashMap<>();
             geometry.put("header", component(editor.workbenchHeader));
             geometry.put("editor_strip", component(editor.openEditorsBar));
@@ -107,7 +111,24 @@ public final class DensityPerformanceProbe {
                 if (!key.isConsumed()) area.getActionMap().get(DefaultEditorKit.defaultKeyTypedAction).actionPerformed(new ActionEvent(area, 0, "x"));
                 return (System.nanoTime() - start) / 1e6;
             });
-            await(() -> metric()[0] > before, 5);
+            try { await(() -> metric()[0] > before, 5); }
+            catch (java.util.concurrent.TimeoutException missing) {
+                out("DENSITY ", edt(() -> {
+                    Map<String, Object> state = new LinkedHashMap<>();
+                    state.put("operation", "missing_paint_diagnostic"); state.put("phase", phase);
+                    state.put("showing", editor.writingArea.isShowing()); state.put("pane", editor.activePaneIndex);
+                    state.put("path", editor.getCurrentBuffer().getFilePath()); state.put("mode", String.valueOf(editor.editorState.mode));
+                    state.put("visible", String.valueOf(editor.writingArea.getVisibleRect()));
+                    state.put("has_focus", editor.writingArea.isFocusOwner()); state.put("length", editor.writingArea.getDocument().getLength());
+                    for (String name : new String[]{"pendingInputNanos", "pendingPaintNanos", "pendingDocumentNanos", "pendingPaintArea"}) {
+                        var field = EditorUiController.class.getDeclaredField(name); field.setAccessible(true);
+                        Object value = field.get(editor.editorUiController);
+                        state.put(name, value instanceof JTextArea area ? Map.of("showing", area.isShowing(), "same_area", area == editor.writingArea) : String.valueOf(value));
+                    }
+                    return state;
+                }));
+                throw missing;
+            }
             out("DENSITY ", Map.of("operation", phase + (i == 0 ? "_first_input" : "_warm_input"), "dispatch_ms", dispatch,
                 "input_to_paint_ms", edt(() -> metric()[1] / 1e6)));
             edt(() -> { buffer.getUndoManager().undo(); return null; });
@@ -138,17 +159,20 @@ public final class DensityPerformanceProbe {
     private static void workload(boolean split) throws Exception {
         var buffer = edt(editor::getCurrentBuffer);
         String original = edt(buffer::getContent);
-        Object ui = edt(() -> editor.writingArea.getUI()), view = edt(() -> editor.writingArea.getUI().getRootView(editor.writingArea));
         Font font = edt(() -> editor.writingArea.getFont());
         capture("default_initial"); heap("ready_no_gc");
         for (int i = 0; i < 3; i++) { System.gc(); Thread.sleep(80); }
         heap("ready_requested_gc");
         for (String phase : List.of("default", "compact", "comfortable", "default_restored")) {
             var snapshot = edt(buffer::textSnapshot); long revision = edt(buffer::documentRevision);
-            timed("switch_" + phase, () -> density(phase.equals("default_restored") ? "default" : phase));
+            Object ui = edt(() -> editor.writingArea.getUI());
+            Object view = edt(() -> editor.writingArea.getUI().getRootView(editor.writingArea).getView(0));
+            timed(phase.equals("compact") ? "first_switch_compact" : "switch_" + phase, () -> {
+                if (!phase.equals("default")) density(phase.equals("default_restored") ? "default" : phase);
+            });
             edt(() -> {
                 if (snapshot != buffer.textSnapshot() || revision != buffer.documentRevision()) throw new AssertionError("Density changed source");
-                if (ui != editor.writingArea.getUI() || view != editor.writingArea.getUI().getRootView(editor.writingArea)) throw new AssertionError("Density rebuilt source view");
+                if (ui != editor.writingArea.getUI() || view != editor.writingArea.getUI().getRootView(editor.writingArea).getView(0)) throw new AssertionError("Density rebuilt source view");
                 if (!font.equals(editor.writingArea.getFont())) throw new AssertionError("Density changed source font");
                 return null;
             });
@@ -158,6 +182,15 @@ public final class DensityPerformanceProbe {
                 timed(phase + "_scroll", () -> editor.getActivePane().getScrollPane().getViewport().setViewPosition(new Point(0, index % 2 * 80)));
             }
             if (!split) picker(phase);
+            for (int i = 0; i < 4; i++) {
+                final int index = i;
+                timed(phase + "_sidebar_scroll", () -> {
+                    var trees = descendants(editor.getRootPane(), JTree.class);
+                    if (!trees.isEmpty()) { JTree tree = trees.getFirst(); tree.scrollRowToVisible(index % 2 == 0 ? 0 : tree.getRowCount() - 1); }
+                });
+            }
+            timed(phase + "_tab_away", () -> editor.loadBufferIntoEditor(tabControl));
+            timed(phase + "_tab_return", () -> editor.loadBufferIntoEditor(buffer));
             capture(phase);
         }
         for (int i = 0; i < 12; i++) {
@@ -199,7 +232,7 @@ public final class DensityPerformanceProbe {
         try {
             Path file = Path.of(args[0]); supported = Boolean.parseBoolean(args[1]);
             boolean wrap = Boolean.parseBoolean(args[2]), split = Boolean.parseBoolean(args[3]);
-            output = Path.of(args[4]); int uiFontSize = Integer.parseInt(args[5]);
+            output = Path.of(args[4]); int uiFontSize = Integer.parseInt(args[5]); boolean sidebar = Boolean.parseBoolean(args[6]);
             long begin = System.nanoTime(); editor = edt(() -> new Texteditor(new String[]{file.toString()}));
             await(() -> editor.getCurrentBuffer() != null && file.toString().equals(editor.getCurrentBuffer().getFilePath()) && !editor.stagedStartupPending, 30);
             out("DENSITY ", Map.of("operation", "launch_to_loaded_editor", "ms", (System.nanoTime() - begin) / 1e6));
@@ -208,6 +241,15 @@ public final class DensityPerformanceProbe {
                 if (uiFontSize > 0) { editor.configManager.set("ui.font.size", String.valueOf(uiFontSize)); editor.sessionConfigController.applyRuntimeConfigFromSettings(); }
                 editor.writingArea.setLineWrap(wrap); editor.writingArea.setWrapStyleWord(wrap);
                 if (split) { editor.splitWindow(true); editor.writingArea.setLineWrap(wrap); editor.writingArea.setWrapStyleWord(wrap); }
+                if (sidebar) {
+                    EditorPane sourcePane = editor.getActivePane();
+                    String treeResult = editor.showFileTree(file.getParent().toString());
+                    if (!treeResult.equals("Tree pane opened")) throw new AssertionError(treeResult);
+                    editor.editorUiController.renderWindowLayout(); editor.activateEditorPane(sourcePane);
+                }
+                FileBuffer source = editor.getCurrentBuffer();
+                tabControl = new FileBuffer(file.resolveSibling("tab-control.md").toFile());
+                editor.buffers.add(tabControl); editor.loadBufferIntoEditor(tabControl); editor.loadBufferIntoEditor(source);
                 editor.validate(); editor.setMode(EditorMode.INSERT);
                 if (editor.messageResetTimer != null) editor.messageResetTimer.stop();
                 editor.requestActivePaneFocus(); return null;
@@ -220,9 +262,13 @@ public final class DensityPerformanceProbe {
             edt(() -> {
                 for (var timer : new javax.swing.Timer[]{editor.messageResetTimer, editor.externalChangeTimer, editor.recoverySnapshotTimer, editor.diagnosticRefreshTimer}) if (timer != null) timer.stop();
                 editor.fileWatcherService.stop(); editor.shutdownSyntaxUi(); editor.shutdownLspScheduling(); editor.disposeMarkdownPreviews();
-                editor.asyncJobService.shutdownNow(); editor.backupScheduler.close(); editor.dispose(); return null;
+                editor.shutdownRecoveryJournalScheduling();
+                editor.asyncJobService.shutdownNow(); editor.backupScheduler.close();
+                editor.treeGitController.closeFinderIndexes(); editor.paletteController.close(); editor.testController.shutdown();
+                editor.debugSessionController.shutdown(); editor.remoteWorkspaceController.closeAll();
+                editor.dispose(); return null;
             });
-            editor = null;
+            editor = null; tabControl = null;
             for (int i = 0; i < 5; i++) { edt(() -> null); System.gc(); Thread.sleep(100); }
             heap("disposed_requested_gc");
             out("DENSITY ", Map.of("operation", "lifecycle", "editor_reachable", closed.get() != null));

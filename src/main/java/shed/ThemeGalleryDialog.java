@@ -9,6 +9,9 @@ import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.Window;
+import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListCellRenderer;
@@ -24,6 +27,7 @@ import javax.swing.ListSelectionModel;
 
 /** Visual selector for the bundled theme palettes. */
 final class ThemeGalleryDialog extends JDialog {
+    private static WeakReference<ThemeGalleryDialog> livePreview = new WeakReference<>(null);
     private static final List<Swatch> SWATCHES = List.of(
         new Swatch("Editor", ThemePreview::normal),
         new Swatch("Insert", ThemePreview::insert),
@@ -43,10 +47,24 @@ final class ThemeGalleryDialog extends JDialog {
     private final JLabel title = new JLabel();
     private final JLabel status = new JLabel();
     private final JButton applyAndSave = new JButton("Apply and Save");
+    private final JButton previewInApp = new JButton("Preview in App");
+    private ConfigManager.ThemePreviewLease previewLease;
 
     static void showFor(Texteditor editor) {
         if (editor == null) return;
+        for (Window window : editor.getOwnedWindows()) {
+            if (window instanceof ThemeGalleryDialog gallery && gallery.isDisplayable()) {
+                gallery.setVisible(true);
+                gallery.toFront();
+                return;
+            }
+        }
         new ThemeGalleryDialog(editor).setVisible(true);
+    }
+
+    static void cancelLivePreview() {
+        ThemeGalleryDialog gallery = livePreview.get();
+        if (gallery != null) gallery.cancelPreview();
     }
 
     private ThemeGalleryDialog(Texteditor editor) {
@@ -106,11 +124,17 @@ final class ThemeGalleryDialog extends JDialog {
     }
 
     private JPanel actions() {
+        previewInApp.addActionListener(event -> {
+            if (previewLease == null) previewSelectedTheme();
+            else cancelPreview();
+        });
+        previewInApp.setToolTipText("Temporarily preview in this workbench without saving. Close or cancel to restore.");
         applyAndSave.addActionListener(event -> applyAndSaveSelection());
         applyAndSave.setToolTipText("Use this theme now and save it to ~/.shed/config.toml.");
         JButton close = new JButton("Close");
         close.addActionListener(event -> dispose());
         JPanel panel = new JPanel();
+        panel.add(previewInApp);
         panel.add(applyAndSave);
         panel.add(close);
         return panel;
@@ -139,6 +163,44 @@ final class ThemeGalleryDialog extends JDialog {
         applyAndSave.setEnabled(true);
         codePreview.setTheme(preview);
         swatchGrid.setTheme(preview);
+        if (previewLease != null) previewSelectedTheme();
+    }
+
+    void previewSelectedTheme() {
+        ThemePreview selected = themes.getSelectedValue();
+        if (selected == null) return;
+        // Swing UI defaults are process-wide; independent multi-window previews need separate qualification.
+        for (Window window : Window.getWindows()) {
+            if (window instanceof Texteditor && window != editor && window.isDisplayable()) {
+                status.setText("Workbench preview requires one Shed window; palette preview remains available.");
+                return;
+            }
+        }
+        String before = editor.configManager.getThemeId();
+        if (previewLease == null) previewLease = editor.configManager.previewTheme(selected.id());
+        else previewLease.select(selected.id());
+        if (previewLease == null) return;
+        livePreview = new WeakReference<>(this);
+        previewInApp.setText("Cancel Preview");
+        status.setText("Previewing " + selected.displayName() + " — not saved");
+        if (!before.equals(editor.configManager.getThemeId())) editor.applyThemeColors();
+        themes.repaint();
+    }
+
+    void cancelPreview() {
+        if (previewLease == null) return;
+        String before = editor.configManager.getThemeId();
+        previewLease.close();
+        previewLease = null;
+        if (livePreview.get() == this) livePreview.clear();
+        previewInApp.setText("Preview in App");
+        if (editor.isDisplayable() && !before.equals(editor.configManager.getThemeId())) editor.applyThemeColors();
+        updateSelection();
+    }
+
+    @Override public void dispose() {
+        cancelPreview();
+        super.dispose();
     }
 
     private void applyAndSaveSelection() {
@@ -148,13 +210,24 @@ final class ThemeGalleryDialog extends JDialog {
     private void applySelectedTheme() {
         ThemePreview preview = themes.getSelectedValue();
         if (preview == null) return;
-        String result = editor.setThemeFromCommand(preview.id());
-        if (!result.startsWith("Theme set to ")) {
-            status.setText(result);
+        ConfigManager.ThemePreviewLease lease = previewLease;
+        if (lease == null) lease = editor.configManager.previewTheme(preview.id());
+        if (lease == null) {
+            status.setText("Theme preview is no longer available");
             return;
         }
-        editor.editorUiController.applyUiTheme(this);
-        status.setText(result + "    " + editor.saveConfigToDisk());
+        try {
+            int count = lease.acceptAndPersist();
+            previewLease = null;
+            if (livePreview.get() == this) livePreview.clear();
+            previewInApp.setText("Preview in App");
+            editor.applyThemeColors();
+            status.setText("Theme set to " + preview.id() + "    Saved config (" + count + " keys)");
+        } catch (IOException error) {
+            if (previewLease == null) lease.close();
+            status.setText("Error saving config: " + error.getMessage());
+            return;
+        }
         title.setText(preview.displayName() + " — active");
         applyAndSave.setEnabled(true);
         themes.repaint();

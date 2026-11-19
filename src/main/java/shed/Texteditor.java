@@ -327,6 +327,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     Texteditor(String[] args, ApplicationErrorReporter errorReporter) {
+        ThemeGalleryDialog.cancelLivePreview();
         long startupStartedAt = System.nanoTime();
         StartupProfile startupProfile = new StartupProfile();
         this.errorReporter = errorReporter == null ? new ApplicationErrorReporter() : errorReporter;

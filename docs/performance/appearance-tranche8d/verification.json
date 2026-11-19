@@ -164,10 +164,28 @@
   ],
   "unchanged_preexisting_files": 1466,
   "head_before": "2e3cfd8e7b5618d0cc330a77e1967d47a699651b",
-  "head_after": "7ec674179b9b921df7a08b479ddfc5fc88f5ff11",
+  "head_after": "b1aacc16fe3cc364e1d1fcc7bb76e41fd6d94fb9",
   "head_note": "HEAD advanced externally during task; agent issued no commit/push/reset/clean/revert commands.",
   "readme_sha256_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
   "readme_sha256_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
   "git_diff_check_exit": 0,
-  "git_diff_check_output": ""
+  "git_diff_check_output": "",
+  "observed_external_heads": [
+    "807db20af0c08cb42dea84777dcb69b7ee1318ce",
+    "b1aacc16fe3cc364e1d1fcc7bb76e41fd6d94fb9",
+    "7ec674179b9b921df7a08b479ddfc5fc88f5ff11"
+  ],
+  "context_guard": {
+    "state": "PASS",
+    "exit": 0,
+    "configuration": "Final JAR; 1 MiB source, enter focus unwrapped, turn wrapping on; prior independent centering false and true. Source document/revision/Undo unchanged; both modes end.",
+    "command": "javac -cp production-qualified.jar:benchmark-classes ContextGuardProbe.java; java -Xms64m -Xmx512m -Duser.home=<isolated-home> -cp context-classes:benchmark-classes:production-qualified.jar shed.ContextGuardProbe <1MiB-fixture>",
+    "timeout_seconds": 30
+  },
+  "inspection_utc": "2026-11-19T03:38:53.762401+00:00",
+  "preexisting_unchanged": 1466,
+  "new_file_whitespace_check": "PASS",
+  "documentation_link_check": "PASS",
+  "prototype_absent_from_packaged_jar": true,
+  "final_jar_sha256": "d448ccae866a592c5e1aee6cbea352c7289cb0fb1780ef8ae65896bec3578dbc"
 }

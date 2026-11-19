@@ -349,7 +349,7 @@ final class SessionConfigController {
         }
         boolean canDetectThemeChange = previousContent != null && updatedContent != null;
         boolean themeChangedInFile = canDetectThemeChange && didConfigKeyChange(previousContent, updatedContent, "theme");
-        String activeThemeBeforeReload = editor.configManager.getThemeId();
+        String activeThemeBeforeReload = editor.configManager.getAuthoritativeThemeId();
         editor.configManager.reload();
         if (!editor.configManager.hasConfigLoadFailure() && canDetectThemeChange && !themeChangedInFile) {
             editor.configManager.setTheme(activeThemeBeforeReload);

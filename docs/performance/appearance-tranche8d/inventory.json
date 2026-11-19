@@ -1,0 +1,249 @@
+{
+  "scope": "all authored or intentionally modified 8D files, independent of external commits",
+  "self_exclusions": [
+    "docs/performance/appearance-tranche8d/inventory.json",
+    "docs/performance/appearance-tranche8d/checksums.sha256"
+  ],
+  "files": {
+    "src/main/java/shed/CommandHandler.java": {
+      "bytes": 45230,
+      "sha256": "f12ef927a8b400f7350e17bc10bf7879b9b337c8af12ada0c4c2e6a23a290db1",
+      "status_from_start": "modified"
+    },
+    "src/main/java/shed/EditorUiController.java": {
+      "bytes": 102702,
+      "sha256": "32fb55042e8f9c807cbe941908536fcbfe2cc0f6f18c0818d6dea36e54e75f4c",
+      "status_from_start": "modified"
+    },
+    "src/main/java/shed/FocusModeController.java": {
+      "bytes": 20040,
+      "sha256": "96ac40fdbaf0a8455925dd449fa7d628e65c56e0f3dd0b7c001b2076d366cba8",
+      "status_from_start": "modified"
+    },
+    "src/main/java/shed/PaletteController.java": {
+      "bytes": 57839,
+      "sha256": "dc55eae0d7162fce245b6b91ce44a12170b687dfc344fe86a17ac0ccf7e57d0c",
+      "status_from_start": "modified"
+    },
+    "src/main/java/shed/SessionConfigController.java": {
+      "bytes": 71348,
+      "sha256": "2dfa1c985c9134751d42e3adaf62f6fcf624c58b9fd7e3824a5e80ae850a9cc4",
+      "status_from_start": "modified"
+    },
+    "src/main/java/shed/Texteditor.java": {
+      "bytes": 125364,
+      "sha256": "6cabd2c814c59887352caef81b52534a5b9fcee483a97757d31200790de71636",
+      "status_from_start": "modified"
+    },
+    "src/main/java/shed/ToolWindowHost.java": {
+      "bytes": 20387,
+      "sha256": "4f63d0b068053b0bff98d993ba648281f4491ca1fc31213b9db0ec6bd1f13926",
+      "status_from_start": "modified"
+    },
+    "src/main/java/shed/WindowLayoutNode.java": {
+      "bytes": 15299,
+      "sha256": "775aaa1d4b027b776482863f54b8b61a95932ec022e0f00d02ab401bf80f07e0",
+      "status_from_start": "modified"
+    },
+    "src/main/java/shed/WorkspaceController.java": {
+      "bytes": 15508,
+      "sha256": "9380d0d1b40d15f14d8ea0b4055225a3f22a22f040d29e019f168caf0096f49c",
+      "status_from_start": "modified"
+    },
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java": {
+      "bytes": 399637,
+      "sha256": "d30f74b58650176301939f677b58d1a8d23b3faa78bd1c7b17ee1d0fc92ebbf9",
+      "status_from_start": "modified"
+    },
+    "src/test/java/shed/CenteredWritingLayoutTest.java": {
+      "bytes": 1026,
+      "sha256": "6d8f4fd76a5743559c4d3c9f733721d4b970efa117c36b4956864ef28a4e7180",
+      "status_from_start": "added"
+    },
+    "src/benchmark/java/shed/FocusModePerformanceProbe.java": {
+      "bytes": 8862,
+      "sha256": "2500e59a1d9233ed7784c5cb487655b740dd1374ecd8aeae52e0e2c1b54925c7",
+      "status_from_start": "added"
+    },
+    "scripts/benchmark-focus-mode.py": {
+      "bytes": 5069,
+      "sha256": "fd1c8f4adaea571611de98c701de81f3680b2c8cfc4ea60e26078e967368f9c5",
+      "status_from_start": "added"
+    },
+    "scripts/test_focus_mode_tooling.py": {
+      "bytes": 2085,
+      "sha256": "f5e0c57f19e98ddfe4810338c634a5b77c99018d19129fad2729ed693227958d",
+      "status_from_start": "added"
+    },
+    "docs/FOCUS_MODE_CENTERED_WRITING.md": {
+      "bytes": 27537,
+      "sha256": "5ffb37c6839e3794d0688c982bbc50e9a7b925946eca86fe9dfe8ff4e2d0d66f",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/CenterDiagnostic.java.txt": {
+      "bytes": 1292,
+      "sha256": "008ae69c5dc2ef5d08e570f1453a711db0cc2530285b5fda6dd54e5e3ce45d1d",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/ContextGuardProbe.java.txt": {
+      "bytes": 1404,
+      "sha256": "64a7d97ca98b46ac0d22aab976e84d225e9e5393e9131bbb4f5e442e442ab6e8",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/INDEX.md": {
+      "bytes": 3679,
+      "sha256": "b317dc143e1de44a6ae1ccb22aed148eddfa3f742250331a705b113a3eecc19f",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/baseline.json.gz": {
+      "bytes": 73042,
+      "sha256": "f49725ab2581d6affede279cad0b1f78a4d200ab5fc7c16442ecd817185bdcd3",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/before.log.gz": {
+      "bytes": 1116,
+      "sha256": "70eee58880b2004331f9bc4310b9fd10eb0870642ae9c6b305a4a8277bb25ac0",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/center-diagnostic.log.gz": {
+      "bytes": 1099,
+      "sha256": "e934bb7854bb655a57515eabd20771f18085910f66a3c46a4e2f8aabfd41aba0",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/center-observation.log.gz": {
+      "bytes": 270,
+      "sha256": "ae19d8ca12b032e73ce3b38e23b5a8992b907bd835b5de6b8b4ff81002308b9d",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/context-guard.log": {
+      "bytes": 75,
+      "sha256": "8673140ba0bc4818648e645eb36b02db2273401e27d6d0e65758c0872f0d9adc",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/exploratory-missing-undo-marker.json.gz": {
+      "bytes": 15360,
+      "sha256": "477d9d7064811ff93bad0ec176eeaa1ca554378401f55db8e125140249cef0e2",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/exploratory-unpaired.json.gz": {
+      "bytes": 39568,
+      "sha256": "ef10220cd666f631bcf313fee6eb0abcbd591b58a071a8d2e058aae1610fcd7e",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/final-performance.log.gz": {
+      "bytes": 139,
+      "sha256": "b969c092a1fe519e43fb4abe29cd6a756238b2eae8ff65973323fdd56a15c462",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/fixtures.json": {
+      "bytes": 1360,
+      "sha256": "d5e0264bdf097dd2a4a3cb461fe754af6a12d46d80340440734c012d105d360f",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/focused-convergence.log.gz": {
+      "bytes": 44,
+      "sha256": "6a58637b154f0d29c811e671384208ac48393082482b008d3809a96656043dd8",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/focused-corrected.log.gz": {
+      "bytes": 949,
+      "sha256": "e97d9adaa91e6c4927ea6e6a8756c6061508da0fbcab01a3d9810a0bff025aa9",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/focused-final.log.gz": {
+      "bytes": 948,
+      "sha256": "2b12d9873f4c565cb13361a7d89b3e9c88f3d4b2e3c1a7fcdbfcecbe3a73514f",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/focused.log.gz": {
+      "bytes": 1570,
+      "sha256": "d45727b53bc9e7020fbdcf4c9d9cf0fc5717006f5d3cd7afaaca456fedb7ea3e",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/git-status-after.txt": {
+      "bytes": 331,
+      "sha256": "18c8525e3695b5468f166571fcb1893f7ac62fc3e9d659520326687d2b5b11d5",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/initial-focused.log.gz": {
+      "bytes": 40,
+      "sha256": "50f0d89644bf1097183263979a72a48ee74af931d491c633cdaa8da5c5088a27",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/maven-bounded.log.gz": {
+      "bytes": 6049,
+      "sha256": "a28e59bd8bb84d99cdc25fc2fb7763466c7f1b88d7244d645ad8bf219bc6b5a7",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/maven-final.log.gz": {
+      "bytes": 5996,
+      "sha256": "be15e93d3f9b808ff66489ffc6089fc157736cd458ad3b63c61c3f3918a5f3b1",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/maven.log.gz": {
+      "bytes": 6064,
+      "sha256": "e8017e44f8c281ef5f33f048b64db741ebbc8d394d201bcb1bfb4ee2fea61b05",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/measurements.json": {
+      "bytes": 101322,
+      "sha256": "d14607a786553bbe1d83951b4290206e31c61d791fb9b6463589883b3a56381b",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/minimum-state.md": {
+      "bytes": 1464,
+      "sha256": "efd83cda3dd46726ddaf899c4ae427be77c45cb67bc7cd4bf87a4b8088a17e53",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/narrow-layout.log.gz": {
+      "bytes": 938,
+      "sha256": "2a1642863a39503ed946326f498437e4e0abb0d3e18097a4c647f9b9a5a833bb",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/package-qualified.log.gz": {
+      "bytes": 42,
+      "sha256": "e7e139336ef9d233059e91f05400d123b3214bf6020e26ab2debd5c06a31c3dc",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/packaged-smoke-qualified.log.gz": {
+      "bytes": 1572,
+      "sha256": "24737620165857594c747ad22ca5b41efd3878598793c9754bd953f0a07f027a",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/paired-final-logs.json.gz": {
+      "bytes": 58596,
+      "sha256": "6719b988cffd6be616d76ac319710acdfb9c2d93c939db34c8b7dada860a8a6b",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/paired-final.json.gz": {
+      "bytes": 74642,
+      "sha256": "93557e157143766787cc362fe0a48bc301fac20e0d92a82f6a172077f308d7f2",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/pre-bound-paired.json.gz": {
+      "bytes": 65021,
+      "sha256": "bf2e8637542b8e6c0a76c78c607f07c752e155e5522f8c44159b282220b422c4",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/reproduction.log.gz": {
+      "bytes": 1057,
+      "sha256": "5fac8e629017370d7f3e99ea2f809c14025e5c6c52a90e284559d0b32c254f7e",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/tooling-qualified.log.gz": {
+      "bytes": 77,
+      "sha256": "cec7baf193eb07a39826326b80867913a34870a53211bc0ced97b5f3e85fae67",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/verification.json": {
+      "bytes": 13275,
+      "sha256": "e824e0d52e841dbc9e12ce580d9094b6ba201368b223298831a2cb79c5be2efd",
+      "status_from_start": "added"
+    },
+    "docs/performance/appearance-tranche8d/width-only-fallback.json.gz": {
+      "bytes": 74571,
+      "sha256": "8c61a3ffeedf4d10c222f8ea171f704439232bc026077528bead532d2ff54208",
+      "status_from_start": "added"
+    }
+  }
+}

@@ -45,6 +45,90 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void themePreviewNeverEntersSavedOrRuntimeSettings() throws Exception {
+        System.setProperty("user.home", tempDir.resolve("preview-save").toString());
+        ConfigManager config = new ConfigManager();
+        config.setAndPersist("theme", "shed-light");
+        var lease = config.previewTheme("dracula");
+        assertNotNull(lease);
+        assertEquals("dracula", config.getThemeId());
+        assertEquals("shed-light", config.get("theme"));
+        assertEquals("shed-light", config.getAuthoritativeThemeId());
+        config.set("font.size", "18");
+        config.persistCurrentConfig();
+        assertEquals("shed-light", new ConfigManager().getThemeId());
+        assertEquals(18, new ConfigManager().getFontSize());
+        lease.close();
+        assertEquals("shed-light", config.getThemeId());
+    }
+
+    @Test
+    void previewRollbackResolvesCurrentAuthorityInsteadOfEntrySnapshot() throws Exception {
+        System.setProperty("user.home", tempDir.resolve("preview-authority").toString());
+        ConfigManager config = new ConfigManager();
+        var lease = config.previewTheme("dracula");
+        assertTrue(lease.select("gruvbox-dark"));
+        config.setTheme("catppuccin-latte");
+        assertEquals("gruvbox-dark", config.getThemeId());
+        config.persistCurrentConfig();
+        config.reload();
+        assertEquals("gruvbox-dark", config.getThemeId());
+        lease.close();
+        assertEquals("catppuccin-latte", config.getThemeId());
+    }
+
+    @Test
+    void previewRejectsUnknownAndStaleOwnersWithoutChangingAuthority() throws Exception {
+        System.setProperty("user.home", tempDir.resolve("preview-stale").toString());
+        ConfigManager config = new ConfigManager();
+        assertNull(config.previewTheme("missing"));
+        var old = config.previewTheme("dracula");
+        assertNull(config.previewTheme("gruvbox-dark"));
+        assertFalse(old.select("missing"));
+        old.close();
+        var current = config.previewTheme("gruvbox-dark");
+        old.close();
+        assertFalse(old.select("dracula"));
+        assertThrows(IOException.class, old::acceptAndPersist);
+        assertEquals("gruvbox-dark", config.getThemeId());
+        current.close();
+        assertEquals("shed-light", config.getThemeId());
+    }
+
+    @Test
+    void acceptingPreviewCommitsThroughExistingPreferences() throws Exception {
+        System.setProperty("user.home", tempDir.resolve("preview-accept").toString());
+        ConfigManager config = new ConfigManager();
+        var lease = config.previewTheme("dracula");
+        assertTrue(lease.acceptAndPersist() > 0);
+        assertEquals("dracula", config.getThemeId());
+        assertEquals("dracula", config.getAuthoritativeThemeId());
+        assertEquals("dracula", new ConfigManager().getThemeId());
+        lease.close();
+        assertEquals("dracula", config.getThemeId());
+    }
+
+    @Test
+    void failedPreviewSaveRetainsPreviewButRestoresAuthoritativePreferences() throws Exception {
+        Path home = tempDir.resolve("preview-failed-save");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        config.setAndPersist("theme", "shed-light");
+        Path file = home.resolve(".shed/config.toml");
+        Files.delete(file);
+        Files.createDirectory(file);
+        var lease = config.previewTheme("dracula");
+        assertThrows(IOException.class, lease::acceptAndPersist);
+        assertEquals("dracula", config.getThemeId());
+        assertEquals("shed-light", config.getAuthoritativeThemeId());
+        lease.close();
+        assertEquals("shed-light", config.getThemeId());
+        Files.delete(file);
+        config.persistCurrentConfig();
+        assertEquals("shed-light", new ConfigManager().getThemeId());
+    }
+
+    @Test
     void loadsDefaultsWhenConfigMissing() {
         Path home = tempDir.resolve("home-default");
         System.setProperty("user.home", home.toString());

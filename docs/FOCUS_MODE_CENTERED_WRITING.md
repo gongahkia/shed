@@ -35,6 +35,8 @@ No new panel, view, dialog, overlay, toolbar, renderer, parser, framework, nativ
 | `docs/FOCUS_MODE_CENTERED_WRITING.md` | This report. |
 | `docs/performance/appearance-tranche8d/` | Raw logs, reports, original inventory, verification, measurements and full added/modified-file inventory. |
 
+The [file inventory](performance/appearance-tranche8d/inventory.json) enumerates every authored/modified file; the [evidence index](performance/appearance-tranche8d/INDEX.md) explains the retained runs and exclusions.
+
 ## D. State ownership
 
 The [minimum state design](performance/appearance-tranche8d/minimum-state.md) was recorded before production implementation. It deliberately captures presentation rather than documents:
@@ -107,6 +109,8 @@ The focused suite covers pre-hidden chrome, idempotent commands across configure
 The BOM/CRLF/Unicode fixture remains the same authoritative document through toggling; its revision, selection, dirty flag and empty Undo history are checked, followed by an explicit byte-identical save. Edits made while focused remain present after exit, and existing Undo/Redo restores those edits normally. Rendering/centering does not create source edits. No new source listener, LSP text-change path, persistence codec or recovery mechanism was introduced.
 
 These tests are deterministic Swing/programmatic integration checks. They are not physical-device IME, screen-reader, native macOS Spaces/fullscreen or Windows/Linux headful certification. The window-state test verifies existing state flags are not changed by toggling; native fullscreen transitions remain a platform qualification item. Prior recovery, LSP, preview, highlighting, navigation, Unicode and keyboard regressions are run separately in the full suite.
+
+A bounded isolated [context guard probe](performance/appearance-tranche8d/ContextGuardProbe.java.txt) also passed against the final JAR: entering with a 1 MiB unwrapped source, then enabling wrapping, ended transient presentation for both prior-independent-centering states. Document identity, revision and Undo remained unchanged. It is separate from the Maven test count.
 
 ## I. Performance and memory
 
@@ -181,7 +185,7 @@ The only intended visual changes are temporary chrome hiding, padding/centering 
 
 README SHA-256 before/after is **`48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e`**. README is not modified. Shed Light, bundled JetBrains Mono, configuration defaults and saved-preference files are unchanged by focus/centering commands.
 
-The starting inventory records 1,476 pre-existing files and HEAD `2e3cfd8e7b5618d0cc330a77e1967d47a699651b`, including pre-existing uncommitted work. During the task HEAD advanced externally to `807db20af0c08cb42dea84777dcb69b7ee1318ce`, capturing prior and partially completed work. The agent issued no commit/push/reset/clean/revert command and preserved that commit. Repository verification compares content with the start inventory rather than claiming a clean checkout or unchanged HEAD.
+The starting inventory records 1,476 pre-existing files and HEAD `2e3cfd8e7b5618d0cc330a77e1967d47a699651b`, including pre-existing uncommitted work. During the task HEAD advanced externally, including commits `807db20af0c08cb42dea84777dcb69b7ee1318ce`, `7ec674179b9b921df7a08b479ddfc5fc88f5ff11` and `b1aacc16fe3cc364e1d1fcc7bb76e41fd6d94fb9`, capturing prior and in-progress work. The timestamped verification record gives the inspection HEAD. The agent issued no commit/push/reset/clean/revert command and preserved those commits. Repository verification compares content with the start inventory rather than claiming a clean checkout or unchanged HEAD. Ten pre-existing files changed intentionally for 8D; the other 1,466 pre-existing files, including prior performance evidence, remained byte-identical. The file inventory enumerates the changes regardless of their current Git tracking state.
 
 ## M. Remaining limitations
 
@@ -190,7 +194,7 @@ The starting inventory records 1,476 pre-existing files and HEAD `2e3cfd8e7b5618
 - Focus/centering are unavailable when an applicable wrapped source exceeds 100 Ki UTF-16 units. Window resizing, enabling wrapping itself, and ordinary root repaint remain core editor operations with outstanding wrapped-layout costs; no universal wrapping/resize latency guarantee is made.
 - Exact restoration applies to surviving components and unchanged-size layout where meaningful. New/closed panes and source navigation are not rolled back; resizing uses existing layout minimums and proportions.
 - Workspace/session replacement intentionally ends transient modes instead of restoring a stale capture later.
-- Stock wrapped text and HTML-preview reflow, Unicode first-use stalls, remaining Unicode corpus mismatches, native-memory attribution and cross-platform performance remain existing qualification concerns. Focus mode does not solve them.
+- Stock wrapped text and HTML-preview reflow, Unicode first-use stalls, the remaining 51 Unicode corpus mismatches, native-memory attribution and cross-platform performance remain existing qualification concerns. Focus mode does not solve them.
 - Native fullscreen/IME/accessibility and other operating systems need platform testing; passing programmatic Swing tests is not a claim of full platform certification.
 
 ## N. Next recommendation

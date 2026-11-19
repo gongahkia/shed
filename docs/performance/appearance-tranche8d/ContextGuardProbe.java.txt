@@ -1,0 +1,27 @@
+package shed;
+import javax.swing.*;
+import static shed.MarkdownPerformanceProbe.*;
+public class ContextGuardProbe {
+ public static void main(String[] args)throws Exception {
+  int exit=1;
+  try {
+   Texteditor editor=edt(()->new Texteditor(new String[]{args[0]}));
+   await(()->!editor.stagedStartupPending&&editor.getCurrentBuffer().hasFilePath(),20);
+   edt(()->{
+    var buffer=editor.getCurrentBuffer();var doc=editor.writingArea.getDocument();long rev=buffer.documentRevision();
+    for(boolean priorCenter:new boolean[]{false,true}) {
+     editor.writingArea.setLineWrap(false);
+     if(priorCenter)editor.commandHandler.execute("center on");
+     editor.commandHandler.execute("focus on");
+     if(!editor.goyoModeEnabled)throw new AssertionError("Eligible source did not enter");
+     editor.writingArea.setLineWrap(true);editor.updateZenModeLayout();
+     if(editor.goyoModeEnabled||editor.focusModeController.isCenteredWriting())throw new AssertionError("Unsupported context did not exit");
+     if(doc!=editor.writingArea.getDocument()||rev!=buffer.documentRevision()||buffer.getUndoManager().canUndo())throw new AssertionError("Source changed");
+    }
+    editor.dispose();return null;
+   });
+   System.out.println("CONTEXT_GUARD_PASS prior_center=false,true; source/revision/undo unchanged");exit=0;
+  }catch(Throwable failure){failure.printStackTrace();}
+  finally{System.exit(exit);}
+ }
+}

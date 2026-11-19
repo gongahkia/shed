@@ -31,6 +31,7 @@ public class ConfigManager {
     }
 
     private final Map<String, String> config;
+    private ThemePreviewLease themePreview;
     private final Map<String, String> defaultConfig;
     private final Map<String, String> persistedConfig;
     private final Map<String, String> projectConfig;
@@ -956,6 +957,53 @@ public class ConfigManager {
     public String getThemeDisplayName() {
         ThemePalette theme = activeTheme();
         return theme == null ? "Shed Light" : theme.displayName;
+    }
+
+    String getAuthoritativeThemeId() {
+        return resolveTheme(getString("theme", DEFAULT_THEME)).id;
+    }
+
+    ThemePreviewLease previewTheme(String requestedTheme) {
+        String alias = THEME_ALIASES.get(normalizeThemeName(requestedTheme == null ? "" : requestedTheme));
+        if (themePreview != null || alias == null || !THEMES.containsKey(alias)) return null;
+        themePreview = new ThemePreviewLease(alias);
+        return themePreview;
+    }
+
+    // A preview changes palette resolution only, never the serializable settings layers.
+    final class ThemePreviewLease implements AutoCloseable {
+        private String theme;
+
+        private ThemePreviewLease(String theme) { this.theme = theme; }
+
+        boolean select(String requestedTheme) {
+            String alias = THEME_ALIASES.get(normalizeThemeName(requestedTheme == null ? "" : requestedTheme));
+            if (themePreview != this || alias == null || !THEMES.containsKey(alias)) return false;
+            theme = alias;
+            return true;
+        }
+
+        int acceptAndPersist() throws IOException {
+            if (themePreview != this) throw new IOException("Theme preview is no longer active");
+            String previous = config.get("theme");
+            Map<String, String> persistedBefore = new HashMap<>(persistedConfig);
+            setTheme(theme);
+            try {
+                int count = persistCurrentConfig();
+                close();
+                return count;
+            } catch (IOException error) {
+                config.put("theme", previous);
+                settings.applyRuntime("theme", previous);
+                persistedConfig.clear();
+                persistedConfig.putAll(persistedBefore);
+                throw error;
+            }
+        }
+
+        @Override public void close() {
+            if (themePreview == this) themePreview = null;
+        }
     }
 
     public String setTheme(String requestedTheme) {
@@ -2364,7 +2412,10 @@ public class ConfigManager {
     }
 
     private ThemePalette activeTheme() {
-        String raw = getString("theme", DEFAULT_THEME);
+        return resolveTheme(themePreview == null ? getString("theme", DEFAULT_THEME) : themePreview.theme);
+    }
+
+    private ThemePalette resolveTheme(String raw) {
         String alias = THEME_ALIASES.get(normalizeThemeName(raw));
         if (alias == null) {
             alias = DEFAULT_THEME;

@@ -2501,6 +2501,183 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void liveThemePreviewCancelsWithoutSourceOrPreferenceChangesAcrossKeymapsAndSplits() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("preview-sources-home");
+        Path file = Files.writeString(tempDir.resolve("preview-sources.md"), "# Heading\nUnicode क्ष 😀 é\n");
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.splitWindow(true);
+                editor.commandHandler.execute("focus on");
+                FileBuffer buffer = editor.getCurrentBuffer();
+                var events = new java.util.concurrent.atomic.AtomicInteger();
+                buffer.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                    public void insertUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
+                    public void removeUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
+                    public void changedUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
+                });
+                var snapshot = buffer.textSnapshot(); long revision = buffer.documentRevision();
+                boolean dirty = buffer.isModified(), undo = buffer.getUndoManager().canUndo();
+                for (String profile : List.of("plain", "vim", "emacs")) {
+                    editor.configManager.set("keymap.profile", profile);
+                    editor.writingArea.setCaretPosition(20); editor.writingArea.moveCaretPosition(10);
+                    var font = editor.writingArea.getFont();
+                    ThemeGalleryDialog gallery = themeGallery(editor);
+                    assertSame(gallery, themeGallery(editor), "only one gallery per owner");
+                    selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme();
+                    assertEquals("dracula", editor.configManager.getThemeId());
+                    assertEquals("shed-light", editor.configManager.get("theme"));
+                    for (EditorPane pane : editor.editorPanes) assertEquals(editor.configManager.getEditorForeground(), pane.getTextArea().getForeground());
+                    selectGalleryTheme(gallery, "gruvbox-dark");
+                    assertEquals("gruvbox-dark", editor.configManager.getThemeId());
+                    gallery.dispose();
+                    assertEquals("shed-light", editor.configManager.getThemeId());
+                    assertEquals(10, editor.writingArea.getCaret().getDot());
+                    assertEquals(20, editor.writingArea.getCaret().getMark());
+                    assertEquals(font, editor.writingArea.getFont());
+                    assertSame(snapshot, buffer.textSnapshot()); assertEquals(revision, buffer.documentRevision());
+                    assertEquals(dirty, buffer.isModified()); assertEquals(undo, buffer.getUndoManager().canUndo());
+                }
+                assertEquals(0, events.get()); assertTrue(editor.goyoModeEnabled);
+                editor.commandHandler.execute("focus off"); return null;
+            });
+            assertEquals("# Heading\nUnicode क्ष 😀 é\n", Files.readString(file));
+            assertFalse(Files.exists(home.resolve(".shed/config.toml")));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void livePreviewCancellationUsesCurrentManualAuthorityAndKeepsFontChanges() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("preview-authority-home"), Files.writeString(tempDir.resolve("preview-authority.md"), "body\n"));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                ThemeGalleryDialog gallery = themeGallery(editor);
+                selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme();
+                editor.setThemeFromCommand("catppuccin-latte");
+                editor.configManager.set("font.size", "18");
+                editor.sessionConfigController.applyRuntimeConfigFromSettings();
+                assertEquals("dracula", editor.configManager.getThemeId());
+                gallery.cancelPreview();
+                assertEquals("catppuccin-latte", editor.configManager.getThemeId());
+                assertEquals(18, editor.configManager.getFontSize());
+                assertEquals(18, editor.writingArea.getFont().getSize());
+                gallery.dispose(); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void galleryAcceptancePersistsWhileRepeatedDisposalReleasesPreviewOwnership() throws Exception {
+        assumeSwingAvailable(); Path home = tempDir.resolve("preview-commit-home");
+        Texteditor editor = createEditor(home, Files.writeString(tempDir.resolve("preview-commit.md"), "body\n"));
+        try {
+            onEdt(() -> {
+                ThemeGalleryDialog gallery = themeGallery(editor);
+                selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme();
+                descendants(gallery, javax.swing.JButton.class).stream().filter(b -> b.getText().equals("Apply and Save")).findFirst().orElseThrow().doClick();
+                assertEquals("dracula", editor.configManager.getAuthoritativeThemeId());
+                gallery.dispose(); assertEquals("dracula", editor.configManager.getThemeId());
+                for (int i = 0; i < 6; i++) {
+                    ThemeGalleryDialog next = themeGallery(editor);
+                    selectGalleryTheme(next, "shed-light"); next.previewSelectedTheme(); next.dispose(); next.dispose();
+                    assertEquals("dracula", editor.configManager.getThemeId());
+                }
+                return null;
+            });
+            assertTrue(Files.readString(home.resolve(".shed/config.toml")).contains("dracula"));
+            onEdt(() -> {
+                ThemeGalleryDialog gallery = themeGallery(editor);
+                selectGalleryTheme(gallery, "shed-light"); gallery.previewSelectedTheme();
+                editor.dispose();
+                assertEquals("dracula", editor.configManager.getThemeId()); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void openingAnotherWorkbenchCancelsLivePreviewAndMultipleWindowsRejectIt() throws Exception {
+        assumeSwingAvailable();
+        Texteditor first = createEditor(tempDir.resolve("preview-first-home"), Files.writeString(tempDir.resolve("preview-first.md"), "first"));
+        Texteditor second = null;
+        try {
+            ThemeGalleryDialog gallery = onEdt(() -> {
+                var shown = themeGallery(first); selectGalleryTheme(shown, "dracula"); shown.previewSelectedTheme();
+                assertEquals("dracula", first.configManager.getThemeId()); return shown;
+            });
+            second = createEditor(tempDir.resolve("preview-second-home"), Files.writeString(tempDir.resolve("preview-second.md"), "second"));
+            onEdt(() -> {
+                assertEquals("shed-light", first.configManager.getThemeId());
+                gallery.previewSelectedTheme();
+                assertEquals("shed-light", first.configManager.getThemeId());
+                assertTrue(descendants(gallery, javax.swing.JLabel.class).stream().anyMatch(label -> label.getText() != null && label.getText().contains("requires one Shed window")));
+                gallery.dispose(); return null;
+            });
+        } finally { disposeEditor(second); disposeEditor(first); }
+    }
+
+    @Test
+    void savingSettingsDuringPreviewDoesNotPromoteTemporaryThemeToAuthority() throws Exception {
+        assumeSwingAvailable(); Path home = tempDir.resolve("preview-settings-home");
+        Texteditor editor = createEditor(home, Files.writeString(tempDir.resolve("preview-settings.md"), "body"));
+        try {
+            onEdt(() -> {
+                editor.configManager.setAndPersist("theme", "shed-light");
+                Path settings = home.resolve(".shed/config.toml"); String before = Files.readString(settings);
+                String after = before + "\n\"font.size\" = 18\n"; Files.writeString(settings, after);
+                ThemeGalleryDialog gallery = themeGallery(editor);
+                selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme();
+                FileBuffer buffer = new FileBuffer(settings.toFile());
+                editor.sessionConfigController.reloadConfigIfSettingsBuffer(buffer, before, after);
+                assertEquals("dracula", editor.configManager.getThemeId());
+                gallery.cancelPreview();
+                assertEquals("shed-light", editor.configManager.getThemeId());
+                assertEquals(18, editor.configManager.getFontSize());
+                gallery.dispose(); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void gallerySaveFailureLeavesPreviewCancellableAndDoesNotCommitItsTheme() throws Exception {
+        assumeSwingAvailable(); Path home = tempDir.resolve("gallery-save-failure-home");
+        Texteditor editor = createEditor(home, Files.writeString(tempDir.resolve("gallery-save-failure.md"), "body"));
+        try {
+            onEdt(() -> {
+                Path settings = home.resolve(".shed/config.toml"); Files.createDirectory(settings);
+                ThemeGalleryDialog gallery = themeGallery(editor);
+                selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme();
+                descendants(gallery, javax.swing.JButton.class).stream().filter(b -> b.getText().equals("Apply and Save")).findFirst().orElseThrow().doClick();
+                assertEquals("shed-light", editor.configManager.getAuthoritativeThemeId());
+                assertEquals("dracula", editor.configManager.getThemeId());
+                assertTrue(descendants(gallery, javax.swing.JLabel.class).stream().anyMatch(label -> label.getText() != null && label.getText().startsWith("Error saving config:")));
+                gallery.dispose(); assertEquals("shed-light", editor.configManager.getThemeId());
+                Files.delete(settings); return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    private static ThemeGalleryDialog themeGallery(Texteditor editor) {
+        ThemeGalleryDialog.showFor(editor);
+        return Arrays.stream(editor.getOwnedWindows()).filter(ThemeGalleryDialog.class::isInstance)
+            .map(ThemeGalleryDialog.class::cast).filter(Window::isDisplayable).findFirst().orElseThrow();
+    }
+
+    private static void selectGalleryTheme(ThemeGalleryDialog gallery, String id) {
+        for (var list : descendants(gallery, javax.swing.JList.class)) {
+            for (int i = 0; i < list.getModel().getSize(); i++) {
+                if (list.getModel().getElementAt(i) instanceof ThemePreview theme && theme.id().equals(id)) {
+                    list.setSelectedIndex(i); return;
+                }
+            }
+        }
+        throw new AssertionError("Missing gallery theme: " + id);
+    }
+
+    @Test
     void themeGallerySavesAndRefreshesForLightThemes() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-themed-gallery");

@@ -149,7 +149,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/run-portable-tests.py \
 
 The same arguments with `--tests LspDefinitionPerformanceTest --measure-lsp` produced the fresh performance control; `--verify-gate` produced the synthetic admission check; `--package-only` produced the JAR with tests skipped solely for packaging. Exact expanded JVM/Maven argv, environment policy, fixture/source/class hashes and logs are indexed in `performance/ide-trackb1a/INDEX.md`. Python tooling uses `python3 -m unittest discover -s scripts -p 'test_*.py' -v` under a fresh disposable environment. The packaged smoke driver supplies the same fresh environment and explicit JDK/JAR, with compiler/runtime home/temp/preferences redirected.
 
-**Not run:** the full historical 1,616-test native/GUI suite, `LspServiceTest`'s real child peers, `TexteditorSwingIntegrationTest`, PTYs, actual native language servers, physical/window input/paint, Windows/Linux GUI qualification. B0.1's gate and its signal-6 NO-GO remain intact. No full-suite pass count is inferred from compilation or historical results.
+**Not run:** the full historical native/GUI Maven suite (B0: 1,616 passed and five skipped), `LspServiceTest`'s real child peers, `TexteditorSwingIntegrationTest`, PTYs, actual native language servers, physical/window input/paint, Windows/Linux GUI qualification. B0.1's gate and its signal-6 NO-GO remain intact. No full-suite pass count is inferred from compilation or historical results.
 
 ## I. UI/UX, defaults and preferences
 

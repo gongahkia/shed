@@ -1,0 +1,123 @@
+[
+  {
+    "stage": "benchmark-active-pane",
+    "exit": 0,
+    "seconds": 11.840676069259644,
+    "args": [
+      "--jar",
+      "/tmp/shed-tranche8h-run/qualification.jar",
+      "--baseline-jar",
+      "/tmp/shed-tranche8h-run/qualification.jar",
+      "--output",
+      "/tmp/shed-tranche8h-run/pane-verified",
+      "--lifecycle-only"
+    ]
+  },
+  {
+    "stage": "benchmark-focus-mode",
+    "exit": 0,
+    "seconds": 10.850861072540283,
+    "args": [
+      "--jar",
+      "/tmp/shed-tranche8h-run/qualification.jar",
+      "--output",
+      "/tmp/shed-tranche8h-run/focus-current"
+    ]
+  },
+  {
+    "stage": "benchmark-theme-preview",
+    "exit": 0,
+    "seconds": 32.85447812080383,
+    "args": [
+      "--jar",
+      "/tmp/shed-tranche8h-run/qualification.jar",
+      "--baseline-jar",
+      "/tmp/shed-tranche8h-run/qualification.jar",
+      "--output",
+      "/tmp/shed-tranche8h-run/theme-current"
+    ]
+  },
+  {
+    "stage": "benchmark-editor",
+    "exit": 0,
+    "seconds": 14.534379005432129,
+    "args": [
+      "--jar",
+      "/tmp/shed-tranche8h-run/qualification.jar",
+      "--runs",
+      "3",
+      "--label",
+      "8h-current",
+      "--output",
+      "/tmp/shed-tranche8h-run/startup.json"
+    ]
+  },
+  {
+    "stage": "visual",
+    "exit": 0,
+    "timeout": false,
+    "seconds": 2.5771019579842687,
+    "command": [
+      "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home/bin/java",
+      "-Xms64m",
+      "-Xmx512m",
+      "-Djava.awt.headless=false",
+      "-Duser.home=/tmp/shed-tranche8h-run/visual-home",
+      "-cp",
+      "/tmp/shed-tranche8h-run/visual-classes:/tmp/shed-tranche8h-run/qualification.jar",
+      "shed.AppearanceQualificationProbe",
+      "/tmp/shed-tranche8h-run/visual.md",
+      "/tmp/shed-tranche8h-run/visual"
+    ],
+    "rss_mib": [
+      4.40625,
+      138.53125,
+      165.828125,
+      171.1875,
+      249.53125,
+      436.28125,
+      567.625,
+      623.359375,
+      651.625,
+      665.46875
+    ]
+  },
+  {
+    "stage": "rooted",
+    "exit": 0,
+    "timeout": false,
+    "seconds": 4.65625299999374,
+    "command": [
+      "/tmp/shed-tranche2b-tools/jdk-21.0.13+9/Contents/Home/bin/java",
+      "-Xms64m",
+      "-Xmx512m",
+      "-Djava.awt.headless=false",
+      "-Duser.home=/tmp/shed-tranche8h-run/rooted-home",
+      "-cp",
+      "/tmp/shed-tranche8h-run/visual-classes:/tmp/shed-tranche8h-run/qualification.jar",
+      "shed.SplitLifecycleDiagnostic",
+      "/tmp/shed-tranche8h-run/rooted.md",
+      "true"
+    ],
+    "rss_mib": [
+      6.5,
+      137.984375,
+      168.6875,
+      172.796875,
+      252.09375,
+      422.359375,
+      556.03125,
+      622.546875,
+      635.734375,
+      636.9375,
+      637.390625,
+      638.3125,
+      638.53125,
+      640.078125,
+      640.140625,
+      640.40625,
+      640.8125,
+      640.8125
+    ]
+  }
+]

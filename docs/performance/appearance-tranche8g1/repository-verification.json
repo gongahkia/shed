@@ -1,8 +1,8 @@
 {
   "entry_head": "9b11e7bfcb1881e04378b0868d52398d1374ddc9",
-  "final_observed_head": "020a881237ecb15ce83b91954edf3a43452bbb75",
+  "final_observed_head": "7469f4188c1c30675b2549e6a7ecdfbb1f1788f4",
   "entry_status": "",
-  "final_observed_status": " M src/main/java/shed/EditorPane.java\n M src/test/java/shed/TexteditorSwingIntegrationTest.java\n?? docs/SPLIT_VIEW_LIFECYCLE_REMEDIATION.md\n?? docs/performance/appearance-tranche8g1/\n",
+  "final_observed_status": " M docs/SPLIT_VIEW_LIFECYCLE_REMEDIATION.md\n M docs/performance/appearance-tranche8g1/repository-verification.json\n?? docs/performance/appearance-tranche8g1/INDEX.md\n?? docs/performance/appearance-tranche8g1/checksums.sha256\n",
   "starting_files": 1669,
   "changed_starting_files": [
     "scripts/benchmark-active-pane.py",
@@ -39,5 +39,6 @@
   "git_diff_check_exit": 0,
   "agent_commits": 0,
   "agent_pushes": 0,
-  "note": "External HEAD advancement preserved; changes inventoried relative to entry."
+  "note": "External commits advanced HEAD while work was in progress; all preserved. Source/probe/artifact verification is relative to entry file hashes and does not require a static HEAD.",
+  "final_observed_at_utc": "2026-11-20T02:31:11.628857+00:00"
 }

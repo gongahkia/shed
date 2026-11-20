@@ -1,0 +1,132 @@
+[
+  {
+    "case": [
+      4096,
+      false,
+      false,
+      0,
+      true
+    ],
+    "phase": "default_initial",
+    "equal": true,
+    "differences": []
+  },
+  {
+    "case": [
+      4096,
+      false,
+      false,
+      0,
+      true
+    ],
+    "phase": "default_restored",
+    "equal": true,
+    "differences": []
+  },
+  {
+    "case": [
+      102400,
+      true,
+      false,
+      0,
+      true
+    ],
+    "state": "INCOMPLETE_PAIR"
+  },
+  {
+    "case": [
+      1048576,
+      false,
+      false,
+      0,
+      false
+    ],
+    "phase": "default_initial",
+    "equal": true,
+    "differences": []
+  },
+  {
+    "case": [
+      1048576,
+      false,
+      false,
+      0,
+      false
+    ],
+    "phase": "default_restored",
+    "equal": true,
+    "differences": []
+  },
+  {
+    "case": [
+      1048576,
+      false,
+      true,
+      0,
+      false
+    ],
+    "phase": "default_initial",
+    "equal": true,
+    "differences": []
+  },
+  {
+    "case": [
+      1048576,
+      false,
+      true,
+      0,
+      false
+    ],
+    "phase": "default_restored",
+    "equal": true,
+    "differences": []
+  },
+  {
+    "case": [
+      1048576,
+      true,
+      false,
+      0,
+      false
+    ],
+    "phase": "default_initial",
+    "equal": true,
+    "differences": []
+  },
+  {
+    "case": [
+      1048576,
+      true,
+      false,
+      0,
+      false
+    ],
+    "phase": "default_restored",
+    "equal": true,
+    "differences": []
+  },
+  {
+    "case": [
+      4096,
+      false,
+      false,
+      24,
+      false
+    ],
+    "phase": "default_initial",
+    "equal": true,
+    "differences": []
+  },
+  {
+    "case": [
+      4096,
+      false,
+      false,
+      24,
+      false
+    ],
+    "phase": "default_restored",
+    "equal": true,
+    "differences": []
+  }
+]

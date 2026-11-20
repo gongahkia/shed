@@ -1,0 +1,30 @@
+{
+  "utc": "2026-11-20T02:46:30Z",
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "load": [
+    3.98876953125,
+    3.9306640625,
+    3.65966796875
+  ],
+  "cpu_count": 8,
+  "hardware": {
+    "exit": 0,
+    "text": "hw.model: Mac15,12\nhw.memsize: 17179869184\nhw.ncpu: 8\nmachdep.cpu.brand_string: Apple M3"
+  },
+  "pressure": {
+    "exit": 0,
+    "text": "The system has 17179869184 (1048576 pages with a page size of 16384).\nSystem-wide memory free percentage: 51%"
+  },
+  "swap": {
+    "exit": 0,
+    "text": "vm.swapusage: total = 2048.00M  used = 999.50M  free = 1048.50M  (encrypted)"
+  },
+  "vm_stat": {
+    "exit": 0,
+    "text": "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                     4237.\nPages active:                                 259000.\nPages inactive:                               256796.\nPages speculative:                              1069.\nPages throttled:                                   0.\nPages wired down:                             159237.\nPages purgeable:                               15585.\n\"Translation faults\":                     1998494941.\nPages copy-on-write:                        83834044.\nPages zero filled:                        1278807328.\nPages reactivated:                          78659587.\nPages purged:                                7814742.\nFile-backed pages:                            162974.\nAnonymous pages:                              353891.\nPages stored in compressor:                   741929.\nPages occupied by compressor:                 330956.\nDecompressions:                             47188213.\nCompressions:                               64106933.\nPageins:                                    43675232.\nPageouts:                                     311338.\nSwapins:                                      202735.\nSwapouts:                                     324791."
+  },
+  "display": {
+    "exit": 0,
+    "text": "Graphics/Displays:\n\n    Apple M3:\n\n      Chipset Model: Apple M3\n      Type: GPU\n      Bus: Built-In\n      Total Number of Cores: 10\n      Vendor: Apple (0x106b)\n      Metal Support: Metal 4\n      Displays:\n        Color LCD:\n          Display Type: Built-in Liquid Retina Display\n          Resolution: 2560 x 1664 Retina\n          Main Display: Yes\n          Mirror: Off\n          Online: Yes\n          Automatically Adjust Brightness: Yes\n          Connection Type: Internal\n        DELL P2425HE:\n          Resolution: 1920 x 1080 (1080p FHD - Full High Definition)\n          UI Looks like: 1920 x 1080 @ 100.00Hz\n          Mirror: Off\n          Online: Yes\n          Rotation: Supported"
+  }
+}

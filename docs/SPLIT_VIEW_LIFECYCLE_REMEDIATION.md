@@ -196,7 +196,7 @@ Before and after README SHA-256:
 
 Entry HEAD was `9b11e7bfcb1881e04378b0868d52398d1374ddc9`, with a clean working tree. Starting hashes cover 1,669 existing files. Ten existing files changed; the other 1,659 remain identical and none is missing. Repository verification records these paths, prior-evidence preservation, source/probe/artifact identities, final status and whitespace checks. README was never modified.
 
-HEAD advanced externally to `020a881237ecb15ce83b91954edf3a43452bbb75` during the task, capturing intermediate work. That commit was preserved. An entry-to-final diff includes changes captured by it, not only the remaining working-tree diff. The agent performed no reset, clean, revert, discard, commit or push.
+HEAD advanced externally during the task, including observations at `020a881237ecb15ce83b91954edf3a43452bbb75` and `7469f4188c1c30675b2549e6a7ecdfbb1f1788f4`, capturing work in progress. Those commits were preserved. An entry-to-final diff includes captured changes, not only the remaining working-tree diff. The agent performed no reset, clean, revert, discard, commit or push.
 
 ## L. Outstanding limitations
 

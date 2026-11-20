@@ -32,6 +32,7 @@ final class LspController {
     private int documentHighlightJobId = -1;
     private long documentHighlightGeneration;
     private int workspaceSymbolQueryGeneration;
+    private LspDefinitionRequests definitionRequests;
     private int codeActionJobId = -1;
     private long codeActionGeneration;
     private final Map<LspServerKey, Integer> automaticLaunchJobs = new HashMap<>();
@@ -260,6 +261,7 @@ final class LspController {
 
 
     public String lspRestart(String ext) {
+        cancelDefinition();
         String extension = ext.isEmpty() ? currentBufferExtension() : ext.replace(".", "").toLowerCase();
         if (extension.isEmpty()) return "No extension specified and no file open";
         int stopped = stopServersForExtension(extension);
@@ -283,6 +285,7 @@ final class LspController {
 
 
     public String lspStop(String ext) {
+        cancelDefinition();
         String extension = ext.isEmpty() ? currentBufferExtension() : ext.replace(".", "").toLowerCase();
         if (extension.isEmpty()) return "No extension specified and no file open";
         int stopped = stopServersForExtension(extension);
@@ -389,28 +392,41 @@ final class LspController {
 
     public String lspGoToDefinition() {
         FileBuffer buffer = editor.getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
+        EditorPane pane = editor.getActivePane();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile() || pane == null || pane.isDisposed()) {
             return "LSP definition requires a file-backed buffer";
         }
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) {
-            return "LSP unavailable";
+        LspClient client = existingLspClient(buffer);
+        if (client == null || !client.isAlive()) {
+            startLspAutomatically(buffer);
+            return "LSP unavailable: language server is starting or not configured; retry definition when ready";
         }
         String unavailable = capabilityUnavailable(client, LspCapability.DEFINITION);
         if (unavailable != null) return unavailable;
         syncLspOpen(buffer);
+        flushPendingLspChange(buffer);
         String uri = bufferUri(buffer);
         try {
-            int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
-            int column = editor.writingArea.getCaretPosition() - editor.writingArea.getLineStartOffset(line);
-            LspClient.Location location = client.definition(uri, line, column);
-            if (location == null) {
-                return "No definition found";
+            var context = LspDefinitionRequests.Context.capture(buffer, pane, client, uri, editor.lspDocumentVersions.get(uri));
+            if (definitionRequests == null) {
+                definitionRequests = new LspDefinitionRequests(editor.asyncJobService,
+                    location -> editor.showMessage(openLspLocation(location, "definition")), editor::showMessage);
             }
-            return openLspLocation(location, "definition");
-        } catch (BadLocationException e) {
-            return "LSP definition failed: " + e.getMessage();
+            return definitionRequests.request(context, () -> definitionContextCurrent(context));
+        } catch (BadLocationException error) {
+            return "LSP definition failed: " + error.getMessage();
         }
+    }
+
+    private boolean definitionContextCurrent(LspDefinitionRequests.Context context) {
+        if (editor.closingDown || !editor.buffers.contains(context.buffer()) || context.pane().isDisposed()
+            || editor.getCurrentBuffer() != context.buffer() || editor.getActivePane() != context.pane()) return false;
+        return context.current(editor.getCurrentBuffer(), editor.getActivePane(), existingLspClient(context.buffer()),
+            bufferUri(context.buffer()), editor.lspDocumentVersions.get(context.uri()), editor.closingDown);
+    }
+
+    void cancelDefinition() {
+        if (definitionRequests != null) definitionRequests.cancel();
     }
 
     public String lspGoToTypeDefinition() {
@@ -1415,8 +1431,16 @@ final class LspController {
 
 
     LspClient.WorkspaceEditResponse applyWorkspaceEditFromServer(String label, List<LspClient.WorkspaceEditOperation> operations) {
-        ShedInformationDialog.showFor(editor, "Workspace Edit Review", buildWorkspaceEditPreview(label, operations, new WorkspaceEditApplyResult())
-            + "\nServer-originated workspace edits require review and were not applied.\n");
+        return requestWorkspaceEditReview(() -> {
+            if (!editor.closingDown) ShedInformationDialog.showFor(editor, "Workspace Edit Review",
+                buildWorkspaceEditPreview(label, operations, new WorkspaceEditApplyResult())
+                    + "\nServer-originated workspace edits require review and were not applied.\n");
+        });
+    }
+
+    static LspClient.WorkspaceEditResponse requestWorkspaceEditReview(Runnable review) {
+        if (SwingUtilities.isEventDispatchThread()) review.run();
+        else SwingUtilities.invokeLater(review);
         return new LspClient.WorkspaceEditResponse(false, "workspace edit requires user review");
     }
 
@@ -2429,6 +2453,7 @@ final class LspController {
     }
 
     void syncLspChange(FileBuffer buffer, FileBuffer.DocumentTextChange textChange) {
+        if (definitionRequests != null) definitionRequests.sourceChanged(buffer);
         if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
             return;
         }
@@ -2465,6 +2490,7 @@ final class LspController {
     }
 
     void shutdown() {
+        if (definitionRequests != null) definitionRequests.close();
         cancelAutomaticLaunches(key -> true);
         workspaceSymbolCoordinator.close();
         if (lspChangeTimer != null) {

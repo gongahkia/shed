@@ -17,6 +17,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class LspClient {
     private static final int MAX_CODE_LENSES = 500;
@@ -603,7 +604,7 @@ public class LspClient {
     private final Map<String, List<Diagnostic>> diagnostics;
     private final Map<String, String> pullDiagnosticResultIds;
     private final Set<Integer> staleRequestIds;
-    private final Object requestLock = new Object();
+    private final ReentrantLock requestLock = new ReentrantLock();
     private final LspFeatureSettings featureSettings;
     private WorkspaceEditHandler workspaceEditHandler;
     private Runnable diagnosticsChangedHandler;
@@ -1632,22 +1633,28 @@ public class LspClient {
     }
 
     public void drainNotifications() {
-        while (true) {
-            Map<String, Object> message = messageQueue.poll();
-            if (message == null) {
-                return;
-            }
-            if (message.containsKey("method")) {
-                handleIncomingMethod(message);
-            } else {
-                Integer responseId = MiniJson.asInt(message.get("id"));
-                if (responseId != null && staleRequestIds.remove(responseId)) {
-                    continue;
+        // The request owner consumes responses and notifications while it waits. UI polling must not steal a response or wait for that owner.
+        if (!requestLock.tryLock()) return;
+        try {
+            while (true) {
+                Map<String, Object> message = messageQueue.poll();
+                if (message == null) {
+                    return;
                 }
-                synchronized (deferredMessages) {
-                    deferredMessages.add(message);
+                if (message.containsKey("method")) {
+                    handleIncomingMethod(message);
+                } else {
+                    Integer responseId = MiniJson.asInt(message.get("id"));
+                    if (responseId != null && staleRequestIds.remove(responseId)) {
+                        continue;
+                    }
+                    synchronized (deferredMessages) {
+                        deferredMessages.add(message);
+                    }
                 }
             }
+        } finally {
+            requestLock.unlock();
         }
     }
 
@@ -1891,7 +1898,13 @@ public class LspClient {
         // Only one request may consume the shared response queue at a time. Keep
         // that wait off the write lock so didChange can be sent while a server
         // is still computing an earlier completion response.
-        synchronized (requestLock) {
+        try {
+            requestLock.lockInterruptibly();
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+        try {
             int id = nextRequestId();
             Map<String, Object> request = new LinkedHashMap<>();
             request.put("jsonrpc", "2.0");
@@ -1905,6 +1918,8 @@ public class LspClient {
                 sendCancelRequest(id);
             }
             return response;
+        } finally {
+            requestLock.unlock();
         }
     }
 

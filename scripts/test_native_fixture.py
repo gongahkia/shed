@@ -212,20 +212,56 @@ class BenchmarkAdmissionTest(unittest.TestCase):
     def test_portable_runner_rejects_native_test_before_tool_lookup(self):
         import subprocess
         import sys
-        with tempfile.TemporaryDirectory() as scratch:
-            output = Path(scratch) / 'not-created'
-            result = subprocess.run([sys.executable, str(Path(__file__).with_name('run-portable-tests.py')),
-                                     '--jdk', '/unused', '--maven', '/unused', '--repository', '/unused',
-                                     '--output', str(output), '--tests', 'PtyTerminalConnectorTest'],
-                                    capture_output=True, text=True, timeout=5)
-            self.assertEqual(result.returncode, 2)
-            self.assertIn('blocked', result.stderr)
-            self.assertFalse(output.exists())
+        for name in ['PtyTerminalConnectorTest', 'LspServiceTest', 'TexteditorSwingIntegrationTest']:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as scratch:
+                output = Path(scratch) / 'not-created'
+                result = subprocess.run([sys.executable, str(Path(__file__).with_name('run-portable-tests.py')),
+                                         '--jdk', '/unused', '--maven', '/unused', '--repository', '/unused',
+                                         '--output', str(output), '--tests', name],
+                                        capture_output=True, text=True, timeout=5)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn('blocked', result.stderr)
+                self.assertFalse(output.exists())
 
     def test_reviewed_test_manifest_matches_sources(self):
         root = Path(__file__).resolve().parents[1]
         lines = (root / 'src/test/resources/shed/portable-fixture-tests.properties').read_text().splitlines()
-        self.assertEqual(len(lines), 8)
+        approved = {
+            'AsyncJobPayloadLifecycleTest',
+            'AsyncJobServiceTest',
+            'BoundedUndoManagerTest',
+            'CenteredWritingLayoutTest',
+            'DocumentFormatPreservationTest',
+            'DocumentLifecycleTest',
+            'DocumentRequestsTest',
+            'DocumentWorkbenchTest',
+            'EditorSurfaceTest',
+            'EmacsKeymapTest',
+            'FileBufferTest',
+            'GraphemeBoundaryTest',
+            'GraphemeEditRangeTest',
+            'KeymapOverlayTest',
+            'LspCompletionApplicationTest',
+            'LspDefinitionPerformanceTest',
+            'LspDefinitionRequestsTest',
+            'LspDefinitionResponsivenessTest',
+            'LspTransportConcurrencyTest',
+            'LspWorkspaceFormatTest',
+            'MarkdownEditTest',
+            'MarkdownHighlightTest',
+            'MarkdownLinkNavigationTest',
+            'NativeFixtureGateTest',
+            'NavigationHistoryTest',
+            'PlainKeymapTest',
+            'RecoveryJournalTest',
+            'SourcePlainViewTest',
+            'SyntaxHighlightServiceTest',
+            'TerminalControllerTest',
+            'ThemePreviewTest',
+            'UiDensityTest',
+            'VersionedTextSnapshotTest',
+        }
+        self.assertEqual({line.split("=", 1)[0] for line in lines}, set(approved))
         for line in lines:
             name, expected = line.split('=')
             self.assertEqual(digest(root / 'src/test/java/shed' / (name + '.java')), expected)

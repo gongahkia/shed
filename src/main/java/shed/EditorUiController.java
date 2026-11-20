@@ -782,6 +782,7 @@ final class EditorUiController {
         }
         editor.cancelMarkdownHeadingEdit();
         editor.cancelMarkdownLinkNavigation();
+        editor.cancelLspDefinition();
         editor.writingArea = pane.getTextArea();
         editor.lineNumberPanel = pane.getLineNumberPanel();
         editor.editorScrollPane = pane.getScrollPane();

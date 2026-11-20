@@ -54,6 +54,7 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--tests', help='Comma-separated reviewed test classes; default all reviewed classes')
     parser.add_argument('--compile-only', action='store_true')
+    parser.add_argument('--measure-lsp', action='store_true', help='Opt into bounded in-process B1A measurements; never launches a server')
     parser.add_argument('--verify-gate', action='store_true', help='Expect rejection of one fixed non-native synthetic sentinel class')
     args = parser.parse_args()
     reviewed = dict(line.split('=', 1) for line in MANIFEST.read_text().splitlines())
@@ -88,6 +89,8 @@ def main():
         settings.write_text('<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"/>\n')
         props = [f'-Duser.home={f.env["HOME"]}', f'-Djava.io.tmpdir={f.env["TMPDIR"]}',
                  f'-Djava.util.prefs.userRoot={f.run_root / "config"}', '-Djava.awt.headless=true']
+        if args.measure_lsp:
+            props.append('-Dshed.test.lsp.measure=true')
         command = [str(jdk / 'bin/java'), *props, f'-Dmaven.home={maven}', f'-Dclassworlds.conf={maven / "bin/m2.conf"}', f'-Dmaven.multiModuleProjectDirectory={ROOT}',
                    '-cp', str(boot[0]), 'org.codehaus.plexus.classworlds.launcher.Launcher', '-B', '-o',
                    '-s', str(settings), '-gs', str(settings), f'-Dmaven.repo.local={cache}', *props,

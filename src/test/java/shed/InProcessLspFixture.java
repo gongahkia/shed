@@ -20,7 +20,11 @@ final class InProcessLspFixture extends Process implements AutoCloseable {
     private final AtomicBoolean alive = new AtomicBoolean(true);
     private byte[] current = new byte[0];
     private int offset;
+    volatile boolean failDefinition;
+    volatile boolean immediateDefinition;
+    final java.util.concurrent.CountDownLatch readerClosed = new java.util.concurrent.CountDownLatch(1);
     private final InputStream input = new InputStream() {
+        @Override public void close() { readerClosed.countDown(); }
         @Override public int read() throws IOException {
             while (offset == current.length) {
                 try { current = incoming.take(); offset = 0; }
@@ -46,6 +50,7 @@ final class InProcessLspFixture extends Process implements AutoCloseable {
             if (header < 0) throw new AssertionError("incomplete LSP frame");
             Map<String, Object> message = MiniJson.asObject(MiniJson.parseStrict(frame.substring(header + 4)));
             String method = String.valueOf(message.get("method"));
+            if (failDefinition && "textDocument/definition".equals(method)) throw new IllegalStateException("synthetic transport failure");
             if ("initialize".equals(method)) {
                 respond(message, Map.of("capabilities", Map.of("definitionProvider", true, "hoverProvider", true,
                     "referencesProvider", true, "completionProvider", Map.of(), "textDocumentSync", 2)));
@@ -53,6 +58,7 @@ final class InProcessLspFixture extends Process implements AutoCloseable {
                 respond(message, Map.of());
             } else {
                 requests.add(message);
+                if (immediateDefinition && "textDocument/definition".equals(method)) respond(message, location("file:///immediate.java"));
             }
         }
     };
@@ -68,6 +74,15 @@ final class InProcessLspFixture extends Process implements AutoCloseable {
             if (request != null && method.equals(request.get("method"))) return request;
         }
         throw new AssertionError("No in-process request: " + method);
+    }
+
+    Map<String, Object> awaitResponse(String id) throws InterruptedException {
+        long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        while (System.nanoTime() < end) {
+            Map<String, Object> response = requests.poll(10, TimeUnit.MILLISECONDS);
+            if (response != null && id.equals(response.get("id")) && !response.containsKey("method")) return response;
+        }
+        throw new AssertionError("No in-process response: " + id);
     }
 
     void respond(Map<String, Object> request, Object result) {

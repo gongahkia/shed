@@ -446,6 +446,7 @@ final class PaneBufferController {
 
 
     public void openFile(File file) throws IOException {
+        editor.cancelLspDefinition();
         if (findBufferByPath(file) != getCurrentBuffer()) editor.recordJumpPosition();
         EditorPane activePane = editor.getActivePane();
         if (activePane != null) openRequests.issue(activePane);
@@ -487,6 +488,7 @@ final class PaneBufferController {
                                java.util.function.Predicate<FileBuffer> loadedValid, boolean checked, Runnable beforeInstall,
                                java.util.function.Consumer<IOException> completion) {
         if (!current.getAsBoolean()) { if (checked && completion != null) completion.accept(new IOException("Markdown navigation cancelled")); return; }
+        editor.cancelLspDefinition();
         if (!checked && findBufferByPath(file) != getCurrentBuffer()) editor.recordJumpPosition();
         if (!checked) persistCurrentBufferState();
         EditorPane targetPane = editor.getActivePane();

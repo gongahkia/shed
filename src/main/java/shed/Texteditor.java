@@ -2385,6 +2385,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return lspController.currentBufferExtension();
     }
 
+    void cancelLspDefinition() {
+        lspController.cancelDefinition();
+    }
+
     public String lspGoToDefinition() {
         return lspController.lspGoToDefinition();
     }

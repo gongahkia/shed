@@ -1,0 +1,21 @@
+{
+  "git": "/opt/homebrew/bin/git",
+  "sh": "/bin/sh",
+  "bash": "/bin/bash",
+  "zsh": "/bin/zsh",
+  "fish": "/opt/homebrew/bin/fish",
+  "node": "/Users/gongahkia/.local/state/fnm_multishells/85606_1795140099907/bin/node",
+  "python3": "/opt/homebrew/bin/python3",
+  "cmake": "/opt/homebrew/bin/cmake",
+  "ctest": "/opt/homebrew/bin/ctest",
+  "cpack": "/opt/homebrew/bin/cpack",
+  "docker": "/opt/homebrew/bin/docker",
+  "devcontainer": null,
+  "dotnet": "/opt/homebrew/bin/dotnet",
+  "opencode": "/opt/homebrew/bin/opencode",
+  "gh": "/opt/homebrew/bin/gh",
+  "psql": "/opt/homebrew/bin/psql",
+  "sqlite3": "/usr/bin/sqlite3",
+  "mysql": "/opt/homebrew/bin/mysql",
+  "swift": "/usr/bin/swift"
+}

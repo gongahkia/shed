@@ -150,6 +150,7 @@ public final class WholeIdeDesktopProbe {
             try{gutter.paint(g);}finally{g.dispose();}return null;});
     }
     public static void main(String[] args) throws Exception {
+        WholeIdeServicesProbe.requireNativeFixture();
         folder=Path.of(args[2]);String mode=args[0];String target=args[1];long begin=System.nanoTime();
         PrintStream previous=System.err;
         System.setErr(new PrintStream(previous,true){@Override public void println(Object value){

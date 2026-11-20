@@ -1,0 +1,6 @@
+{
+  "src/benchmark/java/shed/WholeIdeServicesProbe.java": "07100d590a2c6fb7765ac455544346fac70c7269769de48b8ffe61ae4eff089f",
+  "src/benchmark/java/shed/WholeIdeDesktopProbe.java": "46d2acbaccd26f81b661ec3f5b2efa823e285d4a97ab4bc9c80c77b88ffdcce8",
+  "scripts/audit-whole-ide.py": "3d8581897e6b7066f731dae84e23a804b254304133ada764d8a594a63bd2ee2e",
+  "scripts/test_whole_ide_tooling.py": "338eba91ceed0d7489e085e390d427c1405eebc7861a45c1ea4e0f56c7585c28"
+}

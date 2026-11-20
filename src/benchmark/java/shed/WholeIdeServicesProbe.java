@@ -87,7 +87,10 @@ public final class WholeIdeServicesProbe {
                 check(running.awaitReadiness(1000,null).isEmpty(),"task readiness");running.stop();running.awaitCompletion(null);
             });
             timed("pty_roundtrip",n,()->{
-                var p=new PtyProcessBuilder(new String[]{"/bin/sh"}).setDirectory(root.toString()).setInitialColumns(80).setInitialRows(24).start();
+                var environment=new HashMap<>(System.getenv());
+                environment.put("HISTFILE","/dev/null");
+                environment.put("ENV","/dev/null");environment.put("BASH_ENV","/dev/null");
+                var p=new PtyProcessBuilder(new String[]{"/bin/sh"}).setDirectory(root.toString()).setEnvironment(environment).setInitialColumns(80).setInitialRows(24).start();
                 var connector=new PtyTerminalConnector(p,List.of("/bin/sh"),StandardCharsets.UTF_8);
                 var reader=Executors.newSingleThreadExecutor();
                 try {
@@ -98,7 +101,11 @@ public final class WholeIdeServicesProbe {
             });
         }
     }
+    static void requireNativeFixture() {
+        throw new IllegalStateException("B0.1: native process/PTY confinement unqualified; benchmark blocked");
+    }
     public static void main(String[] args) throws Exception {
+        requireNativeFixture();
         if(args[0].equals("server")){server(Integer.parseInt(args[1]),args.length>2?Path.of(args[2]):null);return;}
         Path root=Path.of(args[0]);state("initial");
         for(int count:new int[]{100,1000,5000})project(root.resolve("project-"+count),count);

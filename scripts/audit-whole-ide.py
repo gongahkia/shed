@@ -42,6 +42,11 @@ def main():
     (output / 'plan.json').write_text(json.dumps(plan, indent=2) + '\n')
     if args.plan_only:
         return 0
+    rejection = {'result': 'BLOCKED', 'reason': 'B0.1: native process/PTY confinement unqualified; no runtime launched'}
+    (output / 'blocked.json').write_text(json.dumps(rejection, indent=2) + '\n')
+    print(rejection['reason'], file=sys.stderr)
+    return 2
+
     jar = args.jar.resolve(strict=True)
     jdk = Path(subprocess.check_output([str(ROOT / 'scripts/resolve-toolchain.sh'), 'home'], text=True).strip())
     spec = importlib.util.spec_from_file_location('markdown_controls', ROOT / 'scripts/benchmark-markdown.py')

@@ -1,0 +1,10 @@
+{
+  "artifact_identical_to_8h": true,
+  "bytes": 102400,
+  "shape": "mixed",
+  "sha256_8h": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
+  "sha256_b0": "a19e41d1bdcc694464a5a2dfea8b8e0823ca1c8614b01b0d601ad09a9c834971",
+  "fresh_b0_loaded_trials": 3,
+  "reproduced_original_timeout": false,
+  "host_and_scratch_layout_identical": false
+}

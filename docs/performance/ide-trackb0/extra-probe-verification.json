@@ -1,0 +1,28 @@
+{
+  "class_checks": [
+    {
+      "class": "WholeIdeServicesProbe.class",
+      "equal": true,
+      "sha256": "d2752ec62948f215d5272866c0c8d7f411605d1edb25c7dfec0e6daea36d4067"
+    },
+    {
+      "class": "WholeIdeDesktopProbe$1.class",
+      "equal": true,
+      "sha256": "38bd77792f0d452cf0e73bea62b372d79075697a5a72bd8233b54f9a08b80e94"
+    },
+    {
+      "class": "WholeIdeServicesProbe$Work.class",
+      "equal": true,
+      "sha256": "2089a6283498b85a0deba632e147a6159be201ed8f1abbd768f9186e8b55d6b2"
+    },
+    {
+      "class": "WholeIdeDesktopProbe.class",
+      "equal": true,
+      "sha256": "edff7334525b84792bfa13669e79261b43de022e74ba323c6b6a00ec06616c76"
+    }
+  ],
+  "sources": {
+    "WholeIdeServicesProbe.java": "b9d00c99b4a9a8335377a46f57f2a63dbb499a601fcde6dca6e28b9ddcceca03",
+    "WholeIdeDesktopProbe.java": "46d2acbaccd26f81b661ec3f5b2efa823e285d4a97ab4bc9c80c77b88ffdcce8"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "nmt": "jcmd timeout at 3 seconds; no NMT result claimed; vmmap succeeds",
+  "optional_image_tool": "Python PIL import unavailable; no installation; JDK ImageIO comparison used",
+  "initial_probe_compile": "Duplicate local root variable in new interference method; corrected before runtime matrix",
+  "capability_inventory_generation": "Initial guessed LargeFilePolicy/AcpSdkInteroperabilityTest names rejected by file-existence assertions; replaced with verified FileBuffer/AcpConnectionTest before publishing",
+  "initial_interference": "Successful background search followed by invalid null-error-message success assertion; corrected to Status.SUCCEEDED; original logs preserved, only bounded interference case rerun",
+  "native_shell_isolation": "Inherited native history/startup environment; real history mtime overlaps focused-run window, no before-hash/content inspection. Native runs stopped; guard only in new benchmark, compile checked, not runtime-retested. Existing tests unchanged; B0.1 prerequisite."
+}

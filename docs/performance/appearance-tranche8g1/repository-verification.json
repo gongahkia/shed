@@ -1,0 +1,43 @@
+{
+  "entry_head": "9b11e7bfcb1881e04378b0868d52398d1374ddc9",
+  "final_observed_head": "020a881237ecb15ce83b91954edf3a43452bbb75",
+  "entry_status": "",
+  "final_observed_status": " M src/main/java/shed/EditorPane.java\n M src/test/java/shed/TexteditorSwingIntegrationTest.java\n?? docs/SPLIT_VIEW_LIFECYCLE_REMEDIATION.md\n?? docs/performance/appearance-tranche8g1/\n",
+  "starting_files": 1669,
+  "changed_starting_files": [
+    "scripts/benchmark-active-pane.py",
+    "scripts/test_active_pane_tooling.py",
+    "src/benchmark/java/shed/ActivePanePerformanceProbe.java",
+    "src/main/java/shed/EditorPane.java",
+    "src/main/java/shed/EditorUiController.java",
+    "src/main/java/shed/MarkdownController.java",
+    "src/main/java/shed/MinimapPanel.java",
+    "src/main/java/shed/PaneBufferController.java",
+    "src/main/java/shed/SessionConfigController.java",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java"
+  ],
+  "unchanged_starting_files": 1659,
+  "missing_starting_files": [],
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "jars": {
+    "baseline": "64ffec96481474d371d393b00695388001700ff03a4a70c9d52005ebcf82e9c8",
+    "candidate": "95f27180c5d955217a8dd9e531d81fc4c1f25d6dc873d77fc0c51dca5ae67f4a"
+  },
+  "measured_compiled_classes_checked": 1426,
+  "class_mismatches": [],
+  "probe_hashes": {
+    "src/benchmark/java/shed/ActivePanePerformanceProbe.java": "43626a87f928dccda60984983fe85c856545a635e8095baa68fa3b24133ebf3e",
+    "src/benchmark/java/shed/MarkdownPerformanceProbe.java": "06be4bc34de31c2fc79a67dfaefe97f60c4b9a3ad65aeaa8049bda6d3dacb3ad",
+    "src/benchmark/java/shed/MarkdownLexicalProbe.java": "a14105c3f99749a46bf546b5eec28a6d60c27bba30354f162ed01a2e3289952e",
+    "src/benchmark/java/shed/SplitLifecycleDiagnostic.java": "f5653ef61c9f654c894074a5ccc1640344cd7ad4b2417e62b78448276617e6a5"
+  },
+  "probe_mismatches": [],
+  "all_primary_source_integrity_checks": true,
+  "candidate_tracked_closed_views_reachable": 0,
+  "candidate_history_pairs_each_fixture": 51,
+  "git_diff_check_exit": 0,
+  "agent_commits": 0,
+  "agent_pushes": 0,
+  "note": "External HEAD advancement preserved; changes inventoried relative to entry."
+}

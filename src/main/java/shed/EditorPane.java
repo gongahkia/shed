@@ -70,8 +70,8 @@ public class EditorPane {
         // Retired carets must not activate panes or inspect another view during detachment.
         for (var listener : textArea.getCaretListeners()) textArea.removeCaretListener(listener);
         for (var listener : textArea.getKeyListeners()) textArea.removeKeyListener(listener);
-        for (var listener : textArea.getFocusListeners()) textArea.removeFocusListener(listener);
         for (var listener : textArea.getMouseListeners()) textArea.removeMouseListener(listener);
+        // Leave focus-lost delivery intact to finish the existing IME composition protocol.
         // Keep an inert Swing component valid for already-queued UI callbacks.
         textArea.setCaret(new javax.swing.text.DefaultCaret());
         textArea.setDocument(new javax.swing.text.PlainDocument());

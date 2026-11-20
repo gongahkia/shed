@@ -3424,6 +3424,29 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void splitLifecycleRetirementKeepsThePendingCompositionFocusLostReset() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("split-composition-home"),
+            Files.writeString(tempDir.resolve("split-composition.md"), "body\n"));
+        try {
+            onEdt(() -> {
+                editor.splitWindow(true); EditorPane retired = editor.getActivePane();
+                var event = new java.awt.event.InputMethodEvent(retired.getTextArea(),
+                    java.awt.event.InputMethodEvent.INPUT_METHOD_TEXT_CHANGED,
+                    new java.text.AttributedString("候").getIterator(), 0, java.awt.font.TextHitInfo.leading(0), null);
+                for (var listener : retired.getTextArea().getInputMethodListeners()) listener.inputMethodTextChanged(event);
+                assertFalse(editor.inputController.allowsAiCompletion());
+                editor.closePane(retired);
+                for (var listener : retired.getTextArea().getFocusListeners())
+                    listener.focusLost(new FocusEvent(retired.getTextArea(), FocusEvent.FOCUS_LOST));
+                assertTrue(editor.inputController.allowsAiCompletion());
+                assertEquals("body\n", editor.getCurrentBuffer().getContent());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void activePaneIndicatorFollowsReplacementAfterClosingActiveSplit() throws Exception {
         assumeSwingAvailable();
         Texteditor editor = createEditor(tempDir.resolve("active-pane-close-home"),

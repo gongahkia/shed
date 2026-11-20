@@ -47,6 +47,7 @@ def main():
     print(rejection['reason'], file=sys.stderr)
     return 2
 
+    # Historical execution path stays dormant until native isolation is separately qualified.
     jar = args.jar.resolve(strict=True)
     jdk = Path(subprocess.check_output([str(ROOT / 'scripts/resolve-toolchain.sh'), 'home'], text=True).strip())
     spec = importlib.util.spec_from_file_location('markdown_controls', ROOT / 'scripts/benchmark-markdown.py')

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "true",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "name": "allowed",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "touch: /tmp/shed-trackb01-run/backend-check/allowed/created: Operation not permitted\n"
+  },
+  {
+    "name": "denied",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "touch: /tmp/shed-trackb01-run/backend-check/sentinel: Operation not permitted\n"
+  }
+]

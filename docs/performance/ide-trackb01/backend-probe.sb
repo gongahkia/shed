@@ -1,0 +1,6 @@
+(version 1)
+(deny default)
+(allow process*)
+(allow sysctl-read)
+(allow file-read*)
+(allow file-write* (subpath "/tmp/shed-trackb01-run/backend-check/allowed") (literal "/dev/null"))

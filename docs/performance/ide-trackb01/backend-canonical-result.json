@@ -1,0 +1,12 @@
+[
+  {
+    "name": "allowed",
+    "exit": 0,
+    "stderr": ""
+  },
+  {
+    "name": "denied",
+    "exit": 1,
+    "stderr": "touch: /private/tmp/shed-trackb01-run/backend-check/sentinel: Operation not permitted\n"
+  }
+]

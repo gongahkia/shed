@@ -39,8 +39,9 @@ class NativeFixtureTest(unittest.TestCase):
         env = dict(self.fixture.env)
         env.pop('HISTFILE')
         with patch('native_fixture.subprocess.Popen') as launch:
-            with self.assertRaises(UnsafeFixture):
+            with self.assertRaises(UnsafeFixture) as error:
                 self.fixture.validate(env)
+            self.assertIn('HISTFILE', str(error.exception))
             launch.assert_not_called()
 
     def test_external_history_rejected(self):
@@ -194,10 +195,6 @@ class NativeFixtureTest(unittest.TestCase):
             f.close()
             self.assertFalse(f.root.exists())
 
-
-if __name__ == '__main__':
-    unittest.main()
-
 class BenchmarkAdmissionTest(unittest.TestCase):
     def test_whole_ide_runtime_rejects_before_toolchain_or_native_work(self):
         import subprocess
@@ -232,3 +229,47 @@ class BenchmarkAdmissionTest(unittest.TestCase):
         for line in lines:
             name, expected = line.split('=')
             self.assertEqual(digest(root / 'src/test/java/shed' / (name + '.java')), expected)
+
+
+class DependencyCopyTest(unittest.TestCase):
+    def load_runner(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('portable_runner', Path(__file__).with_name('run-portable-tests.py'))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_dependency_copy_cannot_write_through_to_source(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            source = Path(scratch) / 'source'
+            source.mkdir()
+            (source / 'artifact').write_text('synthetic dependency')
+            before = digest(source / 'artifact'), (source / 'artifact').stat().st_mtime_ns
+            target = Path(scratch) / 'copy'
+            self.load_runner().copy_dependencies(source, target)
+            (target / 'artifact').write_text('changed copy')
+            self.assertEqual(before, (digest(source / 'artifact'), (source / 'artifact').stat().st_mtime_ns))
+
+    def test_dependency_symlinks_rejected_before_copy(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            source = Path(scratch) / 'source'
+            source.mkdir()
+            (source / 'escape').symlink_to('/dev/null')
+            target = Path(scratch) / 'not-created'
+            with self.assertRaises(UnsafeFixture):
+                self.load_runner().copy_dependencies(source, target)
+            self.assertFalse(target.exists())
+
+    def test_dependency_copy_budget_rejected_before_copy(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            source = Path(scratch) / 'source'
+            source.mkdir()
+            (source / 'artifact').write_bytes(b'bounded')
+            target = Path(scratch) / 'not-created'
+            with self.assertRaises(UnsafeFixture):
+                self.load_runner().copy_dependencies(source, target, maximum_bytes=1)
+            self.assertFalse(target.exists())
+
+
+if __name__ == '__main__':
+    unittest.main()

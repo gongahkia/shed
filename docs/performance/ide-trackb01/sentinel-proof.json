@@ -1,0 +1,11 @@
+{
+  "sha256_before": "1f5c8fe182e0edea33d96563a2d3416b46b802952f5a5d1c9032a01d1fa2cbbc",
+  "sha256_after": "1f5c8fe182e0edea33d96563a2d3416b46b802952f5a5d1c9032a01d1fa2cbbc",
+  "mtime_ns_before": 1795153922587446884,
+  "mtime_ns_after": 1795153922587446884,
+  "content_equal": true,
+  "mtime_equal": true,
+  "cleaned_fixture_absent": true,
+  "external_sentinel_survives": true,
+  "sentinel_owner_cleanup_complete": true
+}

@@ -1,0 +1,14 @@
+{
+  "scripts/native_fixture.py": "c40f621abdfdd0ce61df030a30262d439dd9f73b013f60bf753c8c456b72db7a",
+  "scripts/run-portable-tests.py": "9131b1981c2b6efffbef011cba38d932005e6bd24fcc098653a6c9ab734fc7d1",
+  "scripts/test_native_fixture.py": "cf64665564f97b15316026a46d76561506da46f20f899f509bf4bfdbc0ed5393",
+  "scripts/audit-whole-ide.py": "bcf20632723a39c445487b7192a7c1bf3b05f27fe87761c5eba399b206b16988",
+  "src/benchmark/java/shed/WholeIdeServicesProbe.java": "4ddba7c28bd638ad97259445b0345aa812e5a9b2e0d9b6209b00d8ee0ea31e8a",
+  "src/benchmark/java/shed/WholeIdeDesktopProbe.java": "cb558d8cbe8429f0c571bfa0759678b93a0171397ec5bec9a01dbbcc66ec03e9",
+  "src/test/java/shed/NativeFixtureGate.java": "0c0932cbad34e7a12429dfeb17fb0eb43191c5be46957efc8d03c7f7af1708b0",
+  "src/test/java/shed/NativeFixtureGateTest.java": "1b785570828fc39367661a571777cd9afdf071218d6557e82c6915aedbe75784",
+  "src/test/java/shed/NativeFixtureRejectedSentinelTest.java": "697cf00d9b67b3c5cedf4533d4822358048ead223097f1c6a1a950954be4f970",
+  "src/test/resources/junit-platform.properties": "fed9d00b0973a7a0427415f51244b1e68bcd26b1059d6d7d9063b838553162e9",
+  "src/test/resources/shed/portable-fixture-tests.properties": "1555db47a32845a2f981409ddec04e457a8b17ed8cf1bd509ec620e50a0e1a6f",
+  "src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension": "5d4d248b08cb44ae8bcf4f71faf0957ffb6bd4bd3a25fed2d49daf738addb722"
+}

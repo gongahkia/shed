@@ -1,0 +1,25 @@
+{
+  "jar_sha256": "95f27180c5d955217a8dd9e531d81fc4c1f25d6dc873d77fc0c51dca5ae67f4a",
+  "rows": [
+    {
+      "probe": "WholeIdeServicesProbe",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Exception in thread \"main\" java.lang.IllegalStateException: B0.1: native process/PTY confinement unqualified; benchmark blocked\n\tat shed.WholeIdeServicesProbe.requireNativeFixture(WholeIdeServicesProbe.java:105)\n\tat shed.WholeIdeServicesProbe.main(WholeIdeServicesProbe.java:108)\n",
+      "blocked_before_arguments": true
+    },
+    {
+      "probe": "WholeIdeDesktopProbe",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Exception in thread \"main\" java.lang.IllegalStateException: B0.1: native process/PTY confinement unqualified; benchmark blocked\n\tat shed.WholeIdeServicesProbe.requireNativeFixture(WholeIdeServicesProbe.java:105)\n\tat shed.WholeIdeDesktopProbe.main(WholeIdeDesktopProbe.java:153)\n",
+      "blocked_before_arguments": true
+    }
+  ],
+  "compile": {
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "fixture_removed": true
+}

@@ -1,0 +1,20 @@
+{
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "uname": [
+    "Darwin",
+    "Gabriels-MacBook-Air.local",
+    "25.5.0",
+    "Darwin Kernel Version 25.5.0: Tue Jun  9 22:19:21 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T8122",
+    "arm64"
+  ],
+  "python": "3.15.0 (main, Oct  9 2026, 11:16:41) [Clang 21.0.0 (clang-2100.3.34.2)]",
+  "load_average": [
+    3.9111328125,
+    3.61767578125,
+    3.552734375
+  ],
+  "time_epoch": 1795153922.6091468,
+  "machine": "arm64",
+  "cpu_count": 8,
+  "measurements": "fresh processes, not cold cache; no system setting or credential changes"
+}

@@ -1,4 +1,4 @@
-"""Opt-in, builtin-only shell fixtures. Never imported by the production application."""
+"""Experimental builtin-only shell fixtures; no native backend is qualified. Never imported by the production application."""
 import hashlib
 import json
 import os
@@ -120,7 +120,9 @@ class Fixture:
         env = dict(self.env) if environment is None else environment
         if env != self._expected_environment:
             # Do not log variable values: rejected environments may contain secrets.
-            raise UnsafeFixture('Environment differs from declared fixture allowlist')
+            changed = sorted(key for key in set(env) | set(self._expected_environment)
+                             if env.get(key) != self._expected_environment.get(key))
+            raise UnsafeFixture('Environment allowlist violation: ' + ', '.join(changed))
         for key in ['HOME', 'ZDOTDIR', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_STATE_HOME', 'XDG_RUNTIME_DIR', 'TMPDIR', 'GNUPGHOME']:
             checked(env[key], self.run_root, directory=True)
         for key in ['HISTFILE', 'BASH_ENV', 'ENV', 'GIT_CONFIG_GLOBAL']:
@@ -135,7 +137,7 @@ class Fixture:
 
     def profile(self):
         if platform.system() != 'Darwin' or not Path('/usr/bin/sandbox-exec').is_file():
-            raise UnsafeFixture('Only qualified macOS Seatbelt backend supported')
+            raise UnsafeFixture('Only macOS candidate Seatbelt backend available')
         # zsh -df cannot skip the global zshenv. Reject it rather than trusting unknown startup code.
         if Path('/etc/zshenv').exists() or Path('/etc/zshenv').is_symlink():
             raise UnsafeFixture('Global zshenv present; shell configuration unqualified')
@@ -239,4 +241,3 @@ class Fixture:
         shutil.rmtree(self.root)
         self.closed = True
         self.metrics.append({'operation': 'cleanup', 'ns': time.perf_counter_ns() - started})
-

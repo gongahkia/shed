@@ -904,6 +904,7 @@ final class PaneBufferController {
             editor.updateCurrentLineHighlight();
             editor.refreshLineNumberPanel();
             editor.updateStatusBar();
+            editor.editorUiController.refreshPaneFocus();
             editor.requestActivePaneFocus();
         }
         return "Window closed";

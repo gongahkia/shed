@@ -3170,6 +3170,236 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void activePaneIndicatorFollowsReplacementAfterClosingActiveSplit() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("active-pane-close-home"),
+            Files.writeString(tempDir.resolve("active-pane-close.md"), "# Shared source\nbody\n"));
+        try {
+            onEdt(() -> {
+                editor.splitWindow(true); editor.splitWindow(false);
+                assertPaneIndicators(editor);
+                EditorPane survivor = editor.editorPanes.getFirst();
+                assertEquals("Window closed", editor.closeActiveWindow());
+                assertSame(survivor, editor.getActivePane());
+                assertPaneIndicators(editor);
+                return null;
+            });
+            flushEdt();
+            onEdt(() -> { assertPaneIndicators(editor); return null; });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void activePaneIndicatorFollowsIndexShiftAfterClosingInactiveSplit() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("inactive-pane-close-home"),
+            Files.writeString(tempDir.resolve("inactive-pane-close.md"), "# Shared source\nbody\n"));
+        try {
+            onEdt(() -> {
+                editor.splitWindow(false); editor.splitWindow(true);
+                EditorPane active = editor.getActivePane();
+                assertPaneIndicators(editor);
+                assertEquals("Window closed", editor.closePane(editor.editorPanes.getFirst()));
+                assertSame(active, editor.getActivePane());
+                assertPaneIndicators(editor);
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void activePaneIndicatorsFollowMouseKeyboardBuffersAndReopeningAcrossKeymaps() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("pane-routes.md"), "# Source\nक्ष é 😀\n");
+        Path other = Files.writeString(tempDir.resolve("pane-other.md"), "# Other\n");
+        Texteditor editor = createEditor(tempDir.resolve("pane-routes-home"), file);
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                assertPaneIndicators(editor);
+                FileBuffer source = editor.getCurrentBuffer();
+                editor.splitWindow(true); editor.splitWindow(false);
+                assertPaneIndicators(editor);
+                var snapshot = source.textSnapshot(); long revision = source.documentRevision();
+                var events = new java.util.concurrent.atomic.AtomicInteger();
+                source.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                    public void insertUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
+                    public void removeUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
+                    public void changedUpdate(javax.swing.event.DocumentEvent event) { events.incrementAndGet(); }
+                });
+                for (String profile : List.of("plain", "vim", "emacs")) {
+                    editor.configManager.set("keymap.profile", profile);
+                    EditorPane target = editor.editorPanes.getFirst();
+                    target.getTextArea().dispatchEvent(new java.awt.event.MouseEvent(target.getTextArea(),
+                        java.awt.event.MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(), 0, 10, 10, 1, false, java.awt.event.MouseEvent.BUTTON1));
+                    assertSame(target, editor.getActivePane()); assertPaneIndicators(editor);
+                    assertEquals("Window focus changed", editor.commandHandler.execute("window next"));
+                    assertPaneIndicators(editor);
+                    assertEquals("Window focus changed", editor.commandHandler.execute("window previous"));
+                    assertSame(target, editor.getActivePane()); assertPaneIndicators(editor);
+                }
+                editor.configManager.set("keymap.profile", "vim"); editor.setMode(EditorMode.NORMAL);
+                EditorPane previous = editor.getActivePane();
+                editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, KeyEvent.CTRL_DOWN_MASK, KeyEvent.VK_W, '\u0017'));
+                assertEquals('\u0017', editor.editorState.pendingKey);
+                editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_W, 'w'));
+                assertFalse(previous == editor.getActivePane()); assertPaneIndicators(editor);
+                EditorPane owner = editor.getActivePane();
+                editor.openFile(other.toFile()); assertSame(owner, editor.getActivePane()); assertPaneIndicators(editor);
+                editor.switchToBuffer(editor.buffers.indexOf(source)); assertSame(owner, editor.getActivePane()); assertPaneIndicators(editor);
+                editor.openFile(file.toFile()); assertSame(owner, editor.getActivePane()); assertPaneIndicators(editor);
+                assertSame(snapshot, source.textSnapshot()); assertEquals(revision, source.documentRevision());
+                assertEquals(0, events.get()); assertFalse(source.isModified()); assertFalse(source.getUndoManager().canUndo());
+                return null;
+            });
+            assertEquals("# Source\nक्ष é 😀\n", Files.readString(file));
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void activePaneIndicatorsRetainThemeRolesThroughDensityFocusCenterAndPreview() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("pane-appearance-home"),
+            Files.writeString(tempDir.resolve("pane-appearance.md"), "# Heading\nbody\n".repeat(10)));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                editor.setSize(1200, 800); editor.splitWindow(true);
+                EditorPane owner = editor.getActivePane(); var buffer = owner.getBuffer();
+                owner.getTextArea().setCaretPosition(4); owner.getTextArea().moveCaretPosition(12);
+                var snapshot = buffer.textSnapshot(); long revision = buffer.documentRevision();
+                var font = owner.getTextArea().getFont(); var selection = owner.surface().selection();
+                for (String theme : List.of("shed-light", "shed-dark", "dracula", "catppuccin-latte")) {
+                    editor.setThemeFromCommand(theme);
+                    for (String density : List.of("compact", "comfortable", "default")) {
+                        editor.configManager.set("ui.density", density); editor.sessionConfigController.applySetting("ui.density");
+                        assertPaneIndicators(editor);
+                        assertFalse(editor.configManager.getFocusColor().equals(editor.configManager.getSubtleBorderColor()));
+                    }
+                    editor.commandHandler.execute("center on"); editor.commandHandler.execute("focus on");
+                    assertPaneIndicators(editor);
+                    editor.commandHandler.execute("focus off"); editor.commandHandler.execute("center off");
+                    assertPaneIndicators(editor);
+                }
+                editor.setThemeFromCommand("shed-light");
+                ThemeGalleryDialog gallery = themeGallery(editor);
+                selectGalleryTheme(gallery, "dracula"); gallery.previewSelectedTheme(); assertPaneIndicators(editor);
+                editor.cycleWindowFocus(); assertPaneIndicators(editor);
+                gallery.cancelPreview(); gallery.dispose(); assertPaneIndicators(editor);
+                assertEquals("shed-light", editor.configManager.getThemeId());
+                editor.activateEditorPane(owner);
+                for (String zoom : List.of("0.5", "1", "2")) {
+                    editor.configManager.set("ui.zoom", zoom); editor.editorUiController.refreshPaneFocus(); assertPaneIndicators(editor);
+                }
+                editor.configManager.set("ui.zoom", "1"); editor.editorUiController.refreshPaneFocus();
+                assertSame(snapshot, buffer.textSnapshot()); assertEquals(revision, buffer.documentRevision());
+                assertFalse(buffer.isModified()); assertFalse(buffer.getUndoManager().canUndo());
+                assertEquals(font, owner.getTextArea().getFont()); assertEquals(selection, owner.surface().selection());
+                editor.validate();
+                for (EditorPane pane : editor.editorPanes) {
+                    var scroll = pane.getScrollPane(); var bounds = scroll.getViewportBorderBounds();
+                    assertTrue(bounds.width > 10 && bounds.height > 2);
+                    var image = new java.awt.image.BufferedImage(scroll.getWidth(), scroll.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                    var graphics = image.createGraphics();
+                    try { scroll.paint(graphics); } finally { graphics.dispose(); }
+                    Color expected = pane == owner ? editor.configManager.getFocusColor() : editor.configManager.getSubtleBorderColor();
+                    assertEquals(expected.getRGB(), image.getRGB(bounds.x + bounds.width / 2, bounds.y));
+                }
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void activePaneIndicatorsKeepLogicalOwnerAcrossPickerAndWindowFocusEvents() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("pane-picker-home"),
+            Files.writeString(tempDir.resolve("pane-picker.md"), "# Source\nbody\n"));
+        var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        try {
+            EditorPane owner = onEdt(() -> { editor.splitWindow(true); return editor.getActivePane(); });
+            SwingUtilities.invokeLater(editor::showCommandPalette);
+            assertTrue(awaitUiState(() -> Arrays.stream(editor.getOwnedWindows()).anyMatch(w -> w.isShowing()
+                && w instanceof javax.swing.JDialog dialog && dialog.getTitle().equals("Command Palette"))));
+            onEdt(() -> {
+                var dialog = Arrays.stream(editor.getOwnedWindows()).filter(w -> w instanceof javax.swing.JDialog d
+                    && d.isShowing() && d.getTitle().equals("Command Palette")).findFirst().orElseThrow();
+                try {
+                    descendants(dialog, javax.swing.JTextField.class).getFirst().requestFocusInWindow();
+                    editor.dispatchEvent(new java.awt.event.WindowEvent(editor, java.awt.event.WindowEvent.WINDOW_DEACTIVATED));
+                    assertSame(owner, editor.getActivePane()); assertPaneIndicators(editor);
+                } catch (Throwable error) { failure.set(error); }
+                finally { dialog.dispose(); }
+                return null;
+            });
+            flushEdt();
+            if (failure.get() != null) throw new AssertionError(failure.get());
+            onEdt(() -> {
+                editor.dispatchEvent(new java.awt.event.WindowEvent(editor, java.awt.event.WindowEvent.WINDOW_ACTIVATED));
+                editor.requestActivePaneFocus(); assertSame(owner, editor.getActivePane()); assertPaneIndicators(editor);
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void activePaneIndicatorsKeepActivationListenersAndUndoStableDuringLifecycleCycles() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("pane-lifecycle-home"),
+            Files.writeString(tempDir.resolve("pane-lifecycle.md"), "body\n"));
+        try {
+            onEdt(() -> {
+                FileBuffer source = editor.getCurrentBuffer(); EditorPane original = editor.getActivePane();
+                source.getDocument().insertString(0, "draft ", null); source.getUndoManager().undo();
+                assertTrue(source.getUndoManager().canRedo());
+                boolean dirty = source.isModified();
+                var snapshot = source.textSnapshot(); long revision = source.documentRevision();
+                original.getTextArea().setCaretPosition(1); original.getTextArea().moveCaretPosition(3);
+                var selection = original.surface().selection();
+                int focusListeners = original.getTextArea().getFocusListeners().length;
+                int mouseListeners = original.getTextArea().getMouseListeners().length;
+                int viewportListeners = original.getScrollPane().getViewport().getChangeListeners().length;
+                for (int i = 0; i < 12; i++) {
+                    editor.splitWindow(i % 2 == 0); assertPaneIndicators(editor);
+                    int attached = ((javax.swing.text.AbstractDocument) source.getDocument()).getDocumentListeners().length;
+                    for (int j = 0; j < 8; j++) { editor.cycleWindowFocus(); assertPaneIndicators(editor); }
+                    assertEquals(attached, ((javax.swing.text.AbstractDocument) source.getDocument()).getDocumentListeners().length);
+                    assertEquals("Window closed", editor.closeActiveWindow()); assertPaneIndicators(editor);
+                }
+                assertSame(original, editor.getActivePane());
+                assertEquals(focusListeners, original.getTextArea().getFocusListeners().length);
+                assertEquals(mouseListeners, original.getTextArea().getMouseListeners().length);
+                assertEquals(viewportListeners, original.getScrollPane().getViewport().getChangeListeners().length);
+                // Split disposal itself is qualified separately against the unchanged entry JAR.
+                assertSame(snapshot, source.textSnapshot()); assertEquals(revision, source.documentRevision());
+                assertEquals(selection, original.surface().selection()); assertEquals(dirty, source.isModified());
+                assertTrue(source.getUndoManager().canRedo()); assertFalse(source.getUndoManager().canUndo());
+                assertEquals("body\n", source.getContent());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    private static void assertPaneIndicators(Texteditor editor) {
+        boolean multiple = editor.editorPanes.stream().filter(pane -> !pane.isHiddenByFocusMode()).count() > 1;
+        for (int i = 0; i < editor.editorPanes.size(); i++) {
+            EditorPane pane = editor.editorPanes.get(i);
+            boolean active = pane == editor.getActivePane();
+            assertEquals(active, pane.getScrollPane().getClientProperty("shed.activePane"), "pane " + i);
+            assertEquals((active ? "Active editor pane " : "Editor pane ") + (i + 1),
+                pane.getScrollPane().getAccessibleContext().getAccessibleName());
+            var border = pane.getScrollPane().getViewportBorder();
+            if (!multiple) assertEquals(null, border);
+            else {
+                assertTrue(border instanceof javax.swing.border.MatteBorder);
+                var matte = (javax.swing.border.MatteBorder) border;
+                assertEquals(new Insets(UiZoom.scale(2, editor.configManager.getUiZoom()), 0, 0, 0), matte.getBorderInsets());
+                assertEquals(active ? editor.configManager.getFocusColor() : editor.configManager.getSubtleBorderColor(), matte.getMatteColor());
+            }
+        }
+    }
+
+    @Test
     void splitCloseFocusPreservesActiveBuffer() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-split");

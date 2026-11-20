@@ -1,0 +1,24 @@
+{
+  "entry_head": "d3d9730eef0a80fd8bbc4ea5d774d1e8332aae30",
+  "final_head": "d3d9730eef0a80fd8bbc4ea5d774d1e8332aae30",
+  "entry_status": "",
+  "final_status": " M src/main/java/shed/PaneBufferController.java\n M src/test/java/shed/TexteditorSwingIntegrationTest.java\n?? docs/ACTIVE_PANE_EMPHASIS.md\n?? docs/performance/appearance-tranche8g/\n?? scripts/benchmark-active-pane.py\n?? scripts/test_active_pane_tooling.py\n?? src/benchmark/java/shed/ActivePanePerformanceProbe.java\n",
+  "starting_files": 1629,
+  "unchanged_starting_files": 1627,
+  "changed_starting_files": [
+    "src/main/java/shed/PaneBufferController.java",
+    "src/test/java/shed/TexteditorSwingIntegrationTest.java"
+  ],
+  "missing_starting_files": [],
+  "readme_before": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "measured_classes_checked": 1426,
+  "measured_class_mismatches": [],
+  "measured_probe_mismatches": [],
+  "all_six_source_integrity_results": true,
+  "native_focus_results_correct": 18,
+  "inner_class_bytecode_unchanged": true,
+  "git_diff_check_exit": 0,
+  "agent_commits": 0,
+  "agent_pushes": 0
+}

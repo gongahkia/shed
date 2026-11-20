@@ -94,7 +94,7 @@ final class PaneBufferController {
     }
 
     void loadBufferIntoPane(EditorPane pane, FileBuffer buffer, int caretPosition) {
-        if (pane == null || buffer == null) {
+        if (pane == null || pane.isDisposed() || buffer == null) {
             return;
         }
         pane.rememberBufferView();
@@ -616,6 +616,7 @@ final class PaneBufferController {
         if (editor.windowLayoutRoot == null) editor.windowLayoutRoot = WindowLayoutNode.leaf(targetPane);
         if (!editor.windowLayoutRoot.splitLeaf(targetPane, newPane, orientation, newPaneFirst, 0.5)) {
             editor.editorPanes.remove(newPane);
+            disposePaneView(newPane);
             return "Unable to split the target window";
         }
         if (existing == null) {
@@ -876,9 +877,8 @@ final class PaneBufferController {
         }
 
         detachActiveDocumentListener();
-        openRequests.invalidate(paneToClose);
         editor.editorPanes.remove(paneToClose);
-        editor.disposeAiCompletion(paneToClose.getTextArea());
+        disposePaneView(paneToClose);
         editor.windowLayoutRoot = editor.windowLayoutRoot == null ? null : editor.windowLayoutRoot.removeLeaf(paneToClose);
         if (editor.windowLayoutRoot == null && !editor.editorPanes.isEmpty()) {
             editor.windowLayoutRoot = WindowLayoutNode.leaf(editor.editorPanes.get(0));
@@ -908,6 +908,13 @@ final class PaneBufferController {
             editor.requestActivePaneFocus();
         }
         return "Window closed";
+    }
+
+    void disposePaneView(EditorPane pane) {
+        openRequests.invalidate(pane);
+        editor.disposeAiCompletion(pane.getTextArea());
+        editor.editorUiController.releasePanePresentation(pane);
+        pane.disposeSourceView();
     }
 
 

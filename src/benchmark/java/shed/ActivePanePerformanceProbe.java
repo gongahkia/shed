@@ -142,7 +142,9 @@ public final class ActivePanePerformanceProbe {
             editor = edt(() -> new Texteditor(new String[]{file.toString()}));
             await(() -> editor.getCurrentBuffer() != null && file.toString().equals(editor.getCurrentBuffer().getFilePath()) && !editor.stagedStartupPending, 30);
             edt(() -> { editor.setSize(1100, 760); editor.configManager.set("keymap.profile", "plain"); editor.splitWindow(true); editor.validate(); return null; });
-            nativeFocus(); typing("before"); collect(); memory("ready_requested_gc");
+            if (args.length < 4 || !args[3].equals("lifecycle")) nativeFocus();
+            else out("PANE ", Map.of("operation", "native_focus", "state", "NOT_REQUESTED_LIFECYCLE_ONLY"));
+            typing("before"); collect(); memory("ready_requested_gc");
             capture("two-panes-light");
             timed("first_activation", () -> editor.cycleWindowFocus());
             for (int i = 0; i < 60; i++) timed("warm_activation", () -> editor.cycleWindowFocus());

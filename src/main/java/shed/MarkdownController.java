@@ -131,6 +131,7 @@ final class MarkdownController {
         if (editor.windowLayoutRoot == null) editor.windowLayoutRoot = WindowLayoutNode.leaf(sourcePane);
         if (!editor.windowLayoutRoot.splitLeaf(sourcePane, previewPane, WindowLayoutNode.Orientation.HORIZONTAL, false, 0.5)) {
             editor.editorPanes.remove(previewPane);
+            editor.paneBufferController.disposePaneView(previewPane);
             return "Markdown preview could not create a split";
         }
         editor.loadBufferIntoPane(previewPane, buffer, 0);

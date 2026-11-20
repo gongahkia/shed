@@ -1171,6 +1171,7 @@ final class SessionConfigController {
         editor.focusModeController.endForLayoutReplacement();
         editor.detachActiveDocumentListener();
         editor.disposeMarkdownPreviews();
+        for (EditorPane pane : editor.editorPanes) editor.paneBufferController.disposePaneView(pane);
         editor.editorPanes.clear();
         int totalPanes = Math.max(1, paneCount);
         Dimension size = editor.getSize();

@@ -24,6 +24,8 @@ class MinimapPanel extends JPanel {
         this(textArea, null);
     }
 
+    boolean shows(JTextArea area) { return textArea == area; }
+
     public MinimapPanel(JTextArea textArea, PerfService perfService) {
         this.textArea = textArea;
         this.perfService = perfService;

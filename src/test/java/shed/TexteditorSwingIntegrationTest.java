@@ -3170,6 +3170,260 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void splitLifecycleUndoRedoRestoresExactSourceAfterRepeatedClosure() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("split-undo-home"),
+            Files.writeString(tempDir.resolve("split-undo.md"), "body\n"));
+        try {
+            assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+            onEdt(() -> {
+                FileBuffer buffer = editor.getCurrentBuffer(); var document = buffer.getDocument();
+                var history = buffer.getUndoManager(); EditorPane original = editor.getActivePane();
+                document.insertString(0, "draft ", null); history.undo();
+                original.getTextArea().setCaretPosition(1); original.getTextArea().moveCaretPosition(3);
+                for (int i = 0; i < 12; i++) {
+                    editor.splitWindow(i % 2 == 0);
+                    assertSame(document, editor.writingArea.getDocument());
+                    assertSame(history, buffer.getUndoManager());
+                    for (int j = 0; j < 8; j++) editor.cycleWindowFocus();
+                    editor.closeActiveWindow();
+                }
+                assertSame(original, editor.getActivePane());
+                history.redo(); assertEquals("draft body\n", buffer.getContent());
+                history.undo(); assertEquals("body\n", buffer.getContent());
+                assertEquals(document.getText(0, document.getLength()), buffer.textSnapshot().text());
+                assertTrue(history.canRedo()); assertFalse(history.canUndo());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void splitLifecycleUndoWithLiveSplitsToleratesTransientCaretGeometry() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("live-split-undo-home"),
+            Files.writeString(tempDir.resolve("live-split-undo.md"), "body\n"));
+        try {
+            onEdt(() -> {
+                var buffer = editor.getCurrentBuffer(); var history = buffer.getUndoManager();
+                buffer.getDocument().insertString(0, "draft ", null); history.undo();
+                editor.writingArea.setCaretPosition(1); editor.writingArea.moveCaretPosition(3);
+                editor.splitWindow(true);
+                history.redo(); assertEquals("draft body\n", buffer.getContent());
+                history.undo(); assertEquals("body\n", buffer.getContent());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void splitLifecycleClosureDetachesTheRetiredViewFromSharedDocumentListeners() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("split-detach-home"),
+            Files.writeString(tempDir.resolve("split-detach.md"), "# Shared\nbody\n"));
+        try {
+            onEdt(() -> {
+                FileBuffer buffer = editor.getCurrentBuffer(); var document = buffer.getDocument();
+                EditorPane survivor = editor.getActivePane();
+                editor.splitWindow(true); EditorPane retired = editor.getActivePane();
+                var caretListener = BlockCaret.class.getDeclaredField("edits"); caretListener.setAccessible(true);
+                Object listener = caretListener.get(retired.getTextArea().getCaret());
+                assertTrue(Arrays.asList(document.getDocumentListeners()).contains(listener));
+                editor.closeActiveWindow();
+                assertFalse(Arrays.asList(document.getDocumentListeners()).contains(listener));
+                assertFalse(document == retired.getTextArea().getDocument());
+                assertSame(document, survivor.getTextArea().getDocument());
+                assertSame(buffer, survivor.getBuffer()); assertEquals("# Shared\nbody\n", buffer.getContent());
+                assertPaneIndicators(editor);
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void splitLifecycleLateLoadsAndQueuedViewportRestoresCannotResurrectRetiredPanes() throws Exception {
+        assumeSwingAvailable();
+        Path file = Files.writeString(tempDir.resolve("split-late.md"), "body\n".repeat(100));
+        Path other = Files.writeString(tempDir.resolve("split-late-other.md"), "# Other\n");
+        Texteditor editor = createEditor(tempDir.resolve("split-late-home"), file);
+        try {
+            EditorPane retired = onEdt(() -> {
+                FileBuffer source = editor.getCurrentBuffer(); editor.splitWindow(true);
+                EditorPane target = editor.getActivePane();
+                editor.loadBufferIntoEditor(source);
+                assertTrue(editor.paneBufferController.openFileInSplit(other.toFile(), target,
+                    WindowLayoutNode.Orientation.HORIZONTAL, false).startsWith("Opening in split:"));
+                editor.closePane(target); target.disposeSourceView();
+                SwingUtilities.invokeLater(() -> editor.loadBufferIntoPane(target, source, 2));
+                return target;
+            });
+            assertTrue(awaitUiState(() -> editor.asyncJobService.list().stream()
+                .filter(job -> job.getDescription().equals("open file in split"))
+                .allMatch(job -> job.getStatus() != AsyncJobService.Status.RUNNING)));
+            flushEdt();
+            onEdt(() -> {
+                assertTrue(retired.isDisposed()); assertEquals(null, retired.getBuffer());
+                assertEquals(0, retired.getTextArea().getDocument().getLength());
+                assertEquals(0, retired.getTextArea().getCaretPosition());
+                assertNotNull(retired.getTextArea().getUI());
+                assertEquals(1, editor.editorPanes.size()); assertPaneIndicators(editor);
+                assertEquals(file.toString(), editor.getCurrentBuffer().getFilePath());
+                assertEquals("body\n".repeat(100), editor.getCurrentBuffer().getContent());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void splitLifecycleLayoutReplacementAndWindowDisposalRetireOnlyViews() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("split-reset-home"),
+            Files.writeString(tempDir.resolve("split-reset.md"), "body\n"));
+        FileBuffer source = onEdt(editor::getCurrentBuffer);
+        try {
+            onEdt(() -> {
+                editor.writingArea.insert("draft ", 0); var history = source.getUndoManager();
+                var snapshot = source.textSnapshot(); long revision = source.documentRevision();
+                editor.splitWindow(true); var retired = new ArrayList<>(editor.editorPanes);
+                editor.sessionConfigController.resetEditorPanesForSession(2, null);
+                for (EditorPane pane : retired) {
+                    assertTrue(pane.isDisposed()); assertFalse(pane.getTextArea().getDocument() == source.getDocument());
+                }
+                for (EditorPane pane : editor.editorPanes) editor.loadBufferIntoPane(pane, source, 0);
+                assertSame(snapshot, source.textSnapshot()); assertEquals(revision, source.documentRevision());
+                assertSame(history, source.getUndoManager()); assertTrue(source.isModified());
+                history.undo(); assertEquals("body\n", source.getContent());
+                history.redo(); assertEquals("draft body\n", source.getContent());
+                editor.closeActiveWindow(); assertEquals("Cannot close the only window", editor.closeActiveWindow());
+                assertFalse(editor.getActivePane().isDisposed()); assertPaneIndicators(editor);
+                return null;
+            });
+            disposeEditor(editor);
+            assertTrue(awaitUiState(() -> editor.editorPanes.stream().allMatch(EditorPane::isDisposed)));
+            onEdt(() -> {
+                assertTrue(editor.closingDown); assertEquals("draft body\n", source.getContent());
+                editor.editorUiController.updateStatusBar();
+                assertTrue(source.isModified()); source.getUndoManager().undo(); assertEquals("body\n", source.getContent());
+                source.getUndoManager().redo(); assertEquals("draft body\n", source.getContent());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void splitLifecyclePreservesBoundedMarkdownHistoryEncodingAndRecoveryAcrossKeymaps() throws Exception {
+        assumeSwingAvailable();
+        for (String profile : List.of("plain", "vim", "emacs")) {
+            String separator = profile.equals("vim") ? "\n" : "\r\n";
+            String raw = "\ufeff# Title" + separator + "label é😀 क्ष" + separator;
+            Path file = Files.write(tempDir.resolve("split-source-" + profile + ".md"), raw.getBytes(StandardCharsets.UTF_8));
+            Path other = Files.writeString(tempDir.resolve("split-other-" + profile + ".md"), "# Other\n");
+            Texteditor editor = createEditor(tempDir.resolve("split-profile-" + profile), file);
+            try {
+                assertTrue(awaitUiState(() -> !editor.stagedStartupPending));
+                String expected = onEdt(() -> {
+                    editor.configManager.set("keymap.profile", profile); editor.setMode(EditorMode.INSERT);
+                    FileBuffer source = editor.getCurrentBuffer(); var history = (BoundedUndoManager) source.getUndoManager();
+                    history.configure(new UndoHistoryPolicy(3, 65536)); assertFalse(history.canUndo());
+                    String original = source.getContent(); int start = original.indexOf("label");
+                    editor.writingArea.setCaretPosition(start); editor.writingArea.moveCaretPosition(original.length() - 1);
+                    assertEquals("Link inserted", editor.insertLink());
+                    String linked = original.replace("label é😀 क्ष", "[label é😀 क्ष](url)");
+                    assertEquals(linked, source.getContent());
+                    EditorPane owner = editor.getActivePane();
+                    editor.splitWindow(true); editor.writingArea.append(" draft"); assertTrue(source.isModified());
+                    editor.closeActiveWindow(); assertSame(owner, editor.getActivePane());
+                    history.undo(); assertEquals(linked, source.getContent());
+                    history.undo(); assertEquals(original, source.getContent());
+                    history.redo(); history.redo(); assertEquals(linked + " draft", source.getContent());
+                    FileBuffer alternate = new FileBuffer(other.toFile()); editor.buffers.add(alternate);
+                    editor.loadBufferIntoEditor(alternate); editor.loadBufferIntoEditor(source);
+                    editor.splitWindow(false); editor.closeActiveWindow();
+                    assertSame(history, source.getUndoManager()); assertTrue(history.retainedEditCount() <= 3);
+                    assertTrue(history.retainedBytes() <= 65536);
+                    history.undo(); assertEquals(linked, source.getContent());
+                    source.save(); assertTrue(history.canUndo());
+                    org.junit.jupiter.api.Assertions.assertArrayEquals(raw.replace("label é😀 क्ष", "[label é😀 क्ष](url)").getBytes(StandardCharsets.UTF_8), Files.readAllBytes(file));
+                    assertEquals(linked, new FileBuffer(file.toFile()).getContent());
+                    history.redo(); editor.persistRecoverySnapshots();
+                    return source.getContent();
+                });
+                assertTrue(awaitUiState(() -> {
+                    var journal = RecoveryJournal.read(editor.recoveryStoreDir.toPath());
+                    return journal != null && journal.entries().stream().anyMatch(entry -> entry.content().equals(expected));
+                }));
+                onEdt(() -> {
+                    editor.getCurrentBuffer().save(); assertTrue(editor.deleteBuffer(true).startsWith("Buffer deleted"));
+                    editor.openFile(file.toFile()); return null;
+                });
+                assertTrue(awaitCurrentFile(editor, file));
+                onEdt(() -> { assertEquals(expected, editor.getCurrentBuffer().getContent()); assertFalse(editor.getCurrentBuffer().getUndoManager().canUndo()); return null; });
+            } finally { disposeEditor(editor); }
+        }
+    }
+
+    @Test
+    void splitLifecycleRetiresMinimapAndPendingPaintReferencesWithTheirPane() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("split-presentation-home"),
+            Files.writeString(tempDir.resolve("split-presentation.md"), "body\n"));
+        try {
+            onEdt(() -> {
+                assertEquals("Minimap shown", editor.toggleMinimap());
+                var retainedMinimap = editor.activeMinimapPanel;
+                editor.splitWindow(true); editor.closeActiveWindow();
+                assertSame(retainedMinimap, editor.activeMinimapPanel);
+                assertEquals("Minimap hidden", editor.toggleMinimap());
+                editor.splitWindow(true); EditorPane retired = editor.getActivePane();
+                assertEquals("Minimap shown", editor.toggleMinimap()); assertNotNull(editor.activeMinimapPanel);
+                editor.editorUiController.noteEditorKey(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED,
+                    System.currentTimeMillis(), 0, KeyEvent.VK_X, 'x'));
+                editor.writingArea.insert("x", 0);
+                var pending = EditorUiController.class.getDeclaredField("pendingPaintArea"); pending.setAccessible(true);
+                assertSame(retired.getTextArea(), pending.get(editor.editorUiController));
+                editor.closePane(retired);
+                System.out.println("RETIRED_PRESENTATION_ROOTS minimap=" + (editor.activeMinimapPanel != null)
+                    + " pendingPaint=" + (pending.get(editor.editorUiController) == retired.getTextArea()));
+                assertEquals(null, editor.activeMinimapPanel);
+                assertEquals(null, pending.get(editor.editorUiController));
+                assertEquals("xbody\n", editor.getCurrentBuffer().getContent());
+                editor.getCurrentBuffer().getUndoManager().undo(); assertEquals("body\n", editor.getCurrentBuffer().getContent());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
+    void splitLifecycleVimUndoUsesTheSurvivingPanesDocumentHistory() throws Exception {
+        assumeSwingAvailable();
+        Texteditor editor = createEditor(tempDir.resolve("split-history-owner-home"),
+            Files.writeString(tempDir.resolve("split-history-owner.md"), "first\n"));
+        Path otherFile = Files.writeString(tempDir.resolve("split-history-other.md"), "second\n");
+        try {
+            onEdt(() -> {
+                FileBuffer first = editor.getCurrentBuffer(); EditorPane firstPane = editor.getActivePane();
+                editor.writingArea.insert("A ", 0);
+                editor.splitWindow(true); EditorPane secondPane = editor.getActivePane();
+                FileBuffer second = new FileBuffer(otherFile.toFile()); editor.buffers.add(second);
+                editor.loadBufferIntoEditor(second); editor.writingArea.insert("B ", 0);
+                editor.activateEditorPane(firstPane);
+                editor.configManager.set("keymap.profile", "vim"); editor.setMode(EditorMode.NORMAL);
+                editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_U, 'u'));
+                System.out.println("UNDO_ROUTING first=" + first.getContent().replace("\n", "\\n")
+                    + " second=" + second.getContent().replace("\n", "\\n"));
+                assertEquals("first\n", first.getContent()); assertEquals("B second\n", second.getContent());
+                assertSame(firstPane, editor.getActivePane()); assertSame(first.getUndoManager(), editor.undoManager);
+                editor.documents.activeSurface().redo(); assertEquals("A first\n", first.getContent());
+                editor.activateEditorPane(secondPane); assertSame(second.getUndoManager(), editor.undoManager);
+                editor.closePane(secondPane); assertSame(first.getUndoManager(), editor.undoManager);
+                editor.keyPressed(new KeyEvent(editor.writingArea, KeyEvent.KEY_PRESSED, 0, 0, KeyEvent.VK_U, 'u'));
+                assertEquals("first\n", first.getContent()); assertEquals("B second\n", second.getContent());
+                return null;
+            });
+        } finally { disposeEditor(editor); }
+    }
+
+    @Test
     void activePaneIndicatorFollowsReplacementAfterClosingActiveSplit() throws Exception {
         assumeSwingAvailable();
         Texteditor editor = createEditor(tempDir.resolve("active-pane-close-home"),

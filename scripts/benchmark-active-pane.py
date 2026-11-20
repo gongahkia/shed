@@ -24,6 +24,7 @@ def main():
     parser.add_argument('--baseline-jar', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--generate-only', action='store_true')
+    parser.add_argument('--lifecycle-only', action='store_true', help='Measure lifecycle/editing without the separate native Robot focus qualification')
     args = parser.parse_args()
     output = args.output.resolve()
     if output.exists() or output == ROOT or ROOT in output.parents:
@@ -39,7 +40,7 @@ def main():
     classes = output / 'classes'
     classes.mkdir()
     subprocess.run([str(jdk / 'bin/javac'), '-cp', str(artifacts[1][1]), '-d', str(classes), *map(str, sources)], check=True, timeout=40)
-    report = {'environment_before': base.environment(), 'fixtures': fixtures,
+    report = {'environment_before': base.environment(), 'fixtures': fixtures, 'native_focus_requested': not args.lifecycle_only,
               'jars': {label: hashlib.sha256(path.read_bytes()).hexdigest() for label, path in artifacts},
               'probe_hashes': {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}, 'cases': []}
     for index, size in enumerate(SIZES):
@@ -49,6 +50,8 @@ def main():
             (run / 'home/.shed/config.toml').write_text('schema_version = 1\n"theme" = "shed-light"\n"keymap.profile" = "plain"\n"session.restore.on.start" = false\n')
             command = [str(jdk / 'bin/java'), '-Xms64m', '-Xmx512m', '-Djava.awt.headless=false', f'-Duser.home={run / "home"}',
                        '-cp', os.pathsep.join([str(classes), str(jar)]), 'shed.ActivePanePerformanceProbe', fixtures[size]['path'], str(label == 'candidate').lower(), str(run)]
+            if args.lifecycle_only:
+                command.append('lifecycle')
             env = os.environ.copy()
             for key in ['JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'CLASSPATH']:
                 env.pop(key, None)

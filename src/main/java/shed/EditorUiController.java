@@ -223,6 +223,12 @@ final class EditorUiController {
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
                 editor.handleQuit(false);
             }
+            @Override
+            public void windowClosed(java.awt.event.WindowEvent windowEvent) {
+                editor.closingDown = true;
+                editor.detachActiveDocumentListener();
+                for (EditorPane pane : editor.editorPanes) editor.paneBufferController.disposePaneView(pane);
+            }
         });
         profile.mark("UI remainder");
     }
@@ -780,6 +786,7 @@ final class EditorUiController {
         editor.lineNumberPanel = pane.getLineNumberPanel();
         editor.editorScrollPane = pane.getScrollPane();
         editor.searchManager = pane.getSearchManager();
+        if (pane.getBuffer() != null) editor.undoManager = pane.getBuffer().getUndoManager();
         if (editor.inlineFindBar != null) editor.inlineFindBar.onBufferChanged();
     }
 
@@ -810,6 +817,15 @@ final class EditorUiController {
         updateStatusBar();
         editor.refreshLimelight();
         refreshPaneFocus();
+    }
+
+    void releasePanePresentation(EditorPane pane) {
+        JTextArea area = pane.getTextArea();
+        if (editor.activeMinimapPanel != null && editor.activeMinimapPanel.shows(area)) editor.activeMinimapPanel = null;
+        if (pendingPaintArea == area) {
+            pendingInputNanos = pendingPaintNanos = pendingDocumentNanos = 0L;
+            pendingPaintArea = null;
+        }
     }
 
     void refreshPaneFocus() {

@@ -1,0 +1,12 @@
+{
+  "jar_sha256": "9ff1aeaed4de6a8575f5f3134e2f385e97f079371d11fc6d073d3d34b41dc234",
+  "compiled_production_classes_matching": 1429,
+  "changed_class_entries_from_baseline": [
+    "shed/LineNumberPanel$DiffMarkers.class",
+    "shed/LineNumberPanel$1.class",
+    "shed/LineNumberPanel$2.class",
+    "shed/LineNumberPanel.class"
+  ],
+  "test_classes_absent": true,
+  "baseline_jar_sha256": "2a1767672c3a08dcc3062be06fef462db338adccd649d8df83f6a1fe7e4a29d9"
+}

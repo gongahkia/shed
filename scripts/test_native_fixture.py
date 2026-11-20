@@ -238,6 +238,11 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'EditorSurfaceTest',
             'EmacsKeymapTest',
             'FileBufferTest',
+            'GlyphRenderingQualificationTest',
+            'GutterPerformanceTest',
+            'GutterRenderingTest',
+            'LineNumberPanelTest',
+            'IncrementalDiffGutterTest',
             'GraphemeBoundaryTest',
             'GraphemeEditRangeTest',
             'KeymapOverlayTest',
@@ -309,6 +314,21 @@ class DependencyCopyTest(unittest.TestCase):
 
 
 class SafeVerificationModeTest(unittest.TestCase):
+    def test_gutter_measurements_require_explicit_control_artifact(self):
+        import subprocess
+        import sys
+        script = Path(__file__).with_name('run-portable-tests.py')
+        for arguments in [['--measure-gutter'], ['--gutter-baseline', '/unused'],
+                          ['--package-only', '--measure-gutter', '--gutter-baseline', '/unused']]:
+            with tempfile.TemporaryDirectory() as scratch:
+                output = Path(scratch) / 'not-created'
+                result = subprocess.run([sys.executable, str(script), '--jdk', '/unused', '--maven', '/unused',
+                                         '--repository', '/unused', '--output', str(output), *arguments],
+                                        capture_output=True, text=True, timeout=5)
+                self.assertEqual(2, result.returncode)
+                self.assertFalse(output.exists())
+                self.assertIn('must be supplied together' if len(arguments) < 3 else 'cannot be combined', result.stderr)
+
     def test_packaging_cannot_be_combined_with_test_execution_modes(self):
         import subprocess
         import sys

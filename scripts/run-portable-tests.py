@@ -56,6 +56,8 @@ def main():
     parser.add_argument('--compile-only', action='store_true')
     parser.add_argument('--package-only', action='store_true', help='Build the existing JAR with tests skipped; does not admit native fixtures')
     parser.add_argument('--measure-lsp', action='store_true', help='Opt into bounded in-process B1A measurements; never launches a server')
+    parser.add_argument('--measure-gutter', action='store_true', help='Opt into paired offscreen gutter measurements; no native window/process')
+    parser.add_argument('--gutter-baseline', type=Path, help='Preserved B1A JAR, hash-checked before isolated class loading')
     parser.add_argument('--verify-gate', action='store_true', help='Expect rejection of one fixed non-native synthetic sentinel class')
     args = parser.parse_args()
     reviewed = dict(line.split('=', 1) for line in MANIFEST.read_text().splitlines())
@@ -66,7 +68,9 @@ def main():
         source = ROOT / 'src/test/java/shed' / (name + '.java')
         if hashlib.sha256(source.read_bytes()).hexdigest() != reviewed[name]:
             parser.error('Reviewed source changed: ' + name)
-    if args.package_only and (args.compile_only or args.verify_gate or args.tests or args.measure_lsp):
+    if bool(args.gutter_baseline) != args.measure_gutter:
+        parser.error('--measure-gutter and --gutter-baseline must be supplied together')
+    if args.package_only and (args.compile_only or args.verify_gate or args.tests or args.measure_lsp or args.measure_gutter):
         parser.error('--package-only cannot be combined with test execution modes')
     if args.verify_gate:
         if args.tests or args.compile_only:
@@ -96,6 +100,8 @@ def main():
                  f'-Djava.util.prefs.userRoot={f.run_root / "config"}', '-Djava.awt.headless=true']
         if args.measure_lsp:
             props.append('-Dshed.test.lsp.measure=true')
+        if args.measure_gutter:
+            props.extend(['-Dshed.test.gutter.measure=true', f'-Dshed.test.gutter.baseline={args.gutter_baseline.resolve(strict=True)}'])
         command = [str(jdk / 'bin/java'), *props, f'-Dmaven.home={maven}', f'-Dclassworlds.conf={maven / "bin/m2.conf"}', f'-Dmaven.multiModuleProjectDirectory={ROOT}',
                    '-cp', str(boot[0]), 'org.codehaus.plexus.classworlds.launcher.Launcher', '-B', '-o',
                    '-s', str(settings), '-gs', str(settings), f'-Dmaven.repo.local={cache}', *props,

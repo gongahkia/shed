@@ -46,8 +46,8 @@ class LineNumberPanel extends JPanel {
             @Override public void mousePressed(java.awt.event.MouseEvent event) {
                 if (event.getX() > 12) return;
                 try {
-                    int offset = textArea.viewToModel2D(new Point(0, event.getY()));
-                    breakpointToggleListener.accept(textArea.getLineOfOffset(offset));
+                    int line = lineAtPoint(new Point(0, event.getY()));
+                    if (line >= 0) breakpointToggleListener.accept(line);
                 } catch (BadLocationException ignored) {
                 }
             }
@@ -102,12 +102,16 @@ class LineNumberPanel extends JPanel {
 
         try {
             Rectangle visible = textArea.getVisibleRect();
-            int startLine = textArea.getLineOfOffset(textArea.viewToModel2D(new Point(0, visible.y)));
-            int endLine = textArea.getLineOfOffset(textArea.viewToModel2D(new Point(0, visible.y + visible.height)));
+            int startLine = lineAtPoint(new Point(0, visible.y));
+            int endLine = lineAtPoint(new Point(0, visible.y + visible.height));
+            if (startLine < 0 || endLine < startLine) return;
 
             for (int i = startLine; i <= endLine && i < lineCount; i++) {
                 int lineStart = textArea.getLineStartOffset(i);
-                Point p = textArea.modelToView2D(lineStart).getBounds().getLocation();
+                java.awt.geom.Rectangle2D bounds = textArea.modelToView2D(lineStart);
+                if (bounds == null) return;
+                if (bounds.getY() >= visible.getMaxY()) break;
+                Point p = bounds.getBounds().getLocation();
                 int y = p.y + fm.getAscent();
 
                 String lineNum = formatLineNumber(i, currentLine);
@@ -183,6 +187,15 @@ class LineNumberPanel extends JPanel {
         } catch (BadLocationException e) {
             e.printStackTrace();
         }
+    }
+
+    private int lineAtPoint(Point point) throws BadLocationException {
+        int offset = textArea.viewToModel2D(point);
+        if (offset < 0) return -1;
+        int length = textArea.getDocument().getLength();
+        // Swing views can expose the paragraph's implied end beyond the last source offset.
+        if (offset > length && offset != textArea.getDocument().getDefaultRootElement().getEndOffset()) return -1;
+        return textArea.getLineOfOffset(Math.min(offset, length));
     }
 
     static void applyLineNumberTextRenderingHints(Graphics graphics) {

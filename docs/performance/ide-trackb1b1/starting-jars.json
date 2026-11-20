@@ -1,0 +1,12 @@
+{
+  "target/shed-2.0.0.jar": {
+    "sha256": "2a1767672c3a08dcc3062be06fef462db338adccd649d8df83f6a1fe7e4a29d9",
+    "bytes": 50396057,
+    "preserved_at": "/private/tmp/shed-trackb1b1-run/starting-jars/shed-2.0.0.jar"
+  },
+  "target/original-shed-2.0.0.jar": {
+    "sha256": "c9900d53296fd41c29d05268a3aade93c0b8edaac55be039256b57b7db9ae99e",
+    "bytes": 3737953,
+    "preserved_at": "/private/tmp/shed-trackb1b1-run/starting-jars/original-shed-2.0.0.jar"
+  }
+}

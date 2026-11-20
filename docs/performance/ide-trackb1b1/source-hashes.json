@@ -1,0 +1,8 @@
+{
+  "src/main/java/shed/LineNumberPanel.java": "377bd70725777c7e89114a390540d7ca3a4acbf33409398103b28927e35e2f4a",
+  "src/test/java/shed/GutterRenderingTest.java": "2e91701c30e53f5f024e81044aa79ef644052c5b5a3c9981f51221378322c583",
+  "src/test/java/shed/GutterPerformanceTest.java": "edd55189d58ee9301727972ba7bfce1658f27b14625265750f8b1a2deb8d3ce2",
+  "scripts/run-portable-tests.py": "adde48be064164bdb786aa5b0ef62368a2d1b9baa814b7de676b6a4fba99ca5c",
+  "scripts/test_native_fixture.py": "35f6b693613f82b0623b70aa399d0d6da602c5d7bad9e63d49488285fb432d26",
+  "src/test/resources/shed/portable-fixture-tests.properties": "ae036c8660bcdbf130210d5d13e02e6d308e0e7d35a9311790a72bd26b0cf074"
+}

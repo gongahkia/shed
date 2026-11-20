@@ -1,0 +1,38 @@
+{
+  "os": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "uname": [
+    "Darwin",
+    "Gabriels-MacBook-Air.local",
+    "25.5.0",
+    "Darwin Kernel Version 25.5.0: Tue Jun  9 22:19:21 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T8122",
+    "arm64"
+  ],
+  "hardware": [
+    "Mac15,12",
+    "17179869184",
+    "Apple M3"
+  ],
+  "load_sample_after_benchmark": [
+    3.05029296875,
+    4.41015625,
+    5.2578125
+  ],
+  "load_before_each_benchmark": "not recorded; same-process control/candidate pairs, not isolated or cold-cache runs",
+  "jdk": "21.0.13+9-LTS",
+  "jvm_arguments": [
+    "-Duser.home=/private/tmp/shed-native-ab3cs2zi/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-ab3cs2zi/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-ab3cs2zi/run/config",
+    "-Djava.awt.headless=true",
+    "-Dshed.test.gutter.measure=true",
+    "-Dshed.test.gutter.baseline=/private/tmp/shed-trackb1b1-run/baseline.jar",
+    "-Dmaven.home=/private/tmp/shed-tranche2b-tools/apache-maven-3.9.11",
+    "-Dclassworlds.conf=/private/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/m2.conf",
+    "-Dmaven.multiModuleProjectDirectory=/Users/gongahkia/Desktop/coding/projects/shed"
+  ],
+  "sample_counts": "one first plus 50 warm insert, scroll and gutter-paint samples per 4 KiB/100 KiB/1 MiB source and artifact; 24 candidate pane disposal cycles",
+  "fixture": "B0 exact 430 UTF-16 units mixed-script source in GutterRenderingTest; ASCII fixture hashes in measurements",
+  "qualified_boundary": "queued insert/scroll request to completed offscreen source and gutter paints; not native visible workbench, hardware input or physical scrolling",
+  "processes": "Trusted offline Java/Maven and Python build/check processes only; no native-shell benchmark or actual LSP child",
+  "primary_measurement": "final-bounded-paired-measurements.json"
+}

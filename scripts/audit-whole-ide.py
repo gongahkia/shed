@@ -85,7 +85,7 @@ def main():
         (run / 'home/.shed/config.toml').write_text('schema_version = 1\n"theme" = "shed-light"\n"keymap.profile" = "plain"\n"session.restore.on.start" = false\n')
         command = [str(jdk / 'bin/java'), '-Xms64m', '-Xmx512m', '-Djava.awt.headless=false', f'-Duser.home={run / "home"}',
                    f'-Db0.capture.owned={str(args.capture_owned).lower()}', '-cp', os.pathsep.join([str(classes), str(jar)]), f'shed.{probe}', *arguments]
-        case = {'label': label, 'command': command, 'load_before': os.getloadavg(), 'rss': []}
+        case = {'label': label, 'command': command, 'load_before': os.getloadavg(), 'rss': [], 'spawn_epoch_ms': time.time() * 1000}
         start = time.monotonic()
         with (run / 'stdout.log').open('w') as log:
             process = subprocess.Popen(command, cwd=fixtures, env=env, stdout=log, stderr=subprocess.STDOUT)

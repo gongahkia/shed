@@ -12,7 +12,10 @@ import com.jediterm.core.util.TermSize;
 /** Opt-in local synthetic service controls, never discovered or packaged by the application. */
 public final class WholeIdeServicesProbe {
     @FunctionalInterface interface Work { void run() throws Exception; }
-    static void out(Map<String, Object> fields) { System.out.println("B0 " + MiniJson.stringify(fields)); System.out.flush(); }
+    static void out(Map<String, Object> fields) {
+        var row=new LinkedHashMap<String,Object>(fields);row.putIfAbsent("epoch_ms",System.currentTimeMillis());
+        System.out.println("B0 " + MiniJson.stringify(row));System.out.flush();
+    }
     static void timed(String operation, int sample, Work work) throws Exception {
         var threads = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
         long allocation = threads.getThreadAllocatedBytes(Thread.currentThread().threadId()), start = System.nanoTime();

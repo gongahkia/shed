@@ -2129,6 +2129,7 @@ final class LspController {
     void stopServersForWorkspace(Path workspace) {
         Path root = workspace == null ? null : workspace.toAbsolutePath().normalize();
         if (root == null) return;
+        cancelDefinition();
         cancelAutomaticLaunches(key -> key.workspaceRoot() != null && key.workspaceRoot().startsWith(root));
         List<LspServerKey> keys = new ArrayList<>();
         for (LspServerKey key : editor.lspClients.keySet()) {

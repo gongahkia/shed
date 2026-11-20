@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -299,6 +300,8 @@ public class AsyncJobService {
         record.token.cancel();
         Future<?> future = record.future;
         if (future != null && future.cancel(true) && !record.started) {
+            // cancellation clears the callable, but ThreadPoolExecutor otherwise keeps the queued future
+            if (executor instanceof ThreadPoolExecutor pool && future instanceof Runnable queued) pool.remove(queued);
             record.status = Status.CANCELLED;
             record.errorMessage = "cancelled";
             record.finishedAtMillis = System.currentTimeMillis();

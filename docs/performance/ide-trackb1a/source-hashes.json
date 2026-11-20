@@ -1,0 +1,20 @@
+{
+  "src/main/java/shed/AsyncJobService.java": "7f896528e2d9520056d2367d7cf53b2d06de7048fcc3960e75d460289aca8145",
+  "src/main/java/shed/EditorUiController.java": "b2ae0cc27bddade855ce55ea7367dea5379d597abf0b8f2e93b5e4c5117b3860",
+  "src/main/java/shed/LspClient.java": "519a191ff0cc2c0a172aaec94463b37df0e4943f6c796323e432acbc65572677",
+  "src/main/java/shed/LspController.java": "87107e7ef40205610c5fcf17cdff275e88d0a30afeee6b829ef609f800cf8765",
+  "src/main/java/shed/LspDefinitionRequests.java": "3a8632fb1397bac37e201676e000d7a561a55abf59763d385cee7d0eb30e6809",
+  "src/main/java/shed/PaneBufferController.java": "8da0e88eece2679b34f9627a6f992442578ff7c9be1b533c6d134c86df0eae70",
+  "src/main/java/shed/SessionConfigController.java": "a41e2c09724ea7cbf8511a0db5b64d69406b49782a3ea0ccc2f64a89470a170d",
+  "src/main/java/shed/Texteditor.java": "925b0497532552ddfc210c055fce7b9d99feefafc591f02ab1699d1166a38f57",
+  "src/test/java/shed/InProcessLspFixture.java": "a3d377f3fc60a27f44cdc6522c732e72fed015e854f0bade0b434eb443dc1e59",
+  "src/test/java/shed/LspDefinitionResponsivenessTest.java": "5ece7ebd4f1bda3334069872384f930bb7568e76379d2b98cd3c3d0748ffa555",
+  "src/test/java/shed/LspDefinitionRequestsTest.java": "60d4ed6aa8a42305c973cc56ac59c9560a6d44b102099f63a37878a7a7db3068",
+  "src/test/java/shed/LspDefinitionPerformanceTest.java": "708485946a6f2f4ba950ec9988e77e2a2171e27b51fde5664f3ed6e71d0d91b5",
+  "src/test/java/shed/LspTransportConcurrencyTest.java": "46f52c2977e1a2548a1b1609093602f21944a5f77bae23b606685b7e17e77c36",
+  "src/test/java/shed/LspQueuedCancellationTest.java": "3e3a379a08b1c2f028919b6155aeaa4ce8f8dfe068b628509fedb1c2a651e6fd",
+  "scripts/run-portable-tests.py": "214106d7cad3f101f763cd372aa4d1da1a7131cd82e7a9fdcbf001740619cb91",
+  "scripts/test_native_fixture.py": "7c858444a1b3d27b21a03201a9ad09ff429a1802678fddc4f5bf228c69d83b79",
+  "scripts/test-packaged-markdown.py": "ce9718c4f26e23ab09d965128ce406c872e12c037f6af76966bac4ddc77a48a8",
+  "src/test/resources/shed/portable-fixture-tests.properties": "fc29f0e64bfa3833ae09a325246833973891a23144d290120478456697ce935d"
+}

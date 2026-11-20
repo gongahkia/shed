@@ -1426,6 +1426,7 @@ final class SessionConfigController {
 
 
     int confirmDiscardChanges(String prompt) {
+        editor.cancelLspDefinition(); // modal confirmation can dispatch queued navigation completions
         return JOptionPane.showConfirmDialog(editor,
             prompt,
             "Unsaved Changes",

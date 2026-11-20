@@ -1,0 +1,43 @@
+{
+  "os": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "uname": [
+    "Darwin",
+    "Gabriels-MacBook-Air.local",
+    "25.5.0",
+    "Darwin Kernel Version 25.5.0: Tue Jun  9 22:19:21 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T8122",
+    "arm64"
+  ],
+  "cpus": 8,
+  "load_at_evidence_capture": [
+    2.8359375,
+    3.34423828125,
+    3.2705078125
+  ],
+  "machine": "Apple M3 / 16 GiB (same host as B0/B0.1)",
+  "jdk": "21.0.13+9-LTS",
+  "jvm_arguments": [
+    "-Duser.home=/private/tmp/shed-native-4kmeqw36/run/home",
+    "-Djava.io.tmpdir=/private/tmp/shed-native-4kmeqw36/run/tmp",
+    "-Djava.util.prefs.userRoot=/private/tmp/shed-native-4kmeqw36/run/config",
+    "-Djava.awt.headless=true",
+    "-Dshed.test.lsp.measure=true",
+    "-Dmaven.home=/private/tmp/shed-tranche2b-tools/apache-maven-3.9.11",
+    "-Dclassworlds.conf=/private/tmp/shed-tranche2b-tools/apache-maven-3.9.11/bin/m2.conf",
+    "-Dmaven.multiModuleProjectDirectory=/Users/gongahkia/Desktop/coding/projects/shed"
+  ],
+  "fixture_ascii": {
+    "4096": "f59cff75fd7a425f0ab3bc817c949e9d34ee8c332cf5352d165115347fc7e86f",
+    "102400": "0a39ec8aa59f74dde1ea153ff1317ed87426b0b433ceb9ca7f472a0fb675a561",
+    "1048576": "8e549e3fc1fb905b85f032737a54603a7eff2896b92b1b67e8b3770705b56c7b"
+  },
+  "samples": {
+    "definition_delay_ms": 200,
+    "paired_synchronous": 3,
+    "paired_async": 3,
+    "typing_first_per_phase": 1,
+    "typing_warm_per_phase": 50,
+    "dispose_cycles": 24,
+    "queued_cancellations_under_saturation": 32
+  },
+  "boundaries": "fresh JVM, not cold cache; headless queued component paint; exact source class fingerprints in measurements.json; no real LSP or shell fixture"
+}

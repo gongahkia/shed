@@ -54,6 +54,7 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--tests', help='Comma-separated reviewed test classes; default all reviewed classes')
     parser.add_argument('--compile-only', action='store_true')
+    parser.add_argument('--package-only', action='store_true', help='Build the existing JAR with tests skipped; does not admit native fixtures')
     parser.add_argument('--measure-lsp', action='store_true', help='Opt into bounded in-process B1A measurements; never launches a server')
     parser.add_argument('--verify-gate', action='store_true', help='Expect rejection of one fixed non-native synthetic sentinel class')
     args = parser.parse_args()
@@ -65,6 +66,8 @@ def main():
         source = ROOT / 'src/test/java/shed' / (name + '.java')
         if hashlib.sha256(source.read_bytes()).hexdigest() != reviewed[name]:
             parser.error('Reviewed source changed: ' + name)
+    if args.package_only and (args.compile_only or args.verify_gate or args.tests or args.measure_lsp):
+        parser.error('--package-only cannot be combined with test execution modes')
     if args.verify_gate:
         if args.tests or args.compile_only:
             parser.error('--verify-gate cannot select tests or compile-only')
@@ -78,7 +81,9 @@ def main():
         parser.error('Existing toolchain/cache unavailable')
     f = Fixture()
     report = {'boundary': 'source-reviewed non-native tests, not general process confinement', 'tests': selected,
-              'fixture': str(f.root), 'native_benchmarks': 'BLOCKED'}
+              'fixture': str(f.root), 'native_benchmarks': 'BLOCKED', 'phase': 'package' if args.package_only else 'test-compile' if args.compile_only else 'test'}
+    if args.package_only:
+        report['tests'] = []
     start = time.monotonic()
     try:
         f.validate()
@@ -95,7 +100,7 @@ def main():
                    '-cp', str(boot[0]), 'org.codehaus.plexus.classworlds.launcher.Launcher', '-B', '-o',
                    '-s', str(settings), '-gs', str(settings), f'-Dmaven.repo.local={cache}', *props,
                    '-DforkCount=0', '-Dtest=' + ','.join(selected)]
-        command += ['-DskipTests', 'test-compile'] if args.compile_only else ['test']
+        command += ['-DskipTests', 'package'] if args.package_only else ['-DskipTests', 'test-compile'] if args.compile_only else ['test']
         report['command'] = command
         # This is the existing Maven/JVM build path, not an interactive shell or arbitrary fixture command.
         result = subprocess.run(command, cwd=ROOT, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,

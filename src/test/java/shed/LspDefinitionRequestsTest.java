@@ -90,7 +90,7 @@ class LspDefinitionRequestsTest {
 
         @Override public void close() throws Exception {
             edt(() -> { requests.close(); return null; });
-            jobs.shutdownNow(); idle(); client.stop(); peer.close();
+            jobs.shutdownNow(); idle(); if (client.isAlive()) client.stop(); peer.close();
             assertTrue(peer.readerClosed.await(2, TimeUnit.SECONDS), "in-process reader did not close");
         }
     }
@@ -343,6 +343,17 @@ class LspDefinitionRequestsTest {
             } finally { close.countDown(); }
             assertTrue(closed.await(2, TimeUnit.SECONDS)); h.idle();
             edt(() -> { assertTrue(h.navigated.isEmpty()); assertTrue(h.messages.isEmpty()); return null; });
+        }
+    }
+
+    @Test void cancellingBeforeServerStopDoesNotRequireTheOutstandingDefinitionResponse() throws Exception {
+        try (Harness h = new Harness()) {
+            h.request(); h.peer.await("textDocument/definition");
+            CountDownLatch stopped = new CountDownLatch(1);
+            SwingUtilities.invokeLater(() -> { h.requests.cancel(); h.client.stop(); stopped.countDown(); });
+            assertTrue(stopped.await(2, TimeUnit.SECONDS)); h.idle();
+            assertFalse(h.client.isAlive());
+            edt(() -> { assertTrue(h.navigated.isEmpty()); return null; });
         }
     }
 

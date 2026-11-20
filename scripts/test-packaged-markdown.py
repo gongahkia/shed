@@ -45,10 +45,13 @@ def main():
         classes.mkdir()
         home = work / 'home'
         home.mkdir()
-        subprocess.run([str(jdk / ('bin/javac' + suffix)), '-cp', str(jar), '-d', str(classes), str(probe)],
+        preferences = home / 'java-preferences'
+        preferences.mkdir()
+        properties = [f'-Duser.home={home}', f'-Djava.io.tmpdir={work}', f'-Djava.util.prefs.userRoot={preferences}']
+        subprocess.run([str(jdk / ('bin/javac' + suffix)), *['-J' + value for value in properties], '-cp', str(jar), '-d', str(classes), str(probe)],
                        check=True, timeout=30, env=env)
         command = [str(args.java.resolve(strict=True) if args.java else jdk / ('bin/java' + suffix)),
-                   '-Xms64m', '-Xmx512m', '-Djava.awt.headless=true', f'-Duser.home={home}',
+                   '-Xms64m', '-Xmx512m', '-Djava.awt.headless=true', *properties,
                    '-cp', os.pathsep.join((str(classes), str(jar))), 'shed.PackagedMarkdownSmoke', str(jar), str(work)]
         report = {'jar_sha256': sha256(jar), 'jar_bytes': jar.stat().st_size,
                   'probe_sha256': sha256(probe), 'command': command, 'state': 'ERROR'}

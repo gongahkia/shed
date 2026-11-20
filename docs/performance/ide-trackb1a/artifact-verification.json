@@ -1,0 +1,7 @@
+{
+  "jar_sha256": "2a1767672c3a08dcc3062be06fef462db338adccd649d8df83f6a1fe7e4a29d9",
+  "bytes": 50396057,
+  "production_class_count": 1429,
+  "classes_different_from_current_compilation": [],
+  "test_fixture_class_leaks": []
+}

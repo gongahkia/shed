@@ -118,13 +118,13 @@ class LspDefinitionPerformanceTest {
                         if (pending) { h.request(); request = h.peer.await("textDocument/definition"); }
                         List<Double> samples = new ArrayList<>();
                         for (int n = 0; n < 51; n++) {
+                            long queuedTyping = System.nanoTime();
                             double ms = edt(() -> {
                                 var area = h.pane.getTextArea(); area.setCaretPosition(7);
-                                long start = System.nanoTime();
                                 area.getActionMap().get(DefaultEditorKit.defaultKeyTypedAction)
                                     .actionPerformed(new java.awt.event.ActionEvent(area, 0, "x"));
                                 paint(area, image); long end = System.nanoTime(); h.buffer.getUndoManager().undo();
-                                return (end-start)/1e6;
+                                return (end-queuedTyping)/1e6;
                             });
                             samples.add(ms);
                         }
@@ -159,9 +159,21 @@ class LspDefinitionPerformanceTest {
         var beforeGc = memory();
         var diagnosticGc = new ArrayList<Map<String,Object>>();
         for (int attempt = 0; attempt < 3; attempt++) { System.gc(); diagnosticGc.add(memory()); }
-        System.out.println("B1A_PERFORMANCE " + MiniJson.stringify(Map.of("rows", rows, "memory_before", memoryBefore,
-            "memory_after_24_disposals", beforeGc, "diagnostic_gc_requests", diagnosticGc, "native_processes_launched", 0,
-            "boundary", "headless forced component paint; not native visible workbench or physical input",
-            "production_origin", LspClient.class.getProtectionDomain().getCodeSource().getLocation().toString())));
+        var artifacts = new java.util.TreeMap<String,String>();
+        for (Class<?> type : List.of(LspClient.class, LspController.class, LspDefinitionRequests.class, AsyncJobService.class, SessionConfigController.class, SourcePlainView.class,
+                InProcessLspFixture.class, LspDefinitionRequestsTest.Harness.class, LspDefinitionPerformanceTest.class)) {
+            try (var input = type.getResourceAsStream("/" + type.getName().replace('.', '/') + ".class")) {
+                assertNotNull(input);
+                artifacts.put(type.getName(), java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(input.readAllBytes())));
+            }
+        }
+        var result = new java.util.LinkedHashMap<String,Object>();
+        result.put("rows", rows); result.put("memory_before", memoryBefore); result.put("memory_after_24_disposals", beforeGc);
+        result.put("diagnostic_gc_requests", diagnosticGc); result.put("native_processes_launched", 0);
+        result.put("boundary", "enqueued synthetic typing to completed headless component paint; not native visible workbench or physical input");
+        result.put("production_origin", LspClient.class.getProtectionDomain().getCodeSource().getLocation().toString());
+        result.put("class_sha256", artifacts); result.put("jvm_arguments", ManagementFactory.getRuntimeMXBean().getInputArguments());
+        result.put("jdk", System.getProperty("java.runtime.version")); result.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version"));
+        System.out.println("B1A_PERFORMANCE " + MiniJson.stringify(result));
     }
 }

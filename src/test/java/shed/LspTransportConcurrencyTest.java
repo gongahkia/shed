@@ -59,4 +59,29 @@ class LspTransportConcurrencyTest {
         }
     }
 
+    @Test void definitionCompletionAndReferencesKeepTheirOwnResponses() throws Exception {
+        try (var peer = new InProcessLspFixture()) {
+            LspClient client = peer.client();
+            var workers = java.util.concurrent.Executors.newFixedThreadPool(2);
+            try {
+                var definition = workers.submit(() -> client.definition("file:///source.java", 0, 2));
+                var defRequest = peer.await("textDocument/definition");
+                var completion = workers.submit(() -> client.completion("file:///source.java", 0, 2));
+                // Both features may wait, but their transport serialization must not hold the EDT.
+                CountDownLatch input = new CountDownLatch(1);
+                javax.swing.SwingUtilities.invokeLater(input::countDown);
+                assertTrue(input.await(2, TimeUnit.SECONDS));
+                peer.respond(defRequest, InProcessLspFixture.location("file:///definition.java"));
+                var compRequest = peer.await("textDocument/completion");
+                peer.respond(compRequest, java.util.List.of(java.util.Map.of("label", "completion-value")));
+                assertEquals("file:///definition.java", definition.get(2, TimeUnit.SECONDS).getUri());
+                assertEquals("completion-value", completion.get(2, TimeUnit.SECONDS).getFirst().getLabel());
+                var references = workers.submit(() -> client.references("file:///source.java", 0, 2, true));
+                var refsRequest = peer.await("textDocument/references");
+                peer.respond(refsRequest, InProcessLspFixture.location("file:///references.java"));
+                assertEquals("file:///references.java", references.get(2, TimeUnit.SECONDS).getFirst().getUri());
+            } finally { workers.shutdownNow(); assertTrue(workers.awaitTermination(3, TimeUnit.SECONDS)); client.stop(); }
+        }
+    }
+
 }

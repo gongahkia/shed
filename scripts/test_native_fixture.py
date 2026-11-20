@@ -245,6 +245,7 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'LspDefinitionPerformanceTest',
             'LspDefinitionRequestsTest',
             'LspDefinitionResponsivenessTest',
+            'LspQueuedCancellationTest',
             'LspTransportConcurrencyTest',
             'LspWorkspaceFormatTest',
             'MarkdownEditTest',
@@ -305,6 +306,42 @@ class DependencyCopyTest(unittest.TestCase):
             with self.assertRaises(UnsafeFixture):
                 self.load_runner().copy_dependencies(source, target, maximum_bytes=1)
             self.assertFalse(target.exists())
+
+
+class SafeVerificationModeTest(unittest.TestCase):
+    def test_packaging_cannot_be_combined_with_test_execution_modes(self):
+        import subprocess
+        import sys
+        script = Path(__file__).with_name('run-portable-tests.py')
+        for mode in ['--compile-only', '--verify-gate', '--measure-lsp']:
+            with tempfile.TemporaryDirectory() as scratch:
+                output = Path(scratch) / 'not-created'
+                result = subprocess.run([sys.executable, str(script), '--jdk', '/unused', '--maven', '/unused',
+                                         '--repository', '/unused', '--output', str(output), '--package-only', mode],
+                                        capture_output=True, text=True, timeout=5)
+                self.assertEqual(2, result.returncode)
+                self.assertIn('cannot be combined', result.stderr)
+                self.assertFalse(output.exists())
+
+    def test_media_smoke_redirects_compiler_and_runtime_java_state(self):
+        import importlib.util
+        import sys
+        from types import SimpleNamespace
+        script = Path(__file__).with_name('test-packaged-markdown.py')
+        spec = importlib.util.spec_from_file_location('safe_media_smoke', script)
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        commands = []
+        def run(command, **kwargs):
+            commands.append(command)
+            return SimpleNamespace(returncode=0, stdout='SMOKE_PASS\n', stderr='')
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch); jar = root / 'fixture.jar'; jar.write_bytes(b'synthetic')
+            with patch.object(sys, 'argv', [str(script), '--jdk', str(root), '--jar', str(jar)]), patch.object(module.subprocess, 'run', side_effect=run), patch('builtins.print'):
+                self.assertEqual(0, module.main())
+            self.assertEqual(2, len(commands))
+            for option in ['user.home', 'java.io.tmpdir', 'java.util.prefs.userRoot']:
+                self.assertTrue(any(value.startswith('-J-D' + option + '=') for value in commands[0]))
+                self.assertTrue(any(value.startswith('-D' + option + '=') for value in commands[1]))
 
 
 if __name__ == '__main__':

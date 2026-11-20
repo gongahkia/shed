@@ -238,6 +238,10 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'EditorSurfaceTest',
             'EmacsKeymapTest',
             'FileBufferTest',
+            'BundledEditorFontTest',
+            'IndicConjunctBoundaryTest',
+            'UnicodeEditingRegressionTest',
+            'GlyphRenderingMeasurementTest',
             'GlyphRenderingQualificationTest',
             'GutterPerformanceTest',
             'GutterRenderingTest',
@@ -333,7 +337,7 @@ class SafeVerificationModeTest(unittest.TestCase):
         import subprocess
         import sys
         script = Path(__file__).with_name('run-portable-tests.py')
-        for mode in ['--compile-only', '--verify-gate', '--measure-lsp']:
+        for mode in ['--compile-only', '--verify-gate', '--measure-lsp', '--measure-glyph']:
             with tempfile.TemporaryDirectory() as scratch:
                 output = Path(scratch) / 'not-created'
                 result = subprocess.run([sys.executable, str(script), '--jdk', '/unused', '--maven', '/unused',

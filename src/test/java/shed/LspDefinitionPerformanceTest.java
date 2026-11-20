@@ -146,11 +146,22 @@ class LspDefinitionPerformanceTest {
                 }
             }
         } finally { scheduler.shutdownNow(); }
+        long cleanupStart = System.nanoTime();
+        List<String> ownedThreads;
+        do {
+            ownedThreads = Thread.getAllStackTraces().keySet().stream().filter(Thread::isAlive).map(Thread::getName)
+                .filter(name -> name.equals("shed-worker") || name.equals("shed-lsp-reader")).toList();
+            if (!ownedThreads.isEmpty()) TimeUnit.MILLISECONDS.sleep(1);
+        } while (!ownedThreads.isEmpty() && System.nanoTime() - cleanupStart < TimeUnit.SECONDS.toNanos(2));
+        assertTrue(ownedThreads.isEmpty(), "owned LSP/job threads remain: " + ownedThreads);
+        rows.add(Map.of("operation", "worker_retirement", "remaining_owned_threads", ownedThreads,
+            "bounded_wait_ms", (System.nanoTime()-cleanupStart)/1e6));
         var beforeGc = memory();
         var diagnosticGc = new ArrayList<Map<String,Object>>();
         for (int attempt = 0; attempt < 3; attempt++) { System.gc(); diagnosticGc.add(memory()); }
         System.out.println("B1A_PERFORMANCE " + MiniJson.stringify(Map.of("rows", rows, "memory_before", memoryBefore,
             "memory_after_24_disposals", beforeGc, "diagnostic_gc_requests", diagnosticGc, "native_processes_launched", 0,
-            "boundary", "headless forced component paint; not native visible workbench or physical input")));
+            "boundary", "headless forced component paint; not native visible workbench or physical input",
+            "production_origin", LspClient.class.getProtectionDomain().getCodeSource().getLocation().toString())));
     }
 }

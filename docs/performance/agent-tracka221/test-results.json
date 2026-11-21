@@ -1,0 +1,144 @@
+{
+  "baseline": {},
+  "prerequisite-tests": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 28.10617748599907,
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "safe-tests": {
+    "exit": 1,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 41.61129140200137,
+    "total": 309,
+    "passed": 302,
+    "failed": 1,
+    "errors": 0,
+    "skipped": 6,
+    "admitted_classes": 60
+  },
+  "boundary-and-lsp-recheck": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 24.94167377100166,
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 2
+  },
+  "tooling": {
+    "exit": 1,
+    "fixture_removed": true,
+    "total": 87,
+    "passed": 86,
+    "failed": 0,
+    "errors": 1
+  },
+  "final-safe-tests": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 40.88567363599941,
+    "total": 309,
+    "passed": 303,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 6,
+    "admitted_classes": 60
+  },
+  "package": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "package",
+    "elapsed_s": 28.08568458300215,
+    "admitted_classes": 0
+  },
+  "final-media": {
+    "exit": 0,
+    "fixture_removed": true
+  },
+  "final-media-detail": {
+    "exit": 0
+  },
+  "final-tooling": {
+    "exit": 0,
+    "fixture_removed": true,
+    "total": 86,
+    "passed": 86,
+    "failed": 0,
+    "errors": 0,
+    "excluded": [
+      "test_native_fixture.NativeFixtureTest.test_profile_no_fork_network_or_user_home_access"
+    ]
+  },
+  "status-measurements": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 10.823682491001819,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "metadata-repeat-1": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 10.007722606998868,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "metadata-repeat-2": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 12.084709711001778,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "metadata-repeat-3": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 10.071398485000827,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "navigation-regression-measurements": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 13.05420772800062,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  }
+}

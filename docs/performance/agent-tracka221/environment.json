@@ -1,0 +1,17 @@
+{
+  "system": "Linux",
+  "machine": "x86_64",
+  "release": "7.2.15-1-omarchy",
+  "python": "3.14.8",
+  "toolchain": {
+    "jdk": "/tmp/shed-tracka21-fkbr53a8/jdk-21.0.13.1+2",
+    "maven": "/tmp/shed-tracka21-fkbr53a8/apache-maven-3.9.11",
+    "repository": "/tmp/shed-tracka21-fkbr53a8/dependencies"
+  },
+  "native_shell": "NO-GO; not executed",
+  "desktop": "OPEN; no window launched",
+  "windows_macos": "unverified / No access",
+  "rss": "unmeasured",
+  "measurement_definition_changed": false,
+  "production_code_changed": false
+}

@@ -1,0 +1,268 @@
+{
+  "sources": {
+    "src/main/java/shed/AgentWorkspaceController.java": {
+      "sha256": "ddb8f2b4af214643012519745287e388cf2a05b835599f64fcd87bf7aea9de03",
+      "symbols": {
+        "String handle(String argument)": [
+          32
+        ],
+        "private String start(boolean allowProposals, boolean statusOnly, boolean metadataMode, boolean navigationMode)": [
+          63
+        ]
+      }
+    },
+    "src/main/java/shed/WorkspaceRpc.java": {
+      "sha256": "d9499338f793239bbe718370328e8d82f1eeb31cef044f7be021830394a12d1b",
+      "symbols": {
+        "private String status(": [
+          63
+        ]
+      }
+    },
+    "src/main/java/shed/WorkspaceStatusAttachment.java": {
+      "sha256": "a3edec12830110440dfce3f292442b6168b42cc796219e606bcefa75f9e9d6b5",
+      "symbols": {
+        "record Descriptor(": [
+          20
+        ]
+      }
+    },
+    "src/main/java/shed/WorkspacePaths.java": {
+      "sha256": "22209f32ac65ad26309e7969e459a0e7d9d34792ee0821f9316705282b2b9493",
+      "symbols": {
+        "static Path resolve(Path root, String requested)": [
+          25
+        ]
+      }
+    },
+    "src/main/java/shed/WorkspaceRootResolver.java": {
+      "sha256": "1e906c8390a230cb69e884ff63a7dfd6f9253dd41877a1b5e0e01045ab65eb5e",
+      "symbols": {
+        "static Path normalizedIdentity(Path path)": [
+          32
+        ]
+      }
+    },
+    "src/main/java/shed/LegacyDocumentStore.java": {
+      "sha256": "2973148b31f5dd13892b0f2ebf2a4b48201bf664b1d598e8f7d2ffb3468a6d1e",
+      "symbols": {
+        "FileBuffer load(Path path)": [
+          31
+        ]
+      }
+    },
+    "src/main/java/shed/FileBuffer.java": {
+      "sha256": "44210cdcda2780ebd3644de321938cbf356ae72dc66a33bdbce47f78af4775a0",
+      "symbols": {
+        "public void load(ConfigManager configManager)": [
+          155
+        ],
+        "void adoptReloadedState(FileBuffer loaded)": [
+          197
+        ],
+        "private static ExternalFileStamp observeExternalFile(File targetFile)": [
+          938
+        ],
+        "long documentRevision()": [
+          525
+        ]
+      }
+    },
+    "src/main/java/shed/LargeFileStore.java": {
+      "sha256": "5fde1a98ab7492fa8783bbe8bb50a6950f73de0969a09ee2cc22dabbe2bad93d",
+      "symbols": {
+        "static boolean exceedsLineLimit(Path source, int maximumLines)": [
+          44
+        ]
+      }
+    },
+    "src/main/java/shed/WorkspaceTextFile.java": {
+      "sha256": "66d211bae3b79e7f2c767ac554f38bd9a24014aaffdc50bbb1a11d97b1613e46",
+      "symbols": {
+        "static Snapshot capture(String workspaceId, Path file, boolean allowLatin1, int maximumBytes,": [
+          31
+        ]
+      }
+    },
+    "src/main/java/shed/TextFileCodec.java": {
+      "sha256": "1416f6e25fcfea243f74f28944651facf40aac1610b022a7bf863e16dd9e651d",
+      "symbols": {
+        "static Image decode(byte[] bytes, boolean allowLatin1)": [
+          53
+        ]
+      }
+    },
+    "src/main/java/shed/PaneBufferController.java": {
+      "sha256": "8da0e88eece2679b34f9627a6f992442578ff7c9be1b533c6d134c86df0eae70",
+      "symbols": {
+        "void openFileCheckedAsync(File file, java.util.function.BooleanSupplier current,": [
+          479
+        ],
+        "private void openFileAsync(File file, java.util.function.BooleanSupplier current,": [
+          486
+        ],
+        "private void installLoadedBuffer(File file, FileBuffer buffer, String projectConfigMessage, EditorPane pane)": [
+          564
+        ],
+        "private void restoreBufferIntoPane(EditorPane pane, FileBuffer buffer)": [
+          81
+        ],
+        "void loadBufferIntoPane(EditorPane pane, FileBuffer buffer, int caretPosition)": [
+          96
+        ],
+        "FileBuffer findBufferByPath(File file)": [
+          1063
+        ]
+      }
+    },
+    "src/main/java/shed/DocumentRequests.java": {
+      "sha256": "7ee08753c81c1f5763fd6e8ace22c1b1c950389da98c736b93e44f1fe89eb73d",
+      "symbols": {
+        "long issue(T target)": [
+          10
+        ],
+        "boolean current(T target, long ticket)": [
+          15
+        ],
+        "void invalidate(T target)": [
+          16
+        ]
+      }
+    },
+    "src/main/java/shed/AsyncJobService.java": {
+      "sha256": "7f896528e2d9520056d2367d7cf53b2d06de7048fcc3960e75d460289aca8145",
+      "symbols": {
+        "public <T> int submit(": [
+          197
+        ],
+        "public boolean cancel(": [
+          292
+        ],
+        "private <T> void completeOnEventDispatchThread(": [
+          380
+        ]
+      }
+    },
+    "src/main/java/shed/SessionConfigController.java": {
+      "sha256": "a41e2c09724ea7cbf8511a0db5b64d69406b49782a3ea0ccc2f64a89470a170d",
+      "symbols": {
+        "boolean ensureProjectTrustForFile(File file)": [
+          1714
+        ]
+      }
+    },
+    "src/main/java/shed/EditorMetadata.java": {
+      "sha256": "264ae24be70c4c45eeb53277ac1faa80f2c5898f9a8385b7ad4ab40092bb91f5",
+      "symbols": {
+        "static Context capture(": [
+          66
+        ],
+        "void authorize(Context context)": [
+          125
+        ]
+      }
+    },
+    "src/main/java/shed/EditorNavigation.java": {
+      "sha256": "2ebc378f01fabd60fa902b68ace2c6a6a3bf275d5a190d74cfc4d1303a75de6a",
+      "symbols": {
+        "static void verify(Command c, State state)": [
+          198
+        ]
+      }
+    },
+    "src/main/java/shed/Texteditor.java": {
+      "sha256": "a55d570470f57d12bcc2280a7ed241a2a630889b1f12d10d72dd8b6f4e2dc2c8",
+      "symbols": {
+        "EditorNavigation.State captureEditorNavigation()": [
+          296
+        ]
+      }
+    },
+    "src/main/java/shed/EditorInteraction.java": {
+      "sha256": "3af838a626707d41da3916c788896c97601e90a53aa4b3992c6b7d545c6e2f52",
+      "symbols": {
+        "boolean watch(EditorPane pane)": [
+          31
+        ]
+      }
+    },
+    "src/main/java/shed/WorkspaceBridgeServer.java": {
+      "sha256": "4fac7b748590202100bdf6c36ff24b2623888c2991fb6a3903ccc88d68f7a5dd",
+      "symbols": {
+        "private void serveStatus(Socket connection)": [
+          202
+        ]
+      }
+    },
+    "src/main/java/shed/WorkspaceBridgeClient.java": {
+      "sha256": "52531381b6f4cb63ad2ac92c447d3ab3852f62bc70f01fbfa732908f5e09ee20",
+      "symbols": {
+        "static WorkspaceBridgeClient navigation(": [
+          49
+        ],
+        "private boolean acceptsResult(": [
+          145
+        ]
+      }
+    },
+    "src/main/java/shed/WorkspaceStatusProtocol.java": {
+      "sha256": "a464b4da9f16c8296052252a88df622e82667cde6a38dd1548c2fc3ae8cbae8c",
+      "symbols": {
+        "static Session accept(": [
+          97
+        ],
+        "static Session connect(": [
+          119
+        ]
+      }
+    },
+    "src/main/java/shed/WorkspaceCli.java": {
+      "sha256": "0680886133b4ee381f3e0790f47ae7553489ee37acd10523a5a89e571ad97e9a",
+      "symbols": {
+        "public static int run(": [
+          21
+        ]
+      }
+    },
+    "src/test/java/shed/LspDefinitionResponsivenessTest.java": {
+      "sha256": "5ece7ebd4f1bda3334069872384f930bb7568e76379d2b98cd3c3d0748ffa555",
+      "symbols": {
+        "void synchronousTransportReproducesEdtInputBlockWithoutNativeProcess()": [
+          15
+        ]
+      }
+    },
+    "src/test/java/shed/WorkspaceMetadataMeasurementTest.java": {
+      "sha256": "7ee601d507b0484ca7ec8a297804584c84c9a7c86f1f857cb3ab4a0f7d76b031",
+      "symbols": {
+        "void latencyEdtTypingAllocationsAndTwentyFourDisposalCycles()": [
+          26
+        ]
+      }
+    },
+    "src/main/java/shed/EditorWorkspaceDocuments.java": {
+      "sha256": "353fe4f5b3403b40336e308f94d400d382e100ac3842c07a360288c2faf9af62",
+      "symbols": {
+        "String metadataIdentity(FileBuffer buffer)": [
+          43
+        ]
+      }
+    }
+  },
+  "reviewed_reports": {
+    "docs/AGENT_CONTROL_PLANE_AUDIT.md": "554f2ceda22101c69ea16752b2d2d9b5775ac2e05bfe502dc83503ed09f35f73",
+    "docs/AUTHENTICATED_CONTROL_ATTACHMENT.md": "3581881ad2120c90f8e42313bed58e53d8a5c25d00754e8cafbc23a3c5bc711c",
+    "docs/AUTHENTICATED_EDITOR_OBSERVATION.md": "845637a9b83dbc7d10750881f292fb1bbef2c1d211dd500f9b33838698cc9fde",
+    "docs/AUTHENTICATED_EDITOR_NAVIGATION.md": "5aa31b95f2bc6d864177a8e04f03b3ab528b545c8e02be8056d7e289d958db99",
+    "docs/WHOLE_IDE_AUDIT.md": "1f5fe1a7fc88bc5cc1e6ddd7abf1eaedda92650069f867bf5abbfc02cb0cce2b",
+    "docs/SPLIT_VIEW_LIFECYCLE_REMEDIATION.md": "d68ead89500eed28878e17ca44d52a6a7b183bb23a18411236cc681f3a916a62",
+    "docs/NATIVE_SHELL_FIXTURE_ISOLATION.md": "c5a7208cc9a936845024bf894d99098b45848d306b2a598c1c79d03c246fb769",
+    "docs/AGENT_WORKSPACE.md": "bc6874a00579fe0f59a704e757a579a95fef4260ab2f31837dbdf597d5162f95"
+  },
+  "actual_repository_instructions": {
+    "path": "AGENTS.md",
+    "resolved": "/home/gongahkia/.codex/AGENTS.md",
+    "sha256": "59698e320b1fc594a9d822fbf2f0407b1891975c65969251391051e08da050aa"
+  },
+  "review_scope": "current method implementations and relevant report/evidence contracts; no native acceptance or production controller changes"
+}

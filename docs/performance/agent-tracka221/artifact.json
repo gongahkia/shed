@@ -1,0 +1,11 @@
+{
+  "jar": "target/shed-2.0.0.jar",
+  "sha256": "92d68ac6b8a921f7dcc907706421cff22e33678aee91e8bf93d2b349acdc80d6",
+  "bytes": 50470807,
+  "a22_recorded_jar_sha256": "38e5df3ddfdaae67601279f81d981f961017d600a3fb64d0eb08e629aed8d926",
+  "identical_to_a22_recorded_artifact": false,
+  "compiled_production_classes": 1455,
+  "class_mismatches": [],
+  "new_test_fixtures_shipped": [],
+  "historical_jar_difference_cause": "unverified; no byte-identity claim to historical A2.2 artifact; production inputs compared to this task entry"
+}

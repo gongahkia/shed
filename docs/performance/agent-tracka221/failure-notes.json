@@ -1,0 +1,64 @@
+{
+  "containment": {
+    "verdict": "failed safety invariant; passing characterization tests reproduce it",
+    "original": "prerequisite-tests.json.gz",
+    "extended_repeat": "boundary-and-lsp-recheck.json.gz",
+    "scope": "owned synthetic sibling only; zero installed documents; no shipped agent opening endpoint exploited",
+    "established_root_cause": "Path authorization is separated from pathname-based acquisition through replaceable ancestors; existing loaders accept no project-bound read capability."
+  },
+  "missing_file": {
+    "finding": "Legacy store returns an empty named buffer for missing/removed target; no physical file is created.",
+    "meaning": "not the requested strict-existing-file contract"
+  },
+  "lsp": {
+    "failure": "safe-tests.json.gz",
+    "failed_assertion": "LspDefinitionResponsivenessTest.java:41 sampled waitForResponse stack frame",
+    "precise_cause": "unverified; failed sampled stack was not emitted",
+    "focused_passing_repeat": "boundary-and-lsp-recheck.json.gz",
+    "full_passing_repeat": "final-safe-tests.json.gz",
+    "definition_or_assertion_changed": false
+  },
+  "linux_tooling": {
+    "original": "tooling.json.gz",
+    "counts": "87 attempted; 86 passed; one macOS-only profile-generation error",
+    "final": "final-tooling.json.gz",
+    "applicable_passes": 86,
+    "excluded": "test_native_fixture.NativeFixtureTest.test_profile_no_fork_network_or_user_home_access",
+    "guard_or_assertion_weakened": false
+  },
+  "metadata": {
+    "historical_failure": "historical-a22-metadata-failure.json.gz",
+    "historical_repeat": "historical-a22-metadata-repeat.json.gz",
+    "new_repeats": 3,
+    "new_failures": 0,
+    "definition_or_gate_changed": false,
+    "conclusion": "Cold-tail anomaly unresolved; no new severe warm regression established in three runs. Cause not attributed."
+  },
+  "historical_artifact_comparison": {
+    "status": "different whole-JAR SHA from historical A2.2; current 1455 compiled classes match current JAR",
+    "cause": "unverified; not investigated beyond source/class/hash checks",
+    "assembly_note": "Initial evidence assembler incorrectly required historical whole-JAR identity and stopped at that assertion. Corrected reporting records the difference; no production/build/test behavior changed."
+  },
+  "artifact_observation_correction": {
+    "text": "Correction: I made an unverified claim. Should have been labeled. The scratch entry-artifact.json note claimed a pre-package observation; its recorded file mtime is after package.json. It is not used as a before baseline. Final artifact comparison uses the preserved A2.2 artifact record.",
+    "scratch_record_preserved_outside_repository": "/tmp/shed-tracka221-2w1oglyn/entry-artifact.json",
+    "observed_mtime": 1795243126.802605,
+    "package_report_mtime": 1795243080.6114202
+  },
+  "stopping_boundary": {
+    "production_agent_file_opening": "disabled / unsupported",
+    "new_fs_security_probes_after_latest_instruction": false,
+    "subsequent_work": "documentation and already-running existing safe verification only",
+    "production_or_authorization_changes": false
+  },
+  "blocked_or_unverified": [
+    "authorized file-open implementation and success protocol",
+    "strict relative-file grammar across platforms",
+    "handle/provider containment correction",
+    "typed cancellation and checked installation",
+    "new file-open performance/typing/resource qualification",
+    "new mode/desktop/file-open external-client acceptance",
+    "whole-process RSS",
+    "A3"
+  ]
+}

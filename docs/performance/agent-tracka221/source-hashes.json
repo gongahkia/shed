@@ -1,0 +1,17 @@
+{
+  "src/test/java/shed/ProjectFileOpenPrerequisiteTest.java": {
+    "sha256": "6d073c6c88694c62e0c953d3c3ded12b02847564e620d929457013fe547cf8e4",
+    "entry_sha256": null,
+    "version": "source-versions/src/test/java/shed/ProjectFileOpenPrerequisiteTest.java.gz"
+  },
+  "src/test/resources/shed/portable-fixture-tests.properties": {
+    "sha256": "c254cfe189b8963483875d0c80fdd9d60c4eac5faf1417d1e5f02c41c1b7b147",
+    "entry_sha256": "9cc52066419f469df5bf84ae87c9d82cfca15eaf946ad6cb0d44aeb6246699fb",
+    "version": "source-versions/src/test/resources/shed/portable-fixture-tests.properties.gz"
+  },
+  "scripts/test_native_fixture.py": {
+    "sha256": "3352241c7454498071a9da5a254c882062275d246492cb6002d3eea3b698a8be",
+    "entry_sha256": "f3bd9b30272c188bd550fb03a9051959e217253238a9762b808c5bbf659bb7d2",
+    "version": "source-versions/scripts/test_native_fixture.py.gz"
+  }
+}

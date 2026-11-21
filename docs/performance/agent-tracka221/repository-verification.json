@@ -1,0 +1,87 @@
+{
+  "verdict": "NO-GO for agent file opening; prerequisite review only",
+  "entry_head": "fe5f960c7439f5708d919d945367d7ccfb266404",
+  "entry_status": "",
+  "observed_final_head": "997c6a41eb7acb831101f36704b42e044db90803",
+  "observed_final_status": "",
+  "external_commits_observed_preserved": [
+    "997c6a41eb7acb831101f36704b42e044db90803",
+    "e9f9e5b8eb12971adb07c3e1f20efaa51511a420"
+  ],
+  "agent_commits_or_pushes": false,
+  "reset_clean_revert_discard": false,
+  "readme_before_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "readme_after_sha256": "48bf87f09ffa570b7fc65d305a15c3228bbc67e906cc992e4fe7108893e7501e",
+  "preexisting_changed_inputs": [
+    "scripts/test_native_fixture.py",
+    "src/test/resources/shed/portable-fixture-tests.properties"
+  ],
+  "new_files": [
+    "docs/AUTHENTICATED_PROJECT_FILE_OPENING.md",
+    "docs/performance/agent-tracka221/INDEX.md",
+    "docs/performance/agent-tracka221/artifact.json",
+    "docs/performance/agent-tracka221/baseline.json.gz",
+    "docs/performance/agent-tracka221/boundary-and-lsp-recheck.json.gz",
+    "docs/performance/agent-tracka221/checksums.sha256",
+    "docs/performance/agent-tracka221/environment.json",
+    "docs/performance/agent-tracka221/failure-notes.json",
+    "docs/performance/agent-tracka221/final-media-detail.json.gz",
+    "docs/performance/agent-tracka221/final-media.json.gz",
+    "docs/performance/agent-tracka221/final-safe-tests.json.gz",
+    "docs/performance/agent-tracka221/final-tooling.json.gz",
+    "docs/performance/agent-tracka221/historical-a22-metadata-failure.json.gz",
+    "docs/performance/agent-tracka221/historical-a22-metadata-repeat.json.gz",
+    "docs/performance/agent-tracka221/measurements-summary.json",
+    "docs/performance/agent-tracka221/metadata-repeat-1.json.gz",
+    "docs/performance/agent-tracka221/metadata-repeat-2.json.gz",
+    "docs/performance/agent-tracka221/metadata-repeat-3.json.gz",
+    "docs/performance/agent-tracka221/navigation-regression-measurements.json.gz",
+    "docs/performance/agent-tracka221/package.json.gz",
+    "docs/performance/agent-tracka221/prerequisite-tests.json.gz",
+    "docs/performance/agent-tracka221/repository-verification.json",
+    "docs/performance/agent-tracka221/safe-tests.json.gz",
+    "docs/performance/agent-tracka221/source-hashes.json",
+    "docs/performance/agent-tracka221/source-map.json",
+    "docs/performance/agent-tracka221/source-versions/scripts/test_native_fixture.py.gz",
+    "docs/performance/agent-tracka221/source-versions/src/test/java/shed/ProjectFileOpenPrerequisiteTest.java.gz",
+    "docs/performance/agent-tracka221/source-versions/src/test/resources/shed/portable-fixture-tests.properties.gz",
+    "docs/performance/agent-tracka221/status-measurements.json.gz",
+    "docs/performance/agent-tracka221/test-results.json",
+    "docs/performance/agent-tracka221/tooling.json.gz",
+    "docs/performance/agent-tracka221/verification-sequence.json.gz",
+    "src/test/java/shed/ProjectFileOpenPrerequisiteTest.java"
+  ],
+  "production_inputs_verified_unchanged": 413,
+  "new_production_inputs": [],
+  "unchanged_preexisting_captured_inputs": 2336,
+  "unexpected_changed_or_missing_preexisting_inputs": [],
+  "prior_reports_and_evidence_unchanged": true,
+  "original_a22_timing_failure_and_pass_preserved_byte_for_byte": true,
+  "original_lsp_failure_and_repeats_preserved": true,
+  "new_fs_security_probes_after_stopping_instruction": false,
+  "authorization_changes": false,
+  "verification": {
+    "working_diff_check": {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "entry_diff_check": {
+      "command": [
+        "git",
+        "diff",
+        "fe5f960c7439f5708d919d945367d7ccfb266404",
+        "--check"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  "whole_jar_historical_identity": "not claimed; current hash differs from A2.2 record, cause unverified; current compiled production classes match current artifact"
+}

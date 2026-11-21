@@ -40,6 +40,12 @@ final class EditorWorkspaceDocuments implements WorkspaceDocumentEditor, AutoClo
     @Override public boolean connected() { return !closed.get(); }
     @Override public void close() { closed.set(true); }
 
+    String metadataIdentity(FileBuffer buffer) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Document identity belongs to the EDT");
+        if (closed.get()) throw new WorkspaceApiException(WorkspaceApiException.Code.APP_SHUTTING_DOWN, "Editor is closed");
+        return identities.computeIfAbsent(buffer, ignored -> new Identity(fallbackRoot)).id;
+    }
+
     @Override public List<WorkspaceDocument> snapshots() {
         if (closed.get()) throw new WorkspaceApiException(WorkspaceApiException.Code.NOT_CONNECTED, "Editor document connection is closed");
         List<Captured> captured = onEdt(this::capture);

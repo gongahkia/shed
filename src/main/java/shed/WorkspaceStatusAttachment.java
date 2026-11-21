@@ -14,23 +14,33 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** ephemeral status grant; discovery contains no secret, path, workspace or document metadata. */
+/** ephemeral authenticated grant; discovery contains no secret, path, name or document metadata. */
 final class WorkspaceStatusAttachment implements AutoCloseable {
     static final Duration LIFETIME = Duration.ofMinutes(10);
-    record Descriptor(String instanceId, String windowId, String attachmentId, int port, long expiresAt) {
+    record Descriptor(String instanceId, String windowId, String attachmentId, int port, long expiresAt, String scope, String projectId) {
+        Descriptor(String instanceId, String windowId, String attachmentId, int port, long expiresAt) {
+            this(instanceId, windowId, attachmentId, port, expiresAt, "status", null);
+        }
         Map<String, Object> fields() {
-            return Map.of("schemaVersion", 2, "instanceId", instanceId, "windowId", windowId,
-                "attachmentId", attachmentId, "port", port, "expiresAt", expiresAt, "scope", "status");
+            var fields = new java.util.LinkedHashMap<String, Object>(Map.of("schemaVersion", 2, "instanceId", instanceId, "windowId", windowId,
+                "attachmentId", attachmentId, "port", port, "expiresAt", expiresAt, "scope", scope));
+            if (projectId != null) fields.put("projectId", projectId);
+            return fields;
         }
         static Descriptor read(Path file) throws IOException {
             Map<String, Object> value = object(privateBytes(file));
             if (!Long.valueOf(2).equals(value.get("schemaVersion")))
                 throw failure(WorkspaceApiException.Code.UNSUPPORTED_PROTOCOL);
-            if (!value.keySet().equals(Set.of("schemaVersion", "instanceId", "windowId", "attachmentId", "port", "expiresAt", "scope"))
-                || !"status".equals(value.get("scope")) || !(value.get("port") instanceof Long port) || port < 1 || port > 65535
+            boolean metadata = "editor-metadata".equals(value.get("scope"));
+            Set<String> fields = metadata ? Set.of("schemaVersion", "instanceId", "windowId", "attachmentId", "port", "expiresAt", "scope", "projectId")
+                : Set.of("schemaVersion", "instanceId", "windowId", "attachmentId", "port", "expiresAt", "scope");
+            if (!value.keySet().equals(fields) || !metadata && !"status".equals(value.get("scope"))
+                || metadata && (!(value.get("projectId") instanceof String project) || !project.matches("project-[a-f0-9-]{36}"))
+                || !(value.get("port") instanceof Long port) || port < 1 || port > 65535
                 || !(value.get("expiresAt") instanceof Long expiry) || expiry < 1)
                 throw failure(WorkspaceApiException.Code.SESSION_INVALID);
-            return new Descriptor(uuid(value.get("instanceId")), uuid(value.get("windowId")), uuid(value.get("attachmentId")), port.intValue(), expiry);
+            return new Descriptor(uuid(value.get("instanceId")), uuid(value.get("windowId")), uuid(value.get("attachmentId")), port.intValue(), expiry,
+                (String) value.get("scope"), (String) value.get("projectId"));
         }
     }
 
@@ -46,12 +56,17 @@ final class WorkspaceStatusAttachment implements AutoCloseable {
 
     WorkspaceStatusAttachment(ApplicationStatus application, int port, Path directory, List<Path> roots,
                               Duration lifetime, Clock clock) throws IOException {
+        this(application, port, directory, roots, lifetime, clock, null);
+    }
+
+    WorkspaceStatusAttachment(ApplicationStatus application, int port, Path directory, List<Path> roots,
+                              Duration lifetime, Clock clock, EditorMetadata metadata) throws IOException {
         if (lifetime.isNegative() || lifetime.isZero() || lifetime.compareTo(LIFETIME) > 0) throw new IllegalArgumentException("Invalid attachment lifetime");
         for (Path root : roots) if (directory.startsWith(WorkspacePaths.root(root)))
             throw new IOException("Private attachment storage must be outside configured roots");
         this.clock = clock;
         descriptor = new Descriptor(application.instanceId, application.windowId, UUID.randomUUID().toString(), port,
-            Math.addExact(clock.millis(), lifetime.toMillis()));
+            Math.addExact(clock.millis(), lifetime.toMillis()), metadata == null ? "status" : "editor-metadata", metadata == null ? null : metadata.projectId);
         deadlineNanos = System.nanoTime() + lifetime.toNanos();
         discoveryBytes = MiniJson.stringify(descriptor.fields()).getBytes(StandardCharsets.UTF_8);
         credentialBytes = MiniJson.stringify(Map.of("schemaVersion", 2, "attachmentId", descriptor.attachmentId(),

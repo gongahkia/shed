@@ -1,0 +1,44 @@
+{
+  "offline_provider_bootstrap": {
+    "status": "resolved",
+    "reports": [
+      "stage-a-offline-provider-missing.json.gz",
+      "stage-a-offline-launcher-missing.json.gz"
+    ],
+    "meaning": "No tests executed in these two failures. Missing Surefire provider/launcher artifacts were seeded in the task-owned cache; offline runner and admission remained enabled."
+  },
+  "jdk_download": {
+    "status": "resolved",
+    "meaning": "Initial Python URL retrieval returned HTTP 403. curl retrieval succeeded; downloaded JDK and Maven archive checksums match official release metadata. The terminal retrieval failure has no standalone raw report."
+  },
+  "initial_measurement": {
+    "status": "retained unsupported workload",
+    "report": "initial-measurements.json.gz",
+    "meaning": "The Unicode contract document was reused for ASCII input. [Inference] Retained Swing complex-layout state explains the slowdown, based on the fixture, setter and installed JDK source; its flag was not directly recorded. The no-traffic control had a 61,100.431 ms first paint and 39.261 ms warm p95; traffic p95 14.214 ms. Corrected/final probes use fresh ASCII documents and check both control and traffic p95. No production layout/font change."
+  },
+  "linux_tooling": {
+    "status": "platform exclusion",
+    "initial_report": "initial-tooling.json.gz",
+    "final_report": "final-tooling.json.gz",
+    "case": "test_native_fixture.NativeFixtureTest.test_profile_no_fork_network_or_user_home_access",
+    "meaning": "87 attempted, 86 passed, one error because Fixture.profile rejects a non-macOS host before Seatbelt profile generation. The 86 applicable cases subsequently pass. No assertion, backend guard or production/test implementation was changed to hide the error."
+  },
+  "optional_thread_dump": {
+    "status": "unavailable",
+    "meaning": "A jstack request for the measurement JVM reported non existent JVM pid after that JVM had already completed. No thread dump, source diagnosis or acceptance result was obtained."
+  },
+  "escaped_response_id": {
+    "status": "covered by final regression",
+    "meaning": "Final bounds review identified response growth from a maximally escaped request ID. Metadata now returns a signed/correlated LIMIT_EXCEEDED within 2 KiB instead of falling through to an unsigned transport error; subsequent requests remain usable."
+  },
+  "exclusions": [
+    "real Texteditor/desktop window",
+    "native shell and PTY fixture",
+    "full unreviewed Maven suite",
+    "Windows/macOS runtime qualification",
+    "native Linux desktop",
+    "whole-process RSS/native resource attribution",
+    "real language servers/model providers",
+    "source/navigation/edit/render/capture/event APIs"
+  ]
+}

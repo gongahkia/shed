@@ -40,11 +40,26 @@ final class WorkspaceBridgeClient implements AutoCloseable {
     }
 
     static WorkspaceBridgeClient status(Path descriptor, Path credential) throws IOException {
+        return authenticated(descriptor, credential, "status");
+    }
+
+    static WorkspaceBridgeClient metadata(Path descriptor, Path credential) throws IOException {
+        return authenticated(descriptor, credential, "editor-metadata");
+    }
+
+    private static WorkspaceBridgeClient authenticated(Path descriptor, Path credential, String scope) throws IOException {
         var endpoint = WorkspaceStatusAttachment.Descriptor.read(descriptor);
+        if (!scope.equals(endpoint.scope())) throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.UNAUTHORIZED);
         if (System.currentTimeMillis() >= endpoint.expiresAt()) throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.SESSION_EXPIRED);
         byte[] key = WorkspaceStatusAttachment.readKey(credential, endpoint);
         try { return new WorkspaceBridgeClient(endpoint, key); }
         finally { Arrays.fill(key, (byte) 0); }
+    }
+
+    String metadataRequest() {
+        if (statusSession == null || !"editor-metadata".equals(statusSession.scope())) throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.UNAUTHORIZED);
+        return MiniJson.stringify(Map.of("jsonrpc", "2.0", "id", "metadata", "method", "editor/metadata",
+            "params", Map.of("schemaVersion", 1, "projectId", statusSession.projectId())));
     }
 
     private WorkspaceBridgeClient(WorkspaceStatusAttachment.Descriptor endpoint, byte[] key) throws IOException {
@@ -101,8 +116,17 @@ final class WorkspaceBridgeClient implements AutoCloseable {
             if (!"2.0".equals(response.get("jsonrpc")) || !id.equals(response.get("id"))
                 || !(response.keySet().equals(Set.of("jsonrpc", "id", "result")) || response.keySet().equals(Set.of("jsonrpc", "id", "error"))))
                 throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.SESSION_INVALID);
-            if (response.containsKey("result") && !statusSession.acceptsStatus(MiniJson.asObject(response.get("result"))))
+            if (response.containsKey("result") && !("editor/status".equals(original.get("method"))
+                ? statusSession.acceptsStatus(MiniJson.asObject(response.get("result")))
+                : "editor/metadata".equals(original.get("method")) && statusSession.acceptsMetadata(MiniJson.asObject(response.get("result")))))
                 throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.SESSION_INVALID);
+            if (response.containsKey("result") && "editor/metadata".equals(original.get("method"))) {
+                var params = MiniJson.asObject(original.get("params")); var result = MiniJson.asObject(response.get("result"));
+                if (params == null || !result.get("projectId").equals(params.get("projectId"))
+                    || params.containsKey("expectedPaneId") && !result.get("paneId").equals(params.get("expectedPaneId"))
+                    || params.containsKey("expectedDocumentId") && !result.get("documentId").equals(params.get("expectedDocumentId")))
+                    throw WorkspaceStatusAttachment.failure(WorkspaceApiException.Code.SESSION_INVALID);
+            }
             return payload;
         } catch (IOException failed) {
             if (timedOut.get()) throw new WorkspaceApiException(WorkspaceApiException.Code.TIMEOUT, "Status request timed out");

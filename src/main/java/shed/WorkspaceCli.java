@@ -20,7 +20,7 @@ public final class WorkspaceCli {
     public static int run(String[] args, InputStream input, OutputStream output, OutputStream errors) {
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8), true);
         PrintWriter diagnostics = new PrintWriter(new OutputStreamWriter(errors, StandardCharsets.UTF_8), true);
-        boolean status = false;
+        boolean status = false, metadata = false;
         try {
             if (!handles(args)) throw new IllegalArgumentException("Expected --workspace-api");
             String root = null, request = null, connection = null, credential = null; boolean stdio = false;
@@ -31,16 +31,17 @@ public final class WorkspaceCli {
                     case "--stdio" -> { if (stdio) throw new IllegalArgumentException("Duplicate --stdio"); stdio = true; }
                     case "--connect" -> { if (connection != null || ++i == args.length) throw new IllegalArgumentException("Expected one --connect descriptor"); connection = args[i]; }
                     case "--credential" -> { if (credential != null || ++i == args.length) throw new IllegalArgumentException("Expected one --credential file"); credential = args[i]; }
+                    case "--metadata" -> { if (metadata) throw new IllegalArgumentException("Duplicate --metadata"); metadata = true; }
                     case "--status" -> { if (status) throw new IllegalArgumentException("Duplicate --status"); status = true; }
                     default -> throw new IllegalArgumentException("Unsupported workspace API argument");
                 }
             }
-            if (status) {
-                if (root != null || connection == null || credential == null || stdio || request != null)
-                    throw new IllegalArgumentException("Usage: shed --workspace-api --status --connect <descriptor> --credential <file>");
-                return status(Path.of(connection), Path.of(credential), writer);
+            if (status || metadata) {
+                if (status && metadata || root != null || connection == null || credential == null || stdio || request != null)
+                    throw new IllegalArgumentException("Usage: shed --workspace-api --status|--metadata --connect <descriptor> --credential <file>");
+                return status(Path.of(connection), Path.of(credential), writer, metadata);
             }
-            if (credential != null) throw new IllegalArgumentException("--credential requires --status");
+            if (credential != null) throw new IllegalArgumentException("--credential requires --status or --metadata");
             if (root == null || stdio && request != null) throw new IllegalArgumentException(
                 "Usage: shed --workspace-api --root <directory> [--connect <descriptor>] [--stdio | --request <JSON>]");
             try (WorkspaceBridgeClient remote = connection == null ? null : new WorkspaceBridgeClient(Path.of(connection), Path.of(root))) {
@@ -55,8 +56,8 @@ public final class WorkspaceCli {
             else diagnostics.println(MiniJson.stringify(Map.of("error", error.toMap())));
             return 65;
         } catch (IllegalArgumentException invalid) {
-            if (status) {
-                writer.println(WorkspaceRpc.error("status", -32602, "Invalid status arguments", Map.of("code", "INVALID_REQUEST")));
+            if (status || metadata) {
+                writer.println(WorkspaceRpc.error(metadata ? "metadata" : "status", -32602, metadata ? "Invalid metadata arguments" : "Invalid status arguments", Map.of("code", "INVALID_REQUEST")));
                 return 64;
             }
             diagnostics.println(MiniJson.stringify(Map.of("error", Map.of("code", "INVALID_REQUEST", "message", invalid.getMessage()))));
@@ -67,38 +68,39 @@ public final class WorkspaceCli {
         }
     }
 
-    private static int status(Path descriptor, Path credential, PrintWriter output) {
+    private static int status(Path descriptor, Path credential, PrintWriter output, boolean metadata) {
         String response;
-        try (WorkspaceBridgeClient client = WorkspaceBridgeClient.status(descriptor, credential)) {
-            response = client.exchange(MiniJson.stringify(Map.of("jsonrpc", "2.0", "id", "status", "method", "editor/status",
+        try (WorkspaceBridgeClient client = metadata ? WorkspaceBridgeClient.metadata(descriptor, credential) : WorkspaceBridgeClient.status(descriptor, credential)) {
+            response = client.exchange(metadata ? client.metadataRequest() : MiniJson.stringify(Map.of("jsonrpc", "2.0", "id", "status", "method", "editor/status",
                 "params", Map.of("schemaVersion", 1))));
-        } catch (WorkspaceApiException failure) { return statusFailure(output, failure.code().name()); }
-        catch (java.net.SocketTimeoutException timeout) { return statusFailure(output, "TIMEOUT"); }
-        catch (java.nio.file.NoSuchFileException | java.net.ConnectException unavailable) { return statusFailure(output, "INSTANCE_UNAVAILABLE"); }
-        catch (java.nio.file.FileSystemException denied) { return statusFailure(output, "UNAUTHORIZED"); }
-        catch (IOException failure) { return statusFailure(output, "TRANSPORT_ERROR"); }
-        catch (RuntimeException invalid) { return statusFailure(output, "SESSION_INVALID"); }
+        } catch (WorkspaceApiException failure) { return statusFailure(output, failure.code().name(), metadata); }
+        catch (java.net.SocketTimeoutException timeout) { return statusFailure(output, "TIMEOUT", metadata); }
+        catch (java.nio.file.NoSuchFileException | java.net.ConnectException unavailable) { return statusFailure(output, "INSTANCE_UNAVAILABLE", metadata); }
+        catch (java.nio.file.FileSystemException denied) { return statusFailure(output, "UNAUTHORIZED", metadata); }
+        catch (IOException failure) { return statusFailure(output, "TRANSPORT_ERROR", metadata); }
+        catch (RuntimeException invalid) { return statusFailure(output, "SESSION_INVALID", metadata); }
         Map<String, Object> value = MiniJson.asObject(MiniJson.parseStrict(response));
         if (value.containsKey("error")) {
             var error = MiniJson.asObject(value.get("error")); var data = error == null ? null : MiniJson.asObject(error.get("data"));
-            try { return statusFailure(output, WorkspaceApiException.Code.valueOf((String) data.get("code")).name()); }
-            catch (RuntimeException invalid) { return statusFailure(output, "SESSION_INVALID"); }
+            try { return statusFailure(output, WorkspaceApiException.Code.valueOf((String) data.get("code")).name(), metadata); }
+            catch (RuntimeException invalid) { return statusFailure(output, "SESSION_INVALID", metadata); }
         }
         output.println(response);
         return output.checkError() ? 74 : 0;
     }
 
-    private static int statusFailure(PrintWriter output, String code) {
-        output.println(WorkspaceRpc.error("status", -32000, "Status attachment failed", Map.of("code", code)));
+    private static int statusFailure(PrintWriter output, String code, boolean metadata) {
+        output.println(WorkspaceRpc.error(metadata ? "metadata" : "status", -32000, metadata ? "Metadata attachment failed" : "Status attachment failed", Map.of("code", code)));
         return output.checkError() ? 74 : statusExit(code);
     }
     private static int statusExit(String code) {
         return switch (code) {
             case "INSTANCE_UNAVAILABLE" -> 69;
-            case "UNAUTHORIZED" -> 77;
+            case "UNAUTHORIZED", "PROJECT_UNAUTHORIZED", "PERMISSION_DENIED" -> 77;
             case "UNSUPPORTED_PROTOCOL" -> 76;
-            case "SESSION_INVALID", "SESSION_EXPIRED" -> 78;
-            case "APP_NOT_READY" -> 75;
+            case "SESSION_INVALID", "SESSION_EXPIRED", "AUTHORIZATION_REVOKED", "APP_SHUTTING_DOWN" -> 78;
+            case "APP_NOT_READY", "NO_ACTIVE_EDITOR", "PANE_UNAVAILABLE", "CONTEXT_CHANGED", "INVALID_CONTEXT", "BUSY" -> 75;
+            case "INVALID_REQUEST" -> 64;
             case "TIMEOUT" -> 70;
             default -> 74;
         };

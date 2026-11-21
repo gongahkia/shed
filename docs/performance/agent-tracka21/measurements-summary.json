@@ -1,0 +1,420 @@
+{
+  "final-entry-status-measurements.json": {
+    "before_first_attachment": {
+      "used_heap_bytes": 32525672,
+      "committed_heap_bytes": 56623104,
+      "threads": 6,
+      "attachment_owned_threads": 0,
+      "fds": 175,
+      "rss": "unmeasured"
+    },
+    "disabled_fixture_idle_cpu": {
+      "wall_ns": 200408966,
+      "whole_jvm_cpu_ns": 10000000,
+      "compiler_time_delta_ms": 15,
+      "attachment_platform_thread_cpu_ns": 0
+    },
+    "first_model_factory_and_publication_ms": 27.613058,
+    "first_client_file_validation_connect_auth_ms": 80.118905,
+    "status_round_trip": {
+      "first_ms": 10.920419,
+      "warm_count": 80,
+      "warm_p95_ms": 3.130854,
+      "max_ms": 10.920419,
+      "warm_p50_ms": 1.91927,
+      "warm_p99_observed_ms": 3.958312
+    },
+    "enabled_idle_cpu": {
+      "wall_ns": 200193090,
+      "whole_jvm_cpu_ns": 100000000,
+      "compiler_time_delta_ms": 126,
+      "attachment_platform_thread_cpu_ns": 0
+    },
+    "enabled_idle_memory": {
+      "used_heap_bytes": 47205736,
+      "committed_heap_bytes": 56623104,
+      "threads": 18,
+      "attachment_owned_threads": 2,
+      "fds": 179,
+      "rss": "unmeasured"
+    },
+    "typing_control_1mib": {
+      "first_ms": 89.723496,
+      "warm_count": 50,
+      "warm_p95_ms": 3.344336,
+      "max_ms": 89.723496,
+      "warm_p50_ms": 2.17634,
+      "warm_p99_observed_ms": 3.658764
+    },
+    "typing_with_status_1mib": {
+      "first_ms": 2.316623,
+      "warm_count": 50,
+      "warm_p95_ms": 2.203909,
+      "max_ms": 2.316623,
+      "warm_p50_ms": 1.858423,
+      "warm_p99_observed_ms": 2.31133
+    },
+    "settled_before_cycles": {
+      "used_heap_bytes": 37764768,
+      "committed_heap_bytes": 104857600,
+      "threads": 20,
+      "attachment_owned_threads": 0,
+      "fds": 198,
+      "rss": "unmeasured"
+    },
+    "cycle_count": 24,
+    "factory_publication": {
+      "first_ms": 2.30027,
+      "warm_count": 23,
+      "warm_p95_ms": 2.679951,
+      "max_ms": 2.723601,
+      "warm_p50_ms": 1.942817,
+      "warm_p99_observed_ms": 2.723601
+    },
+    "client_attach_including_auth": {
+      "first_ms": 4.184877,
+      "warm_count": 23,
+      "warm_p95_ms": 4.203402,
+      "max_ms": 4.247389,
+      "warm_p50_ms": 3.602155,
+      "warm_p99_observed_ms": 4.247389
+    },
+    "server_close_including_owned_file_cleanup": {
+      "first_ms": 0.983704,
+      "warm_count": 23,
+      "warm_p95_ms": 1.43253,
+      "max_ms": 1.901815,
+      "warm_p50_ms": 1.200604,
+      "warm_p99_observed_ms": 1.901815
+    },
+    "retained_cycle_objects": 0,
+    "settled_after_cycles": {
+      "used_heap_bytes": 25220480,
+      "committed_heap_bytes": 92274688,
+      "threads": 20,
+      "attachment_owned_threads": 0,
+      "fds": 198,
+      "rss": "unmeasured"
+    },
+    "warm_enabled_settled_memory": {
+      "used_heap_bytes": 25226768,
+      "committed_heap_bytes": 92274688,
+      "threads": 22,
+      "attachment_owned_threads": 2,
+      "fds": 199,
+      "rss": "unmeasured"
+    },
+    "warm_disabled_settled_memory": {
+      "used_heap_bytes": 25227336,
+      "committed_heap_bytes": 92274688,
+      "threads": 20,
+      "attachment_owned_threads": 0,
+      "fds": 198,
+      "rss": "unmeasured"
+    },
+    "warm_enabled_idle_cpu": [
+      {
+        "wall_ns": 200374928,
+        "whole_jvm_cpu_ns": 160000000,
+        "compiler_time_delta_ms": 650,
+        "attachment_platform_thread_cpu_ns": 0
+      },
+      {
+        "wall_ns": 200253832,
+        "whole_jvm_cpu_ns": 0,
+        "compiler_time_delta_ms": 0,
+        "attachment_platform_thread_cpu_ns": 0
+      },
+      {
+        "wall_ns": 200182274,
+        "whole_jvm_cpu_ns": 0,
+        "compiler_time_delta_ms": 0,
+        "attachment_platform_thread_cpu_ns": 0
+      }
+    ],
+    "warm_disabled_idle_cpu": [
+      {
+        "wall_ns": 200196584,
+        "whole_jvm_cpu_ns": 10000000,
+        "compiler_time_delta_ms": 0,
+        "attachment_platform_thread_cpu_ns": 0
+      },
+      {
+        "wall_ns": 200126850,
+        "whole_jvm_cpu_ns": 0,
+        "compiler_time_delta_ms": 0,
+        "attachment_platform_thread_cpu_ns": 0
+      },
+      {
+        "wall_ns": 200137493,
+        "whole_jvm_cpu_ns": 0,
+        "compiler_time_delta_ms": 0,
+        "attachment_platform_thread_cpu_ns": 0
+      }
+    ]
+  },
+  "final-status-measurements.json": {
+    "before_first_attachment": {
+      "used_heap_bytes": 32503912,
+      "committed_heap_bytes": 56623104,
+      "threads": 6,
+      "attachment_owned_threads": 0,
+      "fds": 175,
+      "rss": "unmeasured"
+    },
+    "disabled_fixture_idle_cpu": {
+      "attachment_platform_thread_cpu_ns": 0,
+      "wall_ns": 200362441,
+      "whole_jvm_cpu_ns": 180000000,
+      "compiler_time_delta_ms": 347
+    },
+    "first_model_factory_and_publication_ms": 22.585717,
+    "first_client_file_validation_connect_auth_ms": 65.63784,
+    "status_round_trip": {
+      "max_ms": 9.886151,
+      "warm_p50_ms": 2.170838,
+      "warm_p99_observed_ms": 3.851648,
+      "first_ms": 9.886151,
+      "warm_count": 80,
+      "warm_p95_ms": 3.368837
+    },
+    "enabled_idle_cpu": {
+      "attachment_platform_thread_cpu_ns": 0,
+      "wall_ns": 200294778,
+      "whole_jvm_cpu_ns": 0,
+      "compiler_time_delta_ms": 1
+    },
+    "enabled_idle_memory": {
+      "used_heap_bytes": 49281128,
+      "committed_heap_bytes": 56623104,
+      "threads": 18,
+      "attachment_owned_threads": 2,
+      "fds": 179,
+      "rss": "unmeasured"
+    },
+    "typing_control_1mib": {
+      "max_ms": 96.890369,
+      "warm_p50_ms": 1.250405,
+      "warm_p99_observed_ms": 1.914976,
+      "first_ms": 96.890369,
+      "warm_count": 50,
+      "warm_p95_ms": 1.769811
+    },
+    "typing_with_status_1mib": {
+      "max_ms": 3.559947,
+      "warm_p50_ms": 1.10545,
+      "warm_p99_observed_ms": 3.559947,
+      "first_ms": 2.378704,
+      "warm_count": 50,
+      "warm_p95_ms": 2.252879
+    },
+    "settled_before_cycles": {
+      "used_heap_bytes": 37729728,
+      "committed_heap_bytes": 104857600,
+      "threads": 20,
+      "attachment_owned_threads": 0,
+      "fds": 198,
+      "rss": "unmeasured"
+    },
+    "cycle_count": 24,
+    "factory_publication": {
+      "max_ms": 2.851777,
+      "warm_p50_ms": 2.186175,
+      "warm_p99_observed_ms": 2.851777,
+      "first_ms": 2.561167,
+      "warm_count": 23,
+      "warm_p95_ms": 2.513945
+    },
+    "client_attach_including_auth": {
+      "max_ms": 4.935416,
+      "warm_p50_ms": 3.730888,
+      "warm_p99_observed_ms": 4.813113,
+      "first_ms": 4.935416,
+      "warm_count": 23,
+      "warm_p95_ms": 4.802462
+    },
+    "server_close_including_owned_file_cleanup": {
+      "max_ms": 1.703475,
+      "warm_p50_ms": 1.247529,
+      "warm_p99_observed_ms": 1.703475,
+      "first_ms": 0.701979,
+      "warm_count": 23,
+      "warm_p95_ms": 1.537875
+    },
+    "retained_cycle_objects": 0,
+    "settled_after_cycles": {
+      "used_heap_bytes": 25174728,
+      "committed_heap_bytes": 92274688,
+      "threads": 20,
+      "attachment_owned_threads": 0,
+      "fds": 198,
+      "rss": "unmeasured"
+    },
+    "warm_enabled_settled_memory": {
+      "used_heap_bytes": 25181384,
+      "committed_heap_bytes": 92274688,
+      "threads": 22,
+      "attachment_owned_threads": 2,
+      "fds": 199,
+      "rss": "unmeasured"
+    },
+    "warm_disabled_settled_memory": {
+      "used_heap_bytes": 25181872,
+      "committed_heap_bytes": 92274688,
+      "threads": 20,
+      "attachment_owned_threads": 0,
+      "fds": 198,
+      "rss": "unmeasured"
+    },
+    "warm_enabled_idle_cpu": [
+      {
+        "attachment_platform_thread_cpu_ns": 0,
+        "wall_ns": 200457587,
+        "whole_jvm_cpu_ns": 0,
+        "compiler_time_delta_ms": 0
+      },
+      {
+        "attachment_platform_thread_cpu_ns": 0,
+        "wall_ns": 200247720,
+        "whole_jvm_cpu_ns": 0,
+        "compiler_time_delta_ms": 0
+      },
+      {
+        "attachment_platform_thread_cpu_ns": 0,
+        "wall_ns": 200214213,
+        "whole_jvm_cpu_ns": 0,
+        "compiler_time_delta_ms": 0
+      }
+    ],
+    "warm_disabled_idle_cpu": [
+      {
+        "attachment_platform_thread_cpu_ns": 0,
+        "wall_ns": 200268601,
+        "whole_jvm_cpu_ns": 0,
+        "compiler_time_delta_ms": 0
+      },
+      {
+        "attachment_platform_thread_cpu_ns": 0,
+        "wall_ns": 200112840,
+        "whole_jvm_cpu_ns": 10000000,
+        "compiler_time_delta_ms": 4
+      },
+      {
+        "attachment_platform_thread_cpu_ns": 0,
+        "wall_ns": 200149608,
+        "whole_jvm_cpu_ns": 0,
+        "compiler_time_delta_ms": 0
+      }
+    ]
+  },
+  "final-metadata-measurements.json": {
+    "disabled_memory": {
+      "used_heap_bytes": 32557144,
+      "committed_heap_bytes": 56623104,
+      "threads": 6,
+      "attachment_owned_threads": 0,
+      "fds": 175,
+      "rss": "unmeasured"
+    },
+    "enabled_memory": {
+      "used_heap_bytes": 43042904,
+      "committed_heap_bytes": 56623104,
+      "threads": 11,
+      "attachment_owned_threads": 2,
+      "fds": 181,
+      "rss": "unmeasured"
+    },
+    "metadata_round_trip": {
+      "warm_p99_observed_ms": 7.175033,
+      "warm_p50_ms": 3.266135,
+      "max_ms": 49.632609,
+      "warm_p95_ms": 6.127254,
+      "warm_count": 100,
+      "first_ms": 49.632609
+    },
+    "service_final_edt_capture": {
+      "warm_p99_observed_ms": 0.135432,
+      "warm_p50_ms": 0.05752,
+      "max_ms": 0.206525,
+      "warm_p95_ms": 0.110494,
+      "warm_count": 100,
+      "first_ms": 0.091977
+    },
+    "client_thread_allocated_bytes_per_round_trip": {
+      "count": 101,
+      "first": 180744,
+      "warm_median": 50288.0,
+      "warm_p95": 50368,
+      "maximum": 180744
+    },
+    "jvm_total_allocation_delta_per_round_trip_including_unrelated_work": {
+      "count": 101,
+      "first": 1086744,
+      "warm_median": 104840.0,
+      "warm_p95": 106264,
+      "maximum": 1086744
+    },
+    "edt_capture_small": {
+      "warm_p99_observed_ms": 0.18695,
+      "warm_p50_ms": 0.058063,
+      "max_ms": 1.894372,
+      "warm_p95_ms": 0.104402,
+      "warm_count": 201,
+      "first_ms": 1.894372
+    },
+    "edt_capture_allocated_bytes": {
+      "count": 304,
+      "first": 19928,
+      "warm_median": 232,
+      "warm_p95": 232,
+      "maximum": 19928
+    },
+    "typing_control_1mib": {
+      "warm_p99_observed_ms": 3.448095,
+      "warm_p50_ms": 1.931473,
+      "max_ms": 93.416398,
+      "warm_p95_ms": 3.411332,
+      "warm_count": 50,
+      "first_ms": 93.416398
+    },
+    "metadata_traffic_outcomes_during_human_edits": {
+      "CONTEXT_CHANGED": 51
+    },
+    "typing_with_metadata_1mib": {
+      "warm_p99_observed_ms": 2.570011,
+      "warm_p50_ms": 2.013455,
+      "max_ms": 2.570011,
+      "warm_p95_ms": 2.501429,
+      "warm_count": 50,
+      "first_ms": 2.028912
+    },
+    "edt_capture_during_1mib_typing": {
+      "warm_p99_observed_ms": 0.112966,
+      "warm_p50_ms": 0.049931,
+      "max_ms": 0.187893,
+      "warm_p95_ms": 0.080492,
+      "warm_count": 101,
+      "first_ms": 0.187893
+    },
+    "settled_before_cycles": {
+      "used_heap_bytes": 29933832,
+      "committed_heap_bytes": 100663296,
+      "threads": 21,
+      "attachment_owned_threads": 0,
+      "fds": 198,
+      "rss": "unmeasured"
+    },
+    "cycles": 24,
+    "tracked_objects": 120,
+    "retained_tracked_objects": 0,
+    "settled_after_cycles": {
+      "used_heap_bytes": 29958424,
+      "committed_heap_bytes": 100663296,
+      "threads": 21,
+      "attachment_owned_threads": 0,
+      "fds": 198,
+      "rss": "unmeasured"
+    },
+    "remaining_named_attachment_platform_threads": 0
+  }
+}

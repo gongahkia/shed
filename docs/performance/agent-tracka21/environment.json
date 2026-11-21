@@ -1,0 +1,16 @@
+{
+  "host": {
+    "system": "Linux",
+    "machine": "x86_64",
+    "release": "7.2.15-1-omarchy"
+  },
+  "python": "3.14.8",
+  "jdk_archive_sha256": "bb8a93f9ae6e7a693b2b721e85dbeff26ae1a77447985a8d7afcdd9c7cf6222e",
+  "jdk_release": "21.0.13+100000002.0.LTS",
+  "jdk_checksum_source": "https://api.adoptium.net/v3/assets/latest/21/hotspot?architecture=x64&image_type=jdk&os=linux&vendor=eclipse",
+  "maven_archive_sha512": "bcfe4fe305c962ace56ac7b5fc7a08b87d5abd8b7e89027ab251069faebee516b0ded8961445d6d91ec1985dfe30f8153268843c89aa392733d1a3ec956c9978",
+  "maven_version": "3.9.11",
+  "maven_checksum_source": "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.11/apache-maven-3.9.11-bin.tar.gz.sha512",
+  "native_shell": "NO-GO; not executed",
+  "rss": "unmeasured"
+}

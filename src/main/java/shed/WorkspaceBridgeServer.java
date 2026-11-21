@@ -41,6 +41,7 @@ final class WorkspaceBridgeServer implements AutoCloseable {
     private final byte[] descriptorBytes;
     private final WorkspaceStatusAttachment statusAttachment;
     private final ApplicationStatus applicationStatus;
+    private final EditorMetadata metadata;
 
     WorkspaceBridgeServer(WorkspaceQueryService workspace, Path privateDirectory) throws IOException {
         this(workspace, privateDirectory, 3000);
@@ -55,7 +56,7 @@ final class WorkspaceBridgeServer implements AutoCloseable {
     }
 
     private WorkspaceBridgeServer(WorkspaceQueryService workspace, WorkspaceProposalService proposals, Path privateDirectory, int authenticationTimeoutMillis) throws IOException {
-        this(workspace, proposals, privateDirectory, authenticationTimeoutMillis, null, List.of(), WorkspaceStatusAttachment.LIFETIME, Clock.systemUTC());
+        this(workspace, proposals, privateDirectory, authenticationTimeoutMillis, null, List.of(), WorkspaceStatusAttachment.LIFETIME, Clock.systemUTC(), null);
     }
 
     static WorkspaceBridgeServer status(ApplicationStatus application, Path directory, List<Path> roots) throws IOException {
@@ -63,17 +64,27 @@ final class WorkspaceBridgeServer implements AutoCloseable {
     }
 
     static WorkspaceBridgeServer status(ApplicationStatus application, Path directory, List<Path> roots, Duration lifetime, Clock clock) throws IOException {
-        return new WorkspaceBridgeServer(null, null, directory, WorkspaceStatusProtocol.AUTH_MILLIS, application, roots, lifetime, clock);
+        return new WorkspaceBridgeServer(null, null, directory, WorkspaceStatusProtocol.AUTH_MILLIS, application, roots, lifetime, clock, null);
+    }
+
+    static WorkspaceBridgeServer metadata(ApplicationStatus application, EditorMetadata metadata, Path directory, List<Path> roots) throws IOException {
+        return metadata(application, metadata, directory, roots, WorkspaceStatusAttachment.LIFETIME, Clock.systemUTC());
+    }
+
+    static WorkspaceBridgeServer metadata(ApplicationStatus application, EditorMetadata metadata, Path directory, List<Path> roots, Duration lifetime, Clock clock) throws IOException {
+        return new WorkspaceBridgeServer(null, null, directory, WorkspaceStatusProtocol.AUTH_MILLIS, application, roots,
+            lifetime, clock, java.util.Objects.requireNonNull(metadata));
     }
 
     private WorkspaceBridgeServer(WorkspaceQueryService workspace, WorkspaceProposalService proposals, Path privateDirectory,
                                   int authenticationTimeoutMillis, ApplicationStatus application, List<Path> roots,
-                                  Duration lifetime, Clock clock) throws IOException {
+                                  Duration lifetime, Clock clock, EditorMetadata metadata) throws IOException {
         if (authenticationTimeoutMillis < 1 || authenticationTimeoutMillis > 3000) throw new IllegalArgumentException("Invalid authentication deadline");
         this.authenticationTimeoutMillis = authenticationTimeoutMillis;
         this.applicationStatus = application;
+        this.metadata = metadata;
         deadlines.setRemoveOnCancelPolicy(true);
-        this.rpc = application == null ? new WorkspaceRpc(workspace, proposals) : new WorkspaceRpc(application);
+        this.rpc = application == null ? new WorkspaceRpc(workspace, proposals) : new WorkspaceRpc(application, metadata);
         Path directory = application == null ? PrivateWorkspaceFiles.directory(privateDirectory) : WorkspaceStatusAttachment.privateDirectory(privateDirectory);
         this.listener = new ServerSocket(0, MAX_CLIENTS, loopback());
         WorkspaceStatusAttachment created = null;
@@ -86,7 +97,7 @@ final class WorkspaceBridgeServer implements AutoCloseable {
                 this.statusAttachment = null;
             } else {
                 this.endpoint = null; this.descriptorBytes = null;
-                created = new WorkspaceStatusAttachment(application, listener.getLocalPort(), directory, roots, lifetime, clock);
+                created = new WorkspaceStatusAttachment(application, listener.getLocalPort(), directory, roots, lifetime, clock, metadata);
                 this.statusAttachment = created; this.descriptor = created.discoveryFile();
                 deadlines.schedule(() -> {
                     try { close(); } catch (IOException cleanup) {
@@ -97,6 +108,7 @@ final class WorkspaceBridgeServer implements AutoCloseable {
             Thread.ofPlatform().daemon(true).name("shed-workspace-listener").start(this::accept);
         } catch (IOException | RuntimeException failure) {
             if (created != null) try { created.close(); } catch (IOException cleanup) { failure.addSuppressed(cleanup); }
+            if (metadata != null) metadata.close();
             listener.close(); clients.shutdownNow(); deadlines.shutdownNow(); throw failure;
         }
     }
@@ -104,7 +116,9 @@ final class WorkspaceBridgeServer implements AutoCloseable {
     Path descriptor() { return descriptor; }
     String workspaceId() { return endpoint == null ? null : endpoint.workspaceId; }
     Path credential() { return statusAttachment == null ? null : statusAttachment.credentialFile(); }
-    boolean statusOnly() { return statusAttachment != null; }
+    boolean statusOnly() { return statusAttachment != null && metadata == null; }
+    boolean metadataEnabled() { return metadata != null; }
+    void revokeObservation() { if (metadata != null) metadata.close(); }
     ApplicationStatus statusApplication() { return applicationStatus; }
     int connectionCount() { return connections.size(); }
     void onClosed(Runnable observer) {
@@ -207,7 +221,22 @@ final class WorkspaceBridgeServer implements AutoCloseable {
                             "Attachment has expired", Map.of("code", "SESSION_EXPIRED")), "response", sequence));
                         return;
                     }
-                    WorkspaceStatusProtocol.write(output, session.pack(rpc.handle(request), "response", sequence));
+                    String response = rpc.handle(request);
+                    if (statusAttachment.expired() || closed.get()) {
+                        response = WorkspaceRpc.error(statusRequestId(request), -32000, "Attachment is no longer valid", Map.of("code", "SESSION_EXPIRED"));
+                    } else if (metadata != null && requestMethodIsMetadata(request)) {
+                        try { metadata.validateAuthorization(); }
+                        catch (WorkspaceApiException revoked) {
+                            response = WorkspaceRpc.error(statusRequestId(request), -32000, "Observation authorization is unavailable", Map.of("code", revoked.code().name()));
+                        }
+                    }
+                    if (metadata != null) {
+                        try { WorkspaceStatusProtocol.size(response); }
+                        catch (WorkspaceApiException oversized) {
+                            response = WorkspaceRpc.error(statusRequestId(request), -32000, "Observation response exceeds its limit", Map.of("code", "LIMIT_EXCEEDED"));
+                        }
+                    }
+                    WorkspaceStatusProtocol.write(output, session.pack(response, "response", sequence));
                 } finally { frameDeadline.cancel(false); }
             }
         }
@@ -220,6 +249,13 @@ final class WorkspaceBridgeServer implements AutoCloseable {
         } catch (IllegalArgumentException invalid) { return null; }
     }
 
+    private static boolean requestMethodIsMetadata(String request) {
+        try {
+            var value = MiniJson.asObject(MiniJson.parseStrict(request));
+            return value != null && "editor/metadata".equals(value.get("method"));
+        } catch (IllegalArgumentException invalid) { return false; }
+    }
+
     private ScheduledFuture<?> deadline(Socket connection, int milliseconds) {
         return deadlines.schedule(() -> {
             try { connection.close(); } catch (IOException ignored) { }
@@ -228,6 +264,7 @@ final class WorkspaceBridgeServer implements AutoCloseable {
 
     @Override public void close() throws IOException {
         if (closed.getAndSet(true)) return;
+        if (metadata != null) metadata.close();
         IOException failure = null;
         try { listener.close(); } catch (IOException error) { failure = error; }
         for (Socket connection : connections) {

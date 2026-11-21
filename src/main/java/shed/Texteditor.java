@@ -279,6 +279,17 @@ public class Texteditor extends JFrame implements KeyListener {
 
     String handleAgentCommand(String argument) { return agentWorkspaceController.handle(argument); }
 
+    EditorMetadata.Context captureEditorMetadata() {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Editor observation belongs to the EDT");
+        if (closingDown || !isDisplayable()) throw EditorMetadata.failure(WorkspaceApiException.Code.APP_SHUTTING_DOWN);
+        if (editorPanes.size() > EditorMetadata.MAX_PANES || buffers.size() > EditorMetadata.MAX_OPEN_DOCUMENTS || workspaceRoots.size() > EditorMetadata.MAX_ROOTS)
+            throw EditorMetadata.failure(WorkspaceApiException.Code.LIMIT_EXCEEDED);
+        EditorPane pane = getActivePane();
+        if (pane != null && pane.getBuffer() != null && !buffers.contains(pane.getBuffer()))
+            throw EditorMetadata.failure(WorkspaceApiException.Code.CONTEXT_CHANGED);
+        return EditorMetadata.capture(pane, workspaceDocumentSource, workspaceRoots.active(), workspaceRoots.all(), workspaceRoots.generation());
+    }
+
     private void applyWorkspaceTextBatch(Runnable mutation) {
         Map<EditorPane, BufferViewState> views = new IdentityHashMap<>();
         Map<FileBuffer, VersionedTextSnapshot> before = new IdentityHashMap<>();

@@ -17,6 +17,11 @@ final class ApplicationStatus {
     void ready() { state.compareAndSet(State.STARTING, State.READY); }
     void stopping() { state.set(State.STOPPING); }
 
+    void requireObservationReady() {
+        if (state.get() == State.STOPPING) throw new WorkspaceApiException(WorkspaceApiException.Code.APP_SHUTTING_DOWN, "Application is shutting down");
+        if (state.get() != State.READY) throw new WorkspaceApiException(WorkspaceApiException.Code.APP_NOT_READY, "Application is not ready");
+    }
+
     Map<String, Object> snapshot() {
         return switch (state.get()) {
             case STARTING -> throw new WorkspaceApiException(WorkspaceApiException.Code.APP_NOT_READY, "Application is not ready");

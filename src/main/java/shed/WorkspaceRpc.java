@@ -11,6 +11,7 @@ public final class WorkspaceRpc {
     private final WorkspaceQueryService workspace;
     private final WorkspaceProposalRpc proposals;
     private final ApplicationStatus status;
+    private final EditorMetadata metadata;
 
     public WorkspaceRpc(WorkspaceQueryService workspace) { this(workspace, null); }
 
@@ -18,9 +19,13 @@ public final class WorkspaceRpc {
         this.workspace = Objects.requireNonNull(workspace);
         this.proposals = proposals == null ? null : new WorkspaceProposalRpc(workspace, proposals);
         this.status = null;
+        this.metadata = null;
     }
 
-    WorkspaceRpc(ApplicationStatus status) { this.status = Objects.requireNonNull(status); this.workspace = null; this.proposals = null; }
+    WorkspaceRpc(ApplicationStatus status) { this(status, null); }
+    WorkspaceRpc(ApplicationStatus status, EditorMetadata metadata) {
+        this.status = Objects.requireNonNull(status); this.metadata = metadata; this.workspace = null; this.proposals = null;
+    }
 
     /** Null is a valid notification's no-response result. */
     public String handle(String json) {
@@ -53,6 +58,16 @@ public final class WorkspaceRpc {
 
     private String status(Map<String, Object> request, Object id, boolean notification, String method) {
         if (notification || id == null) return error(null, -32600, "Status requires a request ID", Map.of("code", "INVALID_REQUEST"));
+        if (metadata == null && "editor/metadata".equals(method))
+            return error(id, -32000, "Metadata observation is not authorized", Map.of("code", "PERMISSION_DENIED"));
+        if (metadata != null && "editor/metadata".equals(method)) {
+            try {
+                var params = MiniJson.asObject(request.get("params"));
+                if (params == null) throw EditorMetadata.failure(WorkspaceApiException.Code.INVALID_REQUEST);
+                return MiniJson.stringify(response(id, "result", metadata.observe(params)));
+            } catch (WorkspaceApiException unavailable) { return error(id, -32000, unavailable.getMessage(), Map.of("code", unavailable.code().name())); }
+            catch (RuntimeException invalid) { return error(id, -32603, "Editor context is unavailable", Map.of("code", "INVALID_CONTEXT")); }
+        }
         if (!"editor/status".equals(method)) return error(id, -32601, "Status operation is not supported", Map.of("code", "UNSUPPORTED"));
         var params = MiniJson.asObject(request.get("params"));
         if (params == null || !params.keySet().equals(Set.of("schemaVersion")))

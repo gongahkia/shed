@@ -1,0 +1,8 @@
+{
+  "jar": "target/shed-2.0.0.jar",
+  "sha256": "a3ae5c61fc9fdc9f335f326c74832dd463445f35fddf116e751c6e4f27e0661f",
+  "bytes": 50440842,
+  "compiled_production_classes_checked": 1441,
+  "mismatches": [],
+  "test_classes_shipped": []
+}

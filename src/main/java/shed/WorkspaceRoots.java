@@ -10,6 +10,10 @@ import java.util.Set;
 final class WorkspaceRoots {
     private final List<Path> roots = new ArrayList<>();
     private Path active;
+    private long generation;
+
+    long generation() { return generation; }
+    int size() { return roots.size(); }
 
     List<Path> all() {
         return List.copyOf(roots);
@@ -23,6 +27,7 @@ final class WorkspaceRoots {
         Path normalized = normalize(path);
         if (roots.contains(normalized)) return false;
         roots.add(normalized);
+        generation++;
         if (active == null) active = normalized;
         return true;
     }
@@ -32,6 +37,7 @@ final class WorkspaceRoots {
         int index = roots.indexOf(normalized);
         if (index < 0) return false;
         roots.remove(index);
+        generation++;
         if (normalized.equals(active)) active = roots.isEmpty() ? null : roots.get(Math.min(index, roots.size() - 1));
         return true;
     }
@@ -40,10 +46,12 @@ final class WorkspaceRoots {
         Path normalized = normalize(path);
         if (!roots.contains(normalized) || normalized.equals(active)) return false;
         active = normalized;
+        generation++;
         return true;
     }
 
     void replace(List<Path> nextRoots, Path nextActive) {
+        generation++;
         roots.clear();
         Set<Path> unique = new LinkedHashSet<>();
         if (nextRoots != null) {

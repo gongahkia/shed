@@ -18,6 +18,14 @@ public class EditorPane {
     private Component alternateComponent;
     private boolean hiddenByFocusMode;
     private boolean disposed;
+    private String observationId;
+
+    String observationId() {
+        if (!javax.swing.SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Pane identity belongs to the EDT");
+        if (disposed) throw new WorkspaceApiException(WorkspaceApiException.Code.PANE_UNAVAILABLE, "Editor pane is unavailable");
+        if (observationId == null) observationId = "pane-" + java.util.UUID.randomUUID();
+        return observationId;
+    }
 
     public EditorPane(JTextArea textArea, LineNumberPanel lineNumberPanel, JScrollPane scrollPane, SearchManager searchManager) {
         this.textArea = textArea;

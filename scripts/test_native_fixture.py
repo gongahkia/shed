@@ -279,6 +279,10 @@ class BenchmarkAdmissionTest(unittest.TestCase):
             'WorkspaceCliTest',
             'WorkspaceBridgeTest',
             'WorkspaceStatusMeasurementTest',
+            'EditorMetadataTest',
+            'WorkspaceMetadataTransportTest',
+            'WorkspaceMetadataMeasurementTest',
+            'ArchitectureBoundaryTest',
         }
         self.assertEqual({line.split("=", 1)[0] for line in lines}, set(approved))
         for line in lines:

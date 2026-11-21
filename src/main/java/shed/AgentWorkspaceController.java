@@ -45,26 +45,39 @@ final class AgentWorkspaceController implements AutoCloseable {
             case "api start" -> start(false, false);
             case "api start propose" -> start(true, false);
             case "api start status" -> start(false, true);
+            case "api start metadata" -> start(false, false, true);
             case "api stop" -> stop();
-            default -> "Usage: :agent [edit|ask|run|complete|proposals] or :agent api start [propose|status]|status|stop";
+            default -> "Usage: :agent [edit|ask|run|complete|proposals] or :agent api start [propose|status|metadata]|status|stop";
         };
     }
 
     private String start(boolean allowProposals, boolean statusOnly) {
+        return start(allowProposals, statusOnly, false);
+    }
+
+    private String start(boolean allowProposals, boolean statusOnly, boolean metadataMode) {
         if (disposed.get()) return "Agent API is unavailable while the editor closes.";
-        if (active != null && active.running()) return active.statusOnly() == statusOnly && proposalMode == allowProposals ? status
+        if (active != null && active.running()) return active.statusOnly() == statusOnly && active.metadataEnabled() == metadataMode && proposalMode == allowProposals ? status
             : "Stop the current API before starting it with different permissions.";
         if (startingJob >= 0) return "Agent API startup is already running.";
         Path root = statusOnly ? null : editor.workspaceController.activeRoot();
         if (!statusOnly && root == null) return "Select a workspace folder before starting the agent API.";
         ApplicationStatus capturedStatus = applicationStatus;
         boolean capturedReady = applicationReady;
-        var excludedRoots = statusOnly ? java.util.List.copyOf(editor.workspaceController.roots()) : java.util.List.<Path>of();
+        if (metadataMode && editor.workspaceController.roots().size() > EditorMetadata.MAX_ROOTS) return "Too many workspace folders for bounded metadata observation.";
+        var excludedRoots = statusOnly || metadataMode ? java.util.List.copyOf(editor.workspaceController.roots()) : java.util.List.<Path>of();
+        var approval = metadataMode ? new EditorMetadata.Approval(root, editor.workspaceRoots.generation()) : null;
+        var editorOwner = new java.lang.ref.WeakReference<>(editor);
+        EditorMetadata.Host observationHost = () -> {
+            var live = editorOwner.get();
+            if (live == null) throw EditorMetadata.failure(WorkspaceApiException.Code.APP_SHUTTING_DOWN);
+            return live.captureEditorMetadata();
+        };
         long request = generation.incrementAndGet();
         stopping = false;
         Path directory = Path.of(editor.configManager.getSessionDirectory(), "agent-api");
         proposalMode = allowProposals;
-        String mode = statusOnly ? "Status-only" : allowProposals ? "Proposal-only" : "Read-only";
+        String mode = metadataMode ? "Editor metadata" : statusOnly ? "Status-only" : allowProposals ? "Proposal-only" : "Read-only";
         AgentPolicy policy = allowProposals ? new AgentPolicy(Set.of(AgentPolicy.Capability.READ, AgentPolicy.Capability.PROPOSE),
             java.util.List.of("**/README.md"), java.util.List.of(), true) : AgentPolicy.readOnly();
         Path sessions = Path.of(editor.configManager.getSessionDirectory());
@@ -72,6 +85,12 @@ final class AgentWorkspaceController implements AutoCloseable {
         startingJob = editor.asyncJobService.submit("Start local agent API", token -> {
             WorkspaceBridgeServer server;
             if (statusOnly) server = WorkspaceBridgeServer.status(capturedStatus == null ? new ApplicationStatus(capturedReady) : capturedStatus, directory, excludedRoots);
+            else if (metadataMode) {
+                var application = capturedStatus == null ? new ApplicationStatus(capturedReady) : capturedStatus;
+                var observation = new EditorMetadata(application, approval, observationHost);
+                try { server = WorkspaceBridgeServer.metadata(application, observation, directory, excludedRoots); }
+                catch (IOException | RuntimeException failed) { observation.close(); throw failed; }
+            }
             else {
                 var workspace = editor.workspaceQueries(root, policy);
                 var proposals = new WorkspaceProposalService(workspace, editor.workspaceDocuments(),
@@ -102,11 +121,11 @@ final class AgentWorkspaceController implements AutoCloseable {
                 status = "Agent API could not start. Check local diagnostics and owner-only session directory permissions.";
             } else {
                 active = server;
-                if (statusOnly) {
+                if (statusOnly || metadataMode) {
                     applicationStatus = server.statusApplication();
                     if (applicationReady) applicationStatus.ready();
                 }
-                status = statusOnly ? "Status-only attachment. Descriptor: " + server.descriptor() + ". Credential file: " + server.credential()
+                status = statusOnly || metadataMode ? mode + " attachment. Descriptor: " + server.descriptor() + ". Credential file: " + server.credential()
                     : mode + " agent API for " + root + ". Connection descriptor: " + server.descriptor();
             }
             editor.showMessage(status);
@@ -126,6 +145,7 @@ final class AgentWorkspaceController implements AutoCloseable {
     }
 
     private void release(WorkspaceBridgeServer server) {
+        server.revokeObservation();
         if (!releasing.add(server)) return;
         Thread.ofVirtual().name("shed-workspace-stop").start(() -> {
             try { server.close(); }

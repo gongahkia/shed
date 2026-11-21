@@ -57,6 +57,30 @@ final class WorkspaceStatusProtocol {
                 && target.instanceId().equals(value.get("instanceId")) && target.windowId().equals(value.get("windowId"))
                 && "ready".equals(value.get("readiness")) && Boolean.TRUE.equals(value.get("authenticated")) && List.of("status").equals(value.get("capabilities"));
         }
+        String scope() { return target.scope(); }
+        String projectId() { return target.projectId(); }
+        boolean acceptsMetadata(Map<String, Object> value) {
+            if (!"editor-metadata".equals(scope()) || value == null || !value.keySet().equals(Set.of("schemaVersion", "protocolVersion",
+                "instanceId", "windowId", "capabilities", "projectId", "paneId", "documentId", "documentLength", "documentRevision",
+                "dirty", "caretOffset", "selectionStart", "selectionEnd", "coordinateUnit", "available", "valid"))) return false;
+            if (!Long.valueOf(1).equals(value.get("schemaVersion")) || !Long.valueOf(2).equals(value.get("protocolVersion"))
+                || !target.instanceId().equals(value.get("instanceId")) || !target.windowId().equals(value.get("windowId"))
+                || !target.projectId().equals(value.get("projectId")) || !List.of("status", "editor-metadata").equals(value.get("capabilities"))
+                || !"utf-16".equals(value.get("coordinateUnit")) || !Boolean.TRUE.equals(value.get("available")) || !Boolean.TRUE.equals(value.get("valid"))
+                || !(value.get("dirty") instanceof Boolean) || !(value.get("paneId") instanceof String pane) || !pane.matches("pane-[a-f0-9-]{36}")
+                || !(value.get("documentId") instanceof String document) || !document.matches("buffer-[a-f0-9-]{36}")) return false;
+            try {
+                int length = integer(value.get("documentLength")), caret = integer(value.get("caretOffset")),
+                    start = integer(value.get("selectionStart")), end = integer(value.get("selectionEnd"));
+                if (!(value.get("documentRevision") instanceof Long revision)) return false;
+                EditorMetadata.validateCoordinates(length, revision, caret, start, end);
+                return true;
+            } catch (RuntimeException invalid) { return false; }
+        }
+        private static int integer(Object value) {
+            if (!(value instanceof Long number) || number < 0 || number > Integer.MAX_VALUE) throw denied();
+            return number.intValue();
+        }
     }
 
     static Session accept(WorkspaceStatusAttachment attachment, InputStream input, OutputStream output) throws IOException {
@@ -111,9 +135,13 @@ final class WorkspaceStatusProtocol {
             try (DataOutputStream transcript = new DataOutputStream(bytes)) {
                 // each field is a big-endian byte length and UTF-8 bytes, in this fixed order
                 for (String field : new String[]{"shed-status-v2", role, "2", d.instanceId(), d.windowId(), d.attachmentId(),
-                    Integer.toString(d.port()), Long.toString(d.expiresAt()), "status", clientNonce, serverNonce, sessionId,
+                    Integer.toString(d.port()), Long.toString(d.expiresAt()), d.scope(), clientNonce, serverNonce, sessionId,
                     Long.toString(sequence), payload}) {
                     byte[] utf8 = field.getBytes(StandardCharsets.UTF_8); transcript.writeInt(utf8.length); transcript.write(utf8);
+                }
+                // status transcripts remain byte-for-byte v2; metadata additionally binds its opaque project grant
+                if (d.projectId() != null) {
+                    byte[] utf8 = d.projectId().getBytes(StandardCharsets.UTF_8); transcript.writeInt(utf8.length); transcript.write(utf8);
                 }
             }
             Mac mac = Mac.getInstance("HmacSHA256"); mac.init(new SecretKeySpec(key, "HmacSHA256"));

@@ -1,0 +1,295 @@
+{
+  "release-tooling.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "total": 86,
+    "passed": 86,
+    "failed": 0,
+    "errors": 0,
+    "excluded": [
+      "test_native_fixture.NativeFixtureTest.test_profile_no_fork_network_or_user_home_access"
+    ]
+  },
+  "release-media.json": {
+    "exit": 0,
+    "fixture_removed": true
+  },
+  "release-media-detail.json": {
+    "exit": 0
+  },
+  "release-package.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "package",
+    "elapsed_s": 23.9751121219997,
+    "admitted_classes": 0
+  },
+  "frozen-safe-tests.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 38.78756776500086,
+    "total": 305,
+    "passed": 299,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 6,
+    "admitted_classes": 59
+  },
+  "final-navigation-applied.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 37.85645694399864,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "release-safe-tests.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 36.46298571399893,
+    "total": 305,
+    "passed": 299,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 6,
+    "admitted_classes": 59
+  },
+  "final-navigation.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 13.488338367002143,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "final-metadata-recheck.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 8.886795652997534,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "final-metadata.json": {
+    "exit": 1,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 7.7884083979988645,
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "final-status.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 43.735613161999936,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "entry-metadata.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 13.592887263999728,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "entry-status.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 12.67830597700231,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "final-media.json": {
+    "exit": 0,
+    "fixture_removed": true
+  },
+  "final-media-detail.json": {
+    "exit": 0
+  },
+  "final-package.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "package",
+    "elapsed_s": 27.623589155002264,
+    "admitted_classes": 0
+  },
+  "bounded-final-safe.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 62.635184103997744,
+    "total": 304,
+    "passed": 298,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 6,
+    "admitted_classes": 59
+  },
+  "final-safe-corrected.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 57.2975104449979,
+    "total": 304,
+    "passed": 298,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 6,
+    "admitted_classes": 59
+  },
+  "manifest-tooling.json": {
+    "exit": 0,
+    "fixture_removed": true
+  },
+  "final-safe-regression.json": {
+    "exit": 1,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 50.98523940299856,
+    "total": 304,
+    "passed": 297,
+    "failed": 0,
+    "errors": 1,
+    "skipped": 6,
+    "admitted_classes": 59
+  },
+  "final-tooling.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "total": 86,
+    "passed": 86,
+    "failed": 0,
+    "errors": 0,
+    "excluded": [
+      "test_native_fixture.NativeFixtureTest.test_profile_no_fork_network_or_user_home_access"
+    ]
+  },
+  "safe-regression.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 60.722241362000204,
+    "total": 302,
+    "passed": 296,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 6,
+    "admitted_classes": 59
+  },
+  "tooling.json": {
+    "exit": 1,
+    "fixture_removed": true,
+    "total": 87,
+    "passed": 86,
+    "failed": 0,
+    "errors": 1
+  },
+  "stages-a-d.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 47.313820543000475,
+    "total": 70,
+    "passed": 70,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 5
+  },
+  "stage-b-corrected.json": {
+    "exit": 1,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 38.803763685999,
+    "total": 56,
+    "passed": 55,
+    "failed": 0,
+    "errors": 1,
+    "skipped": 0,
+    "admitted_classes": 4
+  },
+  "stage-b.json": {
+    "exit": 1,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 32.06042023500049,
+    "admitted_classes": 4
+  },
+  "stage-a-corrected.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 42.05786882499888,
+    "total": 11,
+    "passed": 11,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "stage-a.json": {
+    "exit": 1,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 54.253037980000954,
+    "total": 11,
+    "passed": 8,
+    "failed": 0,
+    "errors": 3,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "compile.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test-compile",
+    "elapsed_s": 29.420152976999816,
+    "admitted_classes": 56
+  },
+  "baseline-metadata.json": {
+    "exit": 0,
+    "fixture_removed": true,
+    "phase": "test",
+    "elapsed_s": 37.24042446800013,
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "admitted_classes": 1
+  },
+  "baseline.json": {}
+}

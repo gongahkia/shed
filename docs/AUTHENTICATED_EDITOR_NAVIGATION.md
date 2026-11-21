@@ -101,7 +101,7 @@ Limits remain **2,048 UTF-8 payload bytes**, **4,096 frame bytes**, **128 exchan
 | Already-running operation without a definitive acknowledgment | `OUTCOME_UNKNOWN`, `outcome: "unknown"` |
 | Application not ready / shutting down | `APP_NOT_READY` / `APP_SHUTTING_DOWN`; transport can instead close |
 
-RPC navigation errors carry JSON-RPC code `-32000` and data `{code,outcome}`; ordinary pre-envelope/unknown-method errors retain the earlier protocol's standard codes. Definitively rejected navigation has `outcome: "rejected"`. The CLI normalizes failures without server paths; exit 79 denotes unknown outcome, 75 a context/coordinate/workload refusal, 77 authorization, 78 session/shutdown, 76 version, 70 timeout, 69 unavailable instance, 64 malformed input, 74 transport/unsupported/IO. Broken output also exits 74. Request IDs are client-supplied; no private server filenames/source are added to errors or ordinary logs.
+Checked navigation-dispatch failures carry JSON-RPC code `-32000` and data `{code,outcome}`; unexpected context errors use `-32603`. Transport/auth/session gates and ordinary pre-envelope/unknown-method errors retain the earlier protocol's code-only/standard shapes. Definitively rejected navigation has `outcome: "rejected"`. The CLI normalizes failures without server paths; exit 79 denotes unknown outcome, 75 a context/coordinate/workload refusal, 77 authorization, 78 session/shutdown, 76 version, 70 timeout, 69 unavailable instance, 64 malformed input, 74 transport/unsupported/IO. Broken output also exits 74. Request IDs are client-supplied; no private server filenames/source are added to errors or ordinary logs.
 
 ## Context and human coordination
 

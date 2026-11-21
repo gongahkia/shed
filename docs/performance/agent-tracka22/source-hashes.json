@@ -1,0 +1,112 @@
+{
+  "scripts/test_native_fixture.py": {
+    "sha256": "f3bd9b30272c188bd550fb03a9051959e217253238a9762b808c5bbf659bb7d2",
+    "entry_sha256": "42ec3f989d986f601beccd4c60a32abcb836068b448037d061739125e0a4708a",
+    "version": "source-versions/scripts/test_native_fixture.py.gz"
+  },
+  "src/main/java/shed/AgentWorkspaceController.java": {
+    "sha256": "ddb8f2b4af214643012519745287e388cf2a05b835599f64fcd87bf7aea9de03",
+    "entry_sha256": "c59351a3fbbe6d253287f2ef7743f4d499928d25dbd0dc8c3a99666c615755c3",
+    "version": "source-versions/src/main/java/shed/AgentWorkspaceController.java.gz"
+  },
+  "src/main/java/shed/EditorMetadata.java": {
+    "sha256": "264ae24be70c4c45eeb53277ac1faa80f2c5898f9a8385b7ad4ab40092bb91f5",
+    "entry_sha256": "f9b08e7de6f9798afe149d4102bf921d1c52a522bb2ec593cbd4955cc544603a",
+    "version": "source-versions/src/main/java/shed/EditorMetadata.java.gz"
+  },
+  "src/main/java/shed/EditorUiController.java": {
+    "sha256": "b9c7a404623daec0229c9d855e8745ac987747a8d286c57feb35cab48d55a0f2",
+    "entry_sha256": "b2ae0cc27bddade855ce55ea7367dea5379d597abf0b8f2e93b5e4c5117b3860",
+    "version": "source-versions/src/main/java/shed/EditorUiController.java.gz"
+  },
+  "src/main/java/shed/HelpService.java": {
+    "sha256": "dabfa61cf06e987539bed4ced9c6a620167b5c6a0b1f37bdfcd10a2e7dd93c25",
+    "entry_sha256": "5bcff89b783c0ea3145a1c2885b695e32401f1ea20c59331c4c6ab941780d618",
+    "version": "source-versions/src/main/java/shed/HelpService.java.gz"
+  },
+  "src/main/java/shed/InputController.java": {
+    "sha256": "9faf17ae8d745c6e9f78c42a8d01bb0a859ac60b17aad3713e29dbf29cd63098",
+    "entry_sha256": "d9d8f03269237343135dcbde62ad906c2bba197708781e6b2c926990f1689522",
+    "version": "source-versions/src/main/java/shed/InputController.java.gz"
+  },
+  "src/main/java/shed/Texteditor.java": {
+    "sha256": "a55d570470f57d12bcc2280a7ed241a2a630889b1f12d10d72dd8b6f4e2dc2c8",
+    "entry_sha256": "1aa26db403367d319ca7e299f7c1ecd731968cf335c27941f0fb95ba38b88cd9",
+    "version": "source-versions/src/main/java/shed/Texteditor.java.gz"
+  },
+  "src/main/java/shed/WorkspaceApiException.java": {
+    "sha256": "4d00a0d95c79bfe34ade22c8d6888d616d78d658d510a2db75b8f1f22ca07e3d",
+    "entry_sha256": "d4b32b52259b978bbd45816a1e90c0c95eaac6550e354720708ed6699d2dec15",
+    "version": "source-versions/src/main/java/shed/WorkspaceApiException.java.gz"
+  },
+  "src/main/java/shed/WorkspaceBridgeClient.java": {
+    "sha256": "52531381b6f4cb63ad2ac92c447d3ab3852f62bc70f01fbfa732908f5e09ee20",
+    "entry_sha256": "af112044ac738cf8be3c89d0798331bbfbe8df4cc1314afb4fd39ccbe00684b9",
+    "version": "source-versions/src/main/java/shed/WorkspaceBridgeClient.java.gz"
+  },
+  "src/main/java/shed/WorkspaceBridgeServer.java": {
+    "sha256": "4fac7b748590202100bdf6c36ff24b2623888c2991fb6a3903ccc88d68f7a5dd",
+    "entry_sha256": "3774b8877dfba16aa2027bcd2fab9b678635e24f94b86a08b7a9d1ce16e1ab75",
+    "version": "source-versions/src/main/java/shed/WorkspaceBridgeServer.java.gz"
+  },
+  "src/main/java/shed/WorkspaceCli.java": {
+    "sha256": "0680886133b4ee381f3e0790f47ae7553489ee37acd10523a5a89e571ad97e9a",
+    "entry_sha256": "88729c84f5bcdd49103273ff88c225c98b0757b011b10df35a49167464cb2e43",
+    "version": "source-versions/src/main/java/shed/WorkspaceCli.java.gz"
+  },
+  "src/main/java/shed/WorkspaceRpc.java": {
+    "sha256": "d9499338f793239bbe718370328e8d82f1eeb31cef044f7be021830394a12d1b",
+    "entry_sha256": "06e5ee7010ac9dd2ea9746fb68283302f6de2634efb171ab85d45a966079fec0",
+    "version": "source-versions/src/main/java/shed/WorkspaceRpc.java.gz"
+  },
+  "src/main/java/shed/WorkspaceStatusAttachment.java": {
+    "sha256": "a3edec12830110440dfce3f292442b6168b42cc796219e606bcefa75f9e9d6b5",
+    "entry_sha256": "283d708199a63d91200c94d45d8ace681b30196e109e637cc4ad55ecfd600d1f",
+    "version": "source-versions/src/main/java/shed/WorkspaceStatusAttachment.java.gz"
+  },
+  "src/main/java/shed/WorkspaceStatusProtocol.java": {
+    "sha256": "a464b4da9f16c8296052252a88df622e82667cde6a38dd1548c2fc3ae8cbae8c",
+    "entry_sha256": "79cd021b6ba2f10503e734d201f6f5a21e2e3b0b97c546f042d1cf16c735ef9f",
+    "version": "source-versions/src/main/java/shed/WorkspaceStatusProtocol.java.gz"
+  },
+  "src/test/java/shed/WorkspaceCliTestProcess.java": {
+    "sha256": "2055bffcd96350b602a44eaddc85b70382529476f9d0bedc12f77a76937312e9",
+    "entry_sha256": "1ad6fb06b2cfdbad6ecd69601bcc9b65cfa7a0873c318fa37f434fe5e16a08f0",
+    "version": "source-versions/src/test/java/shed/WorkspaceCliTestProcess.java.gz"
+  },
+  "src/test/resources/shed/portable-fixture-helpers.properties": {
+    "sha256": "e27c5e19bd107cef3a113c70e144c854b10c92590b411f8963c9589a9c0baaff",
+    "entry_sha256": "f5bdaab8e6d898a7d7e25142f2fb6e2beb6bd8e1ffd083624cd89b0e46ba39a6",
+    "version": "source-versions/src/test/resources/shed/portable-fixture-helpers.properties.gz"
+  },
+  "src/test/resources/shed/portable-fixture-tests.properties": {
+    "sha256": "9cc52066419f469df5bf84ae87c9d82cfca15eaf946ad6cb0d44aeb6246699fb",
+    "entry_sha256": "ca3cfbb4a9f793c6bc397ed29360974cfb4fa6c8303926ca1b505244233c4eae",
+    "version": "source-versions/src/test/resources/shed/portable-fixture-tests.properties.gz"
+  },
+  "src/main/java/shed/EditorInteraction.java": {
+    "sha256": "3af838a626707d41da3916c788896c97601e90a53aa4b3992c6b7d545c6e2f52",
+    "entry_sha256": null,
+    "version": "source-versions/src/main/java/shed/EditorInteraction.java.gz"
+  },
+  "src/main/java/shed/EditorNavigation.java": {
+    "sha256": "2ebc378f01fabd60fa902b68ace2c6a6a3bf275d5a190d74cfc4d1303a75de6a",
+    "entry_sha256": null,
+    "version": "source-versions/src/main/java/shed/EditorNavigation.java.gz"
+  },
+  "src/test/java/shed/EditorNavigationTest.java": {
+    "sha256": "e5d6a201e6168fd6e123307cdfccb699efe023a9438f13b1910c732c7be30b56",
+    "entry_sha256": null,
+    "version": "source-versions/src/test/java/shed/EditorNavigationTest.java.gz"
+  },
+  "src/test/java/shed/WorkspaceNavigationTransportTest.java": {
+    "sha256": "d63485c2acda261cc8815f709bafd3969e38c2ae11f7f06073519f446af0b388",
+    "entry_sha256": null,
+    "version": "source-versions/src/test/java/shed/WorkspaceNavigationTransportTest.java.gz"
+  },
+  "src/test/java/shed/WorkspaceNavigationMeasurementTest.java": {
+    "sha256": "a93a38109dc8f4d7efa8e118f3d4c0be08228f76705e792c7695ef3d5d9a07ae",
+    "entry_sha256": null,
+    "version": "source-versions/src/test/java/shed/WorkspaceNavigationMeasurementTest.java.gz"
+  }
+}

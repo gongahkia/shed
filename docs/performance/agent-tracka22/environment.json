@@ -1,0 +1,22 @@
+{
+  "host": {
+    "system": "Linux",
+    "machine": "x86_64",
+    "release": "7.2.15-1-omarchy"
+  },
+  "python": "3.14.8",
+  "toolchain": {
+    "jdk": "/tmp/shed-tracka21-fkbr53a8/jdk-21.0.13.1+2",
+    "maven": "/tmp/shed-tracka21-fkbr53a8/apache-maven-3.9.11",
+    "repository": "/tmp/shed-tracka21-fkbr53a8/dependencies"
+  },
+  "jdk_bin_java_sha256": "75fc4bd3b528a2058a94fa2249a620c73c0717d652e9a072be1e13ba2fcc10dc",
+  "jdk_release": "IMPLEMENTOR=\"Eclipse Adoptium\"\nIMPLEMENTOR_VERSION=\"Temurin-21.0.13.1+2\"\nJAVA_RUNTIME_VERSION=\"21.0.13.1+2-LTS\"\nJAVA_VERSION=\"21.0.13.1\"\nJAVA_VERSION_DATE=\"2026-11-17\"\nLIBC=\"gnu\"\nMODULES=\"java.base java.compiler java.datatransfer java.xml java.prefs java.desktop java.instrument java.logging java.management java.security.sasl java.naming java.rmi java.management.rmi java.net.http java.scripting java.security.jgss java.transaction.xa java.sql java.sql.rowset java.xml.crypto java.se java.smartcardio jdk.accessibility jdk.internal.jvmstat jdk.attach jdk.charsets jdk.internal.opt jdk.zipfs jdk.compiler jdk.crypto.ec jdk.crypto.cryptoki jdk.dynalink jdk.internal.ed jdk.editpad jdk.hotspot.agent jdk.httpserver jdk.incubator.vector jdk.internal.le jdk.internal.vm.ci jdk.internal.vm.compiler jdk.internal.vm.compiler.management jdk.jartool jdk.javadoc jdk.jcmd jdk.management jdk.management.agent jdk.jconsole jdk.jdeps jdk.jdwp.agent jdk.jdi jdk.jfr jdk.jlink jdk.jpackage jdk.jshell jdk.jsobject jdk.jstatd jdk.localedata jdk.management.jfr jdk.naming.dns jdk.naming.rmi jdk.net jdk.nio.mapmode jdk.random jdk.sctp jdk.security.auth jdk.security.jgss jdk.unsupported jdk.unsupported.desktop jdk.xml.dom\"\nOS_ARCH=\"x86_64\"\nOS_NAME=\"Linux\"\nSOURCE=\".:git:8799347eca78\"\nBUILD_SOURCE=\"git:8d9fd6fa96e5066571a13823b07c2934e5958d8b\"\nBUILD_SOURCE_REPO=\"https://github.com/adoptium/temurin-build.git\"\nSOURCE_REPO=\"https://github.com/adoptium/jdk21u.git\"\nFULL_VERSION=\"21.0.13.1+2-LTS\"\nSEMANTIC_VERSION=\"21.0.13.1+2\"\nBUILD_INFO=\"OS: Linux Version: 6.8.0-1070-azure\"\nJVM_VARIANT=\"Hotspot\"\nJVM_VERSION=\"21.0.13.1+2-LTS\"\nIMAGE_TYPE=\"JDK\"\n",
+  "maven": "3.9.11",
+  "provenance": "reused task-owned A2.1 Java 21/Maven/cache; unchanged dependencies; prior verified archive checksums in A2.1 evidence",
+  "native_shell": "NO-GO; not executed",
+  "desktop": "OPEN",
+  "windows_macos": "No access",
+  "rss": "unmeasured",
+  "whole_jvm_idle_cpu": "not qualified: compiler activity contaminates sample"
+}

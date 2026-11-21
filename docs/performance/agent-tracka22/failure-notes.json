@@ -1,0 +1,20 @@
+{
+  "stage-a.json": "11 cases: eight passed and three BUSY errors. Fixed FutureTask publication/admission-count ordering; stage-a-corrected passes 11; frozen suite covers sequential requests.",
+  "stage-b.json": "Compilation failed: new transport fixture omitted java.util.ArrayList import; no tests executed.",
+  "stage-b-corrected.json": "56 cases: 55 passed, one error. An insufficient escaped-ID fixture expected a bound failure from a valid small acknowledgment. Increased to 250 escaped NUL units within request bound; final assertions pass.",
+  "final-safe-regression.json": "304 cases: 297 passed, six skips, one error. Notification test incorrectly expected a server reply where the client rejects a missing ID locally. Corrected test asserts both client and RPC rejection; no production guard weakened.",
+  "final-metadata.json": "One failure: unchanged A2.1 component EDT capture maximum exceeded its existing 4 ms gate. No full metrics were emitted before assertion; exact failed maximum and cause cannot be verified. Unchanged repeat passes. Cold-tail consistency remains open; no production or assertion change for a passing repeat.",
+  "tooling.json": "87 attempted, 86 passed, one macOS-only Seatbelt profile error on Linux. Final applicable 86 pass; excluded case/backend guard not modified.",
+  "earlier_measurements": "baseline-metadata and final-navigation are retained early probes, not pooled into final percentiles. The first navigation probe predates the added applied-command/input series. Final source versions below describe final implementation/probes, not every intermediate input.",
+  "file_opening": "Deferred; no endpoint/path loader exposed. Unsupported-path tests do not qualify authorized file opening.",
+  "unavailable": [
+    "real Texteditor/window integration",
+    "native desktop focus/paint",
+    "native shell/PTY",
+    "full unreviewed Maven suite",
+    "macOS/Windows execution",
+    "whole-process RSS",
+    "reliable whole-process idle CPU",
+    "A3 editing"
+  ]
+}

@@ -126,10 +126,11 @@ final class AgentWorkspaceController implements AutoCloseable {
             if (disposed.get() || generation.get() != request || token.isCancelled()) { release(server); return null; }
             return server;
         }, (snapshot, server, error) -> {
-            if (disposed.get() || generation.get() != request) { if (server != null) release(server); return; }
+            if (disposed.get() || generation.get() != request) { if (server != null) release(server); if (interaction != null) interaction.close(); return; }
             startingJob = -1;
             if (error != null || snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED || server == null || !server.running()) {
                 if (server != null) release(server);
+                if (interaction != null) interaction.close();
                 status = "Agent API could not start. Check local diagnostics and owner-only session directory permissions.";
             } else {
                 active = server;
@@ -164,6 +165,7 @@ final class AgentWorkspaceController implements AutoCloseable {
         generation.incrementAndGet();
         if (startingJob >= 0) editor.asyncJobService.cancel(startingJob);
         startingJob = -1; active = null;
+        if (editor.agentNavigationInteraction != null) { editor.agentNavigationInteraction.close(); editor.agentNavigationInteraction = null; }
         for (WorkspaceBridgeServer server : owned) release(server);
         status = owned.isEmpty() ? "Agent API is stopped; no listener is running."
             : "Agent API stopping; existing connections are being revoked.";

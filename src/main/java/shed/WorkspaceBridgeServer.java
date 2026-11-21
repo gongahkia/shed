@@ -222,7 +222,12 @@ final class WorkspaceBridgeServer implements AutoCloseable {
                             "Attachment has expired", Map.of("code", "SESSION_EXPIRED")), "response", sequence));
                         return;
                     }
-                    String response = rpc.handle(request, () -> !closed.get() && !connection.isClosed() && !statusAttachment.expired());
+                    String response;
+                    if (navigationEnabled()) {
+                        var requestActive = new AtomicBoolean(true);
+                        try { response = rpc.handle(request, () -> requestActive.get() && !closed.get() && !statusAttachment.expired()); }
+                        finally { requestActive.set(false); }
+                    } else response = rpc.handle(request);
                     boolean uncertain = navigationEnabled() && navigationMutation(request) && navigationMayHaveApplied(response);
                     if (statusAttachment.expired() || closed.get()) {
                         response = WorkspaceRpc.error(statusRequestId(request), -32000, "Attachment is no longer valid",

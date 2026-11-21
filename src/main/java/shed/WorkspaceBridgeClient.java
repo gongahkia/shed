@@ -149,9 +149,15 @@ final class WorkspaceBridgeClient implements AutoCloseable {
         if (EditorNavigation.CONTEXT.equals(method)) return statusSession.acceptsNavigation(result, false);
         if (!EditorNavigation.MUTATIONS.contains(method) || !statusSession.acceptsNavigation(result, true) || !method.equals(result.get("operation"))) return false;
         var params = MiniJson.asObject(request.get("params"));
-        return params != null && result.get("projectId").equals(params.get("projectId")) && result.get("paneId").equals(params.get("paneId"))
+        boolean identity = params != null && result.get("projectId").equals(params.get("projectId")) && result.get("paneId").equals(params.get("paneId"))
             && result.get("documentId").equals(params.get("documentId")) && result.get("documentRevision").equals(params.get("documentRevision"))
             && params.get("contextRevision") instanceof Long expected && (long) result.get("contextRevision") > expected;
+        if (!identity) return false;
+        Object start = params.get("editor/caret/set".equals(method) ? "offset" : "start");
+        Object end = "editor/caret/set".equals(method) ? start : params.get("end");
+        if ("editor/reveal".equals(method)) return result.get("caretOffset").equals(params.get("caretOffset"))
+            && result.get("selectionStart").equals(params.get("selectionStart")) && result.get("selectionEnd").equals(params.get("selectionEnd"));
+        return result.get("caretOffset").equals(end) && result.get("selectionStart").equals(start) && result.get("selectionEnd").equals(end);
     }
 
     private ScheduledFuture<?> deadline() {

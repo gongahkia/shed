@@ -135,6 +135,7 @@ final class EditorNavigation implements AutoCloseable {
     @Override public void close() { host.set(null); interaction.close(); }
 
     static Prepared prepare(EditorPane pane, State state, Command command, boolean eligible) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Navigation preparation belongs to the EDT");
         verify(command, state);
         if (!eligible) throw fail(WorkspaceApiException.Code.UNSUPPORTED_MODE);
         var area = pane.getTextArea(); int length = state.metadata().length();
@@ -144,13 +145,13 @@ final class EditorNavigation implements AutoCloseable {
             throw fail(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
         var samples = new ArrayList<Boundary>();
         for (int position : new int[]{command.start(), command.end()}) {
-            if (position == 0 || position == length) { samples.add(new Boundary("", 0)); continue; }
             try {
-                String pair = area.getDocument().getText(position - 1, 2);
-                if (pair.charAt(0) < 128 && pair.charAt(1) < 128) { samples.add(new Boundary(pair, 1)); continue; }
                 var lines = area.getDocument().getDefaultRootElement(); var line = lines.getElement(lines.getElementIndex(position));
                 int start = line.getStartOffset(), end = Math.min(length, line.getEndOffset());
                 if (end - start > MAX_BOUNDARY_UNITS) throw fail(WorkspaceApiException.Code.BOUNDARY_UNAVAILABLE);
+                if (position == 0 || position == length) { samples.add(new Boundary("", 0)); continue; }
+                String pair = area.getDocument().getText(position - 1, 2);
+                if (pair.charAt(0) < 128 && pair.charAt(1) < 128) { samples.add(new Boundary(pair, 1)); continue; }
                 samples.add(new Boundary(area.getDocument().getText(start, end - start), position - start));
             } catch (javax.swing.text.BadLocationException invalid) { throw fail(WorkspaceApiException.Code.INVALID_OFFSET); }
         }
@@ -159,6 +160,7 @@ final class EditorNavigation implements AutoCloseable {
 
     static Applied apply(EditorPane pane, Prepared prepared, State current, boolean eligible, EditorInteraction interaction, BooleanSupplier authorized,
                          java.util.function.Supplier<State> after) {
+        if (!SwingUtilities.isEventDispatchThread()) throw new IllegalStateException("Navigation application belongs to the EDT");
         if (!current.equals(prepared.before())) throw fail(WorkspaceApiException.Code.CONTEXT_CHANGED);
         verify(prepared.command(), current);
         if (!eligible || pane.isDisposed() || pane.isHiddenByFocusMode()) throw fail(WorkspaceApiException.Code.UNSUPPORTED_MODE);

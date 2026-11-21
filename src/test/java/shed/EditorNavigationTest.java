@@ -97,6 +97,9 @@ class EditorNavigationTest {
             fails("INVALID_OFFSET",()->f.run("editor/selection/set",params(context,"editor/selection/set",3,1)));
             EditorMetadataTest.edt(()->{f.editor.active.getBuffer().setContent("é".repeat(10000));return null;});
             fails("BOUNDARY_UNAVAILABLE",()->f.run("editor/caret/set",params(wire(f.context()),"editor/caret/set",2,2)));
+            Path ascii=Files.writeString(f.editor.root.resolve("long-line.java"),"a".repeat(20000));
+            EditorMetadataTest.edt(()->{f.editor.add(ascii);f.activate(f.editor.active);return null;});
+            for(int offset:List.of(0,1,20000))fails("BOUNDARY_UNAVAILABLE",()->f.run("editor/caret/set",params(wire(f.context()),"editor/caret/set",offset,offset)));
         }
     }
 
@@ -180,10 +183,10 @@ class EditorNavigationTest {
     @Test void unsupportedModesRejectWithoutChangingTheirSourceHistoryOrSelection() throws Exception {
         try(var f=new Fixture(temporary)) {
             var before=source(f);
-            for(KeymapProfile profile:KeymapProfile.values()) {
+            for(int attempt=0;attempt<3;attempt++) {
                 f.eligible=false;var c=wire(f.context());
                 fails("UNSUPPORTED_MODE",()->f.run("editor/selection/set",params(c,"editor/selection/set",0,1)));
-                assertEquals(before,source(f));assertEquals(0,EditorMetadataTest.edt(()->f.editor.active.getTextArea().getCaretPosition()),profile.name());
+                assertEquals(before,source(f));assertEquals(0,EditorMetadataTest.edt(()->f.editor.active.getTextArea().getCaretPosition()));
                 f.eligible=true;f.run("editor/caret/set",params(wire(f.context()),"editor/caret/set",1,1));
                 f.run("editor/caret/set",params(wire(f.context()),"editor/caret/set",0,0));
             }
@@ -199,4 +202,46 @@ class EditorNavigationTest {
             assertTrue(EditorMetadataTest.edt(()->f.editor.active.getScrollPane().getViewport().getViewPosition().y)>0);
         }
     }
+    @Test void runningCommandWithLostDeadlineReportsUnknownAndConsumesItsContext() throws Exception {
+        try(var f=new Fixture(temporary);var worker=java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var command=params(wire(f.context()),"editor/caret/set",1,1);
+            CountDownLatch applied=new CountDownLatch(1),release=new CountDownLatch(1);var reads=new AtomicInteger();
+            f.duringApply=()->{if(reads.incrementAndGet()==2){applied.countDown();try{assertTrue(release.await(4,TimeUnit.SECONDS));}catch(InterruptedException e){throw new AssertionError(e);}}};
+            var result=worker.submit(()->assertThrows(WorkspaceApiException.class,()->f.run("editor/caret/set",command)).code());
+            try {
+                assertTrue(applied.await(1,TimeUnit.SECONDS));
+                assertEquals(WorkspaceApiException.Code.OUTCOME_UNKNOWN,result.get(2,TimeUnit.SECONDS));
+                fails("BUSY",()->f.run("editor/caret/set",command));
+            }finally{release.countDown();}
+            EditorMetadataTest.edt(()->null);
+            var current=wire(f.context());assertEquals(1L,current.get("caretOffset"));
+            fails("CONTEXT_CHANGED",()->f.run("editor/caret/set",command));
+        }
+    }
+
+    @Test void sharedSplitNavigationChangesOnlyTheApprovedActiveView() throws Exception {
+        try(var f=new Fixture(temporary)) {
+            var first=f.editor.active;var buffer=first.getBuffer();
+            var second=EditorMetadataTest.edt(()->{var split=f.editor.split(buffer);f.activate(split);return split;});
+            var before=source(f);var focus=java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+            f.run("editor/selection/set",params(wire(f.context()),"editor/selection/set",1,3));
+            assertEquals(0,EditorMetadataTest.edt(()->first.getTextArea().getCaretPosition()));
+            assertEquals(new EditorSurface.Selection(3,1),EditorMetadataTest.edt(()->second.surface().selection()));
+            assertSame(focus,java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner());assertEquals(before,source(f));
+            EditorMetadataTest.edt(()->{first.disposeSourceView();f.editor.panes.remove(first);return null;});
+            f.run("editor/caret/set",params(wire(f.context()),"editor/caret/set",1,1));assertEquals(before,source(f));
+        }
+    }
+
+    @Test void closeDocumentPaneOrApplicationDuringPreparationRejectsBeforeApplication() throws Exception {
+        for(String action:List.of("document","pane","shutdown")) {
+            try(var f=new Fixture(Files.createDirectory(temporary.resolve(action)))) {
+                var command=params(wire(f.context()),"editor/caret/set",1,1);
+                f.beforeApply=()->{switch(action){case "document"->f.editor.buffers.clear();case "pane"->f.editor.active.disposeSourceView();default->f.editor.closing=true;}};
+                fails(switch(action){case "document"->"CONTEXT_CHANGED";case "pane"->"PANE_UNAVAILABLE";default->"APP_SHUTTING_DOWN";},()->f.run("editor/caret/set",command));
+                assertEquals(0,EditorMetadataTest.edt(()->f.editor.active.getTextArea().getCaretPosition()));
+            }
+        }
+    }
+
 }

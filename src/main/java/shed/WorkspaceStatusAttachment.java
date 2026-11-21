@@ -52,7 +52,7 @@ final class WorkspaceStatusAttachment implements AutoCloseable {
     private final Path credentialFile;
     private final byte[] discoveryBytes;
     private final byte[] credentialBytes;
-    private boolean closed;
+    private volatile boolean closed;
 
     WorkspaceStatusAttachment(ApplicationStatus application, int port, Path directory, List<Path> roots,
                               Duration lifetime, Clock clock) throws IOException {
@@ -86,7 +86,8 @@ final class WorkspaceStatusAttachment implements AutoCloseable {
 
     Path discoveryFile() { return discoveryFile; }
     Path credentialFile() { return credentialFile; }
-    synchronized boolean expired() { return closed || clock.millis() >= descriptor.expiresAt() || System.nanoTime() - deadlineNanos >= 0; }
+    // the navigation commit must not wait on the credential cleanup monitor
+    boolean expired() { return closed || clock.millis() >= descriptor.expiresAt() || System.nanoTime() - deadlineNanos >= 0; }
     synchronized byte[] key() {
         if (expired()) throw failure(WorkspaceApiException.Code.SESSION_EXPIRED);
         return key.clone();
